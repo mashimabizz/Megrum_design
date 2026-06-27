@@ -156,8 +156,8 @@ public enum AccountSetupDraftValidator {
     public static let futureBirthDateMessage = "生年月日は今日以前の日付を選択してください"
     public static let missingGenderMessage = "性別を選択してください"
     public static let missingOshiMessage = "推しを1つ以上選択してください"
-    public static let missingL1OshiMessage = "推しマスタを1つ以上選択してください"
-    public static let missingOshiMemberMessage = "選んだ推しマスタごとにメンバーまたはグループ全体を選択してください"
+    public static let missingOshiGroupMessage = "グループ・作品を1つ以上選択してください"
+    public static let missingOshiMemberMessage = "選んだグループ・作品ごとに、メンバー・キャラクターまたは全体を選択してください"
 
     public static func validationMessage(
         displayName: String,

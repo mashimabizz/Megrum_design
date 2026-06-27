@@ -671,6 +671,28 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertFalse(state.isSavingAccountSetup)
     }
 
+    func testAppStateFallsBackWhenAccountSetupInputOmitsNameAndHandle() async {
+        let state = MegrumAppState(repository: PlaceholderAccountSetupRepository())
+        await state.loadInitialData()
+        let groupID = UUID(uuidString: "00000000-0000-0000-0000-000000000021")!
+
+        let completed = await state.completeAccountSetup(
+            handle: "",
+            displayName: "",
+            prefecture: "東京都",
+            birthDate: ProfileBirthDateCodec.date(from: "2001-05-06"),
+            gender: .female,
+            oshiSelections: [
+                AccountSetupOshiInput(groupID: groupID, characterID: nil, kind: .box)
+            ]
+        )
+
+        XCTAssertTrue(completed)
+        XCTAssertEqual(state.viewer?.handle, "megrum_700000000000")
+        XCTAssertEqual(state.viewer?.displayName, "Megrumユーザー")
+        XCTAssertEqual(state.viewer?.accountStatus, .active)
+    }
+
     func testPreviewRepositorySavesOshiSelectionsWithDisplayOrderPriority() async throws {
         let repository = PreviewMegrumRepository()
         let firstGroupID = UUID(uuidString: "00000000-0000-0000-0000-000000000111")!
@@ -1849,6 +1871,39 @@ private struct SingleSnapshotRepository: MegrumRepository {
             proposals: [],
             grooms: [],
             threads: []
+        )
+    }
+}
+
+private struct PlaceholderAccountSetupRepository: MegrumRepository {
+    private let viewerID = UUID(uuidString: "70000000-0000-0000-0000-000000000001")!
+
+    func loadInitialSnapshot() async throws -> MegrumAppSnapshot {
+        MegrumAppSnapshot(
+            viewer: UserProfile(
+                id: viewerID,
+                handle: "megrum",
+                displayName: "Megrum",
+                accountStatus: .onboarding
+            ),
+            inventory: [],
+            wishes: [],
+            proposals: [],
+            grooms: [],
+            threads: []
+        )
+    }
+
+    func completeAccountSetup(_ input: AccountSetupInput) async throws -> UserProfile {
+        UserProfile(
+            id: viewerID,
+            handle: input.handle,
+            displayName: input.displayName,
+            gender: input.gender,
+            prefecture: input.prefecture,
+            birthDate: input.birthDate,
+            age: ProfileBirthDateCodec.age(from: input.birthDate),
+            accountStatus: .active
         )
     }
 }

@@ -67,6 +67,44 @@ enum MegrumAppStateInputNormalizer {
         handle.range(of: #"^[a-z0-9_]{3,20}$"#, options: .regularExpression) != nil
     }
 
+    static func accountSetupHandle(_ handle: String, userID: UUID?) -> String? {
+        if let normalized = profileHandle(handle),
+           isValidProfileHandle(normalized),
+           !isGeneratedPlaceholderHandle(normalized) {
+            return normalized
+        }
+        guard let userID else {
+            return nil
+        }
+        return generatedProfileHandle(userID: userID)
+    }
+
+    static func accountSetupDisplayName(_ displayName: String, fallbackHandle: String) -> String {
+        let normalized = trimmedText(displayName)
+        if !normalized.isEmpty, !isGeneratedPlaceholderDisplayName(normalized) {
+            return String(normalized.prefix(50))
+        }
+        if !isGeneratedPlaceholderHandle(fallbackHandle) {
+            return String(fallbackHandle.prefix(50))
+        }
+        return "Megrumユーザー"
+    }
+
+    static func generatedProfileHandle(userID: UUID) -> String {
+        let stableID = userID.uuidString
+            .replacingOccurrences(of: "-", with: "")
+            .lowercased()
+        return "megrum_\(stableID.prefix(12))"
+    }
+
+    private static func isGeneratedPlaceholderHandle(_ handle: String) -> Bool {
+        handle == "megrum" || handle == "unknown" || handle.hasPrefix("megrum_")
+    }
+
+    private static func isGeneratedPlaceholderDisplayName(_ displayName: String) -> Bool {
+        displayName == "Megrum" || displayName == "unknown"
+    }
+
     static func postalCode(_ value: String) -> String {
         PostalCodeAddressClient.normalizedPostalCode(value)
     }

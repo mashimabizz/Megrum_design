@@ -101,7 +101,7 @@ struct OshiSettingsGroupCard: View {
                 if isExpanded {
                     VStack(alignment: .leading, spacing: 10) {
                         if availableCharacters.isEmpty {
-                            Text(group.pending ? "仮登録中の推しです。承認前でもメンバー追加リクエストを送れます。" : "追加できるメンバーがマスタにありません。")
+                            Text(group.pending ? "仮登録中の推しです。承認前でもメンバー追加リクエストを送れます。" : "追加できるメンバー・キャラクターが登録されていません。")
                                 .font(.system(size: 12, weight: .bold, design: .rounded))
                                 .foregroundStyle(MegrumTheme.muted)
                         } else {

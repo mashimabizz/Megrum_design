@@ -4,6 +4,83 @@
 
 ---
 
+## イテレーション1226.16：初回設定の保存と推し申請修正
+
+### 背景・問題意識
+
+新規オンボーディングで生年月日のカレンダーがタップしづらく、登録できない状態があった。名前・ユーザーIDの入力欄は必要だが、Google登録後の既定プロフィール値（例: 既存の表示名や仮ID）を初期入力として埋めないようにする必要がある。さらに、グループや作品の追加リクエスト後に専用のメンバー画面へ飛ぶのではなく、いったんグループ・作品選択に残し、次へ進んだ時に他の選択済み項目と並べてメンバー・キャラクターを追加リクエストできる必要がある。Google登録経由では `public.users` 行が未作成のまま保存へ進む可能性があり、最後に「プロフィールを保存できませんでした」と出る余地があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/AccountSetupModels.swift` / `AccountSetupScreen.swift` / `AccountSetupStepViews.swift`
+- 初回オンボーディングは Welcome / 推し設定 / 活動エリア / 名前 / ユーザーID / 生年月日 / 性別 / 完了の8ステップを維持した。
+- オンボーディング開始時だけ、viewerに既存の表示名・handleがあっても名前・ユーザーID入力欄を空で始めるようにした。
+- 生年月日の `DatePicker` は既存のgraphical styleを維持し、外側 `ScrollView` と下部アクションバー背景がカレンダーのタップを邪魔しないようにした。
+
+#### `ios-native/Sources/MegrumApp/AccountSetupOshiSection.swift` / `OnboardingOshiSelection.swift` / `OshiSettingsModels.swift`
+- グループ・作品の追加リクエスト後も同じ選択画面に残し、申請中チップとして選択中一覧へ並べるようにした。
+- 次へ進んだメンバー・キャラクター選択では、既存のグループ・作品と申請中のグループ・作品を同じカード列で扱うようにした。
+- 申請中カード内に「メンバーを追加リクエスト」ボタンを表示し、既存グループ・作品のメンバー・キャラクター一覧末尾にも「追加リクエスト」導線を追加した。
+- 専用の申請中メンバー画面Viewを削除し、画面上の `L1` / `L2` / `マスタ` 表示をグループ・作品、メンバー・キャラクター表記へ寄せた。
+
+#### `ios-native/Sources/MegrumApp/MegrumAppStateInputNormalizer.swift` / `MegrumAppStateProfileSettingsActions.swift` / `SupabaseAccountProfilePersistence.swift` / `SupabaseUserProfilePersistenceModels.swift`
+- Repository境界では、万一初期設定入力が空で渡ってもviewer IDから安定した仮ユーザーIDを生成し、表示名は `Megrumユーザー` へフォールバックできるようにした。
+- Google登録経由などで `users` 行が未作成でも、先に `users` をupsertしてから `user_oshi` を差し替え、最後に `account_status='active'` へupsertする順序へ変更した。
+
+#### `ios-native/Sources/MegrumApp/SearchSuggestionBuilder.swift` / `SearchSuggestionViews.swift` / `HomeMatchLogicHelpContent.swift` / `OshiSettingsGroupCardViews.swift`
+- ユーザー表示に残っていた `L1` / `L2` / `マスタ` 系の文言を、グループ・作品、メンバー・キャラクター表記へ変更した。
+
+#### `ios-native/Tests/MegrumAppTests/*.swift`
+- 初回設定で名前・ユーザーIDステップを維持するテスト、申請中グループ・作品からのメンバー・キャラクター申請テスト、Google経由相当の `users` upsert payload テストを追加・更新した。
+
+### 影響範囲
+
+- Swift Native iOSの認証後オンボーディング。
+- 推し設定のグループ・作品追加リクエスト、メンバー・キャラクター追加リクエスト。
+- 初回設定保存時の `users` / `user_oshi` 保存順序。
+- 検索サジェストとヘルプ内の推し階層ラベル。
+- DB schema、取引状態、通知、課金、住所、通報、既存プロフィール編集画面の保存仕様は変更していない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-onboarding-fixes-build`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-onboarding-fixes-tests --enable-xctest --disable-swift-testing -j 1 --filter 'AccountSetupScreenTests|OnboardingOshiSelectionTests|MegrumAppStateTests/testAppStateCompletesAccountSetup|MegrumAppStateTests/testAppStateFallsBackWhenAccountSetupInputOmitsNameAndHandle|MegrumAppStateTests/testAppStateRequiresOshiSelectionForAccountSetup|SupabaseAccountProfilePersistenceTests/testAccountSetup'`
+  - passed（26 tests, 0 failures）
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild-onboarding-fixes CODE_SIGNING_ALLOWED=NO build`
+  - passed
+- `git diff --check`
+  - passed
+
+### セルフレビュー結果
+
+- ✅ 初回設定では名前・ユーザーID入力欄を空で開始し、既存の仮値を初期入力しない
+- ✅ 生年月日は既存のカレンダー表示を維持し、カレンダーのタップ操作を阻害しない
+- ✅ グループ・作品の追加リクエスト後に専用画面へ飛ばず、次のメンバー・キャラクター選択で他の項目と並ぶ
+- ✅ 既存グループ・作品のメンバー・キャラクター一覧末尾にも追加リクエスト導線を出す
+- ✅ Google登録経由で `users` 行が無い場合も、先にupsertしてから推し保存へ進める
+- ✅ 状態IDや新規用語は追加していない。`notes/09` / `notes/22` は初期値と追加リクエスト説明だけ更新した
+- ⚠️ Google OAuth本番経由の実機E2E保存確認はこの作業内では未実施
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/AccountSetupModels.swift`
+- `ios-native/Sources/MegrumApp/AccountSetupScreen.swift`
+- `ios-native/Sources/MegrumApp/AccountSetupOshiSection.swift`
+- `ios-native/Sources/MegrumApp/AccountSetupStepViews.swift`
+- `ios-native/Sources/MegrumApp/OnboardingOshiSelection.swift`
+- `ios-native/Sources/MegrumApp/MegrumAppStateInputNormalizer.swift`
+- `ios-native/Sources/MegrumApp/MegrumAppStateProfileSettingsActions.swift`
+- `ios-native/Sources/MegrumApp/SupabaseAccountProfilePersistence.swift`
+- `ios-native/Sources/MegrumApp/SupabaseUserProfilePersistenceModels.swift`
+- `ios-native/Tests/MegrumAppTests/AccountSetupScreenTests.swift`
+- `ios-native/Tests/MegrumAppTests/OnboardingOshiSelectionTests.swift`
+- `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- `ios-native/Tests/MegrumAppTests/SupabaseAccountProfilePersistenceTests.swift`
+- `notes/09_state_machines.md`
+- `notes/22_swift_native_migration.md`
+
+---
 ## イテレーション1224：交換条件の既定場所を募集へ反映
 
 ### 背景・問題意識

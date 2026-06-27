@@ -8,13 +8,19 @@ struct AccountSetupOshiMasterStep: View {
     @Binding var selectedGenreID: UUID?
     @Binding var searchText: String
     @Binding var selectedGroups: [OshiGroup]
+    var requestedDrafts: [OnboardingOshiDraft]
     var isLoading: Bool
     var errorMessage: String?
     @FocusState.Binding var focusedField: AccountSetupFocusedField?
     var onClearError: () -> Void
+    var onRequestOshi: (String) -> Void
 
     private var selectedGroupIDs: Set<UUID> {
         Set(selectedGroups.map(\.id))
+    }
+
+    private var requestCandidateName: String {
+        searchText.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     var body: some View {
@@ -34,7 +40,7 @@ struct AccountSetupOshiMasterStep: View {
                     ProgressView()
                         .controlSize(.small)
                         .tint(MegrumTheme.lavender)
-                    Text("推しマスタを読み込み中…")
+                    Text("グループ・作品を読み込み中…")
                         .font(.system(size: 13, weight: .black, design: .rounded))
                         .foregroundStyle(MegrumTheme.muted)
                 }
@@ -42,12 +48,12 @@ struct AccountSetupOshiMasterStep: View {
                 .padding(14)
                 .background(.white.opacity(0.78), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
             } else if groups.isEmpty {
-                Text("該当する推しマスタが見つかりません")
-                    .font(.system(size: 13, weight: .black, design: .rounded))
-                    .foregroundStyle(MegrumTheme.muted)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(14)
-                    .background(.white.opacity(0.78), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                AccountSetupOshiNoResultsCard(
+                    query: requestCandidateName,
+                    onRequest: {
+                        onRequestOshi(requestCandidateName)
+                    }
+                )
             } else {
                 OshiMasterCandidateGrid(
                     groups: groups,
@@ -58,7 +64,10 @@ struct AccountSetupOshiMasterStep: View {
                 .padding(.horizontal, -18)
             }
 
-            AccountSetupSelectedL1Summary(selectedGroups: selectedGroups)
+            AccountSetupSelectedGroupSummary(
+                selectedGroups: selectedGroups,
+                requestedDrafts: requestedDrafts
+            )
             AccountSetupErrorText(message: errorMessage)
         }
         .padding(.top, 10)
@@ -74,8 +83,54 @@ struct AccountSetupOshiMasterStep: View {
     }
 }
 
-private struct AccountSetupSelectedL1Summary: View {
+private struct AccountSetupOshiNoResultsCard: View {
+    var query: String
+    var onRequest: () -> Void
+
+    private var canRequest: Bool {
+        !query.isEmpty
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("該当するグループ・作品が見つかりません")
+                .font(.system(size: 13, weight: .black, design: .rounded))
+                .foregroundStyle(MegrumTheme.muted)
+
+            if canRequest {
+                Button(action: onRequest) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.system(size: 16, weight: .black, design: .rounded))
+                        Text("「\(query)」を追加リクエスト")
+                            .font(.system(size: 14, weight: .black, design: .rounded))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.78)
+                        Spacer(minLength: 0)
+                        Image(systemName: "chevron.up.forward")
+                            .font(.system(size: 12, weight: .black, design: .rounded))
+                    }
+                    .foregroundStyle(MegrumTheme.lavender)
+                    .padding(.horizontal, 14)
+                    .frame(height: 46)
+                    .background(MegrumTheme.lavender.opacity(0.12), in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(14)
+        .background(.white.opacity(0.78), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+}
+
+private struct AccountSetupSelectedGroupSummary: View {
     var selectedGroups: [OshiGroup]
+    var requestedDrafts: [OnboardingOshiDraft]
+
+    private var hasSelection: Bool {
+        !selectedGroups.isEmpty || !requestedDrafts.isEmpty
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -83,7 +138,7 @@ private struct AccountSetupSelectedL1Summary: View {
                 .font(.system(size: 14, weight: .black, design: .rounded))
                 .foregroundStyle(MegrumTheme.ink)
 
-            if selectedGroups.isEmpty {
+            if !hasSelection {
                 Text("まだ選択されていません")
                     .font(.system(size: 13, weight: .bold, design: .rounded))
                     .foregroundStyle(MegrumTheme.muted)
@@ -94,13 +149,19 @@ private struct AccountSetupSelectedL1Summary: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
                         ForEach(selectedGroups) { group in
-                            Text(group.name)
-                                .font(.system(size: 13, weight: .black, design: .rounded))
-                                .lineLimit(1)
-                                .padding(.horizontal, 12)
-                                .frame(height: 34)
-                                .background(MegrumTheme.lavender.opacity(0.14), in: Capsule())
-                                .foregroundStyle(MegrumTheme.lavender)
+                            AccountSetupSelectedGroupChip(
+                                title: group.name,
+                                foregroundColor: MegrumTheme.lavender,
+                                backgroundColor: MegrumTheme.lavender.opacity(0.14)
+                            )
+                        }
+
+                        ForEach(requestedDrafts) { draft in
+                            AccountSetupSelectedGroupChip(
+                                title: draft.displayName,
+                                foregroundColor: MegrumTheme.pink,
+                                backgroundColor: MegrumTheme.pink.opacity(0.18)
+                            )
                         }
                     }
                     .padding(.vertical, 2)
@@ -110,13 +171,30 @@ private struct AccountSetupSelectedL1Summary: View {
     }
 }
 
+private struct AccountSetupSelectedGroupChip: View {
+    var title: String
+    var foregroundColor: Color
+    var backgroundColor: Color
+
+    var body: some View {
+        Text(title)
+            .font(.system(size: 13, weight: .black, design: .rounded))
+            .lineLimit(1)
+            .padding(.horizontal, 12)
+            .frame(height: 34)
+            .background(backgroundColor, in: Capsule())
+            .foregroundStyle(foregroundColor)
+    }
+}
+
 struct AccountSetupOshiMemberStep: View {
-    var selectedGroups: [OshiGroup]
+    var targets: [OnboardingOshiMemberTarget]
     @Binding var selectedOshiDrafts: [OnboardingOshiDraft]
     var charactersByGroupID: [UUID: [OshiCharacter]]
     var isLoading: Bool
     var errorMessage: String?
     var onClearError: () -> Void
+    var onRequestMember: (OshiMemberRequestContext) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -125,7 +203,7 @@ struct AccountSetupOshiMemberStep: View {
                     ProgressView()
                         .controlSize(.small)
                         .tint(MegrumTheme.lavender)
-                    Text("メンバー候補を読み込み中…")
+                    Text("メンバー・キャラクター候補を読み込み中…")
                         .font(.system(size: 13, weight: .black, design: .rounded))
                         .foregroundStyle(MegrumTheme.muted)
                 }
@@ -134,12 +212,13 @@ struct AccountSetupOshiMemberStep: View {
                 .background(.white.opacity(0.78), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
             }
 
-            ForEach(selectedGroups) { group in
+            ForEach(targets) { target in
                 AccountSetupOshiMemberGroupCard(
-                    group: group,
-                    characters: charactersByGroupID[group.id] ?? [],
+                    target: target,
+                    characters: target.groupID.flatMap { charactersByGroupID[$0] } ?? [],
                     selectedOshiDrafts: $selectedOshiDrafts,
-                    onClearError: onClearError
+                    onClearError: onClearError,
+                    onRequestMember: onRequestMember
                 )
             }
 
@@ -155,19 +234,24 @@ struct AccountSetupOshiMemberStep: View {
 }
 
 private struct AccountSetupOshiMemberGroupCard: View {
-    var group: OshiGroup
+    var target: OnboardingOshiMemberTarget
     var characters: [OshiCharacter]
     @Binding var selectedOshiDrafts: [OnboardingOshiDraft]
     var onClearError: () -> Void
+    var onRequestMember: (OshiMemberRequestContext) -> Void
+
+    private var activeGroup: OshiGroup? {
+        target.groupID.map { OshiGroup(id: $0, name: target.name) }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
-                Text(group.name)
+                Text(target.name)
                     .font(.system(size: 16, weight: .black, design: .rounded))
                     .foregroundStyle(MegrumTheme.ink)
                 Spacer(minLength: 0)
-                Text(characters.isEmpty ? "箱推しOK" : "複数選択OK")
+                Text(target.pending ? "承認待ち" : (characters.isEmpty ? "全体で登録OK" : "複数選択OK"))
                     .font(.system(size: 11, weight: .black, design: .rounded))
                     .foregroundStyle(MegrumTheme.lavender)
                     .padding(.horizontal, 9)
@@ -175,23 +259,32 @@ private struct AccountSetupOshiMemberGroupCard: View {
                     .background(MegrumTheme.lavender.opacity(0.12), in: Capsule())
             }
 
-            AccountSetupWholeGroupButton(
-                activeGroup: group,
-                isSelected: OnboardingOshiSelectionLogic.isWholeGroupSelected(group, in: selectedOshiDrafts),
-                onToggle: toggleWholeGroup
-            )
+            if let activeGroup {
+                AccountSetupWholeGroupButton(
+                    activeGroup: activeGroup,
+                    isSelected: OnboardingOshiSelectionLogic.isWholeGroupSelected(activeGroup, in: selectedOshiDrafts),
+                    onToggle: toggleWholeGroup
+                )
+            }
 
-            if characters.isEmpty {
-                Text("この推しマスタはメンバー候補がありません。グループ全体で登録できます。")
+            if target.pending {
+                AccountSetupPendingOshiRequestCard(
+                    memberDrafts: OnboardingOshiSelectionLogic.memberRequestDrafts(for: target, in: selectedOshiDrafts),
+                    onRequestMember: { onRequestMember(target.requestContext) }
+                )
+            } else if characters.isEmpty {
+                Text("このグループ・作品にはメンバー・キャラクター候補がありません。全体で登録できます。")
                     .font(.system(size: 12.5, weight: .semibold, design: .rounded))
                     .foregroundStyle(MegrumTheme.muted)
                     .lineSpacing(3)
-            } else {
+                OshiMemberRequestTag(action: { onRequestMember(target.requestContext) })
+            } else if let activeGroup {
                 AccountSetupOshiCharacterScroller(
-                    activeGroup: group,
+                    activeGroup: activeGroup,
                     oshiCharacters: characters,
                     selectedOshiDrafts: selectedOshiDrafts,
-                    onToggleCharacter: toggleCharacter
+                    onToggleCharacter: toggleCharacter,
+                    onRequestMember: { onRequestMember(target.requestContext) }
                 )
             }
         }
@@ -204,9 +297,12 @@ private struct AccountSetupOshiMemberGroupCard: View {
     }
 
     private func toggleWholeGroup() {
+        guard let activeGroup else {
+            return
+        }
         onClearError()
         selectedOshiDrafts = OnboardingOshiSelectionLogic.toggleWholeGroup(
-            group,
+            activeGroup,
             in: selectedOshiDrafts
         )
     }
@@ -218,6 +314,42 @@ private struct AccountSetupOshiMemberGroupCard: View {
             group: group,
             in: selectedOshiDrafts
         )
+    }
+}
+
+private struct AccountSetupPendingOshiRequestCard: View {
+    var memberDrafts: [OnboardingOshiDraft]
+    var onRequestMember: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("グループ・作品全体で仮登録されています。必要な場合だけ、メンバー・キャラクターを追加リクエストしてください。")
+                .font(.system(size: 12.5, weight: .semibold, design: .rounded))
+                .foregroundStyle(MegrumTheme.muted)
+                .lineSpacing(3)
+
+            if !memberDrafts.isEmpty {
+                WrappingTagFlow(spacing: 8, rowSpacing: 8) {
+                    ForEach(memberDrafts) { draft in
+                        AccountSetupSelectedGroupChip(
+                            title: draft.characterName ?? draft.displayName,
+                            foregroundColor: MegrumTheme.pink,
+                            backgroundColor: MegrumTheme.pink.opacity(0.18)
+                        )
+                    }
+                }
+            }
+
+            Button(action: onRequestMember) {
+                Label("メンバーを追加リクエスト", systemImage: "plus.circle.fill")
+                    .font(.system(size: 14, weight: .black, design: .rounded))
+                    .foregroundStyle(MegrumTheme.lavender)
+                    .padding(.horizontal, 13)
+                    .frame(height: 40)
+                    .background(MegrumTheme.lavender.opacity(0.12), in: Capsule())
+            }
+            .buttonStyle(.plain)
+        }
     }
 }
 
@@ -403,6 +535,7 @@ private struct AccountSetupOshiCharacterScroller: View {
     var oshiCharacters: [OshiCharacter]
     var selectedOshiDrafts: [OnboardingOshiDraft]
     var onToggleCharacter: (OshiCharacter, OshiGroup) -> Void
+    var onRequestMember: (() -> Void)? = nil
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
@@ -417,6 +550,10 @@ private struct AccountSetupOshiCharacterScroller: View {
                     ) {
                         onToggleCharacter(character, activeGroup)
                     }
+                }
+
+                if let onRequestMember {
+                    OshiMemberRequestTag(action: onRequestMember)
                 }
             }
             .padding(.vertical, 2)

@@ -63,18 +63,33 @@ struct SupabaseAccountProfilePersistence: Sendable {
     }
 
     func completeAccountSetup(_ input: AccountSetupInput) async throws -> UserProfile {
+        _ = try await upsertAccountSetupProfile(input, accountStatus: .onboarding)
+
         let selections = Self.accountSetupSelections(from: input, userID: userID)
         if !selections.isEmpty {
             _ = try await oshiClient.replaceUserSelections(userID: userID, selections: selections)
         }
 
-        let rows: [UserRow] = try await client.updateRows(
-            in: "users",
-            values: Self.accountSetupUpdatePayload(from: input),
-            select: UserRow.select,
-            queryItems: Self.viewerQueryItems(userID: userID)
-        )
+        let rows = try await upsertAccountSetupProfile(input, accountStatus: .active)
         return rows.first?.profile ?? Self.fallbackAccountSetupProfile(input: input, userID: userID)
+    }
+
+    private func upsertAccountSetupProfile(
+        _ input: AccountSetupInput,
+        accountStatus: AccountStatus
+    ) async throws -> [UserRow] {
+        try await client.upsertRows(
+            into: "users",
+            values: [
+                Self.accountSetupUpsertPayload(
+                    from: input,
+                    userID: userID,
+                    accountStatus: accountStatus
+                )
+            ],
+            select: UserRow.select,
+            onConflict: "id"
+        )
     }
 
     func requestAccountDeletion(_ input: AccountDeletionRequestInput) async throws -> AccountDeletionRequestResult {
@@ -225,6 +240,23 @@ struct SupabaseAccountProfilePersistence: Sendable {
             birthDate: ProfileBirthDateCodec.string(from: input.birthDate),
             age: ProfileBirthDateCodec.age(from: input.birthDate),
             accountStatus: AccountStatus.active.rawValue
+        )
+    }
+
+    static func accountSetupUpsertPayload(
+        from input: AccountSetupInput,
+        userID: UUID,
+        accountStatus: AccountStatus = .active
+    ) -> UserProfileAccountSetupUpsertPayload {
+        UserProfileAccountSetupUpsertPayload(
+            id: userID,
+            handle: input.handle,
+            displayName: input.displayName,
+            gender: input.gender,
+            primaryArea: input.prefecture,
+            birthDate: ProfileBirthDateCodec.string(from: input.birthDate),
+            age: ProfileBirthDateCodec.age(from: input.birthDate),
+            accountStatus: accountStatus.rawValue
         )
     }
 

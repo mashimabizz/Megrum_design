@@ -462,7 +462,7 @@ stateDiagram-v2
 |---|---|---|
 | `registered` | 仮登録 | メール認証前 |
 | `verified` | 認証済 | メール認証完了 |
-| `onboarding` | オンボ中 | Welcome→推しL1→推しL2（必要時）→活動エリア→名前→ユーザーID→生年月日→性別→完了 |
+| `onboarding` | オンボ中 | Welcome→推し設定（グループ・作品→メンバー・キャラクター必要時）→活動エリア→名前→ユーザーID→生年月日→性別→完了 |
 | `active` | アクティブ | 通常アカウント |
 | `suspended` | 停止中 | BAN 状態 |
 | `deletion_requested` | 削除申請中 | 30日猶予期間 |
@@ -473,7 +473,7 @@ stateDiagram-v2
 - **OAuth経路（Apple/Google等）**: メール認証 skip → `verified` に直行（iter20, iter343）
 - **削除30日猶予**: その間にログインで `active` に復帰可能
 - **退会申請の制約（iter1221）**: `sent` / `negotiating` / `agreement_one_side` / `agreed` の進行中取引が1件でもある場合、`active -> deletion_requested` へ遷移できない。退会理由は `account_deletion_requests.reasons`、任意メモは `account_deletion_requests.note` に保存する。
-- **オンボーディング段階**: iter1220以降、認証後は Welcome → 推しL1マスタ選択 → 推しL2メンバー選択（L1がソロのみならskip） → 活動エリア → 名前 → ユーザーID → 生年月日 → 性別 → 完了の8ステップで登録する。状態IDは既存の `onboarding` / `active` を維持する。
+- **オンボーディング段階**: iter1226.16以降、認証後は Welcome → 推し設定（グループ・作品選択 → メンバー・キャラクター選択が必要な場合のみ） → 活動エリア → 名前 → ユーザーID → 生年月日 → 性別 → 完了の8ステップで登録する。名前とユーザーIDの入力欄は初期値を空にし、既存の仮プロフィール値を事前入力しない。状態IDは既存の `onboarding` / `active` を維持する。
 
 ### 関連画面
 
@@ -484,6 +484,7 @@ stateDiagram-v2
 - `ios-native/Sources/MegrumApp/AccountSetupScreen.swift`
 - `ios-native/Sources/MegrumApp/AccountSetupFormViews.swift`
 - `ios-native/Sources/MegrumApp/AccountSetupOshiSection.swift`
+- `ios-native/Sources/MegrumApp/AccountSetupStepViews.swift`
 
 ---
 

@@ -62,8 +62,8 @@ struct HomeMatchLogicHelpContent: View {
             systemImage: "shippingbox.fill",
             title: "グッズ条件の見方",
             rows: [
-                HomeMatchLogicHelpRow(mark: "L1", title: "グループや作品が合う", body: "BTS、TWICE、作品名など、まず大きな推しの分類が合うかを見ます。"),
-                HomeMatchLogicHelpRow(mark: "L2", title: "メンバー指定があればそこまで見る", body: "サナ、モモなどのメンバー指定がある場合は、同じメンバーのグッズだけを候補にします。"),
+                HomeMatchLogicHelpRow(mark: "大", title: "グループや作品が合う", body: "BTS、TWICE、作品名など、まず大きな推しの分類が合うかを見ます。"),
+                HomeMatchLogicHelpRow(mark: "人", title: "メンバー指定があればそこまで見る", body: "サナ、モモなどのメンバー指定がある場合は、同じメンバーのグッズだけを候補にします。"),
                 HomeMatchLogicHelpRow(mark: "種", title: "グッズ種別も合わせる", body: "トレカ、缶バッジ、アクスタなど、指定された種別がある場合はそこも一致させます。"),
                 HomeMatchLogicHelpRow(mark: "タグ", title: "タグは落とさず注意表示にします", body: "タグが合わない場合も候補には残し、カードに「タグ不一致？」と表示します。")
             ],

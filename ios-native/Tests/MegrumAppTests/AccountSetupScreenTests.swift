@@ -6,6 +6,10 @@ final class AccountSetupScreenTests: XCTestCase {
     func testAccountSetupDraftValidatorRequiresDisplayName() {
         let message = AccountSetupDraftValidator.validationMessage(
             displayName: " ",
+            handle: "michirion",
+            prefecture: "東京都",
+            birthDate: Date(timeIntervalSince1970: 0),
+            gender: .female,
             oshiSelections: [makeOshiInput()]
         )
 
@@ -63,6 +67,12 @@ final class AccountSetupScreenTests: XCTestCase {
         XCTAssertEqual(message, AccountSetupDraftValidator.missingGenderMessage)
     }
 
+    func testAccountSetupDraftValidatorAcceptsAllGenderOptions() {
+        for gender in UserGender.allCases {
+            XCTAssertNil(validationMessage(gender: gender), "\(gender) should be accepted")
+        }
+    }
+
     func testAccountSetupDraftValidatorAcceptsReadyDraft() {
         let message = AccountSetupDraftValidator.validationMessage(
             displayName: " みち ",
@@ -74,6 +84,14 @@ final class AccountSetupScreenTests: XCTestCase {
 
     func testAccountSetupDraftValidatorAcceptsCompleteDraft() {
         XCTAssertNil(validationMessage())
+    }
+
+    func testAccountSetupStepsKeepNameAndHandleInput() {
+        XCTAssertEqual(
+            AccountSetupStep.allCases,
+            [.welcome, .oshi, .area, .displayName, .handle, .birthDate, .gender, .completion]
+        )
+        XCTAssertEqual(AccountSetupStep.totalCount, 8)
     }
 
     private func validationMessage(

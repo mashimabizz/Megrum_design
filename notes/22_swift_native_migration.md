@@ -113,6 +113,7 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 - iter309で、`OshiKind` / `OshiGroup` / `OshiCharacter` / `UserOshiSelection` と `SupabaseOshiClient` を追加し、`groups_master` と `characters_master` をSwift側から読める境界を作った。
 - iter310で、初回プロフィール設定画面に推しグループ/メンバー選択を追加し、`user_oshi` を差し替え保存してから `users.account_status='active'` へ進めるようにした。
 - iter1220で、認証後オンボーディングを Welcome / 推し設定 / 活動エリア / 名前 / ユーザーID / 生年月日 / 性別 / 完了の8ステップへ分割した。推し設定はL1マスタ選択から入り、メンバー選択が必要なL1だけL2選択画面を表示する。完了時は `handle` / `display_name` / `primary_area` / `birth_date` / `age` / `gender` / `user_oshi` / `account_status='active'` を保存する。
+- iter1226.16で、認証後オンボーディングの8ステップは維持したまま、名前とユーザーID入力欄の初期値を空にした。グループ・作品の追加リクエスト後は専用画面へ飛ばず、次のメンバー・キャラクター選択で他の項目と並べて追加リクエストできる。Google登録経由などで `users` 行が未作成の場合も、先に `users` upsertしてから `user_oshi` を保存する。
 - iter311で、設定一覧と住所設定フォームを追加し、`user_mailing_addresses` をSwift側から取得/upsertできる境界を作った。
 - iter312で、郵便番号7桁入力からzipcloud公式APIで住所候補を取得し、住所設定フォームへ反映する境界を追加した。
 - iter313で、Supabase redirect URLのquery / fragmentからsession tokenを復元し、SwiftUI `.onOpenURL` でアプリへ反映する境界を追加した。
@@ -373,6 +374,7 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
    - iter379で、ログアウト/Auth復帰、左ドロワー項目遷移、設定一覧、自分プロフィール保存、性別保存を補強した。
    - iter380で、初回設定/プロフィール編集の完了alert、推し選択のアクセシビリティ、法的文書入口、アカウント概要のID/status表示を追加した。
    - iter1220で、認証後オンボーディングを8ステップ化し、推しL1/L2、活動エリア、名前、ユーザーID、生年月日、性別を保存してからホームへ入る流れへ更新した。
+   - iter1226.16で、認証後オンボーディングの名前・ユーザーID入力欄を空で開始するようにした。グループ・作品とメンバー・キャラクターの追加リクエスト導線を同じ推し設定フロー内に統合し、Google登録経由でも初回保存できるように `users` upsert順序を補強した。
    - iter1221で、設定一覧のログアウト下に薄い「退会する」導線を追加し、注意表示→退会理由/メモ→退会申請、進行中取引がある場合のブロック、ホーム復帰まで接続した。
    - 残: 法的文書/ヘルプ本文の最終整合。
    - 主な対象: `ios-native/Sources/MegrumApp/AuthScreen.swift`, `ios-native/Sources/MegrumApp/AccountSetupScreen.swift`, `ios-native/Sources/MegrumApp/SettingsScreen.swift`

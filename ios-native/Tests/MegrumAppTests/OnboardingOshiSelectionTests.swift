@@ -53,6 +53,8 @@ final class OnboardingOshiSelectionTests: XCTestCase {
     func testAccountSetupInputsKeepVisiblePriorityOrder() {
         let twice = OshiGroup(id: UUID(uuidString: "10000000-0000-0000-0000-000000000021")!, name: "TWICE")
         let ive = OshiGroup(id: UUID(uuidString: "10000000-0000-0000-0000-000000000022")!, name: "IVE")
+        let requestID = UUID(uuidString: "10000000-0000-0000-0000-000000000024")!
+        let characterRequestID = UUID(uuidString: "10000000-0000-0000-0000-000000000025")!
         let drafts = [
             OnboardingOshiDraft(groupID: twice.id, groupName: twice.name, characterID: nil, characterName: nil),
             OnboardingOshiDraft(
@@ -60,15 +62,76 @@ final class OnboardingOshiSelectionTests: XCTestCase {
                 groupName: ive.name,
                 characterID: UUID(uuidString: "10000000-0000-0000-0000-000000000023")!,
                 characterName: "LIZ"
+            ),
+            OnboardingOshiDraft(
+                oshiRequestID: requestID,
+                requestedName: "新しい推し",
+                characterRequestID: characterRequestID,
+                requestedCharacterName: "新しいメンバー"
             )
         ]
 
         let inputs = OnboardingOshiSelectionLogic.accountSetupInputs(from: drafts)
 
-        XCTAssertEqual(inputs.map(\.priority), [1, 2])
-        XCTAssertEqual(inputs.map(\.kind), [.box, .specific])
+        XCTAssertEqual(inputs.map(\.priority), [1, 2, 3])
+        XCTAssertEqual(inputs.map(\.kind), [.box, .specific, .specific])
         XCTAssertEqual(inputs.first?.groupID, twice.id)
-        XCTAssertEqual(inputs.last?.groupID, ive.id)
+        XCTAssertEqual(inputs[1].groupID, ive.id)
+        XCTAssertNil(inputs.last?.groupID)
+        XCTAssertEqual(inputs.last?.oshiRequestID, requestID)
+        XCTAssertEqual(inputs.last?.characterRequestID, characterRequestID)
+        XCTAssertEqual(inputs.last?.kind, .specific)
+        XCTAssertEqual(drafts.last?.displayName, "新しい推し / 新しいメンバー（申請中）")
+    }
+
+    func testMemberRequestDraftsFilterByPendingOshiRequest() {
+        let target = OnboardingOshiMemberTarget(
+            oshiRequestID: UUID(uuidString: "10000000-0000-0000-0000-000000000041")!,
+            name: "新しい作品"
+        )
+        let otherRequestID = UUID(uuidString: "10000000-0000-0000-0000-000000000042")!
+        let drafts = [
+            OnboardingOshiDraft(oshiRequestID: target.oshiRequestID, requestedName: target.name),
+            OnboardingOshiDraft(
+                oshiRequestID: target.oshiRequestID,
+                requestedName: target.name,
+                characterRequestID: UUID(uuidString: "10000000-0000-0000-0000-000000000043")!,
+                requestedCharacterName: "主人公"
+            ),
+            OnboardingOshiDraft(
+                oshiRequestID: otherRequestID,
+                requestedName: "別の作品",
+                characterRequestID: UUID(uuidString: "10000000-0000-0000-0000-000000000044")!,
+                requestedCharacterName: "別キャラ"
+            )
+        ]
+
+        let memberDrafts = OnboardingOshiSelectionLogic.memberRequestDrafts(for: target, in: drafts)
+
+        XCTAssertEqual(memberDrafts.map(\.displayName), ["新しい作品 / 主人公（申請中）"])
+    }
+
+    func testRequestedMemberTargetsIncludeOnlyGroupAndWorkRequests() {
+        let groupRequestID = UUID(uuidString: "10000000-0000-0000-0000-000000000051")!
+        let soloRequestID = UUID(uuidString: "10000000-0000-0000-0000-000000000052")!
+        let drafts = [
+            OnboardingOshiDraft(
+                oshiRequestID: groupRequestID,
+                requestedName: "新しい作品",
+                requestedKind: .work
+            ),
+            OnboardingOshiDraft(
+                oshiRequestID: soloRequestID,
+                requestedName: "ソロの人",
+                requestedKind: .solo
+            )
+        ]
+
+        let targets = OnboardingOshiSelectionLogic.requestedMemberTargets(from: drafts)
+
+        XCTAssertEqual(targets.map(\.name), ["新しい作品"])
+        XCTAssertEqual(targets.first?.requestContext.oshiRequestID, groupRequestID)
+        XCTAssertNil(targets.first?.requestContext.groupID)
     }
 
     func testDraftsFromSavedSelectionsKeepSavedPriorityOrder() {

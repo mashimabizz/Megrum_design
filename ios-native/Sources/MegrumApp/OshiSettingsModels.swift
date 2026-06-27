@@ -183,6 +183,20 @@ struct OshiMemberRequestContext: Identifiable, Hashable, Sendable {
         self.initialName = initialName
     }
 
+    init(
+        groupKey: String,
+        groupID: UUID?,
+        oshiRequestID: UUID?,
+        groupName: String,
+        initialName: String? = nil
+    ) {
+        self.groupKey = groupKey
+        self.groupID = groupID
+        self.oshiRequestID = oshiRequestID
+        self.groupName = groupName
+        self.initialName = initialName
+    }
+
     var canCreateCharacterRequest: Bool {
         groupID != nil || oshiRequestID != nil
     }

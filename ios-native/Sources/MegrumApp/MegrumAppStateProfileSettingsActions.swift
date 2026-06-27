@@ -13,19 +13,17 @@ extension MegrumAppState {
         guard !isSavingAccountSetup else {
             return false
         }
-        guard let normalizedHandle = MegrumAppStateInputNormalizer.profileHandle(handle) else {
-            errorMessage = "ユーザーIDを入力してください"
+        guard let normalizedHandle = MegrumAppStateInputNormalizer.accountSetupHandle(
+            handle,
+            userID: viewer?.id
+        ) else {
+            errorMessage = "プロフィールを読み込めませんでした"
             return false
         }
-        guard MegrumAppStateInputNormalizer.isValidProfileHandle(normalizedHandle) else {
-            errorMessage = "ユーザーIDは半角英数字・_ の3〜20文字で入力してください"
-            return false
-        }
-        let trimmedDisplayName = MegrumAppStateInputNormalizer.trimmedText(displayName)
-        guard !trimmedDisplayName.isEmpty else {
-            errorMessage = "表示名を入力してください"
-            return false
-        }
+        let trimmedDisplayName = MegrumAppStateInputNormalizer.accountSetupDisplayName(
+            displayName,
+            fallbackHandle: normalizedHandle
+        )
         if let birthDate,
            birthDate > Date() {
             errorMessage = "生年月日は今日以前の日付を選択してください"

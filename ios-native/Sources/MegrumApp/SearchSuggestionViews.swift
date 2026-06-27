@@ -92,7 +92,7 @@ private struct SearchOshiSuggestionRows: View {
             if case .group = item.action {
                 return true
             }
-            return item.subtitle == "L1"
+            return item.subtitle == "グループ・作品"
         }
     }
 
@@ -101,7 +101,7 @@ private struct SearchOshiSuggestionRows: View {
             if case .member = item.action {
                 return true
             }
-            return item.subtitle == "L2"
+            return item.subtitle == "メンバー・キャラクター"
         }
     }
 

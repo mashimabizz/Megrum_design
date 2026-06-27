@@ -96,7 +96,7 @@ enum SearchSuggestionBuilder {
                         SearchSuggestionItem(
                             id: id,
                             title: groupName,
-                            subtitle: "L1",
+                            subtitle: "グループ・作品",
                             imageURL: nil,
                             action: .group(groupID)
                         )
@@ -109,7 +109,7 @@ enum SearchSuggestionBuilder {
                         SearchSuggestionItem(
                             id: id,
                             title: groupName,
-                            subtitle: "L1",
+                            subtitle: "グループ・作品",
                             imageURL: nil,
                             action: .query(groupName)
                         )
@@ -130,7 +130,7 @@ enum SearchSuggestionBuilder {
                     SearchSuggestionItem(
                         id: id,
                         title: memberName,
-                        subtitle: "L2",
+                        subtitle: "メンバー・キャラクター",
                         imageURL: nil,
                         action: selection.groupID.map { .member(groupID: $0, memberID: memberID) } ?? .query(memberName)
                     )
@@ -142,7 +142,7 @@ enum SearchSuggestionBuilder {
                     SearchSuggestionItem(
                         id: id,
                         title: memberName,
-                        subtitle: "L2",
+                        subtitle: "メンバー・キャラクター",
                         imageURL: nil,
                         action: .query(memberName)
                     )

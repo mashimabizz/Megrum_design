@@ -138,6 +138,33 @@ final class SupabaseAccountProfilePersistenceTests: XCTestCase {
         XCTAssertEqual(profile.accountStatus, .active)
     }
 
+    func testAccountSetupUpsertPayloadCarriesUserIDAndStatus() {
+        let birthDate = ProfileBirthDateCodec.date(from: "2000-02-03")
+        let input = AccountSetupInput(
+            handle: "megrum_000000000901",
+            displayName: "Megrumユーザー",
+            gender: .female,
+            prefecture: "東京都",
+            birthDate: birthDate,
+            oshiSelections: []
+        )
+
+        let payload = SupabaseAccountProfilePersistence.accountSetupUpsertPayload(
+            from: input,
+            userID: userID,
+            accountStatus: .onboarding
+        )
+
+        XCTAssertEqual(payload.id, userID)
+        XCTAssertEqual(payload.handle, "megrum_000000000901")
+        XCTAssertEqual(payload.displayName, "Megrumユーザー")
+        XCTAssertEqual(payload.gender, .female)
+        XCTAssertEqual(payload.primaryArea, "東京都")
+        XCTAssertEqual(payload.birthDate, "2000-02-03")
+        XCTAssertEqual(payload.age, ProfileBirthDateCodec.age(from: birthDate))
+        XCTAssertEqual(payload.accountStatus, AccountStatus.onboarding.rawValue)
+    }
+
     func testAccountSetupSelectionsPreserveInputFields() {
         let groupID = UUID(uuidString: "00000000-0000-0000-0000-000000000911")!
         let characterID = UUID(uuidString: "00000000-0000-0000-0000-000000000912")!
