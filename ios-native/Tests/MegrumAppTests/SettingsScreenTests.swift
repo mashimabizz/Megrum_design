@@ -310,6 +310,11 @@ final class SettingsScreenTests: XCTestCase {
         })
     }
 
+    func testAuthLegalConsentLinksPointToPublicWebPages() {
+        XCTAssertEqual(AuthLegalLinkDestination.terms.absoluteString, "https://megrum.jp/terms")
+        XCTAssertEqual(AuthLegalLinkDestination.privacy.absoluteString, "https://megrum.jp/privacy")
+    }
+
     func testMailingAddressDraftValidatorRequiresFieldsBeforeSave() {
         let address = MailingAddress(
             userID: UUID(uuidString: "20000000-0000-0000-0000-000000000004")!,

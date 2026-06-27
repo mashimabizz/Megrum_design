@@ -91,9 +91,7 @@ private struct AccountSetupProgressHeader: View {
                 }
 
                 if step == .welcome {
-                    Text("Megrum")
-                        .font(.system(size: 36, weight: .black, design: .rounded))
-                        .foregroundStyle(MegrumTheme.lavender)
+                    MegrumWordmark(width: 150)
                 }
             }
             .frame(height: 50)

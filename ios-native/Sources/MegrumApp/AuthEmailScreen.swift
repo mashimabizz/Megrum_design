@@ -83,12 +83,7 @@ struct AuthEmailScreen: View {
                 .buttonStyle(.plain)
                 .padding(.top, 31)
 
-                Text("登録すると利用規約・プライバシーポリシーに同意したことになります")
-                    .font(.system(size: 11.5, weight: .semibold, design: .rounded))
-                    .foregroundStyle(MegrumTheme.muted)
-                    .multilineTextAlignment(.center)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.86)
+                AuthLegalConsentNotice(fontSize: 11.5)
                     .padding(.top, 44)
             }
 

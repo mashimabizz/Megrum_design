@@ -18,21 +18,9 @@ struct AuthChoiceScreen: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Spacer(minLength: isSignIn ? 156 : 106)
+            Spacer(minLength: isSignIn ? 156 : 132)
 
             AuthBrandLockup(showIconTile: !isSignIn)
-
-            if !isSignIn {
-                VStack(spacing: 9) {
-                    Text("Megrumをはじめる")
-                        .font(.system(size: 31, weight: .black, design: .rounded))
-                        .foregroundStyle(MegrumTheme.ink)
-                    Text("アカウントを作成")
-                        .font(.system(size: 16, weight: .semibold, design: .rounded))
-                        .foregroundStyle(MegrumTheme.muted)
-                }
-                .padding(.top, 96)
-            }
 
             VStack(spacing: 18) {
                 #if canImport(AuthenticationServices)
@@ -57,18 +45,14 @@ struct AuthChoiceScreen: View {
                     action: onEmail
                 )
             }
-            .padding(.top, isSignIn ? 132 : 34)
+            .padding(.top, isSignIn ? 132 : 62)
 
             AuthChoiceModeSwitchButton(isSignIn: isSignIn, action: onSwitch)
-                .padding(.top, 54)
+                .padding(.top, isSignIn ? 54 : 44)
 
             if !isSignIn {
-                Spacer(minLength: 102)
-                Text("登録すると 利用規約・プライバシーポリシー に\n同意したことになります")
-                    .font(.system(size: 13, weight: .semibold, design: .rounded))
-                    .foregroundStyle(MegrumTheme.muted)
-                    .multilineTextAlignment(.center)
-                    .lineSpacing(8)
+                Spacer(minLength: 72)
+                AuthLegalConsentNotice(fontSize: 13)
             }
 
             Spacer(minLength: 40)
