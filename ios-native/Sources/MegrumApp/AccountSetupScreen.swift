@@ -175,7 +175,7 @@ public struct AccountSetupScreen: View {
         case .displayName:
             AccountSetupTextInputStep(
                 label: "表示名",
-                placeholder: "みち",
+                placeholder: "例)めぐるむ",
                 text: $displayName,
                 focusedField: $focusedField,
                 focusCase: .displayName,
