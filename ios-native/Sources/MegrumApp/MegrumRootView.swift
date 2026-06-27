@@ -85,6 +85,7 @@ public struct MegrumRootView: View {
             visualQAIndividualListingOptionKind: visualQAIndividualListingOptionKind,
             drawerPageDestination: drawerPageDestination,
             adDisplayContext: adDisplayContext,
+            sessionSource: authState.sessionSource,
             onRetryLoading: syncRepositoryWithAuthSession,
             onSignOutFromLoadingFailure: {
                 await authState.signOut()

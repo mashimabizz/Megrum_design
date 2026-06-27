@@ -30,7 +30,7 @@ extension MegrumAuthState {
             let refreshedSession = try await withAuthTimeout(nanoseconds: authActionTimeoutNanoseconds) {
                 try await repository.refreshSession(currentSession)
             }
-            activateSession(refreshedSession)
+            activateSession(refreshedSession, source: sessionSource)
             return true
         } catch {
             errorMessage = "ログイン情報を更新できませんでした。接続を確認して再読み込みしてください"
@@ -57,7 +57,7 @@ extension MegrumAuthState {
             }) else {
                 return false
             }
-            activateSession(nextSession)
+            activateSession(nextSession, source: .interactive)
             return true
         } catch {
             errorMessage = normalizedMessage(from: error)
@@ -70,6 +70,7 @@ extension MegrumAuthState {
         isLoading = true
         clearFeedback()
         session = nil
+        sessionSource = .none
 
         do {
             try sessionStore.clear()

@@ -2,9 +2,17 @@ import Foundation
 import MegrumCore
 import MegrumData
 
+enum MegrumAuthSessionSource: Equatable {
+    case none
+    case initial
+    case stored
+    case interactive
+}
+
 @MainActor
 public final class MegrumAuthState: ObservableObject {
     @Published public internal(set) var session: AuthSession?
+    @Published var sessionSource: MegrumAuthSessionSource = .none
     @Published public internal(set) var isLoading = false
     @Published public internal(set) var errorMessage: String?
     @Published public internal(set) var successMessage: String?
@@ -30,11 +38,19 @@ public final class MegrumAuthState: ObservableObject {
         self.signOutTimeoutNanoseconds = signOutTimeoutNanoseconds
         if let initialSession {
             self.session = initialSession
+            self.sessionSource = .initial
         } else {
             do {
-                self.session = try sessionStore.load()
+                if let storedSession = try sessionStore.load() {
+                    self.session = storedSession
+                    self.sessionSource = .stored
+                } else {
+                    self.session = nil
+                    self.sessionSource = .none
+                }
             } catch {
                 self.session = nil
+                self.sessionSource = .none
                 try? sessionStore.clear()
             }
         }
@@ -66,14 +82,15 @@ public final class MegrumAuthState: ObservableObject {
                 nanoseconds: authActionTimeoutNanoseconds,
                 operation: action
             )
-            activateSession(nextSession)
+            activateSession(nextSession, source: .interactive)
         } catch {
             errorMessage = normalizedMessage(from: error)
         }
     }
 
-    func activateSession(_ nextSession: AuthSession) {
+    func activateSession(_ nextSession: AuthSession, source: MegrumAuthSessionSource = .interactive) {
         session = nextSession
+        sessionSource = source
         do {
             try sessionStore.save(nextSession)
         } catch {
