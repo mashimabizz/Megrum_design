@@ -45,9 +45,7 @@ extension HomeDiscoveryExperience {
 
             Spacer()
 
-            Text("Megrum")
-                .font(.system(size: 24, weight: .heavy, design: .rounded))
-                .foregroundStyle(MegrumTheme.ink)
+            MegrumWordmark(width: 116)
 
             Spacer()
 

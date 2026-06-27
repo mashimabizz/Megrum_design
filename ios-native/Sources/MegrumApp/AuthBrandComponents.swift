@@ -36,7 +36,7 @@ struct AuthAppIconMark: View {
     var size: CGFloat
 
     var body: some View {
-        Image("LaunchIcon", bundle: .main)
+        Image("MegrumBrandIcon", bundle: .main)
             .resizable()
             .scaledToFit()
             .frame(width: size, height: size)

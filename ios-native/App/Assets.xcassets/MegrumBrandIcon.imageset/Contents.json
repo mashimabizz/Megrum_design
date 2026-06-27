@@ -1,0 +1,23 @@
+{
+  "images": [
+    {
+      "filename": "MegrumBrandIcon.png",
+      "idiom": "universal",
+      "scale": "1x"
+    },
+    {
+      "filename": "MegrumBrandIcon@2x.png",
+      "idiom": "universal",
+      "scale": "2x"
+    },
+    {
+      "filename": "MegrumBrandIcon@3x.png",
+      "idiom": "universal",
+      "scale": "3x"
+    }
+  ],
+  "info": {
+    "author": "xcode",
+    "version": 1
+  }
+}
