@@ -155,6 +155,7 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 - iter367で、Google OAuth authorize URL / request builderを追加し、UI接続前にrequest生成をテストできるようにした。
 - iter369で、Googleログインボタンを `ASWebAuthenticationSession` へ接続し、Supabase OAuth callbackを既存redirect復元境界へ渡せるようにした。
 - iter370で、OAuth callback schemeを `MEGRUM_URL_SCHEME` build settingから導出するようにし、Apple / Googleなどの外部ID Provider error stateを汎用名へ整理した。
+- iter1226.18で、Google OAuth開始URLを `megrum.jp` の中継Routeへ寄せ、iOSの外部認証確認ダイアログに表示されるアプリ名とドメインをMegrum公式表記へ近づけた。Supabase API通信先とnative callback schemeは維持する。
 - iter371で、初回設定と設定後の推し設定を共通化し、複数グループ/複数メンバーの推し選択、自分プロフィール概要、設定一覧からのプロフィール/推し設定導線を追加した。
 - 現時点のAuthはメール/パスワード、Appleログイン、Googleログインの最小導線まで追加済み。Google側のProvider設定と実機callback許可はSupabase/Apple側の設定確認が残る。
 

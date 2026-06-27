@@ -86,17 +86,23 @@ public struct SupabaseMegrumAuthRepository: MegrumAuthRepository {
     private let client: SupabaseAuthClient
     private let accountClient: SupabaseAccountClient?
     private let emailRedirectTo: URL?
+    private let oauthAuthorizeURL: URL?
+    private let oauthRedirectTo: URL?
     private let oauthCallbackSchemeValue: String?
 
     public init(
         client: SupabaseAuthClient,
         accountClient: SupabaseAccountClient? = nil,
-        emailRedirectTo: URL? = nil
+        emailRedirectTo: URL? = nil,
+        oauthAuthorizeURL: URL? = nil
     ) {
         self.client = client
         self.accountClient = accountClient
         self.emailRedirectTo = emailRedirectTo
-        self.oauthCallbackSchemeValue = Self.callbackScheme(from: emailRedirectTo) ?? "megrum-preview"
+        self.oauthAuthorizeURL = oauthAuthorizeURL
+        let oauthCallbackScheme = Self.callbackScheme(from: emailRedirectTo) ?? "megrum-preview"
+        self.oauthCallbackSchemeValue = oauthCallbackScheme
+        self.oauthRedirectTo = Self.oauthRedirectURL(callbackScheme: oauthCallbackScheme)
     }
 
     public func signIn(email: String, password: String) async throws -> AuthSession {
@@ -112,9 +118,17 @@ public struct SupabaseMegrumAuthRepository: MegrumAuthRepository {
     }
 
     public func googleOAuthAuthorizeURL() throws -> URL {
-        try client.makeOAuthAuthorizeURL(
+        if let oauthAuthorizeURL {
+            return try Self.hostedOAuthAuthorizeURL(
+                baseURL: oauthAuthorizeURL,
+                provider: .google,
+                redirectTo: oauthRedirectTo,
+                scopes: ["email", "profile"]
+            )
+        }
+        return try client.makeOAuthAuthorizeURL(
             provider: .google,
-            redirectTo: emailRedirectTo,
+            redirectTo: oauthRedirectTo,
             scopes: ["email", "profile"]
         )
     }
@@ -167,5 +181,42 @@ public struct SupabaseMegrumAuthRepository: MegrumAuthRepository {
             return nil
         }
         return scheme
+    }
+
+    private static func oauthRedirectURL(callbackScheme: String) -> URL? {
+        let scheme = callbackScheme.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !scheme.isEmpty else {
+            return nil
+        }
+        return URL(string: "\(scheme)://auth/callback")
+    }
+
+    private static func hostedOAuthAuthorizeURL(
+        baseURL: URL,
+        provider: SupabaseOAuthProvider,
+        redirectTo: URL?,
+        scopes: [String]
+    ) throws -> URL {
+        guard var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false) else {
+            throw SupabaseAuthError.invalidURL
+        }
+
+        var queryItems = components.queryItems ?? []
+        queryItems.append(URLQueryItem(name: "provider", value: provider.rawValue))
+        if let redirectTo {
+            queryItems.append(URLQueryItem(name: "redirect_to", value: redirectTo.absoluteString))
+        }
+        let normalizedScopes = scopes
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        if !normalizedScopes.isEmpty {
+            queryItems.append(URLQueryItem(name: "scopes", value: normalizedScopes.joined(separator: " ")))
+        }
+        components.queryItems = queryItems
+
+        guard let url = components.url else {
+            throw SupabaseAuthError.invalidURL
+        }
+        return url
     }
 }

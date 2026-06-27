@@ -4,6 +4,55 @@
 
 ---
 
+## イテレーション1226.18：OAuth確認表示のブランド整理
+
+### 背景・問題意識
+
+Google OAuth開始時のiOS確認ダイアログで、アプリ名が `MegrumNative`、認証先がSupabase project refの `kw...supabase.co` と表示され、ユーザーから見て公式サービスの認証導線に見えにくかった。
+
+### 変更内容
+
+#### `ios-native/App/Info.plist` / `ios-native/Config/MegrumNative.xcconfig`
+- `CFBundleName` を `Megrum` に固定し、iOSの外部認証確認ダイアログでも `Megrum` と表示されるようにした。
+- Google OAuth開始用の `MegrumAuthOAuthAuthorizeURL` / `MEGRUM_AUTH_OAUTH_AUTHORIZE_URL` を追加し、既定値を `https://megrum.jp/auth/oauth/authorize` にした。
+
+#### `ios-native/Sources/MegrumApp/MegrumAuthStateFactory.swift` / `MegrumAuthRepositories.swift`
+- live auth repositoryがGoogle OAuth authorize URLを作る時、Supabase project URLを直接開く代わりにMegrum公式サイト側の中継URLから開始できるようにした。
+- native callback scheme は既存の `megrum-preview://auth/callback` / `megrum://auth/callback` を維持した。
+
+#### `web/src/app/auth/oauth/authorize/route.ts`
+- `megrum.jp` 上のOAuth中継Routeを追加し、`provider=google` と許可済みnative callbackだけをSupabase `/auth/v1/authorize` へ転送するようにした。
+
+### 影響範囲
+
+- Swift Native iOSのGoogle OAuth開始時の確認ダイアログ表示。
+- Webの認証中継Route。
+- メール/パスワード認証、Apple ID tokenログイン、Supabase API通信先、既存callback復元、状態遷移、DB schema、通知、課金、取引状態は変更していない。
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-auth-brand-tests --enable-xctest --disable-swift-testing -j 1 --filter 'MegrumAppStateTests/testNativeInfoPlistDeclaresConfigurableURLScheme|MegrumAppStateTests/testNativeAuthXcconfigKeepsURLSchemeAndRedirectInSync|MegrumAppStateTests/testNativeGoogleOAuthUsesNativeCallbackScheme'`
+  - passed（3 tests, 0 failures）
+- `plutil -lint ios-native/App/Info.plist`
+  - passed
+- `npm run lint -- src/app/auth/oauth/authorize/route.ts`
+  - passed
+- `npm run build`（web）
+  - passed
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild-auth-brand CODE_SIGNING_ALLOWED=NO build`
+  - passed
+- Simulator `iPhone 17` にインストールし、ログイン画面のGoogleボタンからiOS確認ダイアログを表示
+  - `“Megrum”がサインインのために“megrum.jp”を使用しようとしています。` と表示されることを確認
+
+### セルフレビュー結果
+
+- ✅ 外部認証確認ダイアログのアプリ名は `Megrum` へ寄る
+- ✅ iOSが最初に開くOAuth URLのホストは `megrum.jp` になる
+- ✅ OAuth完了後のnative callback schemeは維持した
+- ⚠️ Google Cloud / Supabase Dashboard側の本番設定反映と、実OAuthの本番E2E確認は別途必要
+
+---
+
 ## イテレーション1226.16：初回設定の保存と推し申請修正
 
 ### 背景・問題意識

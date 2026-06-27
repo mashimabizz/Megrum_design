@@ -352,6 +352,9 @@ final class MegrumAppStateTests: XCTestCase {
 
         XCTAssertEqual(schemes, ["$(MEGRUM_URL_SCHEME)"])
         XCTAssertEqual(plist["MegrumAuthEmailRedirectURL"] as? String, "$(MEGRUM_AUTH_EMAIL_REDIRECT_URL)")
+        XCTAssertEqual(plist["MegrumAuthOAuthAuthorizeURL"] as? String, "$(MEGRUM_AUTH_OAUTH_AUTHORIZE_URL)")
+        XCTAssertEqual(plist["CFBundleDisplayName"] as? String, "Megrum")
+        XCTAssertEqual(plist["CFBundleName"] as? String, "Megrum")
     }
 
     func testNativeAuthXcconfigKeepsURLSchemeAndRedirectInSync() throws {
@@ -365,6 +368,11 @@ final class MegrumAppStateTests: XCTestCase {
             XCTAssertEqual(
                 entries["MEGRUM_AUTH_EMAIL_REDIRECT_URL"],
                 "https:/$()/megrum.jp/auth/callback?next=mobile&scheme=$(MEGRUM_URL_SCHEME)",
+                configPath
+            )
+            XCTAssertEqual(
+                entries["MEGRUM_AUTH_OAUTH_AUTHORIZE_URL"],
+                "https:/$()/megrum.jp/auth/oauth/authorize",
                 configPath
             )
         }
@@ -383,6 +391,28 @@ final class MegrumAppStateTests: XCTestCase {
 
         XCTAssertTrue(state.isConfigured)
         XCTAssertEqual(state.oauthCallbackScheme, "megrum-dev")
+    }
+
+    func testNativeGoogleOAuthUsesNativeCallbackScheme() throws {
+        let state = MegrumAuthStateFactory.make(
+            environment: [:],
+            infoDictionary: [
+                "MegrumSupabaseURL": "https://example.supabase.co",
+                "MegrumSupabasePublishableKey": "sb_publishable_test",
+                "MegrumSupabaseViewerID": "00000000-0000-0000-0000-000000000000",
+                "MegrumAuthEmailRedirectURL": "https://megrum.jp/auth/callback?next=mobile&scheme=megrum-dev"
+            ]
+        )
+
+        let url = try state.googleOAuthAuthorizeURL()
+        let components = try XCTUnwrap(URLComponents(url: url, resolvingAgainstBaseURL: false))
+
+        XCTAssertEqual(components.scheme, "https")
+        XCTAssertEqual(components.host, "megrum.jp")
+        XCTAssertEqual(components.path, "/auth/oauth/authorize")
+        XCTAssertEqual(components.queryItems?.first(where: { $0.name == "provider" })?.value, "google")
+        XCTAssertEqual(components.queryItems?.first(where: { $0.name == "redirect_to" })?.value, "megrum-dev://auth/callback")
+        XCTAssertEqual(components.queryItems?.first(where: { $0.name == "scopes" })?.value, "email profile")
     }
 
     func testAppStateRefreshesPreviewMeguriFeed() async {

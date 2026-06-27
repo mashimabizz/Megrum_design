@@ -1,0 +1,23 @@
+.DS_Store
+.agents/
+.claude/
+.vercel/
+.xcodebuildmcp/
+ios-native/
+notes/
+scripts/
+supabase/
+テストデータ用/
+利用規約など/
+MegrumIcon 起動.icon/
+MegrumIcon.icon/
+README.md
+AGENTS.md
+CLAUDE.md
+package.json
+package-lock.json
+
+web/.env*.local
+web/.next/
+web/.vercel/
+web/node_modules/

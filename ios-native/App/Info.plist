@@ -13,7 +13,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>$(PRODUCT_NAME)</string>
+	<string>Megrum</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -41,6 +41,8 @@
 	<false/>
 	<key>MegrumAuthEmailRedirectURL</key>
 	<string>$(MEGRUM_AUTH_EMAIL_REDIRECT_URL)</string>
+	<key>MegrumAuthOAuthAuthorizeURL</key>
+	<string>$(MEGRUM_AUTH_OAUTH_AUTHORIZE_URL)</string>
 	<key>MegrumAdMobAppID</key>
 	<string>$(MEGRUM_ADMOB_APP_ID)</string>
 	<key>MegrumAdMobHomeBannerUnitID</key>
