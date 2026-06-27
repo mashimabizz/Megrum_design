@@ -36,12 +36,14 @@ struct AccountSetupStepContainer<Content: View>: View {
                         .multilineTextAlignment(.center)
                         .frame(maxWidth: .infinity)
 
-                    Text(subtitle)
-                        .font(.system(size: 15, weight: .semibold, design: .rounded))
-                        .foregroundStyle(MegrumTheme.muted)
-                        .multilineTextAlignment(.center)
-                        .lineSpacing(4)
-                        .frame(maxWidth: .infinity)
+                    if !subtitle.isEmpty {
+                        Text(subtitle)
+                            .font(.system(size: 15, weight: .semibold, design: .rounded))
+                            .foregroundStyle(MegrumTheme.muted)
+                            .multilineTextAlignment(.center)
+                            .lineSpacing(4)
+                            .frame(maxWidth: .infinity)
+                    }
                 }
                 .padding(.top, step == .welcome ? 0 : 10)
 

@@ -39,7 +39,7 @@ enum AccountSetupStep: Int, CaseIterable, Identifiable, Sendable {
     var subtitle: String {
         switch self {
         case .welcome:
-            "大切なグッズとの出会いを、やさしくつなぎます。"
+            ""
         case .oshi:
             "まずはグループ・作品を選び、次にメンバーを設定します。"
         case .area:

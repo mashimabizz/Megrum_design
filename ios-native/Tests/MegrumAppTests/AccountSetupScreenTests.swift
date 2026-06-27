@@ -96,6 +96,10 @@ final class AccountSetupScreenTests: XCTestCase {
         XCTAssertEqual(AccountSetupStep.totalCount, 8)
     }
 
+    func testWelcomeStepDoesNotShowSubtitleCopy() {
+        XCTAssertTrue(AccountSetupStep.welcome.subtitle.isEmpty)
+    }
+
     func testBirthDateCalendarBuildsTouchableDaysInStableTimezone() throws {
         let month = try XCTUnwrap(ProfileBirthDateCodec.date(from: "2000-01-01"))
         let days = AccountSetupBirthDateCalendarLogic.days(for: month)
