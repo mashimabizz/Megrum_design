@@ -2,6 +2,9 @@
 
 Swift Native iOS版のグッズ登録・Wish登録で、画像からシリーズ名称候補を返すSupabase Edge Function。
 
+画像をOpenAI Responses APIへ送り、`web_search` を必須実行して、画像内の文字・ロゴ・人物・グッズ形状などからネット上の商品情報と画像検索結果に近い表記を照合して候補化する。
+Google LensそのもののAPIキーはiOSアプリへ持たせない。登録途中のbase64画像は、Function側で画像特徴を読み取り、その特徴からWeb検索する。
+
 ## Input
 
 ```json

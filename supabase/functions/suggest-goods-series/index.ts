@@ -45,6 +45,11 @@ type OpenAIContent = {
   image_url?: string;
 };
 
+type OpenAIWebSearchOutput = {
+  type?: string;
+  status?: string;
+};
+
 const jsonHeaders = {
   "content-type": "application/json; charset=utf-8",
 };
@@ -116,7 +121,18 @@ async function suggestSeriesNames(payload: NormalizedPayload, config: RuntimeCon
     },
     body: JSON.stringify({
       model: config.openAIModel,
-      tools: [{ type: "web_search_preview" }],
+      tools: [
+        {
+          type: "web_search",
+          search_context_size: "medium",
+          search_content_types: ["image", "text"],
+          image_settings: {
+            max_results: 5,
+            caption: true,
+          },
+        },
+      ],
+      tool_choice: "required",
       input: [
         {
           role: "user",
@@ -134,6 +150,9 @@ async function suggestSeriesNames(payload: NormalizedPayload, config: RuntimeCon
   }
 
   const body = await response.json();
+  if (!hasCompletedWebSearch(body)) {
+    throw new Error("web_search_not_performed");
+  }
   const text = extractResponseText(body);
   return parseSuggestions(text);
 }
@@ -188,13 +207,28 @@ function promptFor(payload: NormalizedPayload): string {
   return [
     "あなたは日本語の推し活グッズ分類アシスタントです。",
     "添付画像を手がかりに、グッズのシリーズ名・販売企画名・特典名として使えそうな候補を推定してください。",
-    "必要に応じてWeb検索で画像や文脈を確認してください。",
+    "必ずWeb検索を実行してください。画像内の文字、ロゴ、衣装、背景、商品形状、人物名、グループ名、グッズ種別から検索クエリを作り、公式商品情報、販売ページ、中古市場、告知記事、画像検索結果に近い表記を照合してください。",
+    "Google Lensのような逆画像検索に近い使い方を想定しています。画像URLがある場合はそのURL自体も手がかりにし、base64画像の場合は画像から読み取れる特徴を検索語にしてください。",
     "グループ名、メンバー名、グッズ種別だけの一般名は候補にしないでください。",
     "候補は短く、アプリ内のシリーズタグとして自然な日本語または公式表記にしてください。",
+    "検索結果のURL、説明文、出典名、推測理由は出力しないでください。",
     "確度が低い候補は出しすぎず、最大6件にしてください。",
     context ? `\n文脈:\n${context}` : "",
     '\n出力はJSONのみ: {"suggestions":["候補1","候補2"]}',
   ].join("\n");
+}
+
+function hasCompletedWebSearch(body: unknown): boolean {
+  if (!isRecord(body) || !Array.isArray(body.output)) {
+    return false;
+  }
+  return body.output.some((output) => {
+    if (!isRecord(output)) {
+      return false;
+    }
+    const webSearchOutput = output as OpenAIWebSearchOutput;
+    return webSearchOutput.type === "web_search_call" && webSearchOutput.status !== "failed";
+  });
 }
 
 function extractResponseText(body: unknown): string {

@@ -4,6 +4,61 @@
 
 ---
 
+## イテレーション1226.103：画像からシリーズ候補のWeb画像検索化
+
+### 背景・問題意識
+
+グッズ登録・Wish登録の「画像からシリーズ名称の候補を出す」は、ユーザー期待として端末内推定ではなく、ネット上の画像検索や商品情報を照合して候補を返す必要がある。Google LensそのもののAPIキーをiOSアプリへ持たせると秘密情報と実装境界が崩れるため、既存のSupabase Edge Function側で検索を必須化する。
+
+### 変更内容
+
+#### `supabase/functions/suggest-goods-series/index.ts`
+- OpenAI Responses APIの検索ツールを `web_search_preview` から `web_search` へ更新した。
+- `tool_choice: "required"` と `search_content_types: ["image", "text"]` を指定し、画像検索結果と通常Web検索を必ず使うようにした。
+- 画像内の文字、ロゴ、衣装、背景、商品形状、人物名、グループ名、グッズ種別から検索クエリを作り、公式商品情報、販売ページ、中古市場、告知記事、画像検索結果の表記を照合するようプロンプトを強化した。
+- Web検索が実行されなかったレスポンスは失敗として扱うようにした。
+
+#### `supabase/functions/suggest-goods-series/README.md`
+- Functionの実装境界を、画像特徴を読み取ってWeb検索する方式として明記した。
+
+#### remote Supabase
+- `suggest-goods-series` Edge Functionを project `kwpnlcojzseicqbxefih` へデプロイした。
+
+### 影響範囲
+
+- グッズ登録・Wish登録のシリーズ登録シート内「画像からシリーズ名称の候補を出す」
+- `suggest-goods-series` Edge Function
+
+iOS側のボタン、シート表示、画像ペイロード形式、認証済みJWTでFunctionを呼ぶ境界は維持した。
+
+### 確認方法
+
+- `./web/node_modules/.bin/tsc --noEmit --target es2022 --lib es2022,dom --module nodenext --moduleResolution nodenext --skipLibCheck supabase/functions/suggest-goods-series/index.ts`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-series-suggestion-test --enable-xctest --disable-swift-testing -j 1 --filter SupabaseGoodsSeriesSuggestionClientTests`
+  - passed（2 tests, 0 failures）
+- `supabase functions deploy suggest-goods-series`
+  - passed（project `kwpnlcojzseicqbxefih`）
+- `git diff --check`
+  - passed
+- `xcrun devicectl list devices`
+  - passed（`MTO’s phone` available）
+- `xcodebuild -list -project ios-native/MegrumNative.xcodeproj`
+  - passed（scheme `MegrumNative` を確認）
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -configuration Debug -destination 'generic/platform=iOS' -derivedDataPath /tmp/megrum-ios-native-device-build -allowProvisioningUpdates build`
+  - passed
+- `xcrun devicectl device install app --device 7F6C74EF-5786-5316-920A-F7F1CC3FE2A4 /tmp/megrum-ios-native-device-build/Build/Products/Debug-iphoneos/MegrumNative.app`
+  - passed
+- `xcrun devicectl device process launch --device 7F6C74EF-5786-5316-920A-F7F1CC3FE2A4 tokyo.megrum.native.preview`
+  - passed
+
+### セルフレビュー結果
+
+- ✅ APIキーや検索処理をiOSアプリへ入れず、既存の認証済みEdge Function境界を維持した。
+- ✅ 登録途中のbase64画像でも、画像から読み取った特徴をWeb画像検索・商品情報検索へ使う方針にした。
+- ✅ シリーズ候補として表示する値は短い名称だけに保ち、URLや説明文をUIへ混ぜない。
+- ✅ Google Lens相当の完全な逆画像検索API直結ではないが、ネット上の画像検索結果と商品情報を必ず照合する動作へ寄せた。
+
 ## イテレーション1226.102：めぐりメッセージのロック表示
 
 ### 背景・問題意識
