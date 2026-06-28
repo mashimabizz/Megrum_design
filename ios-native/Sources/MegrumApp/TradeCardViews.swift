@@ -51,6 +51,9 @@ struct TradeCard: View {
         if presentation.unreadBadgeCount > 0 {
             parts.insert("未読\(presentation.unreadBadgeCount)件", at: 2)
         }
+        if presentation.needsEvaluationAttention {
+            parts.insert("評価待ち", at: 2)
+        }
         return parts.joined(separator: "、")
     }
 
@@ -116,6 +119,7 @@ private struct TradeCardContent: View {
             TradeCardDivider(readState: presentation.readState)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .background(presentation.readState.stateBackgroundColor)
         .overlay(alignment: .topTrailing) {
             if isSelectionMode {
                 TradeSelectionIndicator(
@@ -124,8 +128,32 @@ private struct TradeCardContent: View {
                 )
                 .padding(.top, 15)
                 .padding(.trailing, TradeCardLayout.horizontalPadding)
+            } else if presentation.needsEvaluationAttention {
+                TradeEvaluationAttentionBadge()
+                    .padding(.top, 14)
+                    .padding(.trailing, TradeCardLayout.horizontalPadding)
             }
         }
         .opacity(isSelectionMode && !isSelectionEnabled ? 0.48 : 1)
+    }
+}
+
+private struct TradeEvaluationAttentionBadge: View {
+    var body: some View {
+        HStack(spacing: 5) {
+            Circle()
+                .fill(.white)
+                .frame(width: 6, height: 6)
+
+            Text("評価待ち")
+                .font(.system(size: 12, weight: .heavy, design: .rounded))
+                .lineLimit(1)
+        }
+        .foregroundStyle(.white)
+        .padding(.horizontal, 9)
+        .padding(.vertical, 6)
+        .background(Color(red: 0.94, green: 0.16, blue: 0.20), in: Capsule())
+        .shadow(color: Color(red: 0.94, green: 0.16, blue: 0.20).opacity(0.24), radius: 10, y: 5)
+        .accessibilityHidden(true)
     }
 }

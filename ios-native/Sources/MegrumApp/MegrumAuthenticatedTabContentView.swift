@@ -206,6 +206,7 @@ struct MegrumAuthenticatedTabContentView: View {
         .tabItem {
             Label(MegrumTab.trades.title, systemImage: MegrumTab.trades.symbolName)
         }
+        .badge(tradeAttentionCounts.total)
     }
 
     private var meguriTab: some View {
@@ -227,6 +228,15 @@ struct MegrumAuthenticatedTabContentView: View {
     private func openTradesFromHomePresentation() {
         requestedTradesStage = nil
         selectedTab = .trades
+    }
+
+    private var tradeAttentionCounts: TradeStageAttentionCounts {
+        TradeStageAttentionCounts(
+            proposals: appState.proposals,
+            messagesByProposalID: appState.messagesByProposalID,
+            viewerReadAtByProposalID: appState.viewerReadAtByProposalID,
+            viewerID: appState.viewer?.id
+        )
     }
 
     private func requestInterstitialIfPrepared(for tab: MegrumTab) {

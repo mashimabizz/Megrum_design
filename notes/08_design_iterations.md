@@ -4,6 +4,63 @@
 
 ---
 
+## イテレーション1226.92：完了済み評価待ちを成立取引に限定
+
+### 背景・問題意識
+
+やりとりフッターの完了済みバッジに、取り下げ・キャンセル・却下など評価対象ではない終了状態が混ざると、ユーザーに不要な対応待ちとして見えてしまう。評価待ちは「あくまでも取引が成立して完了し、自分側の評価が未提出」のものだけに限定する必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/TradeEvaluationAttentionPolicy.swift`
+- 評価待ち判定を共通化し、`status == .completed` に加えて双方合意、双方承認、`completedAt` がある成立済み完了取引だけを対象にした。
+- 自分がすでに評価を送っている場合は評価待ちから除外するようにした。
+
+#### `ios-native/Sources/MegrumApp/TradesScreenPresentation.swift`
+- 完了済みフッターバッジの件数を、共通の評価待ち判定で数えるようにした。
+
+#### `ios-native/Sources/MegrumApp/TradeListOrdering.swift`
+- 評価待ちの完了済み取引を、やりとり一覧内で最優先に並べるようにした。
+
+#### `ios-native/Sources/MegrumApp/TradeCardPresentation.swift`
+#### `ios-native/Sources/MegrumApp/TradeCardViews.swift`
+- 取引カードに評価待ちフラグを渡し、カード右上に赤い `評価待ち` バッジを表示するようにした。
+- VoiceOver向けのカードラベルにも評価待ち状態を含めるようにした。
+
+#### `ios-native/Sources/MegrumApp/TradeDetailScreenPresentation.swift`
+- 取引詳細の評価CTAも同じ評価待ち判定を使うようにして、未成立・取り下げ系の終了状態で評価導線が出ないようにした。
+
+#### `ios-native/Tests/MegrumAppTests/TradeChatAffordanceTests.swift`
+- フッター件数、評価待ち判定、カード表示用フラグ、完了済み一覧の並び順をテストで固定した。
+
+### 影響範囲
+
+- Swift Native iOSのやりとり一覧、やりとりフッター、完了済み取引カード、取引詳細下部CTA。
+- 取引ステータス遷移そのもの、DB/API、通知、認証、評価送信処理は変更していない。
+- `notes/09_state_machines.md` は状態遷移に影響がないため更新していない。
+- `notes/10_glossary.md` は用語変更がないため更新していない。
+- `notes/05_data_model.md` はDBスキーマ変更がないため更新していない。
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-trade-eval-attention --enable-xctest --disable-swift-testing -j 1 --filter TradeChatAffordanceTests`
+  - passed（71 tests, 0 failures）
+- `git diff --check -- ios-native/Sources/MegrumApp/TradeEvaluationAttentionPolicy.swift ios-native/Sources/MegrumApp/TradesScreenPresentation.swift ios-native/Sources/MegrumApp/TradeCardPresentation.swift ios-native/Sources/MegrumApp/TradeCardViews.swift ios-native/Sources/MegrumApp/TradeListOrdering.swift ios-native/Sources/MegrumApp/TradeDetailScreenPresentation.swift ios-native/Tests/MegrumAppTests/TradeChatAffordanceTests.swift`
+  - passed
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'platform=iOS Simulator,id=C70DDDBB-2602-49E0-8F95-1F043BCCED76' -derivedDataPath /Users/michitaka/Library/Developer/Xcode/DerivedData/MegrumNativeTradeEvalAttention CODE_SIGNING_ALLOWED=NO build`
+  - passed
+- `xcrun simctl install C70DDDBB-2602-49E0-8F95-1F043BCCED76 /Users/michitaka/Library/Developer/Xcode/DerivedData/MegrumNativeTradeEvalAttention/Build/Products/Debug-iphonesimulator/MegrumNative.app`
+  - passed
+- `SIMCTL_CHILD_MEGRUM_VISUAL_QA_PREVIEW_AUTH=1 SIMCTL_CHILD_MEGRUM_VISUAL_QA_INITIAL_SCREEN=trades xcrun simctl launch --terminate-running-process C70DDDBB-2602-49E0-8F95-1F043BCCED76 tokyo.megrum.native.preview`
+  - passed（Simulatorで起動し、やりとり一覧への遷移を確認）
+
+### セルフレビュー結果
+
+- ✅ 完了済みバッジは、成立して完了した取引かつ自分の評価が未提出のものだけを数えるようにした。
+- ✅ 取り下げ・キャンセル・却下・期限切れなど、評価対象ではない終了状態は評価待ちから除外した。
+- ✅ 評価待ちカードは赤い右上バッジで目立つようにし、完了済み一覧の上部へ優先表示するようにした。
+- ✅ 取引詳細の評価CTAも同じ判定へ寄せ、一覧と詳細で表示条件がズレないようにした。
+
 ## イテレーション1226.18：OAuth確認表示のブランド整理
 
 ### 背景・問題意識

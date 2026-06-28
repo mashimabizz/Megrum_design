@@ -52,8 +52,13 @@ struct TradesScreen: View {
         selectedStage == .pending && !selectedPendingProposalIDs.isEmpty
     }
 
-    private var stageCounts: TradeStageCounts {
-        TradeStageCounts(proposals: proposals)
+    private var attentionCounts: TradeStageAttentionCounts {
+        TradeStageAttentionCounts(
+            proposals: proposals,
+            messagesByProposalID: messagesByProposalID,
+            viewerReadAtByProposalID: viewerReadAtByProposalID,
+            viewerID: appState.viewer?.id
+        )
     }
 
     var body: some View {
@@ -129,9 +134,9 @@ struct TradesScreen: View {
             isSelectingPendingProposals: isSelectingPendingProposals,
             selectedPendingCount: selectedPendingProposalIDs.count,
             isResponding: appState.respondingProposalID != nil,
-            pendingCount: stageCounts.pending,
-            inProgressCount: stageCounts.inProgress,
-            completedCount: stageCounts.completed,
+            pendingCount: attentionCounts.pendingNeedsResponse,
+            inProgressCount: attentionCounts.inProgressUnread,
+            completedCount: attentionCounts.completedNeedsEvaluation,
             onWithdrawSelected: withdrawSelectedPendingProposals
         )
     }

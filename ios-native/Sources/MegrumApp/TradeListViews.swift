@@ -38,8 +38,9 @@ struct TradeStageBar: View {
         } label: {
             HStack(spacing: 7) {
                 Text(stage.title)
-                Text("\(count)")
-                    .foregroundStyle(selectedStage == stage ? MegrumTheme.lavender : MegrumTheme.sky)
+                if count > 0 {
+                    TradeStageBadge(count: count, isSelected: selectedStage == stage)
+                }
             }
             .font(.system(size: 16, weight: .heavy, design: .rounded))
             .foregroundStyle(selectedStage == stage ? MegrumTheme.ink : MegrumTheme.muted)
@@ -48,8 +49,41 @@ struct TradeStageBar: View {
             .background(selectedStage == stage ? AnyShapeStyle(.white.opacity(0.9)) : AnyShapeStyle(.clear), in: Capsule())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("\(stage.title) \(count)件")
+        .accessibilityLabel(accessibilityLabel(for: stage, count: count))
         .accessibilityHint("やりとり一覧を\(stage.title)に切り替えます")
+    }
+
+    private func accessibilityLabel(for stage: TradeStage, count: Int) -> String {
+        guard count > 0 else {
+            return stage.title
+        }
+        return "\(stage.title) \(count)件"
+    }
+}
+
+private struct TradeStageBadge: View {
+    var count: Int
+    var isSelected: Bool
+
+    var body: some View {
+        Text(displayText)
+            .font(.system(size: 11, weight: .heavy, design: .rounded))
+            .foregroundStyle(.white)
+            .monospacedDigit()
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
+            .padding(.horizontal, displayText.count >= 3 ? 6 : 7)
+            .frame(minWidth: 22, minHeight: 22)
+            .background(badgeFill, in: Capsule())
+            .accessibilityHidden(true)
+    }
+
+    private var displayText: String {
+        count > 99 ? "99+" : "\(count)"
+    }
+
+    private var badgeFill: some ShapeStyle {
+        isSelected ? MegrumTheme.lavender : MegrumTheme.sky
     }
 }
 

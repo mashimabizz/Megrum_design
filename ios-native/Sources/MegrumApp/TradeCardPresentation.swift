@@ -9,6 +9,7 @@ struct TradeCardPresentation: Equatable {
     var updatedText: String
     var readState: TradeCardReadState
     var unreadBadgeCount: Int
+    var needsEvaluationAttention: Bool
     var meetupSummaryText: String?
     var conditionIconSystemName: String
 
@@ -46,6 +47,11 @@ struct TradeCardPresentation: Equatable {
             messages: messages,
             viewerLastReadAt: viewerLastReadAt,
             needsAction: needsAction
+        )
+        self.needsEvaluationAttention = TradeEvaluationAttentionPolicy.needsViewerEvaluation(
+            proposal: proposal,
+            viewerID: viewerID,
+            messages: messages
         )
         let conditionSummary = TradeExchangeConditionSummary.make(for: proposal)
         self.meetupSummaryText = conditionSummary.text
@@ -95,7 +101,7 @@ struct TradeCardPresentation: Equatable {
         }
     }
 
-    private static func needsAction(proposal: TradeProposal, viewerID: UUID?) -> Bool {
+    static func needsAction(proposal: TradeProposal, viewerID: UUID?) -> Bool {
         guard let viewerID else {
             return false
         }

@@ -86,7 +86,12 @@ extension TradeDetailScreen {
                     .padding(.top, 10)
                     .padding(.bottom, 2)
                     .background(.regularMaterial)
-                } else if currentProposal.status == .completed, !evaluationPromptState.hasSubmittedEvaluation {
+                } else if TradeEvaluationAttentionPolicy.needsViewerEvaluation(
+                    proposal: currentProposal,
+                    viewerID: appState.viewer?.id,
+                    messages: messages,
+                    localSubmission: didSubmitEvaluation
+                ) {
                     TradeEvaluationNextStepFooter(
                         isSubmitting: appState.submittingEvaluationProposalID == currentProposal.id,
                         action: {

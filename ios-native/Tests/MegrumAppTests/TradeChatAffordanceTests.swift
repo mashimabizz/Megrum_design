@@ -27,6 +27,121 @@ final class TradeChatAffordanceTests: XCTestCase {
         XCTAssertTrue(TradeStage.completed.emptyMessage.contains("終了"))
     }
 
+
+
+    func testTradeStageAttentionCountsTrackFooterBadgeTargets() {
+        let viewerID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+        let partnerID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+        let base = Date(timeIntervalSince1970: 1_800_000_000)
+        let incomingPending = makeProposal(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000091")!,
+            senderID: partnerID,
+            receiverID: viewerID,
+            status: .sent,
+            createdAt: base
+        )
+        let outgoingPending = makeProposal(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000092")!,
+            senderID: viewerID,
+            receiverID: partnerID,
+            status: .sent,
+            createdAt: base
+        )
+        let inProgressUnread = makeProposal(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000093")!,
+            senderID: viewerID,
+            receiverID: partnerID,
+            status: .agreed,
+            createdAt: base
+        )
+        let inProgressRead = makeProposal(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000094")!,
+            senderID: viewerID,
+            receiverID: partnerID,
+            status: .agreed,
+            createdAt: base
+        )
+        let completedNeedsEvaluation = makeProposal(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000095")!,
+            senderID: viewerID,
+            receiverID: partnerID,
+            status: .completed,
+            createdAt: base
+        )
+        let completedEvaluated = makeProposal(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000096")!,
+            senderID: viewerID,
+            receiverID: partnerID,
+            status: .completed,
+            createdAt: base
+        )
+        let completedWithoutSettlement = makeProposal(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000098")!,
+            senderID: viewerID,
+            receiverID: partnerID,
+            status: .completed,
+            createdAt: base,
+            isCompletedTradeSettled: false
+        )
+        let cancelled = makeProposal(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000097")!,
+            senderID: viewerID,
+            receiverID: partnerID,
+            status: .cancelled,
+            createdAt: base
+        )
+        let messagesByProposalID: [UUID: [TradeMessage]] = [
+            inProgressUnread.id: [
+                tradeMessage(
+                    proposalID: inProgressUnread.id,
+                    senderID: partnerID,
+                    createdAt: base.addingTimeInterval(60)
+                )
+            ],
+            inProgressRead.id: [
+                tradeMessage(
+                    proposalID: inProgressRead.id,
+                    senderID: partnerID,
+                    createdAt: base.addingTimeInterval(90)
+                )
+            ],
+            completedEvaluated.id: [
+                TradeMessage(
+                    id: UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaa0096")!,
+                    proposalID: completedEvaluated.id,
+                    senderID: viewerID,
+                    messageType: .system,
+                    body: TradeEvaluationSystemMessage.body(actorDisplayName: "みち", actorHandle: "michi"),
+                    meta: ["action": TradeEvaluationSystemMessage.action],
+                    createdAt: base.addingTimeInterval(120)
+                )
+            ]
+        ]
+
+        let counts = TradeStageAttentionCounts(
+            proposals: [
+                incomingPending,
+                outgoingPending,
+                inProgressUnread,
+                inProgressRead,
+                completedNeedsEvaluation,
+                completedEvaluated,
+                completedWithoutSettlement,
+                cancelled
+            ],
+            messagesByProposalID: messagesByProposalID,
+            viewerReadAtByProposalID: [
+                inProgressRead.id: base.addingTimeInterval(120)
+            ],
+            viewerID: viewerID
+        )
+
+        XCTAssertEqual(counts.pendingNeedsResponse, 1)
+        XCTAssertEqual(counts.inProgressUnread, 1)
+        XCTAssertEqual(counts.completedNeedsEvaluation, 1)
+        XCTAssertEqual(counts.total, 3)
+    }
+
     func testTradeDetailSlideBackSwipeTracksOnlyRightHorizontalDrags() {
         XCTAssertEqual(
             TradeDetailSlideBackSwipeResolver.interactiveOffset(
@@ -555,6 +670,146 @@ final class TradeChatAffordanceTests: XCTestCase {
 
         XCTAssertEqual(presentation.readState, .unopened)
         XCTAssertEqual(presentation.unreadBadgeCount, 2)
+    }
+
+
+
+    func testTradeCardPresentationMarksSettledCompletedTradeAsEvaluationAttention() {
+        let viewerID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+        let partnerID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+        let proposal = makeProposal(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000316")!,
+            senderID: viewerID,
+            receiverID: partnerID,
+            status: .completed,
+            createdAt: Date(timeIntervalSince1970: 1_000)
+        )
+
+        XCTAssertTrue(
+            TradeCardPresentation(
+                proposal: proposal,
+                viewerID: viewerID,
+                profilesByUserID: [:],
+                messages: [],
+                now: Date(timeIntervalSince1970: 1_200)
+            ).needsEvaluationAttention
+        )
+    }
+
+    func testEvaluationAttentionRequiresSettledCompletedTradeAndMissingViewerEvaluation() {
+        let viewerID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+        let partnerID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+        let base = Date(timeIntervalSince1970: 1_800_000_000)
+        let settledCompleted = makeProposal(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000317")!,
+            senderID: viewerID,
+            receiverID: partnerID,
+            status: .completed,
+            createdAt: base
+        )
+        let completedWithoutSettlement = makeProposal(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000318")!,
+            senderID: viewerID,
+            receiverID: partnerID,
+            status: .completed,
+            createdAt: base,
+            isCompletedTradeSettled: false
+        )
+        let cancelled = makeProposal(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000319")!,
+            senderID: viewerID,
+            receiverID: partnerID,
+            status: .cancelled,
+            createdAt: base
+        )
+        let evaluationNotice = TradeMessage(
+            id: UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaa0317")!,
+            proposalID: settledCompleted.id,
+            senderID: viewerID,
+            messageType: .system,
+            body: TradeEvaluationSystemMessage.body(actorDisplayName: "みち", actorHandle: "michi"),
+            meta: ["action": TradeEvaluationSystemMessage.action],
+            createdAt: base.addingTimeInterval(60)
+        )
+
+        XCTAssertTrue(
+            TradeEvaluationAttentionPolicy.needsViewerEvaluation(
+                proposal: settledCompleted,
+                viewerID: viewerID,
+                messages: []
+            )
+        )
+        XCTAssertFalse(
+            TradeEvaluationAttentionPolicy.needsViewerEvaluation(
+                proposal: settledCompleted,
+                viewerID: viewerID,
+                messages: [evaluationNotice]
+            )
+        )
+        XCTAssertFalse(
+            TradeEvaluationAttentionPolicy.needsViewerEvaluation(
+                proposal: completedWithoutSettlement,
+                viewerID: viewerID,
+                messages: []
+            )
+        )
+        XCTAssertFalse(
+            TradeEvaluationAttentionPolicy.needsViewerEvaluation(
+                proposal: cancelled,
+                viewerID: viewerID,
+                messages: []
+            )
+        )
+    }
+
+    func testTradeListOrderingPrioritizesCompletedEvaluationAttention() {
+        let viewerID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+        let partnerID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+        let base = Date(timeIntervalSince1970: 1_800_000_000)
+        let needsEvaluationOlder = makeProposal(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000341")!,
+            senderID: viewerID,
+            receiverID: partnerID,
+            status: .completed,
+            createdAt: base.addingTimeInterval(10)
+        )
+        let evaluatedNewer = makeProposal(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000342")!,
+            senderID: viewerID,
+            receiverID: partnerID,
+            status: .completed,
+            createdAt: base.addingTimeInterval(20)
+        )
+        let cancelledNewest = makeProposal(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000343")!,
+            senderID: viewerID,
+            receiverID: partnerID,
+            status: .cancelled,
+            createdAt: base.addingTimeInterval(30)
+        )
+        let evaluationNotice = TradeMessage(
+            id: UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaa0342")!,
+            proposalID: evaluatedNewer.id,
+            senderID: viewerID,
+            messageType: .system,
+            body: TradeEvaluationSystemMessage.body(actorDisplayName: "みち", actorHandle: "michi"),
+            meta: ["action": TradeEvaluationSystemMessage.action],
+            createdAt: base.addingTimeInterval(40)
+        )
+
+        let sorted = TradeListOrdering.sorted(
+            [cancelledNewest, evaluatedNewer, needsEvaluationOlder],
+            viewerID: viewerID,
+            messagesByProposalID: [
+                evaluatedNewer.id: [evaluationNotice]
+            ]
+        )
+
+        XCTAssertEqual(sorted.map(\.id), [
+            needsEvaluationOlder.id,
+            evaluatedNewer.id,
+            cancelledNewest.id
+        ])
     }
 
     func testTradeCardPresentationMarksOpenedProposalUnreadWhenActivityChangesAfterRead() {
@@ -1521,9 +1776,11 @@ final class TradeChatAffordanceTests: XCTestCase {
         senderID: UUID,
         receiverID: UUID,
         status: ProposalStatus,
-        createdAt: Date = .now
+        createdAt: Date = .now,
+        isCompletedTradeSettled: Bool = true
     ) -> TradeProposal {
-        TradeProposal(
+        let isSettledCompleted = status == .completed && isCompletedTradeSettled
+        return TradeProposal(
             id: id,
             senderID: senderID,
             receiverID: receiverID,
@@ -1531,8 +1788,11 @@ final class TradeChatAffordanceTests: XCTestCase {
             exchangeMethod: .hand,
             senderGoodsIDs: [UUID(uuidString: "11111111-1111-1111-1111-111111111111")!],
             receiverGoodsIDs: [UUID(uuidString: "22222222-2222-2222-2222-222222222222")!],
-            agreedBySender: status == .agreed || status == .completed,
-            agreedByReceiver: status == .agreed || status == .completed,
+            agreedBySender: status == .agreed || isSettledCompleted,
+            agreedByReceiver: status == .agreed || isSettledCompleted,
+            approvedBySender: isSettledCompleted,
+            approvedByReceiver: isSettledCompleted,
+            completedAt: isSettledCompleted ? createdAt.addingTimeInterval(600) : nil,
             createdAt: createdAt
         )
     }

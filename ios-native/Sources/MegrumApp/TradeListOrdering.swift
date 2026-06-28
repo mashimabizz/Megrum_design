@@ -59,12 +59,14 @@ enum TradeListOrdering {
         let lhsReadPriority = readPriority(
             for: lhs,
             viewerID: viewerID,
+            messages: messagesByProposalID[lhs.id] ?? [],
             lastActivityAt: lhsActivityAt,
             viewerLastReadAt: viewerReadAtByProposalID[lhs.id]
         )
         let rhsReadPriority = readPriority(
             for: rhs,
             viewerID: viewerID,
+            messages: messagesByProposalID[rhs.id] ?? [],
             lastActivityAt: rhsActivityAt,
             viewerLastReadAt: viewerReadAtByProposalID[rhs.id]
         )
@@ -82,9 +84,18 @@ enum TradeListOrdering {
     private static func readPriority(
         for proposal: TradeProposal,
         viewerID: UUID?,
+        messages: [TradeMessage],
         lastActivityAt: Date,
         viewerLastReadAt: Date?
     ) -> Int {
+        if TradeEvaluationAttentionPolicy.needsViewerEvaluation(
+            proposal: proposal,
+            viewerID: viewerID,
+            messages: messages
+        ) {
+            return 0
+        }
+
         switch TradeCardPresentation.readState(
             for: proposal,
             viewerID: viewerID,
@@ -92,11 +103,11 @@ enum TradeListOrdering {
             viewerLastReadAt: viewerLastReadAt
         ) {
         case .unopened:
-            return 0
-        case .opened:
             return 1
-        case .waitingForReply:
+        case .opened:
             return 2
+        case .waitingForReply:
+            return 3
         }
     }
 }

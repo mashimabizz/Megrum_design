@@ -18,6 +18,7 @@ enum VisualQAInitialScreen: String, Equatable {
     case authEmailSignIn = "auth-email-sign-in"
     case authEmailSignUp = "auth-email-sign-up"
     case authPasswordReset = "auth-password-reset"
+    case accountSetup = "account-setup"
     case meguri
     case individualListings = "individual-listings"
     case individualListingHaves = "individual-listing-haves"
