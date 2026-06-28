@@ -190,7 +190,7 @@ enum NativePreviewData {
         MegrumNotification(
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000082")!,
             kind: .meguriBoardReply,
-            title: "掲示板に返信がありました",
+            title: "チャットルームに返信がありました",
             body: "物販列は今だと20分くらいです。",
             linkPath: "/meguri-board-thread?id=preview-board-thread-1",
             createdAt: Date(timeIntervalSinceNow: -420)

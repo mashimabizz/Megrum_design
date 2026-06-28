@@ -3,13 +3,16 @@
 > **目的**：Megrum の全エンティティのDBスキーマ設計と、状態・マッチング・取引のデータフロー定義。
 > 実装の正解集。`09_state_machines.md` と完全に整合させ、`10_glossary.md` の用語を使う。
 
-最終更新: 2026-06-27
-ステータス: Draft v2.50（iter1223 メグルムプラス課金導線と権限・無料上限を追加）
+最終更新: 2026-06-28
+ステータス: Draft v2.53（iter1226.93 めぐりプロフィールを追加）
 
 ## 最新化履歴
 
 | Rev | 日付 | 変更 |
 |---|---|---|
+| **v2.53** | **2026-06-28** | **iter1226.93 反映（めぐり内の表示名・アイコンを保存する `meguri_profiles` と保存RPCを追加。表示名は全ユーザー一意、変更は1ヶ月に1回まで）** |
+| **v2.52** | **2026-06-27** | **iter1226.14 反映（`notifications.kind='groom_liked'`、`notifications.groom_reaction_id`、グルーム/チャットルームカテゴリ別プッシュ設定、グルーム返信/めぐりメッセージ/チャットルーム通知のDBトリガー化を追加）** |
+| **v2.51** | **2026-06-27** | **iter1225 反映（グルームいいねで `expires_at` を3時間延長するRPC、グルーム通報/ブロック操作、掲示板匿名プロフィール、掲示板7日失効・1000返信ロック・1日2件作成上限を追加）** |
 | **v2.50** | **2026-06-27** | **iter1223 反映（メグルムプラス `megrum_plus_monthly` / `megrum_plus` を追加。個別募集無料3件上限、ホーム/検索優先表示、グルームアーカイブ無料10件上限、StoreKit購入同期RPCを定義）** |
 | v1.0 | 2026-04-27 | 初版（マスタ階層、availability_windows、proposals 等） |
 | **v2.0** | **2026-05-01** | **iter24/29/33/34 反映（meetup, outfit, location_share, 状態名統一、deals リネーム）** |
@@ -51,7 +54,7 @@
 | **v2.36** | **2026-06-14** | **iter614 反映（画像種別、対象種別、認識方式、汎用品質、profile_type を追加し、実写/アニメ/イラスト/漫画の候補付けを同じ保存形式で扱う）** |
 | **v2.37** | **2026-06-14** | **iter616 反映（グッズ登録時のメンバー候補付けを選択済み `groups_master` 文脈へ限定し、`kind='solo'` はL2指定不要として扱う）** |
 | **v2.38** | **2026-06-23** | **iter731 反映（Swift Native版が `user_entitlements` から `premium` / `meguri_plus` を読み、広告非表示や有料権限をサーバー集約値で判定する境界を追加）** |
-| **v2.39** | **2026-06-24** | **iter756 反映（`users.is_test_account` を追加し、ホーム候補から検証アカウントを除外。`goods_inventory.title` をdeprecated化し、候補表示はL1/L2/グッズ種別/タグのマスタを正とする）** |
+| **v2.39** | **2026-06-24** | **iter756 反映（`users.is_test_account` を追加し、ホーム候補から検証アカウントを除外。`goods_inventory.title` をdeprecated化し、候補表示はL1/L2/グッズ種別/シリーズのマスタを正とする）** |
 | **v2.40** | **2026-06-24** | **iter763 反映（`proposals.cash_offer` を片側が金額指定・片側がグッズの両方向に対応。`sender_have_ids` または `receiver_have_ids` のどちらか一方が空の金額打診を許容）** |
 | **v2.41** | **2026-06-24** | **iter765 反映（`proposals.cash_amount_side` を追加し、金額指定が `sender` / `receiver` のどちら側かを保存。金額指定側にもグッズを同時に含められるようCHECKを更新）** |
 | **v2.42** | **2026-06-24** | **iter787 反映（個別募集に `at_least` ロジックを追加し、譲側 `have_min_count` / 求側 `listing_wish_options.min_count` で「何個以上」を保存。既存 qty は各アイテム数量として維持）** |
@@ -347,6 +350,7 @@ RLS / 権限（iter278）：
 | カラム | 型 | 説明 |
 |---|---|---|
 | `user_id` | uuid | → users。PK 相当（1ユーザー1件） |
+| `payment_methods` | text[] | 支払い方法設定画面のチェック状態。`bank_transfer` / `paypay` / `cash_exchange` / `other`。`users.payment_methods` と同期して保存する |
 | `bank_name` | text nullable | 銀行名 |
 | `bank_branch_name` | text nullable | 支店名 |
 | `bank_account_type` | text nullable | 普通などの口座種別 |
@@ -357,26 +361,46 @@ RLS / 権限（iter278）：
 
 運用ルール：
 - RLS は本人だけが SELECT / INSERT / UPDATE / DELETE できる。
-- `users.payment_methods` は対応可能な方法の要約、`user_payment_settings` は本人専用の詳細として扱う。
+- `users.payment_methods` は対応可能な方法の要約、`user_payment_settings.payment_methods` は設定画面の再読込用の本人専用コピーとして扱う。保存時は両方を同期する。
 - 口座詳細をホーム候補や公開プロフィールのSELECT経路へ混ぜない。
 - `cash_offer=true` の打診が成立した時点で、`respond_to_proposal_for_viewer` が本人専用行を `proposals.sender_payment_settings` / `receiver_payment_settings` へスナップショット化する。
 
+### `user_exchange_settings`（標準交換条件 / iter1226.32）
+
+本人が設定一覧の「交換条件の設定」から編集する、ユーザー単位の標準交換条件テーブル。相手プロフィールの「交換条件」から読み取り専用で表示する公開寄りの条件として扱う。個別募集ごとの条件は既存どおり `individual_listings.note` 内の交換条件サマリを正とし、このテーブルは全体の標準条件を補足する。
+
+| カラム | 型 | 説明 |
+|---|---|---|
+| `user_id` | uuid | → users。PK 相当（1ユーザー1件） |
+| `preference` | text | `local` / `mail` / `both`。現地・発送での交換可否 |
+| `local_prefecture` | text nullable | 現地交換の主な都道府県 |
+| `local_date_keys` | text[] | 現地交換できる日付キー配列（`YYYY-MM-DD`） |
+| `local_date_details` | jsonb | 日付キーごとの都道府県・補足メモ |
+| `mail_shipping_fee` | text | `owner` / `partner` / `negotiate`。送料負担方針 |
+| `mail_shipping_days` | text | `oneDay` / `twoToFourDays` / `afterFiveDays`。発送目安 |
+| `created_at` / `updated_at` | timestamptz | |
+
+運用ルール：
+- RLS は認証済みユーザーが SELECT でき、INSERT / UPDATE は本人だけができる。
+- 相手プロフィールではこの行を読み取り専用で表示し、編集導線は出さない。
+- 取引の打診・合意時点の条件スナップショットは既存の打診データ側を正とし、このテーブルの後続変更で履歴を上書きしない。
+
 ### `notifications`（通知一覧 / iter92, iter276）
 
-アプリ内の通知一覧と未読バッジの基礎テーブル。打診、取引チャット、グルーム返信、めぐりメッセージ、スポット掲示板返信/メンション、運営通知などの通知を保存する。
+アプリ内の通知一覧と未読バッジの基礎テーブル。打診、取引チャット、グルームいいね/返信、めぐりメッセージ、チャットルーム返信/メンション、運営通知などの通知を保存する。
 
 | カラム | 型 | 説明 |
 |---|---|---|
 | `id` | uuid | PK |
 | `user_id` | uuid | 通知を受け取るユーザー |
-| `kind` | text | `proposal_received` / `message_received` / `groom_reply` / `meguri_board_reply` / `admin_announcement` など |
+| `kind` | text | `proposal_received` / `message_received` / `groom_liked` / `groom_reply` / `meguri_message` / `meguri_board_reply` / `admin_announcement` など |
 | `title` / `body` | text | 通知一覧と端末通知に表示する内容 |
 | `link_path` | text nullable | タップ時の遷移先 |
-| `proposal_id` / `message_id` / `evidence_photo_id` / `evaluation_id` / `dispute_id` ほか | uuid nullable | 関連エンティティ |
+| `proposal_id` / `message_id` / `evidence_photo_id` / `evaluation_id` / `dispute_id` / `groom_reply_id` / `groom_reaction_id` / `meguri_message_id` / `meguri_board_thread_id` / `meguri_board_reply_id` ほか | uuid nullable | 関連エンティティ |
 | `read_at` | timestamptz nullable | nullなら未読 |
 | `created_at` | timestamptz | |
 
-iter276以降、`notifications` に行が追加されると、`notification_devices` の有効トークンへExpo Pushを送るDBトリガーが動く。iter338以降、Swift Native iOS版はAPNs tokenを保存する。iter344で `send-apns-notification` Edge Functionを追加し、iter345でDB triggerからも `app.settings.apns_dispatch_url` / `app.settings.apns_dispatch_secret` が設定済みの場合だけAPNs配送Functionへ `notification_id` を渡すようにした。iter1219以降、打診受信/再打診/見送り/成立、取引チャットメッセージ、キャンセル要請、証跡写真、取引完了、相互評価完了はDB triggerまたはRPC内で `notifications` 行を作成する。iter1222以降、管理者画面の `notifications.send` 権限を持つ管理者は `admin_announcement` を任意ユーザーまたは有効ユーザー全体へ作成できる。`user_notification_settings.push_enabled=false` の場合もアプリ内通知行は残り、OSプッシュ配送だけを止める。
+iter276以降、`notifications` に行が追加されると、`notification_devices` の有効トークンへExpo Pushを送るDBトリガーが動く。iter338以降、Swift Native iOS版はAPNs tokenを保存する。iter344で `send-apns-notification` Edge Functionを追加し、iter345でDB triggerからも `app.settings.apns_dispatch_url` / `app.settings.apns_dispatch_secret` が設定済みの場合だけAPNs配送Functionへ `notification_id` を渡すようにした。iter1219以降、打診受信/再打診/見送り/成立、取引チャットメッセージ、キャンセル要請、証跡写真、取引完了、相互評価完了はDB triggerまたはRPC内で `notifications` 行を作成する。iter1222以降、管理者画面の `notifications.send` 権限を持つ管理者は `admin_announcement` を任意ユーザーまたは有効ユーザー全体へ作成できる。iter1226.14以降、グルームいいね、グルーム返信、通常めぐりメッセージ、チャットルーム投稿/返信、チャットルームメンションもDB triggerで通知行を作成する。`user_notification_settings.push_enabled=false` またはカテゴリ別プッシュ設定がOFFの場合もアプリ内通知行は残り、OSプッシュ配送だけを止める。
 
 ### `user_notification_settings`（通知設定 / iter93, iter276）
 
@@ -385,9 +409,11 @@ iter276以降、`notifications` に行が追加されると、`notification_devi
 | `user_id` | uuid | PK |
 | `email_enabled` | boolean | 既存互換の通知チャネル設定 |
 | `push_enabled` | boolean | iOS/Androidのモバイル通知を受け取るか |
+| `groom_activity_push_enabled` | boolean | グルームいいね・グルーム返信・めぐりメッセージを端末プッシュするか |
+| `chatroom_activity_push_enabled` | boolean | チャットルーム投稿/返信・メンションを端末プッシュするか |
 | `created_at` / `updated_at` | timestamptz | |
 
-アプリ内通知一覧は常時残る。`push_enabled=false` の場合は端末通知だけを止める。
+アプリ内通知一覧は常時残る。`push_enabled=false` の場合は全端末通知だけを止める。`groom_activity_push_enabled=false` は `groom_liked` / `groom_reply` / `meguri_message` の端末通知だけを止め、`chatroom_activity_push_enabled=false` は `meguri_board_reply` / `meguri_board_mention` の端末通知だけを止める。
 
 ### `notification_devices`（モバイル通知端末 / iter276, iter338）
 
@@ -451,6 +477,8 @@ iter162.49 で iOS めぐりホームに追加した、写真中心の24時間�
 | `expires_at` | timestamptz nullable | 通常は `published_at + interval '24 hours'` |
 | `created_at` / `updated_at` | timestamptz | |
 
+iter1225 以降、いいね操作は `set_groom_like_for_viewer(p_post_id,p_is_liked)` RPC を使う。新規いいねが作成された時だけ `expires_at` を `greatest(expires_at, now()) + interval '3 hours'` へ延長し、重複いいねや取り消しでは期限を延長/短縮しない。`list_groom_feed_nearby()` は表示用 `like_count` を返す。
+
 ### `groom_reactions`（グルームいいね / iter164）
 
 | カラム | 型 | 説明 |
@@ -461,7 +489,7 @@ iter162.49 で iOS めぐりホームに追加した、写真中心の24時間�
 | `reaction_type` | text | 初期は `like` のみ |
 | `created_at` | timestamptz | |
 
-`unique (groom_post_id, user_id, reaction_type)` で同一ユーザーの重複いいねを防ぐ。アプリ側は現在ユーザーの liked 状態だけを取得する。
+`unique (groom_post_id, user_id, reaction_type)` で同一ユーザーの重複いいねを防ぐ。アプリ側は現在ユーザーの liked 状態だけを取得する。iter1226.14以降、新規いいねが作成された時だけ `notifications.kind='groom_liked'` と `notifications.groom_reaction_id` を使って投稿者に通知を残す。
 
 ### `groom_views`（グルーム閲覧済み / iter164）
 
@@ -488,7 +516,7 @@ iter162.49 で iOS めぐりホームに追加した、写真中心の24時間�
 | `read_at` | timestamptz nullable | 受信者がめぐりメッセージで開いた時刻 |
 | `created_at` | timestamptz | |
 
-`notifications.kind='groom_reply'` と `notifications.groom_reply_id` を追加し、受信者に通知を残す。
+`notifications.kind='groom_reply'` と `notifications.groom_reply_id` を使い、受信者に通知を残す。iter1226.14以降、通知行はDB triggerで作成し、タイトルは「表示名さんからメッセージが届きました！」形式、bodyには返信本文プレビューを入れない。
 
 ### `groom_hidden_posts`（グルーム非表示 / iter165）
 
@@ -525,6 +553,21 @@ iter162.49 で iOS めぐりホームに追加した、写真中心の24時間�
 | `status` | text | `open` / `reviewing` / `resolved` / `dismissed` |
 | `created_at` / `updated_at` | timestamptz | |
 
+### `meguri_profiles`（めぐりプロフィール / iter1226.93）
+
+めぐり内で表示する名前・アイコンを通常プロフィールとは分けて保存する。グルーム投稿、グルームへのいいね・メッセージ、チャットルームの作成者/参加者表示で優先的に使う。
+
+| カラム | 型 | 説明 |
+|---|---|---|
+| `user_id` | uuid | → users。PK |
+| `display_name` | text | めぐり内表示名。1〜24文字 |
+| `display_name_key` | text | 空白を除去して小文字化した一意判定キー |
+| `avatar_id` | text | `avatar_1`〜`avatar_6` |
+| `last_changed_at` | timestamptz | 最後に名前またはアイコンを変更した時刻 |
+| `created_at` / `updated_at` | timestamptz | |
+
+`display_name_key` は全ユーザーで一意。保存は `set_meguri_profile_for_viewer(display_name, avatar_id)` RPC を使い、既存値から変更がある場合は `last_changed_at` から1ヶ月経過していないと拒否する。同じ値の再保存は許可する。
+
 ### `meguri_messages`（めぐりあいメッセージ / iter165）
 
 グルーム返信後の通常会話を永続化する追記型メッセージ。静的プレビュー相手などUUIDでない相手はローカルフォールバックを使うが、実ユーザー間ではDB同期される。
@@ -542,7 +585,7 @@ iter162.49 で iOS めぐりホームに追加した、写真中心の24時間�
 | `read_at` | timestamptz nullable | 受信者がスレッドを開いた時刻 |
 | `created_at` | timestamptz | |
 
-`notifications.kind='meguri_message'` と `notifications.meguri_message_id` を追加し、受信者に通知を残す。
+`notifications.kind='meguri_message'` と `notifications.meguri_message_id` を使い、受信者に通知を残す。iter1226.14以降、通常めぐりメッセージの通知行はDB triggerで作成し、タイトルは「表示名さんからメッセージが届きました！」形式、bodyにはメッセージプレビューを入れない。`source_groom_reply_id` がある行は `groom_reply` 通知と重複させない。
 iter168.43 以降、無料受信者に本文・画像パスを直接返さないため、通常表示は `list_meguri_messages_for_viewer()` RPC を使う。直接 `meguri_messages` をSELECTできるのは送信者本人、または `user_entitlements(feature_key='meguri_plus', active=true)` を持つ受信者に限定する。
 
 ### `meguri_board_threads`（スポット掲示板スレッド / iter168.73）
@@ -559,6 +602,8 @@ iter168.43 以降、無料受信者に本文・画像パスを直接返さない
 | `category` | text | `question` / `info` / `chat` / `trade` / `lost_found`。iter171 追加 |
 | `status` | text | `visible` / `hidden` / `archived` / `locked`。iter171 追加 |
 | `is_pinned` | boolean | 運営/将来管理用の固定表示フラグ。iter171 追加 |
+| `anonymous_display_name` | text nullable | iter1225 追加。掲示板ごとの匿名表示名。未指定なら通常プロフィール名へフォールバック |
+| `anonymous_avatar_id` | text nullable | iter1225 追加。`avatar_1`〜`avatar_6` の仮アバターID。後で画像差し替え可能 |
 | `audience_scope` | text | `nearby_3km` / `same_prefecture`。`same_spot` / `global` は過去データ互換 |
 | `spot_key` | text nullable | 互換用の粗いスポットキー。新規仕様では閲覧判定の主軸にしない |
 | `spot_label` | text nullable | 画面表示用のスポット名 |
@@ -570,6 +615,7 @@ iter168.43 以降、無料受信者に本文・画像パスを直接返さない
 | `view_count` | integer | 詳細を開いた回数の集計。iter171 追加 |
 | `latest_reply_preview` | text nullable | 最新返信の先頭160字 |
 | `latest_activity_at` | timestamptz | スレッド作成または最新返信時刻 |
+| `expires_at` | timestamptz | iter1225 追加。最後の書き込みから7日後。期限切れは `archived` 化して通常表示から外す |
 | `created_at` / `updated_at` | timestamptz | |
 
 > **公開範囲方針**：`nearby_3km` は現在地と `origin_lat/origin_lng` の距離でRPC判定する。`same_prefecture` はスレッド作成時の都道府県と閲覧者側の都道府県で判定する。正確な緯度経度は画面に表示しない。
@@ -579,6 +625,8 @@ iter168.43 以降、無料受信者に本文・画像パスを直接返さない
 > **ブロック方針（iter178）**：`groom_user_blocks` に保存されたブロック関係はスポット掲示板にも適用する。ブロックした/された相手のスレッドは `can_view_meguri_board_thread*()` と一覧RPCで除外し、ローカル表示も即時に消す。
 
 > **参加中判定（iter188）**：`list_meguri_board_threads_for_viewer()` は `viewer_participated` を返す。閲覧者がスレッド作成者、または `status='visible'` の返信を書いている場合に true とする。通知購読 `viewer_subscribed` とは別概念。
+
+> **期限・上限（iter1225）**：スレッドは最後の書き込みから7日で `archived` 化する。返信追加時は `latest_activity_at` と `expires_at` を更新し、返信数が1000件に到達したら `locked` にする。スレッド作成はユーザー1人あたり1日2件までDBトリガーで制限する。
 
 ### `meguri_board_replies`（スポット掲示板返信 / iter168.73）
 
@@ -641,7 +689,7 @@ iter168.43 以降、無料受信者に本文・画像パスを直接返さない
 | `notification_enabled` | boolean | 返信通知を受け取るか |
 | `created_at` / `updated_at` | timestamptz | |
 
-スレッド作成者と返信者は自動で購読ONになる。ユーザーは一覧/詳細からON/OFFを切り替えられる。購読中スレッドに自分以外が返信した時は `notifications.kind='meguri_board_reply'` を作成し、`meguri_board_thread_id` / `meguri_board_reply_id` と `link_path='/meguri-board-thread?id=...'` を保存する。返信本文に `@handle` が含まれる場合は、本人以外かつスレッドを閲覧できる対象ユーザーに `notifications.kind='meguri_board_mention'` を作成し、通常の購読返信通知とは重複させない。iter178以降、返信者と通知先が `groom_user_blocks` で相互ブロック関係にある場合は返信通知・メンション通知を作成しない。
+スレッド作成者と返信者は自動で購読ONになる。ユーザーは一覧/詳細からON/OFFを切り替えられる。iter1226.14以降、スレッドに「参考になった」を付けたユーザーも購読ONになる。購読中スレッドに自分以外が返信した時は `notifications.kind='meguri_board_reply'` を作成し、`meguri_board_thread_id` / `meguri_board_reply_id` と `link_path='/meguri-board-thread?id=...'` を保存する。返信本文に `@handle` が含まれる場合は、本人以外かつスレッドを閲覧できる対象ユーザーに `notifications.kind='meguri_board_mention'` を作成し、通常の購読返信通知とは重複させない。チャットルーム通知のbodyには返信本文プレビューを入れない。iter178以降、返信者と通知先が `groom_user_blocks` で相互ブロック関係にある場合は返信通知・メンション通知を作成しない。
 
 ### `meguri_board_hidden_threads` / `meguri_board_reports`（非表示・通報 / iter171）
 
@@ -719,7 +767,7 @@ iter62（Phase A）で `exchange_type` 追加。
 | `description` | text nullable | |
 | `flexibility` | int | 1（厳格）〜 5（緩い）。character/goods_type の照合スキップ条件 |
 | `priority` | int | 1（高）〜 5（低）。マッチング表示順に使用 |
-| `exchange_type` | text default `any` | iter62、`same_kind` / `cross_kind` / `any`。**自己申告タグ**、システム判定なし（カードに chip 表示のみ） |
+| `exchange_type` | text default `any` | iter62、`same_kind` / `cross_kind` / `any`。**自己申告シリーズ**、システム判定なし（カードに chip 表示のみ） |
 | `status` | text | `active`（探し中）/ `matched`（マッチあり）/ `in_negotiation`（打診中）/ `achieved`（達成）（09 Wish Lifecycleと整合） |
 | `created_at` / `updated_at` | timestamptz | |
 
@@ -840,7 +888,7 @@ RLS / 権限（iter278）：
 - `status='enabled'` のAW読み取りは `authenticated` のみに限定し、匿名ユーザーには公開しない。
 - 更新ポリシーは `using (auth.uid() = user_id)` と `with check (auth.uid() = user_id)` の両方を持たせる。
 
-### `events`（公演／物販イベントタグ）
+### `events`（公演／物販イベントシリーズ）
 
 | カラム | 型 | 説明 |
 |---|---|---|
@@ -851,12 +899,12 @@ RLS / 権限（iter278）：
 | `venue_name` | text | "ナゴヤドーム" |
 | `genre_id` | uuid | → genres_master |
 | `group_id` | uuid nullable | → groups_master |
-| `created_by` | uuid | → users（ユーザー作成タグ） |
+| `created_by` | uuid | → users（ユーザー作成シリーズ） |
 | `is_verified` | boolean | 運営承認済か（重複名寄せ後） |
 | `created_at` | timestamptz | |
 
 ⚠️ 要確認：
-- ユーザー作成タグの即公開 vs 運営承認後公開
+- ユーザー作成シリーズの即公開 vs 運営承認後公開
 - 重複検出（同名・同会場・同時間）の自動マージ運用
 
 ### `schedules`（個人スケジュール）— 新規（iter67）
@@ -904,7 +952,7 @@ iter28（match_type）/ iter29（数量）/ iter30（7日期限）/ iter32（合
 | `receiver_have_qtys` | int[] | 各 IDの選択数 |
 | `message` | text | |
 | `exchange_method` | text | `hand` / `mail` / `both`。提案単位の受け渡し方法 |
-| `option_tags` | text[] default `{}` | iter170、打診条件タグ。例：即日発送 / 同日発送 / 終演後OK |
+| `option_tags` | text[] default `{}` | iter170、打診条件シリーズ。例：即日発送 / 同日発送 / 終演後OK |
 | `status` | text | `draft` / `sent` / `negotiating` / `agreement_one_side` / `agreed` / `rejected` / `expired`（09と一致） |
 | `agreed_by_sender` | boolean default false | iter32、agreement_one_side 判定用 |
 | `agreed_by_receiver` | boolean default false | iter32 |
@@ -1469,7 +1517,7 @@ RLS:
 
 詳細は `notes/18_matching_v2_design.md` の「2026-06-13 現行ホーム判定仕様（最新）」を正とする。
 
-ホームは「完全マッチ / forward / backward」などのユーザー向け棚では分けない。カードごとに `グッズ条件`、`交換条件`、`支払い条件` を判定し、そのうえで現行ホームの `ユーザー×タグでマッチ` / `ユーザーでマッチ` / `譲るものから見る` へ振り分ける。
+ホームは「完全マッチ / forward / backward」などのユーザー向け棚では分けない。カードごとに `グッズ条件`、`交換条件`、`支払い条件` を判定し、そのうえで現行ホームの `ユーザー×シリーズでマッチ` / `ユーザーでマッチ` / `譲るものから見る` へ振り分ける。
 
 #### グッズ条件
 
@@ -1507,12 +1555,12 @@ RLS:
 
 `account` / `口座` は独立した支払い方法として扱わない。銀行口座の詳細は `user_payment_settings` に本人専用データとして保存し、ホーム候補や公開プロフィールのSELECT経路には出さない。相手向けの取引前表示は `銀行振込 / PayPay / 現金交換 / メルペイ相談可` のような要約に留める。
 
-#### タグ
+#### シリーズ
 
-- グッズタグはマッチング条件として使う。
-- 1つ以上一致すれば `ユーザー×タグでマッチ` に出す。
+- グッズシリーズはマッチング条件として使う。
+- 1つ以上一致すれば `ユーザー×シリーズでマッチ` に出す。
 - 複数一致した場合は同じ棚の中で表示順位を上げる。
-- タグ一致は `グッズ条件◎/○/△` の判定には含めない。
+- シリーズ一致は `グッズ条件◎/○/△` の判定には含めない。
 
 #### Wish の L1 / L2
 
@@ -1550,8 +1598,8 @@ RPC:
 - `get_popular_search_terms(p_limit)`：直近30日の検索実績から人気検索を返す。
 
 検索結果分類:
-- 内部的に `matched` / `possible` / `none` を持つ場合でも、ユーザー向け棚は `ユーザー×タグでマッチ` / `ユーザーでマッチ` / `譲るものから見る` を正とする。
-- 検索結果にも `グッズ条件`、`交換条件`、`支払い条件`、タグ一致理由を持たせ、なぜ候補に出たかを説明できるようにする。
+- 内部的に `matched` / `possible` / `none` を持つ場合でも、ユーザー向け棚は `ユーザー×シリーズでマッチ` / `ユーザーでマッチ` / `譲るものから見る` を正とする。
+- 検索結果にも `グッズ条件`、`交換条件`、`支払い条件`、シリーズ一致理由を持たせ、なぜ候補に出たかを説明できるようにする。
 
 ⚠️ 要確認：
 - バッチ頻度（毎日 / 6h おき / 1h おき）
@@ -1588,7 +1636,7 @@ RPC:
 | 11 | user_wants | `matched` 状態の継続性（一度マッチ通知したら戻らない？） | 通知頻度 |
 | 12 | aw | `ended` から `archived` への自動遷移時間 | 09 未確定項目#2 と同じ |
 | 13 | aw | `auto_from_proposal` AW は取引cancel時に削除？保持？ | データ整合 |
-| 14 | events | ユーザー作成タグの即公開 vs 運営承認 | 運用負荷 |
+| 14 | events | ユーザー作成シリーズの即公開 vs 運営承認 | 運用負荷 |
 | 15 | events | 重複検出・自動マージのルール | データ品質 |
 | 16 | proposal_revisions | 履歴保存の粒度（毎修正全部 vs N件のみ） | ストレージ |
 | 18 | messages | system message の `event_type` 値リスト確定 | 実装明確化 |

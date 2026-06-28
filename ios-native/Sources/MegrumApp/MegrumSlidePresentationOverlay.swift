@@ -1,73 +1,4 @@
-import MegrumDesign
 import SwiftUI
-
-private struct MegrumBackSwipeHandledBySlidePresentationKey: EnvironmentKey {
-    static let defaultValue = false
-}
-
-struct MegrumSlidePresentationDismissAction: Sendable {
-    var action: @MainActor @Sendable () -> Void
-
-    @MainActor
-    func callAsFunction() {
-        action()
-    }
-}
-
-private struct MegrumSlidePresentationDismissKey: EnvironmentKey {
-    static let defaultValue: MegrumSlidePresentationDismissAction? = nil
-}
-
-extension EnvironmentValues {
-    var megrumBackSwipeHandledBySlidePresentation: Bool {
-        get { self[MegrumBackSwipeHandledBySlidePresentationKey.self] }
-        set { self[MegrumBackSwipeHandledBySlidePresentationKey.self] = newValue }
-    }
-
-    var megrumSlidePresentationDismiss: MegrumSlidePresentationDismissAction? {
-        get { self[MegrumSlidePresentationDismissKey.self] }
-        set { self[MegrumSlidePresentationDismissKey.self] = newValue }
-    }
-}
-
-enum MegrumSlidePresentationMetrics {
-    static let leadingEdgeCaptureWidth: CGFloat = 24
-    static let minimumTranslation: CGFloat = 78
-    static let minimumPredictedTranslation: CGFloat = 132
-    static let horizontalDominance: CGFloat = 1.16
-    static let dismissFraction: CGFloat = 0.30
-    static let animation: Animation = .interactiveSpring(
-        response: 0.32,
-        dampingFraction: 0.88,
-        blendDuration: 0.04
-    )
-}
-
-enum MegrumSlideBackSwipeResolver {
-    static func interactiveOffset(translation: CGSize, screenWidth: CGFloat) -> CGFloat? {
-        guard translation.width > 0 else {
-            return nil
-        }
-        let isHorizontal = abs(translation.width) > abs(translation.height) * MegrumSlidePresentationMetrics.horizontalDominance
-        guard isHorizontal else {
-            return nil
-        }
-        return min(translation.width, screenWidth)
-    }
-
-    static func shouldDismiss(
-        translation: CGSize,
-        predictedEndTranslationWidth: CGFloat,
-        screenWidth: CGFloat
-    ) -> Bool {
-        guard let offset = interactiveOffset(translation: translation, screenWidth: screenWidth) else {
-            return false
-        }
-        return offset >= MegrumSlidePresentationMetrics.minimumTranslation
-            || predictedEndTranslationWidth >= MegrumSlidePresentationMetrics.minimumPredictedTranslation
-            || offset >= screenWidth * MegrumSlidePresentationMetrics.dismissFraction
-    }
-}
 
 struct MegrumSlideBoolPresentationOverlay<PresentedContent: View>: View {
     @Binding var isPresented: Bool
@@ -81,23 +12,14 @@ struct MegrumSlideBoolPresentationOverlay<PresentedContent: View>: View {
             if isPresented {
                 ZStack(alignment: .leading) {
                     content(dismissPresentation)
-                        .environment(\.megrumBackSwipeHandledBySlidePresentation, true)
-                        .environment(
-                            \.megrumSlidePresentationDismiss,
-                             MegrumSlidePresentationDismissAction(action: dismissPresentation)
+                        .megrumSlidePresentedContent(
+                            width: proxy.size.width,
+                            height: proxy.size.height,
+                            dragOffset: dragOffset,
+                            dismiss: dismissPresentation
                         )
-                        .frame(width: proxy.size.width, height: proxy.size.height)
-                        .background(MegrumTheme.canvas.ignoresSafeArea())
-                        .offset(x: dragOffset)
-                        .shadow(color: MegrumTheme.ink.opacity(0.16), radius: 24, x: -8, y: 0)
-                        .transition(.asymmetric(
-                            insertion: .move(edge: .trailing),
-                            removal: .move(edge: .trailing)
-                        ))
-                        .zIndex(1)
 
                     leadingEdgeSwipeCaptureArea(screenWidth: proxy.size.width, screenHeight: proxy.size.height)
-                        .zIndex(2)
                 }
             }
         }
@@ -142,10 +64,10 @@ struct MegrumSlideBoolPresentationOverlay<PresentedContent: View>: View {
     }
 
     private func leadingEdgeSwipeCaptureArea(screenWidth: CGFloat, screenHeight: CGFloat) -> some View {
-        Color.black.opacity(0.001)
-            .frame(width: MegrumSlidePresentationMetrics.leadingEdgeCaptureWidth, height: screenHeight)
-            .contentShape(Rectangle())
-            .gesture(backSwipeGesture(screenWidth: screenWidth), including: .gesture)
+        MegrumSlideLeadingEdgeSwipeCaptureArea(
+            screenHeight: screenHeight,
+            gesture: backSwipeGesture(screenWidth: screenWidth)
+        )
     }
 
     private func dismissPresentation() {
@@ -189,23 +111,14 @@ struct MegrumSlideItemPresentationOverlay<Item: Identifiable, PresentedContent: 
             if let item {
                 ZStack(alignment: .leading) {
                     content(item, dismissPresentation)
-                        .environment(\.megrumBackSwipeHandledBySlidePresentation, true)
-                        .environment(
-                            \.megrumSlidePresentationDismiss,
-                             MegrumSlidePresentationDismissAction(action: dismissPresentation)
+                        .megrumSlidePresentedContent(
+                            width: proxy.size.width,
+                            height: proxy.size.height,
+                            dragOffset: dragOffset,
+                            dismiss: dismissPresentation
                         )
-                        .frame(width: proxy.size.width, height: proxy.size.height)
-                        .background(MegrumTheme.canvas.ignoresSafeArea())
-                        .offset(x: dragOffset)
-                        .shadow(color: MegrumTheme.ink.opacity(0.16), radius: 24, x: -8, y: 0)
-                        .transition(.asymmetric(
-                            insertion: .move(edge: .trailing),
-                            removal: .move(edge: .trailing)
-                        ))
-                        .zIndex(1)
 
                     leadingEdgeSwipeCaptureArea(screenWidth: proxy.size.width, screenHeight: proxy.size.height)
-                        .zIndex(2)
                 }
             }
         }
@@ -250,10 +163,10 @@ struct MegrumSlideItemPresentationOverlay<Item: Identifiable, PresentedContent: 
     }
 
     private func leadingEdgeSwipeCaptureArea(screenWidth: CGFloat, screenHeight: CGFloat) -> some View {
-        Color.black.opacity(0.001)
-            .frame(width: MegrumSlidePresentationMetrics.leadingEdgeCaptureWidth, height: screenHeight)
-            .contentShape(Rectangle())
-            .gesture(backSwipeGesture(screenWidth: screenWidth), including: .gesture)
+        MegrumSlideLeadingEdgeSwipeCaptureArea(
+            screenHeight: screenHeight,
+            gesture: backSwipeGesture(screenWidth: screenWidth)
+        )
     }
 
     private func dismissPresentation() {

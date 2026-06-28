@@ -67,7 +67,9 @@ private struct ProposalFilterChip: View {
     var action: () -> Void
 
     var body: some View {
-        Button(action: action) {
+        Button {
+            MegrumHaptics.performSelectionChanged(action)
+        } label: {
             Text(title)
                 .font(.system(size: ProposalGoodsFilterMetrics.chipFontSize, weight: .heavy, design: .rounded))
                 .lineLimit(1)

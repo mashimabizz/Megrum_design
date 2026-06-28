@@ -72,7 +72,7 @@ struct MegrumRootDrawerDestinationSheet: View {
         case .paymentSettings:
             PaymentSettingsScreen(appState: appState, onClose: onClose)
         case .exchangeSettings:
-            HomeExchangeSettingsScreen(individualListings: appState.listings, onClose: onClose)
+            HomeExchangeSettingsScreen(appState: appState, individualListings: appState.listings, onClose: onClose)
         case .megrumPlus:
             SubscriptionSettingsScreen(appState: appState)
         case .settings, .help:

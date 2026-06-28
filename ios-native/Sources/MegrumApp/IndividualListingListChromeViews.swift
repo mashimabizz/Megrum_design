@@ -135,32 +135,26 @@ private struct IndividualListingConditionStripCard: View {
 
     var body: some View {
         Button(action: action) {
-            VStack(alignment: .leading, spacing: 7) {
-                Text("交換条件 \(index + 1)")
-                    .font(.system(size: 15, weight: .black, design: .rounded))
-                    .foregroundStyle(isSelected ? .white : MegrumTheme.ink)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.78)
-
-                Text("\(index + 1)/\(max(1, totalCount))")
-                    .font(.system(size: 17, weight: .heavy, design: .rounded))
-                    .foregroundStyle(isSelected ? .white.opacity(0.92) : MegrumTheme.lavender)
-                    .monospacedDigit()
-            }
-            .padding(.horizontal, 16)
-            .frame(width: 136, height: 74, alignment: .leading)
+            Text(IndividualListingListPresentation.conditionStripTitle(index: index, totalCount: totalCount))
+                .font(.system(size: 15, weight: .black, design: .rounded))
+                .foregroundStyle(isSelected ? .white : MegrumTheme.ink)
+                .lineLimit(1)
+                .minimumScaleFactor(0.78)
+                .monospacedDigit()
+                .padding(.horizontal, 16)
+                .frame(height: 46)
             .background(
                 isSelected ? MegrumTheme.lavender : Color.white.opacity(0.88),
-                in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+                in: Capsule()
             )
             .overlay {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                Capsule()
                     .strokeBorder(isSelected ? MegrumTheme.lavender.opacity(0.35) : MegrumTheme.ink.opacity(0.08), lineWidth: 1)
             }
             .shadow(color: isSelected ? MegrumTheme.lavender.opacity(0.20) : .clear, radius: 12, y: 6)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("交換条件\(index + 1)")
+        .accessibilityLabel(IndividualListingListPresentation.conditionStripTitle(index: index, totalCount: totalCount))
         .accessibilityValue(isSelected ? "選択中" : "\(totalCount)件中\(index + 1)件目")
     }
 }

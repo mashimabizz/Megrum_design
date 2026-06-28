@@ -79,6 +79,37 @@ struct GroomReactionPayload: Encodable, Sendable {
     var reactionType = "like"
 }
 
+struct GroomLikeTogglePayload: Encodable, Sendable {
+    var pPostID: UUID
+    var pIsLiked: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case pPostID
+        case pIsLiked
+    }
+}
+
+struct GroomReportPayload: Encodable, Sendable {
+    var groomPostID: UUID
+    var note: String?
+    var reason: String
+    var reportedUserID: UUID
+    var reporterID: UUID
+
+    init(reporterID: UUID, input: GroomReportCreateInput) {
+        self.groomPostID = input.groomPostID
+        self.note = SupabaseTextNormalizer.optional(input.note)
+        self.reason = input.reason.rawValue
+        self.reportedUserID = input.reportedUserID
+        self.reporterID = reporterID
+    }
+}
+
+struct GroomBlockPayload: Encodable, Sendable {
+    var blockedID: UUID
+    var blockerID: UUID
+}
+
 struct GroomReplyPayload: Encodable, Sendable {
     var body: String
     var groomPostID: UUID
@@ -105,18 +136,17 @@ struct GroomSnapshotPayload: Encodable, Sendable {
     }
 }
 
-struct GroomReplyNotificationPayload: Encodable, Sendable {
+struct GroomReplyMeguriMessagePayload: Encodable, Sendable {
     var body: String
-    var groomReplyID: UUID
-    var kind = "groom_reply"
-    var linkPath: String
-    var title = "グルームに返信が届きました"
-    var userID: UUID
+    var messageType = "text"
+    var recipientID: UUID
+    var senderID: UUID
+    var sourceGroomReplyID: UUID
 
     init(reply: GroomReply) {
-        self.body = String(reply.body.prefix(120))
-        self.groomReplyID = reply.id
-        self.linkPath = "/meguri-letters?open=1&userId=\(reply.senderID.uuidString.lowercased())"
-        self.userID = reply.recipientID
+        self.body = reply.body.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.recipientID = reply.recipientID
+        self.senderID = reply.senderID
+        self.sourceGroomReplyID = reply.id
     }
 }

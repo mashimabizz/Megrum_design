@@ -17,7 +17,7 @@ struct GroomStoryComposerHeader: View {
 
             Spacer()
 
-            Text(hasPhotoDraft ? "投稿前の確認" : "グルームに追加")
+            Text("グルームに追加")
                 .font(.system(size: 20, weight: .heavy, design: .rounded))
                 .foregroundStyle(.white)
 
@@ -40,12 +40,14 @@ struct GroomStoryComposerStepContent: View {
     var isCreating: Bool
     var canUseCamera: Bool
     var cameraSubtitle: String
+    var locksCreationCoordinate: Bool
     var currentCoordinate: MegrumLocationCoordinate?
     var isRequestingLocation: Bool
     var canCreateAtSelectedLocation: Bool
     var onRequestLocation: () -> Void
     var onOpenCamera: () -> Void
     var onOutOfRange: (String) -> Void
+    var onSelectPhotoData: (Data, String) -> Void
     var onPublish: () -> Void
     var onResetPhotoDraft: () -> Void
     var onPrepareFinalStep: () -> Void
@@ -59,6 +61,7 @@ struct GroomStoryComposerStepContent: View {
                 currentCoordinate: currentCoordinate,
                 isRequestingLocation: isRequestingLocation,
                 isCreating: isCreating,
+                locksCreationCoordinate: locksCreationCoordinate,
                 canCreateAtSelectedLocation: canCreateAtSelectedLocation,
                 onRequestLocation: onRequestLocation,
                 onOutOfRange: onOutOfRange,
@@ -73,7 +76,9 @@ struct GroomStoryComposerStepContent: View {
                 isCreating: isCreating,
                 canUseCamera: canUseCamera,
                 cameraSubtitle: cameraSubtitle,
-                onOpenCamera: onOpenCamera
+                locksCreationCoordinate: locksCreationCoordinate,
+                onOpenCamera: onOpenCamera,
+                onSelectPhotoData: onSelectPhotoData
             )
         }
     }

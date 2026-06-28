@@ -21,7 +21,7 @@ struct GoodsSelectionFooter: View {
                 }
 
                 HStack(spacing: GoodsSelectionFooterMetrics.actionSpacing) {
-                    GoodsSelectionFooterButton(title: "タグをつける", systemImage: "tag", role: nil, action: onTag)
+                    GoodsSelectionFooterButton(title: "シリーズを設定", systemImage: "tag", role: nil, action: onTag)
                     GoodsSelectionFooterButton(title: "削除する", systemImage: "trash", role: .destructive, action: onDelete)
                 }
             }
@@ -47,7 +47,9 @@ private struct GoodsSelectionFooterButton: View {
     var action: () -> Void
 
     var body: some View {
-        Button(role: role, action: action) {
+        Button(role: role) {
+            MegrumHaptics.performButtonTap(action)
+        } label: {
             Label(title, systemImage: systemImage)
                 .font(.system(size: 14, weight: .heavy, design: .rounded))
                 .lineLimit(1)

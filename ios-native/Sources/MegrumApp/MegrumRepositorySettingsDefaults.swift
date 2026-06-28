@@ -26,6 +26,14 @@ public extension MegrumRepository {
         []
     }
 
+    func loadBlockedUserIDs() async throws -> Set<UUID> {
+        []
+    }
+
+    func blockUser(_ userID: UUID) async throws -> BlockedUser {
+        throw MegrumRepositoryError.unsupportedMutation
+    }
+
     func unblockUser(_ userID: UUID) async throws {}
 
     func loadNotifications(limit: Int) async throws -> [MegrumNotification] {
@@ -40,12 +48,24 @@ public extension MegrumRepository {
         []
     }
 
+    func loadNotificationSettings() async throws -> UserNotificationSettings {
+        UserNotificationSettings()
+    }
+
     func loadPushNotificationsEnabled() async throws -> Bool {
         true
     }
 
     func setPushNotificationsEnabled(_ enabled: Bool) async throws -> Bool {
         enabled
+    }
+
+    func setGroomActivityPushNotificationsEnabled(_ enabled: Bool) async throws -> UserNotificationSettings {
+        UserNotificationSettings(groomActivityPushEnabled: enabled)
+    }
+
+    func setChatroomActivityPushNotificationsEnabled(_ enabled: Bool) async throws -> UserNotificationSettings {
+        UserNotificationSettings(chatroomActivityPushEnabled: enabled)
     }
 
     func registerNativePushDeviceToken(_ token: String, appVersion: String?) async throws {}

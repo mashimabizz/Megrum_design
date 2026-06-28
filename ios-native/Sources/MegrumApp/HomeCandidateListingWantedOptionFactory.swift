@@ -7,6 +7,7 @@ enum HomeCandidateListingWantedOptionFactory {
         from option: SupabaseHomeListingWishOptionRow,
         viewerInventory: [SupabaseHomeGoodsRow],
         previewInventory: [SupabaseHomeGoodsRow] = [],
+        tagsByInventoryID: [UUID: [SupabaseHomeInventoryTagRow]] = [:],
         includesCash: Bool
     ) -> HomeIndividualListingWantedOption? {
         let logic = ListingLogic(rawValue: option.logic ?? "") ?? .one
@@ -35,7 +36,8 @@ enum HomeCandidateListingWantedOptionFactory {
             previewItems: previewItems(
                 for: option,
                 matchingItems: matchingItems,
-                previewInventory: previewInventory
+                previewInventory: previewInventory,
+                tagsByInventoryID: tagsByInventoryID
             )
         )
     }
@@ -44,6 +46,7 @@ enum HomeCandidateListingWantedOptionFactory {
         from option: SupabaseHomeListingWishOptionRow,
         viewerInventory: [SupabaseHomeGoodsRow],
         previewInventory: [SupabaseHomeGoodsRow],
+        tagsByInventoryID: [UUID: [SupabaseHomeInventoryTagRow]] = [:],
         includesCash: Bool
     ) -> HomeIndividualListingWantedOption? {
         let logic = ListingLogic(rawValue: option.logic ?? "") ?? .one
@@ -60,7 +63,8 @@ enum HomeCandidateListingWantedOptionFactory {
         let previews = previewItems(
             for: option,
             matchingItems: matchingItems,
-            previewInventory: previewInventory
+            previewInventory: previewInventory,
+            tagsByInventoryID: tagsByInventoryID
         )
         let hasConfiguredCondition = !option.wishIds.isEmpty || option.wishGroupId != nil || option.wishGoodsTypeId != nil
         guard hasConfiguredCondition || !previews.isEmpty else {
@@ -157,7 +161,8 @@ enum HomeCandidateListingWantedOptionFactory {
     private static func previewItems(
         for option: SupabaseHomeListingWishOptionRow,
         matchingItems: [SupabaseHomeGoodsRow],
-        previewInventory: [SupabaseHomeGoodsRow]
+        previewInventory: [SupabaseHomeGoodsRow],
+        tagsByInventoryID: [UUID: [SupabaseHomeInventoryTagRow]]
     ) -> [HomeIndividualListingWantedPreviewItem] {
         var previewInventoryByID: [UUID: SupabaseHomeGoodsRow] = [:]
         for row in previewInventory where previewInventoryByID[row.id] == nil {
@@ -176,8 +181,18 @@ enum HomeCandidateListingWantedOptionFactory {
             HomeIndividualListingWantedPreviewItem(
                 id: row.id,
                 title: row.title,
-                imageURL: row.photoUrls.compactMap(URL.init(string:)).first
+                imageURL: GoodsPhotoURLResolver.displayURL(from: row.photoUrls),
+                rawTagNames: rawTagNames(for: row.id, tagsByInventoryID: tagsByInventoryID)
             )
+        }
+    }
+
+    private static func rawTagNames(
+        for inventoryID: UUID,
+        tagsByInventoryID: [UUID: [SupabaseHomeInventoryTagRow]]
+    ) -> [String] {
+        tagsByInventoryID[inventoryID, default: []].compactMap { tag in
+            tag.label?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank
         }
     }
 

@@ -38,6 +38,17 @@ public extension MegrumRepository {
 
     func setGroomLiked(postID: UUID, isLiked: Bool) async throws {}
 
+    func reportGroom(_ input: GroomReportCreateInput) async throws -> GroomReportTicket {
+        GroomReportTicket(
+            id: UUID(),
+            groomPostID: input.groomPostID,
+            reportedUserID: input.reportedUserID,
+            reason: input.reason
+        )
+    }
+
+    func blockGroomUser(_ userID: UUID) async throws {}
+
     func sendGroomReply(_ input: GroomReplyCreateInput) async throws -> GroomReply {
         throw MegrumRepositoryError.unsupportedMutation
     }

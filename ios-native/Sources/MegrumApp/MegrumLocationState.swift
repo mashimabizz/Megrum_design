@@ -13,6 +13,9 @@ final class MegrumLocationState: NSObject, ObservableObject {
     private let manager: CLLocationManager
     private let geocoder = CLGeocoder()
     private var resolvingCoordinate: MegrumLocationCoordinate?
+    private var wantsContinuousLocationUpdates = false
+    private var lastResolvedLocation: CLLocation?
+    private static let continuousReverseGeocodeDistanceMeters: CLLocationDistance = 50
 
     override init() {
         let manager = CLLocationManager()
@@ -20,14 +23,49 @@ final class MegrumLocationState: NSObject, ObservableObject {
         self.authorizationStatus = manager.authorizationStatus
         super.init()
         manager.delegate = self
-        manager.desiredAccuracy = kCLLocationAccuracyHundredMeters
+        manager.desiredAccuracy = kCLLocationAccuracyNearestTenMeters
+        manager.distanceFilter = 10
     }
 
     func requestCurrentLocation(clearsPreviousCoordinate: Bool = false) {
+        requestLocation(clearsPreviousCoordinate: clearsPreviousCoordinate, continuous: false)
+    }
+
+    func startUpdatingCurrentLocation(clearsPreviousCoordinate: Bool = false) {
+        wantsContinuousLocationUpdates = true
+        requestLocation(clearsPreviousCoordinate: clearsPreviousCoordinate, continuous: true)
+    }
+
+    func stopUpdatingCurrentLocation() {
+        wantsContinuousLocationUpdates = false
+        manager.stopUpdatingLocation()
+        isRequestingLocation = false
+    }
+
+    func resolveKnownCoordinate(_ coordinate: MegrumLocationCoordinate) {
+        guard HomeLocalCoordinateStorageCodec.isValid(
+            latitude: coordinate.latitude,
+            longitude: coordinate.longitude
+        ) else {
+            resolvedLocationLabel = nil
+            isResolvingLocationLabel = false
+            return
+        }
+        let location = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+        lastResolvedLocation = location
+        resolveLocationLabel(for: location, coordinate: coordinate)
+    }
+}
+
+private extension MegrumLocationState {
+    func requestLocation(clearsPreviousCoordinate: Bool, continuous: Bool) {
         locationErrorMessage = nil
-        resolvedLocationLabel = nil
         if clearsPreviousCoordinate {
             coordinate = nil
+            resolvedLocationLabel = nil
+            lastResolvedLocation = nil
+        } else if !continuous {
+            resolvedLocationLabel = nil
         }
         authorizationStatus = manager.authorizationStatus
 
@@ -48,11 +86,11 @@ final class MegrumLocationState: NSObject, ObservableObject {
             #endif
         case .authorizedAlways:
             isRequestingLocation = true
-            manager.requestLocation()
+            requestAuthorizedLocation(continuous: continuous)
         #if os(iOS)
         case .authorizedWhenInUse:
             isRequestingLocation = true
-            manager.requestLocation()
+            requestAuthorizedLocation(continuous: continuous)
         #endif
         case .denied, .restricted:
             isRequestingLocation = false
@@ -65,17 +103,12 @@ final class MegrumLocationState: NSObject, ObservableObject {
         }
     }
 
-    func resolveKnownCoordinate(_ coordinate: MegrumLocationCoordinate) {
-        guard HomeLocalCoordinateStorageCodec.isValid(
-            latitude: coordinate.latitude,
-            longitude: coordinate.longitude
-        ) else {
-            resolvedLocationLabel = nil
-            isResolvingLocationLabel = false
-            return
+    func requestAuthorizedLocation(continuous: Bool) {
+        if continuous {
+            manager.startUpdatingLocation()
+        } else {
+            manager.requestLocation()
         }
-        let location = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
-        resolveLocationLabel(for: location, coordinate: coordinate)
     }
 }
 
@@ -85,7 +118,11 @@ extension MegrumLocationState: CLLocationManagerDelegate {
         Task { @MainActor in
             authorizationStatus = status
             if isAuthorized {
-                requestCurrentLocation()
+                if wantsContinuousLocationUpdates {
+                    startUpdatingCurrentLocation()
+                } else {
+                    requestCurrentLocation()
+                }
             } else if status != .notDetermined {
                 isRequestingLocation = false
                 isResolvingLocationLabel = false
@@ -106,7 +143,9 @@ extension MegrumLocationState: CLLocationManagerDelegate {
             self.coordinate = coordinate
             isRequestingLocation = false
             locationErrorMessage = nil
-            resolveLocationLabel(for: location, coordinate: coordinate)
+            if shouldResolveLocationLabel(for: location) {
+                resolveLocationLabel(for: location, coordinate: coordinate)
+            }
         }
     }
 
@@ -125,6 +164,25 @@ extension MegrumLocationState: CLLocationManagerDelegate {
 }
 
 private extension MegrumLocationState {
+    func shouldResolveLocationLabel(for location: CLLocation) -> Bool {
+        guard wantsContinuousLocationUpdates else {
+            lastResolvedLocation = location
+            return true
+        }
+
+        guard let lastResolvedLocation else {
+            self.lastResolvedLocation = location
+            return true
+        }
+
+        guard location.distance(from: lastResolvedLocation) >= Self.continuousReverseGeocodeDistanceMeters else {
+            return false
+        }
+
+        self.lastResolvedLocation = location
+        return true
+    }
+
     func resolveLocationLabel(for location: CLLocation, coordinate: MegrumLocationCoordinate) {
         resolvingCoordinate = coordinate
         resolvedLocationLabel = nil

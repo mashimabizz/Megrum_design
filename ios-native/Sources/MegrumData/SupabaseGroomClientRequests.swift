@@ -78,21 +78,27 @@ extension SupabaseGroomClient {
         )
     }
 
-    public func makeSetLikedRequest(userID: UUID, postID: UUID, isLiked: Bool) throws -> URLRequest {
-        if isLiked {
-            return try client.makeUpsertRequest(
-                into: "groom_reactions",
-                values: [GroomReactionPayload(groomPostID: postID, userID: userID)],
-                onConflict: "groom_post_id,user_id,reaction_type"
-            )
-        }
-        return try client.makeDeleteRequest(
-            from: "groom_reactions",
-            queryItems: [
-                URLQueryItem(name: "groom_post_id", value: "eq.\(postID.uuidString.lowercased())"),
-                URLQueryItem(name: "user_id", value: "eq.\(userID.uuidString.lowercased())"),
-                URLQueryItem(name: "reaction_type", value: "eq.like")
-            ]
+    public func makeSetLikedRequest(userID _: UUID, postID: UUID, isLiked: Bool) throws -> URLRequest {
+        try client.makeRPCRequest(
+            function: "set_groom_like_for_viewer",
+            payload: GroomLikeTogglePayload(pPostID: postID, pIsLiked: isLiked)
+        )
+    }
+
+    public func makeReportPostRequest(reporterID: UUID, input: GroomReportCreateInput) throws -> URLRequest {
+        try client.makeInsertRequest(
+            into: "groom_reports",
+            values: [GroomReportPayload(reporterID: reporterID, input: input)],
+            select: GroomReportRow.select
+        )
+    }
+
+    public func makeBlockUserRequest(blockerID: UUID, blockedID: UUID) throws -> URLRequest {
+        try client.makeUpsertRequest(
+            into: "groom_user_blocks",
+            values: [GroomBlockPayload(blockedID: blockedID, blockerID: blockerID)],
+            select: "blocked_id",
+            onConflict: "blocker_id,blocked_id"
         )
     }
 
@@ -104,10 +110,10 @@ extension SupabaseGroomClient {
         )
     }
 
-    public func makeReplyNotificationRequest(reply: GroomReply) throws -> URLRequest {
+    public func makeGroomReplyMeguriMessageRequest(reply: GroomReply) throws -> URLRequest {
         try client.makeInsertRequest(
-            into: "notifications",
-            values: [GroomReplyNotificationPayload(reply: reply)],
+            into: "meguri_messages",
+            values: [GroomReplyMeguriMessagePayload(reply: reply)],
             select: "id"
         )
     }

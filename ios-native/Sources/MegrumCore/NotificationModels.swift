@@ -14,6 +14,7 @@ public enum MegrumNotificationKind: String, Codable, Sendable, CaseIterable, Ide
     case disputeClosed = "dispute_closed"
     case cancelRequested = "cancel_requested"
     case expiresSoon = "expires_soon"
+    case groomLiked = "groom_liked"
     case groomReply = "groom_reply"
     case meguriMessage = "meguri_message"
     case meguriBoardReply = "meguri_board_reply"
@@ -22,6 +23,22 @@ public enum MegrumNotificationKind: String, Codable, Sendable, CaseIterable, Ide
     case unknown
 
     public var id: String { rawValue }
+}
+
+public struct UserNotificationSettings: Codable, Equatable, Sendable {
+    public var pushEnabled: Bool
+    public var groomActivityPushEnabled: Bool
+    public var chatroomActivityPushEnabled: Bool
+
+    public init(
+        pushEnabled: Bool = true,
+        groomActivityPushEnabled: Bool = true,
+        chatroomActivityPushEnabled: Bool = true
+    ) {
+        self.pushEnabled = pushEnabled
+        self.groomActivityPushEnabled = groomActivityPushEnabled
+        self.chatroomActivityPushEnabled = chatroomActivityPushEnabled
+    }
 }
 
 public struct MegrumNotification: Identifiable, Codable, Hashable, Sendable {

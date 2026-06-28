@@ -132,7 +132,7 @@ private struct BoardCreationMapPreview: View {
             .frame(width: 36, height: 36)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(title.nilIfBlank ?? "掲示板")
+                Text(title.nilIfBlank ?? "チャットルーム")
                     .font(.system(size: 11, weight: .heavy, design: .rounded))
                     .foregroundStyle(MegrumTheme.ink)
                     .lineLimit(1)

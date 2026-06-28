@@ -19,8 +19,8 @@ App Store提出前に必要な `megrum.jp` の公開URL、`support@megrum.jp` �
 | 公開ホスト | Vercel / Cloudflare Pages / GitHub Pages / 既存サーバー | TODO |
 | ドメイン管理 | レジストラ / Cloudflare / Route 53等 | TODO |
 | DNS管理者 | オーナー / 運用担当 | TODO |
-| メール受信 | Google Workspace / iCloud Custom Email / Forward Email等 | TODO |
-| メール送信 | 同上、又はサポートツール | TODO |
+| メール受信 | Zoho Mail（Xserver取得ドメイン `megrum.jp`） | TODO |
+| メール送信 | Zoho Mail + Supabase Auth Custom SMTP（認証メールは `info@megrum.jp`） | TODO |
 | サポートツール | Gmail / HelpScout / Zendesk / Notion+メール等 | TODO |
 | 証跡保存先 | `notes/36` の証跡台帳、ローカルスクショ | TODO |
 
@@ -71,6 +71,10 @@ dig _dmarc.megrum.jp TXT
 - SPFが送信元サービスと一致している。
 - DKIMが送信サービス側で有効になっている。
 - DMARCが設定されている。
+- Zoho Mail上で `info@megrum.jp` が送受信できる。
+- Supabase Auth の Custom SMTP が `info@megrum.jp` を送信元として設定されている。
+- 新規登録確認メール、パスワードリセットメールの From が `info@megrum.jp` になる。
+- Supabase Auth Redirect URLs に `https://megrum.jp/auth/callback?next=mobile&scheme=megrum-preview`、`megrum-preview://auth/callback`、本番schemeの `megrum://auth/callback` が登録されている。
 
 初回は、少なくとも受信確認をP0とし、SPF/DKIM/DMARCは公開前にP0相当に上げる。
 
@@ -168,3 +172,4 @@ curl -I https://megrum.jp/support/ai
 - アカウント削除・個人情報請求: `notes/45_account_deletion_privacy_request_runbook.md`
 - App Store提出司令塔: `notes/39_release_command_center.md`
 - リリース権限・運用アカウント台帳: `notes/61_release_access_owner_registry.md`
+- Authメール送信元・Googleログイン設定: `notes/75_auth_email_google_setup.md`

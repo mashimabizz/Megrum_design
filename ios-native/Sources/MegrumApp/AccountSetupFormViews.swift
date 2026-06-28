@@ -54,7 +54,6 @@ struct AccountSetupStepContainer<Content: View>: View {
             .padding(.top, 26)
             .padding(.bottom, 112)
         }
-        .scrollDisabled(step == .birthDate)
         .safeAreaInset(edge: .bottom) {
             AccountSetupBottomActionBar(
                 title: primaryTitle,
@@ -130,7 +129,9 @@ private struct AccountSetupBottomActionBar: View {
     var onPrimary: () -> Void
 
     var body: some View {
-        Button(action: onPrimary) {
+        Button {
+            MegrumHaptics.performButtonTap(onPrimary)
+        } label: {
             Text(title)
                 .font(.system(size: 20, weight: .black, design: .rounded))
                 .foregroundStyle(.white)
@@ -161,7 +162,9 @@ struct AccountSetupListChoiceRow: View {
     var action: () -> Void
 
     var body: some View {
-        Button(action: action) {
+        Button {
+            MegrumHaptics.performSelectionChanged(action)
+        } label: {
             HStack(spacing: 14) {
                 Image(systemName: isSelected ? "checkmark" : "circle")
                     .font(.system(size: 18, weight: .black, design: .rounded))

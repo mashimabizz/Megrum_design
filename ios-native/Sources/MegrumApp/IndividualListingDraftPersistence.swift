@@ -18,9 +18,6 @@ extension IndividualListingDraft {
             if selectedHaveItems.contains(where: { haveQuantity(for: $0.id) > maxHaveQuantity(for: $0) }) {
                 return "選択した譲るものの残数が足りません"
             }
-            if !hasSameGroupAndType(selectedHaveItems) {
-                return "譲るものは同じグループ・同じ種別で選んでください"
-            }
             if haveLogic == .atLeast, selectedHaveIDs.count < 2 {
                 return "「何個以上」は2件以上選んだ時に設定できます"
             }
@@ -38,9 +35,6 @@ extension IndividualListingDraft {
             let selectedWishItems = selectedWishItems(from: wishes)
             if selectedWishItems.count != selectedWishIDs.count {
                 return "選択したWishを読み込めませんでした"
-            }
-            if !hasSameGroupAndType(selectedWishItems) {
-                return "求めるものは同じグループ・同じ種別で選んでください"
             }
             if wishLogic == .atLeast, selectedWishIDs.count < 2 {
                 return "「何個以上」は2件以上選んだ時に設定できます"
@@ -214,17 +208,4 @@ private extension IndividualListingDraft {
         }
     }
 
-    func hasSameGroupAndType(_ items: [GoodsItem]) -> Bool {
-        guard let first = items.first else {
-            return true
-        }
-        return items.allSatisfy { $0.groupID == first.groupID && $0.goodsTypeID == first.goodsTypeID }
-    }
-
-    func hasSameGroupAndType(_ items: [WishItem]) -> Bool {
-        guard let first = items.first else {
-            return true
-        }
-        return items.allSatisfy { $0.groupID == first.groupID && $0.goodsTypeID == first.goodsTypeID }
-    }
 }

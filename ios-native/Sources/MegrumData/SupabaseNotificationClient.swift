@@ -53,12 +53,16 @@ public final class SupabaseNotificationClient: @unchecked Sendable {
     }
 
     public func loadPushNotificationsEnabled(userID: UUID) async throws -> Bool {
+        try await loadNotificationSettings(userID: userID).pushEnabled
+    }
+
+    public func loadNotificationSettings(userID: UUID) async throws -> UserNotificationSettings {
         let rows: [NotificationSettingRow] = try await client.fetchRows(
             from: "user_notification_settings",
             select: NotificationSettingRow.select,
             queryItems: pushSettingQueryItems(userID: userID)
         )
-        return rows.first?.pushEnabled ?? true
+        return rows.first?.settings ?? UserNotificationSettings()
     }
 
     @discardableResult
@@ -70,6 +74,28 @@ public final class SupabaseNotificationClient: @unchecked Sendable {
             onConflict: "user_id"
         )
         return rows.first?.pushEnabled ?? enabled
+    }
+
+    @discardableResult
+    public func setGroomActivityPushNotificationsEnabled(userID: UUID, enabled: Bool) async throws -> UserNotificationSettings {
+        let rows: [NotificationSettingRow] = try await client.upsertRows(
+            into: "user_notification_settings",
+            values: [GroomActivityNotificationSettingPayload(userID: userID, groomActivityPushEnabled: enabled)],
+            select: NotificationSettingRow.select,
+            onConflict: "user_id"
+        )
+        return rows.first?.settings ?? UserNotificationSettings(groomActivityPushEnabled: enabled)
+    }
+
+    @discardableResult
+    public func setChatroomActivityPushNotificationsEnabled(userID: UUID, enabled: Bool) async throws -> UserNotificationSettings {
+        let rows: [NotificationSettingRow] = try await client.upsertRows(
+            into: "user_notification_settings",
+            values: [ChatroomActivityNotificationSettingPayload(userID: userID, chatroomActivityPushEnabled: enabled)],
+            select: NotificationSettingRow.select,
+            onConflict: "user_id"
+        )
+        return rows.first?.settings ?? UserNotificationSettings(chatroomActivityPushEnabled: enabled)
     }
 
     @discardableResult

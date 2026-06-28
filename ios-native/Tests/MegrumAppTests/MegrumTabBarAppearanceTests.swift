@@ -10,4 +10,14 @@ final class MegrumTabBarAppearanceTests: XCTestCase {
     func testTabBarHidesSystemBackgroundPlate() {
         XCTAssertTrue(MegrumTabBarLayoutMetrics.hidesSystemBackground)
     }
+
+    func testMainTabOrderUsesHomeTradesMeguriInventoryWish() {
+        XCTAssertEqual(MegrumTab.allCases, [.home, .trades, .meguri, .inventory, .wish])
+    }
+
+    func testTradesTabUsesSingleMessageIconAndWishUsesJapaneseTitle() {
+        XCTAssertEqual(MegrumTab.trades.symbolName, "message")
+        XCTAssertEqual(MegrumTab.inventory.symbolName, "rectangle.on.rectangle")
+        XCTAssertEqual(MegrumTab.wish.title, "ウィッシュ")
+    }
 }

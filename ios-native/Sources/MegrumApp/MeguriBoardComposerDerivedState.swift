@@ -87,5 +87,6 @@ extension BoardThreadComposerSheet {
     var submitPrefecture: String? {
         selectedPrefecture.nilIfBlank
             ?? (appState.viewer?.prefecture).nilIfBlank
+            ?? (submitScope == .nearby3km ? "未設定" : nil)
     }
 }

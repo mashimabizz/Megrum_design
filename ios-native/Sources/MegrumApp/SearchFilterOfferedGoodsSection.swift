@@ -87,7 +87,7 @@ struct SearchOfferedGoodsFilterSection: View {
 
             Button(action: onOpenTagPicker) {
                 HStack {
-                    Text("タグ")
+                    Text("シリーズ")
                     Spacer()
                     Text(selectedTagSummary)
                         .foregroundStyle(MegrumTheme.muted)

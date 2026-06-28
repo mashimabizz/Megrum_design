@@ -86,7 +86,7 @@ struct CounterProposalSheet: View {
                 .pickerStyle(.segmented)
             }
 
-            Section("交換条件タグ") {
+            Section("交換条件シリーズ") {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 128), spacing: 8)], spacing: 8) {
                     ForEach(availableConditionTags, id: \.self) { tag in
                         Button {

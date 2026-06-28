@@ -1,8 +1,12 @@
 import MegrumApp
+import OSLog
 import SwiftUI
 #if os(iOS)
 import UIKit
 @preconcurrency import UserNotifications
+#endif
+#if os(iOS) && canImport(GoogleMobileAds)
+@preconcurrency import GoogleMobileAds
 #endif
 
 @main
@@ -15,6 +19,11 @@ struct MegrumNativeApp: App {
     @State private var pendingNativePushToken: String?
     @State private var notificationDestinationTab: MegrumTab?
     #endif
+
+    init() {
+        MegrumRemoteImageCache.configure()
+        Self.startGoogleMobileAdsIfAvailable()
+    }
 
     var body: some Scene {
         WindowGroup {
@@ -70,6 +79,15 @@ struct MegrumNativeApp: App {
     }
 
     #if os(iOS)
+    private static func startGoogleMobileAdsIfAvailable() {
+        #if canImport(GoogleMobileAds)
+        guard MegrumMobileAdsBootstrap.shouldStartSDK else {
+            return
+        }
+        MobileAds.shared.start()
+        #endif
+    }
+
     @MainActor
     private func requestNativePushAuthorizationIfReady() async {
         guard authState.isConfigured, authState.isAuthenticated, !didRequestNativePushAuthorization else {
@@ -116,11 +134,18 @@ struct MegrumNativeApp: App {
     #endif
 }
 
+#if !os(iOS)
+private extension MegrumNativeApp {
+    static func startGoogleMobileAdsIfAvailable() {}
+}
+#endif
+
 #if os(iOS)
 private final class NativePushAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
     nonisolated static let deviceTokenUserInfoKey = "deviceToken"
     nonisolated static let linkPathUserInfoKey = "linkPath"
     nonisolated static let notificationIDUserInfoKey = "notificationID"
+    private static let logger = Logger(subsystem: "tokyo.megrum.native", category: "NativePush")
 
     func application(
         _ application: UIApplication,
@@ -148,7 +173,7 @@ private final class NativePushAppDelegate: NSObject, UIApplicationDelegate, UNUs
         didFailToRegisterForRemoteNotificationsWithError error: Error
     ) {
         #if DEBUG
-        print("APNs registration failed: \(error.localizedDescription)")
+        Self.logger.debug("APNs registration failed: \(error.localizedDescription, privacy: .public)")
         #endif
     }
 

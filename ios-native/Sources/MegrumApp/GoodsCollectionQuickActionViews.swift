@@ -36,7 +36,7 @@ struct GoodsQuickActionHeaderPresentation: Equatable {
         if tagNames.count > visibleTagNames.count {
             tagParts.append("+\(tagNames.count - visibleTagNames.count)")
         }
-        tagLine = tagParts.isEmpty ? "タグ未設定" : tagParts.joined(separator: " ")
+        tagLine = tagParts.isEmpty ? "シリーズ未設定" : tagParts.joined(separator: " ")
     }
 }
 

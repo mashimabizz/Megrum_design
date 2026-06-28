@@ -4,6 +4,8 @@ import SwiftUI
 
 struct MeguriMapRecenterButton: View {
     var isRequesting: Bool
+    var size: CGFloat = 48
+    var iconSize: CGFloat = 18
     var action: () -> Void
 
     var body: some View {
@@ -15,11 +17,11 @@ struct MeguriMapRecenterButton: View {
                         .tint(MegrumTheme.lavender)
                 } else {
                     Image(systemName: "location.fill")
-                        .font(.system(size: 18, weight: .heavy))
+                        .font(.system(size: iconSize, weight: .heavy))
                         .foregroundStyle(MegrumTheme.lavender)
                 }
             }
-            .frame(width: 48, height: 48)
+            .frame(width: size, height: size)
             .background(.regularMaterial, in: Circle())
             .overlay {
                 Circle()
@@ -40,7 +42,7 @@ struct MeguriGroomArchiveButton: View {
             Image(systemName: "archivebox.fill")
                 .font(.system(size: 18, weight: .heavy))
                 .foregroundStyle(MegrumTheme.lavender)
-                .frame(width: 48, height: 48)
+                .frame(width: 46, height: 46)
                 .background(.regularMaterial, in: Circle())
                 .overlay {
                     Circle()
@@ -50,6 +52,49 @@ struct MeguriGroomArchiveButton: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("グルームアーカイブを開く")
+    }
+}
+
+struct MeguriMessageInboxButton: View {
+    var unreadCount: Int
+    var size: CGFloat = 48
+    var iconSize: CGFloat = 18
+    var action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            ZStack(alignment: .topTrailing) {
+                Image(systemName: "message.fill")
+                    .font(.system(size: iconSize, weight: .heavy))
+                    .foregroundStyle(.white)
+                    .frame(width: size, height: size)
+                    .background(
+                        LinearGradient(
+                            colors: [MegrumTheme.sky, MegrumTheme.lavender, MegrumTheme.pink.opacity(0.88)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        in: Circle()
+                    )
+                    .overlay {
+                        Circle()
+                            .stroke(.white.opacity(0.66), lineWidth: 1)
+                    }
+                    .shadow(color: MegrumTheme.lavender.opacity(0.30), radius: 16, y: 8)
+
+                if unreadCount > 0 {
+                    Text(unreadCount > 99 ? "99+" : "\(unreadCount)")
+                        .font(.system(size: 10, weight: .black, design: .rounded))
+                        .foregroundStyle(.white)
+                        .frame(minWidth: 20, minHeight: 20)
+                        .padding(.horizontal, unreadCount > 9 ? 5 : 0)
+                        .background(MegrumTheme.pink, in: Capsule())
+                        .offset(x: size >= 80 ? 2 : 4, y: size >= 80 ? 0 : -4)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("めぐりメッセージを開く")
     }
 }
 
@@ -83,7 +128,7 @@ struct MeguriHomeNoticeCard: View {
     }
 
     private var title: String {
-        if notice.message.contains("掲示板") || notice.message.contains("投稿") {
+        if notice.message.contains("チャットルーム") || notice.message.contains("投稿") {
             return "投稿できませんでした"
         }
         if notice.message.contains("読み込") {

@@ -92,10 +92,10 @@ struct MegrumAuthenticatedTabContentView: View {
     private var tabs: some View {
         TabView(selection: $selectedTab) {
             homeTab
-            inventoryTab
-            wishTab
             tradesTab
             meguriTab
+            inventoryTab
+            wishTab
         }
         .tint(MegrumTheme.lavender)
         .onChange(of: selectedTab) { _, selectedTab in
@@ -215,8 +215,14 @@ struct MegrumAuthenticatedTabContentView: View {
         }
         .tag(MegrumTab.meguri)
         .tabItem {
-            Label(MegrumTab.meguri.title, systemImage: MegrumTab.meguri.symbolName)
+            Label {
+                Text(MegrumTab.meguri.title)
+            } icon: {
+                Image("TabMeguriIcon", bundle: .main)
+                    .renderingMode(.template)
+            }
         }
+        .badge(appState.meguriPendingReplyCount)
     }
 
     private func openWishSection(_ section: WishCollectionSection) {

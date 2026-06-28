@@ -2,8 +2,18 @@ import Foundation
 import MegrumCore
 
 enum IndividualListingListPresentation {
+    static let collapsedOptionSummaryThreshold = 3
+
     static func optionTitle(index: Int) -> String {
         "選択肢\(index)"
+    }
+
+    static func conditionStripTitle(index: Int, totalCount: Int) -> String {
+        "個別募集 \(index + 1) / \(max(1, totalCount))"
+    }
+
+    static func usesCollapsedOptionSummary(optionCount: Int) -> Bool {
+        optionCount >= collapsedOptionSummaryThreshold
     }
 
     static func optionLogicTitle(for option: IndividualListingWishOption) -> String? {

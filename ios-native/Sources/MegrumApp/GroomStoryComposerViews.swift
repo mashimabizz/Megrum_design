@@ -10,6 +10,7 @@ struct GroomStoryComposerScreen: View {
     var isPreparingPhoto: Bool
     var isCreating: Bool
     var canUseCamera: Bool
+    var locksCreationCoordinate: Bool
     var currentCoordinate: MegrumLocationCoordinate?
     var isRequestingLocation: Bool
     var onRequestLocation: () -> Void
@@ -52,12 +53,14 @@ struct GroomStoryComposerScreen: View {
                         isCreating: isCreating,
                         canUseCamera: canUseCamera,
                         cameraSubtitle: cameraSubtitle,
+                        locksCreationCoordinate: locksCreationCoordinate,
                         currentCoordinate: currentCoordinate,
                         isRequestingLocation: isRequestingLocation,
                         canCreateAtSelectedLocation: canCreateAtSelectedLocation,
                         onRequestLocation: onRequestLocation,
                         onOpenCamera: openCameraIfPossible,
                         onOutOfRange: showToast,
+                        onSelectPhotoData: prepareLibraryGroomPhoto,
                         onPublish: publishDraftPhoto,
                         onResetPhotoDraft: resetPhotoDraft,
                         onPrepareFinalStep: seedSelectedCoordinateForFinalStepIfNeeded
@@ -78,6 +81,9 @@ struct GroomStoryComposerScreen: View {
     }
 
     private var cameraSubtitle: String {
+        if locksCreationCoordinate {
+            return "写真が決まったら投稿へ"
+        }
         if !canUseCamera {
             return "この端末では利用不可"
         }
@@ -128,6 +134,15 @@ struct GroomStoryComposerScreen: View {
             }
             onDiscard()
             dismiss()
+        }
+    }
+
+    private func prepareLibraryGroomPhoto(_ data: Data, _ contentType: String) {
+        let upload = normalizedPhotoUpload(from: data)
+        draftPhotoData = upload.data
+        draftPhotoContentType = upload.contentType.nilIfBlank ?? contentType
+        if selectedCreationCoordinate == nil {
+            selectedCreationCoordinate = currentCoordinate
         }
     }
 

@@ -21,8 +21,9 @@ enum AdPlacement: String, CaseIterable, Identifiable, Sendable {
     case homeFeedBanner
     case wishListBanner
     case searchResultsBanner
+    case searchResultsNative
     case publicProfileFooterBanner
-    case pastTradesFooterBanner
+    case tradesListTopBanner
     case homeBrowseInterstitial
     case wishBrowseInterstitial
     case searchBrowseInterstitial
@@ -32,8 +33,10 @@ enum AdPlacement: String, CaseIterable, Identifiable, Sendable {
 
     var format: AdFormat {
         switch self {
-        case .homeFeedBanner, .wishListBanner, .searchResultsBanner, .publicProfileFooterBanner, .pastTradesFooterBanner:
+        case .homeFeedBanner, .wishListBanner, .searchResultsBanner, .publicProfileFooterBanner, .tradesListTopBanner:
             .banner
+        case .searchResultsNative:
+            .native
         case .homeBrowseInterstitial, .wishBrowseInterstitial, .searchBrowseInterstitial, .meguriBrowseInterstitial:
             .interstitial
         }
@@ -45,12 +48,12 @@ enum AdPlacement: String, CaseIterable, Identifiable, Sendable {
             "HOM-main"
         case .wishListBanner, .wishBrowseInterstitial:
             "WSH-list"
-        case .searchResultsBanner, .searchBrowseInterstitial:
+        case .searchResultsBanner, .searchResultsNative, .searchBrowseInterstitial:
             "SCH-main"
         case .publicProfileFooterBanner:
             "PRO-other"
-        case .pastTradesFooterBanner:
-            "TRD-past"
+        case .tradesListTopBanner:
+            "TRD-list"
         case .meguriBrowseInterstitial:
             "MEG-main"
         }
@@ -58,9 +61,9 @@ enum AdPlacement: String, CaseIterable, Identifiable, Sendable {
 
     var tier: AdScreenTier {
         switch self {
-        case .homeFeedBanner, .wishListBanner, .searchResultsBanner:
+        case .homeFeedBanner, .wishListBanner, .searchResultsBanner, .searchResultsNative, .tradesListTopBanner:
             .nativeInline
-        case .publicProfileFooterBanner, .pastTradesFooterBanner:
+        case .publicProfileFooterBanner:
             .footerBanner
         case .homeBrowseInterstitial, .wishBrowseInterstitial, .searchBrowseInterstitial, .meguriBrowseInterstitial:
             .footerBanner
@@ -75,9 +78,11 @@ enum AdPlacement: String, CaseIterable, Identifiable, Sendable {
             "MegrumAdMobWishBannerUnitID"
         case .searchResultsBanner:
             "MegrumAdMobSearchBannerUnitID"
+        case .searchResultsNative:
+            "MegrumAdMobSearchNativeUnitID"
         case .publicProfileFooterBanner:
             "MegrumAdMobProfileBannerUnitID"
-        case .pastTradesFooterBanner:
+        case .tradesListTopBanner:
             "MegrumAdMobTradesBannerUnitID"
         case .homeBrowseInterstitial:
             "MegrumAdMobHomeInterstitialUnitID"
@@ -88,6 +93,10 @@ enum AdPlacement: String, CaseIterable, Identifiable, Sendable {
         case .meguriBrowseInterstitial:
             "MegrumAdMobMeguriInterstitialUnitID"
         }
+    }
+
+    var allowsPreviewViewerFallbackUnit: Bool {
+        self == .homeFeedBanner
     }
 
     static let zeroAdScreenIDs: Set<String> = [
@@ -185,14 +194,30 @@ enum AdDisplayPolicy {
         if AdPlacement.zeroAdScreenIDs.contains(where: { placement.screenID.hasPrefix($0) }) {
             return .suppressed(placement: placement, reason: .forbiddenScreen)
         }
+        if !configuration.isEnabled && !configuration.showsPlaceholders {
+            return .suppressed(placement: placement, reason: .configurationDisabled)
+        }
+        if configuration.isPreviewViewer(context.viewerID), placement.allowsPreviewViewerFallbackUnit {
+            if let previewUnitID = configuration.previewUnitID(for: placement) {
+                return .allowed(
+                    placement: placement,
+                    unitID: previewUnitID,
+                    usesPlaceholder: false
+                )
+            }
+            if configuration.isEnabled || configuration.showsPlaceholders {
+                return .allowed(
+                    placement: placement,
+                    unitID: nil,
+                    usesPlaceholder: true
+                )
+            }
+        }
         if context.isPremiumSubscriber {
             return .suppressed(placement: placement, reason: .premiumSubscriber)
         }
         if context.hasActiveAdSuppression {
             return .suppressed(placement: placement, reason: .activeAdOverride)
-        }
-        if !configuration.isEnabled && !configuration.showsPlaceholders {
-            return .suppressed(placement: placement, reason: .configurationDisabled)
         }
 
         let unitID = configuration.unitID(for: placement)

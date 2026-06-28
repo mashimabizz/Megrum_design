@@ -7,7 +7,9 @@ struct OshiFilterChip: View {
     var action: () -> Void
 
     var body: some View {
-        Button(action: action) {
+        Button {
+            MegrumHaptics.performSelectionChanged(action)
+        } label: {
             Text(title)
                 .font(.system(size: 15, weight: .black, design: .rounded))
                 .lineLimit(1)
@@ -33,7 +35,9 @@ struct OshiRequestSubmitFooter: View {
     var onSubmit: () -> Void
 
     var body: some View {
-        Button(action: onSubmit) {
+        Button {
+            MegrumHaptics.performButtonTap(onSubmit)
+        } label: {
             Text("送信して仮登録")
                 .font(.system(size: 18, weight: .black, design: .rounded))
                 .foregroundStyle(.white)

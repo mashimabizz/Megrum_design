@@ -57,6 +57,23 @@ final class SupabaseOwnedGoodsPersistenceTests: XCTestCase {
         XCTAssertEqual(items[0].tags, [tag])
     }
 
+    func testGoodsItemsResolveRawPhotoPathWithProjectURL() throws {
+        let row = makeRow(
+            kind: "for_trade",
+            status: "active",
+            title: "ミナ トレカ",
+            photoUrls: ["00000000-0000-0000-0000-000000000951/photo.jpg"]
+        )
+        let projectURL = try XCTUnwrap(URL(string: "https://example.supabase.co"))
+
+        let items = SupabaseOwnedGoodsPersistence.goodsItems(from: [row], tagMap: [:], projectURL: projectURL)
+
+        XCTAssertEqual(
+            items.first?.imageURL?.absoluteString,
+            "https://example.supabase.co/storage/v1/object/public/goods-photos/00000000-0000-0000-0000-000000000951/photo.jpg"
+        )
+    }
+
     func testWishItemsMapRowsThroughWishItemProjection() {
         let row = makeRow(
             kind: "wanted",
@@ -88,6 +105,23 @@ final class SupabaseOwnedGoodsPersistenceTests: XCTestCase {
         let wishes = SupabaseOwnedGoodsPersistence.wishItems(from: [row], tagMap: [row.id: [tag]])
 
         XCTAssertEqual(wishes[0].tags, [tag])
+    }
+
+    func testWishItemsResolveRawPhotoPathWithProjectURL() throws {
+        let row = makeRow(
+            kind: "wanted",
+            status: "active",
+            title: "サナ ペンライト",
+            photoUrls: ["00000000-0000-0000-0000-000000000951/wish.jpg"]
+        )
+        let projectURL = try XCTUnwrap(URL(string: "https://example.supabase.co"))
+
+        let wishes = SupabaseOwnedGoodsPersistence.wishItems(from: [row], tagMap: [:], projectURL: projectURL)
+
+        XCTAssertEqual(
+            wishes.first?.imageURL?.absoluteString,
+            "https://example.supabase.co/storage/v1/object/public/goods-photos/00000000-0000-0000-0000-000000000951/wish.jpg"
+        )
     }
 
     func testGoodsTagQueryItemsSortInventoryIDsAndKeepCreatedOrder() {
@@ -126,6 +160,7 @@ final class SupabaseOwnedGoodsPersistenceTests: XCTestCase {
         status: String?,
         title: String,
         id: UUID = UUID(uuidString: "00000000-0000-0000-0000-000000000952")!,
+        photoUrls: [String]? = nil,
         quantity: Int? = nil,
         lockedQty: Int? = nil,
         marketAvailableQty: Int? = nil
@@ -139,7 +174,7 @@ final class SupabaseOwnedGoodsPersistenceTests: XCTestCase {
             characterId: UUID(uuidString: "00000000-0000-0000-0000-000000000954")!,
             goodsTypeId: UUID(uuidString: "00000000-0000-0000-0000-000000000955")!,
             title: title,
-            photoUrls: nil,
+            photoUrls: photoUrls,
             quantity: quantity,
             lockedQty: lockedQty,
             marketAvailableQty: marketAvailableQty

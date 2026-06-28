@@ -27,8 +27,6 @@ final class TradeChatAffordanceTests: XCTestCase {
         XCTAssertTrue(TradeStage.completed.emptyMessage.contains("終了"))
     }
 
-
-
     func testTradeStageAttentionCountsTrackFooterBadgeTargets() {
         let viewerID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
         let partnerID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
@@ -190,6 +188,41 @@ final class TradeChatAffordanceTests: XCTestCase {
                 predictedEndTranslationWidth: 44,
                 screenWidth: 390
             )
+        )
+    }
+
+    func testTradeDetailPresentationSlidesInAndOutFromTrailingEdge() {
+        XCTAssertEqual(
+            TradeDetailSlidePresentationResolver.contentOffset(
+                isPresented: false,
+                dragOffset: 0,
+                screenWidth: 390
+            ),
+            390
+        )
+        XCTAssertEqual(
+            TradeDetailSlidePresentationResolver.contentOffset(
+                isPresented: true,
+                dragOffset: 0,
+                screenWidth: 390
+            ),
+            0
+        )
+        XCTAssertEqual(
+            TradeDetailSlidePresentationResolver.contentOffset(
+                isPresented: true,
+                dragOffset: 118,
+                screenWidth: 390
+            ),
+            118
+        )
+        XCTAssertEqual(
+            TradeDetailSlidePresentationResolver.contentOffset(
+                isPresented: true,
+                dragOffset: 520,
+                screenWidth: 390
+            ),
+            390
         )
     }
 
@@ -378,7 +411,7 @@ final class TradeChatAffordanceTests: XCTestCase {
         XCTAssertFalse(presentation.showsPrimaryAgreeAction)
         XCTAssertFalse(presentation.needsExchangeMethodSelection)
         XCTAssertFalse(presentation.showsPaymentSelector)
-        XCTAssertEqual(presentation.responseHeaderText, "現在出品中です。相手からの返信待ちです。")
+        XCTAssertEqual(presentation.responseHeaderText, "現在打診中です。相手からの返信待ちです。")
     }
 
     func testTradeProposalResponsePresentationHidesControlsForInitialSenderWaiting() {
@@ -626,6 +659,12 @@ final class TradeChatAffordanceTests: XCTestCase {
         )
     }
 
+    func testTradeCardReadStateHighlightsOnlyUnopenedRows() {
+        XCTAssertTrue(TradeCardReadState.unopened.showsStateBackground)
+        XCTAssertFalse(TradeCardReadState.opened.showsStateBackground)
+        XCTAssertFalse(TradeCardReadState.waitingForReply.showsStateBackground)
+    }
+
     func testTradeCardPresentationCountsOnlyUnreadIncomingMessagesAfterProposalWasRead() {
         let viewerID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
         let partnerID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
@@ -671,8 +710,6 @@ final class TradeChatAffordanceTests: XCTestCase {
         XCTAssertEqual(presentation.readState, .unopened)
         XCTAssertEqual(presentation.unreadBadgeCount, 2)
     }
-
-
 
     func testTradeCardPresentationMarksSettledCompletedTradeAsEvaluationAttention() {
         let viewerID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
@@ -1062,9 +1099,9 @@ final class TradeChatAffordanceTests: XCTestCase {
         XCTAssertEqual(incomingPresentation.agreementLabel, "未合意")
         XCTAssertTrue(incomingPresentation.guidanceText.contains("承諾"))
         XCTAssertEqual(outgoingPresentation.relationText, "あなたから送った打診")
-        XCTAssertEqual(outgoingPresentation.statusLabel, "現在出品中")
+        XCTAssertEqual(outgoingPresentation.statusLabel, "現在打診中")
         XCTAssertEqual(outgoingPresentation.agreementLabel, "相手からの返信待ち")
-        XCTAssertTrue(outgoingPresentation.guidanceText.contains("現在出品中です"))
+        XCTAssertTrue(outgoingPresentation.guidanceText.contains("現在打診中です"))
     }
 
     func testTradeDetailHeroUsesOutgoingWaitingStateAfterViewerCounterProposal() {
@@ -1085,7 +1122,7 @@ final class TradeChatAffordanceTests: XCTestCase {
         )
 
         XCTAssertEqual(presentation.relationText, "あなたから送った打診")
-        XCTAssertEqual(presentation.statusLabel, "現在出品中")
+        XCTAssertEqual(presentation.statusLabel, "現在打診中")
         XCTAssertEqual(presentation.agreementLabel, "相手からの返信待ち")
         XCTAssertTrue(presentation.guidanceText.contains("相手からの返信待ち"))
     }
@@ -1161,6 +1198,37 @@ final class TradeChatAffordanceTests: XCTestCase {
 
         XCTAssertTrue(proposal.cashOffer)
         XCTAssertEqual(proposal.cashAmount, 1_100)
+    }
+
+    func testAgreementNextStepFooterHidesAfterEvidencePhotoExists() {
+        let proposalID = UUID(uuidString: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbb0111")!
+        let viewerID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+        let evidencePhoto = TradeEvidencePhoto(
+            id: UUID(uuidString: "eeeeeeee-eeee-eeee-eeee-eeeeeeee0111")!,
+            proposalID: proposalID,
+            photoURL: URL(string: "https://example.com/evidence.jpg")!,
+            position: 1,
+            takenBy: viewerID
+        )
+
+        XCTAssertTrue(
+            TradeAgreementNextStepFooterPolicy.showsEvidenceCaptureFooter(
+                status: .agreed,
+                evidencePhotos: []
+            )
+        )
+        XCTAssertFalse(
+            TradeAgreementNextStepFooterPolicy.showsEvidenceCaptureFooter(
+                status: .agreed,
+                evidencePhotos: [evidencePhoto]
+            )
+        )
+        XCTAssertFalse(
+            TradeAgreementNextStepFooterPolicy.showsEvidenceCaptureFooter(
+                status: .completed,
+                evidencePhotos: []
+            )
+        )
     }
 
     func testTradePreviewThumbnailStyleUsesRnLikeGlyphs() {
@@ -1468,6 +1536,15 @@ final class TradeChatAffordanceTests: XCTestCase {
         XCTAssertEqual(TradeUnavailableChatAction.outfitPhoto.title, "服装写真を共有")
         XCTAssertTrue(TradeUnavailableChatAction.photo.description.contains("写真を送信"))
         XCTAssertTrue(TradeUnavailableChatAction.outfitPhoto.description.contains("服装写真"))
+    }
+
+    func testUnavailableChatActionMapsOnlyPhotoMessageFailures() {
+        XCTAssertEqual(TradeUnavailableChatAction.messageFailureAction(for: .photo), .photo)
+        XCTAssertEqual(TradeUnavailableChatAction.messageFailureAction(for: .outfitPhoto), .outfitPhoto)
+        XCTAssertNil(TradeUnavailableChatAction.messageFailureAction(for: .text))
+        XCTAssertNil(TradeUnavailableChatAction.messageFailureAction(for: .location))
+        XCTAssertNil(TradeUnavailableChatAction.messageFailureAction(for: .arrivalStatus))
+        XCTAssertNil(TradeUnavailableChatAction.messageFailureAction(for: .system))
     }
 
     func testOperationalSystemMessagePresentationUsesMetadataAction() {

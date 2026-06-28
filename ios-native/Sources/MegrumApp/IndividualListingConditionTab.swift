@@ -97,9 +97,9 @@ struct IndividualListingConditionTab: View {
                 selectedCount: max(1, selectedTagNames.count),
                 candidateNames: tagCandidateNames,
                 previewItemsByTag: tagPreviewItemsByTag,
-                navigationTitle: "タグを登録",
+                navigationTitle: "シリーズを登録",
                 textFieldPlaceholder: "例：会場限定",
-                footerText: "この条件にタグを追加します。",
+                footerText: "この条件にシリーズを追加します。",
                 confirmationTitle: "追加"
             ) { tagName in
                 addConditionTag(tagName)

@@ -14,6 +14,7 @@ struct HomeExchangeSettingsScreen: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.megrumSlidePresentationDismiss) private var slideDismiss
 
+    @ObservedObject var appState: MegrumAppState
     var individualListings: [IndividualListing] = []
     var onClose: (() -> Void)?
 
@@ -26,6 +27,7 @@ struct HomeExchangeSettingsScreen: View {
     @State private var visibleMonth = HomeExchangeCalendarMonthBuilder.monthStart(containing: Date())
     @State private var editingDate: HomeExchangeEditingDate?
     @State private var didLoadDraft = false
+    @State private var hasUserEditedDraft = false
 
     var body: some View {
         HomeExchangeSettingsContent(
@@ -42,7 +44,10 @@ struct HomeExchangeSettingsScreen: View {
             onFinishDragSelection: finishDragSelection
         )
         .safeAreaInset(edge: .bottom) {
-            HomeExchangeSettingsSaveFooter(action: save)
+            HomeExchangeSettingsSaveFooter(
+                isSaving: appState.isSavingExchangeSettings,
+                action: save
+            )
         }
         .sheet(item: $editingDate) { editingDate in
             HomeExchangeLocalDateDetailSheet(
@@ -56,6 +61,12 @@ struct HomeExchangeSettingsScreen: View {
         }
         .homeExchangeSettingsNavigationBarHidden()
         .onAppear(perform: loadDraftIfNeeded)
+        .task {
+            await appState.loadExchangeSettings()
+        }
+        .onChange(of: appState.exchangeSettings) { _, settings in
+            applyRemoteSettingsIfPossible(settings)
+        }
     }
 
     private func loadDraftIfNeeded() {
@@ -79,22 +90,55 @@ struct HomeExchangeSettingsScreen: View {
     }
 
     private func selectPreference(_ preference: HomeExchangePreference) {
+        hasUserEditedDraft = true
         withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
             draftPreference = preference
         }
     }
 
     private func save() {
-        storedPreferenceRawValue = draftPreference.rawValue
-        storedLocalPrefecture = primaryLocalPrefecture
-        storedLocalDateKeysRawValue = HomeExchangeDateKey.rawValue(from: draftLocalDateKeys)
-        storedLocalDateDetailsRawValue = HomeExchangeLocalDateDetailCodec.encode(
-            draftLocalDateDetails.filter { draftLocalDateKeys.contains($0.key) }
+        let settings = currentSettings
+        persistLocally(settings)
+        Task {
+            if await appState.saveExchangeSettings(settings) {
+                hasUserEditedDraft = false
+                closeScreen()
+            }
+        }
+    }
+
+    private var currentSettings: HomeDefaultExchangeSettings {
+        HomeDefaultExchangeSettings(
+            preference: draftPreference,
+            localPrefecture: primaryLocalPrefecture,
+            localDateKeys: Array(draftLocalDateKeys),
+            localDateDetails: draftLocalDateDetails.filter { draftLocalDateKeys.contains($0.key) },
+            mailShippingFee: draftMailShippingFee,
+            mailShippingDays: draftMailShippingDays
         )
-        storedMailShippingFeeRawValue = draftMailShippingFee.rawValue
-        storedMailShippingDaysRawValue = draftMailShippingDays.rawValue
+    }
+
+    private func persistLocally(_ settings: HomeDefaultExchangeSettings) {
+        storedPreferenceRawValue = settings.preference.rawValue
+        storedLocalPrefecture = settings.localPrefecture
+        storedLocalDateKeysRawValue = HomeExchangeDateKey.rawValue(from: settings.localDateKeys)
+        storedLocalDateDetailsRawValue = HomeExchangeLocalDateDetailCodec.encode(settings.localDateDetails)
+        storedMailShippingFeeRawValue = settings.mailShippingFee.rawValue
+        storedMailShippingDaysRawValue = settings.mailShippingDays.rawValue
         configuredAt = Date().timeIntervalSince1970
-        closeScreen()
+    }
+
+    private func applyRemoteSettingsIfPossible(_ settings: HomeDefaultExchangeSettings?) {
+        guard let settings, !hasUserEditedDraft else {
+            return
+        }
+        draftPreference = settings.preference
+        draftLocalPrefecture = settings.localPrefecture
+        draftLocalDateKeys = Set(settings.localDateKeys)
+        draftLocalDateDetails = settings.localDateDetails
+        draftMailShippingFee = settings.mailShippingFee
+        draftMailShippingDays = settings.mailShippingDays
+        persistLocally(settings)
     }
 
     private func closeScreen() {
@@ -128,6 +172,7 @@ struct HomeExchangeSettingsScreen: View {
     }
 
     private func tapDate(_ day: HomeExchangeCalendarDay) {
+        hasUserEditedDraft = true
         if !isListingReflectedDate(day.key) {
             selectDate(day.key)
         }
@@ -139,6 +184,7 @@ struct HomeExchangeSettingsScreen: View {
         guard !keys.isEmpty else {
             return
         }
+        hasUserEditedDraft = true
         keys
             .filter { !isListingReflectedDate($0) }
             .forEach(selectDate)
@@ -154,6 +200,7 @@ struct HomeExchangeSettingsScreen: View {
     }
 
     private func saveDateDetail(_ keys: [String], detail: HomeExchangeLocalDateDetail) {
+        hasUserEditedDraft = true
         guard detail.prefecture.nilIfBlank != nil else {
             removeDateDetail(keys)
             return
@@ -165,6 +212,7 @@ struct HomeExchangeSettingsScreen: View {
     }
 
     private func removeDateDetail(_ keys: [String]) {
+        hasUserEditedDraft = true
         keys.forEach { key in
             guard !isListingReflectedDate(key) else {
                 return

@@ -29,7 +29,7 @@ struct GoodsEditorTagsSection: View {
     }
 
     var body: some View {
-        GoodsEditorSectionContainer(title: "タグ", systemImage: "tag") {
+        GoodsEditorSectionContainer(title: "シリーズ", systemImage: "tag") {
             VStack(alignment: .leading, spacing: 12) {
                 GoodsEditorSelectedTagList(
                     tagNames: tagNames,
@@ -60,7 +60,7 @@ struct GoodsEditorTagsSection: View {
                     )
                 }
 
-                Text("タグは5件まで入力できます。保存時にグッズへ反映されます。")
+                Text("シリーズは5件まで入力できます。保存時にグッズへ反映されます。")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(MegrumTheme.muted)
             }

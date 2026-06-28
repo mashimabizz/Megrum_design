@@ -14,7 +14,7 @@ struct GoodsBulkTagSheet: View {
     var selectedCount: Int
     var candidateNames: [String] = []
     var previewItemsByTag: [String: [TagPreviewItem]] = [:]
-    var navigationTitle = "タグをつける"
+    var navigationTitle = "シリーズを設定"
     var textFieldPlaceholder = "例：会場限定"
     var footerText: String?
     var confirmationTitle = "追加"
@@ -38,7 +38,7 @@ struct GoodsBulkTagSheet: View {
                             previewItemsByTag: previewItemsByTag,
                             selectedNames: $selectedCandidateNames,
                             maxSelection: 1,
-                            emptyMessage: "このグループに紐づくタグ候補はまだありません",
+                            emptyMessage: "このグループに紐づくシリーズ候補はまだありません",
                             onToggle: toggleCandidateTag
                         )
                     } header: {
@@ -51,9 +51,9 @@ struct GoodsBulkTagSheet: View {
                 Section {
                     TextField(textFieldPlaceholder, text: $tagDraft)
                 } header: {
-                    Text("追加するタグ")
+                    Text("追加するシリーズ")
                 } footer: {
-                    Text(footerText ?? "\(selectedCount)件のグッズに同じタグを追加します。")
+                    Text(footerText ?? "\(selectedCount)件のグッズに同じシリーズを追加します。")
                 }
             }
             .navigationTitle(navigationTitle)
@@ -66,8 +66,10 @@ struct GoodsBulkTagSheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(confirmationTitle) {
-                        onApply(trimmedTag)
-                        dismiss()
+                        MegrumHaptics.performSelectionChanged {
+                            onApply(trimmedTag)
+                            dismiss()
+                        }
                     }
                     .disabled(trimmedTag.isEmpty)
                 }

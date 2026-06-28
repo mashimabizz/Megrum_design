@@ -214,9 +214,9 @@ struct GoodsEditorSheet: View {
                     selectedCount: 1,
                     candidateNames: editorTagSuggestions,
                     previewItemsByTag: editorTagPreviewItemsByTag,
-                    navigationTitle: "タグを登録",
+                    navigationTitle: "シリーズを登録",
                     textFieldPlaceholder: "例：会場限定",
-                    footerText: "このWishにタグを追加します。",
+                    footerText: "このWishにシリーズを追加します。",
                     confirmationTitle: "追加",
                     onApply: addTagFromSelectionSheet
                 )
@@ -228,9 +228,9 @@ struct GoodsEditorSheet: View {
                     selectedCount: selectedCreateMetaIDs.count,
                     candidateNames: createBulkTagSuggestions,
                     previewItemsByTag: editorTagPreviewItemsByTag,
-                    navigationTitle: "タグを一括登録",
+                    navigationTitle: "シリーズを一括登録",
                     textFieldPlaceholder: "例：会場限定",
-                    footerText: "\(selectedCreateMetaIDs.count)件の画像に同じタグを追加します。",
+                    footerText: "\(selectedCreateMetaIDs.count)件の画像に同じシリーズを追加します。",
                     confirmationTitle: "登録",
                     onApply: applyCreateBulkTag
                 )
@@ -238,17 +238,17 @@ struct GoodsEditorSheet: View {
                 .presentationDragIndicator(.visible)
             }
             .alert(
-                "タグ未設定の画像があります",
+                "シリーズ未設定の画像があります",
                 isPresented: $isConfirmingInventoryCreateWithoutTags
             ) {
-                Button("タグを設定する", role: .cancel) {}
+                Button("シリーズを設定する", role: .cancel) {}
                 Button("このまま登録") {
                     Task {
                         await saveInventoryCreateFlow()
                     }
                 }
             } message: {
-                Text("タグを登録していないと、検索やマッチ候補で見つかりにくくなる可能性があります。なるべくタグを登録してください。")
+                Text("シリーズを登録していないと、検索やマッチ候補で見つかりにくくなる可能性があります。なるべくシリーズを登録してください。")
             }
             .goodsEditorTradingCardBulkSourceDialog(
                 isPresented: $isShowingTradingCardBulkSourceDialog,

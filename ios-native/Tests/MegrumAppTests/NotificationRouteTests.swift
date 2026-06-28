@@ -76,5 +76,7 @@ final class NotificationRouteTests: XCTestCase {
     func testMessageReceivedNotificationIsTradeRelated() {
         XCTAssertTrue(MegrumNotificationKind.messageReceived.isTradeRelatedForCenter)
         XCTAssertEqual(MegrumNotificationKind.messageReceived.centerSymbolName, "message")
+        XCTAssertFalse(MegrumNotificationKind.groomLiked.isTradeRelatedForCenter)
+        XCTAssertEqual(MegrumNotificationKind.groomLiked.centerSymbolName, "heart")
     }
 }

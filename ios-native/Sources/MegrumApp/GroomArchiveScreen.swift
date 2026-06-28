@@ -53,7 +53,7 @@ struct GroomArchiveScreen: View {
                     .padding(.horizontal, 18)
                     .padding(.bottom, 10)
                 }
-                GroomArchiveThumbnailRail(
+                GroomArchiveThumbnailOverview(
                     grooms: archivedGrooms,
                     selectedGroomID: selectedGroom?.id,
                     onSelect: { selectedGroom = $0 }

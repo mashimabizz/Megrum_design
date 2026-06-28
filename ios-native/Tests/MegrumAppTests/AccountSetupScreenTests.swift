@@ -133,6 +133,74 @@ final class AccountSetupScreenTests: XCTestCase {
         XCTAssertNil(AccountSetupBirthDateCalendarLogic.addYears(1, to: futureMonth, maxDate: maxDate))
     }
 
+    func testOshiPresentationStateFiltersGroupsByGenreAndAlias() {
+        let idolGenreID = UUID(uuidString: "30000000-0000-0000-0000-000000000101")!
+        let actorGenreID = UUID(uuidString: "30000000-0000-0000-0000-000000000102")!
+        let groups = [
+            OshiGroup(
+                id: UUID(uuidString: "30000000-0000-0000-0000-000000000111")!,
+                name: "BTS",
+                aliases: ["防弾少年団"],
+                genreID: idolGenreID
+            ),
+            OshiGroup(
+                id: UUID(uuidString: "30000000-0000-0000-0000-000000000112")!,
+                name: "俳優A",
+                aliases: ["actor-a"],
+                genreID: actorGenreID
+            )
+        ]
+
+        let state = AccountSetupOshiPresentationState(
+            groups: groups,
+            genres: [
+                OshiGenre(id: idolGenreID, name: "K-POP"),
+                OshiGenre(id: actorGenreID, name: "俳優")
+            ],
+            selectedGenreID: idolGenreID,
+            searchText: " 防弾 ",
+            selectedGroups: [],
+            selectedDrafts: []
+        )
+
+        XCTAssertEqual(state.filteredGroups.map(\.name), ["BTS"])
+        XCTAssertEqual(state.categoryOptions.map(\.title), ["すべて", "K-POP", "俳優"])
+        XCTAssertNil(state.categoryOptions.first?.id)
+    }
+
+    func testOshiPresentationStateBuildsMemberTargetsFromGroupsAndRequests() {
+        let group = OshiGroup(
+            id: UUID(uuidString: "30000000-0000-0000-0000-000000000121")!,
+            name: "TWICE",
+            kind: .group
+        )
+        let solo = OshiGroup(
+            id: UUID(uuidString: "30000000-0000-0000-0000-000000000122")!,
+            name: "ソロ",
+            kind: .solo
+        )
+        let requestID = UUID(uuidString: "30000000-0000-0000-0000-000000000123")!
+
+        let state = AccountSetupOshiPresentationState(
+            groups: [],
+            genres: [],
+            selectedGenreID: nil,
+            searchText: "",
+            selectedGroups: [group, solo],
+            selectedDrafts: [
+                OnboardingOshiDraft(
+                    oshiRequestID: requestID,
+                    requestedName: "新しい作品",
+                    requestedKind: .work
+                )
+            ]
+        )
+
+        XCTAssertEqual(state.selectedMemberGroups.map(\.name), ["TWICE"])
+        XCTAssertEqual(state.selectedMemberTargets.map(\.name), ["TWICE", "新しい作品"])
+        XCTAssertEqual(state.selectedMemberTargets.last?.requestContext.oshiRequestID, requestID)
+    }
+
     private func validationMessage(
         displayName: String = "みち",
         handle: String = "michirion",

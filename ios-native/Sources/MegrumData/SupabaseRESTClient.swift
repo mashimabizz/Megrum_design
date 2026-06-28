@@ -6,6 +6,10 @@ public final class SupabaseRESTClient: @unchecked Sendable {
     private let decoder: JSONDecoder
     let encoder: JSONEncoder
 
+    public var projectURL: URL {
+        configuration.projectURL
+    }
+
     public init(configuration: SupabaseConfiguration, session: URLSession = .shared) {
         self.configuration = configuration
         self.session = session

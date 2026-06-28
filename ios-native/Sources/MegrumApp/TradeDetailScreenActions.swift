@@ -195,7 +195,7 @@ extension TradeDetailScreen {
             }
         }
         guard let data = try? await item.loadTransferable(type: Data.self) else {
-            unavailableChatAction = messageType == .photo ? .photo : .outfitPhoto
+            unavailableChatAction = TradeUnavailableChatAction.messageFailureAction(for: messageType)
             return
         }
         let upload = normalizedChatPhotoUpload(from: data)
@@ -218,7 +218,7 @@ extension TradeDetailScreen {
             body: messageType == .outfitPhoto ? intent.body : nil
         )
         if !sent {
-            unavailableChatAction = messageType == .photo ? .photo : .outfitPhoto
+            unavailableChatAction = TradeUnavailableChatAction.messageFailureAction(for: messageType)
         }
     }
 

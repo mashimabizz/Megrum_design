@@ -11,6 +11,7 @@ struct IndividualListingReceivePanel: View {
     var goodsTypes: [GoodsType]
     var canEdit: Bool
     var onAddCondition: () -> Void
+    @State private var showsOptionBreakdown = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -23,17 +24,32 @@ struct IndividualListingReceivePanel: View {
             Divider()
 
             VStack(spacing: 0) {
-                ForEach(Array(options.enumerated()), id: \.element.id) { index, option in
-                    IndividualListingOptionRow(
-                        index: index + 1,
-                        option: option,
-                        wishByID: wishByID,
-                        groups: groups,
-                        characters: characters,
-                        goodsTypes: goodsTypes
-                    )
-                    if index < options.count - 1 {
-                        Divider()
+                if IndividualListingListPresentation.usesCollapsedOptionSummary(optionCount: options.count) {
+                    Button {
+                        showsOptionBreakdown = true
+                    } label: {
+                        IndividualListingCollapsedOptionsRow(
+                            options: options,
+                            wishByID: wishByID,
+                            groups: groups,
+                            goodsTypes: goodsTypes
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("選択肢\(options.count)件の内訳を表示")
+                } else {
+                    ForEach(Array(options.enumerated()), id: \.element.id) { index, option in
+                        IndividualListingOptionRow(
+                            index: index + 1,
+                            option: option,
+                            wishByID: wishByID,
+                            groups: groups,
+                            characters: characters,
+                            goodsTypes: goodsTypes
+                        )
+                        if index < options.count - 1 {
+                            Divider()
+                        }
                     }
                 }
 
@@ -54,6 +70,86 @@ struct IndividualListingReceivePanel: View {
             RoundedRectangle(cornerRadius: 24, style: .continuous)
                 .strokeBorder(MegrumTheme.ink.opacity(0.07), lineWidth: 1)
         }
+        .sheet(isPresented: $showsOptionBreakdown) {
+            IndividualListingOptionBreakdownSheet(
+                options: options,
+                wishByID: wishByID,
+                groups: groups,
+                characters: characters,
+                goodsTypes: goodsTypes
+            )
+        }
+    }
+}
+
+private struct IndividualListingCollapsedOptionsRow: View {
+    var options: [IndividualListingWishOption]
+    var wishByID: [UUID: WishItem]
+    var groups: [OshiGroup]
+    var goodsTypes: [GoodsType]
+
+    var body: some View {
+        HStack(spacing: 10) {
+            ForEach(Array(options.prefix(2).enumerated()), id: \.element.id) { _, option in
+                IndividualListingOptionThumbnail(
+                    option: option,
+                    wishByID: wishByID,
+                    groups: groups,
+                    goodsTypes: goodsTypes
+                )
+            }
+
+            IndividualListingOtherOptionsThumbnail()
+
+            Spacer(minLength: 0)
+        }
+        .padding(.vertical, 14)
+        .contentShape(Rectangle())
+    }
+}
+
+private struct IndividualListingOptionBreakdownSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    var options: [IndividualListingWishOption]
+    var wishByID: [UUID: WishItem]
+    var groups: [OshiGroup]
+    var characters: [OshiCharacter]
+    var goodsTypes: [GoodsType]
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 0) {
+                    ForEach(Array(options.enumerated()), id: \.element.id) { index, option in
+                        IndividualListingOptionRow(
+                            index: index + 1,
+                            option: option,
+                            wishByID: wishByID,
+                            groups: groups,
+                            characters: characters,
+                            goodsTypes: goodsTypes
+                        )
+                        if index < options.count - 1 {
+                            Divider()
+                        }
+                    }
+                }
+                .padding(.horizontal, 18)
+                .padding(.bottom, 24)
+            }
+            .background(MegrumTheme.canvas.ignoresSafeArea())
+            .navigationTitle("選択肢の内訳")
+            .megrumInlineNavigationTitle()
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("閉じる") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
     }
 }
 

@@ -49,7 +49,7 @@
 | **Swift Native iOS版** | iOSネイティブ版、Swift版 | `ios-native/` で実装する Swift / SwiftUI / UIKit 版 Megrum。iter299以降のユーザー向けiOS体験の主対象で、Apple標準の遷移・通知・地図・カメラ・Liquid Glass表現を担う | iter299 |
 | **legacy Expo版** | 旧iOSアプリ版、React Native版、Expo版 | `mobile/` で実装されている移行元アプリ。Swift Native版が機能同等になるまで、バックアップ・仕様参照・緊急修正の対象として残す | iter168.63, iter299 |
 | **Appleログイン** | Sign in with Apple | Swift Native iOS版でApple標準の `SignInWithAppleButton` から認証し、Apple identity tokenとraw nonceをSupabase Authへ渡してMegrum sessionを作る認証経路 | iter343 |
-| **Googleログイン** | Google OAuth | Swift Native iOS版でiOS標準の `ASWebAuthenticationSession` からSupabase OAuth authorize URLを開き、callback URLのsessionを既存のredirect復元へ渡してMegrum sessionを作る認証経路 | iter369 |
+| **Googleログイン** | Google OAuth | Swift Native iOS版でiOS標準の `ASWebAuthenticationSession` からSupabase OAuth authorize URLを開き、`megrum-preview://auth/callback` / `megrum://auth/callback` のsessionを既存のredirect復元へ渡してMegrum sessionを作る認証経路 | iter369, iter1226.13 |
 | **モバイル通知** | push notification, 端末通知 | iOS/Android端末に届くMegrumの通知。Expo版はExpo Push Token、Swift Native iOS版はAPNs device tokenを `notification_devices` に登録し、`notifications` の新規行を端末へ配送する | iter276, iter338 |
 | **APNs device token** | native device token, APNsトークン | Swift Native iOS版がApple Push Notification serviceから受け取る端末トークン。`notification_devices.push_provider='apns'` / `native_device_token` に保存する | iter338 |
 | **APNs配送Function** | `send-apns-notification` | 信頼済みサーバー側から `notification_id` を受け取り、対象ユーザーの有効APNs端末へ通知を配送するSupabase Edge Function。DB設定値が揃っていれば `notifications` 作成triggerから呼ばれ、無効端末は `revoked_at` で止める | iter344, iter345 |
@@ -86,17 +86,19 @@
 | **承認待ち** | pending | 追加リクエストが運営確認前の状態。UIでは仮登録中の推し・メンバーに表示する | iter57, iter154.33 |
 | **同担** | どうたん | 同じ推しを応援する人 | — |
 | **推しすれ違い** | oshi encounter | 現地交換とは別に、同担・近い界隈・生活圏でのめぐりを蓄積する体験機能。交換ではなく偶然性と推し活の楽しさを主目的にする | iter157 |
-| **めぐり** | meguri | 推しすれ違いのiOSタブ名・体験名。めぐりあった人、マップ、掲示板、グルームを確認する入口 | iter161, iter168.76 |
+| **めぐり** | meguri | 推しすれ違いのiOSタブ名・体験名。めぐりあった人、マップ、チャットルーム、グルームを確認する入口 | iter161, iter168.76 |
 | **めぐり住人** | meguri resident | めぐりで出会う相手の表示単位。iter168.78以降、めぐりホームでは専用2Dアバターではなく、グッズ交換側と同じプロフィールアイコン（画像または頭文字）を表示する | iter161.9, iter168.73, iter168.78 |
 | **めぐり広場** | meguri plaza | めぐりあった人たちが集まる一覧画面。各アイコンをタップすると詳細プロフィール導線を出す | iter162.42, iter168.73 |
 | **めぐりプロフィール** | meguri profile | めぐり広場やめぐりメッセージから開く、推しすれ違い専用の公開プロフィール。公開アイコン、拠点、公開情報、めぐり回数、メッセージ導線を表示する | iter162.46, iter168.73 |
 | **グルーム** | groom, meguri story | めぐりで使う写真中心の一過性スナップ。撮影した推し活グッズ・服装・現場の雰囲気を丸いアイコンで表示し、全画面閲覧・いいね・メッセージ導線につなげる。iter168.89以降は投稿時の位置を保存し、現在地から1km圏内の投稿を一覧表示する。iter168.95以降、地図では1km圏外も丸アイコンだけ表示し、内容閲覧は1km圏内に限定する。Swift Native版ではiOSカメラ撮影または写真選択から投稿できる | iter162.49, iter165, iter168.89, iter168.95, iter349 |
 | **グルームマップ** | groom map | グルーム投稿を地図上の吹き出し付き丸アイコンとして表示する画面。1km圏内の投稿だけタップで開け、圏外は閲覧不可の案内を出す | iter168.95 |
+| **グルームクラスター** | groom cluster | めぐり地図を広域表示した時に、近接する複数グルームをMegrumアイコン入り吹き出しと件数バッジへまとめた表示。タップすると含まれるグルームをまとめて閲覧する | iter1225 |
 | **グルームアーカイブ** | groom archive | 自分が過去に投稿したグルームだけを地図上のピンとサムネイル列で振り返る画面。ピンまたはサムネイルからストーリー風に開き、上スワイプまたは反応ボタンで投稿ごとのいいね・コメント一覧を確認する | iter747 |
-| **スポット掲示板** | board, thread board | めぐり内で使う、現地の情報共有・雑談のためのスレッド型掲示板。交換成立そのものではなく、現場の状況や温度感を共有する場。閲覧は都道府県単位または現在地から1km圏内。都道府県は掲示板画面で選択でき、初回はプロフィールの都道府県、変更後は端末保存値を既定値にする。めぐりホームでは周辺の掲示板を地図上に表示しつつ、内容閲覧は1km圏内に限定する | iter168.72, iter168.89, iter168.95, iter168.96, iter708 |
-| **掲示板マップ** | board map | 位置情報を持つスポット掲示板のスレッドを地図上に表示する画面。1km圏内のスレッドだけタップで開け、圏外は閲覧不可の案内を出す | iter168.95, iter708 |
-| **掲示板の都道府県設定** | board prefecture default | スポット掲示板の `same_prefecture` 表示・投稿に使う都道府県。プロフィールの都道府県を初期値にし、掲示板画面で変更すると次回以降もその値を使う | iter168.96 |
-| **スレッド** | thread | スポット掲示板の1投稿単位。誰でも立てられ、参加者がチャット形式で返信する。位置つきスレッドの基準地点は、スレッド作成時の位置情報 | iter168.72, iter168.89, iter708 |
+| **チャットルーム** | board, thread board | 旧「スポット掲示板」。めぐり内で使う、現地の情報共有・雑談のためのスレッド型チャットルーム。交換成立そのものではなく、現場の状況や温度感を共有する場。閲覧は都道府県単位または現在地から1km圏内。めぐりホームでは周辺のチャットルームを地図上に表示しつつ、内容閲覧は1km圏内に限定する | iter168.72, iter168.89, iter168.95, iter168.96, iter708, iter1226.12 |
+| **チャットルームマップ** | board map | 位置情報を持つチャットルームのスレッドを地図上に表示する画面。1km圏内のスレッドだけタップで開け、圏外は閲覧不可の案内を出す | iter168.95, iter708, iter1226.12 |
+| **チャットルームの都道府県設定** | board prefecture default | チャットルームの `same_prefecture` 表示・投稿に使う都道府県。プロフィールの都道府県を初期値にし、変更すると次回以降もその値を使う | iter168.96, iter1226.12 |
+| **チャットルーム匿名プロフィール** | board anonymous profile | チャットルームのスレッドごとに設定できる表示名と仮アバター。通常プロフィールと切り離して匿名投稿するための表示情報で、未設定時は通常プロフィール名へフォールバックする | iter1225, iter1226.12 |
+| **スレッド** | thread | チャットルームの1投稿単位。誰でも立てられ、参加者がチャット形式で返信する。位置つきスレッドの基準地点は、スレッド作成時の位置情報 | iter168.72, iter168.89, iter708, iter1226.12 |
 | **掲示板固定スレッド** | pinned thread | スポット掲示板で運営または将来の管理機能により上位表示されるスレッド。`is_pinned=true` の時、一覧・詳細に固定バッジを表示する | iter191 |
 | **掲示板参加者一覧** | thread participants | スポット掲示板のスレッド作成者と可視返信者をまとめて確認する表示。返信数、最終参加時刻、作成者/自分バッジを表示する | iter192 |
 | **掲示板参加者別返信フィルタ** | participant reply filter | 参加者一覧から特定の参加者を選び、その人の可視返信だけをスレッド内検索で絞り込む表示操作 | iter193 |
@@ -185,6 +187,7 @@
 | **掲示板未読区切り** | unread separator | スポット掲示板のスレッド詳細で、前回既読位置より新しい返信の始まりを示す区切り表示 | iter190 |
 | **すれ違いパネル** | encounter panel | 推しごとに、同担や近い界隈とのすれ違いが増えるほどピースが埋まるコレクション表示 | iter157 |
 | **めぐりメッセージ** | encounter message, 旧称: すれ違いレター | めぐりあった相手ごとに届くLINE風のメッセージスレッド。到着・相性・ぼかした場所/時刻は見えるが、本文表示と返信は月額プラン対象。実ユーザー間の通常会話は `meguri_messages` で永続化する | iter162.41, iter165 |
+| **グルーム通知** | groom activity notification | グルームへのいいね、グルーム経由返信、通常めぐりメッセージの通知。`groom_liked` / `groom_reply` / `meguri_message` を使い、設定一覧のON/OFFはOSプッシュだけを制御してアプリ内通知行は残す | iter1226.14 |
 | **箱推し** | はこおし | グループ全員推し（メンバー特定なし） | — |
 | **DD** | だれでも大好き | 複数推しを並列で応援 | — |
 | **推しL1** | グループ／作品 | 第1階層：TWICE、IVE、呪術廻戦 等 | アカウント設定 |
@@ -245,9 +248,9 @@
 | **マッチング相手** | — | ホームに表示される候補ユーザー | home-v2.jsx |
 | **注目マッチ** | featured match | ホーム上部に大きめ表示する上位候補。個別募集・双方向一致・現地交換可能性など、成立期待が高い候補を先に見せる UI セクション | iter151 |
 | **相互マッチ** | reciprocal listing match | 自分の個別募集と相手の個別募集を組み合わせ、自分の「求めるもの」を相手の「譲るもの」または求める金額条件が満たし、相手の「求めるもの」を自分の「譲るもの」または求める金額条件が満たす状態。相手が単に持っているだけのグッズではなく、相手の個別募集の「譲るもの」に入っているグッズだけを見る | iter746 |
-| **タグ不一致？** | tag mismatch hint | L1/L2/グッズ種別は合っているが、グッズタグが一致していない、または一致が弱い相互マッチ候補に付ける注意タグ。候補からは除外しない | iter746 |
+| **シリーズ不一致？** | tag mismatch hint | L1/L2/グッズ種別は合っているが、グッズシリーズが一致していない、または一致が弱い相互マッチ候補に付ける注意表示。候補からは除外しない | iter746 / iter1226.28 |
 | **金額込み候補** | amount-included candidate | 個別募集の求めるものに定価と金額指定が混在し、定価と具体金額を比較できないため候補には残すが、金額条件の確認が必要な相互マッチ候補 | iter746 |
-| **金額不足** | insufficient amount | 金額指定同士の比較で、相手側の提示金額が求めている金額より低い相互マッチ候補に付ける注意タグ | iter746 |
+| **金額不足** | insufficient amount | 金額指定同士の比較で、相手側の提示金額が求めている金額より低い相互マッチ候補に付ける注意表示 | iter746 |
 | **市場残数** | market available quantity | マイグッズの実表示数から、`agreed` の打診で未完了承認の譲数量を差し引いたマッチング上の残数。キャパ以上に打診成立しないための派生値 | iter153, iter421 |
 | **保存検索** | saved search | カスタム検索条件を保存・繰り返し利用 | iter23 |
 | **検索実績** | search query log | ユーザーが検索画面で確定実行した検索語のログ。人気の検索は固定サンプルではなく、この実績から集計する | iter168.90 |
@@ -261,13 +264,13 @@
 | **最低数条件（個別募集）** | at least / 何個以上 | 複数アイテムから指定数以上を満たせば成立する条件。2件以上選択した譲るもの・Wishで選択でき、UI表示は「1個以上」「3個以上」など。各アイテムの数量 `qty` とは別に `min_count` として扱う | iter787 / iter788 |
 | **定価交換** | cash offer / 定価トグル | 個別募集の選択肢の 1 つで、譲を金銭で交換する。マッチング演算には参加せず UI 表示のみ。個別募集作成では `グループ` 行右端の `定価` トグルで扱う | iter67.4 / iter168.86 |
 | **比率（個別募集）** | qty / ratio | 各アイテムの数量で表現（別概念は持たない）。AND は群全体で固定、OR は候補ごとに変えられる | iter67.3 |
-| **同種交換** | same-kind swap | 同じ goods_type 同士の交換。**自己申告タグのみ、システム判定なし** | notes/18 §A-1 |
-| **異種交換** | cross-kind swap | 異なる goods_type 同士の交換。タグのみ | notes/18 §A-1 |
+| **同種交換** | same-kind swap | 同じ goods_type 同士の交換。**自己申告シリーズのみ、システム判定なし** | notes/18 §A-1 |
+| **異種交換** | cross-kind swap | 異なる goods_type 同士の交換。シリーズのみ | notes/18 §A-1 |
 | **混合交換** | any、どちらでも | 同種・異種を問わない（デフォルト） | notes/18 §A-1 |
-| **交換シーンタグ** | exchange context tags | 「終演後交換OK」「グッズ販売中交換OK」など、交換しやすい状況を表す自己申告タグ。UI名は「交換条件タグ」に統一 | iter168.71 / iter284 |
-| **交換条件タグ** | proposal condition tags | 打診確認画面で選ぶ条件タグ。`proposals.option_tags` に打診単位で保存し、郵送可の時は「即日発送」「同日発送」を候補に含める。旧UI名「オプションタグ」は廃止 | iter170 / iter284 |
+| **交換シーンシリーズ** | exchange context tags | 「終演後交換OK」「グッズ販売中交換OK」など、交換しやすい状況を表す自己申告シリーズ。UI名は「交換条件シリーズ」に統一 | iter168.71 / iter284 / iter1226.28 |
+| **交換条件シリーズ** | proposal condition tags | 打診確認画面で選ぶ条件シリーズ。`proposals.option_tags` に打診単位で保存し、現地交換または配送の条件を候補に含める。旧UI名「オプションタグ」「交換条件タグ」は廃止 | iter170 / iter284 / iter1226.28 |
 | **支払い条件** | payment methods | 定価交換や差額相談がある候補で、ユーザー同士の対応可能な支払い方法が重なるかを見る自己申告条件。保存候補は銀行振込 / PayPay / 現金交換 / その他。ホーム判定に使うのは銀行振込 / PayPay / 現金交換のみ。その他は表示メモとして扱い、口座は独立した選択肢にせず本人専用の支払い条件詳細に分離する | iter583, iter584, iter587 |
-| **グッズタグ** | goods tags | `goods_inventory_tags` / `tags_master` でグッズ単位に登録するタグ。検索フィルターでは交換条件タグと混ぜない | iter284 |
+| **グッズシリーズ** | goods tags | `goods_inventory_tags` / `tags_master` でグッズ単位に登録するシリーズ。検索フィルターでは交換条件シリーズと混ぜない | iter284 / iter1226.28 |
 | **交換比率** | exchange ratio | 譲 N 個 ↔ 受 M 個の比率。1:10〜10:1 まで | notes/18 §A-2 |
 | **カレンダー公開** | calendar disclosure | 打診時オプション。相手と自分のスケジュールを重ね見可能にする | notes/18 §A-5, iter168.97 |
 | **カレンダー重ね見** | calendar overlay | 自分と相手のスケジュールをタイムラインで重ねた UI。候補時間を決める補助に使う | notes/18 §B-4, iter168.97 |
@@ -305,7 +308,8 @@
 | **引用返信** | quoted reply | 返信に別の返信の表示名と本文スナップショットを添えて送る機能。引用元が編集・削除されても文脈が残る | iter173 |
 | **スレッド内検索** | in-thread search | スレッド詳細内で返信本文・引用本文・返信者名を絞り込む機能 | iter173 |
 | **スレッド購読** | thread subscription, watch | スポット掲示板スレッドの返信通知を受け取る設定。スレッド作成者と返信者は自動で購読ONになり、ユーザーは一覧/詳細からON/OFFできる | iter174 |
-| **掲示板返信通知** | board reply notification | 購読中のスレッドに自分以外が返信した時に作成される通知。`notifications.kind='meguri_board_reply'` を使い、通知タップで該当スレッドを開く | iter174 |
+| **チャットルーム通知** | chatroom notification, board reply notification | 購読中のチャットルーム、いいねしたチャットルーム、自分宛て返信で作成される通知。`meguri_board_reply` / `meguri_board_mention` を使い、通知タップで該当スレッドを開く。通知本文に投稿プレビューは出さず、設定一覧のON/OFFはOSプッシュだけを制御する | iter174, iter1226.14 |
+| **掲示板返信通知** | board reply notification | チャットルーム通知の旧称。実装kindは `notifications.kind='meguri_board_reply'` のまま維持する | iter174, iter1226.14 |
 | **掲示板メンション** | board mention, @handle | スポット掲示板の返信本文で `@handle` を書き、特定ユーザーへ気づいてもらうための機能。本人以外かつ閲覧可能な相手に `notifications.kind='meguri_board_mention'` を作る | iter175 |
 | **掲示板画像添付** | board image attachment | スポット掲示板のスレッドまたは返信に最大4枚まで添付できる画像。private Storage path をDBに保存し、閲覧可能な時だけ署名URLで表示する | iter176 |
 | **スレッド共有** | thread share | スポット掲示板のスレッドをiOS標準共有シートで共有する機能。タイトル・本文・アプリ内deep linkを渡す | iter177 |
@@ -502,8 +506,11 @@
 | ~~Tier別 wish flexibility~~ | (要確認、現状不明) | 既存スキーマの flexibility カラム |
 | ~~プライベート在庫~~ | 公開モデルに統一 | (なし、F1) |
 | ~~可視性レベル~~ | 公開モデルに統一 | (なし、F1) |
+| ~~タグ~~ | UI 表記を「シリーズ」に統一（iter1226.28）。DB/APIの `tag` 命名は互換性維持のため内部名として残す | **シリーズ** |
 | ~~交換ポリシータグ~~ | 公開モデルに統一 | (なし、F1) |
-| ~~オプションタグ~~ | UI 名を条件の意味が分かる名称へ変更（iter284） | **交換条件タグ** |
+| ~~交換条件タグ~~ | UI 表記を「シリーズ」に統一（iter1226.28） | **交換条件シリーズ** |
+| ~~グッズタグ~~ | UI 表記を「シリーズ」に統一（iter1226.28） | **グッズシリーズ** |
+| ~~オプションタグ~~ | UI 名を条件の意味が分かる名称へ変更（iter284）、さらに iter1226.28 でシリーズ表記へ統一 | **交換条件シリーズ** |
 | ~~交換募集~~ | マイグッズ登録（`kind=for_trade`）に吸収・概念消滅（iter46、iter421でUI名更新） | マイグッズ登録 |
 | ~~募集情報・登録グッズ情報・募集登録~~ | 同上 | マイグッズ情報 |
 | ~~交換依頼~~ | 用語統一（iter46） | **打診（proposal）** |

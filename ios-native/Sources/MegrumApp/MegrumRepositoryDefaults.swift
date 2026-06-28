@@ -89,6 +89,10 @@ public extension MegrumRepository {
         throw MegrumRepositoryError.unsupportedMutation
     }
 
+    func reportUser(_ input: UserReportCreateInput) async throws -> UserReportTicket {
+        throw MegrumRepositoryError.unsupportedMutation
+    }
+
     func loadIndividualListings() async throws -> [IndividualListing] {
         []
     }
@@ -124,5 +128,13 @@ public extension MegrumRepository {
 
     func loadUserEvaluations(userID: UUID, limit: Int) async throws -> [UserEvaluation] {
         []
+    }
+
+    func loadExchangeSettings(userID: UUID) async throws -> HomeDefaultExchangeSettings? {
+        nil
+    }
+
+    func saveExchangeSettings(_ settings: HomeDefaultExchangeSettings) async throws -> HomeDefaultExchangeSettings {
+        settings
     }
 }

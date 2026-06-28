@@ -16,7 +16,7 @@ struct AuthPasswordResetScreen: View {
 
             Spacer(minLength: 54)
 
-            AuthBrandLockup(compact: true)
+            AuthBrandLockup(style: .compactIconAndWordmark, wordmarkWidth: 124)
                 .padding(.bottom, 48)
 
             AuthPasswordResetIntro()

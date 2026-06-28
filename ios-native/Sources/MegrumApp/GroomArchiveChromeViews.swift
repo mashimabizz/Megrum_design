@@ -97,6 +97,70 @@ struct GroomArchiveThumbnailRail: View {
     }
 }
 
+struct GroomArchiveThumbnailOverview: View {
+    var grooms: [GroomPost]
+    var selectedGroomID: UUID?
+    var onSelect: (GroomPost) -> Void
+
+    var body: some View {
+        if !grooms.isEmpty {
+            GeometryReader { proxy in
+                let metrics = GroomArchiveOverviewGridMetrics.metrics(
+                    itemCount: grooms.count,
+                    availableWidth: proxy.size.width
+                )
+                LazyVGrid(columns: metrics.columns, spacing: metrics.spacing) {
+                    ForEach(grooms) { groom in
+                        Button {
+                            onSelect(groom)
+                        } label: {
+                            GroomArchiveOverviewThumbnail(
+                                groom: groom,
+                                isSelected: groom.id == selectedGroomID,
+                                size: metrics.thumbnailSize
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .center)
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 28, style: .continuous)
+                        .stroke(.white.opacity(0.66), lineWidth: 1)
+                }
+                .shadow(color: MegrumTheme.ink.opacity(0.12), radius: 18, y: 10)
+            }
+            .frame(height: GroomArchiveOverviewGridMetrics.containerHeight(itemCount: grooms.count))
+        }
+    }
+}
+
+enum GroomArchiveOverviewGridMetrics {
+    static func metrics(itemCount: Int, availableWidth: CGFloat) -> (columns: [GridItem], spacing: CGFloat, thumbnailSize: CGFloat) {
+        let count = max(itemCount, 1)
+        let maxRows: CGFloat = count <= 10 ? 2 : 3
+        let columnCount = max(1, Int(ceil(CGFloat(count) / maxRows)))
+        let spacing: CGFloat = columnCount > 5 ? 8 : 12
+        let horizontalPadding: CGFloat = 24
+        let usableWidth = max(availableWidth - horizontalPadding - CGFloat(columnCount - 1) * spacing, 48)
+        let itemSize = min(58, max(34, usableWidth / CGFloat(columnCount)))
+        let columns = Array(repeating: GridItem(.fixed(itemSize), spacing: spacing), count: columnCount)
+        return (columns, spacing, itemSize)
+    }
+
+    static func containerHeight(itemCount: Int) -> CGFloat {
+        if itemCount <= 5 {
+            return 94
+        }
+        if itemCount <= 10 {
+            return 150
+        }
+        return 190
+    }
+}
+
 struct GroomArchiveLimitNotice: View {
     var onOpenMegrumPlus: () -> Void
 
@@ -143,5 +207,20 @@ private struct GroomArchiveThumbnail: View {
                 .lineLimit(1)
         }
         .frame(width: 68)
+    }
+}
+
+private struct GroomArchiveOverviewThumbnail: View {
+    var groom: GroomPost
+    var isSelected: Bool
+    var size: CGFloat
+
+    var body: some View {
+        GroomThumbnailCircle(url: groom.imageURL, size: size)
+            .overlay {
+                Circle()
+                    .stroke(isSelected ? MegrumTheme.lavender : .white, lineWidth: isSelected ? 3 : 2)
+            }
+            .contentShape(Circle())
     }
 }

@@ -6,6 +6,77 @@ import SwiftUI
 import UIKit
 #endif
 
+struct BoardAnonymousAvatarOption: Identifiable, Equatable {
+    var id: String
+    var title: String
+    var symbol: String
+    var color: Color
+
+    static let options: [BoardAnonymousAvatarOption] = [
+        .init(id: "avatar_1", title: "ラベンダー", symbol: "sparkles", color: MegrumTheme.lavender),
+        .init(id: "avatar_2", title: "ピンク", symbol: "heart.fill", color: MegrumTheme.pink),
+        .init(id: "avatar_3", title: "スカイ", symbol: "cloud.fill", color: MegrumTheme.sky),
+        .init(id: "avatar_4", title: "スター", symbol: "star.fill", color: Color.yellow.opacity(0.86)),
+        .init(id: "avatar_5", title: "ミント", symbol: "leaf.fill", color: Color.green.opacity(0.72)),
+        .init(id: "avatar_6", title: "ムーン", symbol: "moon.fill", color: Color.indigo.opacity(0.72))
+    ]
+
+    static func option(id: String?) -> BoardAnonymousAvatarOption {
+        options.first { $0.id == id } ?? options[0]
+    }
+}
+
+struct BoardThreadAnonymousProfileSection: View {
+    @Binding var displayName: String
+    @Binding var selectedAvatarID: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("このチャットルームでの名前")
+                .font(.system(size: 14, weight: .heavy, design: .rounded))
+                .foregroundStyle(MegrumTheme.ink)
+
+            TextField("例：めぐりさん", text: $displayName)
+                .font(.system(size: 16, weight: .bold, design: .rounded))
+                .padding(15)
+                .background(.white.opacity(0.9), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+
+            HStack(spacing: 10) {
+                ForEach(BoardAnonymousAvatarOption.options) { option in
+                    Button {
+                        selectedAvatarID = option.id
+                    } label: {
+                        BoardAnonymousAvatar(option: option, isSelected: selectedAvatarID == option.id, size: 42)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(option.title)
+                }
+            }
+        }
+        .padding(14)
+        .background(.white.opacity(0.72), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+}
+
+struct BoardAnonymousAvatar: View {
+    var option: BoardAnonymousAvatarOption
+    var isSelected: Bool = false
+    var size: CGFloat = 36
+
+    var body: some View {
+        Image(systemName: option.symbol)
+            .font(.system(size: size * 0.42, weight: .heavy, design: .rounded))
+            .foregroundStyle(.white)
+            .frame(width: size, height: size)
+            .background(option.color, in: Circle())
+            .overlay {
+                Circle()
+                    .stroke(isSelected ? MegrumTheme.ink : .white.opacity(0.82), lineWidth: isSelected ? 3 : 1.5)
+            }
+            .shadow(color: option.color.opacity(0.24), radius: 8, y: 4)
+    }
+}
+
 struct BoardThreadTitleField: View {
     @Binding var title: String
 
@@ -148,7 +219,7 @@ struct BoardThreadComposerLocationStep: View {
                     .font(.system(size: 18, weight: .heavy, design: .rounded))
                     .foregroundStyle(MegrumTheme.ink)
 
-                Text("掲示板が地図上に表示される見え方を確認しながら、半径1km以内にピンを立ててください。")
+                Text("チャットルームが地図上に表示される見え方を確認しながら、半径1km以内にピンを立ててください。")
                     .font(.system(size: 12, weight: .bold, design: .rounded))
                     .foregroundStyle(MegrumTheme.muted)
                     .fixedSize(horizontal: false, vertical: true)

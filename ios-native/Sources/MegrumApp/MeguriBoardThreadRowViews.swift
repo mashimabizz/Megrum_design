@@ -29,6 +29,12 @@ struct MeguriThreadListRow: View {
                     .font(.system(size: 12.5, weight: .semibold, design: .rounded))
                     .foregroundStyle(MegrumTheme.ink.opacity(0.72))
                     .lineLimit(2)
+                if let remainingTimeText = thread.remainingTimeText {
+                    Label(remainingTimeText, systemImage: "timer")
+                        .font(.system(size: 11, weight: .heavy, design: .rounded))
+                        .foregroundStyle(thread.isClosed ? MegrumTheme.muted : MegrumTheme.pink)
+                        .lineLimit(1)
+                }
             }
 
             Spacer()
@@ -95,6 +101,29 @@ struct MeguriThreadListRow: View {
         return (0..<min(3, grooms.count)).map { offset in
             grooms[(index + offset) % grooms.count]
         }
+    }
+}
+
+extension BoardThread {
+    var effectiveReplyCount: Int {
+        max(replyCount, 0)
+    }
+
+    var remainingTimeText: String? {
+        guard let expiresAt else {
+            return nil
+        }
+        let remaining = expiresAt.timeIntervalSince(Date())
+        guard remaining > 0 else {
+            return "終了"
+        }
+        if remaining < 3_600 {
+            return "残り\(max(1, Int(ceil(remaining / 60))))分"
+        }
+        if remaining < 86_400 {
+            return "残り\(max(1, Int(ceil(remaining / 3_600))))時間"
+        }
+        return "残り\(max(1, Int(ceil(remaining / 86_400))))日"
     }
 }
 

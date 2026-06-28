@@ -176,7 +176,7 @@ private struct MeguriBoardDetailCard: View {
     }
 }
 
-#Preview("めぐり 掲示板詳細") {
+#Preview("めぐり チャットルーム詳細") {
     MeguriBoardDetailDesignPreview()
 }
 #endif

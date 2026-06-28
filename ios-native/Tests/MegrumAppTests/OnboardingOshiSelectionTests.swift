@@ -134,6 +134,41 @@ final class OnboardingOshiSelectionTests: XCTestCase {
         XCTAssertNil(targets.first?.requestContext.groupID)
     }
 
+    func testSeedingWholeGroupSelectionsKeepsRequestsAndRemovesUnselectedGroups() {
+        let selectedSolo = OshiGroup(
+            id: UUID(uuidString: "10000000-0000-0000-0000-000000000061")!,
+            name: "ソロアーティスト",
+            kind: .solo
+        )
+        let unselectedGroup = OshiGroup(
+            id: UUID(uuidString: "10000000-0000-0000-0000-000000000062")!,
+            name: "未選択グループ"
+        )
+        let requestID = UUID(uuidString: "10000000-0000-0000-0000-000000000063")!
+        let drafts = [
+            OnboardingOshiDraft(
+                groupID: unselectedGroup.id,
+                groupName: unselectedGroup.name,
+                characterID: UUID(uuidString: "10000000-0000-0000-0000-000000000064")!,
+                characterName: "未選択メンバー"
+            ),
+            OnboardingOshiDraft(
+                oshiRequestID: requestID,
+                requestedName: "追加リクエスト"
+            )
+        ]
+
+        let seeded = OnboardingOshiSelectionLogic.draftsAfterSeedingWholeGroupSelections(
+            selectedGroups: [selectedSolo],
+            currentDrafts: drafts
+        )
+
+        XCTAssertEqual(seeded.map(\.displayName), ["追加リクエスト（申請中）", "ソロアーティスト 全体"])
+        XCTAssertEqual(seeded.first?.oshiRequestID, requestID)
+        XCTAssertTrue(OnboardingOshiSelectionLogic.isWholeGroupSelected(selectedSolo, in: seeded))
+        XCTAssertFalse(OnboardingOshiSelectionLogic.groupHasSelection(unselectedGroup, in: seeded))
+    }
+
     func testDraftsFromSavedSelectionsKeepSavedPriorityOrder() {
         let twice = OshiGroup(id: UUID(uuidString: "10000000-0000-0000-0000-000000000031")!, name: "TWICE")
         let ive = OshiGroup(id: UUID(uuidString: "10000000-0000-0000-0000-000000000032")!, name: "IVE")

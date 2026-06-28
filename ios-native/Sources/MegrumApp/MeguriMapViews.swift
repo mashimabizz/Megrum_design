@@ -40,14 +40,15 @@ struct MeguriMapPresentationModifier: ViewModifier {
 }
 
 struct MeguriMapScreen: View {
-    var kind: MeguriMapKind
     @ObservedObject var appState: MegrumAppState
     @ObservedObject var locationState: MegrumLocationState
     var selectedPrefecture: String?
     var boardScope: BoardThread.Audience
     @Environment(\.dismiss) private var dismiss
+    @State var kind: MeguriMapKind
     @State var cameraPosition: MapCameraPosition
     @State var selectedGroom: GroomPost?
+    @State var selectedGroomGroup: GroomMapGroomSelection?
     @State var selectedThread: BoardThread?
     @State var mapNotice: String?
     @State var outOfRangeAlertMessage = ""
@@ -66,6 +67,7 @@ struct MeguriMapScreen: View {
         self.locationState = locationState
         self.selectedPrefecture = selectedPrefecture
         self.boardScope = boardScope
+        _kind = State(initialValue: kind)
         let initialGrooms = appState.groomMapPosts.isEmpty ? appState.grooms : appState.groomMapPosts
         _cameraPosition = State(initialValue: .region(MKCoordinateRegion(center: kind.initialCenter(userCoordinate: locationState.coordinate, grooms: initialGrooms, threads: appState.threads), span: kind.regionSpan)))
     }
@@ -76,12 +78,14 @@ struct MeguriMapScreen: View {
                 cameraPosition: $cameraPosition,
                 kind: kind,
                 rangeCircle: rangeCircle,
+                currentCoordinate: locationState.coordinate,
                 grooms: mapGrooms,
                 threads: appState.threads,
                 isVisualQAPreviewEnabled: VisualQAPreviewMode.isEnabled(environment: ProcessInfo.processInfo.environment),
                 isGroomOutOfRange: isGroomOutOfRange,
                 isBoardOutOfRange: isBoardOutOfRange,
                 onOpenGroom: openGroomIfInRange,
+                onOpenGroomCluster: openGroomCluster,
                 onOpenThread: openThreadIfInRange
             )
 
@@ -89,6 +93,8 @@ struct MeguriMapScreen: View {
                 MapGlassHeader(title: kind.title) {
                     dismiss()
                 }
+
+                MeguriMapFilterControl(activeKind: $kind)
 
                 if let mapNotice {
                     MapStatusBadge(
@@ -121,7 +127,7 @@ struct MeguriMapScreen: View {
         }
         .task {
             if !VisualQAPreviewMode.isEnabled(environment: ProcessInfo.processInfo.environment) {
-                locationState.requestCurrentLocation()
+                locationState.startUpdatingCurrentLocation()
             }
             await reloadMapContent(
                 latitude: locationState.coordinate?.latitude,
@@ -139,7 +145,18 @@ struct MeguriMapScreen: View {
                 )
                 await MainActor.run {
                     mapNotice = nil
-                    alignCameraToVisibleContent(userCoordinate: coordinate, animated: true, force: true)
+                    alignCameraToVisibleContent(userCoordinate: coordinate, animated: true)
+                }
+            }
+        }
+        .onChange(of: kind) { _, _ in
+            Task {
+                await reloadMapContent(
+                    latitude: locationState.coordinate?.latitude,
+                    longitude: locationState.coordinate?.longitude
+                )
+                await MainActor.run {
+                    alignCameraToVisibleContent(userCoordinate: locationState.coordinate, animated: true, force: true)
                 }
             }
         }
@@ -147,6 +164,9 @@ struct MeguriMapScreen: View {
             GroomMapDetailSheet(groom: groom)
                 .presentationDetents([.height(280)])
                 .presentationDragIndicator(.visible)
+        }
+        .sheet(item: $selectedGroomGroup) { selection in
+            GroomViewerScreen(grooms: selection.grooms, initialGroom: selection.initialGroom, appState: appState)
         }
         .sheet(item: $selectedThread) { thread in
             NavigationStack {
@@ -163,5 +183,35 @@ struct MeguriMapScreen: View {
         } message: {
             Text(outOfRangeAlertMessage)
         }
+    }
+
+}
+
+struct GroomMapGroomSelection: Identifiable {
+    var grooms: [GroomPost]
+    var initialGroom: GroomPost
+
+    var id: String {
+        grooms.map { $0.id.uuidString }.joined(separator: "-")
+    }
+}
+
+struct MeguriMapFilterControl: View {
+    @Binding var activeKind: MeguriMapKind
+
+    var body: some View {
+        Picker("表示", selection: $activeKind) {
+            Text("すべて").tag(MeguriMapKind.all)
+            Text("グルーム").tag(MeguriMapKind.grooms)
+            Text("チャットルーム").tag(MeguriMapKind.boards)
+        }
+        .pickerStyle(.segmented)
+        .padding(6)
+        .background(.regularMaterial, in: Capsule())
+        .overlay {
+            Capsule()
+                .stroke(Color.white.opacity(0.62), lineWidth: 1)
+        }
+        .padding(.horizontal, 34)
     }
 }

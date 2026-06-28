@@ -21,9 +21,19 @@ public struct BoardThread: Identifiable, Codable, Hashable, Sendable {
     public var imageURLs: [URL]?
     public var imagePaths: [String]?
     public var createdAt: Date
+    public var latestActivityAt: Date
+    public var expiresAt: Date?
+    public var replyCount: Int
+    public var status: String
+    public var anonymousDisplayName: String?
+    public var anonymousAvatarID: String?
 
     public var thumbnailURL: URL? {
         imageURLs?.first
+    }
+
+    public var isClosed: Bool {
+        status != "visible" || replyCount >= 1_000 || (expiresAt.map { $0 <= Date() } ?? false)
     }
 
     public init(
@@ -37,7 +47,13 @@ public struct BoardThread: Identifiable, Codable, Hashable, Sendable {
         prefecture: String? = nil,
         imageURLs: [URL] = [],
         imagePaths: [String] = [],
-        createdAt: Date = .now
+        createdAt: Date = .now,
+        latestActivityAt: Date? = nil,
+        expiresAt: Date? = nil,
+        replyCount: Int = 0,
+        status: String = "visible",
+        anonymousDisplayName: String? = nil,
+        anonymousAvatarID: String? = nil
     ) {
         self.id = id
         self.authorID = authorID
@@ -50,6 +66,12 @@ public struct BoardThread: Identifiable, Codable, Hashable, Sendable {
         self.imageURLs = imageURLs.isEmpty ? nil : imageURLs
         self.imagePaths = imagePaths.isEmpty ? nil : imagePaths
         self.createdAt = createdAt
+        self.latestActivityAt = latestActivityAt ?? createdAt
+        self.expiresAt = expiresAt
+        self.replyCount = replyCount
+        self.status = status
+        self.anonymousDisplayName = anonymousDisplayName
+        self.anonymousAvatarID = anonymousAvatarID
     }
 }
 
@@ -63,6 +85,8 @@ public struct BoardThreadCreateInput: Equatable, Sendable {
     public var prefecture: String?
     public var imagePaths: [String]
     public var thumbnailUpload: GoodsPhotoUpload?
+    public var anonymousDisplayName: String?
+    public var anonymousAvatarID: String?
 
     public init(
         authorID: UUID,
@@ -73,7 +97,9 @@ public struct BoardThreadCreateInput: Equatable, Sendable {
         longitude: Double? = nil,
         prefecture: String? = nil,
         imagePaths: [String] = [],
-        thumbnailUpload: GoodsPhotoUpload? = nil
+        thumbnailUpload: GoodsPhotoUpload? = nil,
+        anonymousDisplayName: String? = nil,
+        anonymousAvatarID: String? = nil
     ) {
         self.authorID = authorID
         self.title = title
@@ -84,6 +110,8 @@ public struct BoardThreadCreateInput: Equatable, Sendable {
         self.prefecture = prefecture
         self.imagePaths = imagePaths
         self.thumbnailUpload = thumbnailUpload
+        self.anonymousDisplayName = anonymousDisplayName
+        self.anonymousAvatarID = anonymousAvatarID
     }
 }
 

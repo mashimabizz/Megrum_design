@@ -35,7 +35,7 @@ struct AppDrawerPresentationState {
         let progress = AppDrawerVisualMetrics.presentationProgress(
             isPresented: isPresented,
             dragTranslation: dragTranslation,
-            drawerTravel: drawerOpenOffset
+            drawerTravel: drawerWidth
         )
 
         self.drawerWidth = drawerWidth

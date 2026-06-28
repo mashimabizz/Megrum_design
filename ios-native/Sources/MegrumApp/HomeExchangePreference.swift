@@ -1,11 +1,11 @@
 import MegrumCore
 
-enum HomeExchangePreference: String, CaseIterable, Identifiable, Sendable {
+public enum HomeExchangePreference: String, CaseIterable, Identifiable, Sendable {
     case local
     case mail
     case both
 
-    var id: String { rawValue }
+    public var id: String { rawValue }
 
     var displayName: String {
         switch self {

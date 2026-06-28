@@ -29,7 +29,7 @@ struct GoodsInventoryCreateMetaFooterView: View {
                 }
 
                 footerButton(
-                    title: "タグ登録",
+                    title: "シリーズ登録",
                     systemImage: "tag",
                     action: onShowTagAssignment
                 )

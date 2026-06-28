@@ -34,13 +34,15 @@ struct SearchGoodsTagSelectionSheet: View {
     var body: some View {
         Form {
             Section {
-                TextField("タグを検索・追加", text: $searchText)
+                TextField("シリーズを検索・追加", text: $searchText)
                     .disableAutocorrection(true)
 
                 if canAddSearchText {
                     Button {
-                        addTag(normalizedSearchText)
-                        searchText = ""
+                        MegrumHaptics.performSelectionChanged {
+                            addTag(normalizedSearchText)
+                            searchText = ""
+                        }
                     } label: {
                         Label("「\(normalizedSearchText)」を追加", systemImage: "plus.circle.fill")
                             .font(.system(size: 16, weight: .heavy, design: .rounded))
@@ -63,7 +65,7 @@ struct SearchGoodsTagSelectionSheet: View {
 
             Section(candidateSectionTitle) {
                 if filteredCandidateNames.isEmpty {
-                    Text("候補がありません。検索欄からタグを追加できます。")
+                    Text("候補がありません。検索欄からシリーズを追加できます。")
                         .font(.system(size: 14, weight: .bold, design: .rounded))
                         .foregroundStyle(MegrumTheme.muted)
                         .fixedSize(horizontal: false, vertical: true)
@@ -79,7 +81,7 @@ struct SearchGoodsTagSelectionSheet: View {
                 }
             }
         }
-        .navigationTitle("タグを選択")
+        .navigationTitle("シリーズを選択")
         .megrumInlineNavigationTitle()
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
@@ -92,9 +94,9 @@ struct SearchGoodsTagSelectionSheet: View {
 
     private var candidateSectionTitle: String {
         if let selectedGroupName {
-            return "\(selectedGroupName)のタグ候補"
+            return "\(selectedGroupName)のシリーズ候補"
         }
-        return "推しに紐づくタグ候補"
+        return "推しに紐づくシリーズ候補"
     }
 
     private func toggleTag(_ tagName: String) {
@@ -151,7 +153,9 @@ private struct SearchFilterChip: View {
     var action: () -> Void
 
     var body: some View {
-        Button(action: action) {
+        Button {
+            MegrumHaptics.performSelectionChanged(action)
+        } label: {
             Text(title)
                 .font(.system(size: 15, weight: .heavy, design: .rounded))
                 .lineLimit(1)

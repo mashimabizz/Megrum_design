@@ -6,6 +6,14 @@ import UIKit
 #endif
 
 enum MegrumHaptics {
+    static func buttonTap() {
+        #if os(iOS)
+        let generator = UIImpactFeedbackGenerator(style: .light)
+        generator.prepare()
+        generator.impactOccurred(intensity: 0.58)
+        #endif
+    }
+
     static func longPress() {
         #if os(iOS)
         let generator = UIImpactFeedbackGenerator(style: .medium)
@@ -20,6 +28,16 @@ enum MegrumHaptics {
         generator.prepare()
         generator.selectionChanged()
         #endif
+    }
+
+    static func performButtonTap(_ action: () -> Void) {
+        buttonTap()
+        action()
+    }
+
+    static func performSelectionChanged(_ action: () -> Void) {
+        selectionChanged()
+        action()
     }
 }
 

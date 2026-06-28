@@ -189,7 +189,7 @@ enum GoodsEditorSaveBlocker: Equatable, Identifiable {
     var title: String {
         switch self {
         case .tagPersistence:
-            "グッズタグ保存が未接続"
+            "グッズシリーズ保存が未接続"
         case .photoPersistence:
             "写真アップロード保存が未接続"
         }
@@ -224,7 +224,7 @@ struct GoodsEditorSaveFailure: Equatable, Identifiable {
             lines.append("写真アップロードで失敗した可能性があります。写真を外して保存するか、通信状況を確認して再試行できます。")
         }
         if includesTagChanges {
-            lines.append("タグ保存で失敗した可能性があります。タグは画面に残っているので、必要なら削除してもう一度試せます。")
+            lines.append("シリーズ保存で失敗した可能性があります。シリーズは画面に残っているので、必要なら削除してもう一度試せます。")
         }
         lines.append("入力内容はこの画面に残しています。")
         return lines.joined(separator: "\n\n")

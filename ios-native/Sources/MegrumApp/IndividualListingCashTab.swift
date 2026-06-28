@@ -22,8 +22,10 @@ struct IndividualListingCashTab: View {
     private func cashModeButton(_ mode: IndividualListingCashPricingMode) -> some View {
         let selected = pricingMode == mode
         return Button {
-            withAnimation(.smooth(duration: 0.18)) {
-                pricingMode = mode
+            MegrumHaptics.performSelectionChanged {
+                withAnimation(.smooth(duration: 0.18)) {
+                    pricingMode = mode
+                }
             }
         } label: {
             VStack(alignment: .leading, spacing: 7) {

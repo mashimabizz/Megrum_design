@@ -17,7 +17,7 @@ struct HomeMutualMatchAttentionTag: Identifiable, Equatable {
     )
 
     static let tagMismatch = HomeMutualMatchAttentionTag(
-        title: "タグ不一致？",
+        title: "シリーズ不一致？",
         systemImage: "exclamationmark.triangle",
         tint: Self.attentionTint
     )

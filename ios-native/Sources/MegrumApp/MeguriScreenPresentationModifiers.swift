@@ -9,9 +9,11 @@ struct MeguriScreenPresentationModifier: ViewModifier {
     @ObservedObject var locationState: MegrumLocationState
     @Binding var selectedThread: BoardThread?
     @Binding var isShowingThreadComposer: Bool
+    @Binding var threadCreationCoordinate: MegrumLocationCoordinate?
     @Binding var isShowingPrefecturePicker: Bool
     @Binding var selectedGroomPhotoItem: PhotosPickerItem?
     @Binding var groomCreationCoordinate: MegrumLocationCoordinate?
+    var isGroomCreationLocationLocked: Bool
     @Binding var groomDraftPhotoData: Data?
     @Binding var groomDraftPhotoContentType: String
     var isPreparingGroomPhoto: Bool
@@ -54,6 +56,8 @@ struct MeguriScreenPresentationModifier: ViewModifier {
                         appState: appState,
                         locationState: locationState,
                         fallbackCoordinate: locationState.coordinate,
+                        initialCreationCoordinate: threadCreationCoordinate,
+                        locksCreationCoordinate: threadCreationCoordinate != nil,
                         selectedPrefecture: selectedPrefecture,
                         onCreated: onThreadCreated
                     )
@@ -80,6 +84,7 @@ struct MeguriScreenPresentationModifier: ViewModifier {
                     isPreparingPhoto: isPreparingGroomPhoto,
                     isCreating: appState.isCreatingGroomPost,
                     canUseCamera: canUseCamera,
+                    locksCreationCoordinate: isGroomCreationLocationLocked,
                     currentCoordinate: locationState.coordinate,
                     isRequestingLocation: locationState.isRequestingLocation,
                     isShowingGroomComposer: $isShowingGroomComposer,

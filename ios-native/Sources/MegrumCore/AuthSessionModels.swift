@@ -20,6 +20,15 @@ public struct AuthSession: Codable, Hashable, Sendable {
     public var tokenType: String
     public var user: AuthUser
 
+    private enum CodingKeys: String, CodingKey {
+        case accessToken
+        case refreshToken
+        case expiresIn
+        case expiresAt
+        case tokenType
+        case user
+    }
+
     public init(
         accessToken: String,
         refreshToken: String? = nil,
@@ -34,6 +43,16 @@ public struct AuthSession: Codable, Hashable, Sendable {
         self.expiresAt = expiresAt
         self.tokenType = tokenType
         self.user = user
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        accessToken = try container.decode(String.self, forKey: .accessToken)
+        refreshToken = try container.decodeIfPresent(String.self, forKey: .refreshToken)
+        expiresIn = try container.decodeIfPresent(Int.self, forKey: .expiresIn)
+        expiresAt = try container.decodeIfPresent(Date.self, forKey: .expiresAt)
+        tokenType = try container.decodeIfPresent(String.self, forKey: .tokenType) ?? "bearer"
+        user = try container.decode(AuthUser.self, forKey: .user)
     }
 
     public var authorizationHeaderValue: String {

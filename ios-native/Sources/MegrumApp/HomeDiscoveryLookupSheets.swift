@@ -16,7 +16,7 @@ struct HomeHavesLookupSheet: View {
 
             if payload.shouldShowTagMatches {
                 HomeDiscoverySection(
-                    title: "メンバー×タグでマッチ",
+                    title: "メンバー×シリーズでマッチ",
                     candidates: payload.tagMatchedCandidates,
                     layout: .grid,
                     showsGridHeaderTitle: true,

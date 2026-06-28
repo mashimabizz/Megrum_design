@@ -7,7 +7,9 @@ struct AuthPrimaryActionButton: View {
     var action: () -> Void
 
     var body: some View {
-        Button(action: action) {
+        Button {
+            MegrumHaptics.performButtonTap(action)
+        } label: {
             HStack(spacing: 10) {
                 if isLoading {
                     ProgressView()

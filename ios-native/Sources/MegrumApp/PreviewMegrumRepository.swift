@@ -104,6 +104,30 @@ public struct PreviewMegrumRepository: MegrumRepository {
         return (profile, normalized)
     }
 
+    public func loadExchangeSettings(userID: UUID) async throws -> HomeDefaultExchangeSettings? {
+        if userID == NativePreviewData.partnerID {
+            return HomeDefaultExchangeSettings(
+                preference: .both,
+                localPrefecture: "東京都",
+                localDateKeys: ["2026-07-03", "2026-07-05"],
+                localDateDetails: [
+                    "2026-07-03": HomeExchangeLocalDateDetail(prefecture: "東京都", memo: "渋谷駅周辺"),
+                    "2026-07-05": HomeExchangeLocalDateDetail(prefecture: "東京都", memo: "会場付近")
+                ],
+                mailShippingFee: .negotiate,
+                mailShippingDays: .twoToFourDays
+            )
+        }
+        if userID == NativePreviewData.viewer.id {
+            return HomeDefaultExchangeSettings.standard
+        }
+        return nil
+    }
+
+    public func saveExchangeSettings(_ settings: HomeDefaultExchangeSettings) async throws -> HomeDefaultExchangeSettings {
+        settings
+    }
+
     private func normalizedHandle(_ handle: String) -> String {
         var normalized = handle.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         while normalized.first == "@" {

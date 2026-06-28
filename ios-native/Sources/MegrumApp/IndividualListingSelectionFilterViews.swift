@@ -131,7 +131,7 @@ private struct IndividualListingTagFilterRow: View {
     var tagNames: [String]
 
     var body: some View {
-        IndividualListingFilterChoiceRow(title: "タグ") {
+        IndividualListingFilterChoiceRow(title: "シリーズ") {
             ChoiceChip(title: "すべて", isSelected: filter.tagNames.isEmpty, style: .compact) {
                 filter.tagNames = []
             }

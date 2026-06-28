@@ -58,12 +58,37 @@ struct BoardThreadRow: Decodable, Sendable {
     var originLng: Double?
     var prefecture: String?
     var imagePaths: [String]?
+    var status: String?
+    var replyCount: Int?
     var latestActivityAt: Date?
+    var expiresAt: Date?
     var createdAt: Date?
+    var anonymousDisplayName: String?
+    var anonymousAvatarID: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case authorId
+        case title
+        case body
+        case audienceScope
+        case originLat
+        case originLng
+        case prefecture
+        case imagePaths
+        case status
+        case replyCount
+        case latestActivityAt
+        case expiresAt
+        case createdAt
+        case anonymousDisplayName
+        case anonymousAvatarID = "anonymousAvatarId"
+    }
 
     func thread(signedURLs: [String: URL]) -> BoardThread? {
         let audience = BoardThread.Audience(rawValue: audienceScope ?? "") ?? .nearby3km
         let paths = imagePaths ?? []
+        let created = createdAt ?? latestActivityAt ?? .now
         return BoardThread(
             id: id,
             authorID: authorId,
@@ -75,7 +100,13 @@ struct BoardThreadRow: Decodable, Sendable {
             prefecture: prefecture,
             imageURLs: paths.compactMap { signedURLs[$0] ?? URL(string: $0) },
             imagePaths: paths,
-            createdAt: latestActivityAt ?? createdAt ?? .now
+            createdAt: created,
+            latestActivityAt: latestActivityAt ?? created,
+            expiresAt: expiresAt,
+            replyCount: max(0, replyCount ?? 0),
+            status: status ?? "visible",
+            anonymousDisplayName: SupabaseTextNormalizer.optional(anonymousDisplayName),
+            anonymousAvatarID: SupabaseTextNormalizer.optional(anonymousAvatarID)
         )
     }
 
@@ -123,6 +154,8 @@ struct BoardThreadInsertPayload: Encodable, Sendable {
     var body: String
     var category: String
     var imagePaths: [String]
+    var anonymousAvatarID: String?
+    var anonymousDisplayName: String?
     var originLat: Double?
     var originLng: Double?
     var prefecture: String?
@@ -136,6 +169,8 @@ struct BoardThreadInsertPayload: Encodable, Sendable {
         self.body = SupabaseTextNormalizer.trimmed(input.body)
         self.category = "chat"
         self.imagePaths = imagePaths
+        self.anonymousAvatarID = SupabaseTextNormalizer.optional(input.anonymousAvatarID)
+        self.anonymousDisplayName = SupabaseTextNormalizer.optional(input.anonymousDisplayName)
         self.originLat = input.latitude
         self.originLng = input.longitude
         self.prefecture = SupabaseTextNormalizer.optional(input.prefecture)
@@ -150,6 +185,8 @@ struct BoardThreadInsertPayload: Encodable, Sendable {
         case body
         case category
         case imagePaths
+        case anonymousAvatarID
+        case anonymousDisplayName
         case originLat
         case originLng
         case prefecture
@@ -165,6 +202,16 @@ struct BoardThreadInsertPayload: Encodable, Sendable {
         try container.encode(body, forKey: .body)
         try container.encode(category, forKey: .category)
         try container.encode(imagePaths, forKey: .imagePaths)
+        if let anonymousAvatarID {
+            try container.encode(anonymousAvatarID, forKey: .anonymousAvatarID)
+        } else {
+            try container.encodeNil(forKey: .anonymousAvatarID)
+        }
+        if let anonymousDisplayName {
+            try container.encode(anonymousDisplayName, forKey: .anonymousDisplayName)
+        } else {
+            try container.encodeNil(forKey: .anonymousDisplayName)
+        }
         if let originLat {
             try container.encode(originLat, forKey: .originLat)
         } else {

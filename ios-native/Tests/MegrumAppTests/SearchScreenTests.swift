@@ -15,6 +15,52 @@ final class SearchScreenTests: XCTestCase {
         XCTAssertTrue(SearchCriteriaResolver.hasCriteria(query: "", activeFilterCount: 1))
     }
 
+    func testSearchResultAdInsertionAddsNativeAdAsEveryFifthDisplaySlot() {
+        let results = makeSearchResults(count: 12)
+        let entries = SearchResultAdInsertion.entries(for: results, includesNativeAds: true)
+
+        XCTAssertEqual(entries.count, 14)
+        XCTAssertEqual(entries[0], .goods(index: 0, results[0]))
+        XCTAssertEqual(entries[3], .goods(index: 3, results[3]))
+        XCTAssertEqual(entries[4], .nativeAd(slotIndex: 1))
+        XCTAssertEqual(entries[8], .goods(index: 7, results[7]))
+        XCTAssertEqual(entries[9], .nativeAd(slotIndex: 2))
+        XCTAssertEqual(entries.last, .goods(index: 11, results[11]))
+        XCTAssertEqual(entries.compactMap(\.goodsResult).count, results.count)
+    }
+
+    func testSearchResultAdInsertionDropsNativeAdsWhenNotAllowed() {
+        let results = makeSearchResults(count: 6)
+        let entries = SearchResultAdInsertion.entries(for: results, includesNativeAds: false)
+
+        XCTAssertEqual(entries, results.enumerated().map { .goods(index: $0.offset, $0.element) })
+    }
+
+    func testSearchResultAdInsertionDoesNotAppendTrailingAdAfterExactDisplayInterval() {
+        let results = makeSearchResults(count: 8)
+        let entries = SearchResultAdInsertion.entries(for: results, includesNativeAds: true)
+
+        XCTAssertEqual(entries.count, 9)
+        XCTAssertEqual(entries[4], .nativeAd(slotIndex: 1))
+        XCTAssertEqual(entries.last, .goods(index: 7, results[7]))
+    }
+
+    func testSearchResultGridLayoutMakesNativeAdUseTwoColumns() {
+        let results = makeSearchResults(count: 9)
+        let entries = SearchResultAdInsertion.entries(for: results, includesNativeAds: true)
+        let rows = SearchResultGridLayout.rows(for: entries)
+
+        XCTAssertEqual(rows.map { $0.cells.map(\.columnSpan) }, [
+            [1, 1, 1],
+            [1, 2],
+            [1, 1, 1],
+            [1, 2],
+            [1]
+        ])
+        XCTAssertEqual(rows[1].cells.last?.entry, .nativeAd(slotIndex: 1))
+        XCTAssertEqual(rows[3].cells.last?.entry, .nativeAd(slotIndex: 2))
+    }
+
     func testSearchBackSwipeDismissesOnlyForClearRightSwipe() {
         XCTAssertTrue(
             SearchBackSwipeResolver.shouldDismiss(
@@ -260,7 +306,7 @@ final class SearchScreenTests: XCTestCase {
             ownerID: NativePreviewData.viewerID,
             groupID: nonOshiGroupID,
             goodsTypeID: NativePreviewData.cardGoodsTypeID,
-            title: "推し外タグ付き",
+            title: "推し外シリーズ付き",
             tags: [GoodsTag(id: UUID(), name: "推し外")]
         )
         let partnerTaggedItem = GoodsItem(
@@ -268,7 +314,7 @@ final class SearchScreenTests: XCTestCase {
             ownerID: NativePreviewData.partnerID,
             groupID: NativePreviewData.groupID,
             goodsTypeID: NativePreviewData.cardGoodsTypeID,
-            title: "相手のタグ付き",
+            title: "相手のシリーズ付き",
             tags: [GoodsTag(id: UUID(), name: "相手だけ")]
         )
 
@@ -294,7 +340,7 @@ final class SearchScreenTests: XCTestCase {
 
         XCTAssertTrue(sections.contains { $0.title == "推しから探す" })
         XCTAssertTrue(sections.contains { $0.title == "Wishから探す" })
-        XCTAssertTrue(sections.contains { $0.title == "タグから探す" })
+        XCTAssertTrue(sections.contains { $0.title == "シリーズから探す" })
         XCTAssertFalse(sections.contains { $0.title == "よく使う条件" })
         let items = sections.flatMap { $0.items }
         XCTAssertTrue(items.contains { $0.title == "aespa" })
@@ -480,5 +526,18 @@ final class SearchScreenTests: XCTestCase {
             SearchResultFilterPolicy.sortedResults(results, sort: .title).first?.item.title,
             "ニンニン 制服"
         )
+    }
+
+    private func makeSearchResults(count: Int) -> [SearchResultItem] {
+        let ownerID = UUID(uuidString: "00000000-0000-0000-0000-00000000AA01")!
+        return (0..<count).map { index in
+            let suffix = String(format: "%012d", index + 1)
+            let item = GoodsItem(
+                id: UUID(uuidString: "00000000-0000-0000-0000-\(suffix)")!,
+                ownerID: ownerID,
+                title: "検索結果\(index + 1)"
+            )
+            return SearchResultItem(item: item, ownerUserID: ownerID, bucket: .possible)
+        }
     }
 }

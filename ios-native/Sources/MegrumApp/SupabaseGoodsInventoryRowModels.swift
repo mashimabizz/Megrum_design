@@ -19,6 +19,10 @@ struct GoodsInventoryRow: Decodable, Sendable {
     var marketAvailableQty: Int?
 
     var goodsItem: GoodsItem {
+        makeGoodsItem()
+    }
+
+    func makeGoodsItem(projectURL: URL? = nil) -> GoodsItem {
         GoodsItem(
             id: id,
             ownerID: userId,
@@ -28,7 +32,7 @@ struct GoodsInventoryRow: Decodable, Sendable {
             memberID: characterId,
             goodsTypeID: goodsTypeId,
             title: title,
-            imageURL: photoUrls?.compactMap(URL.init(string:)).first,
+            imageURL: GoodsPhotoURLResolver.displayURL(from: photoUrls, projectURL: projectURL),
             tags: [],
             quantity: max(1, quantity ?? 1),
             lockedQuantity: max(0, lockedQty ?? 0),
@@ -37,6 +41,10 @@ struct GoodsInventoryRow: Decodable, Sendable {
     }
 
     var wishItem: WishItem {
+        makeWishItem()
+    }
+
+    func makeWishItem(projectURL: URL? = nil) -> WishItem {
         WishItem(
             id: id,
             ownerID: userId,
@@ -44,7 +52,7 @@ struct GoodsInventoryRow: Decodable, Sendable {
             memberID: characterId,
             goodsTypeID: goodsTypeId,
             title: title,
-            imageURL: photoUrls?.compactMap(URL.init(string:)).first,
+            imageURL: GoodsPhotoURLResolver.displayURL(from: photoUrls, projectURL: projectURL),
             tags: [],
             quantity: quantity ?? 1
         )

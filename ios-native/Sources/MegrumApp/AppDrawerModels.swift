@@ -50,7 +50,7 @@ enum AppDrawerDestination: String, Identifiable {
         case .exchangeSettings:
             "交換条件の設定"
         case .megrumPlus:
-            "メグルムプラス"
+            "Megrum プレミアム"
         case .settings:
             "設定とプライバシー"
         case .help:

@@ -44,7 +44,7 @@ public final class SupabaseGoodsInventoryClient: @unchecked Sendable {
             memberID: input.memberID,
             goodsTypeID: input.goodsTypeID,
             title: SupabaseTextNormalizer.trimmed(input.title),
-            imageURL: normalizedPhotoURLs.compactMap(URL.init(string:)).first,
+            imageURL: GoodsPhotoURLResolver.displayURL(from: normalizedPhotoURLs),
             quantity: max(1, min(input.quantity, 999))
         )
         let tags = try await syncGoodsTagsIfNeeded(inventoryID: item.id, tagNames: input.tagNames)

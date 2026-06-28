@@ -216,6 +216,50 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertNil(state.errorMessage)
     }
 
+    func testAppStateReloadsPaymentSettingsAfterRelaunch() async {
+        let repository = PersistentPaymentSettingsRepository()
+        let firstState = MegrumAppState(repository: repository)
+
+        await firstState.loadInitialData()
+        let saved = await firstState.savePaymentSettings(
+            UserPaymentSettings(
+                userID: PersistentPaymentSettingsRepository.viewerID,
+                methods: [.other, .paypay],
+                otherNote: "メルペイ"
+            )
+        )
+
+        let relaunchedState = MegrumAppState(repository: repository)
+        await relaunchedState.loadInitialData()
+        await relaunchedState.loadPaymentSettings()
+
+        XCTAssertTrue(saved)
+        XCTAssertEqual(firstState.paymentSettings?.methods, [.paypay, .other])
+        XCTAssertEqual(relaunchedState.viewer?.paymentMethods, [])
+        XCTAssertEqual(relaunchedState.paymentSettings?.methods, [.paypay, .other])
+        XCTAssertEqual(relaunchedState.paymentSettings?.otherNote, "メルペイ")
+        XCTAssertNil(relaunchedState.errorMessage)
+    }
+
+    func testAppStateSavesPreviewExchangeSettings() async {
+        let state = MegrumAppState(repository: PreviewMegrumRepository())
+
+        await state.loadInitialData()
+        let settings = HomeDefaultExchangeSettings(
+            preference: .mail,
+            localPrefecture: "",
+            localDateKeys: [],
+            mailShippingFee: .owner,
+            mailShippingDays: .oneDay
+        )
+        let saved = await state.saveExchangeSettings(settings)
+
+        XCTAssertTrue(saved)
+        XCTAssertEqual(state.exchangeSettings, settings)
+        XCTAssertFalse(state.isSavingExchangeSettings)
+        XCTAssertNil(state.errorMessage)
+    }
+
     func testAppStateRequestsAccountDeletionThroughRepository() async {
         let repository = AccountDeletionRecordingRepository(proposals: [])
         let state = MegrumAppState(repository: repository)
@@ -474,7 +518,9 @@ final class MegrumAppStateTests: XCTestCase {
             scope: .nearby3km,
             latitude: 35.681236,
             longitude: 139.767125,
-            thumbnailUpload: GoodsPhotoUpload(data: Data([0xff, 0xd8, 0xff]), contentType: "image/jpeg")
+            thumbnailUpload: GoodsPhotoUpload(data: Data([0xff, 0xd8, 0xff]), contentType: "image/jpeg"),
+            anonymousDisplayName: " まくはり民 ",
+            anonymousAvatarID: " avatar_3 "
         )
 
         XCTAssertTrue(created)
@@ -482,6 +528,8 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertEqual(state.threads.first?.title, "終演後の混雑")
         XCTAssertEqual(state.threads.first?.body, "北口はまだゆっくり進めます")
         XCTAssertEqual(state.threads.first?.audience, .nearby3km)
+        XCTAssertEqual(state.threads.first?.anonymousDisplayName, "まくはり民")
+        XCTAssertEqual(state.threads.first?.anonymousAvatarID, "avatar_3")
         XCTAssertNotNil(state.threads.first?.thumbnailURL)
         XCTAssertFalse(state.isCreatingBoardThread)
 
@@ -494,6 +542,8 @@ final class MegrumAppStateTests: XCTestCase {
         )
 
         XCTAssertEqual(record?.title, "退場口")
+        XCTAssertNil(record?.anonymousDisplayName)
+        XCTAssertNil(record?.anonymousAvatarID)
         XCTAssertEqual(state.threads.first?.id, record?.id)
     }
 
@@ -513,7 +563,7 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertEqual(record?.title, "近くの様子")
         XCTAssertEqual(record?.latitude, 35.681236)
         XCTAssertEqual(record?.longitude, 139.767125)
-        XCTAssertNil(record?.prefecture)
+        XCTAssertEqual(record?.prefecture, "未設定")
         XCTAssertNil(state.errorMessage)
     }
 
@@ -550,6 +600,92 @@ final class MegrumAppStateTests: XCTestCase {
 
         XCTAssertFalse(state.isGroomLiked(postID))
         XCTAssertNil(state.errorMessage)
+    }
+
+    func testAppStateUpdatesPreviewGroomLikeCount() async throws {
+        let state = MegrumAppState(repository: PreviewMegrumRepository())
+        let postID = UUID(uuidString: "00000000-0000-0000-0000-000000000501")!
+
+        await state.loadInitialData()
+        let initialLikeCount = state.groomLikeCount(postID)
+
+        await state.setGroomLiked(postID, isLiked: true)
+
+        XCTAssertTrue(state.isGroomLiked(postID))
+        XCTAssertEqual(state.groomLikeCount(postID), initialLikeCount + 1)
+        XCTAssertEqual(state.grooms.first { $0.id == postID }?.liked, true)
+
+        await state.setGroomLiked(postID, isLiked: false)
+
+        XCTAssertFalse(state.isGroomLiked(postID))
+        XCTAssertEqual(state.groomLikeCount(postID), initialLikeCount)
+        XCTAssertEqual(state.grooms.first { $0.id == postID }?.liked, false)
+    }
+
+    func testAppStateReportsAndBlocksPreviewGroomAuthor() async throws {
+        let state = MegrumAppState(repository: PreviewMegrumRepository())
+
+        await state.loadInitialData()
+        let groom = try XCTUnwrap(state.grooms.first { $0.authorID != state.viewer?.id })
+
+        let reported = await state.reportGroom(groom, reason: .privacy, note: "顔が写っています")
+
+        XCTAssertTrue(reported)
+        XCTAssertNil(state.reportingGroomPostID)
+        XCTAssertNil(state.errorMessage)
+
+        let blocked = await state.blockGroomAuthor(groom)
+
+        XCTAssertTrue(blocked)
+        XCTAssertNil(state.blockingGroomUserID)
+        XCTAssertFalse(state.grooms.contains { $0.authorID == groom.authorID })
+        XCTAssertNil(state.errorMessage)
+    }
+
+    func testAppStateRejectsOwnGroomModeration() async throws {
+        let state = MegrumAppState(repository: PreviewMegrumRepository())
+
+        await state.loadInitialData()
+        let ownGroom = try XCTUnwrap(state.grooms.first { $0.authorID == state.viewer?.id })
+        let initialLikeCount = state.groomLikeCount(ownGroom.id)
+
+        await state.setGroomLiked(ownGroom.id, isLiked: true)
+
+        XCTAssertFalse(state.isGroomLiked(ownGroom.id))
+        XCTAssertEqual(state.groomLikeCount(ownGroom.id), initialLikeCount)
+        XCTAssertEqual(state.errorMessage, "自分のグルームにはいいねできません")
+
+        let reported = await state.reportGroom(ownGroom)
+        let blocked = await state.blockGroomAuthor(ownGroom)
+
+        XCTAssertFalse(reported)
+        XCTAssertFalse(blocked)
+        XCTAssertTrue(state.grooms.contains { $0.id == ownGroom.id })
+        XCTAssertEqual(state.errorMessage, "自分をブロックできません")
+    }
+
+    func testAppStateRejectsGroomActionsWithoutViewer() async {
+        let state = MegrumAppState(repository: PreviewMegrumRepository())
+        let postID = UUID(uuidString: "00000000-0000-0000-0000-000000000501")!
+        let groom = GroomPost(
+            id: postID,
+            authorID: UUID(uuidString: "22222222-2222-2222-2222-222222222222")!,
+            imageURL: URL(string: "https://example.com/groom-a.jpg")!,
+            latitude: 35.681236,
+            longitude: 139.767125
+        )
+
+        await state.setGroomLiked(postID, isLiked: true)
+
+        XCTAssertFalse(state.isGroomLiked(postID))
+        XCTAssertEqual(state.errorMessage, "ログイン状態を確認できません")
+
+        let reported = await state.reportGroom(groom)
+        let blocked = await state.blockGroomAuthor(groom)
+
+        XCTAssertFalse(reported)
+        XCTAssertFalse(blocked)
+        XCTAssertEqual(state.errorMessage, "ログイン状態を確認できません")
     }
 
     func testAppStateSendsPreviewGroomReply() async {
@@ -598,9 +734,9 @@ final class MegrumAppStateTests: XCTestCase {
         let recipientID = UUID(uuidString: "22222222-2222-2222-2222-222222222222")!
 
         await state.loadInitialData()
-        await state.loadMeguriMessages()
 
         XCTAssertEqual(state.meguriMessages.first?.body, "グルーム見ました。会場付近ですか？")
+        XCTAssertEqual(state.meguriPendingReplyCount, 1)
 
         let sent = await state.sendMeguriMessage(
             recipientID: recipientID,
@@ -619,7 +755,6 @@ final class MegrumAppStateTests: XCTestCase {
         let peerID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
 
         await state.loadInitialData()
-        await state.loadMeguriMessages()
 
         XCTAssertNil(state.meguriMessages(with: peerID).first?.readAt)
 
@@ -923,6 +1058,42 @@ final class MegrumAppStateTests: XCTestCase {
 
         XCTAssertTrue(reported)
         XCTAssertNil(state.reportingGoodsItemID)
+        XCTAssertNil(state.errorMessage)
+    }
+
+    func testAppStateReportsPreviewUser() async {
+        let state = MegrumAppState(repository: PreviewMegrumRepository())
+        await state.loadInitialData()
+        let partnerID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+
+        let reported = await state.reportUser(
+            targetUserID: partnerID,
+            reason: .harassment,
+            note: " 迷惑なやりとり "
+        )
+
+        XCTAssertTrue(reported)
+        XCTAssertNil(state.reportingUserID)
+        XCTAssertNil(state.errorMessage)
+    }
+
+    func testAppStateBlocksUserAndRemovesVisibleGoods() async {
+        let state = MegrumAppState(repository: PreviewMegrumRepository())
+        let partnerID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+        await state.loadInitialData()
+        await state.searchGoods(query: "")
+        XCTAssertTrue(state.searchResults.contains { $0.ownerUserID == partnerID })
+        XCTAssertTrue(state.homeMatchedItems.contains { $0.ownerID == partnerID })
+
+        let blocked = await state.blockUser(partnerID)
+
+        XCTAssertTrue(blocked)
+        XCTAssertTrue(state.blockedContentUserIDs.contains(partnerID))
+        XCTAssertTrue(state.blockedUsers.contains { $0.userID == partnerID })
+        XCTAssertFalse(state.searchResults.contains { $0.ownerUserID == partnerID })
+        XCTAssertFalse(state.homeMatchedItems.contains { $0.ownerID == partnerID })
+        XCTAssertFalse(state.homePossibleItems.contains { $0.ownerID == partnerID })
+        XCTAssertNil(state.blockingUserID)
         XCTAssertNil(state.errorMessage)
     }
 
@@ -1379,6 +1550,16 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertFalse(state.pushNotificationsEnabled)
         XCTAssertFalse(state.isSavingPushNotificationSetting)
         XCTAssertNil(state.errorMessage)
+
+        let groomSaved = await state.setGroomActivityPushNotificationsEnabled(false)
+        XCTAssertTrue(groomSaved)
+        XCTAssertFalse(state.pushNotificationsEnabled)
+        XCTAssertFalse(state.groomActivityPushNotificationsEnabled)
+
+        let chatroomSaved = await state.setChatroomActivityPushNotificationsEnabled(false)
+        XCTAssertTrue(chatroomSaved)
+        XCTAssertFalse(state.pushNotificationsEnabled)
+        XCTAssertFalse(state.chatroomActivityPushNotificationsEnabled)
     }
 
     func testAppStateRegistersNativePushDeviceTokenThroughRepository() async {
@@ -1901,6 +2082,49 @@ private struct SingleSnapshotRepository: MegrumRepository {
             proposals: [],
             grooms: [],
             threads: []
+        )
+    }
+}
+
+private actor PersistentPaymentSettingsRepository: MegrumRepository {
+    static let viewerID = UUID(uuidString: "77777777-7777-7777-7777-777777777701")!
+    private var storedSettings: UserPaymentSettings?
+
+    func loadInitialSnapshot() async throws -> MegrumAppSnapshot {
+        MegrumAppSnapshot(
+            viewer: UserProfile(
+                id: Self.viewerID,
+                handle: "michilion",
+                displayName: "みちりおん",
+                paymentMethods: [],
+                paymentNote: nil,
+                accountStatus: .active
+            ),
+            inventory: [],
+            wishes: [],
+            proposals: [],
+            grooms: [],
+            threads: []
+        )
+    }
+
+    func loadPaymentSettings() async throws -> UserPaymentSettings? {
+        storedSettings
+    }
+
+    func savePaymentSettings(_ settings: UserPaymentSettings) async throws -> (profile: UserProfile, settings: UserPaymentSettings) {
+        let normalized = settings.normalized(for: Self.viewerID)
+        storedSettings = normalized
+        return (
+            UserProfile(
+                id: Self.viewerID,
+                handle: "michilion",
+                displayName: "みちりおん",
+                paymentMethods: normalized.methods,
+                paymentNote: normalized.otherNote,
+                accountStatus: .active
+            ),
+            normalized
         )
     }
 }

@@ -36,7 +36,7 @@ struct SearchFilterSummaryBar: View {
                 }
 
                 if summaryTitles.isEmpty {
-                    Text("グループを選ぶと、メンバーとグッズタグを選択できます")
+                    Text("グループを選ぶと、メンバーとグッズシリーズを選択できます")
                         .font(.system(size: 15, weight: .bold, design: .rounded))
                         .foregroundStyle(MegrumTheme.muted)
                         .fixedSize(horizontal: false, vertical: true)
@@ -119,13 +119,10 @@ struct SearchContent: View {
                             results: results,
                             appState: appState,
                             viewerID: viewerID,
+                            adDisplayContext: adDisplayContext,
                             onStartProposal: onStartProposal,
                             onOpenOwnerProfile: onOpenOwnerProfile,
                             onReportItem: onReportItem
-                        )
-                        AdBannerSlot(
-                            placement: .searchResultsBanner,
-                            displayContext: adDisplayContext
                         )
                     }
                 } else {

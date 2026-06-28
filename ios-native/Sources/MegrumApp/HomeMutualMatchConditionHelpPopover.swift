@@ -6,10 +6,10 @@ struct HomeMutualMatchConditionHelpPopover: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("タグの見方")
+                    Text("シリーズの見方")
                         .font(.system(size: 17, weight: .black, design: .rounded))
                         .foregroundStyle(MegrumTheme.ink)
-                    Text("相互マッチはグッズ条件で候補に残し、交換条件・支払条件は相談が必要な点だけをタグで出します。")
+                    Text("相互マッチはグッズ条件で候補に残し、交換条件・支払条件は相談が必要な点だけをシリーズで出します。")
                         .font(.system(size: 12, weight: .bold, design: .rounded))
                         .foregroundStyle(MegrumTheme.muted)
                         .fixedSize(horizontal: false, vertical: true)
@@ -41,8 +41,8 @@ struct HomeMutualMatchConditionHelpPopover: View {
                         detail: "定価・金額指定を含む候補です。提示金額が足りない場合は金額不足になります。"
                     )
                     helpRow(
-                        tag: "支払条件のタグ",
-                        detail: "金額条件がある時だけ確認します。共通手段がない、未設定、その他のみの場合に相談タグが出ます。"
+                        tag: "支払条件のシリーズ",
+                        detail: "金額条件がある時だけ確認します。共通手段がない、未設定、その他のみの場合に相談シリーズが出ます。"
                     )
                 }
             }

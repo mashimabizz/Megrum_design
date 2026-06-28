@@ -83,4 +83,5 @@ extension HomeDiscoveryExperience {
 enum HomeDiscoveryHeaderMetrics {
     static let contentTopPadding: CGFloat = 122
     static let contentBottomPadding: CGFloat = FloatingActionLayoutMetrics.contentBottomPadding + 120
+    static let pullRefreshIndicatorTopPadding: CGFloat = 114
 }

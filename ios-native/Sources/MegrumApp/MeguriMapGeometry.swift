@@ -2,6 +2,10 @@ import CoreLocation
 import MapKit
 import MegrumCore
 
+enum MeguriHomeMapCamera {
+    static let focusedSpan = MKCoordinateSpan(latitudeDelta: 0.032, longitudeDelta: 0.032)
+}
+
 extension GroomPost {
     var coordinate: CLLocationCoordinate2D {
         CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
@@ -15,6 +19,16 @@ extension MeguriMapKind {
         }
 
         switch self {
+        case .all:
+            if let groom = grooms.first {
+                return groom.coordinate
+            }
+            if let thread = threads.first(where: { $0.latitude != nil && $0.longitude != nil }),
+               let latitude = thread.latitude,
+               let longitude = thread.longitude {
+                return CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+            }
+            return Self.fallbackCenter
         case .grooms:
             return grooms.first?.coordinate ?? Self.fallbackCenter
         case .boards:
@@ -59,6 +73,13 @@ extension MeguriMapKind {
 
     private func annotationCoordinates(grooms: [GroomPost], threads: [BoardThread]) -> [CLLocationCoordinate2D] {
         switch self {
+        case .all:
+            return grooms.map(\.coordinate) + threads.compactMap { thread in
+                guard let latitude = thread.latitude, let longitude = thread.longitude else {
+                    return nil
+                }
+                return CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+            }
         case .grooms:
             return grooms.map(\.coordinate)
         case .boards:
@@ -73,13 +94,15 @@ extension MeguriMapKind {
 
     private var shouldCenterRangeCircle: Bool {
         switch self {
-        case .grooms, .boards:
+        case .all, .grooms, .boards:
             return true
         }
     }
 
     private var minimumRegionSpan: MKCoordinateSpan {
         switch self {
+        case .all:
+            MKCoordinateSpan(latitudeDelta: 0.04, longitudeDelta: 0.04)
         case .grooms:
             MKCoordinateSpan(latitudeDelta: 0.018, longitudeDelta: 0.018)
         case .boards:
@@ -89,6 +112,8 @@ extension MeguriMapKind {
 
     private var maximumRegionSpan: MKCoordinateSpan {
         switch self {
+        case .all:
+            MKCoordinateSpan(latitudeDelta: 0.16, longitudeDelta: 0.16)
         case .grooms:
             MKCoordinateSpan(latitudeDelta: 0.12, longitudeDelta: 0.12)
         case .boards:

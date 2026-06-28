@@ -51,7 +51,7 @@ enum HomeCandidateListingDetailContextFactory {
             HomeIndividualListingOfferedItem(
                 id: row.id,
                 title: row.title,
-                imageURL: row.photoUrls.compactMap(URL.init(string:)).first,
+                imageURL: GoodsPhotoURLResolver.displayURL(from: row.photoUrls),
                 quantity: quantityByID[row.id] ?? 1
             )
         }

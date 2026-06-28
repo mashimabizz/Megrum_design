@@ -35,7 +35,7 @@ struct CollectionFilterBar: View {
             }
 
             if !availableTagNames.isEmpty || !selectedTagNames.isEmpty {
-                FilterChoiceRow(title: "タグ", isLoading: false) {
+                FilterChoiceRow(title: "シリーズ", isLoading: false) {
                     ChoiceChip(title: "すべて", isSelected: selectedTagNames.isEmpty, style: .compact) {
                         selectedTagNames = []
                     }
@@ -114,7 +114,9 @@ struct ChoiceChip: View {
     var action: () -> Void
 
     var body: some View {
-        Button(action: action) {
+        Button {
+            MegrumHaptics.performSelectionChanged(action)
+        } label: {
             label
         }
         .buttonStyle(.plain)

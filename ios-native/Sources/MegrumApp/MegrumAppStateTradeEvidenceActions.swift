@@ -125,17 +125,21 @@ extension MegrumAppState {
         approvingEvidenceProposalID = proposalID
         errorMessage = nil
         let previousProposal = proposals.first { $0.id == proposalID }
-        if photoID == nil, let optimisticProposal = previousProposal?.markingEvidenceApproved(by: viewer?.id) {
+        if photoID == nil,
+           let optimisticProposal = TradeEvidenceApprovalOptimism.proposalAfterApproval(
+                previousProposal,
+                viewerID: viewer?.id
+           ) {
             replaceProposal(optimisticProposal)
         }
         let previousEvidencePhotos = evidencePhotosByProposalID[proposalID]
         if let viewerID = viewer?.id {
-            evidencePhotosByProposalID[proposalID] = (previousEvidencePhotos ?? []).map { photo in
-                guard photoID == nil || photo.id == photoID else {
-                    return photo
-                }
-                return photo.markingApproved(by: viewerID, in: previousProposal)
-            }
+            evidencePhotosByProposalID[proposalID] = TradeEvidenceApprovalOptimism.photosAfterApproval(
+                previousEvidencePhotos ?? [],
+                photoID: photoID,
+                viewerID: viewerID,
+                proposal: previousProposal
+            )
         }
         do {
             let proposal = try await repository.approveTradeEvidence(proposalID: proposalID, photoID: photoID)
@@ -287,41 +291,5 @@ extension MegrumAppState {
             next.append(localPhoto)
         }
         evidencePhotosByProposalID[input.proposalID] = next.sorted { $0.position < $1.position }
-    }
-}
-
-private extension TradeProposal {
-    func markingEvidenceApproved(by userID: UUID?) -> TradeProposal? {
-        guard let userID, isParticipant(userID) else {
-            return nil
-        }
-
-        var next = self
-        if isSender(userID) {
-            next.approvedBySender = true
-        } else {
-            next.approvedByReceiver = true
-        }
-
-        if next.status == .agreed, next.approvedBySender, next.approvedByReceiver {
-            next.status = .completed
-            next.completedAt = next.completedAt ?? .now
-        }
-        return next
-    }
-}
-
-private extension TradeEvidencePhoto {
-    func markingApproved(by userID: UUID, in proposal: TradeProposal?) -> TradeEvidencePhoto {
-        guard let proposal, proposal.isParticipant(userID) else {
-            return self
-        }
-        var next = self
-        if proposal.isSender(userID) {
-            next.approvedBySender = true
-        } else {
-            next.approvedByReceiver = true
-        }
-        return next
     }
 }

@@ -10,6 +10,17 @@ extension PublicUserProfileScreen {
         publicProfile ?? fallbackPublicProfile
     }
 
+    var moderationTarget: PublicProfileModerationTarget? {
+        guard appState.viewer?.id != userID else {
+            return nil
+        }
+        let profile = displayedPublicProfile?.profile
+        return PublicProfileModerationTarget(
+            userID: userID,
+            displayName: profile?.displayName ?? profile?.handle ?? "このユーザー"
+        )
+    }
+
     var fallbackPublicProfile: PublicUserProfile? {
         userID == HomeDiscoveryFixtures.ownerID ? HomeDiscoveryFixtures.ownerPublicProfile : nil
     }

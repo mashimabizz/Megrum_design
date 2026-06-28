@@ -49,7 +49,7 @@ struct ProposalCreateConditionTagsSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("交換条件タグ")
+            Text("交換条件シリーズ")
                 .font(.system(size: 18, weight: .heavy, design: .rounded))
                 .foregroundStyle(MegrumTheme.ink)
 

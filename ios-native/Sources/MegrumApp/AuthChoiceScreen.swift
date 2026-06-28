@@ -18,9 +18,9 @@ struct AuthChoiceScreen: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Spacer(minLength: isSignIn ? 156 : 132)
+            Spacer(minLength: 132)
 
-            AuthBrandLockup(showIconTile: !isSignIn)
+            AuthBrandLockup(style: .iconAboveWordmark)
 
             VStack(spacing: 18) {
                 #if canImport(AuthenticationServices)
@@ -45,10 +45,10 @@ struct AuthChoiceScreen: View {
                     action: onEmail
                 )
             }
-            .padding(.top, isSignIn ? 132 : 62)
+            .padding(.top, 62)
 
             AuthChoiceModeSwitchButton(isSignIn: isSignIn, action: onSwitch)
-                .padding(.top, isSignIn ? 54 : 44)
+                .padding(.top, 44)
 
             if !isSignIn {
                 Spacer(minLength: 72)

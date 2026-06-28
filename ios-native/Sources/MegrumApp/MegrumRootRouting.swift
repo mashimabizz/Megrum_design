@@ -17,10 +17,10 @@ enum HomeSettingsRoute: Identifiable, Equatable {
 
 public enum MegrumTab: String, CaseIterable, Identifiable, Sendable {
     case home
-    case inventory
-    case wish
     case trades
     case meguri
+    case inventory
+    case wish
 
     public var id: String { rawValue }
 
@@ -31,7 +31,7 @@ public enum MegrumTab: String, CaseIterable, Identifiable, Sendable {
         case .inventory:
             "マイグッズ"
         case .wish:
-            "Wish"
+            "ウィッシュ"
         case .trades:
             "やりとり"
         case .meguri:
@@ -44,11 +44,11 @@ public enum MegrumTab: String, CaseIterable, Identifiable, Sendable {
         case .home:
             "house"
         case .inventory:
-            "shippingbox"
+            "rectangle.on.rectangle"
         case .wish:
             "heart"
         case .trades:
-            "arrow.left.arrow.right"
+            "message"
         case .meguri:
             "dot.radiowaves.left.and.right"
         }

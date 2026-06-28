@@ -35,7 +35,9 @@ struct ProposalMeetupPlaceSuggestionChips: View {
                     HStack(spacing: 8) {
                         ForEach(suggestions, id: \.self) { suggestion in
                             Button {
-                                onSelect(suggestion)
+                                MegrumHaptics.performSelectionChanged {
+                                    onSelect(suggestion)
+                                }
                             } label: {
                                 Text(suggestion)
                                     .font(.system(size: 13, weight: .heavy, design: .rounded))

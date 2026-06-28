@@ -38,7 +38,7 @@ enum IndividualListingOptionReviewItemFactory {
             let groupName = groups.first { $0.id == groupID }?.name ?? "グループ未設定"
             let goodsTypeName = goodsTypes.first { $0.id == goodsTypeID }?.name ?? "種別未設定"
             let memberText = conditionMemberSummary(draft: draft, characters: characters)
-            let tagText = draft.conditionTagNames.isEmpty ? "タグ指定なし" : draft.conditionTagNames.map { "#\($0)" }.joined(separator: " / ")
+            let tagText = draft.conditionTagNames.isEmpty ? "シリーズ指定なし" : draft.conditionTagNames.map { "#\($0)" }.joined(separator: " / ")
             let amountText = draft.usesConditionLogicChoice ? draft.wishLogic.displayName : "\(draft.conditionQuantity)点"
             return IndividualListingOptionReviewItem(
                 title: title,

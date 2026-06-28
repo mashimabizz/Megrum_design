@@ -6,7 +6,9 @@ struct ProposalMeetupPlaceSaveButton: View {
     var onSave: () -> Void
 
     var body: some View {
-        Button(action: onSave) {
+        Button {
+            MegrumHaptics.performButtonTap(onSave)
+        } label: {
             Text("この場所にする")
                 .font(.system(size: 17, weight: .heavy, design: .rounded))
                 .foregroundStyle(.white)

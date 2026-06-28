@@ -335,6 +335,140 @@ final class HomeDiscoveryMatchPolicyTests: XCTestCase {
         XCTAssertEqual(focusedContext.selectedWantedOptionPreviewIndices, Set([0, 1]))
     }
 
+    func testGoodsHitWantedPreviewPrioritizesSeriesMatchedWishes() {
+        var seriesMatchedOffer = HomeDiscoveryFixtures.offerGoods[0]
+        seriesMatchedOffer.rawTagNames = ["ライブ2026"]
+        var otherOffer = HomeDiscoveryFixtures.offerGoods[1]
+        otherOffer.rawTagNames = ["通常盤"]
+        let listingID = UUID(uuidString: "22222222-2222-2222-2222-222222222201")!
+        let option = HomeIndividualListingWantedOption(
+            id: UUID(uuidString: "22222222-2222-2222-2222-222222222202")!,
+            listingID: listingID,
+            position: 1,
+            title: "選択肢",
+            logic: .one,
+            kind: .goods,
+            matchingGoodsIDs: [seriesMatchedOffer.id],
+            previewItems: [
+                HomeIndividualListingWantedPreviewItem(
+                    id: UUID(uuidString: "22222222-2222-2222-2222-222222222203")!,
+                    title: "通常盤 Wish",
+                    rawTagNames: ["別シリーズ"]
+                ),
+                HomeIndividualListingWantedPreviewItem(
+                    id: UUID(uuidString: "22222222-2222-2222-2222-222222222204")!,
+                    title: "ライブ Wish",
+                    rawTagNames: ["ライブ2026"]
+                )
+            ]
+        )
+        let selectionContext = HomeIndividualListingSelectionContext(
+            wantedLogic: .one,
+            offeredLogic: .all,
+            wantedOptions: [option]
+        )
+        let payload = HomeDiscoverySheetPayload(
+            goods: HomeDiscoveryFixtures.selectedYellow,
+            signals: HomeCandidateConditionSignals(
+                goods: .init(hasIndividualListingHit: true, hasWishHit: false),
+                exchange: .init(
+                    postalAcceptedByBoth: false,
+                    localExchangeSelected: false,
+                    prefectureMatches: false,
+                    dateMatches: false
+                ),
+                individualListingSelection: selectionContext
+            )
+        )
+
+        let context = HomeGoodsHitDetailSelectionContext(
+            selection: payload,
+            viewerOfferGoods: [otherOffer, seriesMatchedOffer],
+            selectionState: HomeListingSheetSelectionState()
+        )
+
+        XCTAssertEqual(context.wantedOptionPreviewGoods.map(\.title), ["ライブ Wish", "通常盤 Wish"])
+        XCTAssertEqual(
+            context.wantedOptionPreviewBadgeTextByGoodsID[UUID(uuidString: "22222222-2222-2222-2222-222222222204")!],
+            "シリーズ○"
+        )
+        XCTAssertNil(
+            context.wantedOptionPreviewBadgeTextByGoodsID[UUID(uuidString: "22222222-2222-2222-2222-222222222203")!]
+        )
+    }
+
+    func testGoodsHitWantedOptionsPrioritizeSeriesMatchedOptions() {
+        var seriesMatchedOffer = HomeDiscoveryFixtures.offerGoods[0]
+        seriesMatchedOffer.rawTagNames = ["ライブ2026"]
+        var otherOffer = HomeDiscoveryFixtures.offerGoods[1]
+        otherOffer.rawTagNames = ["通常盤"]
+        let listingID = UUID(uuidString: "22222222-2222-2222-2222-222222222301")!
+        let unmatchedOption = HomeIndividualListingWantedOption(
+            id: UUID(uuidString: "22222222-2222-2222-2222-222222222302")!,
+            listingID: listingID,
+            position: 1,
+            title: "選択肢1",
+            logic: .one,
+            kind: .goods,
+            matchingGoodsIDs: [otherOffer.id],
+            previewItems: [
+                HomeIndividualListingWantedPreviewItem(
+                    id: UUID(uuidString: "22222222-2222-2222-2222-222222222303")!,
+                    title: "別シリーズ Wish",
+                    rawTagNames: ["別シリーズ"]
+                )
+            ]
+        )
+        let matchedOption = HomeIndividualListingWantedOption(
+            id: UUID(uuidString: "22222222-2222-2222-2222-222222222304")!,
+            listingID: listingID,
+            position: 2,
+            title: "選択肢2",
+            logic: .one,
+            kind: .goods,
+            matchingGoodsIDs: [seriesMatchedOffer.id],
+            previewItems: [
+                HomeIndividualListingWantedPreviewItem(
+                    id: UUID(uuidString: "22222222-2222-2222-2222-222222222305")!,
+                    title: "ライブ Wish",
+                    rawTagNames: ["ライブ2026"]
+                )
+            ]
+        )
+        let selectionContext = HomeIndividualListingSelectionContext(
+            wantedLogic: .one,
+            offeredLogic: .all,
+            wantedOptions: [unmatchedOption, matchedOption]
+        )
+        let payload = HomeDiscoverySheetPayload(
+            goods: HomeDiscoveryFixtures.selectedYellow,
+            signals: HomeCandidateConditionSignals(
+                goods: .init(hasIndividualListingHit: true, hasWishHit: false),
+                exchange: .init(
+                    postalAcceptedByBoth: false,
+                    localExchangeSelected: false,
+                    prefectureMatches: false,
+                    dateMatches: false
+                ),
+                individualListingSelection: selectionContext
+            )
+        )
+
+        let context = HomeGoodsHitDetailSelectionContext(
+            selection: payload,
+            viewerOfferGoods: [otherOffer, seriesMatchedOffer],
+            selectionState: HomeListingSheetSelectionState()
+        )
+
+        XCTAssertEqual(context.wantedOptions.map(\.id), [matchedOption.id, unmatchedOption.id])
+        XCTAssertEqual(context.selectedWantedOptionID, matchedOption.id)
+        XCTAssertEqual(context.wantedOptionPreviewGoods.map(\.title), ["ライブ Wish"])
+        XCTAssertEqual(
+            context.wantedOptionPreviewBadgeTextByGoodsID[UUID(uuidString: "22222222-2222-2222-2222-222222222305")!],
+            "シリーズ○"
+        )
+    }
+
     func testGoodsHitDetailRequiresOfferedMinimumBeforeProposalStart() {
         let firstReceive = HomeDiscoveryFixtures.selectedYellow
         let secondReceive = HomeDiscoveryFixtures.sanaBadge
@@ -1990,7 +2124,7 @@ final class HomeDiscoveryMatchPolicyTests: XCTestCase {
     func testHomeDiscoveryCardTitleUsesSelectedGoodsMemberAndTag() {
         let title = HomeDiscoveryCardTitleFormatter.title(
             for: HomeDiscoveryFixtures.momoFanmi,
-            fallback: "メンバー×タグでマッチ",
+            fallback: "メンバー×シリーズでマッチ",
             style: .memberTag
         )
 

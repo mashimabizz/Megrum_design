@@ -52,6 +52,7 @@ enum HomeCandidateListingMatchPolicy {
         viewerInventory: [SupabaseHomeGoodsRow],
         listingInventory: [SupabaseHomeGoodsRow] = [],
         listingWantedInventory: [SupabaseHomeGoodsRow] = [],
+        tagsByInventoryID: [UUID: [SupabaseHomeInventoryTagRow]] = [:],
         candidate: SupabaseHomeGoodsRow? = nil,
         includesCash: Bool = false
     ) -> HomeIndividualListingSelectionContext? {
@@ -72,6 +73,7 @@ enum HomeCandidateListingMatchPolicy {
                     from: option,
                     viewerInventory: viewerInventory,
                     previewInventory: listingWantedInventory,
+                    tagsByInventoryID: tagsByInventoryID,
                     includesCash: includesCash
                 )
             }
@@ -84,6 +86,7 @@ enum HomeCandidateListingMatchPolicy {
                     from: option,
                     viewerInventory: viewerInventory,
                     previewInventory: listingWantedInventory,
+                    tagsByInventoryID: tagsByInventoryID,
                     includesCash: includesCash
                 )
             }
@@ -138,12 +141,14 @@ enum HomeCandidateListingMatchPolicy {
         from option: SupabaseHomeListingWishOptionRow,
         viewerInventory: [SupabaseHomeGoodsRow],
         previewInventory: [SupabaseHomeGoodsRow] = [],
+        tagsByInventoryID: [UUID: [SupabaseHomeInventoryTagRow]] = [:],
         includesCash: Bool
     ) -> HomeIndividualListingWantedOption? {
         HomeCandidateListingWantedOptionFactory.wantedOption(
             from: option,
             viewerInventory: viewerInventory,
             previewInventory: previewInventory,
+            tagsByInventoryID: tagsByInventoryID,
             includesCash: includesCash
         )
     }

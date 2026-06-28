@@ -49,7 +49,7 @@ private struct PrivacySharedInformationSection: View {
             HelpRouteRow(
                 iconName: "location.circle",
                 title: "位置情報",
-                message: "グルームと掲示板は位置情報の許可状態に応じて表示範囲が変わります。端末の設定アプリから変更できます。"
+                message: "グルームとチャットルームは位置情報の許可状態に応じて表示範囲が変わります。端末の設定アプリから変更できます。"
             )
             HelpRouteRow(
                 iconName: "bell.badge",

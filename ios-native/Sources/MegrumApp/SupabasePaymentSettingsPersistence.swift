@@ -20,6 +20,7 @@ final class SupabasePaymentSettingsPersistence: @unchecked Sendable {
         userID: UUID
     ) async throws -> (profile: UserProfile, settings: UserPaymentSettings) {
         let normalized = settings.normalized(for: userID)
+        let storedSettings = try await settingsClient.upsertSettings(normalized)
         let rows: [UserRow] = try await client.updateRows(
             in: "users",
             values: UserPaymentSummaryUpdatePayload(
@@ -29,7 +30,6 @@ final class SupabasePaymentSettingsPersistence: @unchecked Sendable {
             select: UserRow.paymentSummarySelect,
             queryItems: Self.userQueryItems(userID: userID)
         )
-        let storedSettings = try? await settingsClient.upsertSettings(normalized)
         return (
             rows.first?.profile ?? Self.fallbackProfile(userID: userID, normalizedSettings: normalized),
             Self.returnedSettings(storedSettings: storedSettings, normalizedSettings: normalized)

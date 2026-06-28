@@ -7,7 +7,11 @@ struct ProposalCompletionButtonStack: View {
     var body: some View {
         VStack(spacing: 10) {
             ForEach(ProposalCompletionButtonCopy.buttons) { button in
-                Button(action: { onAction(button.action) }) {
+                Button {
+                    MegrumHaptics.performButtonTap {
+                        onAction(button.action)
+                    }
+                } label: {
                     Text(button.title)
                         .font(buttonFont(button.role))
                         .foregroundStyle(buttonForeground(button.role))

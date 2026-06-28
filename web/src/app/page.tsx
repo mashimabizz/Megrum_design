@@ -116,7 +116,7 @@ export default function HomePage() {
               交換できるかもしれないグッズを、画像で探しやすく。
             </h2>
             <p className="mt-4 text-[15px] font-medium leading-8 text-slate-600">
-              検索結果や候補一覧では、グッズ画像、タグ、交換条件の一致状況を見ながら判断できます。条件が合いそうな相手へは、打診から取引チャットへ進みます。
+              検索結果や候補一覧では、グッズ画像、シリーズ、交換条件の一致状況を見ながら判断できます。条件が合いそうな相手へは、打診から取引チャットへ進みます。
             </p>
           </div>
           <div className="grid grid-cols-2 gap-4">

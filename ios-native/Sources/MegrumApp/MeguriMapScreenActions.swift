@@ -36,7 +36,7 @@ extension MeguriMapScreen {
     func centerMapOnCurrentLocation() {
         guard let coordinate = locationState.coordinate else {
             mapNotice = "現在地を確認中"
-            locationState.requestCurrentLocation()
+            locationState.startUpdatingCurrentLocation()
             return
         }
 
@@ -53,6 +53,26 @@ extension MeguriMapScreen {
 
     func reloadMapContent(latitude: Double?, longitude: Double?) async {
         switch kind {
+        case .all:
+            async let grooms: Void = appState.loadGroomMapPosts(
+                latitude: latitude,
+                longitude: longitude,
+                radiusMeters: 3_000
+            )
+            if boardScope == .nearby3km, (latitude == nil || longitude == nil) {
+                await MainActor.run {
+                    locationState.startUpdatingCurrentLocation()
+                }
+                _ = await grooms
+                return
+            }
+            async let boards: Void = appState.loadMeguriFeed(
+                latitude: latitude,
+                longitude: longitude,
+                prefecture: selectedPrefecture,
+                scope: mapBoardScope
+            )
+            _ = await (grooms, boards)
         case .grooms:
             await appState.loadGroomMapPosts(
                 latitude: latitude,
@@ -62,7 +82,7 @@ extension MeguriMapScreen {
         case .boards:
             if boardScope == .nearby3km, (latitude == nil || longitude == nil) {
                 await MainActor.run {
-                    locationState.requestCurrentLocation()
+                    locationState.startUpdatingCurrentLocation()
                 }
                 return
             }
@@ -76,7 +96,7 @@ extension MeguriMapScreen {
     }
 
     func openGroomIfInRange(_ groom: GroomPost) {
-        guard kind == .grooms else {
+        guard kind == .grooms || kind == .all else {
             selectedGroom = groom
             return
         }
@@ -86,7 +106,7 @@ extension MeguriMapScreen {
             return
         }
         guard locationState.coordinate != nil else {
-            locationState.requestCurrentLocation()
+            locationState.startUpdatingCurrentLocation()
             showOutOfRangeAlert(
                 MeguriAccessPolicy.groomAccessMessage(
                     groom,
@@ -99,6 +119,20 @@ extension MeguriMapScreen {
         showOutOfRangeAlert(groomRangeNotice(groom))
     }
 
+    func openGroomCluster(_ grooms: [GroomPost]) {
+        let openable = grooms.filter(canOpen(groom:))
+        let visibleGrooms = openable.isEmpty ? grooms : openable
+        guard let first = visibleGrooms.first else {
+            return
+        }
+        if openable.isEmpty {
+            showOutOfRangeAlert(groomRangeNotice(first))
+            return
+        }
+        mapNotice = nil
+        selectedGroomGroup = GroomMapGroomSelection(grooms: visibleGrooms, initialGroom: first)
+    }
+
     func openThreadIfInRange(_ thread: BoardThread) {
         if canOpen(thread: thread) {
             mapNotice = nil
@@ -106,7 +140,7 @@ extension MeguriMapScreen {
             return
         }
         guard locationState.coordinate != nil else {
-            locationState.requestCurrentLocation()
+            locationState.startUpdatingCurrentLocation()
             showOutOfRangeAlert(
                 MeguriAccessPolicy.boardAccessMessage(
                     thread,
@@ -168,7 +202,7 @@ extension MeguriMapScreen {
     }
 
     func showOutOfRangeAlert(_ message: String) {
-        outOfRangeAlertMessage = message.isEmpty ? "半径1km以内のグルームと掲示板のみ開けます。" : message
+        outOfRangeAlertMessage = message.isEmpty ? "半径1km以内のグルームとチャットルームのみ開けます。" : message
         isShowingOutOfRangeAlert = true
     }
 }

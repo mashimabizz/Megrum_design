@@ -2,33 +2,34 @@ import MegrumDesign
 import SwiftUI
 
 struct AuthBrandLockup: View {
-    var compact = false
-    var showIconTile = false
+    enum Style {
+        case wordmarkOnly
+        case iconAboveWordmark
+        case compactIconAndWordmark
+    }
+
+    var style: Style = .wordmarkOnly
+    var wordmarkWidth: CGFloat = 184
 
     var body: some View {
         Group {
-            if compact {
+            switch style {
+            case .compactIconAndWordmark:
                 HStack(spacing: 15) {
                     AuthAppIconMark(size: 38)
-                    MegrumWordmark(width: 124)
+                    MegrumWordmark(width: wordmarkWidth)
                 }
-            } else if showIconTile {
+            case .iconAboveWordmark:
                 VStack(spacing: 18) {
                     AuthAppIconMark(size: 72)
-                    MegrumWordmark(width: 184)
+                    MegrumWordmark(width: wordmarkWidth)
                 }
-            } else {
-                MegrumWordmark(width: 184)
+            case .wordmarkOnly:
+                MegrumWordmark(width: wordmarkWidth)
                     .frame(maxWidth: .infinity, alignment: .center)
             }
         }
         .frame(maxWidth: .infinity)
-        .overlay {
-            if !compact && !showIconTile {
-                AuthAppIconMark(size: 74)
-                    .offset(y: -70)
-            }
-        }
     }
 }
 

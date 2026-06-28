@@ -13,9 +13,9 @@ enum GoodsEditorPresentationText {
             return "推し・種別、写真、写真ごとの詳細の順に登録できます。"
         }
         if entryKind == .inventory {
-            return "写真、推し、数量、タグを編集できます。"
+            return "写真、推し、数量、シリーズを編集できます。"
         }
-        return "推し、数量、画像、タグを編集できます。"
+        return "推し、数量、画像、シリーズを編集できます。"
     }
 
     static func saveButtonTitle(

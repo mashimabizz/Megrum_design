@@ -94,17 +94,50 @@ extension ProposalCreateFlow {
     }
 
     func createProposal() async {
-        guard configuration.canSubmit, let defaultTargetStatus = configuration.targetStatus else {
+        guard let targetStatus = proposalSubmissionTargetStatus else {
             return
         }
-        let targetStatus = submissionStatusOverride ?? defaultTargetStatus
         saveSelectedMeetupCandidate()
-        let meetupCandidates = configuration.requiresMeetupBeforeSubmit ? meetupInputsForSubmission : []
-        let meetup = meetupCandidates.first
-        guard !configuration.requiresMeetupBeforeSubmit || meetup != nil else {
+        guard let meetupCandidates = preparedMeetupCandidatesForSubmission() else {
             return
         }
-        let draft = ProposalCreateSubmissionDraft(
+        let draft = makeSubmissionDraft(
+            targetStatus: targetStatus,
+            meetupCandidates: meetupCandidates
+        )
+        let created = await appState.createProposal(draft.input)
+        if created {
+            await onCreateSuccess?()
+            if showsCompletionAfterCreate {
+                withAnimation(.snappy) {
+                    submittedSummary = draft.summary
+                }
+            } else {
+                dismissProposalFlow()
+            }
+        }
+    }
+
+    var proposalSubmissionTargetStatus: ProposalStatus? {
+        guard configuration.canSubmit, let defaultTargetStatus = configuration.targetStatus else {
+            return nil
+        }
+        return submissionStatusOverride ?? defaultTargetStatus
+    }
+
+    func preparedMeetupCandidatesForSubmission() -> [ProposalMeetupInput]? {
+        let meetupCandidates = configuration.requiresMeetupBeforeSubmit ? meetupInputsForSubmission : []
+        guard !configuration.requiresMeetupBeforeSubmit || meetupCandidates.first != nil else {
+            return nil
+        }
+        return meetupCandidates
+    }
+
+    func makeSubmissionDraft(
+        targetStatus: ProposalStatus,
+        meetupCandidates: [ProposalMeetupInput]
+    ) -> ProposalCreateSubmissionDraft {
+        ProposalCreateSubmissionDraft(
             receiverID: targetItem.ownerID,
             senderGoodsIDs: orderedSenderGoodsIDs,
             receiverGoodsIDs: resolvedReceiverGoodsIDs,
@@ -124,17 +157,6 @@ extension ProposalCreateFlow {
             methodTitle: Self.methodTitle(exchangeMethod),
             meetupSummary: meetupSummary
         )
-        let created = await appState.createProposal(draft.input)
-        if created {
-            await onCreateSuccess?()
-            if showsCompletionAfterCreate {
-                withAnimation(.snappy) {
-                    submittedSummary = draft.summary
-                }
-            } else {
-                dismissProposalFlow()
-            }
-        }
     }
 
     func dismissProposalFlow() {

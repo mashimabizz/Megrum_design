@@ -58,7 +58,7 @@ private struct NotificationCenterEmptyRow: View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
                 .font(.headline.weight(.bold))
-            Text("打診、取引チャット、掲示板の更新がここにまとまります。")
+            Text("打診、取引チャット、チャットルームの更新がここにまとまります。")
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(MegrumTheme.muted)
         }

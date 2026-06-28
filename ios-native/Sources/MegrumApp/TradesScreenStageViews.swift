@@ -26,19 +26,20 @@ struct TradeStagePage: View {
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 0) {
+                listTopAd
                 if proposals.isEmpty {
                     EmptyTradeStage(stage: stage)
                         .padding(.horizontal, TradeCardLayout.horizontalPadding)
                         .padding(.top, 8)
                 } else {
                     proposalRows
-                    completedFooterAd
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.top, 8)
             .padding(.bottom, 132)
         }
+        .background(Color.white)
     }
 
     private var proposalRows: some View {
@@ -75,15 +76,13 @@ struct TradeStagePage: View {
     }
 
     @ViewBuilder
-    private var completedFooterAd: some View {
-        if stage == .completed {
-            AdBannerSlot(
-                placement: .pastTradesFooterBanner,
-                displayContext: adDisplayContext
-            )
-            .padding(.horizontal, TradeCardLayout.horizontalPadding)
-            .padding(.top, 12)
-        }
+    private var listTopAd: some View {
+        AdBannerSlot(
+            placement: .tradesListTopBanner,
+            displayContext: adDisplayContext,
+            bottomSpacing: 12
+        )
+        .padding(.horizontal, TradeCardLayout.horizontalPadding)
     }
 }
 
@@ -92,9 +91,9 @@ struct TradesFooter: View {
     var isSelectingPendingProposals: Bool
     var selectedPendingCount: Int
     var isResponding: Bool
-    var pendingCount: Int
-    var inProgressCount: Int
-    var completedCount: Int
+    var pendingBadgeCount: Int
+    var inProgressBadgeCount: Int
+    var completedBadgeCount: Int
     var onWithdrawSelected: () -> Void
 
     var body: some View {
@@ -103,9 +102,9 @@ struct TradesFooter: View {
         } else {
             TradeStageBar(
                 selectedStage: $selectedStage,
-                pendingCount: pendingCount,
-                inProgressCount: inProgressCount,
-                completedCount: completedCount
+                pendingBadgeCount: pendingBadgeCount,
+                inProgressBadgeCount: inProgressBadgeCount,
+                completedBadgeCount: completedBadgeCount
             )
         }
     }

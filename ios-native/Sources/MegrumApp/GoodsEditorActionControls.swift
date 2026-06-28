@@ -5,7 +5,9 @@ struct GoodsEditorCloseButton: View {
     var onClose: () -> Void
 
     var body: some View {
-        Button(action: onClose) {
+        Button {
+            MegrumHaptics.performButtonTap(onClose)
+        } label: {
             Text("戻る")
                 .font(.headline.weight(.black))
                 .frame(maxWidth: .infinity)
@@ -23,7 +25,9 @@ struct GoodsEditorSaveButton: View {
     var onSave: () -> Void
 
     var body: some View {
-        Button(action: onSave) {
+        Button {
+            MegrumHaptics.performButtonTap(onSave)
+        } label: {
             HStack(spacing: 10) {
                 if isSaving {
                     ProgressView()
@@ -47,7 +51,9 @@ struct GoodsEditorDeleteButton: View {
     var onConfirmDelete: () -> Void
 
     var body: some View {
-        Button(role: .destructive, action: onConfirmDelete) {
+        Button(role: .destructive) {
+            MegrumHaptics.performButtonTap(onConfirmDelete)
+        } label: {
             HStack(spacing: 8) {
                 if isMutating {
                     ProgressView()

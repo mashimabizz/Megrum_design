@@ -177,7 +177,7 @@ final class GoodsEditorDraftTests: XCTestCase {
         var draft = GoodsEditorDraft(mode: .create, entryKind: .inventory)
         draft.groupID = groupID
         draft.goodsTypeID = goodsTypeID
-        draft.addTag("共有タグは画像単位登録へ流れない")
+        draft.addTag("共有シリーズは画像単位登録へ流れない")
 
         let inputs = GoodsInventoryCreateInputBuilder.inputs(
             metas: [GoodsCreateMetaDraft(photoID: photoID, memberID: memberID, quantity: 3, tagNames: ["ラキドロ"])],
@@ -466,7 +466,7 @@ final class GoodsEditorDraftTests: XCTestCase {
         XCTAssertTrue(failure.includesPhotoUpload)
         XCTAssertTrue(failure.includesTagChanges)
         XCTAssertTrue(failure.message.contains("写真を外して保存"))
-        XCTAssertTrue(failure.message.contains("タグは画面に残っている"))
+        XCTAssertTrue(failure.message.contains("シリーズは画面に残っている"))
         XCTAssertTrue(failure.message.contains("入力内容はこの画面に残しています"))
     }
 
@@ -595,7 +595,7 @@ final class GoodsEditorDraftTests: XCTestCase {
             id: UUID(),
             ownerID: ownerID,
             groupID: groupID,
-            title: "タグ候補テスト",
+            title: "シリーズ候補テスト",
             tags: tagNames.map { GoodsTag(id: UUID(), name: $0) }
         )
     }
@@ -605,7 +605,7 @@ final class GoodsEditorDraftTests: XCTestCase {
             id: UUID(),
             ownerID: ownerID,
             groupID: groupID,
-            title: "タグ候補テスト",
+            title: "シリーズ候補テスト",
             tags: tagNames.map { GoodsTag(id: UUID(), name: $0) }
         )
     }

@@ -32,7 +32,9 @@ struct AccountSetupOshiChip: View {
     var action: () -> Void
 
     var body: some View {
-        Button(action: action) {
+        Button {
+            MegrumHaptics.performSelectionChanged(action)
+        } label: {
             Label {
                 Text(title)
             } icon: {
@@ -109,7 +111,11 @@ private struct AccountSetupSelectedOshiDraftScroller: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
                 ForEach(selectedOshiDrafts) { draft in
-                    Button(action: { onRemoveDraft(draft) }) {
+                    Button {
+                        MegrumHaptics.performSelectionChanged {
+                            onRemoveDraft(draft)
+                        }
+                    } label: {
                         AccountSetupSelectedOshiDraftChip(displayName: draft.displayName)
                     }
                     .buttonStyle(.plain)
@@ -157,7 +163,9 @@ struct AccountSetupWholeGroupButton: View {
     var onToggle: () -> Void
 
     var body: some View {
-        Button(action: onToggle) {
+        Button {
+            MegrumHaptics.performSelectionChanged(onToggle)
+        } label: {
             HStack {
                 Text("グループ全体")
                 Spacer()

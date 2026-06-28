@@ -64,6 +64,10 @@ public extension SupabaseMegrumRepository {
         try await goodsReportClient.createReport(reporterID: viewerID, input: input)
     }
 
+    func reportUser(_ input: UserReportCreateInput) async throws -> UserReportTicket {
+        try await userReportClient.createReport(reporterID: viewerID, input: input)
+    }
+
     func loadIndividualListings() async throws -> [IndividualListing] {
         try await listingClient.loadListings(userID: viewerID)
     }

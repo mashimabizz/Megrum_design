@@ -197,7 +197,7 @@ muted:       #6b6478
    - signup を試して、新しいテンプレが届くか確認
    - パスワードリセットも同様
 
-> 💡 Supabase 組み込み SMTP からではなく、Brevo SMTP（iter55 で設定済）から送信されるため、この HTML がそのまま届きます。
+> 💡 送信元は Supabase 組み込み SMTP ではなく、Zoho の `info@megrum.jp` を使う Custom SMTP にする。Supabase Dashboard → Authentication → SMTP Settings で `Sender email / Admin email = info@megrum.jp`、`Sender name = Megrum`、Zoho SMTP host / port / credentials を設定してからテスト送信する。
 
 ---
 

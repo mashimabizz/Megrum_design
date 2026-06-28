@@ -85,7 +85,7 @@ struct TradeDetailHeroPresentation: Equatable, Sendable {
         case .draft:
             return "下書き"
         case .sent:
-            return isReceiver ? "新着打診" : "現在出品中"
+            return isReceiver ? "新着打診" : "現在打診中"
         case .negotiating:
             return "ネゴ中"
         case .agreementOneSide:
@@ -135,7 +135,7 @@ struct TradeDetailHeroPresentation: Equatable, Sendable {
         switch status {
         case .sent:
             return isSender
-                ? "現在出品中です。相手からの返信待ちです。"
+                ? "現在打診中です。相手からの返信待ちです。"
                 : "内容を確認して、承諾・再打診・見送りを選べます。"
         case .negotiating:
             return "条件を相談中です。双方が納得した内容で合意すると取引予定に進みます。"

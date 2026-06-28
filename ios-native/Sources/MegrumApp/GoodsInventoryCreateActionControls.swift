@@ -7,7 +7,9 @@ struct GoodsCreatePhotoPickButton: View {
     var action: () -> Void
 
     var body: some View {
-        Button(action: action) {
+        Button {
+            MegrumHaptics.performButtonTap(action)
+        } label: {
             VStack(spacing: 10) {
                 Image(systemName: systemImage)
                     .font(.system(size: 24, weight: .bold))
@@ -36,7 +38,9 @@ struct GoodsTradingCardBulkStartButton: View {
     var action: () -> Void
 
     var body: some View {
-        Button(action: action) {
+        Button {
+            MegrumHaptics.performButtonTap(action)
+        } label: {
             HStack(spacing: 12) {
                 GoodsTradingCardBulkStartIcon(isProcessing: isProcessing)
                 GoodsTradingCardBulkStartCopy()
@@ -97,7 +101,9 @@ struct GoodsCreatePrimaryButton: View {
     var action: () -> Void
 
     var body: some View {
-        Button(action: action) {
+        Button {
+            MegrumHaptics.performButtonTap(action)
+        } label: {
             HStack(spacing: 10) {
                 if showsProgress && isCreatingGoodsEntry {
                     ProgressView()
@@ -123,7 +129,9 @@ struct GoodsCreateSecondaryButton: View {
     var action: () -> Void
 
     var body: some View {
-        Button(action: action) {
+        Button {
+            MegrumHaptics.performButtonTap(action)
+        } label: {
             Text(title)
                 .font(.headline.weight(.black))
                 .foregroundStyle(MegrumTheme.lavender)
@@ -148,7 +156,9 @@ struct GoodsEditorSelectionChip: View {
     var action: () -> Void
 
     var body: some View {
-        Button(action: action) {
+        Button {
+            MegrumHaptics.performSelectionChanged(action)
+        } label: {
             Text(title)
                 .font(.system(size: isCompact ? 12 : 13, weight: .black, design: .rounded))
                 .foregroundStyle(isSelected ? .white : MegrumTheme.ink)
@@ -180,7 +190,9 @@ struct GoodsEditorQuantityButton: View {
     var action: () -> Void
 
     var body: some View {
-        Button(action: action) {
+        Button {
+            MegrumHaptics.performButtonTap(action)
+        } label: {
             Image(systemName: systemImage)
                 .font(.system(size: 14, weight: .black))
                 .foregroundStyle(MegrumTheme.lavender)

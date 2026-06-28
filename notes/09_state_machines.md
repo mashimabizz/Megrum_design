@@ -36,7 +36,7 @@
 10. [Local Mode（現地モード / iter63〜）](#10-local-mode)
 11. [Meguri Message Lifecycle（めぐりメッセージ）](#11-meguri-message-lifecycle)
 12. [Groom Lifecycle（グルーム）](#12-groom-lifecycle)
-13. [Meguri Board Lifecycle（スポット掲示板）](#13-meguri-board-lifecycleスポット掲示板)
+13. [Meguri Board Lifecycle（チャットルーム）](#13-meguri-board-lifecycleチャットルーム)
 14. [Admin / Billing Lifecycle（管理者・有料権限）](#14-admin--billing-lifecycle管理者有料権限)
 15. [付録：エンティティ間の関係](#15-付録エンティティ間の関係)
 
@@ -473,7 +473,8 @@ stateDiagram-v2
 - **OAuth経路（Apple/Google等）**: メール認証 skip → `verified` に直行（iter20, iter343）
 - **削除30日猶予**: その間にログインで `active` に復帰可能
 - **退会申請の制約（iter1221）**: `sent` / `negotiating` / `agreement_one_side` / `agreed` の進行中取引が1件でもある場合、`active -> deletion_requested` へ遷移できない。退会理由は `account_deletion_requests.reasons`、任意メモは `account_deletion_requests.note` に保存する。
-- **オンボーディング段階**: iter1226.16以降、認証後は Welcome → 推し設定（グループ・作品選択 → メンバー・キャラクター選択が必要な場合のみ） → 活動エリア → 名前 → ユーザーID → 生年月日 → 性別 → 完了の8ステップで登録する。名前とユーザーIDの入力欄は初期値を空にし、既存の仮プロフィール値を事前入力しない。状態IDは既存の `onboarding` / `active` を維持する。
+- **オンボーディング段階**: iter1226.17以降、認証後は Welcome → 推し設定（グループ・作品選択 → メンバー・キャラクター選択が必要な場合のみ） → 活動エリア → 名前 → ユーザーID → 生年月日 → 性別 → 完了の8ステップで登録する。名前とユーザーIDの入力欄は初期値を空にし、既存の仮プロフィール値を事前入力しない。初回設定の性別候補は女性・男性のみ。状態IDは既存の `onboarding` / `active` を維持する。
+- **保存済みセッションからの復帰**: iter1226.86以降、保存済みセッションで再起動した `onboarding` はログイン画面へ戻さず、認証状態を維持してアカウント設定の続きへ進める。`registered` / `verified` は初回設定開始前の状態としてログイン画面へ戻す余地を残し、`active` 以降は通常画面を維持する。
 
 ### 関連画面
 
@@ -656,6 +657,7 @@ stateDiagram-v2
     [*] --> draft: カメラ撮影 / 編集
     draft --> published: 投稿
     published --> expired: 24時間経過
+    published --> published: いいねで期限延長
     published --> hidden: 削除 / 通報対応 / ブロック
     expired --> archived: 履歴化
 ```
@@ -674,6 +676,7 @@ stateDiagram-v2
 
 - ホーム一覧の表示対象は現在地から1km圏内の投稿に限定し、フォロー/フォロワー関係を前提にしない。
 - グルームマップでは、位置情報を持つ投稿を丸アイコンとして地図上に表示する。1km圏内の投稿だけ内容を開け、1km圏外の投稿をタップした場合は「圏外のため見ることができません」と案内する。
+- iter1225 以降、地図を広域表示した時は近接するグルームをクラスタ化し、Megrumアイコン入りの吹き出しと件数バッジで表示する。クラスタタップ時は含まれるグルームをまとめて閲覧する。これは表示集約であり、投稿状態は変えない。
 - 投稿時に `origin_lat/origin_lng` を保存する。画面には正確な位置を出さず、`place_hint` の丸めた表示だけを使う。
 - 場所と時刻は必ず丸め、正確な現在地・生活導線・滞在時刻を特定できる表示にしない。
 - グルームへの返信は、めぐりメッセージ導線へつなげる。交換・打診・取引へは自動遷移しない。
@@ -681,16 +684,18 @@ stateDiagram-v2
 - `groom-posts` Storage は private bucket とし、`can_view_groom_post()` を満たす投稿だけ署名URLを発行する。
 - 例外として、`groom_replies.groom_snapshot.image_path` に残した投稿画像は、投稿が期限切れ/アーカイブ済みでも返信スレッド参加者だけ署名URLを発行できる。
 - `published` の通常表示は `expires_at > now()` の投稿だけに限定する。アプリ起動時/復帰時に `expire_groom_posts()` を呼び、pg_cron が利用できる環境では15分間隔でも期限切れ投稿を `expired`、期限切れから7日経過した投稿を `archived` へ進める。
-- いいねは `groom_reactions`、閲覧済みは `groom_views`、返信は `groom_replies` に保存する。返信は `notifications.kind='groom_reply'` を作り、めぐりメッセージで開いた時に `groom_replies.read_at` を更新する。
-- グルーム返信後の通常会話は `meguri_messages` に保存し、`notifications.kind='meguri_message'` を作る。受信者が会話を開いた時に `meguri_messages.read_at` を更新する。
+- いいねは `groom_reactions`、閲覧済みは `groom_views`、返信は `groom_replies` に保存する。iter1226.14以降、新規いいねは `notifications.kind='groom_liked'`、返信は `notifications.kind='groom_reply'` をDB triggerで作り、返信通知のbodyには本文プレビューを入れない。めぐりメッセージで開いた時に `groom_replies.read_at` を更新する。
+- iter1225 以降、いいねは `set_groom_like_for_viewer()` RPCで更新する。新規いいねが1件作成された場合だけ `expires_at` を3時間延長し、重複いいねや取り消しでは期限を延長/短縮しない。アプリは `like_count` を表示し、いいね済みはピンクのハートで示す。
+- グルーム返信後の通常会話は `meguri_messages` に保存し、`notifications.kind='meguri_message'` をDB triggerで作る。グルーム返信から複製された起点メッセージは `groom_reply` 通知と重複させず、通常めぐりメッセージ通知のbodyにも本文プレビューを入れない。受信者が会話を開いた時に `meguri_messages.read_at` を更新する。
 - ユーザー単位の非表示は `groom_hidden_posts`、ブロックは `groom_user_blocks`、通報は `groom_reports` に保存し、RLSとアプリフィードの両方で表示対象から除外する。
+- グルームのブロックは `groom_user_blocks` に保存するめぐり文脈ブロックであり、グッズ交換のブロックとは別の扱いにする。
 - 初期実装は写真1枚 + ひとこと + いいね + メッセージ入力を対象にし、動画・公開範囲の細分化は後続検討とする。
 
 ---
 
-## 13. Meguri Board Lifecycle（スポット掲示板）
+## 13. Meguri Board Lifecycle（チャットルーム）
 
-めぐり内のスレッド型掲示板。交換成立そのものではなく、現地の情報共有・雑談・列状況・導線共有を扱う。
+旧「スポット掲示板」。めぐり内のスレッド型チャットルーム。交換成立そのものではなく、現地の情報共有・雑談・列状況・導線共有を扱う。
 
 ### 状態図
 
@@ -699,10 +704,14 @@ stateDiagram-v2
     [*] --> visible: スレッド作成
     visible --> visible: 返信追加
     visible --> visible: 購読ON/OFF
+    visible --> visible: 返信追加で7日延長
+    visible --> locked: 返信1000件到達
     visible --> locked: 作成者/運営判断で返信停止
     locked --> locked: 購読ON/OFF
     locked --> visible: 作成者/運営判断で返信再開
+    visible --> archived: 最終書き込みから7日経過
     visible --> archived: 作成者が削除
+    locked --> archived: 最終書き込みから7日経過
     locked --> archived: 作成者が削除
     visible --> hidden: 通報対応 / 管理者非表示
     locked --> hidden: 通報対応 / 管理者非表示
@@ -721,10 +730,15 @@ stateDiagram-v2
 ### ビジネスルール
 
 - 新規スレッドの公開範囲は `nearby_3km` / `same_prefecture` の2択。
+- iter1225 以降、スレッドは最後の書き込みから1週間で通常表示から外れ、`expire_meguri_board_threads()` により `archived` へ進む。残り時間は一覧・詳細に表示する。
+- iter1225 以降、返信数が1000件に到達したスレッドは `locked` になり、新規返信を受け付けない。ユーザーのスレッド作成は1日2件までDBトリガーで制限する。
+- iter1225 以降、スレッド作成時にチャットルームごとの匿名表示名と6種類の仮アバターを設定できる。未指定時は通常プロフィール表示へフォールバックする。
 - `nearby_3km` は互換維持のraw値として残す。現在のめぐり画面ではスレッド作成時の `origin_lat/origin_lng` を基準に、閲覧者の現在地から1km以内なら詳細閲覧できる。
-- `same_prefecture` はスレッド作成時の都道府県を基準に、閲覧者がスポット掲示板で選んだ都道府県と一致する場合に表示する。
-- スポット掲示板の都道府県は初回のみプロフィールの都道府県を既定値にし、ユーザーが画面内で変更した後は端末保存値を次回以降の既定値にする。
-- めぐりホームと掲示板マップでは位置情報を持つスレッドを地図上に表示する。1km圏内のスレッドだけ詳細へ進め、1km圏外のスレッドをタップした場合は「圏外のため見ることができません」と案内する。
+- `same_prefecture` はスレッド作成時の都道府県を基準に、閲覧者がチャットルームで選んだ都道府県と一致する場合に表示する。
+- チャットルームの都道府県は初回のみプロフィールの都道府県を既定値にし、ユーザーが画面内で変更した後は端末保存値を次回以降の既定値にする。
+- めぐりホームとチャットルームマップでは位置情報を持つスレッドを地図上に表示する。1km圏内のスレッドだけ詳細へ進め、1km圏外のスレッドをタップした場合は「圏外のため見ることができません」と案内する。
+- iter1225 以降、めぐり地図は `すべて` / `グルームのみ` / `チャットルームのみ` を切り替えられる。初期表示でチャットルームボトムシートは開かず、チャットルームピンをタップした時だけ該当スレッドを開く。
+- iter1226.12 以降、めぐりホーム自体に `すべて` / `グルーム` / `チャット` の表示切替を置き、ホーム地図の1km圏内をタップして `グルーム` または `チャット` 作成を選べる。地図タップで作成地点が確定している場合、作成画面内の最終位置決めステップはスキップする。
 - iter191 以降、`is_pinned=true` のスレッドは一覧・詳細で固定バッジを表示し、通常の並び替えより上位に置く。
 - iter172 以降、自分のスレッドはタイトル/本文/カテゴリを編集でき、締め切り/再開/削除ができる。削除は `archived` へのソフト削除。
 - iter172 以降、自分の返信は編集でき、削除時は `meguri_board_replies.status='deleted'` としてプレースホルダ表示にする。
@@ -741,9 +755,9 @@ stateDiagram-v2
 - iter196 以降、スレッド内検索では返信番号（例: `#12`）も検索対象に含める。検索中の件数表示は検索結果/全件数の形式にする。
 - iter197 以降、スレッド内検索中は返信本文、引用本文、引用者名、返信者名、返信番号の一致箇所を強調表示する。強調表示は表示操作であり、スレッド/返信の状態は変えない。
 - iter198 以降、スレッド内検索中は検索結果の現在位置/総件数を表示し、前後の検索結果へ移動できる。検索結果ナビは表示操作であり、スレッド/返信の状態は変えない。
-- iter174 以降、スレッド作成者と返信者は `meguri_board_thread_subscriptions.notification_enabled=true` で自動購読される。ユーザーは一覧/詳細から通知ON/OFFを切り替えられる。
-- iter174 以降、購読中スレッドに自分以外が返信すると `notifications.kind='meguri_board_reply'` を作成し、通知タップで該当スレッドへ戻れるようにする。通知OFFのユーザーと返信者本人には送らない。
-- iter175 以降、返信本文の `@handle` は掲示板メンションとして解釈する。本人以外かつ対象スレッドを閲覧できるユーザーには `notifications.kind='meguri_board_mention'` を作成し、通常の購読返信通知とは重複させない。
+- iter174 以降、スレッド作成者と返信者は `meguri_board_thread_subscriptions.notification_enabled=true` で自動購読される。ユーザーは一覧/詳細からスレッド単位の通知ON/OFFを切り替えられる。iter1226.14以降、スレッドに「参考になった」を付けたユーザーも自動購読される。
+- iter174 以降、購読中スレッドに自分以外が返信すると `notifications.kind='meguri_board_reply'` を作成し、通知タップで該当スレッドへ戻れるようにする。通知OFFのユーザーと返信者本人には送らない。iter1226.14以降、チャットルーム通知のbodyには返信本文プレビューを入れない。
+- iter175 以降、返信本文の `@handle` は掲示板メンションとして解釈する。本人以外かつ対象スレッドを閲覧できるユーザーには `notifications.kind='meguri_board_mention'` を作成し、通常の購読返信通知とは重複させない。設定一覧のチャットルーム通知OFFはOSプッシュだけを止め、アプリ内通知行は残す。
 - iter184 以降、返信アクションから「メンションして返信」を選ぶと返信入力欄へ対象ユーザーの `@handle` を挿入する。削除済み返信、自分の返信、`locked` スレッドでは挿入しない。
 - iter176 以降、スレッドと返信は最大4枚の画像を添付できる。画像は `meguri-board-media` private Storage path として保存し、閲覧可能なスレッド/返信を取得した後だけ署名URLで表示する。
 - iter182 以降、スレッド詳細内の添付画像はタップで全画面プレビュー表示できる。これは表示状態のみで、スレッド/返信の状態は変えない。

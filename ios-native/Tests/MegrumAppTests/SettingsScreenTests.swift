@@ -22,7 +22,7 @@ final class SettingsScreenTests: XCTestCase {
         XCTAssertEqual(AppDrawerDestination.paymentSettings.title, "支払い方法の設定")
         XCTAssertEqual(AppDrawerDestination.exchangeSettings.title, "交換条件の設定")
         XCTAssertEqual(AppDrawerDestination.help.title, "ヘルプ")
-        XCTAssertEqual(AppDrawerDestination.megrumPlus.title, "メグルムプラス")
+        XCTAssertEqual(AppDrawerDestination.megrumPlus.title, "Megrum プレミアム")
         XCTAssertEqual(AppDrawerDestination.oshiSettings.systemImage, "sparkles")
         XCTAssertEqual(AppDrawerDestination.paymentSettings.systemImage, "yensign.circle")
         XCTAssertEqual(AppDrawerDestination.exchangeSettings.systemImage, "arrow.left.arrow.right.circle")
@@ -50,6 +50,55 @@ final class SettingsScreenTests: XCTestCase {
                 .logout
             ]
         )
+    }
+
+    func testSettingsStatusTextResolverFormatsNotificationStates() {
+        XCTAssertEqual(
+            SettingsStatusTextResolver.notificationStatusText(hasNotifications: false, unreadCount: 0),
+            "未読なし"
+        )
+        XCTAssertEqual(
+            SettingsStatusTextResolver.notificationStatusText(hasNotifications: true, unreadCount: 3),
+            "未読 3件"
+        )
+        XCTAssertEqual(
+            SettingsStatusTextResolver.notificationStatusText(hasNotifications: true, unreadCount: 0),
+            "すべて既読"
+        )
+    }
+
+    func testSettingsStatusTextResolverFormatsProfileAddressAndSubscription() {
+        let viewerID = UUID(uuidString: "20000000-0000-0000-0000-000000000071")!
+        let viewer = UserProfile(
+            id: viewerID,
+            handle: "michi",
+            displayName: "みち",
+            prefecture: "東京都"
+        )
+        let address = MailingAddress(
+            userID: viewerID,
+            recipientName: "松尾",
+            postalCode: "1500001",
+            prefecture: "東京都",
+            city: "渋谷区",
+            line1: "神宮前1-1-1"
+        )
+
+        XCTAssertEqual(SettingsStatusTextResolver.profileStatusText(viewer: nil), "未読み込み")
+        XCTAssertEqual(SettingsStatusTextResolver.profileStatusText(viewer: viewer), "みち / 東京都")
+        XCTAssertEqual(SettingsStatusTextResolver.addressStatusText(address: nil), "未登録")
+        XCTAssertEqual(SettingsStatusTextResolver.addressStatusText(address: address), address.summary)
+        XCTAssertEqual(SettingsStatusTextResolver.subscriptionStatusText(isActive: true), "有効")
+        XCTAssertEqual(SettingsStatusTextResolver.subscriptionStatusText(isActive: false), "未加入")
+    }
+
+    func testSettingsStatusTextResolverFormatsPushNotificationRows() {
+        XCTAssertEqual(SettingsStatusTextResolver.pushNotificationStatusText(isEnabled: true), "端末に通知を届ける")
+        XCTAssertEqual(SettingsStatusTextResolver.pushNotificationStatusText(isEnabled: false), "端末通知はOFF")
+        XCTAssertEqual(SettingsStatusTextResolver.groomNotificationStatusText(isEnabled: true), "いいね・メッセージ")
+        XCTAssertEqual(SettingsStatusTextResolver.groomNotificationStatusText(isEnabled: false), "グルーム通知はOFF")
+        XCTAssertEqual(SettingsStatusTextResolver.chatroomNotificationStatusText(isEnabled: true), "投稿・返信")
+        XCTAssertEqual(SettingsStatusTextResolver.chatroomNotificationStatusText(isEnabled: false), "チャットルーム通知はOFF")
     }
 
     func testAccountDeletionDraftValidatorRequiresReasonAndLimitsMemo() {
@@ -236,6 +285,24 @@ final class SettingsScreenTests: XCTestCase {
 
         XCTAssertEqual(draft.methods, [.bankTransfer, .cashExchange])
         XCTAssertEqual(draft.otherNote, "プロフィール側")
+    }
+
+    func testDefaultExchangeSettingsPreserveSelectedDateDetails() {
+        let settings = HomeDefaultExchangeSettings(
+            preference: .both,
+            localPrefecture: "東京都",
+            localDateKeys: ["2026-07-03"],
+            localDateDetails: [
+                "2026-07-03": HomeExchangeLocalDateDetail(prefecture: " 東京都 ", memo: " 会場付近 "),
+                "2026-08-01": HomeExchangeLocalDateDetail(prefecture: "大阪府", memo: "未選択")
+            ],
+            mailShippingFee: .owner,
+            mailShippingDays: .oneDay
+        )
+
+        XCTAssertEqual(settings.localDateDetails["2026-07-03"]?.prefecture, "東京都")
+        XCTAssertEqual(settings.localDateDetails["2026-07-03"]?.memo, "会場付近")
+        XCTAssertNil(settings.localDateDetails["2026-08-01"])
     }
 
     func testLoginSecuritySummaryFormatsAuthenticatedSession() {

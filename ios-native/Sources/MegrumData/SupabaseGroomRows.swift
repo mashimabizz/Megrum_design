@@ -8,6 +8,7 @@ struct GroomFeedRow: Decodable, Sendable {
         "image_url",
         "image_path",
         "published_at",
+        "expires_at",
         "created_at",
         "origin_lat",
         "origin_lng"
@@ -18,9 +19,11 @@ struct GroomFeedRow: Decodable, Sendable {
     var imageUrl: String?
     var imagePath: String?
     var publishedAt: Date?
+    var expiresAt: Date?
     var createdAt: Date?
     var originLat: Double?
     var originLng: Double?
+    var likeCount: Int?
 
     func post(signedURLs: [String: URL] = [:]) -> GroomPost? {
         guard
@@ -37,7 +40,9 @@ struct GroomFeedRow: Decodable, Sendable {
             imageURL: url,
             latitude: latitude,
             longitude: longitude,
-            createdAt: publishedAt ?? createdAt ?? .now
+            createdAt: publishedAt ?? createdAt ?? .now,
+            expiresAt: expiresAt,
+            likeCount: max(0, likeCount ?? 0)
         )
     }
 
@@ -92,6 +97,19 @@ struct GroomFeedRow: Decodable, Sendable {
 struct GroomViewRow: Decodable, Sendable {
     var groomPostID: UUID?
     var userID: UUID?
+
+    enum CodingKeys: String, CodingKey {
+        case groomPostID = "groomPostId"
+        case userID = "userId"
+    }
+}
+
+struct GroomBlockRow: Decodable, Sendable {
+    var blockedID: UUID?
+
+    enum CodingKeys: String, CodingKey {
+        case blockedID = "blockedId"
+    }
 }
 
 struct GroomReactionRow: Decodable, Sendable {
@@ -106,6 +124,13 @@ struct GroomReactionRow: Decodable, Sendable {
     var userID: UUID
     var reactionType: String?
     var createdAt: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case groomPostID = "groomPostId"
+        case userID = "userId"
+        case reactionType
+        case createdAt
+    }
 
     var reaction: GroomReaction {
         GroomReaction(
@@ -138,6 +163,17 @@ struct GroomReplyRow: Decodable, Sendable {
     var readAt: Date?
     var createdAt: Date?
 
+    enum CodingKeys: String, CodingKey {
+        case id
+        case groomPostID = "groomPostId"
+        case senderID = "senderId"
+        case recipientID = "recipientId"
+        case body
+        case groomSnapshot
+        case readAt
+        case createdAt
+    }
+
     var reply: GroomReply {
         GroomReply(
             id: id,
@@ -164,8 +200,42 @@ struct GroomSnapshotRow: Decodable, Sendable {
     }
 }
 
-struct GroomNotificationAckRow: Decodable, Sendable {
-    var id: UUID?
+struct GroomReportRow: Decodable, Sendable {
+    static let select = [
+        "id",
+        "groom_post_id",
+        "reported_user_id",
+        "reason",
+        "status",
+        "created_at"
+    ].joined(separator: ",")
+
+    var id: UUID
+    var groomPostID: UUID
+    var reportedUserID: UUID
+    var reason: String?
+    var status: String?
+    var createdAt: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case groomPostID = "groomPostId"
+        case reportedUserID = "reportedUserId"
+        case reason
+        case status
+        case createdAt
+    }
+
+    var ticket: GroomReportTicket {
+        GroomReportTicket(
+            id: id,
+            groomPostID: groomPostID,
+            reportedUserID: reportedUserID,
+            reason: GroomReportReason(rawValue: reason ?? "") ?? .other,
+            status: status ?? "open",
+            createdAt: createdAt ?? .now
+        )
+    }
 }
 
 private func haversineMeters(

@@ -120,7 +120,9 @@ struct SettingsAccountDeletionTextButton: View {
 }
 
 struct SettingsPushNotificationRow: View {
+    var title: String = "モバイル通知"
     var statusText: String
+    var systemImage: String = "iphone.radiowaves.left.and.right"
     var isEnabled: Bool
     var isLoading: Bool
     var isSaving: Bool
@@ -129,9 +131,9 @@ struct SettingsPushNotificationRow: View {
     var body: some View {
         HStack(spacing: 12) {
             SettingsMenuRowLabel(
-                title: "モバイル通知",
+                title: title,
                 subtitle: statusText,
-                systemImage: "iphone.radiowaves.left.and.right"
+                systemImage: systemImage
             )
 
             Spacer(minLength: 12)
@@ -141,7 +143,7 @@ struct SettingsPushNotificationRow: View {
                     .controlSize(.small)
             } else {
                 Toggle(
-                    "モバイル通知",
+                    title,
                     isOn: Binding(
                         get: { isEnabled },
                         set: { enabled in

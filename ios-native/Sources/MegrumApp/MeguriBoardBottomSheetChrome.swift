@@ -35,7 +35,7 @@ struct MeguriBoardSheetTopSurface: View {
             )
 
             MeguriBoardQuickActionRow(
-                title: "掲示板",
+                title: "チャットルーム",
                 subtitle: "\(threadCount)件の現地トピック",
                 systemImage: "pencil",
                 actionTitle: "作成",

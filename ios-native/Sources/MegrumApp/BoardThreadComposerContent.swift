@@ -9,9 +9,12 @@ import UIKit
 struct BoardThreadComposerContent: View {
     @Binding var title: String
     @Binding var bodyText: String
+    @Binding var anonymousDisplayName: String
+    @Binding var anonymousAvatarID: String
     @Binding var thumbnailItem: PhotosPickerItem?
     var missingContextMessage: String?
     var isShowingLocationStep: Bool
+    var locksCreationCoordinate: Bool
     var hasThumbnail: Bool
     var currentCoordinate: MegrumLocationCoordinate?
     var isRequestingLocation: Bool
@@ -27,22 +30,19 @@ struct BoardThreadComposerContent: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                BoardThreadComposerHeader()
-
-                if let missingContextMessage {
-                    MeguriNoticeBanner(message: missingContextMessage)
-                }
-
                 thumbnailSection
+
+                BoardThreadAnonymousProfileSection(
+                    displayName: $anonymousDisplayName,
+                    selectedAvatarID: $anonymousAvatarID
+                )
 
                 BoardThreadTitleField(title: $title)
 
                 BoardThreadBodyEditor(bodyText: $bodyText)
 
-                if isShowingLocationStep {
+                if !locksCreationCoordinate, isShowingLocationStep {
                     locationStep
-                } else {
-                    MeguriNoticeBanner(message: "タイトルと本文が決まったら、最後に地図上で表示される場所を選びます。")
                 }
             }
             .padding(20)
@@ -68,7 +68,7 @@ struct BoardThreadComposerContent: View {
 
     private var locationStep: some View {
         BoardThreadComposerLocationStep(
-            title: title.nilIfBlank ?? "掲示板",
+            title: title.nilIfBlank ?? "チャットルーム",
             summary: bodyText.nilIfBlank ?? "現地の話題",
             hasThumbnail: hasThumbnail,
             currentCoordinate: currentCoordinate,
@@ -78,20 +78,6 @@ struct BoardThreadComposerContent: View {
             onOutOfRange: onOutOfRange,
             onAppear: onLocationStepAppear
         )
-    }
-}
-
-private struct BoardThreadComposerHeader: View {
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("スレッドを立てる")
-                .font(.system(size: 30, weight: .heavy, design: .rounded))
-                .foregroundStyle(MegrumTheme.ink)
-
-            Text("周辺の人と現地情報を共有できます")
-                .font(.system(size: 14, weight: .bold, design: .rounded))
-                .foregroundStyle(MegrumTheme.muted)
-        }
     }
 }
 

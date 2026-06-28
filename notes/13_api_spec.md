@@ -350,7 +350,7 @@ Google OAuth経由ログイン or 新規登録。
 - **Auth**: 必須
 - **Request**: `{ user_id }`
 - **Response 201**: `{ user_id, blocked_at }`
-- **Side effects**: グルーム、めぐりメッセージ、スポット掲示板のスレッド/返信表示、掲示板返信通知、掲示板メンション通知を相互に抑制する
+- **Side effects**: グルーム、めぐりメッセージ、スポット掲示板のスレッド/返信表示、グルーム通知、チャットルーム通知、掲示板メンション通知を相互に抑制する
 
 ### DELETE /api/v1/accounts/me/blocks/:user_id
 
@@ -438,7 +438,7 @@ iter24 で `genres_master` / `groups_master` / `characters_master` / `goods_type
 
 ### GET /api/v1/masters/events
 
-イベントタグ一覧（AW・proposals.meetup の `event_id` 用）。
+イベントシリーズ一覧（AW・proposals.meetup の `event_id` 用）。
 
 - **Auth**: 必須
 - **Query**: `?genre_id=...&group_id=...&from=...&to=...`
@@ -446,7 +446,7 @@ iter24 で `genres_master` / `groups_master` / `characters_master` / `goods_type
 
 ### POST /api/v1/masters/events
 
-イベントタグの新規作成（ユーザー作成）。
+イベントシリーズの新規作成（ユーザー作成）。
 
 - **Auth**: 必須
 - **Request**: `{ name, start_at, end_at, lat, lng, venue_name, genre_id, group_id? }`
@@ -685,7 +685,7 @@ AW削除。
 
 ### GET /api/v1/matches/search
 
-ホーム右下の検索画面。グッズ名・推し・タグにヒットする他ユーザーの譲候補を返す。
+ホーム右下の検索画面。グッズ名・推し・シリーズにヒットする他ユーザーの譲候補を返す。
 
 - **Auth**: 必須
 - **Query**: `?q=...`
@@ -1125,7 +1125,7 @@ AW削除。
 - **Auth**: 必須
 - **Request**: `{ "enabled": true, "reaction_type": "useful" }`
 - **Response 204**: no content
-- **Side effects**: `meguri_board_thread_reactions` を insert/delete、`reaction_count` を同期
+- **Side effects**: `meguri_board_thread_reactions` を insert/delete、`reaction_count` を同期。ONにした場合は `meguri_board_thread_subscriptions.notification_enabled=true` も upsert し、以後の投稿通知対象にする
 - **Screen**: `meguri-board`, `meguri-board-thread`
 
 ### PUT /api/v1/meguri-board/threads/:id/subscription
@@ -1135,7 +1135,7 @@ AW削除。
 - **Auth**: 必須
 - **Request**: `{ "enabled": true }`
 - **Response 204**: no content
-- **Side effects**: `meguri_board_thread_subscriptions.notification_enabled` を upsert。ON中のスレッドに自分以外が返信すると `notifications.kind='meguri_board_reply'` が作成される
+- **Side effects**: `meguri_board_thread_subscriptions.notification_enabled` を upsert。ON中のスレッドに自分以外が返信すると `notifications.kind='meguri_board_reply'` が作成される。通知bodyには本文プレビューを入れない
 - **Screen**: `meguri-board`, `meguri-board-thread`, `notifications`
 
 ### PUT /api/v1/meguri-board/replies/:id/reaction
@@ -1659,7 +1659,7 @@ Native ad（マッチカード型広告）取得。
 通知設定取得。
 
 - **Auth**: 必須
-- **Response 200**: `{ push_enabled, topics: { match_found, message_received, agreement_reached, dispute_filed, ... }, quiet_hours }`
+- **Response 200**: `{ push_enabled, groom_activity_push_enabled, chatroom_activity_push_enabled }`
 - **Screen**: `SET-notif`
 
 ### PATCH /api/v1/notifications/settings
@@ -1667,7 +1667,8 @@ Native ad（マッチカード型広告）取得。
 通知設定更新。
 
 - **Auth**: 必須
-- **Request**: 部分更新。MVPでは `{ push_enabled }`
+- **Request**: 部分更新。MVPでは `{ push_enabled }`、めぐりカテゴリでは `{ groom_activity_push_enabled }` / `{ chatroom_activity_push_enabled }`
+- **Side effects**: `push_enabled=false` は全OSプッシュを止める。`groom_activity_push_enabled=false` は `groom_liked` / `groom_reply` / `meguri_message`、`chatroom_activity_push_enabled=false` は `meguri_board_reply` / `meguri_board_mention` のOSプッシュだけを止める。アプリ内通知行は常に作成する
 
 ### WS /api/v1/ws
 
@@ -1729,7 +1730,7 @@ WebSocket でリアルタイム更新。
 
 | # | 項目 | 解決時期 |
 |---|---|---|
-| 24 | events のユーザー作成タグの即公開 vs 運営承認 | 設計詰め |
+| 24 | events のユーザー作成シリーズの即公開 vs 運営承認 | 設計詰め |
 | 25 | events の重複検出・自動マージルール | 実装着手 |
 | 26 | QRコードの中身（user_id だけ？署名付き？） | 設計詰め |
 | 27 | マッチング計算のバッチ頻度（毎日/6h/1h） | 実装着手 |

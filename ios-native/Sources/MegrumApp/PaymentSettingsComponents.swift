@@ -1,3 +1,4 @@
+import MegrumCore
 import MegrumDesign
 import SwiftUI
 #if os(iOS)
@@ -32,6 +33,119 @@ struct PaymentSettingsDivider: View {
     var body: some View {
         Divider()
             .padding(.leading, 104)
+    }
+}
+
+struct PaymentSettingsBankCard: View {
+    @Binding var bankName: String
+    @Binding var bankBranchName: String
+    @Binding var bankAccountType: String
+    @Binding var bankAccountNumber: String
+    @Binding var bankAccountHolder: String
+    var focusedField: FocusState<PaymentSettingsField?>.Binding
+
+    var body: some View {
+        VStack(spacing: 0) {
+            PaymentSettingsTextFieldRow(
+                title: "銀行名",
+                placeholder: "みずほ銀行",
+                text: $bankName,
+                focusedField: focusedField,
+                field: .bankName
+            )
+            PaymentSettingsDivider()
+            PaymentSettingsTextFieldRow(
+                title: "支店名",
+                placeholder: "渋谷支店",
+                text: $bankBranchName,
+                focusedField: focusedField,
+                field: .bankBranchName
+            )
+            PaymentSettingsDivider()
+            PaymentSettingsTextFieldRow(
+                title: "口座種別",
+                placeholder: "普通",
+                text: $bankAccountType,
+                focusedField: focusedField,
+                field: .bankAccountType
+            )
+            PaymentSettingsDivider()
+            PaymentSettingsTextFieldRow(
+                title: "口座番号",
+                placeholder: "1234567",
+                text: $bankAccountNumber,
+                keyboard: .numberPad,
+                focusedField: focusedField,
+                field: .bankAccountNumber
+            )
+            PaymentSettingsDivider()
+            PaymentSettingsTextFieldRow(
+                title: "口座名義",
+                placeholder: "ヤマダ ハナコ",
+                text: $bankAccountHolder,
+                focusedField: focusedField,
+                field: .bankAccountHolder
+            )
+        }
+        .paymentSettingsCardStyle()
+    }
+}
+
+struct PaymentSettingsValidationErrorView: View {
+    var validationMessage: String?
+    var appErrorMessage: String?
+
+    var body: some View {
+        if let message = validationMessage ?? appErrorMessage {
+            Label(message, systemImage: "exclamationmark.triangle.fill")
+                .font(.system(size: 13, weight: .bold, design: .rounded))
+                .foregroundStyle(Color(red: 0.851, green: 0.51, blue: 0.42))
+                .padding(.top, 4)
+        }
+    }
+}
+
+struct PaymentSettingsBottomBar: View {
+    var isSaving: Bool
+    var onCancel: () -> Void
+    var onSave: () -> Void
+
+    var body: some View {
+        HStack(spacing: 18) {
+            Button("キャンセル", action: onCancel)
+                .font(.system(size: 18, weight: .black, design: .rounded))
+                .foregroundStyle(MegrumTheme.lavender)
+                .frame(maxWidth: .infinity)
+                .frame(height: 52)
+
+            Button(action: onSave) {
+                HStack(spacing: 10) {
+                    if isSaving {
+                        ProgressView()
+                            .controlSize(.small)
+                            .tint(.white)
+                    }
+                    Text("保存する")
+                        .font(.system(size: 18, weight: .black, design: .rounded))
+                }
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .frame(height: 52)
+                .background(
+                    LinearGradient(
+                        colors: [MegrumTheme.lavender, MegrumTheme.sky],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    ),
+                    in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+                )
+            }
+            .disabled(isSaving)
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 14)
+        .padding(.bottom, 12)
+        .background(.white.opacity(0.96))
     }
 }
 

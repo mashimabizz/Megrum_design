@@ -22,7 +22,7 @@ struct ProposalConfirmSummary: View {
             ProposalSummaryRow(title: "交換方法", value: methodTitle)
             ProposalSummaryRow(title: "待ち合わせ", value: meetupSummary)
             if !conditionTags.isEmpty {
-                ProposalSummaryRow(title: "条件タグ", value: conditionTags.joined(separator: " / "))
+                ProposalSummaryRow(title: "条件シリーズ", value: conditionTags.joined(separator: " / "))
             }
         }
         .padding(16)

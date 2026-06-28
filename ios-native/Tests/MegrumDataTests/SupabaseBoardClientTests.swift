@@ -145,6 +145,24 @@ final class SupabaseBoardClientTests: XCTestCase {
         XCTAssertEqual(json["p_scope"] as? String, "nearby_3km")
     }
 
+    func testGlobalBoardThreadRequestKeepsGlobalScopeContext() throws {
+        let client = SupabaseBoardClient(configuration: configuration)
+
+        let request = try client.makeLoadThreadsRequest(
+            latitude: 35.681236,
+            longitude: 139.767125,
+            prefecture: " 東京都 ",
+            scope: .global
+        )
+        let body = try XCTUnwrap(request.httpBody)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+
+        XCTAssertEqual(json["p_viewer_lat"] as? Double, 35.681236)
+        XCTAssertEqual(json["p_viewer_lng"] as? Double, 139.767125)
+        XCTAssertEqual(json["p_prefecture"] as? String, "東京都")
+        XCTAssertEqual(json["p_scope"] as? String, "global")
+    }
+
     func testLoadThreadsFiltersUnexpectedFarNearbyRowsClientSide() throws {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [BoardMockURLProtocol.self]
@@ -167,6 +185,8 @@ final class SupabaseBoardClientTests: XCTestCase {
                 "origin_lat": 35.681236,
                 "origin_lng": 139.767125,
                 "prefecture": "東京都",
+                "anonymous_display_name": "まくはり民",
+                "anonymous_avatar_id": "avatar_3",
                 "latest_activity_at": "2026-05-31T00:00:00Z",
                 "created_at": "2026-05-31T00:00:00Z"
               },
@@ -200,6 +220,8 @@ final class SupabaseBoardClientTests: XCTestCase {
         }
 
         XCTAssertEqual(threads.map(\.title), ["近いスレッド"])
+        XCTAssertEqual(threads.first?.anonymousDisplayName, "まくはり民")
+        XCTAssertEqual(threads.first?.anonymousAvatarID, "avatar_3")
     }
 
     func testBuildsBoardThreadCreateRequest() throws {
@@ -223,7 +245,7 @@ final class SupabaseBoardClientTests: XCTestCase {
         let json = try XCTUnwrap(rows.first)
 
         XCTAssertEqual(request.httpMethod, "POST")
-        XCTAssertTrue(request.url?.absoluteString.hasPrefix("https://example.supabase.co/rest/v1/meguri_board_threads?select=id,author_id,title,body,audience_scope,origin_lat,origin_lng,prefecture,image_paths,latest_activity_at,created_at") == true)
+        XCTAssertTrue(request.url?.absoluteString.hasPrefix("https://example.supabase.co/rest/v1/meguri_board_threads?select=id,author_id,title,body,audience_scope,origin_lat,origin_lng,prefecture,image_paths,status,reply_count,latest_activity_at,expires_at,created_at,anonymous_display_name,anonymous_avatar_id") == true)
         XCTAssertEqual(request.value(forHTTPHeaderField: "Prefer"), "return=representation")
         XCTAssertEqual(json["author_id"] as? String, authorID.uuidString.uppercased())
         XCTAssertEqual(json["title"] as? String, "物販列どのくらい？")
@@ -231,11 +253,117 @@ final class SupabaseBoardClientTests: XCTestCase {
         XCTAssertEqual(json["audience_scope"] as? String, "nearby_3km")
         XCTAssertEqual(json["category"] as? String, "chat")
         XCTAssertEqual((json["image_paths"] as? [String]) ?? ["unexpected"], ["board_threads/22222222-2222-2222-2222-222222222222/thumb.jpg"])
+        XCTAssertTrue(json["anonymous_display_name"] is NSNull)
+        XCTAssertTrue(json["anonymous_avatar_id"] is NSNull)
         XCTAssertEqual(json["origin_lat"] as? Double, 35.681236)
         XCTAssertEqual(json["origin_lng"] as? Double, 139.767125)
         XCTAssertEqual(json["prefecture"] as? String, "東京都")
         XCTAssertTrue(json["spot_key"] is NSNull)
         XCTAssertTrue(json["spot_label"] is NSNull)
+    }
+
+    func testBuildsBoardThreadCreateRequestWithAnonymousProfile() throws {
+        let client = SupabaseBoardClient(configuration: configuration)
+        let authorID = UUID(uuidString: "22222222-2222-2222-2222-222222222222")!
+
+        let request = try client.makeCreateThreadRequest(
+            BoardThreadCreateInput(
+                authorID: authorID,
+                title: "現地の様子",
+                body: "入場列の情報です",
+                audience: .nearby3km,
+                latitude: 35.681236,
+                longitude: 139.767125,
+                prefecture: "東京都",
+                anonymousDisplayName: " まくはり民 ",
+                anonymousAvatarID: " avatar_3 "
+            )
+        )
+        let body = try XCTUnwrap(request.httpBody)
+        let rows = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [[String: Any]])
+        let json = try XCTUnwrap(rows.first)
+
+        XCTAssertEqual(json["anonymous_display_name"] as? String, "まくはり民")
+        XCTAssertEqual(json["anonymous_avatar_id"] as? String, "avatar_3")
+    }
+
+    func testAppendReplyThrowsMalformedResponseWhenRPCReturnsNoRows() throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [BoardMockURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        let client = SupabaseBoardClient(configuration: self.configuration, session: session)
+        let threadID = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
+
+        BoardMockURLProtocol.requestHandler = { request in
+            guard let url = request.url else {
+                throw BoardMockError.missingURL
+            }
+            XCTAssertEqual(url.path, "/rest/v1/rpc/append_meguri_board_reply_for_viewer")
+            return (BoardMockURLProtocol.response(for: url, statusCode: 200), Data("[]".utf8))
+        }
+        defer {
+            BoardMockURLProtocol.requestHandler = nil
+        }
+
+        do {
+            _ = try waitForBoardAsyncResult {
+                try await client.appendReply(
+                    BoardReplyCreateInput(
+                        threadID: threadID,
+                        body: "空レスポンス",
+                        latitude: 35.681236,
+                        longitude: 139.767125,
+                        prefecture: "東京都",
+                        scope: .nearby3km
+                    )
+                )
+            }
+            XCTFail("Expected malformed response")
+        } catch let error as SupabaseBoardClientError {
+            XCTAssertEqual(error, .malformedResponse)
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+    }
+
+    func testCreateThreadThrowsMalformedResponseWhenInsertReturnsNoRows() throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [BoardMockURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        let client = SupabaseBoardClient(configuration: self.configuration, session: session)
+        let authorID = UUID(uuidString: "22222222-2222-2222-2222-222222222222")!
+
+        BoardMockURLProtocol.requestHandler = { request in
+            guard let url = request.url else {
+                throw BoardMockError.missingURL
+            }
+            XCTAssertEqual(url.path, "/rest/v1/meguri_board_threads")
+            return (BoardMockURLProtocol.response(for: url, statusCode: 201), Data("[]".utf8))
+        }
+        defer {
+            BoardMockURLProtocol.requestHandler = nil
+        }
+
+        do {
+            _ = try waitForBoardAsyncResult {
+                try await client.createThread(
+                    BoardThreadCreateInput(
+                        authorID: authorID,
+                        title: "空レスポンス",
+                        body: "作成できたように見せない",
+                        audience: .nearby3km,
+                        latitude: 35.681236,
+                        longitude: 139.767125,
+                        prefecture: "東京都"
+                    )
+                )
+            }
+            XCTFail("Expected malformed response")
+        } catch let error as SupabaseBoardClientError {
+            XCTAssertEqual(error, .malformedResponse)
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
     }
 
     private var configuration: SupabaseConfiguration {

@@ -33,6 +33,20 @@ final class SupabaseGoodsInventoryRowModelsTests: XCTestCase {
         XCTAssertEqual(wish.tags, [])
     }
 
+    func testGoodsItemNormalizesSignedSupabaseGoodsPhotoURL() {
+        let row = makeRow(
+            kind: "for_trade",
+            photoUrls: [
+                "https://example.supabase.co/storage/v1/object/sign/goods-photos/user/photo.jpg?token=old"
+            ]
+        )
+
+        XCTAssertEqual(
+            row.goodsItem.imageURL?.absoluteString,
+            "https://example.supabase.co/storage/v1/object/public/goods-photos/user/photo.jpg"
+        )
+    }
+
     private func makeRow(
         kind: String?,
         status: String? = nil,

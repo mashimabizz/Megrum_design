@@ -1,8 +1,19 @@
-import MegrumApp
+@testable import MegrumApp
 import MegrumCore
 import XCTest
 
 final class IndividualListingStateReducerTests: XCTestCase {
+    func testConditionStripTitleUsesSingleLineListingCountCopy() {
+        XCTAssertEqual(
+            IndividualListingListPresentation.conditionStripTitle(index: 0, totalCount: 5),
+            "個別募集 1 / 5"
+        )
+        XCTAssertEqual(
+            IndividualListingListPresentation.conditionStripTitle(index: 2, totalCount: 0),
+            "個別募集 3 / 1"
+        )
+    }
+
     func testUpsertingNewListingInsertsAtFront() {
         let existing = makeListing(idSuffix: "901")
         let inserted = makeListing(idSuffix: "902")

@@ -138,23 +138,34 @@ public final class SupabaseGroomClient: @unchecked Sendable {
         )
     }
 
-    public func setLiked(userID: UUID, postID: UUID, isLiked: Bool) async throws {
-        if isLiked {
-            let _: [GroomReactionRow] = try await client.upsertRows(
-                into: "groom_reactions",
-                values: [GroomReactionPayload(groomPostID: postID, userID: userID)],
-                onConflict: "groom_post_id,user_id,reaction_type"
-            )
-        } else {
-            try await client.deleteRows(
-                from: "groom_reactions",
-                queryItems: [
-                    URLQueryItem(name: "groom_post_id", value: "eq.\(postID.uuidString.lowercased())"),
-                    URLQueryItem(name: "user_id", value: "eq.\(userID.uuidString.lowercased())"),
-                    URLQueryItem(name: "reaction_type", value: "eq.like")
-                ]
-            )
-        }
+    public func setLiked(userID _: UUID, postID: UUID, isLiked: Bool) async throws {
+        try await client.rpcVoid(
+            function: "set_groom_like_for_viewer",
+            payload: GroomLikeTogglePayload(pPostID: postID, pIsLiked: isLiked)
+        )
+    }
+
+    public func reportPost(reporterID: UUID, input: GroomReportCreateInput) async throws -> GroomReportTicket {
+        let rows: [GroomReportRow] = try await client.insertRows(
+            into: "groom_reports",
+            values: [GroomReportPayload(reporterID: reporterID, input: input)],
+            select: GroomReportRow.select
+        )
+        return rows.first?.ticket ?? GroomReportTicket(
+            id: UUID(),
+            groomPostID: input.groomPostID,
+            reportedUserID: input.reportedUserID,
+            reason: input.reason
+        )
+    }
+
+    public func blockUser(blockerID: UUID, blockedID: UUID) async throws {
+        let _: [GroomBlockRow] = try await client.upsertRows(
+            into: "groom_user_blocks",
+            values: [GroomBlockPayload(blockedID: blockedID, blockerID: blockerID)],
+            select: "blocked_id",
+            onConflict: "blocker_id,blocked_id"
+        )
     }
 
     public func sendReply(_ input: GroomReplyCreateInput) async throws -> GroomReply {
@@ -166,7 +177,18 @@ public final class SupabaseGroomClient: @unchecked Sendable {
         guard let reply = rows.first?.reply else {
             throw SupabaseGroomClientError.malformedResponse
         }
-        try? await createReplyNotification(reply: reply)
+        try? await createReplyMeguriMessage(reply: reply)
         return reply
     }
+
+    private func createReplyMeguriMessage(reply: GroomReply) async throws {
+        let _: [EmptyInsertResult] = try await client.insertRows(
+            into: "meguri_messages",
+            values: [GroomReplyMeguriMessagePayload(reply: reply)],
+            select: "id"
+        )
+    }
+
 }
+
+private struct EmptyInsertResult: Decodable, Sendable {}

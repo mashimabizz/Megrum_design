@@ -75,7 +75,7 @@ extension MegrumAppState {
         isLoadingPushNotificationSetting = true
         errorMessage = nil
         do {
-            pushNotificationsEnabled = try await repository.loadPushNotificationsEnabled()
+            applyNotificationSettings(try await repository.loadNotificationSettings())
         } catch {
             errorMessage = "モバイル通知設定を読み込めませんでした"
         }
@@ -99,6 +99,52 @@ extension MegrumAppState {
         } catch {
             pushNotificationsEnabled = previous
             errorMessage = "モバイル通知設定を保存できませんでした"
+            isSavingPushNotificationSetting = false
+            return false
+        }
+    }
+
+    @discardableResult
+    public func setGroomActivityPushNotificationsEnabled(_ enabled: Bool) async -> Bool {
+        guard !isSavingPushNotificationSetting else {
+            return false
+        }
+
+        let previous = groomActivityPushNotificationsEnabled
+        groomActivityPushNotificationsEnabled = enabled
+        isSavingPushNotificationSetting = true
+        errorMessage = nil
+        do {
+            let settings = try await repository.setGroomActivityPushNotificationsEnabled(enabled)
+            groomActivityPushNotificationsEnabled = settings.groomActivityPushEnabled
+            isSavingPushNotificationSetting = false
+            return true
+        } catch {
+            groomActivityPushNotificationsEnabled = previous
+            errorMessage = "グルーム通知設定を保存できませんでした"
+            isSavingPushNotificationSetting = false
+            return false
+        }
+    }
+
+    @discardableResult
+    public func setChatroomActivityPushNotificationsEnabled(_ enabled: Bool) async -> Bool {
+        guard !isSavingPushNotificationSetting else {
+            return false
+        }
+
+        let previous = chatroomActivityPushNotificationsEnabled
+        chatroomActivityPushNotificationsEnabled = enabled
+        isSavingPushNotificationSetting = true
+        errorMessage = nil
+        do {
+            let settings = try await repository.setChatroomActivityPushNotificationsEnabled(enabled)
+            chatroomActivityPushNotificationsEnabled = settings.chatroomActivityPushEnabled
+            isSavingPushNotificationSetting = false
+            return true
+        } catch {
+            chatroomActivityPushNotificationsEnabled = previous
+            errorMessage = "チャットルーム通知設定を保存できませんでした"
             isSavingPushNotificationSetting = false
             return false
         }
@@ -152,5 +198,11 @@ extension MegrumAppState {
             isRevokingNativePushDevice = false
             return false
         }
+    }
+
+    private func applyNotificationSettings(_ settings: UserNotificationSettings) {
+        pushNotificationsEnabled = settings.pushEnabled
+        groomActivityPushNotificationsEnabled = settings.groomActivityPushEnabled
+        chatroomActivityPushNotificationsEnabled = settings.chatroomActivityPushEnabled
     }
 }

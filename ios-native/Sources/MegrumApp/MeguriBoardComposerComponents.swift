@@ -82,7 +82,7 @@ struct BoardPrefecturePickerSheet: View {
                 .padding(.vertical, 6)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("\(prefecture)を掲示板の都道府県に設定")
+            .accessibilityLabel("\(prefecture)をチャットルームの都道府県に設定")
         }
         .navigationTitle("都道府県を選択")
         .megrumInlineNavigationTitle()

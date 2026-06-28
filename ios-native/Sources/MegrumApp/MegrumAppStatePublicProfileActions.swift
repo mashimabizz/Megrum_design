@@ -7,6 +7,11 @@ extension MegrumAppState {
         guard loadingPublicProfileUserID != userID else {
             return
         }
+        await loadBlockedContentUserIDsIfNeeded(reportsFailure: false)
+        guard !blockedContentUserIDs.contains(userID) else {
+            removeBlockedContent(userID: userID)
+            return
+        }
         loadingPublicProfileUserID = userID
         errorMessage = nil
         do {
@@ -29,18 +34,29 @@ extension MegrumAppState {
         guard loadingPublicExchangeUserID != userID else {
             return
         }
+        await loadBlockedContentUserIDsIfNeeded(reportsFailure: false)
+        guard !blockedContentUserIDs.contains(userID) else {
+            removeBlockedContent(userID: userID)
+            return
+        }
         loadingPublicExchangeUserID = userID
         errorMessage = nil
         do {
             async let tradeGoods = repository.loadPublicTradeGoods(userID: userID, limit: 60)
             async let listings = repository.loadPublicIndividualListings(userID: userID)
             publicTradeGoodsByUserID = PublicUserContentStateReducer.storingTradeGoods(
-                try await tradeGoods,
+                BlockedUserContentFilter.goods(
+                    try await tradeGoods,
+                    blockedUserIDs: blockedContentUserIDs
+                ),
                 for: userID,
                 in: publicTradeGoodsByUserID
             )
             publicListingsByUserID = PublicUserContentStateReducer.storingIndividualListings(
-                try await listings,
+                BlockedUserContentFilter.listings(
+                    try await listings,
+                    blockedUserIDs: blockedContentUserIDs
+                ),
                 for: userID,
                 in: publicListingsByUserID
             )
@@ -52,6 +68,11 @@ extension MegrumAppState {
 
     public func loadUserEvaluations(userID: UUID, limit: Int = 50) async {
         guard loadingEvaluationsUserID != userID else {
+            return
+        }
+        await loadBlockedContentUserIDsIfNeeded(reportsFailure: false)
+        guard !blockedContentUserIDs.contains(userID) else {
+            removeBlockedContent(userID: userID)
             return
         }
         loadingEvaluationsUserID = userID

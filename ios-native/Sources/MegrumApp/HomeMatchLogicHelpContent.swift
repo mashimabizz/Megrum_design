@@ -65,7 +65,7 @@ struct HomeMatchLogicHelpContent: View {
                 HomeMatchLogicHelpRow(mark: "大", title: "グループや作品が合う", body: "BTS、TWICE、作品名など、まず大きな推しの分類が合うかを見ます。"),
                 HomeMatchLogicHelpRow(mark: "人", title: "メンバー指定があればそこまで見る", body: "サナ、モモなどのメンバー指定がある場合は、同じメンバーのグッズだけを候補にします。"),
                 HomeMatchLogicHelpRow(mark: "種", title: "グッズ種別も合わせる", body: "トレカ、缶バッジ、アクスタなど、指定された種別がある場合はそこも一致させます。"),
-                HomeMatchLogicHelpRow(mark: "タグ", title: "タグは落とさず注意表示にします", body: "タグが合わない場合も候補には残し、カードに「タグ不一致？」と表示します。")
+                HomeMatchLogicHelpRow(mark: "シリーズ", title: "シリーズは落とさず注意表示にします", body: "シリーズが合わない場合も候補には残し、カードに「シリーズ不一致？」と表示します。")
             ],
             actions: [
                 HomeMatchLogicHelpAction(title: "Wishも設定", systemImage: "heart.fill", action: onOpenWish)
@@ -93,7 +93,7 @@ struct HomeMatchLogicHelpContent: View {
             systemImage: "info.circle.fill",
             title: "交換・支払条件の見方",
             rows: [
-                HomeMatchLogicHelpRow(mark: "交", title: "交換条件", body: "グッズ条件で相互に合う候補は残し、交換手段、都道府県、日程、送料で決める必要がある点を注意タグにします。"),
+                HomeMatchLogicHelpRow(mark: "交", title: "交換条件", body: "グッズ条件で相互に合う候補は残し、交換手段、都道府県、日程、送料で決める必要がある点を注意シリーズにします。"),
                 HomeMatchLogicHelpRow(mark: "支", title: "支払条件", body: "物々交換だけなら見ません。定価や金額指定を含む候補だけ、共通の支払方法があるかを確認します。")
             ],
             footer: "現在の標準交換条件: \(exchangeSettings.summaryText)",

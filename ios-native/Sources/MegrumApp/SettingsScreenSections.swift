@@ -6,10 +6,14 @@ struct SettingsPrimarySection: View {
     var profileStatusText: String
     var notificationStatusText: String
     var pushNotificationStatusText: String
+    var groomNotificationStatusText: String
+    var chatroomNotificationStatusText: String
     var addressStatusText: String
     var subscriptionStatusText: String
     var onOpenRoute: (SettingsEssentialRoute) -> Void
     var onSetPushNotificationsEnabled: @MainActor @Sendable (Bool) -> Void
+    var onSetGroomActivityPushNotificationsEnabled: @MainActor @Sendable (Bool) -> Void
+    var onSetChatroomActivityPushNotificationsEnabled: @MainActor @Sendable (Bool) -> Void
 
     var body: some View {
         Section {
@@ -36,6 +40,26 @@ struct SettingsPrimarySection: View {
                 isLoading: appState.isLoadingPushNotificationSetting,
                 isSaving: appState.isSavingPushNotificationSetting,
                 onToggle: onSetPushNotificationsEnabled
+            )
+
+            SettingsPushNotificationRow(
+                title: "グルーム通知",
+                statusText: groomNotificationStatusText,
+                systemImage: "heart",
+                isEnabled: appState.groomActivityPushNotificationsEnabled,
+                isLoading: appState.isLoadingPushNotificationSetting,
+                isSaving: appState.isSavingPushNotificationSetting,
+                onToggle: onSetGroomActivityPushNotificationsEnabled
+            )
+
+            SettingsPushNotificationRow(
+                title: "チャットルーム通知",
+                statusText: chatroomNotificationStatusText,
+                systemImage: "text.bubble",
+                isEnabled: appState.chatroomActivityPushNotificationsEnabled,
+                isLoading: appState.isLoadingPushNotificationSetting,
+                isSaving: appState.isSavingPushNotificationSetting,
+                onToggle: onSetChatroomActivityPushNotificationsEnabled
             )
 
             SettingsNavigationButtonRow(

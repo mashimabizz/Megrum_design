@@ -23,6 +23,44 @@ final class HomeScreenFlowTests: XCTestCase {
         XCTAssertFalse(HomeGroomRailPolicy.isVisibleOnHome)
     }
 
+    func testHomePullRefreshProgressClampsToTriggerDistance() {
+        XCTAssertEqual(
+            HomePullRefreshPresentation.effectivePullOffset(scrollOffset: -20, manualOffset: 18),
+            18
+        )
+        XCTAssertEqual(
+            HomePullRefreshPresentation.effectivePullOffset(scrollOffset: 34, manualOffset: 12),
+            34
+        )
+        XCTAssertEqual(
+            HomePullRefreshPresentation.progress(for: -12, isRefreshing: false),
+            0
+        )
+        XCTAssertEqual(
+            HomePullRefreshPresentation.progress(
+                for: HomePullRefreshPresentation.triggerDistance / 2,
+                isRefreshing: false
+            ),
+            0.5,
+            accuracy: 0.001
+        )
+        XCTAssertEqual(
+            HomePullRefreshPresentation.progress(
+                for: HomePullRefreshPresentation.triggerDistance * 2,
+                isRefreshing: false
+            ),
+            1
+        )
+    }
+
+    func testHomePullRefreshIndicatorStaysVisibleWhileRefreshing() {
+        let progress = HomePullRefreshPresentation.progress(for: 0, isRefreshing: true)
+
+        XCTAssertEqual(progress, 1)
+        XCTAssertEqual(HomePullRefreshPresentation.indicatorOpacity(progress: progress), 1)
+        XCTAssertEqual(HomePullRefreshPresentation.indicatorScale(progress: progress), 1)
+    }
+
     func testMutualMatchEmptyStatePromptsListingCreationWhenNoListingsExist() {
         let presentation = HomeMutualMatchEmptyStatePresentation(listingCount: 0)
 
@@ -384,7 +422,7 @@ final class HomeScreenFlowTests: XCTestCase {
         XCTAssertEqual(candidates.first?.viewerGoodsItems.count, 2)
         XCTAssertEqual(candidates.first?.requestedGoodsBadgeTitle, "セット")
         XCTAssertEqual(candidates.first?.offeredGoodsBadgeTitle, "どれか1つ")
-        XCTAssertEqual(candidates.flatMap(\.attentionTags).map(\.title).contains("タグ不一致？"), true)
+        XCTAssertEqual(candidates.flatMap(\.attentionTags).map(\.title).contains("シリーズ不一致？"), true)
         XCTAssertEqual(candidates.flatMap(\.attentionTags).map(\.title).contains("金額込み候補"), true)
         XCTAssertEqual(candidates.first?.partnerMetaText, "東京都 ・ 20代 ・ 評価12件 ★4.8")
         XCTAssertFalse(candidates.first?.partnerMetaText.contains("サナ推し") == true)

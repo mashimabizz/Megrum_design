@@ -3,38 +3,6 @@ import MegrumCore
 import MegrumDesign
 import SwiftUI
 
-struct ListingOfferCashCard: View {
-    var amount: Int?
-
-    var body: some View {
-        VStack(spacing: 14) {
-            Image(systemName: "gift.fill")
-                .font(.system(size: 27, weight: .bold, design: .rounded))
-                .foregroundStyle(.white)
-                .frame(width: 54, height: 54)
-                .background(MegrumTheme.lavender, in: Circle())
-
-            Text(priceText)
-                .font(.system(size: 25, weight: .black, design: .rounded))
-                .foregroundStyle(MegrumTheme.ink)
-                .lineLimit(1)
-                .minimumScaleFactor(0.62)
-        }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 24)
-        .frame(maxWidth: .infinity)
-        .background(MegrumTheme.lavender.opacity(0.10), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .strokeBorder(MegrumTheme.lavender.opacity(0.18), lineWidth: 1.2)
-        }
-    }
-
-    private var priceText: String {
-        TradeAmountFormatter.fixedPrice(amount: amount)
-    }
-}
-
 struct IndividualListingOptionRow: View {
     var index: Int
     var option: IndividualListingWishOption
@@ -141,16 +109,6 @@ private struct IndividualListingOptionPreviewContent: View {
     }
 }
 
-struct IndividualListingEmptyOptionRow: View {
-    var body: some View {
-        Text("求めるものが未設定です")
-            .font(.system(size: 15, weight: .semibold, design: .rounded))
-            .foregroundStyle(MegrumTheme.muted)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(18)
-    }
-}
-
 private struct ListingOptionPriceBadge: View {
     var amount: Int?
 
@@ -194,32 +152,5 @@ private struct ListingConditionTokenFlow: View {
                     .background(MegrumTheme.sky.opacity(0.16), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
             }
         }
-    }
-}
-
-struct IndividualListingAddConditionRow: View {
-    var action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 10) {
-                Image(systemName: "plus")
-                    .font(.system(size: 15, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
-                    .frame(width: 30, height: 30)
-                    .background(MegrumTheme.lavender, in: Circle())
-
-                Text("条件を編集")
-                    .font(.system(size: 15, weight: .black, design: .rounded))
-                    .foregroundStyle(MegrumTheme.lavender)
-
-                Spacer(minLength: 0)
-            }
-            .padding(.horizontal, 10)
-            .frame(height: 48)
-            .background(MegrumTheme.lavender.opacity(0.08), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("条件を編集")
     }
 }

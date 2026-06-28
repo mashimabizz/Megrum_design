@@ -4,9 +4,9 @@ import SwiftUI
 extension TradeCardReadState {
     var showsStateBackground: Bool {
         switch self {
-        case .unopened, .opened:
+        case .unopened:
             true
-        case .waitingForReply:
+        case .opened, .waitingForReply:
             false
         }
     }
@@ -14,11 +14,9 @@ extension TradeCardReadState {
     var stateBackgroundColor: Color {
         switch self {
         case .unopened:
-            MegrumTheme.ink.opacity(0.09)
-        case .opened:
-            MegrumTheme.ink.opacity(0.055)
-        case .waitingForReply:
-            .clear
+            MegrumTheme.canvas
+        case .opened, .waitingForReply:
+            .white
         }
     }
 
@@ -26,9 +24,7 @@ extension TradeCardReadState {
         switch self {
         case .unopened:
             MegrumTheme.ink.opacity(0.14)
-        case .opened:
-            MegrumTheme.ink.opacity(0.10)
-        case .waitingForReply:
+        case .opened, .waitingForReply:
             .clear
         }
     }

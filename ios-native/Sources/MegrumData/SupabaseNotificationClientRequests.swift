@@ -39,6 +39,10 @@ extension SupabaseNotificationClient {
     }
 
     public func makeLoadPushSettingRequest(userID: UUID) throws -> URLRequest {
+        try makeLoadNotificationSettingsRequest(userID: userID)
+    }
+
+    public func makeLoadNotificationSettingsRequest(userID: UUID) throws -> URLRequest {
         try client.makeRequest(
             path: "/rest/v1/user_notification_settings",
             queryItems: [
@@ -51,6 +55,24 @@ extension SupabaseNotificationClient {
         try client.makeUpsertRequest(
             into: "user_notification_settings",
             values: [NotificationSettingPayload(userID: userID, pushEnabled: enabled)],
+            select: NotificationSettingRow.select,
+            onConflict: "user_id"
+        )
+    }
+
+    public func makeSetGroomActivityPushSettingRequest(userID: UUID, enabled: Bool) throws -> URLRequest {
+        try client.makeUpsertRequest(
+            into: "user_notification_settings",
+            values: [GroomActivityNotificationSettingPayload(userID: userID, groomActivityPushEnabled: enabled)],
+            select: NotificationSettingRow.select,
+            onConflict: "user_id"
+        )
+    }
+
+    public func makeSetChatroomActivityPushSettingRequest(userID: UUID, enabled: Bool) throws -> URLRequest {
+        try client.makeUpsertRequest(
+            into: "user_notification_settings",
+            values: [ChatroomActivityNotificationSettingPayload(userID: userID, chatroomActivityPushEnabled: enabled)],
             select: NotificationSettingRow.select,
             onConflict: "user_id"
         )

@@ -29,7 +29,7 @@ extension MegrumAppState {
             errorMessage = "生年月日は今日以前の日付を選択してください"
             return false
         }
-        guard gender != nil else {
+        guard AccountSetupGenderOptions.contains(gender) else {
             errorMessage = "性別を選択してください"
             return false
         }

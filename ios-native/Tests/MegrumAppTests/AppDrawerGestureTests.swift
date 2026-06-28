@@ -164,6 +164,27 @@ final class AppDrawerGestureTests: XCTestCase {
         )
     }
 
+    func testClosedDrawerRevealDoesNotRunAheadOfFingerTranslation() {
+        let presentation = AppDrawerPresentationState(
+            containerWidth: 402,
+            isPresented: false,
+            dragTranslation: 54
+        )
+        let drawerRightEdge = presentation.drawerWidth
+            + AppDrawerVisualMetrics.drawerOffset(
+                drawerWidth: presentation.drawerWidth,
+                progress: presentation.progress
+            )
+
+        XCTAssertEqual(drawerRightEdge, 54, accuracy: 0.01)
+        XCTAssertLessThanOrEqual(drawerRightEdge, 54.01)
+        XCTAssertEqual(
+            presentation.contentOffset,
+            AppDrawerVisualMetrics.openOffset(screenWidth: 402) * (CGFloat(54) / 361.8),
+            accuracy: 0.01
+        )
+    }
+
     func testClosedDrawerStartsTrackingOnHorizontalRightSwipe() {
         let translation = AppDrawerGestureResolver.activeTranslation(
             isPresented: false,

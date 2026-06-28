@@ -9,7 +9,9 @@ struct ProposalMeetupPlaceActionButton: View {
     var onTap: () -> Void
 
     var body: some View {
-        Button(action: onTap) {
+        Button {
+            MegrumHaptics.performButtonTap(onTap)
+        } label: {
             Label {
                 Text(title)
             } icon: {

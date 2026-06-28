@@ -68,7 +68,17 @@ struct HomeGoodsHitDetailSheet: View {
                     && selection.individualListingSelection.detail != nil,
                 onOpenOtherOptions: openWantedOptionPicker
             )
-            wantedSelectionRail
+            HomeGoodsHitWantedSelectionRail(
+                usesListingWantedOptions: selectionContext.usesListingWantedOptions,
+                wantedOptionPreviewGoods: selectionContext.wantedOptionPreviewGoods,
+                selectedWantedOptionPreviewIndices: selectionContext.selectedWantedOptionPreviewIndices,
+                topTrailingBadgeTextByGoodsID: selectionContext.wantedOptionPreviewBadgeTextByGoodsID,
+                wantedGoods: selectionContext.wantedGoods,
+                selectedWantedIndices: selectionState.selectedWantedIndices,
+                cardSize: selectionCardSize,
+                onSelectWantedOptionPreviewGoods: toggleWantedOptionPreviewGoods,
+                onSelectWantedGoods: toggleWantedGoods
+            )
 
             if !selectionState.selectedWantedIndices.isEmpty {
                 if let selectedCashOption = selectionContext.selectedCashOption {
@@ -134,26 +144,6 @@ struct HomeGoodsHitDetailSheet: View {
             selectionState: selectionState,
             focusedWantedOptionID: focusedWantedOptionID
         )
-    }
-
-    @ViewBuilder
-    private var wantedSelectionRail: some View {
-        if selectionContext.usesListingWantedOptions,
-           !selectionContext.wantedOptionPreviewGoods.isEmpty {
-            HomeGoodsImagePanelRail(
-                goods: selectionContext.wantedOptionPreviewGoods,
-                selectedIndices: selectionContext.selectedWantedOptionPreviewIndices,
-                cardSize: selectionCardSize,
-                onSelect: toggleWantedOptionPreviewGoods
-            )
-        } else {
-            HomeGoodsImagePanelRail(
-                goods: selectionContext.wantedGoods,
-                selectedIndices: selectionState.selectedWantedIndices,
-                cardSize: selectionCardSize,
-                onSelect: toggleWantedGoods
-            )
-        }
     }
 
     private func toggleWantedOptionPreviewGoods(at _: Int) {
@@ -280,58 +270,5 @@ struct HomeGoodsHitDetailSheet: View {
             return receiverGoods
         }
         return proposalSelection.receiverGoods.map { [$0] } ?? [selection.goods]
-    }
-}
-
-private struct HomeWantedSelectionSectionHeader: View {
-    var systemName: String
-    var title: String
-    var trailing: String?
-    var showsOtherOptionsButton: Bool
-    var onOpenOtherOptions: () -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(alignment: .top, spacing: 10) {
-                Image(systemName: systemName)
-                    .font(.system(size: 19, weight: .bold))
-                    .foregroundStyle(MegrumTheme.lavender)
-                    .frame(width: 24, height: 24)
-                    .padding(.top, 1)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
-                        .font(.system(size: 19, weight: .black, design: .rounded))
-                        .foregroundStyle(MegrumTheme.ink)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.68)
-
-                    if let trailing {
-                        Text(trailing)
-                            .font(.system(size: 11.5, weight: .black, design: .rounded))
-                            .foregroundStyle(MegrumTheme.lavender)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.82)
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-                if showsOtherOptionsButton {
-                    Button("他の選択肢", systemImage: "list.bullet.rectangle", action: onOpenOtherOptions)
-                        .font(.system(size: 12.5, weight: .black, design: .rounded))
-                        .foregroundStyle(MegrumTheme.lavender)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.70)
-                        .padding(.horizontal, 9)
-                        .frame(height: 30)
-                        .background(MegrumTheme.lavender.opacity(0.10), in: Capsule())
-                        .overlay {
-                            Capsule()
-                                .strokeBorder(MegrumTheme.lavender.opacity(0.20), lineWidth: 1)
-                        }
-                        .buttonStyle(.plain)
-                }
-            }
-        }
     }
 }

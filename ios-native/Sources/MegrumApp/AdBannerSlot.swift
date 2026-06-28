@@ -1,10 +1,18 @@
 import MegrumDesign
 import SwiftUI
+#if os(iOS)
+import UIKit
+#endif
+#if os(iOS) && canImport(GoogleMobileAds)
+@preconcurrency import GoogleMobileAds
+#endif
 
 struct AdBannerSlot: View {
     var placement: AdPlacement
     var displayContext: AdDisplayContext
     var configuration: AdRuntimeConfiguration = .current()
+    var bottomSpacing: CGFloat = 0
+    @State private var adMobLoadState: AdMobBannerLoadState = .loading
 
     private var decision: AdDisplayDecision {
         AdDisplayPolicy.decision(
@@ -15,10 +23,47 @@ struct AdBannerSlot: View {
     }
 
     var body: some View {
-        if decision.isAllowed, decision.usesPlaceholder {
-            AdBannerPlaceholder(placement: placement)
+        Group {
+            if decision.isAllowed {
+                if decision.usesPlaceholder {
+                    AdBannerPlaceholder(placement: placement)
+                        .padding(.bottom, bottomSpacing)
+                } else {
+                    adMobBanner
+                }
+            }
+        }
+        .onChange(of: decision.unitID) { _, _ in
+            adMobLoadState = .loading
         }
     }
+
+    @ViewBuilder
+    private var adMobBanner: some View {
+        #if os(iOS) && canImport(GoogleMobileAds)
+        if let unitID = decision.unitID, adMobLoadState != .failed {
+            AdMobBannerView(unitID: unitID, loadState: $adMobLoadState)
+                .frame(maxWidth: .infinity)
+                .frame(height: adMobBannerHeight)
+                .padding(.bottom, adMobBannerHeight > 0 ? bottomSpacing : 0)
+                .clipped()
+                .accessibilityLabel("広告")
+        }
+        #endif
+    }
+
+    private var adMobBannerHeight: CGFloat {
+        guard case let .loaded(height) = adMobLoadState else {
+            return 0
+        }
+        return height
+    }
+}
+
+private enum AdMobBannerLoadState: Equatable {
+    case loading
+    case loaded(height: CGFloat)
+    case failed
 }
 
 private struct AdBannerPlaceholder: View {
@@ -47,3 +92,63 @@ private struct AdBannerPlaceholder: View {
         .accessibilityHint("広告SDK導入後にバナー広告を表示する場所です")
     }
 }
+
+#if os(iOS) && canImport(GoogleMobileAds)
+private struct AdMobBannerView: UIViewRepresentable {
+    var unitID: String
+    @Binding var loadState: AdMobBannerLoadState
+
+    func makeUIView(context: Context) -> BannerView {
+        let adSize = largeAnchoredAdaptiveBanner(width: 320)
+        let banner = BannerView(adSize: adSize)
+        banner.adUnitID = unitID
+        banner.rootViewController = UIApplication.shared.megrumAdRootViewController
+        banner.delegate = context.coordinator
+        banner.load(Request())
+        return banner
+    }
+
+    func updateUIView(_ uiView: BannerView, context: Context) {
+        uiView.rootViewController = UIApplication.shared.megrumAdRootViewController
+        if uiView.adUnitID != unitID {
+            loadState = .loading
+            uiView.adUnitID = unitID
+            uiView.load(Request())
+        }
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(loadState: $loadState)
+    }
+
+    final class Coordinator: NSObject, BannerViewDelegate {
+        @Binding private var loadState: AdMobBannerLoadState
+
+        init(loadState: Binding<AdMobBannerLoadState>) {
+            _loadState = loadState
+        }
+
+        func bannerViewDidReceiveAd(_ bannerView: BannerView) {
+            loadState = .loaded(height: ceil(bannerView.adSize.size.height))
+        }
+
+        func bannerView(_ bannerView: BannerView, didFailToReceiveAdWithError error: Error) {
+            loadState = .failed
+        }
+    }
+}
+
+private extension UIApplication {
+    var megrumAdRootViewController: UIViewController? {
+        for scene in connectedScenes {
+            guard let windowScene = scene as? UIWindowScene else {
+                continue
+            }
+            if let rootViewController = windowScene.windows.first(where: \.isKeyWindow)?.rootViewController {
+                return rootViewController
+            }
+        }
+        return nil
+    }
+}
+#endif

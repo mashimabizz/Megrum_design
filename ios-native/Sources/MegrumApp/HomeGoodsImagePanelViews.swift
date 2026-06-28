@@ -5,6 +5,7 @@ struct HomeGoodsImagePanelRail: View {
     var goods: [HomeMockGoods]
     var selectedIndices: Set<Int>
     var selectedBannerText: String?
+    var topTrailingBadgeTextByGoodsID: [UUID: String]
     var cardSize: HomeGoodsImagePanelCardSize
     var onSelect: (Int) -> Void
 
@@ -12,12 +13,14 @@ struct HomeGoodsImagePanelRail: View {
         goods: [HomeMockGoods],
         selectedIndices: Set<Int>,
         selectedBannerText: String? = nil,
+        topTrailingBadgeTextByGoodsID: [UUID: String] = [:],
         cardSize: HomeGoodsImagePanelCardSize = .regular,
         onSelect: @escaping (Int) -> Void
     ) {
         self.goods = goods
         self.selectedIndices = selectedIndices
         self.selectedBannerText = selectedBannerText
+        self.topTrailingBadgeTextByGoodsID = topTrailingBadgeTextByGoodsID
         self.cardSize = cardSize
         self.onSelect = onSelect
     }
@@ -32,7 +35,8 @@ struct HomeGoodsImagePanelRail: View {
                         HomeImagePanelGoodsCard(
                             goods: goods,
                             selected: selectedIndices.contains(index),
-                            selectedBannerText: selectedBannerText
+                            selectedBannerText: selectedBannerText,
+                            topTrailingBadgeText: topTrailingBadgeTextByGoodsID[goods.id]
                         )
                     }
                     .buttonStyle(.plain)
@@ -58,6 +62,7 @@ struct HomeGoodsImagePanelGrid: View {
     var goods: [HomeMockGoods]
     var selectedIndices: Set<Int>
     var selectedBannerText: String?
+    var topTrailingBadgeTextByGoodsID: [UUID: String]
     var onSelect: (Int) -> Void
 
     private var columns: [GridItem] {
@@ -71,11 +76,13 @@ struct HomeGoodsImagePanelGrid: View {
         goods: [HomeMockGoods],
         selectedIndices: Set<Int>,
         selectedBannerText: String? = nil,
+        topTrailingBadgeTextByGoodsID: [UUID: String] = [:],
         onSelect: @escaping (Int) -> Void
     ) {
         self.goods = goods
         self.selectedIndices = selectedIndices
         self.selectedBannerText = selectedBannerText
+        self.topTrailingBadgeTextByGoodsID = topTrailingBadgeTextByGoodsID
         self.onSelect = onSelect
     }
 
@@ -88,7 +95,8 @@ struct HomeGoodsImagePanelGrid: View {
                     HomeImagePanelGoodsCard(
                         goods: goods,
                         selected: selectedIndices.contains(index),
-                        selectedBannerText: selectedBannerText
+                        selectedBannerText: selectedBannerText,
+                        topTrailingBadgeText: topTrailingBadgeTextByGoodsID[goods.id]
                     )
                     .aspectRatio(1, contentMode: .fit)
                 }
@@ -104,6 +112,7 @@ struct HomeGoodsImagePanelPagedGrid: View {
     var goods: [HomeMockGoods]
     var selectedIndices: Set<Int>
     var selectedBannerText: String?
+    var topTrailingBadgeTextByGoodsID: [UUID: String]
     var onSelect: (Int) -> Void
 
     private let columnsPerPage = 3
@@ -114,11 +123,13 @@ struct HomeGoodsImagePanelPagedGrid: View {
         goods: [HomeMockGoods],
         selectedIndices: Set<Int>,
         selectedBannerText: String? = nil,
+        topTrailingBadgeTextByGoodsID: [UUID: String] = [:],
         onSelect: @escaping (Int) -> Void
     ) {
         self.goods = goods
         self.selectedIndices = selectedIndices
         self.selectedBannerText = selectedBannerText
+        self.topTrailingBadgeTextByGoodsID = topTrailingBadgeTextByGoodsID
         self.onSelect = onSelect
     }
 
@@ -141,7 +152,8 @@ struct HomeGoodsImagePanelPagedGrid: View {
                                     HomeImagePanelGoodsCard(
                                         goods: goods,
                                         selected: selectedIndices.contains(index),
-                                        selectedBannerText: selectedBannerText
+                                        selectedBannerText: selectedBannerText,
+                                        topTrailingBadgeText: topTrailingBadgeTextByGoodsID[goods.id]
                                     )
                                     .frame(width: cellSide, height: cellSide)
                                 }
@@ -169,6 +181,7 @@ struct HomeImagePanelGoodsCard: View {
     var goods: HomeMockGoods
     var selected: Bool
     var selectedBannerText: String?
+    var topTrailingBadgeText: String?
     var showsSelectionIndicator: Bool = true
 
     var body: some View {
@@ -193,6 +206,24 @@ struct HomeImagePanelGoodsCard: View {
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 7)
                         .background(MegrumTheme.lavender.opacity(0.92))
+                }
+            }
+            .overlay(alignment: .topTrailing) {
+                if let topTrailingBadgeText {
+                    Text(topTrailingBadgeText)
+                        .font(.system(size: 10.5, weight: .black, design: .rounded))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 4)
+                        .background(MegrumTheme.lavender.opacity(0.94), in: Capsule())
+                        .overlay {
+                            Capsule()
+                                .strokeBorder(.white.opacity(0.76), lineWidth: 1)
+                        }
+                        .shadow(color: .black.opacity(0.18), radius: 4, y: 2)
+                        .padding(7)
                 }
             }
             .overlay {

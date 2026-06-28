@@ -223,6 +223,21 @@ final class SupabaseHomeClientTests: XCTestCase {
         )
     }
 
+    func testDecodesMegrumPlusUserIDRowFromSupabaseSnakeCase() throws {
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        let rows = try decoder.decode([SupabaseMegrumPlusUserIDRow].self, from: Data("""
+        [
+          {
+            "user_id": "22222222-2222-2222-2222-222222222222"
+          }
+        ]
+        """.utf8))
+
+        XCTAssertEqual(rows.first?.userID, uuid("22222222-2222-2222-2222-222222222222"))
+        XCTAssertEqual(rows.first?.id, uuid("22222222-2222-2222-2222-222222222222"))
+    }
+
     func testDecodesHomeDTOsWithEmbeddedRelationsAndFlexibleNumericValues() throws {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601

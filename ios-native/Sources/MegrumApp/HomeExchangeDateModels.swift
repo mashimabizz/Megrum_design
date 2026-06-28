@@ -3,9 +3,14 @@ import MegrumCore
 import MegrumDesign
 import SwiftUI
 
-struct HomeExchangeLocalDateDetail: Codable, Equatable, Sendable {
+public struct HomeExchangeLocalDateDetail: Codable, Equatable, Sendable {
     var prefecture: String
     var memo: String
+
+    public init(prefecture: String, memo: String) {
+        self.prefecture = prefecture
+        self.memo = memo
+    }
 }
 struct HomeExchangeEditingDate: Identifiable, Equatable {
     var dateKeys: [String]

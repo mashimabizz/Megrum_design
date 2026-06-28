@@ -30,6 +30,14 @@ public extension SupabaseMegrumRepository {
         try await homeLocalModePersistence.saveSettings(settings, now: now)
     }
 
+    func loadExchangeSettings(userID: UUID) async throws -> HomeDefaultExchangeSettings? {
+        try await exchangeSettingsClient.loadSettings(userID: userID)
+    }
+
+    func saveExchangeSettings(_ settings: HomeDefaultExchangeSettings) async throws -> HomeDefaultExchangeSettings {
+        try await exchangeSettingsClient.upsertSettings(settings, userID: viewerID)
+    }
+
     func loadMailingAddress() async throws -> MailingAddress? {
         try await mailingAddressClient.loadAddress(userID: viewerID)
     }
@@ -54,6 +62,20 @@ public extension SupabaseMegrumRepository {
         try await blockClient.loadBlockedUsers(blockerID: viewerID)
     }
 
+    func loadBlockedUserIDs() async throws -> Set<UUID> {
+        try await blockClient.loadBlockedUserIDs(userID: viewerID)
+    }
+
+    func blockUser(_ userID: UUID) async throws -> BlockedUser {
+        var blockedUser = try await blockClient.blockUser(blockerID: viewerID, blockedID: userID)
+        if let profile = try await publicProfilePersistence.loadProfile(userID: userID)?.profile {
+            blockedUser.handle = profile.handle
+            blockedUser.displayName = profile.displayName
+            blockedUser.avatarURL = profile.avatarURL
+        }
+        return blockedUser
+    }
+
     func unblockUser(_ userID: UUID) async throws {
         try await blockClient.unblockUser(blockerID: viewerID, blockedID: userID)
     }
@@ -70,12 +92,24 @@ public extension SupabaseMegrumRepository {
         try await notificationClient.markAllNotificationsRead(userID: viewerID)
     }
 
+    func loadNotificationSettings() async throws -> UserNotificationSettings {
+        try await notificationClient.loadNotificationSettings(userID: viewerID)
+    }
+
     func loadPushNotificationsEnabled() async throws -> Bool {
         try await notificationClient.loadPushNotificationsEnabled(userID: viewerID)
     }
 
     func setPushNotificationsEnabled(_ enabled: Bool) async throws -> Bool {
         try await notificationClient.setPushNotificationsEnabled(userID: viewerID, enabled: enabled)
+    }
+
+    func setGroomActivityPushNotificationsEnabled(_ enabled: Bool) async throws -> UserNotificationSettings {
+        try await notificationClient.setGroomActivityPushNotificationsEnabled(userID: viewerID, enabled: enabled)
+    }
+
+    func setChatroomActivityPushNotificationsEnabled(_ enabled: Bool) async throws -> UserNotificationSettings {
+        try await notificationClient.setChatroomActivityPushNotificationsEnabled(userID: viewerID, enabled: enabled)
     }
 
     func registerNativePushDeviceToken(_ token: String, appVersion: String?) async throws {

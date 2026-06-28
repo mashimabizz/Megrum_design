@@ -44,10 +44,14 @@ struct HomeDiscoveryExperience: View {
     var body: some View {
         ZStack(alignment: .top) {
             TabView(selection: $selectedPrimaryTab) {
-                ScrollView {
+                HomePullRefreshScrollView(
+                    coordinateSpaceName: "home-discovery-candidates-refresh",
+                    indicatorTopPadding: HomeDiscoveryHeaderMetrics.pullRefreshIndicatorTopPadding,
+                    onRefresh: onRefresh
+                ) {
                     VStack(alignment: .leading, spacing: 14) {
                         HomeDiscoverySection(
-                            title: "メンバー×タグでマッチ",
+                            title: "メンバー×シリーズでマッチ",
                             candidates: userTagCandidates,
                             layout: .grid,
                             cardTitleStyle: .memberTag,
@@ -86,9 +90,6 @@ struct HomeDiscoveryExperience: View {
                     .padding(.top, HomeDiscoveryHeaderMetrics.contentTopPadding)
                     .padding(.bottom, HomeDiscoveryHeaderMetrics.contentBottomPadding)
                 }
-                .refreshable {
-                    await onRefresh()
-                }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .tag(HomeDiscoveryPrimaryTab.candidates)
 
@@ -96,12 +97,11 @@ struct HomeDiscoveryExperience: View {
                     candidates: mutualMatchCandidates,
                     listingCount: viewerIndividualListingCount,
                     contentTopPadding: HomeDiscoveryHeaderMetrics.contentTopPadding,
+                    refreshIndicatorTopPadding: HomeDiscoveryHeaderMetrics.pullRefreshIndicatorTopPadding,
+                    onRefresh: onRefresh,
                     onSelect: { selectedMutualMatchCandidate = $0 },
                     onCreateListing: openIndividualListingCreation
                 )
-                .refreshable {
-                    await onRefresh()
-                }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .tag(HomeDiscoveryPrimaryTab.mutual)
             }

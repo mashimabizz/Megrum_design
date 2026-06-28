@@ -14,7 +14,7 @@ struct TagCandidatePreviewSelector: View {
     var previewItemsByTag: [String: [TagPreviewItem]]
     @Binding var selectedNames: [String]
     var maxSelection = 5
-    var emptyMessage = "タグ候補はまだありません"
+    var emptyMessage = "シリーズ候補はまだありません"
     var onToggle: (String) -> Void
 
     @State private var previewedName: String?
@@ -45,7 +45,9 @@ struct TagCandidatePreviewSelector: View {
         WrappingTagFlow(spacing: 8, rowSpacing: 8) {
             ForEach(selectedNames, id: \.self) { name in
                 Button {
-                    toggle(name)
+                    MegrumHaptics.performSelectionChanged {
+                        toggle(name)
+                    }
                 } label: {
                     HStack(spacing: 5) {
                         Text("#\(name)")
@@ -69,8 +71,11 @@ struct TagCandidatePreviewSelector: View {
         return VStack(alignment: .leading, spacing: 0) {
             Button {
                 if selected || previewing {
-                    toggle(name)
+                    MegrumHaptics.performSelectionChanged {
+                        toggle(name)
+                    }
                 } else {
+                    MegrumHaptics.buttonTap()
                     withAnimation(.smooth(duration: 0.18)) {
                         previewedName = name
                     }
@@ -99,8 +104,8 @@ struct TagCandidatePreviewSelector: View {
                 .fixedSize(horizontal: true, vertical: false)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("タグ候補 #\(name)")
-            .accessibilityHint(previewing ? "もう一度タップするとこのタグを選択します" : "タップすると紐づく画像の吹き出しを表示します")
+            .accessibilityLabel("シリーズ候補 #\(name)")
+            .accessibilityHint(previewing ? "もう一度タップするとこのシリーズを選択します" : "タップすると紐づく画像の吹き出しを表示します")
             .disabled(!selected && selectedNames.count >= maxSelection)
             .opacity(!selected && selectedNames.count >= maxSelection ? 0.45 : 1)
 

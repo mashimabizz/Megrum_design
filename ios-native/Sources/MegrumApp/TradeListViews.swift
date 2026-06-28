@@ -16,15 +16,15 @@ struct TradeDetailUnavailableScreen: View {
 
 struct TradeStageBar: View {
     @Binding var selectedStage: TradeStage
-    var pendingCount: Int
-    var inProgressCount: Int
-    var completedCount: Int
+    var pendingBadgeCount: Int
+    var inProgressBadgeCount: Int
+    var completedBadgeCount: Int
 
     var body: some View {
         HStack(spacing: 8) {
-            stageButton(.pending, count: pendingCount)
-            stageButton(.inProgress, count: inProgressCount)
-            stageButton(.completed, count: completedCount)
+            stageButton(.pending, badgeCount: pendingBadgeCount)
+            stageButton(.inProgress, badgeCount: inProgressBadgeCount)
+            stageButton(.completed, badgeCount: completedBadgeCount)
         }
         .padding(7)
         .background(.regularMaterial, in: Capsule())
@@ -32,14 +32,14 @@ struct TradeStageBar: View {
         .shadow(color: MegrumTheme.ink.opacity(0.12), radius: 18, y: 10)
     }
 
-    private func stageButton(_ stage: TradeStage, count: Int) -> some View {
+    private func stageButton(_ stage: TradeStage, badgeCount: Int) -> some View {
         Button {
             selectedStage = stage
         } label: {
             HStack(spacing: 7) {
                 Text(stage.title)
-                if count > 0 {
-                    TradeStageBadge(count: count, isSelected: selectedStage == stage)
+                if badgeCount > 0 {
+                    TradeStageBadge(count: badgeCount, isSelected: selectedStage == stage)
                 }
             }
             .font(.system(size: 16, weight: .heavy, design: .rounded))
@@ -49,15 +49,15 @@ struct TradeStageBar: View {
             .background(selectedStage == stage ? AnyShapeStyle(.white.opacity(0.9)) : AnyShapeStyle(.clear), in: Capsule())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(accessibilityLabel(for: stage, count: count))
+        .accessibilityLabel(accessibilityLabel(for: stage, badgeCount: badgeCount))
         .accessibilityHint("やりとり一覧を\(stage.title)に切り替えます")
     }
 
-    private func accessibilityLabel(for stage: TradeStage, count: Int) -> String {
-        guard count > 0 else {
+    private func accessibilityLabel(for stage: TradeStage, badgeCount: Int) -> String {
+        guard badgeCount > 0 else {
             return stage.title
         }
-        return "\(stage.title) \(count)件"
+        return "\(stage.title) \(badgeCount)件"
     }
 }
 
@@ -74,7 +74,10 @@ private struct TradeStageBadge: View {
             .minimumScaleFactor(0.8)
             .padding(.horizontal, displayText.count >= 3 ? 6 : 7)
             .frame(minWidth: 22, minHeight: 22)
-            .background(badgeFill, in: Capsule())
+            .background(
+                badgeFill,
+                in: Capsule()
+            )
             .accessibilityHidden(true)
     }
 

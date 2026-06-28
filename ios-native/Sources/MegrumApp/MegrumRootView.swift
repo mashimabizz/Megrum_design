@@ -19,6 +19,7 @@ public struct MegrumRootView: View {
     @State private var didOpenVisualQAProposalRoute = false
     private let visualQAInitialScreen: VisualQAInitialScreen?
     @State private var drawerDragTranslation: CGFloat = 0
+    @State private var isReturningStoredIncompleteAccountToLogin = false
     @Environment(\.scenePhase) private var scenePhase
     @Binding private var notificationDestinationTab: MegrumTab?
 
@@ -45,10 +46,13 @@ public struct MegrumRootView: View {
 
     public var body: some View {
         Group {
-            if authState.isAuthenticated {
-                authenticatedRoot
-            } else {
+            if AccountSetupSessionPolicy.shouldShowAuthScreen(
+                isAuthenticated: authState.isAuthenticated,
+                isReturningStoredIncompleteAccountToLogin: isReturningStoredIncompleteAccountToLogin
+            ) {
                 AuthScreen(authState: authState, visualQAInitialScreen: visualQAInitialScreen)
+            } else {
+                authenticatedRoot
             }
         }
         .dismissKeyboardOnNonInputTap()
@@ -66,12 +70,22 @@ public struct MegrumRootView: View {
             notificationDestinationTab = nil
         }
         .onChange(of: scenePhase) { _, phase in
-            guard phase == .active, authState.isAuthenticated else {
+            guard
+                phase == .active,
+                authState.isAuthenticated,
+                !isReturningStoredIncompleteAccountToLogin
+            else {
                 return
             }
             Task {
                 await syncRepositoryWithAuthSession()
             }
+        }
+        .onChange(of: authState.sessionSource) { _, source in
+            guard AccountSetupSessionPolicy.shouldClearReturnToLoginOverride(sessionSource: source) else {
+                return
+            }
+            isReturningStoredIncompleteAccountToLogin = false
         }
     }
 
@@ -94,7 +108,7 @@ public struct MegrumRootView: View {
                 }
             },
             onReturnToLoginFromIncompleteAccount: {
-                await authState.signOut()
+                isReturningStoredIncompleteAccountToLogin = true
             },
             onDismissDrawerPage: {
                 drawerPageDestination = nil
@@ -139,7 +153,7 @@ public struct MegrumRootView: View {
             NavigationStack {
                 switch route {
                 case .exchange:
-                    HomeExchangeSettingsScreen(individualListings: appState.listings) {
+                    HomeExchangeSettingsScreen(appState: appState, individualListings: appState.listings) {
                         homeSettingsRoute = nil
                     }
                 case .payment:

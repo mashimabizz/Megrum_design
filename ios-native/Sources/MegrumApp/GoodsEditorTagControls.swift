@@ -7,11 +7,13 @@ struct GoodsEditorTagPickerButton: View {
     var action: () -> Void
 
     var body: some View {
-        Button(action: action) {
+        Button {
+            MegrumHaptics.performButtonTap(action)
+        } label: {
             HStack(spacing: 10) {
                 Image(systemName: "tag")
                     .font(.system(size: 15, weight: .black))
-                Text(tagCount == 0 ? "タグを選ぶ" : "タグを追加")
+                Text(tagCount == 0 ? "シリーズを選ぶ" : "シリーズを追加")
                     .font(.system(size: 15, weight: .black, design: .rounded))
                 Spacer()
                 Image(systemName: "chevron.forward")
@@ -41,7 +43,9 @@ struct GoodsEditorSelectedTagList: View {
             GoodsEditorFlowLayout(spacing: 8) {
                 ForEach(tagNames, id: \.self) { tag in
                     Button {
-                        onRemoveTag(tag)
+                        MegrumHaptics.performSelectionChanged {
+                            onRemoveTag(tag)
+                        }
                     } label: {
                         HStack(spacing: 5) {
                             Text("#\(tag)")
@@ -73,7 +77,9 @@ struct GoodsEditorSuggestedTagList: View {
             GoodsEditorFlowLayout(spacing: 8) {
                 ForEach(tagNames, id: \.self) { tag in
                     Button {
-                        onAddSuggestedTag(tag)
+                        MegrumHaptics.performSelectionChanged {
+                            onAddSuggestedTag(tag)
+                        }
                     } label: {
                         Text("#\(tag)")
                             .font(.caption.weight(.black))
@@ -108,7 +114,9 @@ struct GoodsEditorTagInputRow: View {
                 .submitLabel(.done)
                 .onSubmit(onAddTag)
                 .megrumTextFieldStyle()
-            Button("追加", action: onAddTag)
+            Button("追加") {
+                MegrumHaptics.performSelectionChanged(onAddTag)
+            }
                 .buttonStyle(.bordered)
                 .tint(MegrumTheme.lavender)
                 .disabled(!canAddTag)

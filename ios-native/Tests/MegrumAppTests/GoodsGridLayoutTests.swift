@@ -22,6 +22,44 @@ final class GoodsGridLayoutTests: XCTestCase {
         XCTAssertEqual(GoodsGridLayout(columns: 5).skeletonTileCount, 10)
     }
 
+    func testRemoteGoodsImageLoadingRetriesBeforeFallback() {
+        XCTAssertEqual(GoodsRemoteImageLoadingPolicy.maximumAttempts, 4)
+        XCTAssertEqual(GoodsRemoteImageLoadingPolicy.retryDelaysNanoseconds.first, 0)
+        XCTAssertGreaterThanOrEqual(GoodsRemoteImageLoadingPolicy.requestTimeout, 10)
+    }
+
+    func testRemoteGoodsImageDataLoaderCachesFileData() async throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("megrum-goods-image-\(UUID().uuidString).bin")
+        let data = Data("megrum-image".utf8)
+        try data.write(to: url)
+
+        let firstLoad = try await GoodsRemoteImageDataLoader.loadData(from: url)
+        try FileManager.default.removeItem(at: url)
+        let cachedLoad = try await GoodsRemoteImageDataLoader.loadData(from: url)
+
+        XCTAssertEqual(firstLoad, data)
+        XCTAssertEqual(cachedLoad, data)
+    }
+
+    func testRemoteGoodsImageDataLoaderRejectsEmptyFileData() async throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("megrum-empty-goods-image-\(UUID().uuidString).bin")
+        try Data().write(to: url)
+        defer {
+            try? FileManager.default.removeItem(at: url)
+        }
+
+        do {
+            _ = try await GoodsRemoteImageDataLoader.loadData(from: url)
+            XCTFail("Expected empty image data to fail.")
+        } catch GoodsRemoteImageLoadError.emptyData {
+            XCTAssertTrue(true)
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+    }
+
     func testGoodsGridUsesReactNativeCardSpacingAndRatio() {
         XCTAssertEqual(GoodsGridLayout.columnSpacing, 10)
         XCTAssertEqual(GoodsGridLayout.rowSpacing, 10)
@@ -38,7 +76,7 @@ final class GoodsGridLayoutTests: XCTestCase {
         XCTAssertEqual(GoodsQuickActionKind.moveToKeep.title, "自分用キープへ")
         XCTAssertEqual(GoodsQuickActionKind.moveToKeep.title(for: .active), "自分用キープへ")
         XCTAssertEqual(GoodsQuickActionKind.moveToKeep.title(for: .keep), "譲る候補へ")
-        XCTAssertEqual(GoodsQuickActionKind.tag.title, "タグをつける")
+        XCTAssertEqual(GoodsQuickActionKind.tag.title, "シリーズを設定")
         XCTAssertEqual(GoodsQuickActionKind.delete.title, "削除する")
         XCTAssertNil(GoodsQuickActionKind.edit.role)
         XCTAssertNotNil(GoodsQuickActionKind.delete.role)
@@ -128,7 +166,7 @@ final class GoodsGridLayoutTests: XCTestCase {
         let header = GoodsQuickActionHeaderPresentation(item: item)
 
         XCTAssertEqual(header.masterLine, "グループ未設定トレカ")
-        XCTAssertEqual(header.tagLine, "タグ未設定")
+        XCTAssertEqual(header.tagLine, "シリーズ未設定")
     }
 
     func testDeleteConfirmationPresentationMatchesOshiDeleteCalloutCopy() {
@@ -219,7 +257,7 @@ final class GoodsGridLayoutTests: XCTestCase {
         XCTAssertEqual(GoodsTileCollectionCardStyle.glyph(for: item), "K")
         XCTAssertEqual(GoodsTileCollectionCardStyle.tagLine(for: item), "# aespa # トレカ")
         XCTAssertEqual(GoodsTileCollectionCardStyle.glyph(for: untagged), "J")
-        XCTAssertEqual(GoodsTileCollectionCardStyle.tagLine(for: untagged), "タグ未設定")
+        XCTAssertEqual(GoodsTileCollectionCardStyle.tagLine(for: untagged), "シリーズ未設定")
     }
 
     func testCollectionFilterMatchesGroupGoodsTypeAndTags() {

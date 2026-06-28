@@ -5,7 +5,9 @@ struct IndividualListingEditorBackBottomBarButton: View {
     var action: () -> Void
 
     var body: some View {
-        Button("戻る", action: action)
+        Button("戻る") {
+            MegrumHaptics.performButtonTap(action)
+        }
             .font(.system(size: 18, weight: .black, design: .rounded))
             .foregroundStyle(MegrumTheme.lavender)
             .frame(width: 132, height: 58)
@@ -24,7 +26,9 @@ struct IndividualListingEditorPrimaryBottomBarButton: View {
     var action: () -> Void
 
     var body: some View {
-        Button(action: action) {
+        Button {
+            MegrumHaptics.performButtonTap(action)
+        } label: {
             Group {
                 if isSaving {
                     ProgressView()
@@ -60,7 +64,9 @@ struct IndividualListingEditorSelectAllVisibleButton: View {
     var action: () -> Void
 
     var body: some View {
-        Button(action: action) {
+        Button {
+            MegrumHaptics.performButtonTap(action)
+        } label: {
             Text(title)
                 .font(.system(size: 14, weight: .black, design: .rounded))
                 .foregroundStyle(MegrumTheme.lavender)
@@ -86,7 +92,9 @@ struct IndividualListingEditorAddOptionButton: View {
     var action: () -> Void
 
     var body: some View {
-        Button(action: action) {
+        Button {
+            MegrumHaptics.performButtonTap(action)
+        } label: {
             Text(IndividualListingEditorBottomBarPresentation.addOptionTitle)
                 .font(.system(size: 15, weight: .black, design: .rounded))
                 .foregroundStyle(MegrumTheme.lavender)

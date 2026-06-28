@@ -57,6 +57,10 @@ public struct SupabaseMegrumPlusUserIDRow: Decodable, Equatable, Sendable, Ident
     public var userID: UUID
 
     public var id: UUID { userID }
+
+    enum CodingKeys: String, CodingKey {
+        case userID = "userId"
+    }
 }
 
 extension SupabaseHomeUserRow {

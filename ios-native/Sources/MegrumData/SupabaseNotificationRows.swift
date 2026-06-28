@@ -26,8 +26,18 @@ struct NotificationRow: Decodable, Sendable {
 }
 
 struct NotificationSettingRow: Decodable, Sendable {
-    static let select = "push_enabled"
+    static let select = "push_enabled,groom_activity_push_enabled,chatroom_activity_push_enabled"
     var pushEnabled: Bool
+    var groomActivityPushEnabled: Bool?
+    var chatroomActivityPushEnabled: Bool?
+
+    var settings: UserNotificationSettings {
+        UserNotificationSettings(
+            pushEnabled: pushEnabled,
+            groomActivityPushEnabled: groomActivityPushEnabled ?? true,
+            chatroomActivityPushEnabled: chatroomActivityPushEnabled ?? true
+        )
+    }
 }
 
 struct NotificationDeviceRow: Decodable, Sendable {

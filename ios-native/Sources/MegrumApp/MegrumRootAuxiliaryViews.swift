@@ -18,15 +18,29 @@ extension View {
 struct NativeLoadingScreen: View {
     var title: String
 
+    private let iconSize: CGFloat = 120
+
     var body: some View {
-        ZStack {
+        GeometryReader { proxy in
+            let iconCenter = CGPoint(x: proxy.size.width / 2, y: proxy.size.height / 2)
+            let spinnerCenterY = (iconCenter.y + (iconSize / 2) + proxy.size.height) / 2
+
             Color.white.ignoresSafeArea()
+
             Image("LaunchIcon", bundle: .main)
                 .resizable()
                 .scaledToFit()
-                .frame(width: 120, height: 120)
+                .frame(width: iconSize, height: iconSize)
+                .position(iconCenter)
                 .accessibilityLabel(Text(title))
+
+            ProgressView()
+                .controlSize(.large)
+                .tint(MegrumTheme.lavender)
+                .position(x: iconCenter.x, y: spinnerCenterY)
+                .accessibilityLabel("読み込み中")
         }
+        .ignoresSafeArea()
     }
 }
 

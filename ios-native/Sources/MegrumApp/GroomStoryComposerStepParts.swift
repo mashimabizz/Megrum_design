@@ -2,6 +2,9 @@ import Foundation
 import MegrumDesign
 import PhotosUI
 import SwiftUI
+#if canImport(Photos)
+import Photos
+#endif
 #if canImport(UIKit)
 import UIKit
 #endif
@@ -31,32 +34,105 @@ struct GroomStoryPhotoActionGrid: View {
     var canUseCamera: Bool
     var cameraSubtitle: String
     var onOpenCamera: () -> Void
+    var onSelectPhotoData: (Data, String) -> Void
+    @State private var recentAssets: [GroomPhotoLibraryAsset] = []
+    @State private var authorizationStatus: GroomPhotoLibraryAuthorization = .unknown
 
     var body: some View {
-        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-            Button(action: onOpenCamera) {
-                GroomComposerActionTile(
-                    title: "カメラで撮る",
-                    subtitle: cameraSubtitle,
-                    systemImage: "camera.fill",
-                    isLoading: isPreparingPhoto
-                )
-            }
-            .buttonStyle(.plain)
-            .disabled(isPreparingPhoto || isCreating)
-            .opacity(canUseCamera ? 1 : 0.48)
+        VStack(alignment: .leading, spacing: 18) {
+            Text("最近の項目")
+                .font(.system(size: 22, weight: .heavy, design: .rounded))
+                .foregroundStyle(.white)
 
-            PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
-                GroomComposerActionTile(
-                    title: "写真を選ぶ",
-                    subtitle: "写真が決まったら場所選択へ",
-                    systemImage: "photo.on.rectangle.angled",
-                    isLoading: isPreparingPhoto
-                )
+            LazyVGrid(
+                columns: GroomPhotoActionGridMetrics.columns,
+                spacing: GroomPhotoActionGridMetrics.spacing
+            ) {
+                Button(action: onOpenCamera) {
+                    GroomComposerCameraTile(isLoading: isPreparingPhoto)
+                }
+                .buttonStyle(.plain)
+                .disabled(isPreparingPhoto || isCreating)
+                .opacity(canUseCamera ? 1 : 0.48)
+
+                #if canImport(UIKit) && canImport(Photos)
+                ForEach(recentAssets) { asset in
+                    Button {
+                        loadPhotoData(for: asset)
+                    } label: {
+                        GroomPhotoLibraryThumbnail(asset: asset)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isPreparingPhoto || isCreating)
+                }
+                #endif
             }
-            .buttonStyle(.plain)
-            .disabled(isPreparingPhoto || isCreating)
+
+            if authorizationStatus == .denied {
+                PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
+                    Label("アルバムから選ぶ", systemImage: "photo.on.rectangle")
+                        .font(.system(size: 15, weight: .heavy, design: .rounded))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 48)
+                        .background(.white.opacity(0.12), in: Capsule())
+                }
+                .buttonStyle(.plain)
+            }
         }
+        .task {
+            await loadRecentAssets()
+        }
+    }
+
+    @MainActor
+    private func loadRecentAssets() async {
+        #if canImport(UIKit) && canImport(Photos)
+        let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+        switch status {
+        case .authorized, .limited:
+            authorizationStatus = .authorized
+            recentAssets = GroomPhotoLibraryAsset.fetchRecent(limit: 35)
+        case .notDetermined:
+            authorizationStatus = .unknown
+            let requested = await withCheckedContinuation { continuation in
+                PHPhotoLibrary.requestAuthorization(for: .readWrite) { status in
+                    continuation.resume(returning: status)
+                }
+            }
+            if requested == .authorized || requested == .limited {
+                authorizationStatus = .authorized
+                recentAssets = GroomPhotoLibraryAsset.fetchRecent(limit: 35)
+            } else {
+                authorizationStatus = .denied
+                recentAssets = []
+            }
+        default:
+            authorizationStatus = .denied
+            recentAssets = []
+        }
+        #else
+        authorizationStatus = .denied
+        #endif
+    }
+
+    private func loadPhotoData(for asset: GroomPhotoLibraryAsset) {
+        #if canImport(UIKit) && canImport(Photos)
+        guard let phAsset = asset.phAsset else {
+            return
+        }
+        let options = PHImageRequestOptions()
+        options.deliveryMode = .highQualityFormat
+        options.isNetworkAccessAllowed = true
+        PHImageManager.default().requestImageDataAndOrientation(for: phAsset, options: options) { data, typeIdentifier, _, _ in
+            guard let data else {
+                return
+            }
+            Task { @MainActor in
+                onSelectPhotoData(data, GroomPhotoLibraryAsset.contentType(for: typeIdentifier))
+            }
+        }
+        #endif
     }
 }
 

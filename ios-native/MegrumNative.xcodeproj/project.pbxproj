@@ -10,6 +10,7 @@
 		13CA94AC73314C2BBD87BB5D /* MegrumNativeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB317683D09049DF88A9DF5A /* MegrumNativeApp.swift */; };
 		455A5FD2CC3F4C6FAF0B9FE2 /* MegrumApp in Frameworks */ = {isa = PBXBuildFile; productRef = 2CAA32C3F51848648465951E /* MegrumApp */; };
 		7C35B443C9C34E51AF45D3F2 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = C8F50324503B4596A4E03357 /* PrivacyInfo.xcprivacy */; };
+		8B8C7A1F2A03407C8E14D5B6 /* GoogleMobileAds in Frameworks */ = {isa = PBXBuildFile; productRef = 6E7A4F123BC74F69A2D9150C /* GoogleMobileAds */; };
 		A2F716C91609477A83F4F4C1 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 5FE3FB4473824B50B23B9D87 /* Assets.xcassets */; };
 		B1E54F89762842C7A1B05E31 /* MegrumIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = F4C8A9E13D6B4D1B93A67210 /* MegrumIcon.icon */; };
 /* End PBXBuildFile section */
@@ -32,6 +33,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				455A5FD2CC3F4C6FAF0B9FE2 /* MegrumApp in Frameworks */,
+				8B8C7A1F2A03407C8E14D5B6 /* GoogleMobileAds in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -95,6 +97,7 @@
 			name = MegrumNative;
 			packageProductDependencies = (
 				2CAA32C3F51848648465951E /* MegrumApp */,
+				6E7A4F123BC74F69A2D9150C /* GoogleMobileAds */,
 			);
 			productName = MegrumNative;
 			productReference = D3FBF9C8C95D427FAF75EE97 /* MegrumNative.app */;
@@ -127,6 +130,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				C87356ADDE0348AAA98EF4C5 /* XCLocalSwiftPackageReference "." */,
+				4A9C0B2D6E734742A3F7A819 /* XCRemoteSwiftPackageReference "swift-package-manager-google-mobile-ads" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 00AC5373E5B84AB5B97B34E1 /* Products */;
@@ -180,6 +184,7 @@
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MARKETING_VERSION = 0.1.0;
+				MEGRUM_ADMOB_TEST_ADS_ENABLED = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = tokyo.megrum.native.preview;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -366,11 +371,27 @@
 		};
 /* End XCLocalSwiftPackageReference section */
 
+/* Begin XCRemoteSwiftPackageReference section */
+		4A9C0B2D6E734742A3F7A819 /* XCRemoteSwiftPackageReference "swift-package-manager-google-mobile-ads" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/googleads/swift-package-manager-google-mobile-ads.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 13.6.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
 /* Begin XCSwiftPackageProductDependency section */
 		2CAA32C3F51848648465951E /* MegrumApp */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = C87356ADDE0348AAA98EF4C5 /* XCLocalSwiftPackageReference "." */;
 			productName = MegrumApp;
+		};
+		6E7A4F123BC74F69A2D9150C /* GoogleMobileAds */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 4A9C0B2D6E734742A3F7A819 /* XCRemoteSwiftPackageReference "swift-package-manager-google-mobile-ads" */;
+			productName = GoogleMobileAds;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

@@ -1,6 +1,6 @@
 import Foundation
 import MegrumCore
-import MegrumData
+@testable import MegrumData
 import XCTest
 
 final class SupabaseGroomClientTests: XCTestCase {
@@ -94,7 +94,8 @@ final class SupabaseGroomClientTests: XCTestCase {
                     "published_at": "2026-05-31T00:00:00Z",
                     "created_at": "2026-05-31T00:00:00Z",
                     "origin_lat": 35.681236,
-                    "origin_lng": 139.767125
+                    "origin_lng": 139.767125,
+                    "like_count": 7
                   }
                 ]
                 """.utf8)
@@ -120,6 +121,7 @@ final class SupabaseGroomClientTests: XCTestCase {
         XCTAssertEqual(posts.first?.imageURL.relativeString, imagePath)
         XCTAssertEqual(posts.first?.latitude, 35.681236)
         XCTAssertEqual(posts.first?.longitude, 139.767125)
+        XCTAssertEqual(posts.first?.likeCount, 7)
     }
 
     func testLoadNearbyGroomsFiltersUnexpectedFarRowsClientSide() throws {
@@ -193,7 +195,7 @@ final class SupabaseGroomClientTests: XCTestCase {
         let payload = try XCTUnwrap(rows.first)
 
         XCTAssertEqual(request.httpMethod, "POST")
-        XCTAssertEqual(request.url?.absoluteString, "https://example.supabase.co/rest/v1/groom_posts?select=id,user_id,image_url,image_path,published_at,created_at,origin_lat,origin_lng")
+        XCTAssertEqual(request.url?.absoluteString, "https://example.supabase.co/rest/v1/groom_posts?select=id,user_id,image_url,image_path,published_at,expires_at,created_at,origin_lat,origin_lng")
         XCTAssertEqual(request.value(forHTTPHeaderField: "Prefer"), "return=representation")
         XCTAssertEqual(payload["user_id"] as? String, authorID.uuidString.lowercased())
         XCTAssertEqual(payload["status"] as? String, "published")
@@ -222,18 +224,134 @@ final class SupabaseGroomClientTests: XCTestCase {
 
         let likeRequest = try client.makeSetLikedRequest(userID: userID, postID: postID, isLiked: true)
         let likeBody = try XCTUnwrap(likeRequest.httpBody)
-        let likeRows = try XCTUnwrap(JSONSerialization.jsonObject(with: likeBody) as? [[String: Any]])
+        let likeJSON = try XCTUnwrap(JSONSerialization.jsonObject(with: likeBody) as? [String: Any])
 
-        XCTAssertEqual(likeRequest.url?.absoluteString, "https://example.supabase.co/rest/v1/groom_reactions?select=*&on_conflict=groom_post_id,user_id,reaction_type")
-        XCTAssertEqual(likeRows.first?["reaction_type"] as? String, "like")
+        XCTAssertEqual(likeRequest.httpMethod, "POST")
+        XCTAssertEqual(likeRequest.url?.absoluteString, "https://example.supabase.co/rest/v1/rpc/set_groom_like_for_viewer")
+        XCTAssertEqual(likeJSON["p_post_id"] as? String, postID.uuidString.uppercased())
+        XCTAssertEqual(likeJSON["p_is_liked"] as? Bool, true)
 
         let unlikeRequest = try client.makeSetLikedRequest(userID: userID, postID: postID, isLiked: false)
+        let unlikeBody = try XCTUnwrap(unlikeRequest.httpBody)
+        let unlikeJSON = try XCTUnwrap(JSONSerialization.jsonObject(with: unlikeBody) as? [String: Any])
 
-        XCTAssertEqual(unlikeRequest.httpMethod, "DELETE")
-        XCTAssertEqual(unlikeRequest.url?.absoluteString, "https://example.supabase.co/rest/v1/groom_reactions?groom_post_id=eq.00000000-0000-0000-0000-000000000501&user_id=eq.00000000-0000-0000-0000-000000000001&reaction_type=eq.like")
+        XCTAssertEqual(unlikeRequest.httpMethod, "POST")
+        XCTAssertEqual(unlikeRequest.url?.absoluteString, "https://example.supabase.co/rest/v1/rpc/set_groom_like_for_viewer")
+        XCTAssertEqual(unlikeJSON["p_post_id"] as? String, postID.uuidString.uppercased())
+        XCTAssertEqual(unlikeJSON["p_is_liked"] as? Bool, false)
     }
 
-    func testBuildsGroomReplyAndNotificationRequests() throws {
+    func testBuildsGroomReportAndBlockRequests() throws {
+        let client = SupabaseGroomClient(configuration: configuration)
+        let reporterID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+        let reportedUserID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+        let postID = UUID(uuidString: "00000000-0000-0000-0000-000000000501")!
+
+        let reportRequest = try client.makeReportPostRequest(
+            reporterID: reporterID,
+            input: GroomReportCreateInput(
+                groomPostID: postID,
+                reportedUserID: reportedUserID,
+                reason: .privacy,
+                note: "   "
+            )
+        )
+        let reportBody = try XCTUnwrap(reportRequest.httpBody)
+        let reportRows = try XCTUnwrap(JSONSerialization.jsonObject(with: reportBody) as? [[String: Any]])
+        let reportJSON = try XCTUnwrap(reportRows.first)
+
+        XCTAssertEqual(reportRequest.httpMethod, "POST")
+        XCTAssertEqual(reportRequest.url?.absoluteString, "https://example.supabase.co/rest/v1/groom_reports?select=id,groom_post_id,reported_user_id,reason,status,created_at")
+        XCTAssertEqual(reportJSON["groom_post_id"] as? String, postID.uuidString.lowercased())
+        XCTAssertEqual(reportJSON["reporter_id"] as? String, reporterID.uuidString.lowercased())
+        XCTAssertEqual(reportJSON["reported_user_id"] as? String, reportedUserID.uuidString.lowercased())
+        XCTAssertEqual(reportJSON["reason"] as? String, "privacy")
+        XCTAssertNil(reportJSON["note"])
+
+        let blockRequest = try client.makeBlockUserRequest(blockerID: reporterID, blockedID: reportedUserID)
+        let blockBody = try XCTUnwrap(blockRequest.httpBody)
+        let blockRows = try XCTUnwrap(JSONSerialization.jsonObject(with: blockBody) as? [[String: Any]])
+        let blockJSON = try XCTUnwrap(blockRows.first)
+
+        XCTAssertEqual(blockRequest.httpMethod, "POST")
+        XCTAssertEqual(blockRequest.url?.absoluteString, "https://example.supabase.co/rest/v1/groom_user_blocks?select=blocked_id&on_conflict=blocker_id,blocked_id")
+        XCTAssertEqual(blockJSON["blocker_id"] as? String, reporterID.uuidString.lowercased())
+        XCTAssertEqual(blockJSON["blocked_id"] as? String, reportedUserID.uuidString.lowercased())
+    }
+
+    func testGroomRowsDecodeIDFieldsFromSupabaseSnakeCase() throws {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        let viewRows = try decoder.decode([GroomViewRow].self, from: Data("""
+        [
+          {
+            "groom_post_id": "00000000-0000-0000-0000-000000000501",
+            "user_id": "00000000-0000-0000-0000-000000000001"
+          }
+        ]
+        """.utf8))
+        let blockRows = try decoder.decode([GroomBlockRow].self, from: Data("""
+        [
+          {
+            "blocked_id": "00000000-0000-0000-0000-000000000002"
+          }
+        ]
+        """.utf8))
+        let reactionRows = try decoder.decode([GroomReactionRow].self, from: Data("""
+        [
+          {
+            "groom_post_id": "00000000-0000-0000-0000-000000000501",
+            "user_id": "00000000-0000-0000-0000-000000000001",
+            "reaction_type": "like",
+            "created_at": "2026-06-27T00:00:00Z"
+          }
+        ]
+        """.utf8))
+        let replyRows = try decoder.decode([GroomReplyRow].self, from: Data("""
+        [
+          {
+            "id": "00000000-0000-0000-0000-000000000701",
+            "groom_post_id": "00000000-0000-0000-0000-000000000501",
+            "sender_id": "00000000-0000-0000-0000-000000000001",
+            "recipient_id": "00000000-0000-0000-0000-000000000002",
+            "body": "かわいいです",
+            "groom_snapshot": {
+              "image_url": "https://example.com/groom.jpg",
+              "image_path": "groom/0001.jpg"
+            },
+            "read_at": null,
+            "created_at": "2026-06-27T00:00:00Z"
+          }
+        ]
+        """.utf8))
+        let reportRows = try decoder.decode([GroomReportRow].self, from: Data("""
+        [
+          {
+            "id": "00000000-0000-0000-0000-000000000901",
+            "groom_post_id": "00000000-0000-0000-0000-000000000501",
+            "reported_user_id": "00000000-0000-0000-0000-000000000002",
+            "reason": "privacy",
+            "status": "open",
+            "created_at": "2026-06-27T00:00:00Z"
+          }
+        ]
+        """.utf8))
+
+        XCTAssertEqual(viewRows.first?.groomPostID, UUID(uuidString: "00000000-0000-0000-0000-000000000501"))
+        XCTAssertEqual(viewRows.first?.userID, UUID(uuidString: "00000000-0000-0000-0000-000000000001"))
+        XCTAssertEqual(blockRows.first?.blockedID, UUID(uuidString: "00000000-0000-0000-0000-000000000002"))
+        XCTAssertEqual(reactionRows.first?.groomPostID, UUID(uuidString: "00000000-0000-0000-0000-000000000501"))
+        XCTAssertEqual(reactionRows.first?.userID, UUID(uuidString: "00000000-0000-0000-0000-000000000001"))
+        XCTAssertEqual(replyRows.first?.groomPostID, UUID(uuidString: "00000000-0000-0000-0000-000000000501"))
+        XCTAssertEqual(replyRows.first?.senderID, UUID(uuidString: "00000000-0000-0000-0000-000000000001"))
+        XCTAssertEqual(replyRows.first?.recipientID, UUID(uuidString: "00000000-0000-0000-0000-000000000002"))
+        XCTAssertEqual(replyRows.first?.groomSnapshot?.imagePath, "groom/0001.jpg")
+        XCTAssertEqual(reportRows.first?.groomPostID, UUID(uuidString: "00000000-0000-0000-0000-000000000501"))
+        XCTAssertEqual(reportRows.first?.reportedUserID, UUID(uuidString: "00000000-0000-0000-0000-000000000002"))
+    }
+
+    func testBuildsGroomReplyAndMeguriMessageRequests() throws {
         let client = SupabaseGroomClient(configuration: configuration)
         let senderID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
         let recipientID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
@@ -262,7 +380,7 @@ final class SupabaseGroomClientTests: XCTestCase {
         XCTAssertEqual(payload["recipient_id"] as? String, recipientID.uuidString.lowercased())
         XCTAssertEqual(snapshot["image_url"] as? String, "https://example.com/groom.jpg")
 
-        let notificationRequest = try client.makeReplyNotificationRequest(
+        let meguriMessageRequest = try client.makeGroomReplyMeguriMessageRequest(
             reply: GroomReply(
                 id: replyID,
                 groomPostID: postID,
@@ -272,15 +390,16 @@ final class SupabaseGroomClientTests: XCTestCase {
                 groomImageURL: URL(string: "https://example.com/groom.jpg")
             )
         )
-        let notificationBody = try XCTUnwrap(notificationRequest.httpBody)
-        let notificationRows = try XCTUnwrap(JSONSerialization.jsonObject(with: notificationBody) as? [[String: Any]])
-        let notificationPayload = try XCTUnwrap(notificationRows.first)
+        let meguriMessageBody = try XCTUnwrap(meguriMessageRequest.httpBody)
+        let meguriMessageRows = try XCTUnwrap(JSONSerialization.jsonObject(with: meguriMessageBody) as? [[String: Any]])
+        let meguriMessagePayload = try XCTUnwrap(meguriMessageRows.first)
 
-        XCTAssertEqual(notificationRequest.url?.absoluteString, "https://example.supabase.co/rest/v1/notifications?select=id")
-        XCTAssertEqual(notificationPayload["kind"] as? String, "groom_reply")
-        XCTAssertEqual(notificationPayload["groom_reply_id"] as? String, replyID.uuidString.lowercased())
-        XCTAssertEqual(notificationPayload["user_id"] as? String, recipientID.uuidString.lowercased())
-        XCTAssertEqual(notificationPayload["title"] as? String, "グルームに返信が届きました")
+        XCTAssertEqual(meguriMessageRequest.url?.absoluteString, "https://example.supabase.co/rest/v1/meguri_messages?select=id")
+        XCTAssertEqual(meguriMessagePayload["sender_id"] as? String, senderID.uuidString.lowercased())
+        XCTAssertEqual(meguriMessagePayload["recipient_id"] as? String, recipientID.uuidString.lowercased())
+        XCTAssertEqual(meguriMessagePayload["source_groom_reply_id"] as? String, replyID.uuidString.lowercased())
+        XCTAssertEqual(meguriMessagePayload["message_type"] as? String, "text")
+        XCTAssertEqual(meguriMessagePayload["body"] as? String, "かわいいです")
     }
 
     func testBuildsGroomArchiveAndEngagementRequests() throws {
@@ -292,7 +411,7 @@ final class SupabaseGroomClientTests: XCTestCase {
         let archiveRequest = try client.makeLoadOwnGroomArchiveRequest(userID: userID, limit: 42)
         XCTAssertEqual(
             archiveRequest.url?.absoluteString,
-            "https://example.supabase.co/rest/v1/groom_posts?select=id,user_id,image_url,image_path,published_at,created_at,origin_lat,origin_lng&user_id=eq.00000000-0000-0000-0000-000000000001&status=eq.published&order=published_at.desc.nullslast,created_at.desc&limit=42"
+            "https://example.supabase.co/rest/v1/groom_posts?select=id,user_id,image_url,image_path,published_at,expires_at,created_at,origin_lat,origin_lng&user_id=eq.00000000-0000-0000-0000-000000000001&status=eq.published&order=published_at.desc.nullslast,created_at.desc&limit=42"
         )
 
         let reactionsRequest = try client.makeLoadReactionsRequest(postIDs: [secondPostID, firstPostID])

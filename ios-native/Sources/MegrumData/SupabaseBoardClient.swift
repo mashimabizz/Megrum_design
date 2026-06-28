@@ -3,10 +3,11 @@ import MegrumCore
 
 public enum SupabaseBoardClientError: Error, Equatable, Sendable {
     case imageTooLarge
+    case malformedResponse
 }
 
 public final class SupabaseBoardClient: @unchecked Sendable {
-    private static let threadSelect = "id,author_id,title,body,audience_scope,origin_lat,origin_lng,prefecture,image_paths,latest_activity_at,created_at"
+    private static let threadSelect = "id,author_id,title,body,audience_scope,origin_lat,origin_lng,prefecture,image_paths,status,reply_count,latest_activity_at,expires_at,created_at,anonymous_display_name,anonymous_avatar_id"
     private static let nearbyRadiusMeters = 3_000.0
     private static let boardMediaBucket = "meguri-board-media"
     private static let maxUploadBytes = Int(9.5 * 1_024 * 1_024)
@@ -76,12 +77,10 @@ public final class SupabaseBoardClient: @unchecked Sendable {
             function: "append_meguri_board_reply_for_viewer",
             payload: BoardReplyAppendPayload(input: input)
         )
-        return rows.first?.reply ?? BoardReply(
-            id: UUID(),
-            threadID: input.threadID,
-            authorID: UUID(),
-            body: SupabaseTextNormalizer.trimmed(input.body)
-        )
+        guard let reply = rows.first?.reply else {
+            throw SupabaseBoardClientError.malformedResponse
+        }
+        return reply
     }
 
     public func createThread(_ input: BoardThreadCreateInput) async throws -> BoardThread {
@@ -91,19 +90,14 @@ public final class SupabaseBoardClient: @unchecked Sendable {
             values: [BoardThreadInsertPayload(input: input, imagePaths: imagePaths)],
             select: Self.threadSelect
         )
+        guard let row = rows.first else {
+            throw SupabaseBoardClientError.malformedResponse
+        }
         let signedURLs = await signedURLMap(for: rows)
-        return rows.first?.thread(signedURLs: signedURLs) ?? BoardThread(
-            id: UUID(),
-            authorID: input.authorID,
-            title: SupabaseTextNormalizer.trimmed(input.title),
-            body: SupabaseTextNormalizer.trimmed(input.body),
-            audience: input.audience,
-            latitude: input.latitude,
-            longitude: input.longitude,
-            prefecture: SupabaseTextNormalizer.optional(input.prefecture),
-            imageURLs: imagePaths.compactMap { displayURL(for: $0, signedURLs: signedURLs) },
-            imagePaths: imagePaths
-        )
+        guard let thread = row.thread(signedURLs: signedURLs) else {
+            throw SupabaseBoardClientError.malformedResponse
+        }
+        return thread
     }
 
     public func makeLoadThreadsRequest(
@@ -189,10 +183,6 @@ public final class SupabaseBoardClient: @unchecked Sendable {
 
     private func storagePathCandidate(_ path: String) -> Bool {
         URL(string: path)?.scheme == nil
-    }
-
-    private func displayURL(for path: String, signedURLs: [String: URL]) -> URL? {
-        signedURLs[path] ?? URL(string: path)
     }
 
     private func boardImagePath(userID: UUID, contentType: String) -> String {

@@ -92,7 +92,7 @@ struct GoodsInventoryRow: Decodable, Sendable {
             memberName: characterName,
             goodsTypeName: goodsTypeName,
             title: masterGoodsTitle ?? title,
-            imageURL: photoUrls?.compactMap(URL.init(string:)).first,
+            imageURL: GoodsPhotoURLResolver.displayURL(from: photoUrls),
             tags: [],
             quantity: max(1, quantity ?? 1),
             lockedQuantity: max(0, lockedQty ?? 0),

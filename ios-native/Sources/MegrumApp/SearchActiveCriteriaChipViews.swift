@@ -40,7 +40,9 @@ private struct SearchActiveCriteriaChip: View {
                 }
 
             Button {
-                onRemove(chip.removal)
+                MegrumHaptics.performSelectionChanged {
+                    onRemove(chip.removal)
+                }
             } label: {
                 Image(systemName: "xmark")
                     .font(.system(size: 8.5, weight: .black))

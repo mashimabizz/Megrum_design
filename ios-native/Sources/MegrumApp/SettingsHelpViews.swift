@@ -26,7 +26,7 @@ struct SettingsHelpScreen: View {
                 HelpRouteRow(
                     iconName: "bell",
                     title: "通知",
-                    message: "打診、取引チャット、評価、掲示板の更新を確認できます。届かない時はモバイル通知のON/OFFも見直してください。"
+                    message: "打診、取引チャット、評価、チャットルームの更新を確認できます。届かない時はモバイル通知のON/OFFも見直してください。"
                 )
                 HelpRouteRow(
                     iconName: "shippingbox",

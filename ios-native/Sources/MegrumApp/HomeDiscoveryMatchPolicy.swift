@@ -44,7 +44,7 @@ enum HomeDiscoveryMatchPolicy {
         guard let signals,
               signals.matchesViewerWish,
               signals.matchesViewerWishCharacter,
-              item.memberID != nil
+              item.memberID != nil || item.groupID != nil
         else {
             return false
         }

@@ -36,3 +36,12 @@ enum TradeDetailSlideBackSwipeResolver {
         return isLongEnough
     }
 }
+
+enum TradeDetailSlidePresentationResolver {
+    static func contentOffset(isPresented: Bool, dragOffset: CGFloat, screenWidth: CGFloat) -> CGFloat {
+        guard isPresented else {
+            return screenWidth
+        }
+        return max(0, min(dragOffset, screenWidth))
+    }
+}

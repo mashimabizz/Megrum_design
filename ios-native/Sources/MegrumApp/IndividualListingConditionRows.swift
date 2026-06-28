@@ -54,7 +54,7 @@ struct IndividualListingTagRow: View {
     var body: some View {
         Button(action: action) {
             HStack {
-                IndividualListingConditionRowTitle("タグ")
+                IndividualListingConditionRowTitle("シリーズ")
                 Spacer()
                 IndividualListingConditionRowValue(value: tagSummary, showsChevron: true)
             }

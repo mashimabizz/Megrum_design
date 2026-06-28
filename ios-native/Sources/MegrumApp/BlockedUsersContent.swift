@@ -50,7 +50,7 @@ private struct BlockedUsersEmptyRow: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("ブロック中のユーザーはいません")
                 .font(.headline.weight(.bold))
-            Text("必要になった時は、プロフィールや掲示板のメニューから追加できます。")
+            Text("必要になった時は、プロフィールやチャットルームのメニューから追加できます。")
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(MegrumTheme.muted)
         }

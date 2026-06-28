@@ -57,15 +57,18 @@ public struct HomeIndividualListingWantedPreviewItem: Identifiable, Equatable, S
     public var id: UUID
     public var title: String
     public var imageURL: URL?
+    public var rawTagNames: [String]
 
     public init(
         id: UUID,
         title: String,
-        imageURL: URL? = nil
+        imageURL: URL? = nil,
+        rawTagNames: [String] = []
     ) {
         self.id = id
         self.title = title.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank ?? "グッズ"
         self.imageURL = imageURL
+        self.rawTagNames = rawTagNames
     }
 }
 

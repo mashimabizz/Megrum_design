@@ -1,31 +1,34 @@
 import Foundation
 import MegrumCore
 
-struct HomeDefaultExchangeSettings: Equatable, Sendable {
+public struct HomeDefaultExchangeSettings: Equatable, Sendable {
     var preference: HomeExchangePreference
     var requiresSamePrefecture: Bool
     var requiresDateOverlap: Bool
     var localPrefecture: String
     var localDateKeys: [String]
+    var localDateDetails: [String: HomeExchangeLocalDateDetail]
     var mailShippingFee: IndividualListingShippingFeeDraft
     var mailShippingDays: IndividualListingShippingDaysDraft
 
-    static let standard = HomeDefaultExchangeSettings(
+    public static let standard = HomeDefaultExchangeSettings(
         preference: .both,
         requiresSamePrefecture: true,
         requiresDateOverlap: false,
         localPrefecture: "",
         localDateKeys: [],
+        localDateDetails: [:],
         mailShippingFee: .negotiate,
         mailShippingDays: .twoToFourDays
     )
 
-    init(
+    public init(
         preference: HomeExchangePreference = .both,
         requiresSamePrefecture: Bool = true,
         requiresDateOverlap: Bool = false,
         localPrefecture: String = "",
         localDateKeys: [String] = [],
+        localDateDetails: [String: HomeExchangeLocalDateDetail] = [:],
         mailShippingFee: IndividualListingShippingFeeDraft = .negotiate,
         mailShippingDays: IndividualListingShippingDaysDraft = .twoToFourDays
     ) {
@@ -34,16 +37,18 @@ struct HomeDefaultExchangeSettings: Equatable, Sendable {
         self.requiresDateOverlap = requiresDateOverlap
         self.localPrefecture = localPrefecture.trimmingCharacters(in: .whitespacesAndNewlines)
         self.localDateKeys = HomeExchangeDateKey.normalizedKeys(from: HomeExchangeDateKey.rawValue(from: localDateKeys))
+        self.localDateDetails = Self.normalizedDetails(localDateDetails, selectedKeys: self.localDateKeys)
         self.mailShippingFee = mailShippingFee
         self.mailShippingDays = mailShippingDays
     }
 
-    init(
+    public init(
         preferenceRawValue: String,
         requiresSamePrefecture _: Bool,
         requiresDateOverlap _: Bool,
         localPrefecture: String = "",
         localDateKeysRawValue: String = "",
+        localDateDetailsRawValue: String = "",
         mailShippingFeeRawValue: String = IndividualListingShippingFeeDraft.negotiate.rawValue,
         mailShippingDaysRawValue: String = IndividualListingShippingDaysDraft.twoToFourDays.rawValue
     ) {
@@ -53,6 +58,7 @@ struct HomeDefaultExchangeSettings: Equatable, Sendable {
             requiresDateOverlap: Self.standard.requiresDateOverlap,
             localPrefecture: localPrefecture,
             localDateKeys: HomeExchangeDateKey.normalizedKeys(from: localDateKeysRawValue),
+            localDateDetails: HomeExchangeLocalDateDetailCodec.decode(localDateDetailsRawValue),
             mailShippingFee: IndividualListingShippingFeeDraft(rawValue: mailShippingFeeRawValue) ?? Self.standard.mailShippingFee,
             mailShippingDays: IndividualListingShippingDaysDraft(rawValue: mailShippingDaysRawValue) ?? Self.standard.mailShippingDays
         )
@@ -189,6 +195,23 @@ struct HomeDefaultExchangeSettings: Equatable, Sendable {
     private func normalizedText(_ value: String) -> String? {
         let normalized = value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         return normalized.isEmpty ? nil : normalized
+    }
+
+    private static func normalizedDetails(
+        _ details: [String: HomeExchangeLocalDateDetail],
+        selectedKeys: [String]
+    ) -> [String: HomeExchangeLocalDateDetail] {
+        let selectedKeySet = Set(selectedKeys)
+        return details.reduce(into: [String: HomeExchangeLocalDateDetail]()) { result, pair in
+            guard selectedKeySet.contains(pair.key) else {
+                return
+            }
+            let detail = pair.value
+            result[pair.key] = HomeExchangeLocalDateDetail(
+                prefecture: detail.prefecture.trimmingCharacters(in: .whitespacesAndNewlines),
+                memo: detail.memo.trimmingCharacters(in: .whitespacesAndNewlines)
+            )
+        }
     }
 }
 

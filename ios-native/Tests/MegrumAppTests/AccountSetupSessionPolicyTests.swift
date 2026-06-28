@@ -4,7 +4,28 @@ import MegrumData
 import XCTest
 
 final class AccountSetupSessionPolicyTests: XCTestCase {
-    func testIncompleteStoredAccountStatusesReturnToLoginOnNormalLaunch() {
+    func testAuthScreenVisibilityCanBeForcedWithoutClearingAuthentication() {
+        XCTAssertTrue(
+            AccountSetupSessionPolicy.shouldShowAuthScreen(
+                isAuthenticated: true,
+                isReturningStoredIncompleteAccountToLogin: true
+            )
+        )
+        XCTAssertFalse(
+            AccountSetupSessionPolicy.shouldShowAuthScreen(
+                isAuthenticated: true,
+                isReturningStoredIncompleteAccountToLogin: false
+            )
+        )
+        XCTAssertTrue(
+            AccountSetupSessionPolicy.shouldShowAuthScreen(
+                isAuthenticated: false,
+                isReturningStoredIncompleteAccountToLogin: false
+            )
+        )
+    }
+
+    func testUnstartedStoredAccountStatusesReturnToLoginOnNormalLaunch() {
         XCTAssertTrue(
             AccountSetupSessionPolicy.shouldReturnToLogin(
                 accountStatus: .registered,
@@ -19,7 +40,16 @@ final class AccountSetupSessionPolicyTests: XCTestCase {
                 visualQAInitialScreen: nil
             )
         )
-        XCTAssertTrue(
+    }
+
+    func testStoredOnboardingAccountResumesSetupWithoutReturningToLogin() {
+        XCTAssertFalse(
+            AccountSetupSessionPolicy.shouldShowAuthScreen(
+                isAuthenticated: true,
+                isReturningStoredIncompleteAccountToLogin: false
+            )
+        )
+        XCTAssertFalse(
             AccountSetupSessionPolicy.shouldReturnToLogin(
                 accountStatus: .onboarding,
                 sessionSource: .stored,
@@ -77,6 +107,13 @@ final class AccountSetupSessionPolicyTests: XCTestCase {
                 visualQAInitialScreen: .accountSetup
             )
         )
+    }
+
+    func testReturnToLoginOverrideClearsOnlyAfterInteractiveAuthOrSignOut() {
+        XCTAssertTrue(AccountSetupSessionPolicy.shouldClearReturnToLoginOverride(sessionSource: .interactive))
+        XCTAssertTrue(AccountSetupSessionPolicy.shouldClearReturnToLoginOverride(sessionSource: .none))
+        XCTAssertFalse(AccountSetupSessionPolicy.shouldClearReturnToLoginOverride(sessionSource: .stored))
+        XCTAssertFalse(AccountSetupSessionPolicy.shouldClearReturnToLoginOverride(sessionSource: .initial))
     }
 
     @MainActor

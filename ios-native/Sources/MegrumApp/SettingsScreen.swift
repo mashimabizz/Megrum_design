@@ -41,10 +41,14 @@ struct SettingsScreen: View {
                     profileStatusText: profileStatusText,
                     notificationStatusText: notificationStatusText,
                     pushNotificationStatusText: pushNotificationStatusText,
+                    groomNotificationStatusText: groomNotificationStatusText,
+                    chatroomNotificationStatusText: chatroomNotificationStatusText,
                     addressStatusText: addressStatusText,
                     subscriptionStatusText: subscriptionStatusText,
                     onOpenRoute: openRoute,
-                    onSetPushNotificationsEnabled: setPushNotificationsEnabled
+                    onSetPushNotificationsEnabled: setPushNotificationsEnabled,
+                    onSetGroomActivityPushNotificationsEnabled: setGroomActivityPushNotificationsEnabled,
+                    onSetChatroomActivityPushNotificationsEnabled: setChatroomActivityPushNotificationsEnabled
                 )
 
                 SettingsSupportAccountSection(
@@ -81,38 +85,38 @@ struct SettingsScreen: View {
     }
 
     private var notificationStatusText: String {
-        guard !appState.notifications.isEmpty else {
-            return "未読なし"
-        }
-        if appState.unreadNotificationCount > 0 {
-            return "未読 \(appState.unreadNotificationCount)件"
-        }
-        return "すべて既読"
+        SettingsStatusTextResolver.notificationStatusText(
+            hasNotifications: !appState.notifications.isEmpty,
+            unreadCount: appState.unreadNotificationCount
+        )
     }
 
     private var pushNotificationStatusText: String {
-        appState.pushNotificationsEnabled ? "端末に通知を届ける" : "端末通知はOFF"
+        SettingsStatusTextResolver.pushNotificationStatusText(isEnabled: appState.pushNotificationsEnabled)
+    }
+
+    private var groomNotificationStatusText: String {
+        SettingsStatusTextResolver.groomNotificationStatusText(
+            isEnabled: appState.groomActivityPushNotificationsEnabled
+        )
+    }
+
+    private var chatroomNotificationStatusText: String {
+        SettingsStatusTextResolver.chatroomNotificationStatusText(
+            isEnabled: appState.chatroomActivityPushNotificationsEnabled
+        )
     }
 
     private var profileStatusText: String {
-        guard let viewer = appState.viewer else {
-            return "未読み込み"
-        }
-        if let prefecture = viewer.prefecture, !prefecture.isEmpty {
-            return "\(viewer.displayName) / \(prefecture)"
-        }
-        return viewer.displayName
+        SettingsStatusTextResolver.profileStatusText(viewer: appState.viewer)
     }
 
     private var addressStatusText: String {
-        guard let address = appState.mailingAddress, address.isReady else {
-            return "未登録"
-        }
-        return address.summary
+        SettingsStatusTextResolver.addressStatusText(address: appState.mailingAddress)
     }
 
     private var subscriptionStatusText: String {
-        appState.subscriptionState.isMegrumPlusActive ? "有効" : "未加入"
+        SettingsStatusTextResolver.subscriptionStatusText(isActive: appState.subscriptionState.isMegrumPlusActive)
     }
 
     private var accountSummary: SettingsAccountSummary {
@@ -141,6 +145,18 @@ struct SettingsScreen: View {
     private func setPushNotificationsEnabled(_ enabled: Bool) {
         Task {
             await appState.setPushNotificationsEnabled(enabled)
+        }
+    }
+
+    private func setGroomActivityPushNotificationsEnabled(_ enabled: Bool) {
+        Task {
+            await appState.setGroomActivityPushNotificationsEnabled(enabled)
+        }
+    }
+
+    private func setChatroomActivityPushNotificationsEnabled(_ enabled: Bool) {
+        Task {
+            await appState.setChatroomActivityPushNotificationsEnabled(enabled)
         }
     }
 

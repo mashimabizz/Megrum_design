@@ -8,3 +8,4 @@ MEGRUM_SUPABASE_VIEWER_ID = 00000000-0000-0000-0000-000000000000
 MEGRUM_URL_SCHEME = megrum-preview
 MEGRUM_AUTH_EMAIL_REDIRECT_URL = https:/$()/megrum.jp/auth/callback?next=mobile&scheme=$(MEGRUM_URL_SCHEME)
 MEGRUM_AUTH_OAUTH_AUTHORIZE_URL = https:/$()/megrum.jp/auth/oauth/authorize
+MEGRUM_AD_PREVIEW_VIEWER_IDS =

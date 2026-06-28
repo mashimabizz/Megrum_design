@@ -64,25 +64,34 @@ struct HomeExchangeSettingsInstructionBanner: View {
 }
 
 struct HomeExchangeSettingsSaveFooter: View {
+    var isSaving = false
     var action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            Text("保存")
-                .font(.title3.weight(.black))
-                .foregroundStyle(Color.white)
-                .frame(maxWidth: .infinity, minHeight: 60)
-                .background(
-                    LinearGradient(
-                        colors: [MegrumTheme.lavender, MegrumTheme.lavender.opacity(0.82)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    in: RoundedRectangle(cornerRadius: 18)
-                )
-                .shadow(color: MegrumTheme.lavender.opacity(0.28), radius: 18, y: 10)
+            HStack(spacing: 10) {
+                if isSaving {
+                    ProgressView()
+                        .controlSize(.small)
+                        .tint(.white)
+                }
+                Text("保存")
+                    .font(.title3.weight(.black))
+            }
+            .foregroundStyle(Color.white)
+            .frame(maxWidth: .infinity, minHeight: 60)
+            .background(
+                LinearGradient(
+                    colors: [MegrumTheme.lavender, MegrumTheme.lavender.opacity(0.82)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ),
+                in: RoundedRectangle(cornerRadius: 18)
+            )
+            .shadow(color: MegrumTheme.lavender.opacity(0.28), radius: 18, y: 10)
         }
         .buttonStyle(.plain)
+        .disabled(isSaving)
         .padding(.horizontal, 20)
         .padding(.top, 10)
         .padding(.bottom, 12)

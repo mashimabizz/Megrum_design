@@ -3,73 +3,57 @@ import MegrumCore
 import MegrumData
 
 enum HomeCandidateComposer {
-    static func sections(from composition: SupabaseHomeComposition) -> HomeCandidateSections {
+    static func sections(
+        from composition: SupabaseHomeComposition,
+        viewerOshiSelections: [UserOshiSelection] = []
+    ) -> HomeCandidateSections {
         let tagsByInventoryID = Dictionary(grouping: composition.inventoryTags, by: \.inventoryId)
         let viewerInventory = composition.viewerInventory
         let viewerWishes = composition.viewerWishes
+        let viewerInterests = viewerInterests(
+            viewerWishes: viewerWishes,
+            viewerOshiSelections: viewerOshiSelections
+        )
         let viewerUser = composition.viewerUser
         let listingOptionsByListingID = Dictionary(grouping: composition.listingWishOptions, by: \.listingId)
-        let viewerIsTestAccount = composition.viewerUser.map(HomeCandidateRowMapper.isTestUser) ?? false
-        let excludedTestPartnerUserIDs: Set<UUID> = viewerIsTestAccount
-            ? []
-            : Set(composition.partnerUsers.filter(HomeCandidateRowMapper.isTestUser).map(\.id))
-        let visiblePartnerUsers = composition.partnerUsers.filter { !excludedTestPartnerUserIDs.contains($0.id) }
-        let partnerInventory = viewerIsTestAccount
-            ? composition.partnerInventory
-            : composition.partnerInventory.filter { !excludedTestPartnerUserIDs.contains($0.userId) }
-        let partnerWishes = viewerIsTestAccount
-            ? composition.partnerWishes
-            : composition.partnerWishes.filter { !excludedTestPartnerUserIDs.contains($0.userId) }
-        let partnerListings = viewerIsTestAccount
-            ? composition.partnerListings
-            : composition.partnerListings.filter { !excludedTestPartnerUserIDs.contains($0.userId) }
-        let partnerActivityWindows = viewerIsTestAccount
-            ? composition.partnerActivityWindows
-            : composition.partnerActivityWindows.filter { !excludedTestPartnerUserIDs.contains($0.userId) }
-        let partnerWishesByUser = Dictionary(grouping: partnerWishes, by: \.userId)
-        let partnerListingsByUser = Dictionary(grouping: partnerListings, by: \.userId)
-        let partnerUsersByID = Dictionary(uniqueKeysWithValues: visiblePartnerUsers.map { ($0.id, $0) })
-        let partnerActivityWindowsByUser = Dictionary(grouping: partnerActivityWindows, by: \.userId)
+        let partnerScope = HomeCandidatePartnerScope(composition: composition)
         let availableViewerInventory = viewerInventory.filter(HomeCandidateRowMapper.isMarketAvailable)
         let viewerAllowsMail = availableViewerInventory.contains { exchangeAllowsMail($0.exchangeType) }
         let viewerAllowsLocal = availableViewerInventory.contains { exchangeAllowsLocal($0.exchangeType) }
         let mutualMatchCandidates = mutualMatchCandidates(
-            from: composition.filteredPartnerData(
-                partnerInventory: partnerInventory,
-                partnerWishes: partnerWishes,
-                partnerUsers: visiblePartnerUsers,
-                partnerListings: partnerListings,
-                partnerActivityWindows: partnerActivityWindows
-            ),
+            from: partnerScope.filteredComposition(from: composition),
             tagsByInventoryID: tagsByInventoryID,
             listingOptionsByListingID: listingOptionsByListingID,
-            partnerUsersByID: partnerUsersByID
+            partnerUsersByID: partnerScope.usersByID
         )
 
         var matched: [GoodsItem] = []
         var possible: [GoodsItem] = []
         var conditionSignalsByItemID: [UUID: HomeCandidateConditionSignals] = [:]
 
-        for candidate in sortedCandidates(partnerInventory) where HomeCandidateRowMapper.isMarketAvailable(candidate) {
+        for candidate in sortedCandidates(partnerScope.inventory) where HomeCandidateRowMapper.isMarketAvailable(candidate) {
             let candidateItem = HomeCandidateRowMapper.makeGoodsItem(
                 from: candidate,
                 tags: tagsByInventoryID[candidate.id] ?? [],
-                ownerUser: partnerUsersByID[candidate.userId],
+                ownerUser: partnerScope.usersByID[candidate.userId],
                 ownerHasMegrumPlus: composition.megrumPlusUserIDs.contains(candidate.userId)
             )
             let matchingViewerWishes = viewerWishes.filter { wish in
                 wishRow(wish, matches: candidate)
             }
-            let satisfiesViewerWish = !matchingViewerWishes.isEmpty
-            let satisfiesViewerWishCharacter = matchingViewerWishes.contains { wish in
-                wishRowHasSameConfirmedCharacter(wish, candidate)
+            let matchingViewerInterests = viewerInterests.filter { interest in
+                interest.matches(candidate)
+            }
+            let satisfiesViewerWish = !matchingViewerInterests.isEmpty
+            let satisfiesViewerWishCharacter = matchingViewerInterests.contains { interest in
+                interest.matchesMemberShelf(candidate)
             }
             let tagMatchCount = HomeCandidateTagMatcher.count(
                 itemID: candidate.id,
                 matchingRows: matchingViewerWishes,
                 tagsByInventoryID: tagsByInventoryID
             )
-            let partnerWishesForCandidate = partnerWishesByUser[candidate.userId, default: []]
+            let partnerWishesForCandidate = partnerScope.wishesByUser[candidate.userId, default: []]
             let partnerWishHitRows = partnerWishesForCandidate.filter { partnerWish in
                 availableViewerInventory.contains { viewerItem in
                     wishRow(partnerWish, matches: viewerItem)
@@ -81,7 +65,7 @@ enum HomeCandidateComposer {
                 }
             }
             let partnerWishHitCount = partnerWishHitRows.count
-            let partnerListingHitCount = partnerListingsByUser[candidate.userId, default: []].filter { listing in
+            let partnerListingHitCount = partnerScope.listingsByUser[candidate.userId, default: []].filter { listing in
                 HomeCandidateListingMatchPolicy.listingIncludesCandidate(listing, candidate: candidate)
                     && HomeCandidateListingMatchPolicy.listingHasSelectableWantedOption(
                         listing: listing,
@@ -94,18 +78,19 @@ enum HomeCandidateComposer {
             let partnerListingHit = partnerListingHitCount > 0
             let partnerWantsViewerGoods = partnerWishHit || partnerListingHit
             let individualListingSelection = HomeCandidateListingMatchPolicy.firstSelection(
-                listings: partnerListingsByUser[candidate.userId, default: []],
+                listings: partnerScope.listingsByUser[candidate.userId, default: []],
                 optionsByListingID: listingOptionsByListingID,
                 viewerInventory: availableViewerInventory,
-                listingInventory: partnerInventory,
+                listingInventory: partnerScope.inventory,
                 listingWantedInventory: partnerWishesForCandidate + availableViewerInventory,
+                tagsByInventoryID: tagsByInventoryID,
                 candidate: candidate,
                 includesCash: true
             )
             conditionSignalsByItemID[candidate.id] = conditionSignals(
                 candidate: candidate,
-                partnerUser: partnerUsersByID[candidate.userId],
-                partnerActivityWindows: partnerActivityWindowsByUser[candidate.userId, default: []],
+                partnerUser: partnerScope.usersByID[candidate.userId],
+                partnerActivityWindows: partnerScope.activityWindowsByUser[candidate.userId, default: []],
                 viewerActivityWindows: composition.viewerActivityWindows,
                 viewerUser: viewerUser,
                 viewerAllowsMail: viewerAllowsMail,
@@ -133,11 +118,11 @@ enum HomeCandidateComposer {
         }
 
         for viewerItem in viewerInventory where HomeCandidateRowMapper.isMarketAvailable(viewerItem) {
-            let matchingPartnerWishes = partnerWishes.filter { partnerWish in
+            let matchingPartnerWishes = partnerScope.wishes.filter { partnerWish in
                 wishRow(partnerWish, matches: viewerItem)
             }
             let wishMatchedPartnerUserIDs = orderedUnique(matchingPartnerWishes.map(\.userId))
-            let matchingPartnerListings = partnerListings.filter { listing in
+            let matchingPartnerListings = partnerScope.listings.filter { listing in
                 HomeCandidateListingMatchPolicy.listingWantsViewerGoods(
                     listing: listing,
                     options: listingOptionsByListingID[listing.id, default: []],
@@ -152,21 +137,21 @@ enum HomeCandidateComposer {
             let orderedPartnerIDs = orderedUnique(matchingPartnerWishes.map(\.userId) + matchingPartnerListings.map(\.userId))
             let paymentSignals = HomeCandidatePaymentPolicy.signals(
                 viewerMethods: viewerUser?.paymentMethods,
-                partnerMethodsList: orderedPartnerIDs.map { partnerUsersByID[$0]?.paymentMethods }
+                partnerMethodsList: orderedPartnerIDs.map { partnerScope.usersByID[$0]?.paymentMethods }
             )
             let partnerAllowsMail = matchingPartnerWishes.contains { exchangeAllowsMail($0.exchangeType) }
                 || matchingPartnerListingOptions.contains { exchangeAllowsMail($0.exchangeType) }
             let partnerAllowsLocal = matchingPartnerWishes.contains { exchangeAllowsLocal($0.exchangeType) }
                 || matchingPartnerListingOptions.contains { exchangeAllowsLocal($0.exchangeType) }
             let partnerLocalPrefectureNames = orderedPartnerIDs.compactMap { partnerID in
-                partnerUsersByID[partnerID]?.primaryArea
+                partnerScope.usersByID[partnerID]?.primaryArea
             }
             let partnerLocalPrefectures = Set(
                 partnerLocalPrefectureNames.compactMap(HomeCandidateComposer.normalizedArea)
             )
             let partnerLocalDateKeys = HomeCandidateComposer.localDateKeys(
                 from: orderedPartnerIDs.flatMap { partnerID in
-                    partnerActivityWindowsByUser[partnerID, default: []]
+                    partnerScope.activityWindowsByUser[partnerID, default: []]
                 }
             )
             let partnerExchangeMethodTitle = HomeCandidateComposer.exchangeMethodTitle(
@@ -178,14 +163,15 @@ enum HomeCandidateComposer {
                 dateKeys: partnerLocalDateKeys
             )
             let prefectureMatches = orderedPartnerIDs.contains { partnerID in
-                prefecturesMatch(viewerUser?.primaryArea, partnerUsersByID[partnerID]?.primaryArea)
+                prefecturesMatch(viewerUser?.primaryArea, partnerScope.usersByID[partnerID]?.primaryArea)
             }
             let individualListingSelection = HomeCandidateListingMatchPolicy.firstSelection(
                 listings: matchingPartnerListings,
                 optionsByListingID: listingOptionsByListingID,
                 viewerInventory: [viewerItem],
-                listingInventory: partnerInventory,
-                listingWantedInventory: partnerWishes + [viewerItem]
+                listingInventory: partnerScope.inventory,
+                listingWantedInventory: partnerScope.wishes + [viewerItem],
+                tagsByInventoryID: tagsByInventoryID
             )
 
             conditionSignalsByItemID[viewerItem.id] = HomeCandidateConditionSignals(
@@ -237,32 +223,14 @@ enum HomeCandidateComposer {
     ) -> Bool {
         HomeCandidateGoodsMatchPolicy.wishRowHasSameConfirmedCharacter(wish, item)
     }
-}
 
-private extension SupabaseHomeComposition {
-    func filteredPartnerData(
-        partnerInventory: [SupabaseHomeGoodsRow],
-        partnerWishes: [SupabaseHomeGoodsRow],
-        partnerUsers: [SupabaseHomeUserRow],
-        partnerListings: [SupabaseHomeListingRow],
-        partnerActivityWindows: [SupabaseHomeActivityWindowRow]
-    ) -> SupabaseHomeComposition {
-        SupabaseHomeComposition(
-            localMode: localMode,
-            viewerUser: viewerUser,
-            viewerInventory: viewerInventory,
-            viewerWishes: viewerWishes,
-            viewerListings: viewerListings,
-            partnerInventory: partnerInventory,
-            partnerWishes: partnerWishes,
-            partnerUsers: partnerUsers,
-            partnerListings: partnerListings,
-            listingWishOptions: listingWishOptions,
-            viewerActivityWindows: viewerActivityWindows,
-            partnerActivityWindows: partnerActivityWindows,
-            inventoryTags: inventoryTags,
-            unreadNotificationIDs: unreadNotificationIDs,
-            megrumPlusUserIDs: megrumPlusUserIDs
-        )
+    private static func viewerInterests(
+        viewerWishes: [SupabaseHomeGoodsRow],
+        viewerOshiSelections: [UserOshiSelection]
+    ) -> [HomeCandidateViewerInterest] {
+        guard viewerWishes.isEmpty else {
+            return viewerWishes.map(HomeCandidateViewerInterest.wish)
+        }
+        return HomeCandidateViewerInterest.oshiSelections(viewerOshiSelections)
     }
 }

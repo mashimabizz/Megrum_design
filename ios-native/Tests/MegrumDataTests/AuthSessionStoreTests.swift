@@ -1,3 +1,4 @@
+import Foundation
 import MegrumCore
 import MegrumData
 import XCTest
@@ -20,6 +21,28 @@ final class AuthSessionStoreTests: XCTestCase {
 
         try store.clear()
         XCTAssertNil(try store.load())
+    }
+
+    func testAuthSessionDecodesLegacyStoredPayloadWithoutTokenType() throws {
+        let payload = """
+        {
+          "accessToken": "legacy_access_token",
+          "refreshToken": "legacy_refresh_token",
+          "expiresIn": 3600,
+          "user": {
+            "id": "33333333-3333-3333-3333-333333333333",
+            "email": "michi@example.com"
+          }
+        }
+        """
+
+        let session = try JSONDecoder().decode(AuthSession.self, from: Data(payload.utf8))
+
+        XCTAssertEqual(session.accessToken, "legacy_access_token")
+        XCTAssertEqual(session.refreshToken, "legacy_refresh_token")
+        XCTAssertEqual(session.expiresIn, 3_600)
+        XCTAssertEqual(session.tokenType, "bearer")
+        XCTAssertEqual(session.user.email, "michi@example.com")
     }
 
     func testAuthSessionRefreshPolicyHandlesLegacyExpiryData() {

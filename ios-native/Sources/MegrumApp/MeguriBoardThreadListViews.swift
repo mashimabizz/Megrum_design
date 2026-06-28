@@ -31,7 +31,7 @@ struct MeguriBoardThreadListState: View {
                             MeguriThreadListRow(
                                 thread: thread,
                                 grooms: grooms,
-                                replyCount: replyCounts[thread.id, default: 0],
+                                replyCount: max(replyCounts[thread.id, default: 0], thread.effectiveReplyCount),
                                 index: index
                             )
                         }

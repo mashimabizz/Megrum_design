@@ -43,7 +43,9 @@ private struct SearchPaymentMethodChip: View {
     var action: () -> Void
 
     var body: some View {
-        Button(action: action) {
+        Button {
+            MegrumHaptics.performSelectionChanged(action)
+        } label: {
             Label {
                 Text(method.displayName)
                     .lineLimit(1)

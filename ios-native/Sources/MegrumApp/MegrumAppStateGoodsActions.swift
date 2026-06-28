@@ -104,6 +104,7 @@ extension MegrumAppState {
         isSearchingGoods = true
         errorMessage = nil
         do {
+            await loadBlockedContentUserIDsIfNeeded(reportsFailure: false)
             let items = try await repository.searchGoods(
                 GoodsSearchInput(
                     query: query,
@@ -122,7 +123,10 @@ extension MegrumAppState {
             guard activeSearchRequestID == requestID else {
                 return
             }
-            searchResults = results
+            searchResults = BlockedUserContentFilter.searchResults(
+                results,
+                blockedUserIDs: blockedContentUserIDs
+            )
         } catch {
             if activeSearchRequestID == requestID {
                 errorMessage = "検索結果を読み込めませんでした"

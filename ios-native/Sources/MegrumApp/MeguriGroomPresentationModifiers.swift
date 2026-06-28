@@ -12,6 +12,7 @@ struct MeguriGroomComposerPresentationModifier: ViewModifier {
     var isPreparingPhoto: Bool
     var isCreating: Bool
     var canUseCamera: Bool
+    var locksCreationCoordinate: Bool
     var currentCoordinate: MegrumLocationCoordinate?
     var isRequestingLocation: Bool
     @Binding var isShowingGroomComposer: Bool
@@ -36,6 +37,7 @@ struct MeguriGroomComposerPresentationModifier: ViewModifier {
                 isPreparingPhoto: isPreparingPhoto,
                 isCreating: isCreating,
                 canUseCamera: canUseCamera,
+                locksCreationCoordinate: locksCreationCoordinate,
                 currentCoordinate: currentCoordinate,
                 isRequestingLocation: isRequestingLocation,
                 onRequestLocation: onRequestLocation,
@@ -67,6 +69,7 @@ private extension View {
         isPreparingPhoto: Bool,
         isCreating: Bool,
         canUseCamera: Bool,
+        locksCreationCoordinate: Bool,
         currentCoordinate: MegrumLocationCoordinate?,
         isRequestingLocation: Bool,
         onRequestLocation: @escaping () -> Void,
@@ -84,6 +87,7 @@ private extension View {
                 isPreparingPhoto: isPreparingPhoto,
                 isCreating: isCreating,
                 canUseCamera: canUseCamera,
+                locksCreationCoordinate: locksCreationCoordinate,
                 currentCoordinate: currentCoordinate,
                 isRequestingLocation: isRequestingLocation,
                 onRequestLocation: onRequestLocation,
@@ -102,6 +106,7 @@ private extension View {
                 isPreparingPhoto: isPreparingPhoto,
                 isCreating: isCreating,
                 canUseCamera: false,
+                locksCreationCoordinate: locksCreationCoordinate,
                 currentCoordinate: currentCoordinate,
                 isRequestingLocation: isRequestingLocation,
                 onRequestLocation: onRequestLocation,

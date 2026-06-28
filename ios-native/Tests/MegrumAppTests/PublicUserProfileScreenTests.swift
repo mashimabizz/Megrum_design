@@ -1,4 +1,5 @@
 @testable import MegrumApp
+import CoreGraphics
 import MegrumCore
 import XCTest
 
@@ -14,6 +15,73 @@ final class PublicUserProfileScreenTests: XCTestCase {
         XCTAssertEqual(ProfileVisualHeroDensity.compact.handleFontSize, 13)
         XCTAssertEqual(ProfileVisualHeroDensity.compact.scheduleActionHeight, 38)
         XCTAssertGreaterThanOrEqual(ProfileVisualHeroDensity.compact.statMinWidth, 52)
+    }
+
+    func testPublicExchangeConditionsPresentationCollectsReadonlyConditions() {
+        let userID = UUID(uuidString: "10000000-0000-0000-0000-000000000901")!
+        let listingID = UUID(uuidString: "10000000-0000-0000-0000-000000000902")!
+        let exchangeSummary = IndividualListingExchangeSummary(
+            handoffMethod: .both,
+            localPrefecture: "東京都",
+            localPlaceMemo: "会場付近",
+            localSchedule: "7月3日",
+            shippingFee: .negotiate,
+            shippingDays: .twoToFourDays,
+            acceptsOutsideCondition: true
+        )
+        let listing = IndividualListing(
+            id: listingID,
+            ownerID: userID,
+            haves: [],
+            note: exchangeSummary.storageLine
+        )
+        let settings = HomeDefaultExchangeSettings(
+            preference: .local,
+            localPrefecture: "大阪府",
+            localDateKeys: ["2026-07-03"],
+            localDateDetails: [
+                "2026-07-03": HomeExchangeLocalDateDetail(prefecture: "大阪府", memo: "梅田")
+            ],
+            mailShippingFee: .owner,
+            mailShippingDays: .oneDay
+        )
+        let profile = UserProfile(
+            id: userID,
+            handle: "michi",
+            displayName: "みち",
+            paymentMethods: [.paypay]
+        )
+
+        let presentation = PublicExchangeConditionsPresentation(
+            standardSettings: settings,
+            listings: [listing],
+            profile: profile
+        )
+
+        XCTAssertEqual(presentation.standardSettings, settings)
+        XCTAssertEqual(presentation.listingConditions.map(\.id), [listingID])
+        XCTAssertEqual(presentation.paymentSummaryText, "PayPay")
+        XCTAssertFalse(presentation.isEmpty)
+    }
+
+    func testPublicExchangeConditionsPresentationShowsEmptyWhenNothingIsPublic() {
+        let presentation = PublicExchangeConditionsPresentation(
+            standardSettings: nil,
+            listings: [
+                IndividualListing(
+                    id: UUID(uuidString: "10000000-0000-0000-0000-000000000911")!,
+                    ownerID: UUID(uuidString: "10000000-0000-0000-0000-000000000912")!,
+                    haves: [],
+                    note: "メモだけ"
+                )
+            ],
+            profile: nil
+        )
+
+        XCTAssertNil(presentation.standardSettings)
+        XCTAssertTrue(presentation.listingConditions.isEmpty)
+        XCTAssertEqual(presentation.paymentSummaryText, "未設定")
+        XCTAssertTrue(presentation.isEmpty)
     }
 
     func testPublicOshiTagsKeepGroupAndMemberInSameColorGroup() {

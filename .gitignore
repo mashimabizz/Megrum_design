@@ -22,6 +22,9 @@
 # 詳細は notes/17_legal_alignment.md
 利用規約など/
 
+# Local design source assets copied into app asset catalogs as needed.
+Logo set/
+
 # Logs
 *.log
 npm-debug.log*

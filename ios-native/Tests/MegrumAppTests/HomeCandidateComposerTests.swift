@@ -1098,7 +1098,18 @@ final class HomeCandidateComposerTests: XCTestCase {
             ],
             viewerActivityWindows: [],
             partnerActivityWindows: [],
-            inventoryTags: [],
+            inventoryTags: [
+                try inventoryTagRow(
+                    inventoryID: viewerExactID,
+                    tagID: "40000000-0000-0000-0000-000000000066",
+                    label: "ライブ2026"
+                ),
+                try inventoryTagRow(
+                    inventoryID: partnerWishOnlyID,
+                    tagID: "40000000-0000-0000-0000-000000000071",
+                    label: "会場限定"
+                )
+            ],
             unreadNotificationIDs: []
         )
 
@@ -1120,7 +1131,9 @@ final class HomeCandidateComposerTests: XCTestCase {
         XCTAssertEqual(partnerDetail.offeredItems.map(\.quantity), [2, 1])
         XCTAssertEqual(partnerDetail.wantedOptions.map(\.kind), [.goods, .condition, .cash, .goods])
         XCTAssertEqual(partnerDetail.wantedOptions[0].previewItems.map(\.imageURL?.absoluteString), ["https://example.com/viewer-exact.jpg"])
+        XCTAssertEqual(partnerDetail.wantedOptions[0].previewItems.map(\.rawTagNames), [["ライブ2026"]])
         XCTAssertEqual(partnerDetail.wantedOptions[3].previewItems.map(\.imageURL?.absoluteString), ["https://example.com/partner-wish.jpg"])
+        XCTAssertEqual(partnerDetail.wantedOptions[3].previewItems.map(\.rawTagNames), [["会場限定"]])
 
         let viewerSignals = try XCTUnwrap(sections.conditionSignalsByItemID[UUID(uuidString: viewerExactID)!])
         XCTAssertEqual(viewerSignals.individualListingSelection?.wantedOptions.map(\.kind), [.goods])
@@ -1486,6 +1499,190 @@ final class HomeCandidateComposerTests: XCTestCase {
 
         XCTAssertTrue(signals.matchesViewerWish)
         XCTAssertTrue(signals.matchesViewerWishCharacter)
+    }
+
+    func testComposerUsesSpecificOshiWhenViewerHasNoWishes() throws {
+        let viewerID = UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!
+        let groupID = UUID(uuidString: "20000000-0000-0000-0000-000000000101")!
+        let memberID = UUID(uuidString: "21000000-0000-0000-0000-000000000101")!
+        let partnerGoodsID = UUID(uuidString: "10000000-0000-0000-0000-000000000101")!
+        let composition = SupabaseHomeComposition(
+            localMode: nil,
+            viewerInventory: [],
+            viewerWishes: [],
+            viewerListings: [],
+            partnerInventory: [
+                try goodsRow(
+                    id: partnerGoodsID.uuidString,
+                    userID: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+                    groupID: groupID.uuidString,
+                    characterID: memberID.uuidString,
+                    goodsTypeID: "30000000-0000-0000-0000-000000000101",
+                    title: "Aさん トレカ",
+                    groupName: "BTS",
+                    characterName: "Aさん",
+                    goodsTypeName: "トレカ"
+                )
+            ],
+            partnerWishes: [],
+            partnerUsers: [],
+            partnerListings: [],
+            listingWishOptions: [],
+            viewerActivityWindows: [],
+            partnerActivityWindows: [],
+            inventoryTags: [],
+            unreadNotificationIDs: []
+        )
+        let oshiSelections = [
+            UserOshiSelection(
+                id: UUID(uuidString: "90000000-0000-0000-0000-000000000101")!,
+                userID: viewerID,
+                groupID: groupID,
+                characterID: memberID,
+                kind: .specific,
+                priority: 1,
+                groupName: "BTS",
+                characterName: "Aさん"
+            )
+        ]
+
+        let sections = HomeCandidateComposer.sections(
+            from: composition,
+            viewerOshiSelections: oshiSelections
+        )
+        let signals = try XCTUnwrap(sections.conditionSignalsByItemID[partnerGoodsID])
+        let candidates = HomeDiscoveryCandidateFactory.candidates(
+            from: sections.possibleItems,
+            source: .user,
+            goodsTypes: [],
+            conditionSignalsByItemID: sections.conditionSignalsByItemID
+        )
+
+        XCTAssertEqual(sections.possibleItems.map(\.id), [partnerGoodsID])
+        XCTAssertTrue(signals.matchesViewerWish)
+        XCTAssertTrue(signals.matchesViewerWishCharacter)
+        XCTAssertTrue(HomeDiscoveryMatchPolicy.isMemberMatchEligible(item: sections.possibleItems[0], signals: signals))
+        XCTAssertEqual(candidates.map(\.title), ["Aさん"])
+    }
+
+    func testComposerUsesSoloOshiAsGroupCandidateWhenViewerHasNoWishes() throws {
+        let viewerID = UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!
+        let soloGroupID = UUID(uuidString: "20000000-0000-0000-0000-000000000102")!
+        let partnerGoodsID = UUID(uuidString: "10000000-0000-0000-0000-000000000102")!
+        let composition = SupabaseHomeComposition(
+            localMode: nil,
+            viewerInventory: [],
+            viewerWishes: [],
+            viewerListings: [],
+            partnerInventory: [
+                try goodsRow(
+                    id: partnerGoodsID.uuidString,
+                    userID: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+                    groupID: soloGroupID.uuidString,
+                    goodsTypeID: "30000000-0000-0000-0000-000000000102",
+                    title: "IU ペンライト",
+                    groupName: "IU",
+                    goodsTypeName: "ペンライト"
+                )
+            ],
+            partnerWishes: [],
+            partnerUsers: [],
+            partnerListings: [],
+            listingWishOptions: [],
+            viewerActivityWindows: [],
+            partnerActivityWindows: [],
+            inventoryTags: [],
+            unreadNotificationIDs: []
+        )
+        let oshiSelections = [
+            UserOshiSelection(
+                id: UUID(uuidString: "90000000-0000-0000-0000-000000000102")!,
+                userID: viewerID,
+                groupID: soloGroupID,
+                characterID: nil,
+                kind: .box,
+                priority: 1,
+                groupName: "IU"
+            )
+        ]
+
+        let sections = HomeCandidateComposer.sections(
+            from: composition,
+            viewerOshiSelections: oshiSelections
+        )
+        let signals = try XCTUnwrap(sections.conditionSignalsByItemID[partnerGoodsID])
+        let candidates = HomeDiscoveryCandidateFactory.candidates(
+            from: sections.possibleItems,
+            source: .user,
+            goodsTypes: [],
+            conditionSignalsByItemID: sections.conditionSignalsByItemID
+        )
+
+        XCTAssertEqual(sections.possibleItems.map(\.id), [partnerGoodsID])
+        XCTAssertNil(sections.possibleItems.first?.memberID)
+        XCTAssertTrue(signals.matchesViewerWish)
+        XCTAssertTrue(signals.matchesViewerWishCharacter)
+        XCTAssertTrue(HomeDiscoveryMatchPolicy.isMemberMatchEligible(item: sections.possibleItems[0], signals: signals))
+        XCTAssertEqual(candidates.map(\.title), ["IU"])
+    }
+
+    func testComposerDoesNotUseOshiFallbackWhenViewerHasWishes() throws {
+        let viewerID = UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!
+        let wishGroupID = UUID(uuidString: "20000000-0000-0000-0000-000000000103")!
+        let oshiGroupID = UUID(uuidString: "20000000-0000-0000-0000-000000000104")!
+        let partnerGoodsID = UUID(uuidString: "10000000-0000-0000-0000-000000000103")!
+        let composition = SupabaseHomeComposition(
+            localMode: nil,
+            viewerInventory: [],
+            viewerWishes: [
+                try goodsRow(
+                    id: "10000000-0000-0000-0000-000000000104",
+                    userID: viewerID.uuidString,
+                    groupID: wishGroupID.uuidString,
+                    goodsTypeID: "30000000-0000-0000-0000-000000000103",
+                    title: "登録済みWish"
+                )
+            ],
+            viewerListings: [],
+            partnerInventory: [
+                try goodsRow(
+                    id: partnerGoodsID.uuidString,
+                    userID: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+                    groupID: oshiGroupID.uuidString,
+                    goodsTypeID: "30000000-0000-0000-0000-000000000103",
+                    title: "推しには合うがWishには合わないグッズ"
+                )
+            ],
+            partnerWishes: [],
+            partnerUsers: [],
+            partnerListings: [],
+            listingWishOptions: [],
+            viewerActivityWindows: [],
+            partnerActivityWindows: [],
+            inventoryTags: [],
+            unreadNotificationIDs: []
+        )
+        let oshiSelections = [
+            UserOshiSelection(
+                id: UUID(uuidString: "90000000-0000-0000-0000-000000000103")!,
+                userID: viewerID,
+                groupID: oshiGroupID,
+                characterID: nil,
+                kind: .box,
+                priority: 1,
+                groupName: "推しグループ"
+            )
+        ]
+
+        let sections = HomeCandidateComposer.sections(
+            from: composition,
+            viewerOshiSelections: oshiSelections
+        )
+
+        XCTAssertTrue(sections.matchedItems.isEmpty)
+        XCTAssertTrue(sections.possibleItems.isEmpty)
+        XCTAssertFalse(sections.conditionSignalsByItemID[partnerGoodsID]?.matchesViewerWish ?? true)
+        XCTAssertFalse(sections.conditionSignalsByItemID[partnerGoodsID]?.matchesViewerWishCharacter ?? true)
     }
 
     func testComposerHidesUnavailablePartnerStock() throws {

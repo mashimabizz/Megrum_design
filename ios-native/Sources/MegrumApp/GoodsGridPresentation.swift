@@ -69,7 +69,7 @@ enum GoodsQuickActionKind: CaseIterable, Identifiable, Equatable {
         case .moveToKeep:
             itemStatus == .keep ? "譲る候補へ" : "自分用キープへ"
         case .tag:
-            "タグをつける"
+            "シリーズを設定"
         case .delete:
             "削除する"
         }
@@ -105,7 +105,7 @@ enum GoodsTileCollectionCardStyle {
 
     static func tagLine(for tags: [GoodsTag]) -> String {
         guard !tags.isEmpty else {
-            return "タグ未設定"
+            return "シリーズ未設定"
         }
 
         let visibleTags = tags.prefix(2).map { "# \($0.name)" }.joined(separator: " ")

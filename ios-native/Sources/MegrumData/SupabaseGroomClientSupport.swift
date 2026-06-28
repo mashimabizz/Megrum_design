@@ -11,14 +11,6 @@ extension SupabaseGroomClient {
         return signedURLs
     }
 
-    func createReplyNotification(reply: GroomReply) async throws {
-        let _: [GroomNotificationAckRow] = try await client.insertRows(
-            into: "notifications",
-            values: [GroomReplyNotificationPayload(reply: reply)],
-            select: "id"
-        )
-    }
-
     func ownGroomArchiveQueryItems(userID: UUID, limit: Int) -> [URLQueryItem] {
         [
             URLQueryItem(name: "user_id", value: "eq.\(userID.uuidString.lowercased())"),

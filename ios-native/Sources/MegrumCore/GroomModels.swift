@@ -7,6 +7,8 @@ public struct GroomPost: Identifiable, Codable, Hashable, Sendable {
     public var latitude: Double
     public var longitude: Double
     public var createdAt: Date
+    public var expiresAt: Date?
+    public var likeCount: Int
     public var liked: Bool
 
     public init(
@@ -16,6 +18,8 @@ public struct GroomPost: Identifiable, Codable, Hashable, Sendable {
         latitude: Double,
         longitude: Double,
         createdAt: Date = .now,
+        expiresAt: Date? = nil,
+        likeCount: Int = 0,
         liked: Bool = false
     ) {
         self.id = id
@@ -24,6 +28,8 @@ public struct GroomPost: Identifiable, Codable, Hashable, Sendable {
         self.latitude = latitude
         self.longitude = longitude
         self.createdAt = createdAt
+        self.expiresAt = expiresAt
+        self.likeCount = likeCount
         self.liked = liked
     }
 }
@@ -132,6 +138,59 @@ public struct GroomReaction: Identifiable, Codable, Hashable, Sendable {
         self.groomPostID = groomPostID
         self.userID = userID
         self.reactionType = reactionType
+        self.createdAt = createdAt
+    }
+}
+
+public enum GroomReportReason: String, Codable, Sendable, CaseIterable, Identifiable {
+    case spam
+    case harassment
+    case privacy
+    case other
+
+    public var id: String { rawValue }
+}
+
+public struct GroomReportCreateInput: Equatable, Sendable {
+    public var groomPostID: UUID
+    public var reportedUserID: UUID
+    public var reason: GroomReportReason
+    public var note: String?
+
+    public init(
+        groomPostID: UUID,
+        reportedUserID: UUID,
+        reason: GroomReportReason,
+        note: String? = nil
+    ) {
+        self.groomPostID = groomPostID
+        self.reportedUserID = reportedUserID
+        self.reason = reason
+        self.note = note
+    }
+}
+
+public struct GroomReportTicket: Identifiable, Codable, Hashable, Sendable {
+    public var id: UUID
+    public var groomPostID: UUID
+    public var reportedUserID: UUID
+    public var reason: GroomReportReason
+    public var status: String
+    public var createdAt: Date
+
+    public init(
+        id: UUID,
+        groomPostID: UUID,
+        reportedUserID: UUID,
+        reason: GroomReportReason,
+        status: String = "open",
+        createdAt: Date = .now
+    ) {
+        self.id = id
+        self.groomPostID = groomPostID
+        self.reportedUserID = reportedUserID
+        self.reason = reason
+        self.status = status
         self.createdAt = createdAt
     }
 }

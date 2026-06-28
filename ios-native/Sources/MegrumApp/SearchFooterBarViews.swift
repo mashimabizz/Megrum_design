@@ -10,7 +10,9 @@ struct SearchFooterBar: View {
     var body: some View {
         MegrumGlassGroup(spacing: SearchLayoutMetrics.footerGlassGroupSpacing) {
             HStack(spacing: SearchLayoutMetrics.footerGlassGroupSpacing) {
-                Button(action: onFilterTap) {
+                Button {
+                    MegrumHaptics.performButtonTap(onFilterTap)
+                } label: {
                     SearchFilterIconButtonContent(activeFilterCount: activeFilterCount)
                 }
                 .buttonStyle(.plain)
@@ -18,7 +20,9 @@ struct SearchFooterBar: View {
 
                 SearchInputBar(query: $query, onSubmit: onSubmit)
 
-                Button(action: onSubmit) {
+                Button {
+                    MegrumHaptics.performButtonTap(onSubmit)
+                } label: {
                     Image(systemName: "magnifyingglass")
                         .font(.system(size: 24, weight: .heavy))
                         .foregroundStyle(.white)

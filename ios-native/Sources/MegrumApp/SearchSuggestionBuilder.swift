@@ -62,7 +62,7 @@ enum SearchSuggestionBuilder {
             ),
             SearchSuggestionSection(
                 id: "tag",
-                title: "タグから探す",
+                title: "シリーズから探す",
                 systemImageName: "tag.fill",
                 tintRole: .muted,
                 items: tagItems(

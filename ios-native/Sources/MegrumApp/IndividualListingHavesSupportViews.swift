@@ -20,8 +20,10 @@ struct IndividualListingHaveTabs: View {
 
     private func tabButton(_ tab: IndividualListingHavesStep.Tab, title: String) -> some View {
         Button {
-            withAnimation(.smooth(duration: 0.2)) {
-                selection = tab
+            MegrumHaptics.performSelectionChanged {
+                withAnimation(.smooth(duration: 0.2)) {
+                    selection = tab
+                }
             }
         } label: {
             Text(title)

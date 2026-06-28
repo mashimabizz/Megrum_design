@@ -4,7 +4,9 @@ import SwiftUI
 
 extension TradeDetailScreen {
     var bodyBeforeDialogs: some View {
-        TradeDetailContent(
+        let evidencePhotos = appState.evidencePhotos(for: currentProposal)
+
+        return TradeDetailContent(
             proposal: currentProposal,
             messages: messages,
             viewerID: viewerID,
@@ -23,7 +25,7 @@ extension TradeDetailScreen {
             viewerPaymentNote: viewerPaymentNote,
             viewerHasCounterProposal: viewerHasCounterProposal,
             isMessageComposerFocused: isMessageComposerFocused,
-            evidencePhotos: appState.evidencePhotos(for: currentProposal),
+            evidencePhotos: evidencePhotos,
             selectedEvidencePhotoItem: evidencePhotoPickerSelection,
             partnerLastReadAt: appState.partnerLastReadAt(for: currentProposal.id),
             evaluationState: evaluationPromptState,
@@ -75,7 +77,10 @@ extension TradeDetailScreen {
         .background(MegrumTheme.canvas.ignoresSafeArea())
         .safeAreaInset(edge: .bottom) {
             VStack(spacing: 0) {
-                if currentProposal.status == .agreed {
+                if TradeAgreementNextStepFooterPolicy.showsEvidenceCaptureFooter(
+                    status: currentProposal.status,
+                    evidencePhotos: evidencePhotos
+                ) {
                     TradeAgreementNextStepFooter(
                         isAddingEvidence: appState.addingEvidenceProposalID == currentProposal.id,
                         action: {

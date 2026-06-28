@@ -8,7 +8,9 @@ struct OshiMasterCandidateTag: View {
     var action: () -> Void
 
     var body: some View {
-        Button(action: action) {
+        Button {
+            MegrumHaptics.performSelectionChanged(action)
+        } label: {
             Text(title)
                 .font(.system(size: 14.5, weight: .black, design: .rounded))
                 .lineLimit(1)

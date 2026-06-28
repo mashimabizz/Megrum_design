@@ -91,7 +91,7 @@ struct TradesScreen: View {
                 .padding(.horizontal, 20)
                 .padding(.bottom, 10)
         }
-        .background(MegrumTheme.canvas.ignoresSafeArea())
+        .background(Color.white.ignoresSafeArea())
         .megrumHiddenNavigationBar()
         .onAppear {
             consumeRequestedStage()
@@ -134,9 +134,9 @@ struct TradesScreen: View {
             isSelectingPendingProposals: isSelectingPendingProposals,
             selectedPendingCount: selectedPendingProposalIDs.count,
             isResponding: appState.respondingProposalID != nil,
-            pendingCount: attentionCounts.pendingNeedsResponse,
-            inProgressCount: attentionCounts.inProgressUnread,
-            completedCount: attentionCounts.completedNeedsEvaluation,
+            pendingBadgeCount: attentionCounts.pendingNeedsResponse,
+            inProgressBadgeCount: attentionCounts.inProgressUnread,
+            completedBadgeCount: attentionCounts.completedNeedsEvaluation,
             onWithdrawSelected: withdrawSelectedPendingProposals
         )
     }

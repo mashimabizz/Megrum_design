@@ -65,103 +65,49 @@ struct BoardMapPin: View {
             .shadow(color: MegrumTheme.ink.opacity(0.2), radius: 12, y: 7)
             .saturation(isOutOfRange ? 0.35 : 1)
             .opacity(isOutOfRange ? 0.72 : 1)
-            .accessibilityLabel(isOutOfRange ? "1km圏外の掲示板 \(thread.title)" : "掲示板 \(thread.title)")
+            .accessibilityLabel(isOutOfRange ? "1km圏外のチャットルーム \(thread.title)" : "チャットルーム \(thread.title)")
     }
 }
 
-struct GroomMapDetailSheet: View {
-    var groom: GroomPost
+struct GroomClusterMapPin: View {
+    var count: Int
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("グルーム")
-                .font(.system(size: 26, weight: .heavy, design: .rounded))
-                .foregroundStyle(MegrumTheme.ink)
+        VStack(spacing: 0) {
+            ZStack(alignment: .topTrailing) {
+                Text("Mg")
+                    .font(.system(size: 16, weight: .black, design: .rounded))
+                    .foregroundStyle(.white)
+                    .frame(width: 58, height: 48)
+                    .background(
+                        LinearGradient(
+                            colors: [MegrumTheme.lavender, MegrumTheme.pink],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    )
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .stroke(.white, lineWidth: 3)
+                    }
 
-            AsyncImage(url: groom.imageURL) { phase in
-                switch phase {
-                case .success(let image):
-                    image
-                        .resizable()
-                        .scaledToFill()
-                case .failure:
-                    RoundedRectangle(cornerRadius: 24, style: .continuous)
-                        .fill(.white.opacity(0.86))
-                        .overlay {
-                            GroomImageFailureView(message: "画像を読み込めませんでした", foregroundColor: MegrumTheme.ink)
-                        }
-                default:
-                    RoundedRectangle(cornerRadius: 24, style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [MegrumTheme.sky, MegrumTheme.pink],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .overlay {
-                            ProgressView()
-                                .tint(.white)
-                        }
-                }
+                Text("\(count)")
+                    .font(.system(size: 11, weight: .black, design: .rounded))
+                    .foregroundStyle(.white)
+                    .frame(minWidth: 22, minHeight: 22)
+                    .background(MegrumTheme.pink, in: Circle())
+                    .overlay(Circle().stroke(.white, lineWidth: 2))
+                    .offset(x: 8, y: -8)
             }
-            .frame(maxWidth: .infinity)
-            .frame(height: 160)
-            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .shadow(color: MegrumTheme.ink.opacity(0.22), radius: 12, y: 8)
+
+            Triangle()
+                .fill(.white)
+                .frame(width: 14, height: 8)
+                .offset(y: -1)
         }
-        .padding(20)
-        .background(MegrumTheme.canvas)
-    }
-}
-
-struct GroomThumbnailCircle: View {
-    var url: URL
-    var size: CGFloat
-
-    var body: some View {
-        AsyncImage(url: url) { phase in
-            switch phase {
-            case .success(let image):
-                image
-                    .resizable()
-                    .scaledToFill()
-            case .failure:
-                GroomImageFailureView(message: nil, foregroundColor: .white)
-            default:
-                ProgressView()
-                    .tint(.white)
-            }
-        }
-        .frame(width: size, height: size)
-        .background(
-            LinearGradient(
-                colors: [MegrumTheme.sky, MegrumTheme.pink],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        )
-        .clipShape(Circle())
-        .contentShape(Circle())
-    }
-}
-
-struct GroomImageFailureView: View {
-    var message: String?
-    var foregroundColor: Color
-
-    var body: some View {
-        VStack(spacing: 6) {
-            Image(systemName: "photo")
-                .font(.system(size: message == nil ? 20 : 30, weight: .bold))
-
-            if let message {
-                Text(message)
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
-                    .multilineTextAlignment(.center)
-            }
-        }
-        .foregroundStyle(foregroundColor.opacity(0.78))
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .accessibilityLabel("\(count)件のグルーム")
     }
 }
 
@@ -177,6 +123,40 @@ struct BoardMapAnnotation: Identifiable {
         }
         self.thread = thread
         self.coordinate = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+    }
+}
+
+struct GroomMapCluster: Identifiable {
+    var id: String
+    var posts: [GroomPost]
+    var coordinate: CLLocationCoordinate2D
+
+    var title: String {
+        posts.count > 1 ? "\(posts.count)件のグルーム" : "グルーム"
+    }
+
+    static func clusters(from posts: [GroomPost], cellDegrees: Double = 0.0024) -> [GroomMapCluster] {
+        let grouped = Dictionary(grouping: posts) { post in
+            let lat = Int((post.latitude / cellDegrees).rounded())
+            let lng = Int((post.longitude / cellDegrees).rounded())
+            return "\(lat):\(lng)"
+        }
+        return grouped.map { key, groupedPosts in
+            let latitude = groupedPosts.map(\.latitude).reduce(0, +) / Double(groupedPosts.count)
+            let longitude = groupedPosts.map(\.longitude).reduce(0, +) / Double(groupedPosts.count)
+            let id = groupedPosts.count == 1 ? groupedPosts[0].id.uuidString : key
+            return GroomMapCluster(
+                id: id,
+                posts: groupedPosts.sorted { $0.createdAt > $1.createdAt },
+                coordinate: CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+            )
+        }
+        .sorted { lhs, rhs in
+            if lhs.posts.count == rhs.posts.count {
+                return lhs.id < rhs.id
+            }
+            return lhs.posts.count > rhs.posts.count
+        }
     }
 }
 

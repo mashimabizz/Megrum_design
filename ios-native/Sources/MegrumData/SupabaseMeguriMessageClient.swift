@@ -29,13 +29,14 @@ public final class SupabaseMeguriMessageClient: @unchecked Sendable {
             values: [MeguriMessageCreatePayload(input: input)],
             select: MeguriMessageRow.insertSelect
         )
-        return rows.first?.message ?? MeguriMessage(
+        let message = rows.first?.message ?? MeguriMessage(
             id: UUID(),
             senderID: input.senderID,
             recipientID: input.recipientID,
             sourceGroomReplyID: input.sourceGroomReplyID,
             body: SupabaseTextNormalizer.trimmed(input.body)
         )
+        return message
     }
 
     @discardableResult

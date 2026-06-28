@@ -14,13 +14,13 @@ struct SupabaseOwnedGoodsPersistence: Sendable {
     func loadTradeGoods() async throws -> [GoodsItem] {
         let rows = try await fetchOwnGoodsRows(kind: GoodsEntryKind.inventory.inventoryKind)
         let tagMap = await bestEffortGoodsTagMap(inventoryIDs: rows.map(\.id))
-        return Self.goodsItems(from: rows, tagMap: tagMap)
+        return Self.goodsItems(from: rows, tagMap: tagMap, projectURL: client.projectURL)
     }
 
     func loadWishes() async throws -> [WishItem] {
         let rows = try await fetchOwnGoodsRows(kind: GoodsEntryKind.wish.inventoryKind)
         let tagMap = await bestEffortGoodsTagMap(inventoryIDs: rows.map(\.id))
-        return Self.wishItems(from: rows, tagMap: tagMap)
+        return Self.wishItems(from: rows, tagMap: tagMap, projectURL: client.projectURL)
     }
 
     private func fetchOwnGoodsRows(kind: String) async throws -> [GoodsInventoryRow] {
@@ -91,8 +91,12 @@ struct SupabaseOwnedGoodsPersistence: Sendable {
     }
 
     static func goodsItems(from rows: [GoodsInventoryRow], tagMap: [UUID: [GoodsTag]]) -> [GoodsItem] {
+        goodsItems(from: rows, tagMap: tagMap, projectURL: nil)
+    }
+
+    static func goodsItems(from rows: [GoodsInventoryRow], tagMap: [UUID: [GoodsTag]], projectURL: URL?) -> [GoodsItem] {
         rows.map { row in
-            var item = row.goodsItem
+            var item = row.makeGoodsItem(projectURL: projectURL)
             item.tags = tagMap[row.id] ?? []
             return item
         }
@@ -103,8 +107,12 @@ struct SupabaseOwnedGoodsPersistence: Sendable {
     }
 
     static func wishItems(from rows: [GoodsInventoryRow], tagMap: [UUID: [GoodsTag]]) -> [WishItem] {
+        wishItems(from: rows, tagMap: tagMap, projectURL: nil)
+    }
+
+    static func wishItems(from rows: [GoodsInventoryRow], tagMap: [UUID: [GoodsTag]], projectURL: URL?) -> [WishItem] {
         rows.map { row in
-            var item = row.wishItem
+            var item = row.makeWishItem(projectURL: projectURL)
             item.tags = tagMap[row.id] ?? []
             return item
         }

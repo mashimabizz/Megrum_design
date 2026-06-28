@@ -10,6 +10,7 @@ struct AnchoredDestructiveConfirmationPopover: View {
     var onConfirm: () -> Void
     var isConfirmEnabled: Bool = true
     var showsArrow: Bool = true
+    var destructiveTint: Color = OshiSettingsConfirmationPalette.warn
 
     var body: some View {
         VStack(alignment: .trailing, spacing: 0) {
@@ -61,7 +62,7 @@ struct AnchoredDestructiveConfirmationPopover: View {
                             .foregroundStyle(.white)
                             .frame(maxWidth: .infinity)
                             .frame(height: 38)
-                            .background(OshiSettingsConfirmationPalette.warn, in: Capsule())
+                            .background(destructiveTint, in: Capsule())
                     }
                     .buttonStyle(.plain)
                     .disabled(!isConfirmEnabled)

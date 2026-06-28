@@ -183,6 +183,7 @@ final class SupabaseRequestParityTests: XCTestCase {
             "dispute_closed",
             "cancel_requested",
             "expires_soon",
+            "groom_liked",
             "groom_reply",
             "meguri_message",
             "meguri_board_reply",
@@ -209,24 +210,7 @@ final class SupabaseRequestParityTests: XCTestCase {
         XCTAssertTrue(loadSelect.split(separator: ",").contains("link_path"))
         XCTAssertFalse(loadSelect.contains("linkPath"))
 
-        let groomClient = SupabaseGroomClient(configuration: configuration)
-        let senderID = uuid("22222222-2222-2222-2222-222222222222")
-        let recipientID = uuid("33333333-3333-3333-3333-333333333333")
-        let reply = GroomReply(
-            id: uuid("44444444-4444-4444-4444-444444444444"),
-            groomPostID: uuid("55555555-5555-5555-5555-555555555555"),
-            senderID: senderID,
-            recipientID: recipientID,
-            body: "hello"
-        )
-        let notificationRequest = try groomClient.makeReplyNotificationRequest(reply: reply)
-        let payload = try firstPayloadRow(from: notificationRequest)
-        let linkPath = try XCTUnwrap(payload["link_path"] as? String)
-
-        XCTAssertEqual(payload["kind"] as? String, "groom_reply")
-        XCTAssertTrue(linkPath.hasPrefix("/meguri-letters?"))
-        XCTAssertTrue(linkPath.contains("userId=\(senderID.uuidString.lowercased())"))
-        XCTAssertNil(payload["linkPath"])
+        XCTAssertTrue(loadSelect.split(separator: ",").contains("kind"))
     }
 
     private var configuration: SupabaseConfiguration {

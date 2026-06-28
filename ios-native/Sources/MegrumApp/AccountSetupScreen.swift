@@ -29,38 +29,35 @@ public struct AccountSetupScreen: View {
     @State private var setupInputErrorMessage: String?
     @FocusState private var focusedField: AccountSetupFocusedField?
 
+    private var oshiPresentationState: AccountSetupOshiPresentationState {
+        AccountSetupOshiPresentationState(
+            groups: appState.oshiGroups,
+            genres: appState.oshiGenres,
+            selectedGenreID: selectedGenreID,
+            searchText: oshiSearchText,
+            selectedGroups: selectedOshiGroups,
+            selectedDrafts: selectedOshiDrafts
+        )
+    }
+
     private var selectedOshiInputs: [AccountSetupOshiInput] {
-        OnboardingOshiSelectionLogic.accountSetupInputs(from: selectedOshiDrafts)
+        oshiPresentationState.selectedInputs
     }
 
     private var filteredOshiGroups: [OshiGroup] {
-        let normalizedSearch = oshiSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        return appState.oshiGroups.filter { group in
-            if let selectedGenreID, group.genreID != selectedGenreID {
-                return false
-            }
-            guard !normalizedSearch.isEmpty else {
-                return true
-            }
-            return ([group.name] + group.aliases).contains { candidate in
-                candidate.localizedCaseInsensitiveContains(normalizedSearch)
-            }
-        }
+        oshiPresentationState.filteredGroups
     }
 
     private var oshiCategoryOptions: [OshiCategoryOption] {
-        [OshiCategoryOption(id: nil, title: "すべて")] + appState.oshiGenres.map {
-            OshiCategoryOption(id: $0.id, title: $0.name)
-        }
+        oshiPresentationState.categoryOptions
     }
 
     private var selectedMemberGroups: [OshiGroup] {
-        selectedOshiGroups.filter(\.supportsMemberSelection)
+        oshiPresentationState.selectedMemberGroups
     }
 
     private var selectedMemberTargets: [OnboardingOshiMemberTarget] {
-        selectedMemberGroups.map(OnboardingOshiMemberTarget.init(group:))
-            + OnboardingOshiSelectionLogic.requestedMemberTargets(from: selectedOshiDrafts)
+        oshiPresentationState.selectedMemberTargets
     }
 
     public init(appState: MegrumAppState, mode: AccountSetupMode = .onboarding) {
@@ -135,91 +132,34 @@ public struct AccountSetupScreen: View {
 
     @ViewBuilder
     private var currentStepContent: some View {
-        switch step {
-        case .welcome:
-            AccountSetupWelcomeStep()
-        case .oshi:
-            if isSelectingOshiMembers {
-                AccountSetupOshiMemberStep(
-                    targets: selectedMemberTargets,
-                    selectedOshiDrafts: $selectedOshiDrafts,
-                    charactersByGroupID: charactersByGroupID,
-                    isLoading: isLoadingSelectedMembers || appState.isLoadingOshiCharacters,
-                    errorMessage: setupInputErrorMessage ?? appState.errorMessage,
-                    onClearError: clearError,
-                    onRequestMember: showOshiMemberRequestSheet
-                )
-            } else {
-                AccountSetupOshiMasterStep(
-                    groups: filteredOshiGroups,
-                    categoryOptions: oshiCategoryOptions,
-                    selectedGenreID: $selectedGenreID,
-                    searchText: $oshiSearchText,
-                    selectedGroups: $selectedOshiGroups,
-                    requestedDrafts: selectedOshiDrafts.filter { $0.oshiRequestID != nil },
-                    isLoading: appState.isLoadingOshiGroups,
-                    errorMessage: setupInputErrorMessage ?? appState.errorMessage,
-                    focusedField: $focusedField,
-                    onClearError: clearError,
-                    onRequestOshi: showOshiRequestSheet
-                )
-            }
-        case .area:
-            AccountSetupAreaStep(
-                selectedPrefecture: $prefecture,
-                searchText: $prefectureSearchText,
-                errorMessage: setupInputErrorMessage,
-                focusedField: $focusedField,
-                onClearError: clearError
-            )
-        case .displayName:
-            AccountSetupTextInputStep(
-                label: "表示名",
-                placeholder: "例)めぐるむ",
-                text: $displayName,
-                focusedField: $focusedField,
-                focusCase: .displayName,
-                footnote: "本名や個人が特定できる情報は避けてください。あとから変更できます。",
-                errorMessage: setupInputErrorMessage,
-                onClearError: clearError
-            )
-        case .handle:
-            AccountSetupTextInputStep(
-                label: "ユーザーID",
-                placeholder: "megrum_id",
-                text: $handle,
-                focusedField: $focusedField,
-                focusCase: .handle,
-                leadingText: "@",
-                isHandleField: true,
-                footnote: "半角英数字と _ の3〜20文字で設定してください。",
-                errorMessage: setupInputErrorMessage,
-                onClearError: clearError
-            )
-        case .birthDate:
-            AccountSetupBirthDateStep(
-                birthDate: $birthDate,
-                errorMessage: setupInputErrorMessage,
-                onClearError: clearError
-            )
-        case .gender:
-            AccountSetupGenderStep(
-                gender: $gender,
-                errorMessage: setupInputErrorMessage,
-                onClearError: clearError
-            )
-        case .completion:
-            AccountSetupCompletionStep(
-                displayName: displayName,
-                handle: handle,
-                prefecture: prefecture,
-                birthDate: birthDate,
-                gender: gender,
-                selectedOshiDrafts: selectedOshiDrafts,
-                isSaving: appState.isSavingAccountSetup,
-                errorMessage: setupInputErrorMessage ?? appState.errorMessage
-            )
-        }
+        AccountSetupStepContent(
+            step: step,
+            isSelectingOshiMembers: isSelectingOshiMembers,
+            selectedMemberTargets: selectedMemberTargets,
+            selectedOshiDrafts: $selectedOshiDrafts,
+            charactersByGroupID: charactersByGroupID,
+            isLoadingSelectedMembers: isLoadingSelectedMembers,
+            isLoadingOshiCharacters: appState.isLoadingOshiCharacters,
+            groups: filteredOshiGroups,
+            categoryOptions: oshiCategoryOptions,
+            selectedGenreID: $selectedGenreID,
+            oshiSearchText: $oshiSearchText,
+            selectedOshiGroups: $selectedOshiGroups,
+            isLoadingOshiGroups: appState.isLoadingOshiGroups,
+            selectedPrefecture: $prefecture,
+            prefectureSearchText: $prefectureSearchText,
+            displayName: $displayName,
+            handle: $handle,
+            birthDate: $birthDate,
+            gender: $gender,
+            isSaving: appState.isSavingAccountSetup,
+            setupErrorMessage: setupInputErrorMessage,
+            appErrorMessage: appState.errorMessage,
+            focusedField: $focusedField,
+            onClearError: clearError,
+            onRequestOshi: showOshiRequestSheet,
+            onRequestMember: showOshiMemberRequestSheet
+        )
     }
 
     private var currentTitle: String {
@@ -362,20 +302,10 @@ public struct AccountSetupScreen: View {
     }
 
     private func seedWholeGroupDraftsForSoloGroups() {
-        let selectedIDs = Set(selectedOshiGroups.map(\.id))
-        selectedOshiDrafts.removeAll { draft in
-            guard let groupID = draft.groupID else {
-                return false
-            }
-            return !selectedIDs.contains(groupID)
-        }
-
-        for group in selectedOshiGroups where !group.supportsMemberSelection {
-            guard !OnboardingOshiSelectionLogic.isWholeGroupSelected(group, in: selectedOshiDrafts) else {
-                continue
-            }
-            selectedOshiDrafts = OnboardingOshiSelectionLogic.toggleWholeGroup(group, in: selectedOshiDrafts)
-        }
+        selectedOshiDrafts = OnboardingOshiSelectionLogic.draftsAfterSeedingWholeGroupSelections(
+            selectedGroups: selectedOshiGroups,
+            currentDrafts: selectedOshiDrafts
+        )
     }
 
     private func loadCharactersForSelectedMemberGroups() async {

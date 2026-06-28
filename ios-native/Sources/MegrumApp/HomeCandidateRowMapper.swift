@@ -72,7 +72,7 @@ enum HomeCandidateRowMapper {
             memberName: row.characterName,
             goodsTypeName: row.goodsTypeName,
             title: row.title,
-            imageURL: row.photoUrls.compactMap(URL.init(string:)).first,
+            imageURL: GoodsPhotoURLResolver.displayURL(from: row.photoUrls),
             tags: tags.compactMap { tag in
                 guard let label = tag.label?.trimmingCharacters(in: .whitespacesAndNewlines),
                       !label.isEmpty

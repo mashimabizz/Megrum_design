@@ -9,6 +9,16 @@ struct NotificationSettingPayload: Encodable, Sendable {
     var pushEnabled: Bool
 }
 
+struct GroomActivityNotificationSettingPayload: Encodable, Sendable {
+    var userID: UUID
+    var groomActivityPushEnabled: Bool
+}
+
+struct ChatroomActivityNotificationSettingPayload: Encodable, Sendable {
+    var userID: UUID
+    var chatroomActivityPushEnabled: Bool
+}
+
 struct RevokeNativePushDevicePayload: Encodable, Sendable {
     var revokedAt: String
 }

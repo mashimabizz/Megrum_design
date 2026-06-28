@@ -18,10 +18,13 @@ struct AuthEmailScreen: View {
         VStack(spacing: 0) {
             AuthTopBar(title: isSignIn ? "メールでログイン" : "メールで登録", onBack: onBackToProvider)
 
-            Spacer(minLength: isSignIn ? 22 : 36)
+            Spacer(minLength: isSignIn ? 48 : 36)
 
-            AuthBrandLockup(compact: true)
-                .padding(.bottom, isSignIn ? 38 : 44)
+            AuthBrandLockup(
+                style: isSignIn ? .wordmarkOnly : .compactIconAndWordmark,
+                wordmarkWidth: isSignIn ? 142 : 124
+            )
+            .padding(.bottom, isSignIn ? 18 : 44)
 
             if !isSignIn {
                 Text("メールアドレスで登録")
@@ -33,7 +36,7 @@ struct AuthEmailScreen: View {
             }
 
             AuthEmailCredentialFields(email: $email, password: $password)
-                .padding(.top, isSignIn ? 36 : 50)
+                .padding(.top, isSignIn ? 26 : 50)
 
             if let feedback {
                 AuthVisualFeedbackRow(feedback: feedback)

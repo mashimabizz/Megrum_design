@@ -60,7 +60,7 @@ struct TradeProposalResponsePresentation: Equatable {
 
     var responseHeaderText: String? {
         if viewerHasCounterProposal {
-            return "現在出品中です。相手からの返信待ちです。"
+            return "現在打診中です。相手からの返信待ちです。"
         }
         return showsResponseInstruction ? "応じる条件を選んでください" : nil
     }

@@ -15,7 +15,7 @@ struct HomeGoodsHitDetailSelectionContext {
         if let focusedWantedOption {
             return [focusedWantedOption]
         }
-        return selectableWantedOptions
+        return prioritizedWantedOptions(selectableWantedOptions)
     }
 
     var receiveGoods: [HomeMockGoods] {
@@ -35,10 +35,19 @@ struct HomeGoodsHitDetailSelectionContext {
     }
 
     var wantedOptionPreviewGoods: [HomeMockGoods] {
-        HomeGoodsHitDetailGoodsResolver.wantedOptionPreviewGoods(
-            option: displayedWantedOption,
+        HomeGoodsHitWantedOptionSeriesResolver.orderedPreviewGoods(
+            for: displayedWantedOption,
             usesListingWantedOptions: usesListingWantedOptions,
-            goodsPool: wantedOptionPreviewGoodsPool
+            previewGoodsPool: wantedOptionPreviewGoodsPool,
+            allOfferGoods: allOfferGoods
+        )
+    }
+
+    var wantedOptionPreviewBadgeTextByGoodsID: [UUID: String] {
+        HomeGoodsHitWantedOptionSeriesResolver.badgeTextByGoodsID(
+            option: displayedWantedOption,
+            previewGoods: wantedOptionPreviewGoods,
+            allOfferGoods: allOfferGoods
         )
     }
 
@@ -259,5 +268,14 @@ struct HomeGoodsHitDetailSelectionContext {
 
     private var displayedWantedOption: HomeIndividualListingWantedOption? {
         selectedWantedOptions.first ?? focusedWantedOption ?? wantedOptions.first
+    }
+
+    private func prioritizedWantedOptions(_ options: [HomeIndividualListingWantedOption]) -> [HomeIndividualListingWantedOption] {
+        HomeGoodsHitWantedOptionSeriesResolver.prioritizedWantedOptions(
+            options,
+            usesListingWantedOptions: usesListingWantedOptions,
+            previewGoodsPool: wantedOptionPreviewGoodsPool,
+            allOfferGoods: allOfferGoods
+        )
     }
 }

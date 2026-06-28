@@ -5,29 +5,45 @@ struct HomeMutualMatchPage: View {
     var candidates: [HomeMutualMatchCandidate]
     var listingCount: Int = 0
     var contentTopPadding: CGFloat
+    var refreshIndicatorTopPadding: CGFloat = 0
+    var onRefresh: (() async -> Void)?
     var onSelect: (HomeMutualMatchCandidate) -> Void
     var onCreateListing: () -> Void = {}
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                if candidates.isEmpty {
-                    HomeMutualMatchEmptyStateView(
-                        presentation: HomeMutualMatchEmptyStatePresentation(listingCount: listingCount),
-                        onCreateListing: onCreateListing
-                    )
-                } else {
-                    VStack(spacing: 0) {
-                        ForEach(candidates) { candidate in
-                            HomeMutualMatchCard(candidate: candidate, onSelect: onSelect)
-                        }
+        if let onRefresh {
+            HomePullRefreshScrollView(
+                coordinateSpaceName: "home-mutual-match-refresh",
+                indicatorTopPadding: refreshIndicatorTopPadding,
+                onRefresh: onRefresh
+            ) {
+                content
+            }
+        } else {
+            ScrollView {
+                content
+            }
+        }
+    }
+
+    private var content: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            if candidates.isEmpty {
+                HomeMutualMatchEmptyStateView(
+                    presentation: HomeMutualMatchEmptyStatePresentation(listingCount: listingCount),
+                    onCreateListing: onCreateListing
+                )
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(candidates) { candidate in
+                        HomeMutualMatchCard(candidate: candidate, onSelect: onSelect)
                     }
                 }
             }
-            .padding(.horizontal, 20)
-            .padding(.top, contentTopPadding)
-            .padding(.bottom, FloatingActionLayoutMetrics.contentBottomPadding)
         }
+        .padding(.horizontal, 20)
+        .padding(.top, contentTopPadding)
+        .padding(.bottom, FloatingActionLayoutMetrics.contentBottomPadding)
     }
 }
 

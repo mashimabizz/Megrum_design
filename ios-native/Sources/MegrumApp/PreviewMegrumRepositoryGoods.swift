@@ -121,6 +121,14 @@ public extension PreviewMegrumRepository {
         )
     }
 
+    func reportUser(_ input: UserReportCreateInput) async throws -> UserReportTicket {
+        UserReportTicket(
+            id: UUID(),
+            targetUserID: input.targetUserID,
+            status: "open"
+        )
+    }
+
     func loadIndividualListings() async throws -> [IndividualListing] {
         NativePreviewData.listings
     }

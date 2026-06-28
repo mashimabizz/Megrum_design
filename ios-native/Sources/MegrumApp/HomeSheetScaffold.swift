@@ -47,7 +47,9 @@ struct HomeSheetScaffold<Content: View>: View {
                     .accessibilityLabel("閉じる")
 
                     if showsWishCopyButton {
-                        Button(action: wishCopyButtonAction) {
+                        Button {
+                            MegrumHaptics.performButtonTap(wishCopyButtonAction)
+                        } label: {
                             Image(systemName: "star.fill")
                                 .font(.system(size: 18, weight: .black))
                                 .foregroundStyle(.white)
@@ -76,7 +78,9 @@ struct HomeSheetScaffold<Content: View>: View {
         if bottomButton != nil || secondaryButton != nil {
             VStack(spacing: 10) {
                 if let bottomButton {
-                    Button(action: bottomButtonAction) {
+                    Button {
+                        MegrumHaptics.performButtonTap(bottomButtonAction)
+                    } label: {
                         HStack(spacing: 10) {
                             Image(systemName: "ellipsis.message.fill")
                             Text(bottomButton)

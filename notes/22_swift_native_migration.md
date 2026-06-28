@@ -114,6 +114,7 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 - iter310で、初回プロフィール設定画面に推しグループ/メンバー選択を追加し、`user_oshi` を差し替え保存してから `users.account_status='active'` へ進めるようにした。
 - iter1220で、認証後オンボーディングを Welcome / 推し設定 / 活動エリア / 名前 / ユーザーID / 生年月日 / 性別 / 完了の8ステップへ分割した。推し設定はL1マスタ選択から入り、メンバー選択が必要なL1だけL2選択画面を表示する。完了時は `handle` / `display_name` / `primary_area` / `birth_date` / `age` / `gender` / `user_oshi` / `account_status='active'` を保存する。
 - iter1226.16で、認証後オンボーディングの8ステップは維持したまま、名前とユーザーID入力欄の初期値を空にした。グループ・作品の追加リクエスト後は専用画面へ飛ばず、次のメンバー・キャラクター選択で他の項目と並べて追加リクエストできる。Google登録経由などで `users` 行が未作成の場合も、先に `users` upsertしてから `user_oshi` を保存する。
+- iter1226.17で、生年月日入力をSwiftUIボタン式カレンダーへ置き換え、日付セルのタップを安定させた。初回設定の性別候補は女性・男性のみにし、`users` upsert後の返却selectは列権限が安定している列に限定して保存失敗を避けるようにした。
 - iter311で、設定一覧と住所設定フォームを追加し、`user_mailing_addresses` をSwift側から取得/upsertできる境界を作った。
 - iter312で、郵便番号7桁入力からzipcloud公式APIで住所候補を取得し、住所設定フォームへ反映する境界を追加した。
 - iter313で、Supabase redirect URLのquery / fragmentからsession tokenを復元し、SwiftUI `.onOpenURL` でアプリへ反映する境界を追加した。
@@ -157,7 +158,7 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 - iter370で、OAuth callback schemeを `MEGRUM_URL_SCHEME` build settingから導出するようにし、Apple / Googleなどの外部ID Provider error stateを汎用名へ整理した。
 - iter1226.18で、Google OAuth開始URLを `megrum.jp` の中継Routeへ寄せ、iOSの外部認証確認ダイアログに表示されるアプリ名とドメインをMegrum公式表記へ近づけた。Supabase API通信先とnative callback schemeは維持する。
 - iter371で、初回設定と設定後の推し設定を共通化し、複数グループ/複数メンバーの推し選択、自分プロフィール概要、設定一覧からのプロフィール/推し設定導線を追加した。
-- 現時点のAuthはメール/パスワード、Appleログイン、Googleログインの最小導線まで追加済み。Google側のProvider設定と実機callback許可はSupabase/Apple側の設定確認が残る。
+- 現時点のAuthはメール/パスワード、Appleログイン、Googleログインの最小導線まで追加済み。iter1226.13でGoogle OAuthの戻り先をWeb中継ではなく `megrum-preview://auth/callback` / `megrum://auth/callback` のnative callbackに寄せた。Google側Provider設定、Supabase Redirect URL allowlist、Zoho Custom SMTPは管理画面側の設定確認が残る。
 
 ### Phase 3: Exchange core
 
@@ -184,44 +185,44 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 - iter358で、相手プロフィールに「譲る候補 / 個別募集」のNative segmented controlを追加し、相手の公開グッズや個別募集から打診作成sheetへ進める導線を接続した。個別募集起点の打診では既存 `proposals.listing_id` を保持する。
 - iter359で、Swift Native版の取引詳細から届いた打診を「この内容で承諾」または「断る」導線へ接続した。`proposals.agreed_by_sender` / `agreed_by_receiver` を読み書きし、両者合意で `agreed`、片側合意で `agreement_one_side`、断る場合は `rejected` へ進める。
 - iter360で、`exchange_method='both'` の打診を承諾する時に、Native segmented pickerで `hand` または `mail` を選ばせ、その選択値を `proposals.exchange_method` へPATCHしてから合意へ進めるようにした。
-- iter361で、取引詳細の返答パネルから「条件を変えて再打診」を開けるようにした。元 Proposal を直接変更せず、参加者視点で提示物を反転コピーし、Native sheetで交換手段・交換条件タグ・メッセージを調整した `status='negotiating'` の新しい打診を作成する。再打診作成者は自分の条件に合意済みとして `agreed_by_sender=true` にする。
+- iter361で、取引詳細の返答パネルから「条件を変えて再打診」を開けるようにした。元 Proposal を直接変更せず、参加者視点で提示物を反転コピーし、Native sheetで交換手段・交換条件シリーズ・メッセージを調整した `status='negotiating'` の新しい打診を作成する。再打診作成者は自分の条件に合意済みとして `agreed_by_sender=true` にする。
 - iter362で、取引チャットのメッセージ入力欄の上からも同じ再打診sheetを開けるようにした。再打診は `sent` / `negotiating` / `agreement_one_side` のProposalに限定し、Swift版のiOS標準デザイン感を最終方針として維持する。
 - iter363で、取引チャットのメッセージ入力欄上に「スケジュール」ボタンを追加し、Native sheetで自分と相手の予定を週（5日）/月で確認できるようにした。`schedules` テーブルの `place_name` を含む読み込み境界も追加し、旧Expo版の見た目ではなくSwiftUI標準のsheet / segmented picker / materialで表示する。
 - iter365で、並列実装バッチとして、打診作成sheetの `listing_id` 保持、`ProposalMeetupInput` による現地系打診validation、在庫/Wishグリッドのローディング/空状態/長押し操作、検索/相手プロフィール/個別募集起点の打診導線、取引返答・拒否・証跡承認のRPC化をまとめて補強した。
 - iter365で、Supabase migration `20260531013000_harden_proposal_response_rpc.sql` を追加し、`respond_to_proposal_for_viewer` と `approve_trade_evidence_for_viewer` で行ロックしながら合意・拒否・完了・在庫/個別募集更新を行う方針へ寄せた。
 - iter366で、Swift Nativeの打診作成sheetから `hand` / `both` を送れるように待ち合わせ候補入力を追加し、有効な `ProposalMeetupInput` を送信payloadへ含めるようにした。
 - iter366で、完了RPCを再定義し、双方承認時に数量減算、受け取り側keep作成、譲渡履歴作成、個別募集closed化を同一トランザクションで行うようにした。
-- iter367で、検索画面の下部フィルター導線を検索前から使えるようにし、グループ選択後だけメンバーとグッズタグ候補を表示するNative sheetへ整理した。現地交換日付は複数日、現地交換場所は都道府県として選択できる。
+- iter367で、検索画面の下部フィルター導線を検索前から使えるようにし、グループ選択後だけメンバーとグッズシリーズ候補を表示するNative sheetへ整理した。現地交換日付は複数日、現地交換場所は都道府県として選択できる。
 - iter367で、取引チャットの入力欄を `safeAreaInset` に寄せ、スケジュール、再打診、通報などを入力欄上のメニューへ整理した。写真、位置情報、system、到着状態のメッセージrequest builderも追加した。
 - iter367で、取引チャットの共有写真ビューアをピンチズーム、ズーム中ドラッグ、ダブルタップリセットに対応させた。
 - iter368で、検索の `GoodsSearchInput` に `memberID` を追加し、`goods_inventory.character_id` をlive requestへ渡せるようにした。Preview repositoryとテストも同じ条件に揃えた。
-- iter368で、検索フィルターのグッズ種別とグッズタグを分離し、グループ未選択時はメンバーとグッズタグ候補を非表示にした。グッズタグ候補は最大20件まで表示する。
+- iter368で、検索フィルターのグッズ種別とグッズシリーズを分離し、グループ未選択時はメンバーとグッズシリーズ候補を非表示にした。グッズシリーズ候補は最大20件まで表示する。
 - iter369で、在庫/Wishグリッドの列数・spacing・スケルトン数を共有する `GoodsGridLayout` にまとめ、3/4/5列切り替え、空状態、長押しメニュー、数量バッジ、アクセシビリティを補強した。
 - iter369で、取引チャット系request境界を補強し、位置情報message、到着状態meta、写真message type validation、申告memo validation、証跡承認/評価送信validationを追加した。
 - iter370で、取引チャット入力欄上に到着ステータス、現在地共有、服装写真共有のNative affordanceを追加した。到着ステータスは既存text message境界で送信し、typed location / arrival messageのAppState接続は後続で実装する。
 - iter371で、検索結果/相手プロフィールからの打診作成を専用 `ProposalCreateFlow` に置き換え、「私が出す」「受け取る」「待ち合わせ」「確認」の段階で複数提示物と現地/郵送/どちらもOKを扱えるようにした。
 - iter371で、取引チャットの現在地共有と到着ステータスをAppState/repositoryへ接続し、`messages.location_lat/location_lng/location_label` と `meta.status` を使うtyped messageとして送れるようにした。
 - iter372で、ホームに現地交換モードカードと編集sheetを追加し、会場/現在地、時間枠、半径、持参グッズ概要を表示できるようにした。現時点では端末内保存で、Supabase AW接続は後続対象。
-- iter372で、在庫/WishのNative編集画面を追加し、タイトル、種別、グループ、メンバー、グッズ種別、数量、ステータス、タグ、写真選択入口をまとめた。保存境界未接続の項目は保存前に明示して、黙って欠落させない。
+- iter372で、在庫/WishのNative編集画面を追加し、タイトル、種別、グループ、メンバー、グッズ種別、数量、ステータス、シリーズ、写真選択入口をまとめた。保存境界未接続の項目は保存前に明示して、黙って欠落させない。
 - iter372で、打診送信後に完了画面を表示し、送信後に入力ステップへ戻りにくい構造へ寄せた。
 - iter372で、遅刻/キャンセルの連絡を異議申告ではなく取引チャットのsystem messageとして送る境界へ整理した。
 - iter372で、異議詳細、タイムライン、返信、取り下げ、遅刻/キャンセルdraftのNative scaffoldを追加した。取引詳細からの本接続と実データ接続は後続対象。
 - iter373で、取引チャットの服装写真共有を `PhotosPicker` から `chat-photos` Storage upload、署名URL作成、`messages.message_type='outfit_photo'` 作成まで接続した。
 - iter373で、在庫/Wish編集向けに `goods_inventory` の本人所有PATCH境界とrequest testsを追加した。編集画面からの呼び出し接続は後続対象。
 - iter373で、異議詳細のload、異議返信、取り下げPATCHのlive境界とrequest testsを追加した。scaffold画面からの呼び出し接続は後続対象。
-- iter375で、在庫/Wish編集画面から `updateGoodsEntry` を呼び、本人所有 `goods_inventory` PATCH境界へ接続した。既存画像・既存タグは保存blockerにせず、変更されたタグと新規ローカル写真だけを後続対象として明示する。
+- iter375で、在庫/Wish編集画面から `updateGoodsEntry` を呼び、本人所有 `goods_inventory` PATCH境界へ接続した。既存画像・既存シリーズは保存blockerにせず、変更されたシリーズと新規ローカル写真だけを後続対象として明示する。
 - iter375で、在庫/Wish作成payloadに `character_id` と `status` を含め、新規登録時にもメンバー/状態を落とさないようにした。
 - iter375で、異議詳細画面をload/reply/withdrawの非同期storeへ拡張し、live repositoryへ接続できる画面状態へ進めた。取引詳細からのrouting接続は後続対象。
 - iter375で、`activity_windows` と `user_local_mode_settings` のSwift Data境界を追加した。Home現地交換モード/AW UIからの本接続は後続対象。
 - iter375で、遅刻、キャンセル申請、キャンセル承認などの取引チャットsystem messageをRN互換metadataで作るrequest境界を追加した。入力欄上メニューからのtyped接続と表示デザイン調整は後続対象。
 - iter376で、在庫/Wish作成・編集時のローカル写真を `goods-photos` storageへアップロードし、返却URLを `goods_inventory.photo_urls` へ保存する流れへ接続した。HEICなどは可能な範囲でJPEGへ変換し、対応済み画像形式はcontent typeを維持する。
-- iter376で、`attach_inventory_tag` / `detach_inventory_tag` RPCと `goods_inventory_tags` 読み込みをSwift Data境界へ追加し、作成・検索・公開在庫読み込み・更新でタグを保持できるようにした。
+- iter376で、`attach_inventory_tag` / `detach_inventory_tag` RPCと `goods_inventory_tags` 読み込みをSwift Data境界へ追加し、作成・検索・公開在庫読み込み・更新でシリーズを保持できるようにした。
 - iter377で、個別募集編集をNative Formから `listings` PATCH と `listing_wish_options` PATCH/insertへ接続し、画面内だけでなくSupabaseへ保存される境界まで進めた。
 - iter377で、ホーム現地交換モードの持参候補が相手グッズではなく自分の在庫を優先するように修正した。
-- iter378で、在庫/Wish保存失敗時に入力・タグ・選択写真を保持し、再試行または写真を外して保存できる復帰UIを追加した。
+- iter378で、在庫/Wish保存失敗時に入力・シリーズ・選択写真を保持し、再試行または写真を外して保存できる復帰UIを追加した。
 - iter378で、取引チャットの遅刻連絡とキャンセル申請を `messages.meta.action` 付きのtyped system messageとしてAppState / repository / Supabase message clientへ接続した。
 - iter378で、異議詳細の役割別アクション、証跡表示、反論時の `disputes` 更新をlive Data境界へ追加した。
-- iter379で、在庫/Wish編集画面に既存写真/選択済み写真のpreview、画像読み込み中/失敗時fallback、10MB超過の保存前validationを追加し、失敗後も入力内容・タグ・選択写真を保持したまま再試行できるようにした。
+- iter379で、在庫/Wish編集画面に既存写真/選択済み写真のpreview、画像読み込み中/失敗時fallback、10MB超過の保存前validationを追加し、失敗後も入力内容・シリーズ・選択写真を保持したまま再試行できるようにした。
 - iter379で、`goods-photos` uploadのContent-Type正規化、空/未対応/過大ファイルのrequest validation、グリッド/詳細の画像fallbackを補強した。
 - iter379で、ホーム現地交換モード、打診作成カレンダー/マップ、取引詳細の当日/異議系表示、送信後導線の統合分を取り込んだ。
 - iter380で、ホーム現地交換モードON時にiOS位置情報を取得し、座標を `activity_windows.center_lat/lng` と `user_local_mode_settings.last_location_lat/lng` へ保存/復元する境界まで接続した。
@@ -245,7 +246,7 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 - iter409で、関係図の候補抽出・個別募集条件からの提示物推定・fallbackを `MatchRelationScreenTests` で検証し、`swift build` とSimulator向け `xcodebuild` を通した。
 - iter410で、Swift Native打診作成の複数待ち合わせ候補を `ProposalCreateInput.meetupCandidates` から `proposals.meetup_candidates` へ保存するpayloadへ拡張した。主候補は既存 `meetup_*` 5列へミラーし、JSON側はRN版互換の `startAt/endAt/placeName/lat/lng/mode` 形を保つ。
 - iter411で、関係図をRN版 `match-detail` と同じ「個別募集の中で候補を選ぶ」構造へ修正した。自分/相手の個別募集を一つ選ぶUIを廃止し、wish候補・譲る候補の選択を集計して打診へ進む。
-- iter412で、RN版 `proposal-select` / `proposal-confirm` をサブエージェント監査から日本語仕様整理し、Swift Nativeの提示物選択/送信内容確認へ反映した。相手から受け取る候補を相手の公開在庫から選択できるようにし、私が出す/受け取る双方のフィルター、交換手段による待ち合わせタブ出し分け、確認画面の交換条件タグ/住所確認、関係図起点の初期ステップを整理した。
+- iter412で、RN版 `proposal-select` / `proposal-confirm` をサブエージェント監査から日本語仕様整理し、Swift Nativeの提示物選択/送信内容確認へ反映した。相手から受け取る候補を相手の公開在庫から選択できるようにし、私が出す/受け取る双方のフィルター、交換手段による待ち合わせタブ出し分け、確認画面の交換条件シリーズ/住所確認、関係図起点の初期ステップを整理した。
 - iter413で、ホーム/関係図起点の `match_type` 引き継ぎ、確認画面の `expose_calendar`、住所未登録時の住所設定導線、送信完了後の `打診一覧に飛ぶ` / `まだ他に探す` 導線、受け取る候補未選択時の送信ブロックを追加した。
 
 ### Phase 4: Meguri core
@@ -295,7 +296,7 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 - iter373で、`swift build` / `swift test` 236件 / `xcodebuild` Simulator build / 署名付きiPhone向けDebug build は成功した。`MTO’s phone` はCoreDeviceで `unavailable` のため、自動installは未完了。
 - iter375で、RN parity backlogのP0から在庫/Wish編集画面の保存接続、在庫/Wish作成payloadのメンバー/status保持、異議詳細画面のlive-ready化、AW Data境界、取引チャット運用系system message境界を追加した。
 - iter375で、`swift build` / `swift test` 262件 / `xcodebuild` Simulator build / 署名付きiPhone向けDebug build は成功した。`MTO’s phone` はCoreDeviceで `unavailable` のため、自動installは端末接続復帰待ち。
-- iter376で、左ドロワー/設定/ログアウト/Auth実環境接続、在庫/Wish写真アップロード、タグ保存境界を優先補強した。
+- iter376で、左ドロワー/設定/ログアウト/Auth実環境接続、在庫/Wish写真アップロード、シリーズ保存境界を優先補強した。
 - iter376で、`swift build` / `swift test` 276件 / 署名付きiPhone向けDebug build は成功した。`MTO’s phone` へのinstallも成功した。自動launchのみ端末ロック中のためOSに拒否された。
 - iter377で、左ドロワー配下設定、認証入力、プロフィール編集、個別募集編集、現地交換モード持参候補を優先補強した。
 - iter377で、`swift build` / `swift test` 299件 / 署名付きiPhone向けDebug build は成功した。`MTO’s phone` への上書きinstallと自動launchまで成功した。
@@ -331,11 +332,11 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
    - 残: 相手から見える現地交換モードの表示確認、ホーム上のグルーム導線整理。
    - 主な対象: `ios-native/Sources/MegrumApp/HomeScreen.swift`, `ios-native/Sources/MegrumApp/MegrumAppState.swift`
 2. Inventory / Wish Creation and Editing
-   - iter372で、在庫/WishのNative編集画面を追加し、写真選択入口、タグ、メンバー、status、数量などの入力UIを先に載せた。
+   - iter372で、在庫/WishのNative編集画面を追加し、写真選択入口、シリーズ、メンバー、status、数量などの入力UIを先に載せた。
    - iter373で、`goods_inventory` の本人所有PATCH境界とrequest testsを追加した。
    - iter375で、編集画面からPATCH境界を呼ぶ接続と、作成時のメンバー/status保持を追加した。
-   - iter376で、写真Uploadとタグjoin table保存をlive repositoryへ接続した。
-   - iter378で、保存失敗時に入力・タグ・写真を保持し、再試行または写真を外して保存できるUIを追加した。
+   - iter376で、写真Uploadとシリーズjoin table保存をlive repositoryへ接続した。
+   - iter378で、保存失敗時に入力・シリーズ・写真を保持し、再試行または写真を外して保存できるUIを追加した。
    - iter379で、既存/選択写真preview、画像fallback、10MB超過validation、Content-Type正規化を追加した。
    - 残: 複数カード切り抜き、Storage/RLS実機データでの権限確認。
    - 主な対象: `ios-native/Sources/MegrumApp/CollectionScreens.swift`, 新規 `GoodsEditorScreen.swift`
@@ -347,7 +348,7 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
    - iter380で、待ち合わせ候補を最大3件まで持てるdraft、候補追加/選択/削除、MapKit座標選択、スケジュール場所候補の重複排除を追加した。
    - iter410で、複数待ち合わせ候補をDBへそのまま保存するpayload拡張を追加した。
    - iter411で、関係図からの打診起点をRN版同様に候補選択型へ修正し、複数個別募集を単一 `listingID` へ無理に丸めない集計へ寄せた。
-   - iter412で、`proposal-select` / `proposal-confirm` をRN版から仕様整理し、相手在庫からの受け取り候補選択、私が出す/受け取るのフィルター、交換手段別タブ、確認画面の交換条件タグ/住所確認、関係図起点の初期ステップを補強した。
+   - iter412で、`proposal-select` / `proposal-confirm` をRN版から仕様整理し、相手在庫からの受け取り候補選択、私が出す/受け取るのフィルター、交換手段別タブ、確認画面の交換条件シリーズ/住所確認、関係図起点の初期ステップを補強した。
    - iter413で、`match_type` / `expose_calendar` / 送信完了後導線 / 住所未登録導線 / 受け取る候補必須validationを補強した。
    - 残: liveスケジュール背景の密度調整、複数個別募集を完全に保持するDB/API拡張、相手条件の送信直前再検証。
    - 主な対象: `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`, `ios-native/Sources/MegrumApp/SearchScreen.swift`, `ios-native/Sources/MegrumApp/PublicUserProfileScreen.swift`
@@ -376,6 +377,7 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
    - iter380で、初回設定/プロフィール編集の完了alert、推し選択のアクセシビリティ、法的文書入口、アカウント概要のID/status表示を追加した。
    - iter1220で、認証後オンボーディングを8ステップ化し、推しL1/L2、活動エリア、名前、ユーザーID、生年月日、性別を保存してからホームへ入る流れへ更新した。
    - iter1226.16で、認証後オンボーディングの名前・ユーザーID入力欄を空で開始するようにした。グループ・作品とメンバー・キャラクターの追加リクエスト導線を同じ推し設定フロー内に統合し、Google登録経由でも初回保存できるように `users` upsert順序を補強した。
+   - iter1226.17で、生年月日カレンダーをタップ可能なButtonセルへ置き換え、性別候補を女性・男性に限定し、初回保存後の `users` 返却selectを列権限に合わせて安定化した。
    - iter1221で、設定一覧のログアウト下に薄い「退会する」導線を追加し、注意表示→退会理由/メモ→退会申請、進行中取引がある場合のブロック、ホーム復帰まで接続した。
    - 残: 法的文書/ヘルプ本文の最終整合。
    - 主な対象: `ios-native/Sources/MegrumApp/AuthScreen.swift`, `ios-native/Sources/MegrumApp/AccountSetupScreen.swift`, `ios-native/Sources/MegrumApp/SettingsScreen.swift`

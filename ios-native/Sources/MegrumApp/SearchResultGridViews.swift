@@ -6,6 +6,8 @@ struct SearchResultGrid: View {
     var results: [SearchResultItem]
     var appState: MegrumAppState?
     var viewerID: UUID?
+    var adDisplayContext: AdDisplayContext = AdDisplayContext()
+    var adConfiguration: AdRuntimeConfiguration = .current()
     var onStartProposal: (GoodsItem) -> Void
     var onOpenOwnerProfile: (UUID) -> Void
     var onReportItem: (GoodsItem, GoodsReportReason, String) -> Void
@@ -14,28 +16,15 @@ struct SearchResultGrid: View {
     @State private var pendingProfileUserID: UUID?
     @State private var reportTargetItem: GoodsItem?
 
-    private let columns = Array(repeating: GridItem(.flexible(), spacing: 12), count: 3)
-
     var body: some View {
-        LazyVGrid(columns: columns, spacing: 14) {
-            ForEach(Array(results.enumerated()), id: \.element.id) { index, result in
-                SearchResultGridCard(
-                    item: result.item,
-                    goods: homeGoods(for: result.item, index: index),
-                    conditionTags: conditionTags(for: result, index: index),
-                    viewerID: viewerID,
-                    onOpen: {
-                        selectedSheet = SearchResultHomePresentation.sheet(
-                            for: result,
-                            index: index,
-                            goodsTypes: appState?.goodsTypes ?? [],
-                            explicitSignals: appState?.homeCandidateConditionSignals ?? [:]
-                        )
-                    },
-                    onReport: {
-                        reportTargetItem = result.item
+        Grid(horizontalSpacing: SearchResultGridMetrics.columnSpacing, verticalSpacing: SearchResultGridMetrics.rowSpacing) {
+            ForEach(displayRows) { row in
+                GridRow(alignment: .top) {
+                    ForEach(row.cells) { cell in
+                        gridCell(for: cell.entry)
+                            .gridCellColumns(cell.columnSpan)
                     }
-                )
+                }
             }
         }
         .megrumSlideItemPresentation(item: $selectedSheet) { sheet, _ in
@@ -77,6 +66,25 @@ struct SearchResultGrid: View {
             .map { index, item in
                 HomeMockGoods.from(item: item, index: index, goodsTypes: appState?.goodsTypes ?? [])
             }
+    }
+
+    private var displayEntries: [SearchResultGridEntry] {
+        SearchResultAdInsertion.entries(
+            for: results,
+            includesNativeAds: nativeAdDecision.isAllowed
+        )
+    }
+
+    private var displayRows: [SearchResultGridRow] {
+        SearchResultGridLayout.rows(for: displayEntries)
+    }
+
+    private var nativeAdDecision: AdDisplayDecision {
+        AdDisplayPolicy.decision(
+            for: .searchResultsNative,
+            context: adDisplayContext,
+            configuration: adConfiguration
+        )
     }
 
     private func homeGoods(for item: GoodsItem, index: Int) -> HomeMockGoods {
@@ -127,44 +135,35 @@ struct SearchResultGrid: View {
             result.item.ownerID != viewerID
         }?.item
     }
-}
 
-enum SearchResultHomePresentation {
-    static func signals(
-        for result: SearchResultItem,
-        index: Int,
-        explicitSignals: [UUID: HomeCandidateConditionSignals]
-    ) -> HomeCandidateConditionSignals {
-        explicitSignals[result.item.id] ?? fallbackSignals(for: result.bucket, index: index)
-    }
-
-    static func sheet(
-        for result: SearchResultItem,
-        index: Int,
-        goodsTypes: [GoodsType],
-        explicitSignals: [UUID: HomeCandidateConditionSignals]
-    ) -> HomeDiscoverySheet {
-        let signals = signals(for: result, index: index, explicitSignals: explicitSignals)
-        let payload = HomeDiscoverySheetPayload(
-            goods: HomeMockGoods.from(item: result.item, index: index, goodsTypes: goodsTypes),
-            signals: signals
-        )
-        switch HomeDiscoveryMatchPolicy.goodsCondition(for: signals.goods) {
-        case .direct:
-            return .goodsHit(payload)
-        case .wish, .none:
-            return .wishHit(payload)
-        }
-    }
-
-    private static func fallbackSignals(for bucket: SearchMatchBucket, index: Int) -> HomeCandidateConditionSignals {
-        switch bucket {
-        case .matched:
-            HomeCandidateConditionSignalDefaults.matched(index: index)
-        case .possible:
-            HomeCandidateConditionSignalDefaults.possible(index: index)
-        case .none:
-            HomeCandidateConditionSignalDefaults.noEvidence
+    @ViewBuilder
+    private func gridCell(for entry: SearchResultGridEntry) -> some View {
+        switch entry {
+        case let .goods(index, result):
+            SearchResultGridCard(
+                item: result.item,
+                goods: homeGoods(for: result.item, index: index),
+                conditionTags: conditionTags(for: result, index: index),
+                viewerID: viewerID,
+                onOpen: {
+                    selectedSheet = SearchResultHomePresentation.sheet(
+                        for: result,
+                        index: index,
+                        goodsTypes: appState?.goodsTypes ?? [],
+                        explicitSignals: appState?.homeCandidateConditionSignals ?? [:]
+                    )
+                },
+                onReport: {
+                    reportTargetItem = result.item
+                }
+            )
+        case .nativeAd:
+            AdNativeSlot(
+                placement: .searchResultsNative,
+                displayContext: adDisplayContext,
+                configuration: adConfiguration,
+                presentation: .searchResultsGrid
+            )
         }
     }
 }

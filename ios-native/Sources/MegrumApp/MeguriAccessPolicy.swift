@@ -128,9 +128,9 @@ enum MeguriAccessPolicy {
             return ""
         }
         guard let distance = distanceMeters(from: currentCoordinate, to: thread) else {
-            return "現在地取得後に掲示板を開けます"
+            return "現在地取得後にチャットルームを開けます"
         }
-        return "現在地から\(distance.meguriDistanceText)。1km圏外の掲示板は見ることができません"
+        return "現在地から\(distance.meguriDistanceText)。1km圏外のチャットルームは見ることができません"
     }
 
     static func creationLocationMessage(

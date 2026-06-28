@@ -27,6 +27,29 @@ public extension PreviewMegrumRepository {
         NativePreviewData.blockedUsers
     }
 
+    func loadBlockedUserIDs() async throws -> Set<UUID> {
+        Set(NativePreviewData.blockedUsers.map(\.userID))
+    }
+
+    func blockUser(_ userID: UUID) async throws -> BlockedUser {
+        let profile: UserProfile? = if userID == NativePreviewData.partnerID {
+            NativePreviewData.partner
+        } else if userID == NativePreviewData.viewerID {
+            NativePreviewData.viewer
+        } else if userID == HomeDiscoveryFixtures.ownerID {
+            HomeDiscoveryFixtures.ownerPublicProfile.profile
+        } else {
+            nil
+        }
+        return BlockedUser(
+            userID: userID,
+            handle: profile?.handle ?? "blocked_user",
+            displayName: profile?.displayName ?? profile?.handle ?? "ブロック中のユーザー",
+            avatarURL: profile?.avatarURL,
+            blockedAt: .now
+        )
+    }
+
     func unblockUser(_ userID: UUID) async throws {}
 
     func loadNotifications(limit: Int) async throws -> [MegrumNotification] {
@@ -49,12 +72,24 @@ public extension PreviewMegrumRepository {
         }
     }
 
+    func loadNotificationSettings() async throws -> UserNotificationSettings {
+        UserNotificationSettings()
+    }
+
     func loadPushNotificationsEnabled() async throws -> Bool {
         true
     }
 
     func setPushNotificationsEnabled(_ enabled: Bool) async throws -> Bool {
         enabled
+    }
+
+    func setGroomActivityPushNotificationsEnabled(_ enabled: Bool) async throws -> UserNotificationSettings {
+        UserNotificationSettings(groomActivityPushEnabled: enabled)
+    }
+
+    func setChatroomActivityPushNotificationsEnabled(_ enabled: Bool) async throws -> UserNotificationSettings {
+        UserNotificationSettings(chatroomActivityPushEnabled: enabled)
     }
 
     func registerNativePushDeviceToken(_ token: String, appVersion: String?) async throws {}

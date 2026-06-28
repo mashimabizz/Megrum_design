@@ -20,12 +20,12 @@ enum IndividualListingEditorStep: Int, CaseIterable, Identifiable {
     }
 }
 
-enum IndividualListingHandoffDraft: String, CaseIterable, Identifiable {
+public enum IndividualListingHandoffDraft: String, CaseIterable, Identifiable, Sendable {
     case local
     case mail
     case both
 
-    var id: String { rawValue }
+    public var id: String { rawValue }
 
     var title: String {
         switch self {
@@ -50,12 +50,12 @@ enum IndividualListingHandoffDraft: String, CaseIterable, Identifiable {
     }
 }
 
-enum IndividualListingShippingFeeDraft: String, CaseIterable, Identifiable {
+public enum IndividualListingShippingFeeDraft: String, CaseIterable, Identifiable, Sendable {
     case owner
     case partner
     case negotiate
 
-    var id: String { rawValue }
+    public var id: String { rawValue }
 
     static let selectableCases: [Self] = [.owner, .negotiate]
 
@@ -71,12 +71,12 @@ enum IndividualListingShippingFeeDraft: String, CaseIterable, Identifiable {
     }
 }
 
-enum IndividualListingShippingDaysDraft: String, CaseIterable, Identifiable {
+public enum IndividualListingShippingDaysDraft: String, CaseIterable, Identifiable, Sendable {
     case oneDay
     case twoToFourDays
     case afterFiveDays
 
-    var id: String { rawValue }
+    public var id: String { rawValue }
 
     var title: String {
         switch self {

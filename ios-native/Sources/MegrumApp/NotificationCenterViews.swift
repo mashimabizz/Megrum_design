@@ -115,6 +115,8 @@ extension MegrumNotificationKind {
             "exclamationmark.triangle"
         case .expiresSoon:
             "clock"
+        case .groomLiked:
+            "heart"
         case .groomReply, .meguriMessage:
             "message"
         case .meguriBoardReply, .meguriBoardMention:
@@ -132,7 +134,7 @@ extension MegrumNotificationKind {
             Color.green
         case .proposalRejected, .disputeReceived, .disputeResponded, .disputeClosed, .cancelRequested:
             Color.orange
-        case .evaluationReceived, .meguriBoardMention, .expiresSoon:
+        case .evaluationReceived, .groomLiked, .meguriBoardMention, .expiresSoon:
             MegrumTheme.pink
         case .messageReceived:
             MegrumTheme.sky
@@ -150,7 +152,7 @@ extension MegrumNotificationKind {
              .disputeReceived, .disputeResponded, .disputeClosed, .cancelRequested,
              .expiresSoon:
             true
-        case .groomReply, .meguriMessage, .meguriBoardReply, .meguriBoardMention,
+        case .groomLiked, .groomReply, .meguriMessage, .meguriBoardReply, .meguriBoardMention,
              .adminAnnouncement, .unknown:
             false
         }
