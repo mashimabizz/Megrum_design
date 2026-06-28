@@ -6,14 +6,34 @@ extension MegrumAppState {
     public func loadGroomMapPosts(
         latitude: Double? = nil,
         longitude: Double? = nil,
-        radiusMeters: Int = 3_000
+        radiusMeters: Int = 3_000,
+        force: Bool = false
     ) async {
-        guard !isLoadingGroomMap else {
+        let cacheKey = MeguriFeedCacheKey(
+            latitude: latitude,
+            longitude: longitude,
+            radiusMeters: radiusMeters
+        )
+        let hasCachedContent = !groomMapPosts.isEmpty
+        guard force || groomMapCacheKey != cacheKey || !hasCachedContent else {
+            return
+        }
+        guard !isGroomMapRequestInFlight else {
             return
         }
 
-        isLoadingGroomMap = true
+        let shouldShowLoading = !hasCachedContent
+        isGroomMapRequestInFlight = true
+        if shouldShowLoading {
+            isLoadingGroomMap = true
+        }
         errorMessage = nil
+        defer {
+            isGroomMapRequestInFlight = false
+            if shouldShowLoading {
+                isLoadingGroomMap = false
+            }
+        }
         do {
             let posts = try await repository.loadGroomMapPosts(
                 latitude: latitude,
@@ -21,11 +41,13 @@ extension MegrumAppState {
                 radiusMeters: radiusMeters
             )
             groomMapPosts = posts
+            groomMapCacheKey = cacheKey
             await loadMeguriProfiles(userIDs: Set(posts.map(\.authorID)), reportsFailure: false)
         } catch {
-            errorMessage = "グルームマップを読み込めませんでした"
+            if !hasCachedContent {
+                errorMessage = "グルームマップを読み込めませんでした"
+            }
         }
-        isLoadingGroomMap = false
     }
 
     public func loadGroomArchive(limit: Int = MegrumPlusLimits.defaultGroomArchivePageLimit) async {

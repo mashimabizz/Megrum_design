@@ -62,6 +62,39 @@ public final class SupabaseMeguriProfileClient: @unchecked Sendable {
         }
     }
 
+    public func saveProfile(_ input: MeguriProfileUpdateInput, userID: UUID) async throws -> MeguriProfile {
+        do {
+            return try await saveProfile(input)
+        } catch SupabaseMeguriProfileClientError.duplicatedDisplayName {
+            throw SupabaseMeguriProfileClientError.duplicatedDisplayName
+        } catch SupabaseMeguriProfileClientError.changeLocked {
+            throw SupabaseMeguriProfileClientError.changeLocked
+        } catch SupabaseMeguriProfileClientError.malformedResponse {
+            throw SupabaseMeguriProfileClientError.malformedResponse
+        } catch {
+            return try await upsertProfile(input, userID: userID)
+        }
+    }
+
+    private func upsertProfile(_ input: MeguriProfileUpdateInput, userID: UUID) async throws -> MeguriProfile {
+        do {
+            let rows: [MeguriProfileRow] = try await client.upsertRows(
+                into: "meguri_profiles",
+                values: [MeguriProfileUpsertPayload(userID: userID, input: input)],
+                select: MeguriProfileRow.select,
+                onConflict: "user_id"
+            )
+            guard let profile = rows.first?.profile else {
+                throw SupabaseMeguriProfileClientError.malformedResponse
+            }
+            return profile
+        } catch let error as SupabaseRESTError where error == .unexpectedStatus(409) {
+            throw SupabaseMeguriProfileClientError.duplicatedDisplayName
+        } catch let error as SupabaseRESTError where error == .unexpectedStatus(400) {
+            throw SupabaseMeguriProfileClientError.changeLocked
+        }
+    }
+
     public func makeLoadProfilesRequest(userIDs: Set<UUID>) throws -> URLRequest {
         let joinedIDs = userIDs.map { $0.uuidString.lowercased() }.sorted().joined(separator: ",")
         return try client.makeRequest(
@@ -77,6 +110,15 @@ public final class SupabaseMeguriProfileClient: @unchecked Sendable {
         try client.makeRPCRequest(
             function: "set_meguri_profile_for_viewer",
             payload: MeguriProfileSavePayload(input: input)
+        )
+    }
+
+    public func makeUpsertProfileRequest(_ input: MeguriProfileUpdateInput, userID: UUID) throws -> URLRequest {
+        try client.makeUpsertRequest(
+            into: "meguri_profiles",
+            values: [MeguriProfileUpsertPayload(userID: userID, input: input)],
+            select: MeguriProfileRow.select,
+            onConflict: "user_id"
         )
     }
 }

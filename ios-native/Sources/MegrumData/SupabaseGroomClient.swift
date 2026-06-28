@@ -13,6 +13,7 @@ public final class SupabaseGroomClient: @unchecked Sendable {
     static let maxMapRadiusMeters = 3_000
     static let minRadiusMeters = 100
     let client: SupabaseRESTClient
+    let signedURLCache = SupabaseGroomSignedURLCache()
 
     public init(configuration: SupabaseConfiguration, session: URLSession = .shared) {
         self.client = SupabaseRESTClient(configuration: configuration, session: session)

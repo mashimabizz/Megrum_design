@@ -4,6 +4,64 @@
 
 ---
 
+## イテレーション1226.97：めぐり読込とプロフィール保存改善
+
+### 背景・問題意識
+
+めぐりのグルーム読み込みで、画面を戻るたびに同じ範囲のデータと画像署名URLを取り直し、既に表示済みの内容でもローディングが出やすかった。また、めぐり画面左側の自分プロフィールアイコンが下部の操作アイコン列と中央線で揃っておらず、めぐりプロフィール保存もRPC未反映時に失敗していた。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MegrumAppState*`
+- めぐりフィードとグルームマップに位置・範囲・表示種別ベースのキャッシュキーを追加し、同じ条件で既に表示済みなら再読み込みしないようにした。
+- リクエスト中フラグを追加し、同じ読み込みが重複して走らないようにした。
+- 既存表示がある状態の更新ではローディング表示で画面を空にせず、失敗時も既存内容を保持するようにした。
+- グルーム作成直後だけは `force` 付きで再読み込みし、新規投稿が反映されるようにした。
+
+#### `ios-native/Sources/MegrumData/SupabaseGroomClient*`
+- Storage画像の署名URLを50分キャッシュし、一度読み込んだグルーム画像では署名URLを再取得しないようにした。
+- 未キャッシュの署名URL取得は並列化し、複数画像の読み込み待ちを短くした。
+
+#### `ios-native/Sources/MegrumData/SupabaseMeguriProfileClient*`
+#### `ios-native/Sources/MegrumApp/SupabaseMegrumRepositoryMeguri.swift`
+- めぐりプロフィール保存は従来のRPCを優先し、RPCが未反映または失敗した場合は本人の `meguri_profiles` 行を直接 upsert するフォールバックを追加した。
+- 重複名、変更ロック、不正レスポンスとして判定できるエラーは従来通りユーザー向けエラーへ残した。
+
+#### `ios-native/Sources/MegrumApp/MeguriHomeViews.swift`
+- 左側の自分プロフィールアイコンを下部のチャット・アーカイブ列と同じ中央線に揃え、少し上へ移動した。
+
+### 影響範囲
+
+- めぐりホームの初期表示・再表示・グルーム作成後更新
+- グルーム画像の署名URL取得
+- めぐりプロフィール保存
+- めぐり画面左側のプロフィールアイコン配置
+
+状態名や取引状態は追加・変更していないため `notes/09_state_machines.md` は更新しない。新しいユーザー向け用語も追加していないため `notes/10_glossary.md` は更新しない。
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-meguri-cache --enable-xctest --disable-swift-testing -j 1 --filter 'MegrumAppStateTests|SupabaseGroomClientTests|SupabaseMeguriProfileClientTests'`
+  - passed（109 tests, 0 failures）
+- `git diff --check`
+  - passed
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'platform=iOS Simulator,id=C70DDDBB-2602-49E0-8F95-1F043BCCED76' -derivedDataPath /tmp/megrum-native-meguri-cache-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+  - passed
+- `xcrun simctl install C70DDDBB-2602-49E0-8F95-1F043BCCED76 /tmp/megrum-native-meguri-cache-xcodebuild/Build/Products/Debug-iphonesimulator/MegrumNative.app`
+  - passed
+- `SIMCTL_CHILD_MEGRUM_VISUAL_QA_PREVIEW_AUTH=1 SIMCTL_CHILD_MEGRUM_VISUAL_QA_INITIAL_SCREEN=meguri xcrun simctl launch --terminate-running-process C70DDDBB-2602-49E0-8F95-1F043BCCED76 tokyo.megrum.native.preview`
+  - passed（PID 39434）
+- `xcrun simctl io C70DDDBB-2602-49E0-8F95-1F043BCCED76 screenshot /tmp/megrum-meguri-cache-check.png`
+  - passed（左側プロフィールアイコンの中央線揃えを確認）
+
+### セルフレビュー結果
+
+- ✅ 同じ範囲のめぐりを開き直すだけなら既存表示を保持し、不要な読み込みとローディングを避ける。
+- ✅ グルーム作成後は強制更新するため、新規投稿の反映は維持した。
+- ✅ 署名URLキャッシュは有効期限より短い50分にして、期限切れURLの再利用リスクを抑えた。
+- ✅ めぐりプロフィール保存はRPC優先のまま、RPC未反映環境でも本人行の保存に進める。
+- ✅ 左側プロフィールアイコンは下部操作列と視覚的な中心を揃えた。
+
 ## イテレーション1226.96：推し設定と再打診の実操作修正
 
 ### 背景・問題意識

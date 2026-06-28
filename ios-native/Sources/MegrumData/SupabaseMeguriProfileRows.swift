@@ -32,3 +32,15 @@ struct MeguriProfileSavePayload: Encodable, Sendable {
         self.pAvatarId = SupabaseTextNormalizer.trimmed(input.avatarID)
     }
 }
+
+struct MeguriProfileUpsertPayload: Encodable, Sendable {
+    var userID: UUID
+    var displayName: String
+    var avatarID: String
+
+    init(userID: UUID, input: MeguriProfileUpdateInput) {
+        self.userID = userID
+        self.displayName = SupabaseTextNormalizer.trimmed(input.displayName)
+        self.avatarID = SupabaseTextNormalizer.trimmed(input.avatarID)
+    }
+}

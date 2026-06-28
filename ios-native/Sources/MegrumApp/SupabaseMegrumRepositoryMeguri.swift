@@ -64,7 +64,7 @@ public extension SupabaseMegrumRepository {
     }
 
     func saveMeguriProfile(_ input: MeguriProfileUpdateInput) async throws -> MeguriProfile {
-        try await meguriProfileClient.saveProfile(input)
+        try await meguriProfileClient.saveProfile(input, userID: viewerID)
     }
 
     func loadMeguriMessages() async throws -> [MeguriMessage] {

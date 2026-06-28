@@ -175,6 +175,62 @@ final class SupabaseGroomClientTests: XCTestCase {
         XCTAssertEqual(posts.map(\.imageURL.absoluteString), ["https://example.com/near.jpg"])
     }
 
+    func testLoadNearbyGroomsReusesCachedSignedURLForRepeatedPath() throws {
+        let imagePath = "00000000-0000-0000-0000-000000000001/cached.jpg"
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [GroomMockURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        let client = SupabaseGroomClient(configuration: self.configuration, session: session)
+        var signRequestCount = 0
+
+        GroomMockURLProtocol.requestHandler = { request in
+            guard let url = request.url else {
+                throw GroomMockError.missingURL
+            }
+
+            switch url.path {
+            case "/rest/v1/rpc/list_groom_feed_nearby":
+                let data = Data("""
+                [
+                  {
+                    "id": "00000000-0000-0000-0000-000000000501",
+                    "user_id": "00000000-0000-0000-0000-000000000001",
+                    "image_url": "\(imagePath)",
+                    "image_path": "\(imagePath)",
+                    "published_at": "2026-05-31T00:00:00Z",
+                    "created_at": "2026-05-31T00:00:00Z",
+                    "origin_lat": 35.681236,
+                    "origin_lng": 139.767125
+                  }
+                ]
+                """.utf8)
+                return (GroomMockURLProtocol.response(for: url, statusCode: 200), data)
+
+            case "/storage/v1/object/sign/groom-posts/\(imagePath)":
+                signRequestCount += 1
+                let data = Data(#"{"signedURL":"https://cdn.example.com/cached.jpg"}"#.utf8)
+                return (GroomMockURLProtocol.response(for: url, statusCode: 200), data)
+
+            default:
+                throw GroomMockError.unexpectedRequest(url.absoluteString)
+            }
+        }
+        defer {
+            GroomMockURLProtocol.requestHandler = nil
+        }
+
+        let first = try waitForAsyncResult {
+            try await client.loadNearbyGrooms(latitude: 35.681236, longitude: 139.767125)
+        }
+        let second = try waitForAsyncResult {
+            try await client.loadNearbyGrooms(latitude: 35.681236, longitude: 139.767125)
+        }
+
+        XCTAssertEqual(first.first?.imageURL.absoluteString, "https://cdn.example.com/cached.jpg")
+        XCTAssertEqual(second.first?.imageURL.absoluteString, "https://cdn.example.com/cached.jpg")
+        XCTAssertEqual(signRequestCount, 1)
+    }
+
     func testBuildsGroomPostCreateRequest() throws {
         let client = SupabaseGroomClient(configuration: configuration)
         let authorID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!

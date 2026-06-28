@@ -7,15 +7,37 @@ extension MegrumAppState {
         latitude: Double? = nil,
         longitude: Double? = nil,
         prefecture: String? = nil,
-        scope: BoardThread.Audience = .nearby3km
+        scope: BoardThread.Audience = .nearby3km,
+        force: Bool = false
     ) async {
-        guard !isLoadingMeguri else {
+        let selectedPrefecture = boardPrefecture(explicitPrefecture: prefecture)
+        let cacheKey = MeguriFeedCacheKey(
+            latitude: latitude,
+            longitude: longitude,
+            radiusMeters: 1_000,
+            prefecture: selectedPrefecture,
+            scope: scope
+        )
+        let hasCachedContent = !grooms.isEmpty || !threads.isEmpty
+        guard force || meguriFeedCacheKey != cacheKey || !hasCachedContent else {
+            return
+        }
+        guard !isMeguriFeedRequestInFlight else {
             return
         }
 
-        let selectedPrefecture = boardPrefecture(explicitPrefecture: prefecture)
-        isLoadingMeguri = true
+        let shouldShowLoading = !hasCachedContent
+        isMeguriFeedRequestInFlight = true
+        if shouldShowLoading {
+            isLoadingMeguri = true
+        }
         errorMessage = nil
+        defer {
+            isMeguriFeedRequestInFlight = false
+            if shouldShowLoading {
+                isLoadingMeguri = false
+            }
+        }
         do {
             async let loadedGrooms = repository.loadGrooms(
                 latitude: latitude,
@@ -32,14 +54,16 @@ extension MegrumAppState {
             let nextThreads = try await loadedThreads
             grooms = nextGrooms
             threads = nextThreads
+            meguriFeedCacheKey = cacheKey
             await loadMeguriProfiles(
                 userIDs: Set(nextGrooms.map(\.authorID) + nextThreads.map(\.authorID)),
                 reportsFailure: false
             )
         } catch {
-            errorMessage = "めぐりを読み込めませんでした"
+            if !hasCachedContent {
+                errorMessage = "めぐりを読み込めませんでした"
+            }
         }
-        isLoadingMeguri = false
     }
 
     private func boardPrefecture(explicitPrefecture: String?) -> String? {

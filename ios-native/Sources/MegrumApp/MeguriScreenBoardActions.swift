@@ -56,7 +56,7 @@ extension MeguriScreen {
         }
     }
 
-    func reloadMeguriFeed(scope: BoardThread.Audience? = nil) async {
+    func reloadMeguriFeed(scope: BoardThread.Audience? = nil, force: Bool = false) async {
         let targetScope = scope ?? selectedBoardScope
         if targetScope == .nearby3km, locationState.coordinate == nil {
             await MainActor.run {
@@ -68,13 +68,15 @@ extension MeguriScreen {
             latitude: locationState.coordinate?.latitude,
             longitude: locationState.coordinate?.longitude,
             prefecture: selectedBoardPrefecture,
-            scope: targetScope
+            scope: targetScope,
+            force: force
         )
         if let coordinate = locationState.coordinate {
             await appState.loadGroomMapPosts(
                 latitude: coordinate.latitude,
                 longitude: coordinate.longitude,
-                radiusMeters: 3_000
+                radiusMeters: 3_000,
+                force: force
             )
         }
     }

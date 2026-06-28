@@ -83,7 +83,7 @@ extension MeguriScreen {
         )
         if created {
             localNoticeMessage = nil
-            await reloadMeguriFeed()
+            await reloadMeguriFeed(force: true)
             return true
         } else {
             let message = appState.errorMessage ?? "グルームを投稿できませんでした"

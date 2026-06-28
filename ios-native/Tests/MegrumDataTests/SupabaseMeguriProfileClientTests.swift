@@ -32,6 +32,29 @@ final class SupabaseMeguriProfileClientTests: XCTestCase {
         XCTAssertEqual(json["p_avatar_id"] as? String, "avatar_3")
     }
 
+    func testBuildsUpsertProfileFallbackRequest() throws {
+        let client = SupabaseMeguriProfileClient(configuration: configuration)
+        let userID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+
+        let request = try client.makeUpsertProfileRequest(
+            MeguriProfileUpdateInput(displayName: " めぐり名 ", avatarID: " avatar_3 "),
+            userID: userID
+        )
+        let body = try XCTUnwrap(request.httpBody)
+        let rows = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [[String: Any]])
+        let payload = try XCTUnwrap(rows.first)
+
+        XCTAssertEqual(request.httpMethod, "POST")
+        XCTAssertEqual(
+            request.url?.absoluteString,
+            "https://example.supabase.co/rest/v1/meguri_profiles?select=user_id,display_name,avatar_id,last_changed_at,created_at,updated_at&on_conflict=user_id"
+        )
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Prefer"), "resolution=merge-duplicates,return=representation")
+        XCTAssertEqual(payload["user_id"] as? String, userID.uuidString.lowercased())
+        XCTAssertEqual(payload["display_name"] as? String, "めぐり名")
+        XCTAssertEqual(payload["avatar_id"] as? String, "avatar_3")
+    }
+
     private var configuration: SupabaseConfiguration {
         SupabaseConfiguration(
             projectURL: URL(string: "https://example.supabase.co")!,

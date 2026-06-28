@@ -488,6 +488,22 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertTrue(state.threads.contains { $0.prefecture == "東京都" })
     }
 
+    func testAppStateReusesCachedMeguriFeedForSameLocationBucket() async {
+        let repository = CountingMeguriRepository()
+        let state = MegrumAppState(repository: repository)
+
+        await state.loadMeguriFeed(latitude: 35.681236, longitude: 139.767125, scope: .nearby3km)
+        await state.loadMeguriFeed(latitude: 35.681240, longitude: 139.767129, scope: .nearby3km)
+
+        let groomLoadCount = await repository.groomLoadCount()
+        let boardLoadCount = await repository.boardLoadCount()
+        XCTAssertEqual(groomLoadCount, 1)
+        XCTAssertEqual(boardLoadCount, 1)
+        XCTAssertFalse(state.grooms.isEmpty)
+        XCTAssertFalse(state.threads.isEmpty)
+        XCTAssertFalse(state.isLoadingMeguri)
+    }
+
     func testAppStateLoadsAndSendsPreviewBoardReplies() async {
         let state = MegrumAppState(repository: PreviewMegrumRepository())
         let threadID = UUID(uuidString: "00000000-0000-0000-0000-000000000601")!
@@ -2159,6 +2175,69 @@ private struct PlaceholderAccountSetupRepository: MegrumRepository {
             age: ProfileBirthDateCodec.age(from: input.birthDate),
             accountStatus: .active
         )
+    }
+}
+
+private actor CountingMeguriRepository: MegrumRepository {
+    private let viewerID = UUID(uuidString: "44444444-4444-4444-4444-444444444441")!
+    private var groomLoads = 0
+    private var boardLoads = 0
+
+    func loadInitialSnapshot() async throws -> MegrumAppSnapshot {
+        MegrumAppSnapshot(
+            viewer: UserProfile(
+                id: viewerID,
+                handle: "meguri_cache",
+                displayName: "めぐりキャッシュ"
+            ),
+            inventory: [],
+            wishes: [],
+            proposals: [],
+            grooms: [],
+            threads: []
+        )
+    }
+
+    func loadGrooms(latitude: Double?, longitude: Double?, radiusMeters: Int) async throws -> [GroomPost] {
+        groomLoads += 1
+        return [
+            GroomPost(
+                id: UUID(uuidString: "44444444-4444-4444-4444-444444444451")!,
+                authorID: viewerID,
+                imageURL: URL(string: "https://example.com/groom-cache.jpg")!,
+                latitude: latitude ?? 35.681236,
+                longitude: longitude ?? 139.767125
+            )
+        ]
+    }
+
+    func loadBoardThreads(
+        latitude: Double?,
+        longitude: Double?,
+        prefecture: String?,
+        scope: BoardThread.Audience
+    ) async throws -> [BoardThread] {
+        boardLoads += 1
+        return [
+            BoardThread(
+                id: UUID(uuidString: "44444444-4444-4444-4444-444444444461")!,
+                authorID: viewerID,
+                title: "キャッシュ確認",
+                body: "同じ場所では再取得しない",
+                audience: scope,
+                latitude: latitude,
+                longitude: longitude,
+                prefecture: prefecture
+            )
+        ]
+    }
+
+    func groomLoadCount() -> Int {
+        groomLoads
+    }
+
+    func boardLoadCount() -> Int {
+        boardLoads
     }
 }
 

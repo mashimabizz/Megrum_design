@@ -126,6 +126,10 @@ public final class MegrumAppState: ObservableObject {
     var activeSearchRequestID: UUID?
     var registeredNativePushDeviceToken: String?
     var hasLoadedBlockedContentUserIDs = false
+    var meguriFeedCacheKey: MeguriFeedCacheKey?
+    var groomMapCacheKey: MeguriFeedCacheKey?
+    var isMeguriFeedRequestInFlight = false
+    var isGroomMapRequestInFlight = false
     private static weak var activeInstanceStorage: MegrumAppState?
 
     static var activeInstance: MegrumAppState? {
