@@ -4,6 +4,66 @@
 
 ---
 
+## イテレーション1226.105：SwiftUI状態境界の整理
+
+### 背景・問題意識
+
+オンボーディング、グッズ画像表示、グッズ登録の一部状態が画面本体に散っており、今後の保存・画像候補・登録フロー修正時に関係ない状態まで読み解く必要があった。挙動、レイアウト、ナビゲーション、保存順、DB/API境界を変えず、状態所有とファイル責務だけを整理する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/AccountSetupScreen.swift`
+- 推し選択関連の状態を `AccountSetupOshiState` へ集約した。
+- 表示名、ID、都道府県、生年月日、性別、入力エラーを `AccountSetupProfileState` へ集約した。
+- 既存のバリデーション、追加リクエスト、保存API呼び出し順は維持した。
+
+#### `ios-native/Sources/MegrumApp/AccountSetupOshiState.swift`
+#### `ios-native/Sources/MegrumApp/AccountSetupProfileState.swift`
+- `AccountSetupScreen` の入力・推し選択状態を小さな状態型として分離した。
+
+#### `ios-native/Sources/MegrumApp/GoodsRemoteImage.swift`
+#### `ios-native/Sources/MegrumApp/GoodsGridDisplayViews.swift`
+- グッズ画像の読み込み、スケルトン、フォールバック表示を `GoodsRemoteImage.swift` へ移動し、グッズ表示補助ファイルの責務を整理した。
+
+#### `ios-native/Sources/MegrumApp/GoodsEditorScreen.swift`
+#### `ios-native/Sources/MegrumApp/GoodsEditorSheetSeriesSuggestions.swift`
+#### `ios-native/Sources/MegrumApp/GoodsEditorImageSeriesSuggestionState.swift`
+- 画像からシリーズ候補を出す処理の候補一覧、読み込み中、エラー状態を `GoodsEditorImageSeriesSuggestionState` へ集約した。
+
+### 影響範囲
+
+- 新規オンボーディングの入力状態管理
+- グッズ一覧・検索・プロフィールなどで使うリモート画像表示部品
+- マイグッズ/Wish登録の画像からシリーズ候補を出すシート状態
+
+表示文言、保存処理、Supabase API、認証状態、通知、課金、取引状態は変更していない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/AccountSetupScreen.swift ios-native/Sources/MegrumApp/AccountSetupOshiState.swift ios-native/Sources/MegrumApp/AccountSetupProfileState.swift ios-native/Sources/MegrumApp/GoodsGridDisplayViews.swift ios-native/Sources/MegrumApp/GoodsRemoteImage.swift ios-native/Sources/MegrumApp/GoodsEditorScreen.swift ios-native/Sources/MegrumApp/GoodsEditorSheetSeriesSuggestions.swift ios-native/Sources/MegrumApp/GoodsEditorImageSeriesSuggestionState.swift`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-account --enable-xctest --disable-swift-testing -j 1 --filter 'AccountSetupScreenTests|AccountSetupSessionPolicyTests|OnboardingOshiSelectionTests'`
+  - passed（35 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-account --enable-xctest --disable-swift-testing -j 1 --filter 'GoodsGridLayoutTests'`
+  - passed（28 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-account --enable-xctest --disable-swift-testing -j 1 --filter 'GoodsEditorDraftTests|GoodsEditorWishPhotoRemovalPolicyTests'`
+  - passed（29 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-full --enable-xctest --disable-swift-testing -j 1`
+  - passed（1198 tests, 3 skipped）
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild-refactor CODE_SIGNING_ALLOWED=NO build`
+  - passed
+
+### セルフレビュー結果
+
+- ✅ ユーザーに見える文言、レイアウト、画面遷移、保存順、API呼び出しは維持した。
+- ✅ `AccountSetupScreen` の状態が推し選択とプロフィール入力で分かれ、今後のオンボーディング修正時に読む範囲が狭くなった。
+- ✅ グッズ画像表示の読み込みUIを独立ファイルへ移し、一覧表示系の部品責務を見つけやすくした。
+- ✅ 画像からシリーズ候補を出す状態を1つの型にまとめ、読み込み中・候補・エラーの更新漏れを起こしにくくした。
+- ✅ `notes/09_state_machines.md` は状態遷移の追加・変更がないため更新不要と判断した。
+- ✅ `notes/10_glossary.md` は新しい用語追加がないため更新不要と判断した。
+- ✅ `notes/05_data_model.md` はデータモデル変更がないため更新不要と判断した。
+
+
 ## イテレーション1226.103：画像からシリーズ候補のWeb画像検索化
 
 ### 背景・問題意識

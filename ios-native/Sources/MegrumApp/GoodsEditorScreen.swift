@@ -52,9 +52,7 @@ struct GoodsEditorSheet: View {
     @State var isShowingTagSelectionSheet = false
     @State var isShowingCreateBulkTagSelectionSheet = false
     @State var isConfirmingInventoryCreateWithoutTags = false
-    @State var imageSeriesSuggestionNames: [String] = []
-    @State var isSuggestingImageSeries = false
-    @State var imageSeriesSuggestionError: String?
+    @State var imageSeriesSuggestionState = GoodsEditorImageSeriesSuggestionState()
     @FocusState var isTagFieldFocused: Bool
     #if canImport(PhotosUI)
     @State var selectedPhotoItem: PhotosPickerItem?
@@ -232,9 +230,9 @@ struct GoodsEditorSheet: View {
                     textFieldPlaceholder: "例：会場限定",
                     footerText: "このWishにシリーズを追加します。",
                     confirmationTitle: "追加",
-                    imageSuggestionNames: imageSeriesSuggestionNames,
-                    isSuggestingFromImage: isSuggestingImageSeries,
-                    imageSuggestionError: imageSeriesSuggestionError,
+                    imageSuggestionNames: imageSeriesSuggestionState.names,
+                    isSuggestingFromImage: imageSeriesSuggestionState.isLoading,
+                    imageSuggestionError: imageSeriesSuggestionState.errorMessage,
                     canSuggestFromImage: draftSeriesSuggestionInput != nil,
                     onSuggestFromImage: requestDraftImageSeriesSuggestions,
                     onApply: addTagFromSelectionSheet
@@ -251,9 +249,9 @@ struct GoodsEditorSheet: View {
                     textFieldPlaceholder: "例：会場限定",
                     footerText: "\(selectedCreateMetaIDs.count)件の画像に同じシリーズを追加します。",
                     confirmationTitle: "登録",
-                    imageSuggestionNames: imageSeriesSuggestionNames,
-                    isSuggestingFromImage: isSuggestingImageSeries,
-                    imageSuggestionError: imageSeriesSuggestionError,
+                    imageSuggestionNames: imageSeriesSuggestionState.names,
+                    isSuggestingFromImage: imageSeriesSuggestionState.isLoading,
+                    imageSuggestionError: imageSeriesSuggestionState.errorMessage,
                     canSuggestFromImage: selectedCreateMetaSeriesSuggestionInput != nil,
                     onSuggestFromImage: requestSelectedCreateMetaImageSeriesSuggestions,
                     onApply: applyCreateBulkTag

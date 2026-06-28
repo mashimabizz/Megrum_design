@@ -9,34 +9,20 @@ public struct AccountSetupScreen: View {
     private let mode: AccountSetupMode
 
     @State private var step: AccountSetupStep = .welcome
-    @State private var isSelectingOshiMembers = false
-    @State private var oshiSearchText = ""
-    @State private var selectedGenreID: UUID?
-    @State private var selectedOshiGroups: [OshiGroup] = []
-    @State private var selectedOshiDrafts: [OnboardingOshiDraft] = []
-    @State private var charactersByGroupID: [UUID: [OshiCharacter]] = [:]
-    @State private var isLoadingSelectedMembers = false
-    @State private var oshiRequestSheet: OshiRequestSheetState?
-    @State private var oshiMemberRequestContext: OshiMemberRequestContext?
+    @State private var oshiState = AccountSetupOshiState()
+    @State private var profileState: AccountSetupProfileState
     @State private var toastMessage: String?
     @State private var toastID = UUID()
-    @State private var prefectureSearchText = ""
-    @State private var displayName: String
-    @State private var handle: String
-    @State private var prefecture: String
-    @State private var birthDate: Date
-    @State private var gender: UserGender?
-    @State private var setupInputErrorMessage: String?
     @FocusState private var focusedField: AccountSetupFocusedField?
 
     private var oshiPresentationState: AccountSetupOshiPresentationState {
         AccountSetupOshiPresentationState(
             groups: appState.oshiGroups,
             genres: appState.oshiGenres,
-            selectedGenreID: selectedGenreID,
-            searchText: oshiSearchText,
-            selectedGroups: selectedOshiGroups,
-            selectedDrafts: selectedOshiDrafts
+            selectedGenreID: oshiState.selectedGenreID,
+            searchText: oshiState.searchText,
+            selectedGroups: oshiState.selectedGroups,
+            selectedDrafts: oshiState.selectedDrafts
         )
     }
 
@@ -63,11 +49,15 @@ public struct AccountSetupScreen: View {
     public init(appState: MegrumAppState, mode: AccountSetupMode = .onboarding) {
         self.appState = appState
         self.mode = mode
-        _displayName = State(initialValue: mode == .onboarding ? "" : (appState.viewer?.displayName ?? ""))
-        _handle = State(initialValue: mode == .onboarding ? "" : (appState.viewer?.handle ?? ""))
-        _prefecture = State(initialValue: appState.viewer?.prefecture ?? "")
-        _birthDate = State(initialValue: appState.viewer?.birthDate ?? Self.defaultBirthDate)
-        _gender = State(initialValue: AccountSetupGenderOptions.contains(appState.viewer?.gender) ? appState.viewer?.gender : nil)
+        _profileState = State(
+            initialValue: AccountSetupProfileState(
+                displayName: mode == .onboarding ? "" : (appState.viewer?.displayName ?? ""),
+                handle: mode == .onboarding ? "" : (appState.viewer?.handle ?? ""),
+                prefecture: appState.viewer?.prefecture ?? "",
+                birthDate: appState.viewer?.birthDate ?? Self.defaultBirthDate,
+                gender: AccountSetupGenderOptions.contains(appState.viewer?.gender) ? appState.viewer?.gender : nil
+            )
+        )
     }
 
     public var body: some View {
@@ -81,20 +71,20 @@ public struct AccountSetupScreen: View {
         .task {
             await prepareInitialState()
         }
-        .sheet(item: $oshiRequestSheet) { state in
+        .sheet(item: $oshiState.requestSheet) { state in
             OshiRequestSheet(
                 state: state,
                 genres: appState.oshiGenres,
-                onClose: { oshiRequestSheet = nil },
+                onClose: { oshiState.requestSheet = nil },
                 onSubmit: submitOshiRequestTapped
             )
             .presentationDetents([.large])
             .presentationDragIndicator(.hidden)
         }
-        .sheet(item: $oshiMemberRequestContext) { context in
+        .sheet(item: $oshiState.memberRequestContext) { context in
             OshiMemberRequestSheet(
                 context: context,
-                onClose: { oshiMemberRequestContext = nil },
+                onClose: { oshiState.memberRequestContext = nil },
                 onSubmit: { payload in
                     submitOshiMemberRequestTapped(payload, context: context)
                 }
@@ -109,8 +99,8 @@ public struct AccountSetupScreen: View {
             step: step,
             title: currentTitle,
             subtitle: currentSubtitle,
-            showsBackButton: step != .welcome || isSelectingOshiMembers,
-            isPrimaryDisabled: appState.isSavingAccountSetup || isLoadingSelectedMembers,
+            showsBackButton: step != .welcome || oshiState.isSelectingMembers,
+            isPrimaryDisabled: appState.isSavingAccountSetup || oshiState.isLoadingSelectedMembers,
             primaryTitle: step.primaryButtonTitle,
             onBack: goBack,
             onPrimary: primaryAction
@@ -134,26 +124,26 @@ public struct AccountSetupScreen: View {
     private var currentStepContent: some View {
         AccountSetupStepContent(
             step: step,
-            isSelectingOshiMembers: isSelectingOshiMembers,
+            isSelectingOshiMembers: oshiState.isSelectingMembers,
             selectedMemberTargets: selectedMemberTargets,
-            selectedOshiDrafts: $selectedOshiDrafts,
-            charactersByGroupID: charactersByGroupID,
-            isLoadingSelectedMembers: isLoadingSelectedMembers,
+            selectedOshiDrafts: $oshiState.selectedDrafts,
+            charactersByGroupID: oshiState.charactersByGroupID,
+            isLoadingSelectedMembers: oshiState.isLoadingSelectedMembers,
             isLoadingOshiCharacters: appState.isLoadingOshiCharacters,
             groups: filteredOshiGroups,
             categoryOptions: oshiCategoryOptions,
-            selectedGenreID: $selectedGenreID,
-            oshiSearchText: $oshiSearchText,
-            selectedOshiGroups: $selectedOshiGroups,
+            selectedGenreID: $oshiState.selectedGenreID,
+            oshiSearchText: $oshiState.searchText,
+            selectedOshiGroups: $oshiState.selectedGroups,
             isLoadingOshiGroups: appState.isLoadingOshiGroups,
-            selectedPrefecture: $prefecture,
-            prefectureSearchText: $prefectureSearchText,
-            displayName: $displayName,
-            handle: $handle,
-            birthDate: $birthDate,
-            gender: $gender,
+            selectedPrefecture: $profileState.prefecture,
+            prefectureSearchText: $profileState.prefectureSearchText,
+            displayName: $profileState.displayName,
+            handle: $profileState.handle,
+            birthDate: $profileState.birthDate,
+            gender: $profileState.gender,
             isSaving: appState.isSavingAccountSetup,
-            setupErrorMessage: setupInputErrorMessage,
+            setupErrorMessage: profileState.inputErrorMessage,
             appErrorMessage: appState.errorMessage,
             focusedField: $focusedField,
             onClearError: clearError,
@@ -163,14 +153,14 @@ public struct AccountSetupScreen: View {
     }
 
     private var currentTitle: String {
-        if step == .oshi, isSelectingOshiMembers {
+        if step == .oshi, oshiState.isSelectingMembers {
             return "メンバー・キャラクターを選ぶ"
         }
         return step.title
     }
 
     private var currentSubtitle: String {
-        if step == .oshi, isSelectingOshiMembers {
+        if step == .oshi, oshiState.isSelectingMembers {
             return "選んだグループ・作品ごとにメンバー・キャラクターを設定します。全体での登録も選べます。"
         }
         return step.subtitle
@@ -182,7 +172,7 @@ public struct AccountSetupScreen: View {
         case .welcome:
             advance(to: .oshi)
         case .oshi:
-            if isSelectingOshiMembers {
+            if oshiState.isSelectingMembers {
                 advanceFromOshiMembers()
             } else {
                 Task { await advanceFromOshiMasters() }
@@ -197,8 +187,8 @@ public struct AccountSetupScreen: View {
     private func goBack() {
         focusedField = nil
         clearError()
-        if step == .oshi, isSelectingOshiMembers {
-            isSelectingOshiMembers = false
+        if step == .oshi, oshiState.isSelectingMembers {
+            oshiState.isSelectingMembers = false
             return
         }
         if let previous = step.previous {
@@ -216,15 +206,15 @@ public struct AccountSetupScreen: View {
     private func advanceFromValidatedStep(_ validatedStep: AccountSetupStep) {
         let message = AccountSetupDraftValidator.validationMessage(
             for: validatedStep,
-            displayName: displayName,
-            handle: handle,
-            prefecture: prefecture,
-            birthDate: birthDate,
-            gender: gender,
+            displayName: profileState.displayName,
+            handle: profileState.handle,
+            prefecture: profileState.prefecture,
+            birthDate: profileState.birthDate,
+            gender: profileState.gender,
             oshiSelections: selectedOshiInputs
         )
         guard message == nil else {
-            setupInputErrorMessage = message
+            profileState.inputErrorMessage = message
             return
         }
         guard let next = validatedStep.next else {
@@ -234,8 +224,8 @@ public struct AccountSetupScreen: View {
     }
 
     private func advanceFromOshiMasters() async {
-        guard !selectedOshiGroups.isEmpty || !selectedOshiDrafts.isEmpty else {
-            setupInputErrorMessage = AccountSetupDraftValidator.missingOshiGroupMessage
+        guard !oshiState.selectedGroups.isEmpty || !oshiState.selectedDrafts.isEmpty else {
+            profileState.inputErrorMessage = AccountSetupDraftValidator.missingOshiGroupMessage
             return
         }
 
@@ -248,50 +238,50 @@ public struct AccountSetupScreen: View {
 
         await loadCharactersForSelectedMemberGroups()
         withAnimation(.snappy(duration: 0.2)) {
-            isSelectingOshiMembers = true
+            oshiState.isSelectingMembers = true
         }
     }
 
     private func advanceFromOshiMembers() {
         let incompleteTargets = selectedMemberTargets.filter { target in
-            !OnboardingOshiSelectionLogic.targetHasSelection(target, in: selectedOshiDrafts)
+            !OnboardingOshiSelectionLogic.targetHasSelection(target, in: oshiState.selectedDrafts)
         }
         guard incompleteTargets.isEmpty else {
-            setupInputErrorMessage = AccountSetupDraftValidator.missingOshiMemberMessage
+            profileState.inputErrorMessage = AccountSetupDraftValidator.missingOshiMemberMessage
             return
         }
         guard !selectedOshiInputs.isEmpty else {
-            setupInputErrorMessage = AccountSetupDraftValidator.missingOshiMessage
+            profileState.inputErrorMessage = AccountSetupDraftValidator.missingOshiMessage
             return
         }
-        isSelectingOshiMembers = false
+        oshiState.isSelectingMembers = false
         advance(to: .area)
     }
 
     private func save() async {
         focusedField = nil
-        setupInputErrorMessage = AccountSetupDraftValidator.validationMessage(
-            displayName: displayName,
-            handle: handle,
-            prefecture: prefecture,
-            birthDate: birthDate,
-            gender: gender,
+        profileState.inputErrorMessage = AccountSetupDraftValidator.validationMessage(
+            displayName: profileState.displayName,
+            handle: profileState.handle,
+            prefecture: profileState.prefecture,
+            birthDate: profileState.birthDate,
+            gender: profileState.gender,
             oshiSelections: selectedOshiInputs
         )
-        guard setupInputErrorMessage == nil else {
+        guard profileState.inputErrorMessage == nil else {
             return
         }
 
         let completed = await appState.completeAccountSetup(
-            handle: handle,
-            displayName: displayName,
-            prefecture: prefecture,
-            birthDate: birthDate,
-            gender: gender,
+            handle: profileState.handle,
+            displayName: profileState.displayName,
+            prefecture: profileState.prefecture,
+            birthDate: profileState.birthDate,
+            gender: profileState.gender,
             oshiSelections: selectedOshiInputs
         )
         if !completed {
-            setupInputErrorMessage = appState.errorMessage
+            profileState.inputErrorMessage = appState.errorMessage
         }
     }
 
@@ -302,34 +292,34 @@ public struct AccountSetupScreen: View {
     }
 
     private func seedWholeGroupDraftsForSoloGroups() {
-        selectedOshiDrafts = OnboardingOshiSelectionLogic.draftsAfterSeedingWholeGroupSelections(
-            selectedGroups: selectedOshiGroups,
-            currentDrafts: selectedOshiDrafts
+        oshiState.selectedDrafts = OnboardingOshiSelectionLogic.draftsAfterSeedingWholeGroupSelections(
+            selectedGroups: oshiState.selectedGroups,
+            currentDrafts: oshiState.selectedDrafts
         )
     }
 
     private func loadCharactersForSelectedMemberGroups() async {
-        guard !isLoadingSelectedMembers else {
+        guard !oshiState.isLoadingSelectedMembers else {
             return
         }
-        isLoadingSelectedMembers = true
-        for group in selectedMemberGroups where charactersByGroupID[group.id] == nil {
+        oshiState.isLoadingSelectedMembers = true
+        for group in selectedMemberGroups where oshiState.charactersByGroupID[group.id] == nil {
             await appState.loadOshiCharacters(group: group)
-            charactersByGroupID[group.id] = appState.oshiCharacters
+            oshiState.charactersByGroupID[group.id] = appState.oshiCharacters
         }
-        isLoadingSelectedMembers = false
+        oshiState.isLoadingSelectedMembers = false
     }
 
     private func showOshiRequestSheet(_ query: String) {
         focusedField = nil
         clearError()
-        oshiRequestSheet = .oshi(initialName: query)
+        oshiState.requestSheet = .oshi(initialName: query)
     }
 
     private func showOshiMemberRequestSheet(_ context: OshiMemberRequestContext) {
         focusedField = nil
         clearError()
-        oshiMemberRequestContext = context
+        oshiState.memberRequestContext = context
     }
 
     private func submitOshiRequestTapped(_ payload: OshiRequestSheetPayload) {
@@ -344,7 +334,7 @@ public struct AccountSetupScreen: View {
     }
 
     private func submitOshiRequest(_ payload: OshiRequestSheetPayload) async {
-        oshiRequestSheet = nil
+        oshiState.requestSheet = nil
         let requestedName = payload.name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !requestedName.isEmpty else {
             return
@@ -357,13 +347,13 @@ public struct AccountSetupScreen: View {
                 note: payload.note
             )
         ) else {
-            setupInputErrorMessage = appState.errorMessage
+            profileState.inputErrorMessage = appState.errorMessage
             return
         }
 
         withAnimation(.snappy(duration: 0.2)) {
-            selectedOshiDrafts.removeAll { $0.oshiRequestID == requestID }
-            selectedOshiDrafts.append(
+            oshiState.selectedDrafts.removeAll { $0.oshiRequestID == requestID }
+            oshiState.selectedDrafts.append(
                 OnboardingOshiDraft(
                     oshiRequestID: requestID,
                     requestedName: requestedName,
@@ -379,16 +369,16 @@ public struct AccountSetupScreen: View {
         _ payload: OshiMemberRequestSheetPayload,
         context: OshiMemberRequestContext
     ) async {
-        oshiMemberRequestContext = nil
+        oshiState.memberRequestContext = nil
         let requestedName = payload.name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !requestedName.isEmpty else {
             return
         }
         guard context.canCreateCharacterRequest else {
-            setupInputErrorMessage = "対象の推しを確認できませんでした"
+            profileState.inputErrorMessage = "対象の推しを確認できませんでした"
             return
         }
-        guard selectedOshiDrafts.contains(where: { draft in
+        guard oshiState.selectedDrafts.contains(where: { draft in
             draft.groupID == context.groupID
                 && draft.oshiRequestID == context.oshiRequestID
                 && draft.characterName?.compare(
@@ -407,19 +397,19 @@ public struct AccountSetupScreen: View {
                 note: payload.note
             )
         ) else {
-            setupInputErrorMessage = appState.errorMessage
+            profileState.inputErrorMessage = appState.errorMessage
             return
         }
 
         withAnimation(.snappy(duration: 0.2)) {
-            selectedOshiDrafts.removeAll { draft in
+            oshiState.selectedDrafts.removeAll { draft in
                 draft.groupID == context.groupID
                     && draft.oshiRequestID == context.oshiRequestID
                     && draft.characterID == nil
                     && draft.characterRequestID == nil
             }
             if let groupID = context.groupID {
-                selectedOshiDrafts.append(
+                oshiState.selectedDrafts.append(
                     OnboardingOshiDraft(
                         groupID: groupID,
                         groupName: context.groupName,
@@ -428,7 +418,7 @@ public struct AccountSetupScreen: View {
                     )
                 )
             } else if let oshiRequestID = context.oshiRequestID {
-                selectedOshiDrafts.append(
+                oshiState.selectedDrafts.append(
                     OnboardingOshiDraft(
                         oshiRequestID: oshiRequestID,
                         requestedName: context.groupName,
@@ -443,7 +433,7 @@ public struct AccountSetupScreen: View {
     }
 
     private func clearError() {
-        setupInputErrorMessage = nil
+        profileState.inputErrorMessage = nil
     }
 
     private func showToast(_ message: String) {

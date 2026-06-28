@@ -52,33 +52,31 @@ extension GoodsEditorSheet {
     }
 
     func resetImageSeriesSuggestions() {
-        imageSeriesSuggestionNames = []
-        imageSeriesSuggestionError = nil
-        isSuggestingImageSeries = false
+        imageSeriesSuggestionState.reset()
     }
 
     private func requestImageSeriesSuggestions(target: SeriesSuggestionTarget) {
-        guard !isSuggestingImageSeries else {
+        guard !imageSeriesSuggestionState.isLoading else {
             return
         }
         guard let input = seriesSuggestionInput(for: target) else {
-            imageSeriesSuggestionError = "画像を登録すると候補を検索できます。"
+            imageSeriesSuggestionState.errorMessage = "画像を登録すると候補を検索できます。"
             return
         }
 
-        isSuggestingImageSeries = true
-        imageSeriesSuggestionError = nil
+        imageSeriesSuggestionState.isLoading = true
+        imageSeriesSuggestionState.errorMessage = nil
         Task {
             do {
                 let names = try await appState.suggestGoodsSeriesNamesFromImage(input)
-                imageSeriesSuggestionNames = TagNameNormalizer.uniquePreservingOrder(names, limit: 6)
-                if imageSeriesSuggestionNames.isEmpty {
-                    imageSeriesSuggestionError = "候補を見つけられませんでした。手入力で追加してください。"
+                imageSeriesSuggestionState.names = TagNameNormalizer.uniquePreservingOrder(names, limit: 6)
+                if imageSeriesSuggestionState.names.isEmpty {
+                    imageSeriesSuggestionState.errorMessage = "候補を見つけられませんでした。手入力で追加してください。"
                 }
             } catch {
-                imageSeriesSuggestionError = "画像からシリーズ候補を取得できませんでした。時間をおいて再度お試しください。"
+                imageSeriesSuggestionState.errorMessage = "画像からシリーズ候補を取得できませんでした。時間をおいて再度お試しください。"
             }
-            isSuggestingImageSeries = false
+            imageSeriesSuggestionState.isLoading = false
         }
     }
 
