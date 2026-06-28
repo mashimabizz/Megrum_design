@@ -9,6 +9,7 @@ import SwiftUI
 struct GoodsEditorSheet: View {
     @ObservedObject var appState: MegrumAppState
     var route: GoodsEditorRoute
+    var onCreatedInventoryItems: ([GoodsItem]) -> Void
 
     enum PhotoCaptureTarget {
         case draft
@@ -61,9 +62,14 @@ struct GoodsEditorSheet: View {
     @State var selectedTradingCardBulkPhotoItem: PhotosPickerItem?
     #endif
 
-    init(appState: MegrumAppState, route: GoodsEditorRoute) {
+    init(
+        appState: MegrumAppState,
+        route: GoodsEditorRoute,
+        onCreatedInventoryItems: @escaping ([GoodsItem]) -> Void = { _ in }
+    ) {
         self.appState = appState
         self.route = route
+        self.onCreatedInventoryItems = onCreatedInventoryItems
         _draft = State(initialValue: GoodsEditorDraft(mode: route.mode, entryKind: route.kind, item: route.item))
     }
 

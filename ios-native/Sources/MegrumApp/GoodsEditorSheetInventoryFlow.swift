@@ -127,14 +127,20 @@ extension GoodsEditorSheet {
 
         createError = nil
         var savedCount = 0
+        var createdItems: [GoodsItem] = []
         for input in inputs {
-            let saved = await appState.createGoodsEntry(input)
-            if !saved {
+            guard let created = await appState.createGoodsEntryRecord(input) else {
                 let base = appState.errorMessage ?? "保存に失敗しました"
                 createError = savedCount > 0 ? "\(savedCount)件は登録済みです。\(base)" : base
                 return
             }
+            if input.kind == .inventory {
+                createdItems.append(created)
+            }
             savedCount += 1
+        }
+        if !createdItems.isEmpty {
+            onCreatedInventoryItems(createdItems)
         }
         dismiss()
     }

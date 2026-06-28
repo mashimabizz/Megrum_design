@@ -19,14 +19,18 @@ extension MegrumAppState {
     }
 
     public func createGoodsEntry(_ input: GoodsEntryInput) async -> Bool {
+        await createGoodsEntryRecord(input) != nil
+    }
+
+    public func createGoodsEntryRecord(_ input: GoodsEntryInput) async -> GoodsItem? {
         guard !isCreatingGoodsEntry else {
-            return false
+            return nil
         }
 
         let trimmedTitle = MegrumAppStateInputNormalizer.trimmedText(input.title)
         guard !trimmedTitle.isEmpty else {
             errorMessage = "グッズ名を入力してください"
-            return false
+            return nil
         }
         let normalizedInput = GoodsEntryInput(
             kind: input.kind,
@@ -47,11 +51,11 @@ extension MegrumAppState {
             let created = try await repository.createGoodsEntry(normalizedInput)
             upsertGoodsItemLocally(created, kind: normalizedInput.kind)
             isCreatingGoodsEntry = false
-            return true
+            return created
         } catch {
             errorMessage = "グッズを保存できませんでした"
             isCreatingGoodsEntry = false
-            return false
+            return nil
         }
     }
 

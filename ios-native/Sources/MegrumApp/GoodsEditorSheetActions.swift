@@ -1,7 +1,10 @@
+import MegrumCore
+
 extension GoodsEditorSheet {
     func save() async {
         lastSaveFailure = nil
         let saved: Bool
+        var createdInventoryItems: [GoodsItem] = []
         switch draft.mode {
         case .create:
             guard let input = draft.createInput(
@@ -11,7 +14,14 @@ extension GoodsEditorSheet {
             ) else {
                 return
             }
-            saved = await appState.createGoodsEntry(input)
+            if let created = await appState.createGoodsEntryRecord(input) {
+                saved = true
+                if input.kind == .inventory {
+                    createdInventoryItems = [created]
+                }
+            } else {
+                saved = false
+            }
         case .edit:
             guard let itemID = draft.existingItemID,
                   let input = draft.updateInput(
@@ -27,6 +37,9 @@ extension GoodsEditorSheet {
             return
         }
         if saved {
+            if !createdInventoryItems.isEmpty {
+                onCreatedInventoryItems(createdInventoryItems)
+            }
             dismiss()
         } else {
             lastSaveFailure = GoodsEditorSaveFailure.make(draft: draft, appMessage: appState.errorMessage)

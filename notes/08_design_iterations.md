@@ -4,6 +4,70 @@
 
 ---
 
+## イテレーション1226.100：マイグッズX共有導線
+
+### 背景・問題意識
+
+マイグッズ登録後に、そのままXで「譲れるグッズを登録した」ことを周知できる導線がなかった。登録直後の文脈で中央ポップアップを出し、投稿文と画像をアプリ側で作ることで、ユーザーがXへ移って投稿しやすい状態にする。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MegrumAppStateGoodsActions.swift`
+- 既存の `createGoodsEntry(_:)` の挙動は維持しつつ、保存後の `GoodsItem` を返す `createGoodsEntryRecord(_:)` を追加した。
+- 登録成功後に、実際に保存されたグッズ情報を共有導線へ渡せるようにした。
+
+#### `ios-native/Sources/MegrumApp/GoodsEditorScreen.swift`
+#### `ios-native/Sources/MegrumApp/GoodsEditorSheetActions.swift`
+#### `ios-native/Sources/MegrumApp/GoodsEditorSheetInventoryFlow.swift`
+- マイグッズの単体登録・複数画像登録の両方で、登録成功した `GoodsItem` を親画面へ通知するコールバックを追加した。
+- Wish登録や編集保存では共有ポップアップを出さないよう、マイグッズ新規登録だけに絞った。
+
+#### `ios-native/Sources/MegrumApp/GoodsCollectionScreenBody.swift`
+#### `ios-native/Sources/MegrumApp/GoodsCollectionShareActions.swift`
+#### `ios-native/Sources/MegrumApp/GoodsSharePrompt*`
+- 登録後に背景を薄暗くした中央ポップアップを表示し、「Xで作成したマイグッズをポストする」ボタンを追加した。
+- ボタン押下時に、投稿文と共有画像を生成してiOS標準共有画面へ渡すようにした。
+
+#### `ios-native/Sources/MegrumApp/GoodsSharePost*`
+#### `ios-native/Sources/MegrumApp/PlatformShareImage.swift`
+- X投稿用の本文を生成する処理を追加した。
+- グループ、メンバー、シリーズ、グッズ種別、`グッズ交換` のハッシュタグを重複排除して組み立てるようにした。
+- 最大20件までの登録画像を白背景の一覧画像にし、タイトル「（ユーザー名）さんが登録した譲れるグッズ一覧」と右下のMegrumロゴ・アイコンを入れるようにした。
+
+#### `ios-native/Tests/MegrumAppTests/GoodsSharePostTextBuilderTests.swift`
+- 投稿文の重複排除、ハッシュタグ正規化、共有画像の最大20件制限をテストした。
+
+### 影響範囲
+
+- マイグッズ新規登録直後の導線
+- X共有用の投稿文生成
+- X共有用の画像生成
+
+登録・編集・削除の状態遷移は変えていないため `notes/09_state_machines.md` は更新しない。新しいユーザー向け用語は追加していないため `notes/10_glossary.md` は更新しない。
+
+### 確認方法
+
+- `git diff --check`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-share-post-test --enable-xctest --disable-swift-testing -j 1 --filter GoodsSharePostTextBuilderTests`
+  - passed（3 tests, 0 failures）
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'platform=iOS Simulator,id=C70DDDBB-2602-49E0-8F95-1F043BCCED76' -derivedDataPath /tmp/megrum-native-share-post-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+  - passed
+- `xcrun simctl install C70DDDBB-2602-49E0-8F95-1F043BCCED76 /tmp/megrum-native-share-post-xcodebuild/Build/Products/Debug-iphonesimulator/MegrumNative.app`
+  - passed
+- `xcrun simctl launch --terminate-running-process C70DDDBB-2602-49E0-8F95-1F043BCCED76 tokyo.megrum.native.preview`
+  - passed
+- `xcrun simctl io C70DDDBB-2602-49E0-8F95-1F043BCCED76 screenshot /tmp/megrum-share-post-launch.png`
+  - passed
+
+### セルフレビュー結果
+
+- ✅ マイグッズ登録成功後だけ中央ポップアップを出し、Wish登録・編集保存には出さない。
+- ✅ iOSの仕様上、Xへの無断自動投稿はせず、投稿文と画像を共有画面へ渡してユーザーが最終投稿する形にした。
+- ✅ 投稿文のハッシュタグは同じ値を重複表示しない。
+- ✅ 共有画像は最大20件に制限し、大量登録時も1枚の画像サイズが暴れないようにした。
+- ✅ 既存の登録保存失敗時のエラー表示は維持した。
+
 ## イテレーション1226.99：めぐりグルームタップ修正
 
 ### 背景・問題意識

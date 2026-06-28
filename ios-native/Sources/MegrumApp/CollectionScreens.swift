@@ -29,6 +29,12 @@ struct GoodsCollectionScreen: View {
     @State var isConfirmingBulkDelete = false
     @State var canConfirmDelete = false
     @State var oshiCharactersByGroupID: [UUID: [OshiCharacter]] = [:]
+    @State var sharePromptContext: GoodsSharePostContext?
+    @State var isPreparingSharePost = false
+    @State var sharePostErrorMessage: String?
+    #if os(iOS)
+    @State var shareActivityPayload: GoodsSharePostPayload?
+    #endif
 
     static let inventoryStatuses = GoodsCollectionInventoryStatusPolicy.displayedStatuses
 }

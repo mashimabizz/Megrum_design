@@ -39,6 +39,18 @@ extension GoodsCollectionScreen {
                     .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .bottomTrailing)))
                     .zIndex(4)
             }
+
+            if let sharePromptContext {
+                GoodsSharePromptOverlay(
+                    context: sharePromptContext,
+                    isPreparing: isPreparingSharePost,
+                    errorMessage: sharePostErrorMessage,
+                    onDismiss: dismissSharePrompt,
+                    onShare: startGoodsSharePost
+                )
+                .transition(.opacity.combined(with: .scale(scale: 0.97)))
+                .zIndex(20)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
         .animation(
@@ -54,7 +66,8 @@ extension GoodsCollectionScreen {
                 NavigationStack {
                     GoodsEditorSheet(
                         appState: appState,
-                        route: route
+                        route: route,
+                        onCreatedInventoryItems: presentSharePrompt
                     )
                 }
             }
@@ -83,7 +96,11 @@ extension GoodsCollectionScreen {
         } message: {
             Text("データ保存の準備がまだ整っていません。")
         }
+        #if os(iOS)
+        .sheet(item: $shareActivityPayload, content: GoodsShareActivitySheet.init)
+        #endif
         .animation(.snappy(duration: 0.18), value: hasPendingDeleteConfirmation)
+        .animation(.spring(response: 0.30, dampingFraction: 0.86), value: sharePromptContext?.id)
         .task {
             await loadFilterChoicesIfNeeded()
         }
