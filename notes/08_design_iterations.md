@@ -4,6 +4,67 @@
 
 ---
 
+## イテレーション1226.96：推し設定と再打診の実操作修正
+
+### 背景・問題意識
+
+推し設定、検索結果、取引チャット、左ドロワーの支払い設定で、実操作時に意図した挙動にならない箇所が残っていた。特に、ソロ対象への不要な追加導線、再打診時の新規打診作成、評価送信後の無反応、支払い設定済みでも要設定扱いになる表示は、ユーザーの操作理解を妨げていた。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/OshiSettings*`
+- ソロのグループ・作品では「追加」導線とメンバー読み込みを出さないようにした。
+- 削除確認の吹き出しを親画面側の状態で管理し、対象カードを前面に出して次カードの背面に隠れないようにした。
+- ドロワー内表示時の戻るボタンがシートを閉じられるように、明示的な `onClose` を渡す構成にした。
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlow*`
+#### `ios-native/Sources/MegrumData/SupabaseProposalClient*`
+- 取引チャットからの再打診は新規打診を作らず、元の打診を `negotiating` として更新し、合意フラグを打診者側へ戻すようにした。
+- PostgREST の既存打診読み込みと `PATCH` リクエストを追加し、対象者以外が更新できないように参加者条件を付けた。
+
+#### `ios-native/Sources/MegrumApp/Trade*`
+- 定価・金額指定の打診を、グッズ画像と同じ並びに入るグラデーションカードとして表示するようにした。
+- 評価送信後に「評価を送信しました」トーストを表示し、評価画面を閉じてチャットを再読み込みするようにした。
+- 現在地共有メッセージは座標がある場合に MapKit の実地図プレビューを表示するようにした。
+
+#### `ios-native/Sources/MegrumApp/SearchResultGridViews.swift`
+- 検索結果画像タップ時も、ホームのマッチ候補と同じ `HomeDiscoverySheetView` をネイティブ sheet として表示するようにした。
+
+#### `ios-native/Sources/MegrumApp/AppDrawer*`
+#### `ios-native/Sources/MegrumApp/PaymentSettingsResolver.swift`
+#### `ios-native/Sources/MegrumCore/UserPaymentModels.swift`
+- 支払い方法の保存データが1つでもあれば、左ドロワーの「要設定」タグを出さないようにした。
+
+### 影響範囲
+
+- 推し設定画面
+- 検索結果の詳細表示
+- 取引チャットの再打診、金額表示、評価送信、現在地プレビュー
+- 左ドロワーの支払い方法表示
+
+状態名の追加・変更はなく、再打診は既存の `negotiating` 打診を更新する扱いのため `notes/09_state_machines.md` は更新しない。新しいユーザー向け用語も追加していないため `notes/10_glossary.md` は更新しない。
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-fixes --enable-xctest --disable-swift-testing -j 1 --filter 'OshiSettingsDraftTests|AppDrawerGestureTests|SupabaseProposalClientTests'`
+  - passed（64 tests, 0 failures）
+- `git diff --check`
+  - passed
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'platform=iOS Simulator,id=C70DDDBB-2602-49E0-8F95-1F043BCCED76' -derivedDataPath /tmp/megrum-native-current-fixes-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+  - passed
+- `xcrun simctl install C70DDDBB-2602-49E0-8F95-1F043BCCED76 /tmp/megrum-native-current-fixes-xcodebuild/Build/Products/Debug-iphonesimulator/MegrumNative.app`
+  - passed
+- `SIMCTL_CHILD_MEGRUM_VISUAL_QA_PREVIEW_AUTH=1 SIMCTL_CHILD_MEGRUM_VISUAL_QA_INITIAL_SCREEN=home xcrun simctl launch --terminate-running-process C70DDDBB-2602-49E0-8F95-1F043BCCED76 tokyo.megrum.native.preview`
+  - passed（PID 14072）
+
+### セルフレビュー結果
+
+- ✅ ソロ推しでは不要なメンバー追加操作を出さず、既存のグループ推しでは追加操作を維持した。
+- ✅ 再打診は同じ打診IDを更新するため、取引履歴が分裂しない。
+- ✅ 定価・金額指定は既存のグッズ表示と同じ文脈で確認できる。
+- ✅ 支払い方法の「要設定」判定は、保存済みデータの有無を優先して表示する。
+- ✅ 評価送信と現在地プレビューはユーザーに操作結果が見える形にした。
+
 ## イテレーション1226.95：蓄積差分の整理と検証
 
 ### 背景・問題意識

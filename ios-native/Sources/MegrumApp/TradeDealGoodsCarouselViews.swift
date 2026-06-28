@@ -6,6 +6,8 @@ struct TradeGoodsCarouselColumn: View {
     var title: String
     var emptyTitle: String
     var items: [GoodsItem]
+    var cashOffer: Bool
+    var cashAmount: Int?
     var accentColor: Color
     var badgeTitle: String?
     var onStageTap: (() -> Void)?
@@ -33,7 +35,7 @@ struct TradeGoodsCarouselColumn: View {
                     .background(accentColor, in: Capsule())
             }
 
-            if items.isEmpty {
+            if displayItems.isEmpty {
                 TradeGoodsEmptyCarouselStage(title: emptyTitle, accentColor: accentColor)
                     .frame(height: TradeGoodsCarouselLayout.stageHeight)
             } else {
@@ -44,14 +46,18 @@ struct TradeGoodsCarouselColumn: View {
     }
 
     private var countText: String {
-        guard !items.isEmpty else {
+        guard !displayItems.isEmpty else {
             return "0/0"
         }
-        return "\(selectedIndex + 1)/\(items.count)"
+        return "\(selectedIndex + 1)/\(displayItems.count)"
+    }
+
+    private var displayItems: [TradeDealDisplayItem] {
+        items.map(TradeDealDisplayItem.goods) + (cashOffer ? [.cash(amount: cashAmount)] : [])
     }
 
     private var tableStep: Double {
-        360.0 / Double(max(items.count, 3))
+        360.0 / Double(max(displayItems.count, 3))
     }
 
     private var displayedDragProgress: Double {
@@ -62,6 +68,7 @@ struct TradeGoodsCarouselColumn: View {
         GeometryReader { proxy in
             TradeGoodsCarouselStage(
                 items: items,
+                displayItems: displayItems,
                 selectedIndex: selectedIndex,
                 dragProgress: displayedDragProgress,
                 tableRotation: (Double(selectedIndex) + displayedDragProgress) * tableStep,
@@ -72,7 +79,7 @@ struct TradeGoodsCarouselColumn: View {
             .modifier(TradeGoodsCarouselGestureModifier(
                 width: proxy.size.width,
                 usesScrollFriendlyPan: onStageTap != nil,
-                isPanEnabled: items.count > 1 && !reduceMotion,
+                isPanEnabled: displayItems.count > 1 && !reduceMotion,
                 onStageTap: onStageTap,
                 onChanged: { translation in
                     handleCarouselDragChanged(translation: translation, width: proxy.size.width)
@@ -102,8 +109,8 @@ struct TradeGoodsCarouselColumn: View {
                 break
             }
         }
-        .onChange(of: items.map(\.id)) { _, _ in
-            selectedIndex = min(selectedIndex, max(0, items.count - 1))
+        .onChange(of: displayItems.map(\.id)) { _, _ in
+            selectedIndex = min(selectedIndex, max(0, displayItems.count - 1))
             dragProgress = 0
         }
     }
@@ -123,7 +130,7 @@ struct TradeGoodsCarouselColumn: View {
     }
 
     private func handleCarouselDragChanged(translation: CGSize, width: CGFloat) {
-        guard items.count > 1, !reduceMotion else {
+        guard displayItems.count > 1, !reduceMotion else {
             return
         }
         guard let progress = carouselDragProgress(translation: translation, width: width) else {
@@ -144,7 +151,7 @@ struct TradeGoodsCarouselColumn: View {
         projectedTranslationWidth: CGFloat,
         width: CGFloat
     ) {
-        guard items.count > 1 else {
+        guard displayItems.count > 1 else {
             dragProgress = 0
             return
         }
@@ -194,7 +201,7 @@ struct TradeGoodsCarouselColumn: View {
     }
 
     private func wrappedIndex(_ index: Int) -> Int {
-        (index % items.count + items.count) % items.count
+        (index % displayItems.count + displayItems.count) % displayItems.count
     }
 }
 

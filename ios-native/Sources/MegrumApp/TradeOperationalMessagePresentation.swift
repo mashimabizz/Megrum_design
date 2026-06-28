@@ -7,8 +7,12 @@ struct TradeOperationalMessagePresentation: Equatable, Sendable {
     var systemImage: String
     var body: String
     var detail: String?
+    var latitude: Double?
+    var longitude: Double?
 
     init(message: TradeMessage) {
+        latitude = message.locationLatitude
+        longitude = message.locationLongitude
         switch message.messageType {
         case .location:
             title = message.locationLabel.nilIfBlank ?? "現在地共有"

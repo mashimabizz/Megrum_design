@@ -6,6 +6,7 @@ struct OshiSettingsGroupDraft: Identifiable, Hashable, Sendable {
     var requestID: UUID?
     var name: String
     var pending: Bool
+    var supportsMemberSelection: Bool
     var priority: Int
     var members: [OshiSettingsMemberDraft]
 
@@ -23,15 +24,24 @@ struct OshiSettingsGroupDraft: Identifiable, Hashable, Sendable {
         self.requestID = nil
         self.name = masterGroup.name
         self.pending = false
+        self.supportsMemberSelection = masterGroup.supportsMemberSelection
         self.priority = priority
         self.members = []
     }
 
-    init(requestID: UUID, name: String, pending: Bool, priority: Int, members: [OshiSettingsMemberDraft] = []) {
+    init(
+        requestID: UUID,
+        name: String,
+        pending: Bool,
+        supportsMemberSelection: Bool = true,
+        priority: Int,
+        members: [OshiSettingsMemberDraft] = []
+    ) {
         self.groupID = nil
         self.requestID = requestID
         self.name = name
         self.pending = pending
+        self.supportsMemberSelection = supportsMemberSelection
         self.priority = priority
         self.members = members
     }
@@ -50,6 +60,7 @@ struct OshiSettingsGroupDraft: Identifiable, Hashable, Sendable {
                     requestID: nil,
                     name: selection.groupName ?? groupsByID[groupID]?.name ?? "選択済みグループ",
                     pending: false,
+                    supportsMemberSelection: groupsByID[groupID]?.supportsMemberSelection ?? true,
                     priority: selection.priority,
                     members: []
                 )
@@ -60,6 +71,7 @@ struct OshiSettingsGroupDraft: Identifiable, Hashable, Sendable {
                     requestID: requestID,
                     name: selection.oshiRequestName ?? "承認待ちの推し",
                     pending: true,
+                    supportsMemberSelection: true,
                     priority: selection.priority,
                     members: []
                 )
@@ -126,6 +138,7 @@ struct OshiSettingsGroupDraft: Identifiable, Hashable, Sendable {
         requestID: UUID?,
         name: String,
         pending: Bool,
+        supportsMemberSelection: Bool,
         priority: Int,
         members: [OshiSettingsMemberDraft]
     ) {
@@ -133,6 +146,7 @@ struct OshiSettingsGroupDraft: Identifiable, Hashable, Sendable {
         self.requestID = requestID
         self.name = name
         self.pending = pending
+        self.supportsMemberSelection = supportsMemberSelection
         self.priority = priority
         self.members = members
     }

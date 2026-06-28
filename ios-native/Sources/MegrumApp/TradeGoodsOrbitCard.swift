@@ -1,8 +1,9 @@
 import MegrumCore
+import MegrumDesign
 import SwiftUI
 
 struct TradeGoodsOrbitCard: View {
-    var item: GoodsItem
+    var item: TradeDealDisplayItem
     var accentColor: Color
     var prominence: Double
     var badgeTitle: String?
@@ -13,7 +14,12 @@ struct TradeGoodsOrbitCard: View {
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
-            TradeGoodsArtwork(item: item, accentColor: accentColor)
+            switch item {
+            case .goods(let goods):
+                TradeGoodsArtwork(item: goods, accentColor: accentColor)
+            case .cash(let amount):
+                TradeCashOrbitArtwork(cashAmount: amount)
+            }
 
             if let badgeTitle, clampedProminence > 0.70 {
                 Text(badgeTitle)
@@ -38,5 +44,33 @@ struct TradeGoodsOrbitCard: View {
                 .strokeBorder(accentColor.opacity(0.44 + clampedProminence * 0.12), lineWidth: 1.2 + CGFloat(clampedProminence) * 0.45)
         }
         .shadow(color: accentColor.opacity(0.13 + clampedProminence * 0.07), radius: 6 + CGFloat(clampedProminence) * 3, y: 4)
+    }
+}
+
+private struct TradeCashOrbitArtwork: View {
+    var cashAmount: Int?
+
+    var body: some View {
+        LinearGradient(
+            colors: [MegrumTheme.sky, MegrumTheme.lavender],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+        .overlay {
+            VStack(spacing: 5) {
+                Image(systemName: "yensign.circle.fill")
+                    .font(.system(size: 21, weight: .black))
+                Text(cashText)
+                    .font(.system(size: 15, weight: .black, design: .rounded))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.64)
+            }
+            .foregroundStyle(.white)
+            .padding(6)
+        }
+    }
+
+    private var cashText: String {
+        cashAmount.map(TradeAmountFormatter.compactYen) ?? "定価"
     }
 }

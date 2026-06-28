@@ -3,6 +3,7 @@ import SwiftUI
 
 struct TradeGoodsCarouselStage: View {
     var items: [GoodsItem]
+    var displayItems: [TradeDealDisplayItem]
     var selectedIndex: Int
     var dragProgress: Double
     var tableRotation: Double
@@ -65,10 +66,10 @@ struct TradeGoodsCarouselStage: View {
     }
 
     private var visibleEntries: [TradeGoodsCarouselEntry] {
-        items.indices
+        displayItems.indices
             .map { index in
                 TradeGoodsCarouselEntry(
-                    item: items[index],
+                    item: displayItems[index],
                     position: relativePosition(for: index)
                 )
             }
@@ -85,10 +86,10 @@ struct TradeGoodsCarouselStage: View {
     }
 
     private func relativePosition(for index: Int) -> Double {
-        guard !items.isEmpty else {
+        guard !displayItems.isEmpty else {
             return 0
         }
-        let count = items.count
+        let count = displayItems.count
         let forward = (index - selectedIndex + count) % count
         let backward = (selectedIndex - index + count) % count
         let shortest = forward <= backward ? Double(forward) : -Double(backward)
@@ -97,10 +98,10 @@ struct TradeGoodsCarouselStage: View {
 }
 
 private struct TradeGoodsCarouselEntry: Identifiable {
-    var item: GoodsItem
+    var item: TradeDealDisplayItem
     var position: Double
 
-    var id: GoodsItem.ID {
+    var id: String {
         item.id
     }
 }

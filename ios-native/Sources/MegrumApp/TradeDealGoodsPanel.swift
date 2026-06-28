@@ -5,6 +5,10 @@ import SwiftUI
 struct TradeDealGoodsPanel: View {
     var offeredItems: [GoodsItem]
     var requestedItems: [GoodsItem]
+    var offeredCashOffer: Bool
+    var offeredCashAmount: Int?
+    var requestedCashOffer: Bool
+    var requestedCashAmount: Int?
     var offeredBadgeTitle: String?
     var requestedBadgeTitle: String?
     var offeredTitle: String
@@ -16,6 +20,10 @@ struct TradeDealGoodsPanel: View {
     init(
         offeredItems: [GoodsItem],
         requestedItems: [GoodsItem],
+        offeredCashOffer: Bool = false,
+        offeredCashAmount: Int? = nil,
+        requestedCashOffer: Bool = false,
+        requestedCashAmount: Int? = nil,
         offeredBadgeTitle: String? = nil,
         requestedBadgeTitle: String? = nil,
         offeredTitle: String = "譲るグッズ",
@@ -26,6 +34,10 @@ struct TradeDealGoodsPanel: View {
     ) {
         self.offeredItems = offeredItems
         self.requestedItems = requestedItems
+        self.offeredCashOffer = offeredCashOffer
+        self.offeredCashAmount = offeredCashAmount
+        self.requestedCashOffer = requestedCashOffer
+        self.requestedCashAmount = requestedCashAmount
         self.offeredBadgeTitle = offeredBadgeTitle
         self.requestedBadgeTitle = requestedBadgeTitle
         self.offeredTitle = offeredTitle
@@ -41,6 +53,8 @@ struct TradeDealGoodsPanel: View {
                 title: requestedTitle,
                 emptyTitle: requestedEmptyTitle,
                 items: requestedItems,
+                cashOffer: requestedCashOffer,
+                cashAmount: requestedCashAmount,
                 accentColor: MegrumTheme.lavender,
                 badgeTitle: requestedBadgeTitle,
                 onStageTap: onCarouselTap
@@ -52,6 +66,8 @@ struct TradeDealGoodsPanel: View {
                 title: offeredTitle,
                 emptyTitle: offeredEmptyTitle,
                 items: offeredItems,
+                cashOffer: offeredCashOffer,
+                cashAmount: offeredCashAmount,
                 accentColor: MegrumTheme.pink,
                 badgeTitle: offeredBadgeTitle,
                 onStageTap: onCarouselTap

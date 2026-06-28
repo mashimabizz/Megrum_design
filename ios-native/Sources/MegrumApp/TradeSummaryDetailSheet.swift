@@ -24,6 +24,7 @@ struct TradeSummaryDetailSheet: View {
 
     var route: TradeSummaryDetailRoute
     var proposal: TradeProposal
+    var viewerID: UUID?
     var requestedGoods: [GoodsItem]
     var offeredGoods: [GoodsItem]
     var requestedGoodsCount: Int
@@ -39,6 +40,7 @@ struct TradeSummaryDetailSheet: View {
                     case .tradeContent:
                         TradeSummaryTradeContent(
                             proposal: proposal,
+                            viewerID: viewerID,
                             requestedGoods: requestedGoods,
                             offeredGoods: offeredGoods,
                             requestedGoodsCount: requestedGoodsCount,
@@ -97,6 +99,7 @@ private struct TradeSummaryExchangeMethodContent: View {
 
 private struct TradeSummaryTradeContent: View {
     var proposal: TradeProposal
+    var viewerID: UUID?
     var requestedGoods: [GoodsItem]
     var offeredGoods: [GoodsItem]
     var requestedGoodsCount: Int
@@ -110,7 +113,7 @@ private struct TradeSummaryTradeContent: View {
                         title: "受け取る",
                         items: requestedGoods,
                         expectedCount: requestedGoodsCount,
-                        cashOffer: proposal.cashOffer,
+                        cashOffer: cashBelongsToRequestedSide,
                         cashAmount: proposal.cashAmount
                     )
 
@@ -123,11 +126,38 @@ private struct TradeSummaryTradeContent: View {
                         title: "出す",
                         items: offeredGoods,
                         expectedCount: offeredGoodsCount,
-                        cashOffer: false,
-                        cashAmount: nil
+                        cashOffer: cashBelongsToOfferedSide,
+                        cashAmount: proposal.cashAmount
                     )
                 }
             }
         }
+    }
+
+    private var cashBelongsToRequestedSide: Bool {
+        proposal.cashOffer && !cashBelongsToOfferedSide
+    }
+
+    private var cashBelongsToOfferedSide: Bool {
+        guard proposal.cashOffer, let side = resolvedCashSide else {
+            return false
+        }
+        guard let viewerID else {
+            return side == .sender
+        }
+        return proposal.isSender(viewerID) ? side == .sender : side == .receiver
+    }
+
+    private var resolvedCashSide: ProposalCashSide? {
+        if let cashAmountSide = proposal.cashAmountSide {
+            return cashAmountSide
+        }
+        if proposal.senderGoodsIDs.isEmpty, !proposal.receiverGoodsIDs.isEmpty {
+            return .sender
+        }
+        if proposal.receiverGoodsIDs.isEmpty, !proposal.senderGoodsIDs.isEmpty {
+            return .receiver
+        }
+        return .receiver
     }
 }

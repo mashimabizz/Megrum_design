@@ -25,6 +25,22 @@ final class OshiSettingsDraftTests: XCTestCase {
         XCTAssertEqual(OshiSettingsPresentationText.groupSummary(for: draft), "推しメンバー 1人")
     }
 
+    func testSoloOshiGroupDoesNotSupportMemberSelection() {
+        let solo = OshiGroup(
+            id: uuid("10000000-0000-0000-0000-000000000209"),
+            name: "キム・スヒョン",
+            kind: .solo
+        )
+        let draft = OshiSettingsGroupDraft(masterGroup: solo, priority: 1)
+
+        XCTAssertFalse(draft.supportsMemberSelection)
+        XCTAssertNil(OshiSettingsPresentationText.groupSummary(for: draft))
+        XCTAssertEqual(
+            OshiSettingsGroupDraft.accountSetupInputs(from: [draft]).first?.kind,
+            .box
+        )
+    }
+
     func testOshiSettingsMemberChipCopyDoesNotPrefixPlus() {
         let group = OshiGroup(id: uuid("10000000-0000-0000-0000-000000000204"), name: "TWICE")
         let character = OshiCharacter(

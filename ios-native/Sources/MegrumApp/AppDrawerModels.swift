@@ -97,8 +97,8 @@ enum AppDrawerSettingsBadgePolicy {
             : nil
     }
 
-    static func paymentBadgeText(methods: [UserPaymentMethod]) -> String? {
-        UserPaymentMethod.normalized(methods).isEmpty ? needsConfigurationBadge : nil
+    static func paymentBadgeText(methods: [UserPaymentMethod], hasAnyStoredData: Bool = false) -> String? {
+        hasAnyStoredData || !UserPaymentMethod.normalized(methods).isEmpty ? nil : needsConfigurationBadge
     }
 }
 

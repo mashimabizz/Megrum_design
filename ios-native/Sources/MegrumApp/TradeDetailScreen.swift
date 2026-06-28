@@ -30,6 +30,7 @@ struct TradeDetailScreen: View {
     @State var disputeDetailRoute: TradeDisputeDetailRoute?
     @State var partnerProfileRoute: TradePartnerProfileRoute?
     @State var didSubmitEvaluation = false
+    @State var toastMessage: String?
     @State var isMessageComposerFocused = false
     @StateObject var locationState = MegrumLocationState()
 
@@ -162,6 +163,16 @@ struct TradeDetailScreen: View {
                 .zIndex(10)
             }
         }
+        .overlay(alignment: .bottom) {
+            if let toastMessage {
+                MeguriToastView(message: toastMessage)
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 28)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .zIndex(9)
+            }
+        }
+        .animation(.spring(response: 0.32, dampingFraction: 0.88), value: toastMessage)
 #if os(iOS)
         .toolbar(selectedRemoteImage == nil ? .visible : .hidden, for: .navigationBar)
 #endif

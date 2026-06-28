@@ -53,6 +53,9 @@ final class AppDrawerGestureTests: XCTestCase {
         XCTAssertNil(
             AppDrawerSettingsBadgePolicy.paymentBadgeText(methods: [.paypay])
         )
+        XCTAssertNil(
+            AppDrawerSettingsBadgePolicy.paymentBadgeText(methods: [], hasAnyStoredData: true)
+        )
     }
 
     func testDrawerExchangeBadgeRequiresFutureLocalDateForLocalMethods() {

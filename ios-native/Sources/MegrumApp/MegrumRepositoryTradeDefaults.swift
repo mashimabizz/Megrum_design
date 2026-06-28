@@ -6,6 +6,10 @@ public extension MegrumRepository {
         throw MegrumRepositoryError.unsupportedMutation
     }
 
+    func reviseProposal(proposalID: UUID, input: ProposalCreateInput) async throws -> TradeProposal {
+        throw MegrumRepositoryError.unsupportedMutation
+    }
+
     func agreeProposal(proposalID: UUID, acceptedExchangeMethod: ExchangeMethod?) async throws -> TradeProposal {
         throw MegrumRepositoryError.unsupportedMutation
     }

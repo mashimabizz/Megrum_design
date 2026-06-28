@@ -66,7 +66,7 @@ struct MegrumRootDrawerDestinationSheet: View {
         case .profileEdit:
             OwnProfileScreen(appState: appState, onClose: onClose)
         case .oshiSettings:
-            OshiSettingsScreen(appState: appState)
+            OshiSettingsScreen(appState: appState, onClose: onClose)
         case .schedules:
             PersonalScheduleScreen(appState: appState)
         case .paymentSettings:

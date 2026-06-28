@@ -255,6 +255,18 @@ extension TradeDetailScreen {
         }
     }
 
+    func showToast(_ message: String) {
+        toastMessage = message
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 1_800_000_000)
+            if toastMessage == message {
+                withAnimation(.snappy(duration: 0.18)) {
+                    toastMessage = nil
+                }
+            }
+        }
+    }
+
     var canUseCamera: Bool {
 #if os(iOS)
         UIImagePickerController.isSourceTypeAvailable(.camera)

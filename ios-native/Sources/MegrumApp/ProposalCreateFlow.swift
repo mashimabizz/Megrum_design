@@ -18,6 +18,7 @@ struct ProposalCreateFlow: View {
     var initialShippingDays: IndividualListingShippingDaysDraft? = nil
     var initialStep: ProposalCreateStep = .give
     var submissionStatusOverride: ProposalStatus?
+    var revisingProposalID: UUID?
     var showsCompletionAfterCreate = true
     var visualQAInitialScreen: VisualQAInitialScreen? = nil
     var onCreateSuccess: (() async -> Void)?

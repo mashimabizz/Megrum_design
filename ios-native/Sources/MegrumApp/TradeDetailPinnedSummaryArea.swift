@@ -84,6 +84,7 @@ struct TradeDetailPinnedSummaryArea: View {
             TradeSummaryDetailSheet(
                 route: route,
                 proposal: proposal,
+                viewerID: viewerID,
                 requestedGoods: requestedGoods,
                 offeredGoods: offeredGoods,
                 requestedGoodsCount: requestedGoodsCount,

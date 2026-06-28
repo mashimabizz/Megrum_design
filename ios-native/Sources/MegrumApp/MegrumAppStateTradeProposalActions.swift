@@ -6,8 +6,9 @@ extension MegrumAppState {
         guard !isCreatingProposal else {
             return false
         }
-        let senderHasSelection = !input.senderGoodsIDs.isEmpty || input.cashAmountSide == .sender
-        let receiverHasSelection = !input.receiverGoodsIDs.isEmpty || input.cashAmountSide == .receiver
+        let cashSide = resolvedCashSide(for: input)
+        let senderHasSelection = !input.senderGoodsIDs.isEmpty || cashSide == .sender
+        let receiverHasSelection = !input.receiverGoodsIDs.isEmpty || cashSide == .receiver
         guard senderHasSelection && receiverHasSelection else {
             errorMessage = "提示物を選択してください"
             return false
@@ -29,6 +30,37 @@ extension MegrumAppState {
             return true
         } catch {
             errorMessage = "打診を作成できませんでした"
+            isCreatingProposal = false
+            return false
+        }
+    }
+
+    public func reviseProposal(proposalID: UUID, input: ProposalCreateInput) async -> Bool {
+        guard !isCreatingProposal else {
+            return false
+        }
+        let cashSide = resolvedCashSide(for: input)
+        let senderHasSelection = !input.senderGoodsIDs.isEmpty || cashSide == .sender
+        let receiverHasSelection = !input.receiverGoodsIDs.isEmpty || cashSide == .receiver
+        guard senderHasSelection && receiverHasSelection else {
+            errorMessage = "提示物を選択してください"
+            return false
+        }
+        guard !(input.cashAmountSide == nil && input.cashAmount != nil) else {
+            errorMessage = "金額指定の対象を確認してください"
+            return false
+        }
+
+        isCreatingProposal = true
+        errorMessage = nil
+        do {
+            let proposal = try await repository.reviseProposal(proposalID: proposalID, input: input)
+            replaceProposal(proposal)
+            isCreatingProposal = false
+            await loadMessages(proposalID: proposalID)
+            return true
+        } catch {
+            errorMessage = "打診を更新できませんでした"
             isCreatingProposal = false
             return false
         }
@@ -99,5 +131,21 @@ extension MegrumAppState {
             respondingProposalID = nil
             return false
         }
+    }
+
+    private func resolvedCashSide(for input: ProposalCreateInput) -> ProposalCashSide? {
+        if let cashAmountSide = input.cashAmountSide {
+            return cashAmountSide
+        }
+        guard input.cashOffer else {
+            return nil
+        }
+        if input.senderGoodsIDs.isEmpty, !input.receiverGoodsIDs.isEmpty {
+            return .sender
+        }
+        if input.receiverGoodsIDs.isEmpty, !input.senderGoodsIDs.isEmpty {
+            return .receiver
+        }
+        return nil
     }
 }

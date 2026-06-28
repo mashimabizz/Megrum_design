@@ -47,6 +47,18 @@ extension SupabaseProposalClient {
         )
     }
 
+    public func makeReviseProposalRequest(userID: UUID, proposalID: UUID, input: ProposalCreateInput, now: Date = .now) throws -> URLRequest {
+        try client.makeMutationRequest(
+            path: "/rest/v1/proposals",
+            queryItems: [
+                URLQueryItem(name: "select", value: ProposalRow.select)
+            ] + participantProposalQueryItems(proposalID: proposalID, userID: userID),
+            method: "PATCH",
+            body: encoder.encode(try ProposalRevisionPayload(senderID: userID, input: input, now: now)),
+            prefer: "return=representation"
+        )
+    }
+
     public func makeAgreeProposalRequest(
         userID: UUID,
         proposal: TradeProposal,

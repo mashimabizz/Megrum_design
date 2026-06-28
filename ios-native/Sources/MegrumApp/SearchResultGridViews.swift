@@ -27,7 +27,10 @@ struct SearchResultGrid: View {
                 }
             }
         }
-        .megrumSlideItemPresentation(item: $selectedSheet) { sheet, _ in
+        .sheet(
+            item: $selectedSheet,
+            onDismiss: presentPendingProfileIfNeeded
+        ) { sheet in
             HomeDiscoverySheetView(
                 sheet: sheet,
                 appState: appState,
@@ -35,14 +38,8 @@ struct SearchResultGrid: View {
                 onOpenOwnerProfile: requestProfilePresentation,
                 onStartProposal: requestProposalPresentation
             )
-            .megrumInteractiveBackSwipe {
-                selectedSheet = nil
-            }
-        }
-        .onChange(of: selectedSheet?.id) { oldValue, newValue in
-            if oldValue != nil && newValue == nil {
-                presentPendingProfileIfNeeded()
-            }
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
         }
         .sheet(item: $reportTargetItem) { item in
             NavigationStack {

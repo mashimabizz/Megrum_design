@@ -13,4 +13,10 @@ enum PaymentSettingsResolver {
     static func otherNote(settings: UserPaymentSettings?, viewer: UserProfile?) -> String? {
         settings?.otherNote?.nilIfBlank ?? viewer?.paymentNote?.nilIfBlank
     }
+
+    static func hasAnyData(settings: UserPaymentSettings?, viewer: UserProfile?) -> Bool {
+        settings?.hasAnyData == true
+            || !UserPaymentMethod.normalized(viewer?.paymentMethods ?? []).isEmpty
+            || viewer?.paymentNote?.nilIfBlank != nil
+    }
 }

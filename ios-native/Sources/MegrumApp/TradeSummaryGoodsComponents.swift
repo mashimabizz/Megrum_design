@@ -10,7 +10,7 @@ struct TradeSummaryGoodsSection: View {
     var cashAmount: Int?
 
     private var displayCount: Int {
-        max(items.count, expectedCount)
+        max(items.count + (cashOffer ? 1 : 0), expectedCount)
     }
 
     var body: some View {
@@ -36,10 +36,10 @@ struct TradeSummaryGoodsSection: View {
                     ForEach(items) { item in
                         TradeSummaryGoodsRow(item: item)
                     }
-                }
 
-                if cashOffer {
-                    TradeCashAmountPanel(cashAmount: cashAmount)
+                    if cashOffer {
+                        TradeSummaryCashRow(cashAmount: cashAmount)
+                    }
                 }
             }
         }
@@ -52,6 +52,46 @@ struct TradeSummaryGoodsSection: View {
             return "定価"
         }
         return "\(displayCount)点"
+    }
+}
+
+struct TradeSummaryCashRow: View {
+    var cashAmount: Int?
+
+    var body: some View {
+        HStack(spacing: 10) {
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [MegrumTheme.sky, MegrumTheme.lavender],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .frame(width: 46, height: 46)
+                .overlay {
+                    Image(systemName: "yensign")
+                        .font(.system(size: 17, weight: .black))
+                        .foregroundStyle(.white)
+                }
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(cashText)
+                    .font(.system(size: 13, weight: .black, design: .rounded))
+                    .foregroundStyle(MegrumTheme.ink)
+                    .lineLimit(1)
+                Text("支払い")
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .foregroundStyle(MegrumTheme.muted)
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 8)
+        }
+    }
+
+    private var cashText: String {
+        cashAmount.map(TradeAmountFormatter.compactYen) ?? "定価"
     }
 }
 

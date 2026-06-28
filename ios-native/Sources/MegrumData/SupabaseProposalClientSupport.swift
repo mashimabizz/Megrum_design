@@ -53,6 +53,15 @@ extension SupabaseProposalClient {
         ]
     }
 
+    func participantProposalQueryItems(proposalID: UUID, userID: UUID) -> [URLQueryItem] {
+        let viewer = userID.uuidString.lowercased()
+        return [
+            URLQueryItem(name: "id", value: "eq.\(proposalID.uuidString.lowercased())"),
+            URLQueryItem(name: "or", value: "(sender_id.eq.\(viewer),receiver_id.eq.\(viewer))"),
+            URLQueryItem(name: "limit", value: "1")
+        ]
+    }
+
     func evidencePhotoDeleteQueryItems(userID: UUID, proposalID: UUID, photoID: UUID) -> [URLQueryItem] {
         [
             URLQueryItem(name: "id", value: "eq.\(photoID.uuidString.lowercased())"),

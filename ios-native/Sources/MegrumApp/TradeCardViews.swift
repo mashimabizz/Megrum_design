@@ -60,6 +60,8 @@ struct TradeCard: View {
     var body: some View {
         TradeCardContent(
             presentation: presentation,
+            proposal: proposal,
+            viewerID: viewerID,
             offeredItems: previewItems(for: offeredGoodsIDs),
             requestedItems: previewItems(for: requestedGoodsIDs),
             isSelectionMode: isSelectionMode,
@@ -87,6 +89,8 @@ struct TradeCard: View {
 
 private struct TradeCardContent: View {
     var presentation: TradeCardPresentation
+    var proposal: TradeProposal
+    var viewerID: UUID?
     var offeredItems: [GoodsItem]
     var requestedItems: [GoodsItem]
     var isSelectionMode: Bool
@@ -102,6 +106,10 @@ private struct TradeCardContent: View {
                 TradeDealGoodsPanel(
                     offeredItems: offeredItems,
                     requestedItems: requestedItems,
+                    offeredCashOffer: cashBelongsToOfferedSide,
+                    offeredCashAmount: proposal.cashAmount,
+                    requestedCashOffer: cashBelongsToRequestedSide,
+                    requestedCashAmount: proposal.cashAmount,
                     onCarouselTap: onOpen
                 )
 
@@ -135,6 +143,33 @@ private struct TradeCardContent: View {
             }
         }
         .opacity(isSelectionMode && !isSelectionEnabled ? 0.48 : 1)
+    }
+
+    private var cashBelongsToOfferedSide: Bool {
+        guard proposal.cashOffer, let side = resolvedCashSide else {
+            return false
+        }
+        guard let viewerID else {
+            return side == .sender
+        }
+        return proposal.isSender(viewerID) ? side == .sender : side == .receiver
+    }
+
+    private var cashBelongsToRequestedSide: Bool {
+        proposal.cashOffer && !cashBelongsToOfferedSide
+    }
+
+    private var resolvedCashSide: ProposalCashSide? {
+        if let cashAmountSide = proposal.cashAmountSide {
+            return cashAmountSide
+        }
+        if proposal.senderGoodsIDs.isEmpty, !proposal.receiverGoodsIDs.isEmpty {
+            return .sender
+        }
+        if proposal.receiverGoodsIDs.isEmpty, !proposal.senderGoodsIDs.isEmpty {
+            return .receiver
+        }
+        return .receiver
     }
 }
 

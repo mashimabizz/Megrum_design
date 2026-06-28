@@ -67,6 +67,32 @@ public final class SupabaseProposalClient: @unchecked Sendable {
         )
     }
 
+    public func reviseProposal(
+        userID: UUID,
+        proposalID: UUID,
+        input: ProposalCreateInput,
+        now: Date = .now
+    ) async throws -> TradeProposal {
+        let current = try await loadProposal(proposalID: proposalID)
+        guard current.isParticipant(userID), input.receiverID == current.partnerID(for: userID) else {
+            throw SupabaseProposalClientError.notParticipant
+        }
+        guard current.allowsCounterProposal else {
+            throw SupabaseProposalClientError.invalidStatus
+        }
+
+        let rows: [ProposalRow] = try await client.updateRows(
+            in: "proposals",
+            values: try ProposalRevisionPayload(senderID: userID, input: input, now: now),
+            select: ProposalRow.select,
+            queryItems: participantProposalQueryItems(proposalID: proposalID, userID: userID)
+        )
+        guard let updated = rows.first?.proposal else {
+            throw SupabaseProposalClientError.malformedResponse
+        }
+        return updated
+    }
+
     public func agreeProposal(userID: UUID, proposalID: UUID, acceptedExchangeMethod: ExchangeMethod?) async throws -> TradeProposal {
         let rows: [ProposalRow] = try await client.rpcRows(
             function: "respond_to_proposal_for_viewer",

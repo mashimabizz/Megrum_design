@@ -2,6 +2,9 @@ import MegrumCore
 
 extension OshiSettingsScreen {
     func availableCharacters(for group: OshiSettingsGroupDraft) -> [OshiCharacter] {
+        guard group.supportsMemberSelection else {
+            return []
+        }
         guard let groupID = group.groupID else {
             return []
         }

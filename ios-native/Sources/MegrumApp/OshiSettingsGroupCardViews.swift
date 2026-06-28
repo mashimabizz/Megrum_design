@@ -6,14 +6,16 @@ struct OshiSettingsGroupCard: View {
     var group: OshiSettingsGroupDraft
     var availableCharacters: [OshiCharacter]
     var isExpanded: Bool
+    var isRemoveConfirmationActive: Bool
     var isSaving: Bool
     var onToggleExpanded: () -> Void
+    var onShowRemoveConfirmation: () -> Void
+    var onHideRemoveConfirmation: () -> Void
     var onRemoveGroup: () -> Void
     var onRemoveMember: (OshiSettingsMemberDraft) -> Void
     var onAddMember: (OshiCharacter) -> Void
     var onRequestMember: () -> Void
 
-    @State private var showsRemoveConfirmation = false
     @State private var canConfirmRemoval = false
 
     private var summary: String? {
@@ -23,13 +25,11 @@ struct OshiSettingsGroupCard: View {
     private func showRemoveConfirmation() {
         canConfirmRemoval = false
         withAnimation(.snappy(duration: 0.18)) {
-            showsRemoveConfirmation = true
+            onShowRemoveConfirmation()
         }
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: 250_000_000)
-            if showsRemoveConfirmation {
-                canConfirmRemoval = true
-            }
+            canConfirmRemoval = true
         }
     }
 
@@ -82,23 +82,25 @@ struct OshiSettingsGroupCard: View {
                         )
                     }
 
-                    Button(action: onToggleExpanded) {
-                        Text(OshiSettingsPresentationText.memberToggleTitle(isExpanded: isExpanded))
-                            .font(.system(size: 13, weight: .black, design: .rounded))
-                            .foregroundStyle(MegrumTheme.muted)
-                            .padding(.horizontal, 12)
-                            .frame(height: 32)
-                            .overlay {
-                                Capsule()
-                                    .strokeBorder(style: StrokeStyle(lineWidth: 1.4, dash: [5, 5]))
-                                    .foregroundStyle(MegrumTheme.muted.opacity(0.35))
-                            }
-                            .fixedSize(horizontal: true, vertical: false)
+                    if group.supportsMemberSelection {
+                        Button(action: onToggleExpanded) {
+                            Text(OshiSettingsPresentationText.memberToggleTitle(isExpanded: isExpanded))
+                                .font(.system(size: 13, weight: .black, design: .rounded))
+                                .foregroundStyle(MegrumTheme.muted)
+                                .padding(.horizontal, 12)
+                                .frame(height: 32)
+                                .overlay {
+                                    Capsule()
+                                        .strokeBorder(style: StrokeStyle(lineWidth: 1.4, dash: [5, 5]))
+                                        .foregroundStyle(MegrumTheme.muted.opacity(0.35))
+                                }
+                                .fixedSize(horizontal: true, vertical: false)
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                 }
 
-                if isExpanded {
+                if isExpanded && group.supportsMemberSelection {
                     VStack(alignment: .leading, spacing: 10) {
                         if availableCharacters.isEmpty {
                             Text(group.pending ? "仮登録中の推しです。承認前でもメンバー追加リクエストを送れます。" : "追加できるメンバー・キャラクターが登録されていません。")
@@ -159,20 +161,20 @@ struct OshiSettingsGroupCard: View {
             }
             .shadow(color: .black.opacity(0.025), radius: 12, x: 0, y: 6)
 
-            if showsRemoveConfirmation {
+            if isRemoveConfirmationActive {
                 AnchoredDestructiveConfirmationPopover(
                     title: OshiSettingsPresentationText.removeGroupConfirmationTitle,
                     message: OshiSettingsPresentationText.removeGroupConfirmationMessage,
                     destructiveTitle: OshiSettingsPresentationText.removeGroupConfirmationAction,
                     onCancel: {
                         withAnimation(.snappy(duration: 0.18)) {
-                            showsRemoveConfirmation = false
                             canConfirmRemoval = false
+                            onHideRemoveConfirmation()
                         }
                     },
                     onConfirm: {
-                        showsRemoveConfirmation = false
                         canConfirmRemoval = false
+                        onHideRemoveConfirmation()
                         onRemoveGroup()
                     },
                     isConfirmEnabled: canConfirmRemoval

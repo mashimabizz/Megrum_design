@@ -4,7 +4,11 @@ import SwiftUI
 
 extension OshiSettingsScreen {
     func closeScreen() {
-        dismiss()
+        if let onClose {
+            onClose()
+        } else {
+            dismiss()
+        }
     }
 
     func showMasterSheet() {
@@ -12,6 +16,9 @@ extension OshiSettingsScreen {
     }
 
     func toggleExpandedGroup(_ group: OshiSettingsGroupDraft) {
+        guard group.supportsMemberSelection else {
+            return
+        }
         withAnimation(.snappy(duration: 0.2)) {
             expandedGroupKey = expandedGroupKey == group.key ? nil : group.key
         }
@@ -38,6 +45,9 @@ extension OshiSettingsScreen {
     }
 
     func requestMemberTapped(_ group: OshiSettingsGroupDraft) {
+        guard group.supportsMemberSelection else {
+            return
+        }
         requestSheet = .member(OshiMemberRequestContext(group: group))
     }
 
@@ -72,6 +82,10 @@ extension OshiSettingsScreen {
         guard charactersByGroupID[groupID] == nil,
               let group = appState.oshiGroups.first(where: { $0.id == groupID })
         else {
+            return
+        }
+        guard group.supportsMemberSelection else {
+            charactersByGroupID[groupID] = []
             return
         }
         await appState.loadOshiCharacters(group: group)

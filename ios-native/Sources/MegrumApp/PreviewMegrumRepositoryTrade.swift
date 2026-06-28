@@ -21,6 +21,27 @@ public extension PreviewMegrumRepository {
         )
     }
 
+    func reviseProposal(proposalID: UUID, input: ProposalCreateInput) async throws -> TradeProposal {
+        TradeProposal(
+            id: proposalID,
+            senderID: NativePreviewData.viewerID,
+            receiverID: input.receiverID,
+            listingID: input.listingID,
+            status: .negotiating,
+            exchangeMethod: input.exchangeMethod,
+            senderGoodsIDs: input.senderGoodsIDs,
+            receiverGoodsIDs: input.receiverGoodsIDs,
+            conditionTags: input.conditionTags,
+            cashOffer: input.cashOffer,
+            cashAmount: input.cashAmount,
+            cashAmountSide: input.cashAmountSide,
+            agreedBySender: true,
+            agreedByReceiver: false,
+            updatedAt: .now,
+            meetupCandidates: input.meetupCandidates.isEmpty ? input.meetup.map { [$0] } : input.meetupCandidates
+        )
+    }
+
     func agreeProposal(proposalID: UUID, acceptedExchangeMethod: ExchangeMethod?) async throws -> TradeProposal {
         let proposal = NativePreviewData.proposals.first { $0.id == proposalID }
             ?? TradeProposal(

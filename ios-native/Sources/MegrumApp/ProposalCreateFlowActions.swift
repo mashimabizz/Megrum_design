@@ -105,8 +105,13 @@ extension ProposalCreateFlow {
             targetStatus: targetStatus,
             meetupCandidates: meetupCandidates
         )
-        let created = await appState.createProposal(draft.input)
-        if created {
+        let submitted: Bool
+        if let revisingProposalID {
+            submitted = await appState.reviseProposal(proposalID: revisingProposalID, input: draft.input)
+        } else {
+            submitted = await appState.createProposal(draft.input)
+        }
+        if submitted {
             await onCreateSuccess?()
             if showsCompletionAfterCreate {
                 withAnimation(.snappy) {

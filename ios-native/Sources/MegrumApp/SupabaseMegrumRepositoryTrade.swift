@@ -7,6 +7,10 @@ public extension SupabaseMegrumRepository {
         try await proposalClient.createProposal(senderID: viewerID, input: input)
     }
 
+    func reviseProposal(proposalID: UUID, input: ProposalCreateInput) async throws -> TradeProposal {
+        try await proposalClient.reviseProposal(userID: viewerID, proposalID: proposalID, input: input)
+    }
+
     func agreeProposal(proposalID: UUID, acceptedExchangeMethod: ExchangeMethod?) async throws -> TradeProposal {
         try await proposalClient.agreeProposal(
             userID: viewerID,

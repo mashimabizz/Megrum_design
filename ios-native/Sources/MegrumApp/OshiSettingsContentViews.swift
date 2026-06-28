@@ -9,6 +9,7 @@ struct OshiSettingsMainContent: View {
     var errorMessage: String?
     var noticeMessage: String?
     var expandedGroupKey: String?
+    @Binding var activeRemoveConfirmationGroupKey: String?
     var availableCharacters: (OshiSettingsGroupDraft) -> [OshiCharacter]
     var onBack: () -> Void
     var onShowMasterSheet: () -> Void
@@ -47,13 +48,21 @@ struct OshiSettingsMainContent: View {
                                     group: group,
                                     availableCharacters: availableCharacters(group),
                                     isExpanded: expandedGroupKey == group.key,
+                                    isRemoveConfirmationActive: activeRemoveConfirmationGroupKey == group.key,
                                     isSaving: isSaving,
                                     onToggleExpanded: { onToggleExpanded(group) },
+                                    onShowRemoveConfirmation: { activeRemoveConfirmationGroupKey = group.key },
+                                    onHideRemoveConfirmation: {
+                                        if activeRemoveConfirmationGroupKey == group.key {
+                                            activeRemoveConfirmationGroupKey = nil
+                                        }
+                                    },
                                     onRemoveGroup: { onRemoveGroup(group) },
                                     onRemoveMember: { onRemoveMember($0, group) },
                                     onAddMember: { onAddMember($0, group) },
                                     onRequestMember: { onRequestMember(group) }
                                 )
+                                .zIndex(activeRemoveConfirmationGroupKey == group.key ? 100 : 0)
                             }
                         }
                         .padding(.horizontal, 20)

@@ -76,6 +76,69 @@ struct ProposalCreatePayload: Encodable, Sendable {
     }
 }
 
+struct ProposalRevisionPayload: Encodable, Sendable {
+    var senderId: UUID
+    var receiverId: UUID
+    var matchType: String
+    var senderHaveIds: [UUID]
+    var senderHaveQtys: [Int]
+    var receiverHaveIds: [UUID]
+    var receiverHaveQtys: [Int]
+    var message: String?
+    var messageTone: String
+    var status: String
+    var lastActionAt: String
+    var expiresAt: String?
+    var exchangeMethod: String
+    var optionTags: [String]
+    var exposeCalendar: Bool
+    var listingId: UUID?
+    var cashOffer: Bool
+    var cashAmount: Int?
+    var cashAmountSide: String?
+    var meetupStartAt: String?
+    var meetupEndAt: String?
+    var meetupPlaceName: String?
+    var meetupLat: Double?
+    var meetupLng: Double?
+    var meetupCandidates: [ProposalMeetupCandidatePayload]
+    var agreedBySender: Bool
+    var agreedByReceiver: Bool
+    var updatedAt: String
+
+    init(senderID: UUID, input: ProposalCreateInput, now: Date) throws {
+        let createPayload = try ProposalCreatePayload(senderID: senderID, input: input, now: now)
+        self.senderId = createPayload.senderId
+        self.receiverId = createPayload.receiverId
+        self.matchType = createPayload.matchType
+        self.senderHaveIds = createPayload.senderHaveIds
+        self.senderHaveQtys = createPayload.senderHaveQtys
+        self.receiverHaveIds = createPayload.receiverHaveIds
+        self.receiverHaveQtys = createPayload.receiverHaveQtys
+        self.message = createPayload.message
+        self.messageTone = createPayload.messageTone
+        self.status = ProposalStatus.negotiating.rawValue
+        self.lastActionAt = createPayload.lastActionAt
+        self.expiresAt = createPayload.expiresAt
+        self.exchangeMethod = createPayload.exchangeMethod
+        self.optionTags = createPayload.optionTags
+        self.exposeCalendar = createPayload.exposeCalendar
+        self.listingId = createPayload.listingId
+        self.cashOffer = createPayload.cashOffer
+        self.cashAmount = createPayload.cashAmount
+        self.cashAmountSide = createPayload.cashAmountSide
+        self.meetupStartAt = createPayload.meetupStartAt
+        self.meetupEndAt = createPayload.meetupEndAt
+        self.meetupPlaceName = createPayload.meetupPlaceName
+        self.meetupLat = createPayload.meetupLat
+        self.meetupLng = createPayload.meetupLng
+        self.meetupCandidates = createPayload.meetupCandidates
+        self.agreedBySender = true
+        self.agreedByReceiver = false
+        self.updatedAt = SupabaseDateEncoding.isoTimestamp(now)
+    }
+}
+
 struct ProposalMeetupCandidatePayload: Encodable, Sendable {
     var startAt: String
     var endAt: String

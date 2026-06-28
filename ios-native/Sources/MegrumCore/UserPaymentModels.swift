@@ -99,6 +99,16 @@ public struct UserPaymentSettings: Identifiable, Codable, Hashable, Sendable {
         UserPaymentMethod.displayText(for: methods, otherNote: otherNote)
     }
 
+    public var hasAnyData: Bool {
+        !methods.isEmpty
+            || !bankName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || !bankBranchName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || !bankAccountType.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || !bankAccountNumber.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || !bankAccountHolder.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || otherNote?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+    }
+
     public func normalized(for userID: UUID? = nil) -> UserPaymentSettings {
         UserPaymentSettings(
             userID: userID ?? self.userID,

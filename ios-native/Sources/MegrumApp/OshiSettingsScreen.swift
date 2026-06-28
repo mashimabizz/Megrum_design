@@ -4,10 +4,12 @@ import SwiftUI
 
 struct OshiSettingsScreen: View {
     @ObservedObject var appState: MegrumAppState
+    var onClose: (() -> Void)?
     @Environment(\.dismiss) var dismiss
     @State var groups: [OshiSettingsGroupDraft] = []
     @State var charactersByGroupID: [UUID: [OshiCharacter]] = [:]
     @State var expandedGroupKey: String?
+    @State var activeRemoveConfirmationGroupKey: String?
     @State var isSaving = false
     @State var isLoading = false
     @State var noticeMessage: String?
@@ -23,6 +25,7 @@ struct OshiSettingsScreen: View {
             errorMessage: errorMessage,
             noticeMessage: noticeMessage,
             expandedGroupKey: expandedGroupKey,
+            activeRemoveConfirmationGroupKey: $activeRemoveConfirmationGroupKey,
             availableCharacters: availableCharacters(for:),
             onBack: closeScreen,
             onShowMasterSheet: showMasterSheet,

@@ -187,6 +187,7 @@ extension TradeDetailScreen {
                     didSubmitEvaluation = true
                     await appState.loadMessages(proposalID: currentProposal.id)
                     isShowingEvaluationPage = false
+                    showToast("評価を送信しました")
                 }
             }
         }
@@ -215,6 +216,7 @@ extension TradeDetailScreen {
                     initialExchangeMethod: currentProposal.exchangeMethod,
                     initialStep: .give,
                     submissionStatusOverride: .negotiating,
+                    revisingProposalID: currentProposal.id,
                     showsCompletionAfterCreate: false,
                     onCreateSuccess: {
                         _ = await appState.sendSystemMessage(

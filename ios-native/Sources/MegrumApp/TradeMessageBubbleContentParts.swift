@@ -1,5 +1,6 @@
 import MegrumCore
 import MegrumDesign
+import MapKit
 import SwiftUI
 
 struct TradePhotoMessageBubble: View {
@@ -139,26 +140,42 @@ struct TradeLocationPreviewBubble: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             ZStack {
-                LinearGradient(
-                    colors: [
-                        Color(red: 0.82, green: 0.91, blue: 0.82),
-                        Color(red: 0.8, green: 0.88, blue: 0.96),
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-
-                TradeLocationMapGrid()
-
-                Circle()
-                    .fill(MegrumTheme.lavender)
-                    .frame(width: 34, height: 34)
-                    .overlay {
-                        Text("!")
-                            .font(.system(size: 18, weight: .black, design: .rounded))
-                            .foregroundStyle(.white)
+                if let coordinate {
+                    Map(initialPosition: .region(mapRegion(for: coordinate))) {
+                        Marker(presentation.title, systemImage: "location.fill", coordinate: coordinate)
+                            .tint(MegrumTheme.lavender)
                     }
-                    .shadow(color: MegrumTheme.lavender.opacity(0.32), radius: 8, y: 3)
+                    .allowsHitTesting(false)
+                    .mapControlVisibility(.hidden)
+                    .overlay {
+                        LinearGradient(
+                            colors: [.clear, .white.opacity(0.16)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    }
+                } else {
+                    LinearGradient(
+                        colors: [
+                            Color(red: 0.82, green: 0.91, blue: 0.82),
+                            Color(red: 0.8, green: 0.88, blue: 0.96),
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+
+                    TradeLocationMapGrid()
+
+                    Circle()
+                        .fill(MegrumTheme.lavender)
+                        .frame(width: 34, height: 34)
+                        .overlay {
+                            Text("!")
+                                .font(.system(size: 18, weight: .black, design: .rounded))
+                                .foregroundStyle(.white)
+                        }
+                        .shadow(color: MegrumTheme.lavender.opacity(0.32), radius: 8, y: 3)
+                }
             }
             .frame(height: 132)
 
@@ -188,6 +205,24 @@ struct TradeLocationPreviewBubble: View {
         .shadow(color: MegrumTheme.ink.opacity(0.05), radius: 10, y: 4)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(presentation.title)。\(presentation.body)")
+    }
+
+    private var coordinate: CLLocationCoordinate2D? {
+        guard let latitude = presentation.latitude,
+              let longitude = presentation.longitude,
+              latitude.isFinite,
+              longitude.isFinite
+        else {
+            return nil
+        }
+        return CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+    }
+
+    private func mapRegion(for coordinate: CLLocationCoordinate2D) -> MKCoordinateRegion {
+        MKCoordinateRegion(
+            center: coordinate,
+            span: MKCoordinateSpan(latitudeDelta: 0.006, longitudeDelta: 0.006)
+        )
     }
 }
 
