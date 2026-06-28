@@ -38,7 +38,7 @@ struct MeguriHomeMapBackdrop: View {
 
                         if selectedKind == .all || selectedKind == .grooms {
                             ForEach(grooms) { groom in
-                                Annotation("グルーム", coordinate: groom.coordinate) {
+                                Annotation("", coordinate: groom.coordinate) {
                                     Button {
                                         onSelectGroom(groom)
                                     } label: {
@@ -82,6 +82,12 @@ struct MeguriHomeMapBackdrop: View {
                         SpatialTapGesture()
                             .onEnded { value in
                                 guard pendingCreationCoordinate == nil else {
+                                    return
+                                }
+                                guard !isAnnotationTap(
+                                    at: value.location,
+                                    in: proxy
+                                ) else {
                                     return
                                 }
                                 guard let coordinate = proxy.convert(value.location, from: .local) else {
@@ -146,6 +152,34 @@ struct MeguriHomeMapBackdrop: View {
                 }
             }
         }
+    }
+}
+
+private extension MeguriHomeMapBackdrop {
+    func isAnnotationTap(at location: CGPoint, in proxy: MapProxy) -> Bool {
+        if selectedKind == .all || selectedKind == .grooms {
+            for groom in grooms {
+                guard let point = proxy.convert(groom.coordinate, to: .local) else {
+                    continue
+                }
+                if abs(location.x - point.x) <= 54, abs(location.y - point.y) <= 64 {
+                    return true
+                }
+            }
+        }
+
+        if selectedKind == .all || selectedKind == .boards {
+            for annotation in threads.compactMap(BoardMapAnnotation.init(thread:)) {
+                guard let point = proxy.convert(annotation.coordinate, to: .local) else {
+                    continue
+                }
+                if abs(location.x - point.x) <= 94, abs(location.y - point.y) <= 48 {
+                    return true
+                }
+            }
+        }
+
+        return false
     }
 }
 

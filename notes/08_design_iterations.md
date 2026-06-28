@@ -4,6 +4,57 @@
 
 ---
 
+## イテレーション1226.99：めぐりグルームタップ修正
+
+### 背景・問題意識
+
+めぐりホームの地図で既存グルームをタップしたとき、地図全体の作成用タップ判定にも反応し、「作成しますか？」の吹き出しが出ることがあった。また、グルーム表示まわりで単体グルーム下のラベルと画像切り替えアニメーションが体験を少し重くしていた。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MeguriHomeMapBackdrop.swift`
+- 地図タップ時にグルーム・チャットルーム注釈付近のタップを作成用タップとして扱わない判定を追加した。
+- 単体グルーム注釈の表示タイトルを空にし、ピン下に「グルーム」ラベルが出ないようにした。
+
+#### `ios-native/Sources/MegrumApp/MeguriMapAnnotationViews.swift`
+- 通常のめぐり地図でも単体グルーム注釈タイトルを空にした。
+
+#### `ios-native/Sources/MegrumApp/GroomStoryTileViews.swift`
+- 自分のグルーム追加タイル下の「グルーム」表示を削除した。アクセシビリティラベルは維持した。
+
+#### `ios-native/Sources/MegrumApp/GroomViewerScreen.swift`
+#### `ios-native/Sources/MegrumApp/GroomArchiveStoryViews.swift`
+- グルーム閲覧中の左右タップで画像を即時切り替えるよう、画像遷移アニメーションとインデックス変更アニメーションを外した。
+
+### 影響範囲
+
+- めぐりホーム地図のグルーム・チャットルーム注釈タップ
+- めぐり地図の単体グルーム注釈ラベル
+- グルーム追加タイル
+- グルーム閲覧・アーカイブ閲覧の左右タップ切り替え
+
+状態遷移は変えていないため `notes/09_state_machines.md` は更新しない。ユーザー向けの新用語も追加していないため `notes/10_glossary.md` は更新しない。
+
+### 確認方法
+
+- `git diff --check`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-groom-tap-build`
+  - passed
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'platform=iOS Simulator,id=C70DDDBB-2602-49E0-8F95-1F043BCCED76' -derivedDataPath /tmp/megrum-native-groom-tap-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+  - passed
+- `xcrun simctl install C70DDDBB-2602-49E0-8F95-1F043BCCED76 /tmp/megrum-native-groom-tap-xcodebuild/Build/Products/Debug-iphonesimulator/MegrumNative.app`
+  - passed
+- `SIMCTL_CHILD_MEGRUM_VISUAL_QA_PREVIEW_AUTH=1 SIMCTL_CHILD_MEGRUM_VISUAL_QA_INITIAL_SCREEN=meguri xcrun simctl launch --terminate-running-process C70DDDBB-2602-49E0-8F95-1F043BCCED76 tokyo.megrum.native.preview`
+  - passed
+
+### セルフレビュー結果
+
+- ✅ 既存の空き地図タップから作成吹き出しを出す挙動は維持した。
+- ✅ グルームピン・チャットルーム付近のタップだけを作成判定から除外し、既存投稿を見る操作と作成操作を分離した。
+- ✅ グルーム閲覧の閉じる・下スワイプ・いいね・返信の操作は変更していない。
+- ✅ 通常の `swift build` は `ios-native/.build/build.db` の disk I/O error で落ちたため、scratch path で検証した。
+
 ## イテレーション1226.98：画像からシリーズ候補を提示
 
 ### 背景・問題意識

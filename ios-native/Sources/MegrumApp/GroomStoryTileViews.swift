@@ -9,15 +9,8 @@ struct GroomMyStoryTile: View {
 
     var body: some View {
         Button(action: onAdd) {
-            VStack(spacing: 8) {
-                GroomMyStoryAvatar(viewer: viewer, isLoading: isLoading)
-
-                Text("グルーム")
-                    .font(.system(size: 12, weight: .heavy, design: .rounded))
-                    .foregroundStyle(MegrumTheme.ink)
-                    .lineLimit(1)
-                    .frame(width: 88)
-            }
+            GroomMyStoryAvatar(viewer: viewer, isLoading: isLoading)
+                .frame(width: 88, height: 86, alignment: .top)
         }
         .buttonStyle(.plain)
         .disabled(isLoading)

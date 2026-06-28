@@ -84,7 +84,6 @@ struct GroomViewerScreen: View {
                         .resizable()
                         .scaledToFit()
                         .id(currentGroom.id)
-                        .transition(.opacity.combined(with: .scale(scale: 0.98)))
                 case .failure:
                     GroomImageFailureView(message: "画像を読み込めませんでした", foregroundColor: .white)
                 default:
@@ -210,7 +209,9 @@ struct GroomViewerScreen: View {
             }
             return
         }
-        withAnimation(.smooth(duration: 0.18)) {
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
             currentIndex = nextIndex
         }
     }

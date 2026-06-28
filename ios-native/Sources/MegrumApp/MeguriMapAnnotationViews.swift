@@ -132,7 +132,7 @@ struct GroomMapCluster: Identifiable {
     var coordinate: CLLocationCoordinate2D
 
     var title: String {
-        posts.count > 1 ? "\(posts.count)件のグルーム" : "グルーム"
+        posts.count > 1 ? "\(posts.count)件のグルーム" : ""
     }
 
     static func clusters(from posts: [GroomPost], cellDegrees: Double = 0.0024) -> [GroomMapCluster] {
