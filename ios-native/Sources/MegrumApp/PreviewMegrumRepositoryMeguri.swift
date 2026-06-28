@@ -37,6 +37,17 @@ public extension PreviewMegrumRepository {
 
     func setGroomLiked(postID: UUID, isLiked: Bool) async throws {}
 
+    func reportGroom(_ input: GroomReportCreateInput) async throws -> GroomReportTicket {
+        GroomReportTicket(
+            id: UUID(),
+            groomPostID: input.groomPostID,
+            reportedUserID: input.reportedUserID,
+            reason: input.reason
+        )
+    }
+
+    func blockGroomUser(_ userID: UUID) async throws {}
+
     func sendGroomReply(_ input: GroomReplyCreateInput) async throws -> GroomReply {
         GroomReply(
             id: UUID(),
@@ -45,6 +56,23 @@ public extension PreviewMegrumRepository {
             recipientID: input.recipientID,
             body: input.body,
             groomImageURL: input.groomImageURL
+        )
+    }
+
+    func loadMeguriProfile(userID: UUID) async throws -> MeguriProfile? {
+        previewMeguriProfile(userID: userID)
+    }
+
+    func loadMeguriProfiles(userIDs: Set<UUID>) async throws -> [MeguriProfile] {
+        userIDs.compactMap(previewMeguriProfile(userID:))
+    }
+
+    func saveMeguriProfile(_ input: MeguriProfileUpdateInput) async throws -> MeguriProfile {
+        MeguriProfile(
+            userID: NativePreviewData.viewerID,
+            displayName: input.displayName,
+            avatarID: input.avatarID,
+            lastChangedAt: .now
         )
     }
 
@@ -111,7 +139,9 @@ public extension PreviewMegrumRepository {
             longitude: input.longitude,
             prefecture: input.prefecture,
             imageURLs: imageURLs,
-            imagePaths: input.imagePaths
+            imagePaths: input.imagePaths,
+            anonymousDisplayName: input.anonymousDisplayName,
+            anonymousAvatarID: input.anonymousAvatarID
         )
     }
 
@@ -136,5 +166,30 @@ public extension PreviewMegrumRepository {
         } catch {
             return nil
         }
+    }
+
+    private func previewMeguriProfile(userID: UUID) -> MeguriProfile? {
+        if userID == NativePreviewData.viewerID {
+            return MeguriProfile(
+                userID: userID,
+                displayName: "みちめぐり",
+                avatarID: "avatar_1",
+                lastChangedAt: Date(timeIntervalSince1970: 1_766_000_000)
+            )
+        }
+        if userID == NativePreviewData.partnerID {
+            return MeguriProfile(
+                userID: userID,
+                displayName: "まくはり民",
+                avatarID: "avatar_3",
+                lastChangedAt: Date(timeIntervalSince1970: 1_766_100_000)
+            )
+        }
+        return MeguriProfile(
+            userID: userID,
+            displayName: "めぐりさん",
+            avatarID: "avatar_2",
+            lastChangedAt: Date(timeIntervalSince1970: 1_766_200_000)
+        )
     }
 }

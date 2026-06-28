@@ -143,6 +143,7 @@ public protocol MegrumRepository: Sendable {
     func archiveGoodsItem(itemID: UUID) async throws
     func deleteGoodsItem(itemID: UUID) async throws
     func reportGoods(_ input: GoodsReportCreateInput) async throws -> GoodsReportTicket
+    func reportUser(_ input: UserReportCreateInput) async throws -> UserReportTicket
     func loadIndividualListings() async throws -> [IndividualListing]
     func createIndividualListing(_ input: IndividualListingCreateInput) async throws -> IndividualListing
     func updateIndividualListing(
@@ -182,6 +183,8 @@ public protocol MegrumRepository: Sendable {
     func createSchedule(_ input: PersonalScheduleCreateInput) async throws -> PersonalSchedule
     func loadHomeLocalModeSettings(now: Date) async throws -> HomeLocalActivitySettings?
     func saveHomeLocalModeSettings(_ settings: HomeLocalActivitySettings, now: Date) async throws -> HomeLocalActivitySettings
+    func loadExchangeSettings(userID: UUID) async throws -> HomeDefaultExchangeSettings?
+    func saveExchangeSettings(_ settings: HomeDefaultExchangeSettings) async throws -> HomeDefaultExchangeSettings
     func loadGrooms(latitude: Double?, longitude: Double?, radiusMeters: Int) async throws -> [GroomPost]
     func loadGroomMapPosts(latitude: Double?, longitude: Double?, radiusMeters: Int) async throws -> [GroomPost]
     func loadOwnGroomArchive(limit: Int) async throws -> [GroomPost]
@@ -190,7 +193,12 @@ public protocol MegrumRepository: Sendable {
     func createGroomPost(_ input: GroomPostCreateInput) async throws -> GroomPost
     func markGroomViewed(postID: UUID) async throws
     func setGroomLiked(postID: UUID, isLiked: Bool) async throws
+    func reportGroom(_ input: GroomReportCreateInput) async throws -> GroomReportTicket
+    func blockGroomUser(_ userID: UUID) async throws
     func sendGroomReply(_ input: GroomReplyCreateInput) async throws -> GroomReply
+    func loadMeguriProfile(userID: UUID) async throws -> MeguriProfile?
+    func loadMeguriProfiles(userIDs: Set<UUID>) async throws -> [MeguriProfile]
+    func saveMeguriProfile(_ input: MeguriProfileUpdateInput) async throws -> MeguriProfile
     func loadMeguriMessages() async throws -> [MeguriMessage]
     func sendMeguriMessage(_ input: MeguriMessageCreateInput) async throws -> MeguriMessage
     func markMeguriMessagesRead(peerID: UUID, readAt: Date) async throws -> [MeguriMessage]
@@ -204,15 +212,34 @@ public protocol MegrumRepository: Sendable {
     func savePaymentSettings(_ settings: UserPaymentSettings) async throws -> (profile: UserProfile, settings: UserPaymentSettings)
     func lookupAddress(postalCode: String) async throws -> PostalCodeAddress?
     func loadBlockedUsers() async throws -> [BlockedUser]
+    func loadBlockedUserIDs() async throws -> Set<UUID>
+    func blockUser(_ userID: UUID) async throws -> BlockedUser
     func unblockUser(_ userID: UUID) async throws
     func loadNotifications(limit: Int) async throws -> [MegrumNotification]
     func markNotificationRead(_ notificationID: UUID) async throws -> MegrumNotification?
     func markAllNotificationsRead() async throws -> [MegrumNotification]
+    func loadNotificationSettings() async throws -> UserNotificationSettings
     func loadPushNotificationsEnabled() async throws -> Bool
     func setPushNotificationsEnabled(_ enabled: Bool) async throws -> Bool
+    func setGroomActivityPushNotificationsEnabled(_ enabled: Bool) async throws -> UserNotificationSettings
+    func setChatroomActivityPushNotificationsEnabled(_ enabled: Bool) async throws -> UserNotificationSettings
     func registerNativePushDeviceToken(_ token: String, appVersion: String?) async throws
     func revokeNativePushDeviceToken(_ token: String, revokedAt: Date) async throws
     func updateOwnProfile(_ input: OwnProfileUpdateInput) async throws -> UserProfile
     func completeAccountSetup(_ input: AccountSetupInput) async throws -> UserProfile
     func requestAccountDeletion(_ input: AccountDeletionRequestInput) async throws -> AccountDeletionRequestResult
+}
+
+public extension MegrumRepository {
+    func loadMeguriProfile(userID _: UUID) async throws -> MeguriProfile? {
+        nil
+    }
+
+    func loadMeguriProfiles(userIDs _: Set<UUID>) async throws -> [MeguriProfile] {
+        []
+    }
+
+    func saveMeguriProfile(_: MeguriProfileUpdateInput) async throws -> MeguriProfile {
+        throw MegrumRepositoryError.unsupportedMutation
+    }
 }

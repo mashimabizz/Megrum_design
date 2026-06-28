@@ -17,23 +17,30 @@ struct MeguriScreen: View {
     @State var groomDraftPhotoContentType = "image/jpeg"
     @State var isPreparingGroomPhoto = false
     @State var groomCreationCoordinate: MegrumLocationCoordinate?
+    @State var isGroomCreationLocationLocked = false
     @State var isShowingGroomComposer = false
     @State var isShowingGroomCamera = false
     @State var isShowingGroomArchive = false
+    @State var isShowingMeguriMessages = false
+    @State var isShowingMeguriProfileSettings = false
     @State var activeMap: MeguriMapKind?
+    @State var homeMapKind: MeguriMapKind = .all
     @State var isShowingThreadComposer = false
+    @State var threadCreationCoordinate: MegrumLocationCoordinate?
+    @State var pendingMapCreationCoordinate: MegrumLocationCoordinate?
     @State var isShowingPrefecturePicker = false
     @State var localNoticeMessage: String?
     @State var toastMessage: String?
+    @State var toastPlacement: MeguriToastPlacement = .bottom
     @State var toastID = UUID()
     @State var outOfRangeAlertMessage = ""
     @State var isShowingOutOfRangeAlert = false
-    @State var boardSheetDetent: MeguriBoardSheetDetent = .regular
+    @State var boardSheetDetent: MeguriBoardSheetDetent = .compact
     @State var shouldCenterHomeMapWhenLocationArrives = false
     @State var homeCameraPosition = MapCameraPosition.region(
         MKCoordinateRegion(
             center: CLLocationCoordinate2D(latitude: 35.7056, longitude: 139.7519),
-            span: MKCoordinateSpan(latitudeDelta: 0.030, longitudeDelta: 0.030)
+            span: MeguriHomeMapCamera.focusedSpan
         )
     )
 
@@ -53,33 +60,44 @@ struct MeguriScreen: View {
         MeguriHomeContent(
             cameraPosition: $homeCameraPosition,
             viewer: appState.viewer,
+            meguriProfile: appState.meguriProfile,
             grooms: appState.grooms,
             mapGrooms: appState.groomMapPosts.isEmpty ? appState.grooms : appState.groomMapPosts,
             threads: appState.threads,
-            replyCounts: appState.boardRepliesByThreadID.mapValues(\.count),
             currentCoordinate: locationState.coordinate,
-            isLoading: appState.isLoadingMeguri,
-            selectedScope: selectedBoardScope,
-            selectedPrefecture: selectedBoardPrefecture ?? "都道府県",
             notice: notice,
             isRequestingLocation: locationState.isRequestingLocation,
-            boardSheetDetent: $boardSheetDetent,
-            onOpenMap: { activeMap = .boards },
+            unreadMessageCount: appState.meguriUnreadMessageCount,
+            selectedMapKind: $homeMapKind,
             onRecenterMap: centerHomeMapOnCurrentLocation,
+            onOpenMessages: {
+                isShowingMeguriMessages = true
+            },
             onSelectGroom: openGroomFromStrip,
             onSelectThread: openThreadFromHome,
+            onTapMapCoordinate: handleHomeMapTap,
+            pendingCreationCoordinate: pendingMapCreationCoordinate,
+            onCreateGroomAtPendingCoordinate: openGroomComposerAtPendingCoordinate,
+            onCreateThreadAtPendingCoordinate: openThreadComposerAtPendingCoordinate,
+            onCancelPendingCreationCoordinate: dismissPendingMapCreationCoordinate,
             onNoticeAction: handleLocationNoticeAction,
-            onChangeScope: updateBoardScope,
-            onOpenPrefecture: { isShowingPrefecturePicker = true },
-            onOpenGroomComposer: openGroomComposer,
-            onOpenThreadComposer: openThreadComposer,
-            onOpenGroomArchive: { isShowingGroomArchive = true }
+            onOpenGroomArchive: { isShowingGroomArchive = true },
+            onOpenMeguriProfile: { isShowingMeguriProfileSettings = true }
         )
         .allowsHitTesting(!isShowingGroomArchive)
         .background(MegrumTheme.canvas.ignoresSafeArea())
         .megrumHiddenNavigationBar()
         .task {
             requestInitialLocationIfNeeded()
+        }
+        .onDisappear {
+            locationState.stopUpdatingCurrentLocation()
+        }
+        .task {
+            await appState.loadMeguriMessages()
+        }
+        .task {
+            await appState.loadMeguriProfile(reportsFailure: false)
         }
         .task(id: appState.grooms.map(\.authorID)) {
             await preloadGroomAuthorProfiles()
@@ -95,12 +113,27 @@ struct MeguriScreen: View {
         } message: {
             Text(outOfRangeAlertMessage)
         }
-        .overlay(alignment: .bottom) {
+        .overlay(alignment: toastPlacement.alignment) {
             if let toastMessage {
                 MeguriToastView(message: toastMessage)
-                    .padding(.bottom, 104)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .padding(.top, toastPlacement == .top ? 92 : 0)
+                    .padding(.bottom, toastPlacement == .bottom ? 104 : 0)
+                    .transition(toastPlacement.transition)
             }
+        }
+        .sheet(isPresented: $isShowingMeguriMessages) {
+            NavigationStack {
+                MeguriMessageInboxScreen(appState: appState)
+            }
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $isShowingMeguriProfileSettings) {
+            NavigationStack {
+                MeguriProfileSettingsSheet(appState: appState)
+            }
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
         }
         .modifier(
             MeguriScreenPresentationModifier(
@@ -108,9 +141,11 @@ struct MeguriScreen: View {
                 locationState: locationState,
                 selectedThread: $selectedThread,
                 isShowingThreadComposer: $isShowingThreadComposer,
+                threadCreationCoordinate: $threadCreationCoordinate,
                 isShowingPrefecturePicker: $isShowingPrefecturePicker,
                 selectedGroomPhotoItem: $selectedGroomPhotoItem,
                 groomCreationCoordinate: $groomCreationCoordinate,
+                isGroomCreationLocationLocked: isGroomCreationLocationLocked,
                 groomDraftPhotoData: $groomDraftPhotoData,
                 groomDraftPhotoContentType: $groomDraftPhotoContentType,
                 isPreparingGroomPhoto: isPreparingGroomPhoto,
@@ -129,7 +164,7 @@ struct MeguriScreen: View {
                 },
                 onSelectPrefecture: selectBoardPrefecture,
                 onRequestLocation: {
-                    locationState.requestCurrentLocation()
+                    locationState.startUpdatingCurrentLocation()
                 },
                 onOpenGroomCamera: {
                     #if os(iOS)
@@ -144,7 +179,9 @@ struct MeguriScreen: View {
                     #endif
                 },
                 onPrepareCapturedGroomPhoto: prepareCapturedGroomPhoto,
-                onShowToast: showToast,
+                onShowToast: { message in
+                    showToast(message)
+                },
                 onPublishGroomPhoto: publishGroomPhoto,
                 onResetGroomDraft: resetGroomDraft
             )

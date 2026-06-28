@@ -15,11 +15,13 @@ extension MegrumAppState {
         isLoadingGroomMap = true
         errorMessage = nil
         do {
-            groomMapPosts = try await repository.loadGroomMapPosts(
+            let posts = try await repository.loadGroomMapPosts(
                 latitude: latitude,
                 longitude: longitude,
                 radiusMeters: radiusMeters
             )
+            groomMapPosts = posts
+            await loadMeguriProfiles(userIDs: Set(posts.map(\.authorID)), reportsFailure: false)
         } catch {
             errorMessage = "グルームマップを読み込めませんでした"
         }
@@ -120,17 +122,117 @@ extension MegrumAppState {
     }
 
     public func setGroomLiked(_ postID: UUID, isLiked: Bool) async {
+        guard let viewerID = viewer?.id else {
+            errorMessage = "ログイン状態を確認できません"
+            return
+        }
+        if groomPostForGroomAction(postID)?.authorID == viewerID {
+            errorMessage = "自分のグルームにはいいねできません"
+            return
+        }
+
         let previousLikedIDs = likedGroomIDs
+        let previousGrooms = grooms
+        let previousMapPosts = groomMapPosts
+        let previousArchive = ownGroomArchive
+        let didChange = likedGroomIDs.contains(postID) != isLiked
         likedGroomIDs = GroomInteractionStateReducer.settingLiked(
             postID: postID,
             isLiked: isLiked,
             in: likedGroomIDs
         )
+        grooms = GroomPostLocalMutation.settingLiked(
+            postID: postID,
+            isLiked: isLiked,
+            adjustsCount: didChange,
+            in: grooms
+        )
+        groomMapPosts = GroomPostLocalMutation.settingLiked(
+            postID: postID,
+            isLiked: isLiked,
+            adjustsCount: didChange,
+            in: groomMapPosts
+        )
+        ownGroomArchive = GroomPostLocalMutation.settingLiked(
+            postID: postID,
+            isLiked: isLiked,
+            adjustsCount: didChange,
+            in: ownGroomArchive
+        )
         do {
             try await repository.setGroomLiked(postID: postID, isLiked: isLiked)
         } catch {
             likedGroomIDs = previousLikedIDs
+            grooms = previousGrooms
+            groomMapPosts = previousMapPosts
+            ownGroomArchive = previousArchive
             errorMessage = "グルームのいいねを更新できませんでした"
+        }
+    }
+
+    public func reportGroom(
+        _ groom: GroomPost,
+        reason: GroomReportReason = .other,
+        note: String? = nil
+    ) async -> Bool {
+        guard let viewerID = viewer?.id else {
+            errorMessage = "ログイン状態を確認できません"
+            return false
+        }
+        guard viewerID != groom.authorID else {
+            errorMessage = "自分のグルームは通報できません"
+            return false
+        }
+        guard reportingGroomPostID != groom.id else {
+            return false
+        }
+
+        reportingGroomPostID = groom.id
+        errorMessage = nil
+        do {
+            _ = try await repository.reportGroom(
+                GroomReportCreateInput(
+                    groomPostID: groom.id,
+                    reportedUserID: groom.authorID,
+                    reason: reason,
+                    note: note
+                )
+            )
+            reportingGroomPostID = nil
+            return true
+        } catch {
+            errorMessage = "グルームを通報できませんでした"
+            reportingGroomPostID = nil
+            return false
+        }
+    }
+
+    public func blockGroomAuthor(_ groom: GroomPost) async -> Bool {
+        guard let viewerID = viewer?.id else {
+            errorMessage = "ログイン状態を確認できません"
+            return false
+        }
+        guard viewerID != groom.authorID else {
+            errorMessage = "自分をブロックできません"
+            return false
+        }
+        guard blockingGroomUserID != groom.authorID else {
+            return false
+        }
+
+        blockingGroomUserID = groom.authorID
+        errorMessage = nil
+        do {
+            try await repository.blockGroomUser(groom.authorID)
+            grooms = GroomPostLocalMutation.removing(authorID: groom.authorID, from: grooms)
+            groomMapPosts = GroomPostLocalMutation.removing(authorID: groom.authorID, from: groomMapPosts)
+            ownGroomArchive = GroomPostLocalMutation.removing(authorID: groom.authorID, from: ownGroomArchive)
+            blockingGroomUserID = nil
+            return true
+        } catch {
+            errorMessage = "ユーザーをブロックできませんでした"
+            blockingGroomUserID = nil
+            return false
         }
     }
 
@@ -173,6 +275,11 @@ extension MegrumAppState {
                 to: groomRepliesByPostID,
                 postID: postID
             )
+            let message = GroomReplyMeguriMessageMapper.sentMessage(from: reply, viewer: viewer)
+            meguriMessages = MeguriMessageReadStateReducer.appendingSentMessage(
+                message,
+                to: meguriMessages
+            )
             sendingGroomReplyPostID = nil
             return true
         } catch {
@@ -193,5 +300,14 @@ extension MegrumAppState {
         for userID in userIDs where userID != viewer?.id && publicProfilesByUserID[userID] == nil {
             await loadPublicUserProfile(userID: userID, reportsFailure: false)
         }
+    }
+
+    private func groomPostForGroomAction(_ postID: UUID) -> GroomPost? {
+        GroomPostLocalMutation.firstPost(
+            id: postID,
+            in: grooms,
+            groomMapPosts,
+            ownGroomArchive
+        )
     }
 }

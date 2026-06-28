@@ -19,7 +19,10 @@ struct BoardThreadDetailScreen: View {
     }
 
     private var missingReplyContextMessage: String? {
-        switch replyContextScope {
+        if thread.isClosed {
+            return "このチャットルームは終了しています"
+        }
+        return switch replyContextScope {
         case .nearby3km:
             coordinate == nil ? "この話題への返信には現在地が必要です" : nil
         case .samePrefecture:
@@ -38,6 +41,7 @@ struct BoardThreadDetailScreen: View {
             replies: replies,
             viewer: appState.viewer,
             profilesByUserID: appState.publicProfilesByUserID,
+            meguriProfilesByUserID: appState.meguriProfilesByUserID,
             grooms: appState.grooms
         )
         .makePresentation()
@@ -64,9 +68,10 @@ struct BoardThreadDetailScreen: View {
                                 thread: thread,
                                 authorName: presentation.authorName,
                                 authorAvatarURL: presentation.authorAvatarURL,
+                                authorAvatarID: presentation.authorAvatarID,
                                 authorInitial: presentation.authorInitial,
                                 authorRelativeTime: presentation.authorRelativeTime,
-                                replyCount: max(replies.count, appState.boardRepliesByThreadID[thread.id]?.count ?? replies.count),
+                                replyCount: max(thread.effectiveReplyCount, replies.count, appState.boardRepliesByThreadID[thread.id]?.count ?? replies.count),
                                 participantAvatars: presentation.participantAvatars,
                                 replies: presentation.replies,
                                 isLoadingReplies: appState.loadingBoardRepliesThreadID == thread.id,
@@ -106,6 +111,7 @@ struct BoardThreadDetailScreen: View {
                     scope: replyContextScope
                 )
                 await preloadParticipantProfiles()
+                await preloadParticipantMeguriProfiles()
                 await MainActor.run {
                     scrollToLatest(proxy, animated: false)
                 }
@@ -115,9 +121,19 @@ struct BoardThreadDetailScreen: View {
 
     private func preloadParticipantProfiles() async {
         let viewerID = appState.viewer?.id
-        for userID in detailPresentation.participantIDs where userID != viewerID && appState.publicProfilesByUserID[userID] == nil {
-            await appState.loadPublicUserProfile(userID: userID, reportsFailure: false)
+        guard thread.anonymousDisplayName?.isBlank != false && thread.anonymousAvatarID?.isBlank != false else {
+            return
         }
+        if thread.authorID != viewerID && appState.publicProfilesByUserID[thread.authorID] == nil {
+            await appState.loadPublicUserProfile(userID: thread.authorID, reportsFailure: false)
+        }
+    }
+
+    private func preloadParticipantMeguriProfiles() async {
+        await appState.loadMeguriProfiles(
+            userIDs: Set(([thread.authorID] + replies.map(\.authorID))),
+            reportsFailure: false
+        )
     }
 
     private func sendReply(proxy: ScrollViewProxy) {

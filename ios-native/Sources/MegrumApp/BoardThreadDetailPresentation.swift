@@ -4,6 +4,7 @@ import MegrumCore
 struct BoardThreadDetailPresentation {
     var authorName: String
     var authorAvatarURL: URL?
+    var authorAvatarID: String?
     var authorInitial: String
     var authorRelativeTime: String
     var participantAvatars: [BoardParticipantAvatar]
@@ -16,12 +17,14 @@ struct BoardThreadDetailPresentationBuilder {
     var replies: [BoardReply]
     var viewer: UserProfile?
     var profilesByUserID: [UUID: PublicUserProfile]
+    var meguriProfilesByUserID: [UUID: MeguriProfile]
     var grooms: [GroomPost]
 
     func makePresentation(now: Date = Date()) -> BoardThreadDetailPresentation {
         BoardThreadDetailPresentation(
             authorName: authorDisplayName,
             authorAvatarURL: authorAvatarURL,
+            authorAvatarID: authorAvatarID,
             authorInitial: authorInitial,
             authorRelativeTime: relativeTime(from: thread.createdAt, now: now),
             participantAvatars: participantAvatars,
@@ -31,6 +34,15 @@ struct BoardThreadDetailPresentationBuilder {
     }
 
     private var authorDisplayName: String {
+        if let anonymousName = thread.anonymousDisplayName, !anonymousName.isBlank {
+            return anonymousName
+        }
+        if let name = meguriProfilesByUserID[thread.authorID]?.displayName.nilIfBlank {
+            return name
+        }
+        if isThreadAuthorAnonymous {
+            return "匿名さん"
+        }
         if thread.authorID == viewer?.id {
             return viewer?.displayName ?? "あなた"
         }
@@ -38,21 +50,36 @@ struct BoardThreadDetailPresentationBuilder {
     }
 
     private var authorAvatarURL: URL? {
-        profile(for: thread.authorID)?.avatarURL ?? fallbackGroomURL(index: 0)
+        if isThreadAuthorAnonymous || meguriProfilesByUserID[thread.authorID] != nil {
+            return nil
+        }
+        return profile(for: thread.authorID)?.avatarURL ?? fallbackGroomURL(index: 0)
+    }
+
+    private var authorAvatarID: String? {
+        thread.anonymousAvatarID?.nilIfBlank ?? meguriProfilesByUserID[thread.authorID]?.avatarID
     }
 
     private var authorInitial: String {
         authorDisplayName.first.map(String.init) ?? "話"
     }
 
+    private var isThreadAuthorAnonymous: Bool {
+        thread.anonymousDisplayName?.isBlank == false || thread.anonymousAvatarID?.isBlank == false
+    }
+
     private var participantAvatars: [BoardParticipantAvatar] {
         participantIDs.enumerated().map { index, id in
-            let profile = profile(for: id)
             let isMine = id == viewer?.id
+            let isAuthor = id == thread.authorID
+            let displayName = participantDisplayName(for: id, fallbackIndex: index)
             return BoardParticipantAvatar(
                 id: id,
-                avatarURL: profile?.avatarURL ?? fallbackGroomURL(index: index),
-                initial: isMine ? "あ" : profile?.displayName.first.map(String.init) ?? fallbackParticipantName(index: index).first.map(String.init) ?? "話"
+                avatarID: isAuthor ? authorAvatarID : meguriProfilesByUserID[id]?.avatarID,
+                avatarURL: isAuthor && !isThreadAuthorAnonymous && meguriProfilesByUserID[id] == nil
+                    ? profile(for: id)?.avatarURL ?? fallbackGroomURL(index: index)
+                    : nil,
+                initial: isAuthor ? authorInitial : isMine ? "あ" : displayName.first.map(String.init) ?? "話"
             )
         }
     }
@@ -64,17 +91,39 @@ struct BoardThreadDetailPresentationBuilder {
 
     private func replyRows(now: Date) -> [BoardReplyDisplay] {
         replies.enumerated().map { index, reply in
-            let profile = profile(for: reply.authorID)
             let isMine = reply.authorID == viewer?.id
+            let displayName = participantDisplayName(for: reply.authorID, fallbackIndex: index + 1)
+            let showsPublicAuthorAvatar = reply.authorID == thread.authorID
+                && !isThreadAuthorAnonymous
+                && meguriProfilesByUserID[reply.authorID] == nil
             return BoardReplyDisplay(
                 reply: reply,
-                displayName: isMine ? "あなた" : profile?.displayName ?? fallbackParticipantName(index: index),
-                avatarURL: profile?.avatarURL ?? fallbackGroomURL(index: index + 1),
-                initial: profile?.displayName.first.map(String.init) ?? fallbackParticipantName(index: index).first.map(String.init) ?? "話",
+                displayName: displayName,
+                avatarID: meguriProfilesByUserID[reply.authorID]?.avatarID,
+                avatarURL: showsPublicAuthorAvatar ? profile(for: reply.authorID)?.avatarURL ?? fallbackGroomURL(index: index + 1) : nil,
+                initial: displayName.first.map(String.init) ?? "話",
                 isMine: isMine,
                 relativeTime: relativeTime(from: reply.createdAt, now: now)
             )
         }
+    }
+
+    private func participantDisplayName(for userID: UUID, fallbackIndex: Int) -> String {
+        if userID == thread.authorID {
+            return authorDisplayName
+        }
+        if userID == viewer?.id {
+            return "あなた"
+        }
+        if let name = meguriProfilesByUserID[userID]?.displayName.nilIfBlank {
+            return name
+        }
+        return anonymousParticipantName(for: userID, fallbackIndex: fallbackIndex)
+    }
+
+    private func anonymousParticipantName(for userID: UUID, fallbackIndex: Int) -> String {
+        let participantIndex = participantIDs.firstIndex(of: userID) ?? fallbackIndex
+        return fallbackParticipantName(index: max(0, participantIndex - 1))
     }
 
     private func profile(for userID: UUID) -> UserProfile? {

@@ -3,17 +3,26 @@ import MegrumCore
 
 @MainActor
 extension MegrumAppState {
-    public func loadMeguriMessages() async {
+    public func loadMeguriMessages(reportsFailure: Bool = true) async {
         guard !isLoadingMeguriMessages else {
             return
         }
 
         isLoadingMeguriMessages = true
-        errorMessage = nil
+        if reportsFailure {
+            errorMessage = nil
+        }
         do {
-            meguriMessages = try await repository.loadMeguriMessages()
+            let loadedMessages = try await repository.loadMeguriMessages()
+            meguriMessages = loadedMessages
+            await loadMeguriProfiles(
+                userIDs: Set(loadedMessages.flatMap { [$0.senderID, $0.recipientID] }),
+                reportsFailure: false
+            )
         } catch {
-            errorMessage = "めぐりメッセージを読み込めませんでした"
+            if reportsFailure {
+                errorMessage = "めぐりメッセージを読み込めませんでした"
+            }
         }
         isLoadingMeguriMessages = false
     }
@@ -54,6 +63,7 @@ extension MegrumAppState {
                 message,
                 to: meguriMessages
             )
+            await loadMeguriProfiles(userIDs: [recipientID], reportsFailure: false)
             sendingMeguriMessageRecipientID = nil
             return true
         } catch {

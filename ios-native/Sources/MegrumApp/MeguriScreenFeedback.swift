@@ -6,13 +6,14 @@ import UIKit
 
 extension MeguriScreen {
     func showOutOfRangeAlert(_ message: String) {
-        outOfRangeAlertMessage = message.isEmpty ? "半径1km以内のグルームと掲示板のみ開けます。" : message
+        outOfRangeAlertMessage = message.isEmpty ? "半径1km以内のグルームとチャットルームのみ開けます。" : message
         isShowingOutOfRangeAlert = true
     }
 
-    func showToast(_ message: String) {
+    func showToast(_ message: String, placement: MeguriToastPlacement = .bottom) {
         let toastID = UUID()
         self.toastID = toastID
+        toastPlacement = placement
         withAnimation(.smooth(duration: 0.18)) {
             toastMessage = message
         }
@@ -42,7 +43,7 @@ extension MeguriScreen {
         if locationState.permissionPhase == .denied || locationState.permissionPhase == .servicesDisabled {
             openAppSettings()
         } else {
-            locationState.requestCurrentLocation()
+            locationState.startUpdatingCurrentLocation()
         }
     }
 

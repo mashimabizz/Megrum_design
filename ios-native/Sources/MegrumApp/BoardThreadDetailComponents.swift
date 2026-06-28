@@ -6,6 +6,7 @@ struct BoardReplyDisplay: Identifiable {
     var id: UUID { reply.id }
     var reply: BoardReply
     var displayName: String
+    var avatarID: String?
     var avatarURL: URL?
     var initial: String
     var isMine: Bool
@@ -14,6 +15,7 @@ struct BoardReplyDisplay: Identifiable {
 
 struct BoardParticipantAvatar: Identifiable {
     var id: UUID
+    var avatarID: String?
     var avatarURL: URL?
     var initial: String
 }
@@ -51,6 +53,7 @@ struct BoardThreadDetailCard: View {
     var thread: BoardThread
     var authorName: String
     var authorAvatarURL: URL?
+    var authorAvatarID: String?
     var authorInitial: String
     var authorRelativeTime: String
     var replyCount: Int
@@ -67,8 +70,10 @@ struct BoardThreadDetailCard: View {
                 threadBody: thread.body,
                 authorName: authorName,
                 authorAvatarURL: authorAvatarURL,
+                authorAvatarID: authorAvatarID,
                 authorInitial: authorInitial,
-                authorRelativeTime: authorRelativeTime
+                authorRelativeTime: authorRelativeTime,
+                remainingTimeText: thread.remainingTimeText
             )
 
             BoardThreadDetailReplySummary(

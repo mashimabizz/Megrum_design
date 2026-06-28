@@ -15,6 +15,7 @@ extension MeguriScreen {
 
     func preloadGroomAuthorProfiles() async {
         let authorIDs = Set(appState.grooms.map(\.authorID))
+        await appState.loadMeguriProfiles(userIDs: authorIDs, reportsFailure: false)
         for authorID in authorIDs where authorID != appState.viewer?.id && appState.publicProfilesByUserID[authorID] == nil {
             await appState.loadPublicUserProfile(userID: authorID, reportsFailure: false)
         }
@@ -31,8 +32,9 @@ extension MeguriScreen {
             showToast("写真を読み込めませんでした")
             return
         }
-        groomDraftPhotoData = data
-        groomDraftPhotoContentType = inferredPhotoMessageContentType(from: data)
+        let upload = normalizedPhotoUpload(from: data)
+        groomDraftPhotoData = upload.data
+        groomDraftPhotoContentType = upload.contentType
         if groomCreationCoordinate == nil {
             groomCreationCoordinate = locationState.coordinate
         }
@@ -55,7 +57,7 @@ extension MeguriScreen {
         coordinate: MegrumLocationCoordinate
     ) async -> Bool {
         guard locationState.coordinate != nil else {
-            locationState.requestCurrentLocation()
+            locationState.startUpdatingCurrentLocation()
             showToast("現在地を確認してから投稿してください")
             return false
         }
@@ -94,9 +96,24 @@ extension MeguriScreen {
     func openGroomComposer() {
         resetGroomDraft()
         if locationState.coordinate == nil {
-            locationState.requestCurrentLocation()
+            locationState.startUpdatingCurrentLocation()
         }
         isShowingGroomComposer = true
+    }
+
+    func openGroomComposer(at coordinate: MegrumLocationCoordinate) {
+        resetGroomDraft()
+        groomCreationCoordinate = coordinate
+        isGroomCreationLocationLocked = true
+        isShowingGroomComposer = true
+    }
+
+    func openGroomComposerAtPendingCoordinate() {
+        guard let coordinate = pendingMapCreationCoordinate else {
+            return
+        }
+        dismissPendingMapCreationCoordinate()
+        openGroomComposer(at: coordinate)
     }
 
     func resetGroomDraft() {
@@ -104,6 +121,7 @@ extension MeguriScreen {
         groomDraftPhotoData = nil
         groomDraftPhotoContentType = "image/jpeg"
         groomCreationCoordinate = nil
+        isGroomCreationLocationLocked = false
         isPreparingGroomPhoto = false
     }
 
@@ -114,7 +132,7 @@ extension MeguriScreen {
             viewerID: appState.viewer?.id
         ) else {
             if locationState.coordinate == nil {
-                locationState.requestCurrentLocation()
+                locationState.startUpdatingCurrentLocation()
             }
             showOutOfRangeAlert(
                 MeguriAccessPolicy.groomAccessMessage(

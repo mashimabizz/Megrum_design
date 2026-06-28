@@ -7,7 +7,13 @@ extension MeguriScreen {
         guard !VisualQAPreviewMode.isEnabled(environment: ProcessInfo.processInfo.environment) else {
             return
         }
-        locationState.requestCurrentLocation()
+        if let coordinate = locationState.coordinate {
+            shouldCenterHomeMapWhenLocationArrives = false
+            centerHomeMap(on: coordinate, animated: false)
+        } else {
+            shouldCenterHomeMapWhenLocationArrives = true
+        }
+        locationState.startUpdatingCurrentLocation()
     }
 
     func handleCoordinateChange(_ coordinate: MegrumLocationCoordinate) {
@@ -42,7 +48,7 @@ extension MeguriScreen {
     func updateBoardScope(_ scope: BoardThread.Audience) {
         storedBoardScopeRaw = scope.rawValue
         if scope == .nearby3km, locationState.coordinate == nil {
-            locationState.requestCurrentLocation()
+            locationState.startUpdatingCurrentLocation()
             return
         }
         Task {
@@ -54,7 +60,7 @@ extension MeguriScreen {
         let targetScope = scope ?? selectedBoardScope
         if targetScope == .nearby3km, locationState.coordinate == nil {
             await MainActor.run {
-                locationState.requestCurrentLocation()
+                locationState.startUpdatingCurrentLocation()
             }
             return
         }
@@ -74,9 +80,15 @@ extension MeguriScreen {
     }
 
     func openThreadComposer() {
+        threadCreationCoordinate = nil
         if locationState.coordinate == nil {
-            locationState.requestCurrentLocation()
+            locationState.startUpdatingCurrentLocation()
         }
+        isShowingThreadComposer = true
+    }
+
+    func openThreadComposer(at coordinate: MegrumLocationCoordinate) {
+        threadCreationCoordinate = coordinate
         isShowingThreadComposer = true
     }
 
@@ -87,7 +99,7 @@ extension MeguriScreen {
             viewerID: appState.viewer?.id
         ) else {
             if locationState.coordinate == nil {
-                locationState.requestCurrentLocation()
+                locationState.startUpdatingCurrentLocation()
             }
             showOutOfRangeAlert(
                 MeguriAccessPolicy.boardAccessMessage(
@@ -104,13 +116,14 @@ extension MeguriScreen {
     func centerHomeMapOnCurrentLocation() {
         guard let coordinate = locationState.coordinate else {
             shouldCenterHomeMapWhenLocationArrives = true
-            locationState.requestCurrentLocation()
+            locationState.startUpdatingCurrentLocation()
             return
         }
         centerHomeMap(on: coordinate, animated: true)
     }
 
     func openPendingCreatedThreadIfNeeded() {
+        threadCreationCoordinate = nil
         guard let thread = pendingCreatedThread else {
             return
         }
@@ -121,7 +134,7 @@ extension MeguriScreen {
     func centerHomeMap(on coordinate: MegrumLocationCoordinate, animated: Bool) {
         let region = MKCoordinateRegion(
             center: coordinate.clLocationCoordinate,
-            span: MKCoordinateSpan(latitudeDelta: 0.018, longitudeDelta: 0.018)
+            span: MeguriHomeMapCamera.focusedSpan
         )
         let update = {
             homeCameraPosition = .region(region)
@@ -132,6 +145,40 @@ extension MeguriScreen {
             }
         } else {
             update()
+        }
+    }
+
+    func handleHomeMapTap(_ coordinate: MegrumLocationCoordinate) {
+        guard let currentCoordinate = locationState.coordinate else {
+            pendingMapCreationCoordinate = nil
+            shouldCenterHomeMapWhenLocationArrives = true
+            locationState.startUpdatingCurrentLocation()
+            showToast("現在地を確認してから、1km圏内をタップしてください")
+            return
+        }
+        guard MeguriAccessPolicy.canCreateAt(
+            coordinate,
+            currentCoordinate: currentCoordinate
+        ) else {
+            showToast("1km圏外にグルーム・チャットは作成できません", placement: .top)
+            return
+        }
+        withAnimation(.easeOut(duration: 0.16)) {
+            pendingMapCreationCoordinate = coordinate
+        }
+    }
+
+    func openThreadComposerAtPendingCoordinate() {
+        guard let coordinate = pendingMapCreationCoordinate else {
+            return
+        }
+        dismissPendingMapCreationCoordinate()
+        openThreadComposer(at: coordinate)
+    }
+
+    func dismissPendingMapCreationCoordinate() {
+        withAnimation(.easeOut(duration: 0.14)) {
+            pendingMapCreationCoordinate = nil
         }
     }
 }

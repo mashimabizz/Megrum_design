@@ -20,7 +20,7 @@ struct GroomViewerPresentationModifier: ViewModifier {
     }
 }
 
-private struct GroomViewerScreen: View {
+struct GroomViewerScreen: View {
     var grooms: [GroomPost]
     var initialGroom: GroomPost
     @ObservedObject var appState: MegrumAppState
@@ -28,6 +28,8 @@ private struct GroomViewerScreen: View {
     @State private var currentIndex: Int
     @State private var dragOffset: CGSize = .zero
     @State private var replyDraft = ""
+    @State private var isShowingReportConfirmation = false
+    @State private var isShowingBlockConfirmation = false
 
     init(grooms: [GroomPost], initialGroom: GroomPost, appState: MegrumAppState) {
         let fallbackGrooms = grooms.isEmpty ? [initialGroom] : grooms
@@ -46,11 +48,29 @@ private struct GroomViewerScreen: View {
     }
 
     private var canReplyToCurrentGroom: Bool {
-        appState.viewer?.id != currentGroom.authorID
+        guard let viewerID = appState.viewer?.id else {
+            return false
+        }
+        return viewerID != currentGroom.authorID
     }
 
     private var isSendingReply: Bool {
         appState.sendingGroomReplyPostID == currentGroom.id
+    }
+
+    private var authorMeguriProfile: MeguriProfile? {
+        appState.meguriProfile(for: currentGroom.authorID)
+    }
+
+    private var authorPublicProfile: UserProfile? {
+        appState.publicProfilesByUserID[currentGroom.authorID]?.profile
+    }
+
+    private var authorName: String {
+        authorMeguriProfile?.displayName.nilIfBlank
+            ?? authorPublicProfile?.displayName.nilIfBlank
+            ?? (currentGroom.authorID == appState.viewer?.id ? appState.viewer?.displayName : nil)
+            ?? "めぐりユーザー"
     }
 
     var body: some View {
@@ -97,16 +117,35 @@ private struct GroomViewerScreen: View {
                     currentIndex: currentIndex
                 )
 
-                GroomViewerCloseButton {
+                GroomViewerTopBar(
+                    authorName: authorName,
+                    authorAvatarID: authorMeguriProfile?.avatarID,
+                    authorAvatarURL: authorMeguriProfile == nil ? authorPublicProfile?.avatarURL : nil,
+                    canModerate: canReplyToCurrentGroom,
+                    onReport: { isShowingReportConfirmation = true },
+                    onBlock: { isShowingBlockConfirmation = true }
+                ) {
                     dismiss()
                 }
 
                 Spacer()
 
+                if let remainingTimeText = currentGroom.remainingTimeText {
+                    Text(remainingTimeText)
+                        .font(.system(size: 12, weight: .black, design: .rounded))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 12)
+                        .frame(height: 28)
+                        .background(.black.opacity(0.28), in: Capsule())
+                        .padding(.bottom, 10)
+                }
+
                 GroomViewerBottomControls(
                     canReply: canReplyToCurrentGroom,
+                    canLike: canReplyToCurrentGroom,
                     isSendingReply: isSendingReply,
                     isLiked: isCurrentGroomLiked,
+                    likeCount: appState.groomLikeCount(currentGroom.id, fallback: currentGroom.likeCount),
                     onSubmitReply: submitGroomReply,
                     onToggleLike: toggleCurrentGroomLike,
                     replyDraft: $replyDraft
@@ -115,6 +154,34 @@ private struct GroomViewerScreen: View {
         }
         .task(id: currentGroom.id) {
             await appState.markGroomViewed(currentGroom.id)
+            await appState.loadMeguriProfiles(userIDs: [currentGroom.authorID], reportsFailure: false)
+            if currentGroom.authorID != appState.viewer?.id,
+               appState.publicProfilesByUserID[currentGroom.authorID] == nil {
+                await appState.loadPublicUserProfile(userID: currentGroom.authorID, reportsFailure: false)
+            }
+        }
+        .confirmationDialog("このグルームを通報しますか？", isPresented: $isShowingReportConfirmation, titleVisibility: .visible) {
+            Button("通報する", role: .destructive) {
+                Task {
+                    _ = await appState.reportGroom(currentGroom)
+                }
+            }
+            Button("キャンセル", role: .cancel) {}
+        } message: {
+            Text("運営が内容を確認します。")
+        }
+        .confirmationDialog("この投稿者をブロックしますか？", isPresented: $isShowingBlockConfirmation, titleVisibility: .visible) {
+            Button("ブロックする", role: .destructive) {
+                Task {
+                    let blocked = await appState.blockGroomAuthor(currentGroom)
+                    if blocked {
+                        dismiss()
+                    }
+                }
+            }
+            Button("キャンセル", role: .cancel) {}
+        } message: {
+            Text("グルームとチャットルームで相手の投稿が表示されにくくなります。グッズ交換のブロックとは別です。")
         }
         .gesture(
             DragGesture(minimumDistance: 12)
@@ -170,5 +237,21 @@ private struct GroomViewerScreen: View {
                 replyDraft = ""
             }
         }
+    }
+}
+
+private extension GroomPost {
+    var remainingTimeText: String? {
+        guard let expiresAt else {
+            return nil
+        }
+        let remaining = expiresAt.timeIntervalSince(Date())
+        guard remaining > 0 else {
+            return "終了"
+        }
+        if remaining < 3_600 {
+            return "残り\(max(1, Int(ceil(remaining / 60))))分"
+        }
+        return "残り\(max(1, Int(ceil(remaining / 3_600))))時間"
     }
 }

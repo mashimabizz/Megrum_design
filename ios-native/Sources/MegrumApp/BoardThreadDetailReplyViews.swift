@@ -1,3 +1,4 @@
+import MegrumCore
 import MegrumDesign
 import SwiftUI
 
@@ -10,6 +11,7 @@ struct BoardThreadReplyRow: View {
         } else {
             HStack(alignment: .top, spacing: 10) {
                 BoardThreadDetailAvatar(
+                    avatarID: display.avatarID,
                     imageURL: display.avatarURL,
                     initial: display.initial,
                     size: 36
@@ -110,6 +112,7 @@ struct BoardThreadDetailAvatarStack: View {
         HStack(spacing: -7) {
             ForEach(avatars.prefix(5)) { avatar in
                 BoardThreadDetailAvatar(
+                    avatarID: avatar.avatarID,
                     imageURL: avatar.avatarURL,
                     initial: avatar.initial,
                     size: 28
@@ -129,11 +132,18 @@ struct BoardThreadDetailAvatarStack: View {
 }
 
 struct BoardThreadDetailAvatar: View {
+    var avatarID: String?
     var imageURL: URL?
     var initial: String
     var size: CGFloat
 
     var body: some View {
+        if let avatarID, !avatarID.isBlank {
+            BoardAnonymousAvatar(
+                option: BoardAnonymousAvatarOption.option(id: avatarID),
+                size: size
+            )
+        } else {
         Circle()
             .fill(MegrumTheme.lavender.opacity(0.14))
             .frame(width: size, height: size)
@@ -158,6 +168,7 @@ struct BoardThreadDetailAvatar: View {
                 }
             }
             .clipShape(Circle())
+        }
     }
 
     private var fallbackInitial: some View {

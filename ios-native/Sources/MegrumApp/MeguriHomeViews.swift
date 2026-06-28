@@ -1,59 +1,60 @@
 import MegrumCore
+import MegrumDesign
 import MapKit
 import SwiftUI
 
 struct MeguriHomeContent: View {
     @Binding var cameraPosition: MapCameraPosition
     var viewer: UserProfile?
+    var meguriProfile: MeguriProfile?
     var grooms: [GroomPost]
     var mapGrooms: [GroomPost]
     var threads: [BoardThread]
-    var replyCounts: [UUID: Int]
     var currentCoordinate: MegrumLocationCoordinate?
-    var isLoading: Bool
-    var selectedScope: BoardThread.Audience
-    var selectedPrefecture: String
     var notice: MegrumLocationNotice?
     var isRequestingLocation: Bool
-    @Binding var boardSheetDetent: MeguriBoardSheetDetent
-    var onOpenMap: () -> Void
+    var unreadMessageCount: Int
+    @Binding var selectedMapKind: MeguriMapKind
     var onRecenterMap: () -> Void
+    var onOpenMessages: () -> Void
     var onSelectGroom: (GroomPost) -> Void
     var onSelectThread: (BoardThread) -> Void
+    var onTapMapCoordinate: (MegrumLocationCoordinate) -> Void
+    var pendingCreationCoordinate: MegrumLocationCoordinate?
+    var onCreateGroomAtPendingCoordinate: () -> Void
+    var onCreateThreadAtPendingCoordinate: () -> Void
+    var onCancelPendingCreationCoordinate: () -> Void
     var onNoticeAction: () -> Void
-    var onChangeScope: (BoardThread.Audience) -> Void
-    var onOpenPrefecture: () -> Void
-    var onOpenGroomComposer: () -> Void
-    var onOpenThreadComposer: () -> Void
     var onOpenGroomArchive: () -> Void
+    var onOpenMeguriProfile: () -> Void
 
     var body: some View {
         GeometryReader { proxy in
             ZStack(alignment: .bottom) {
                 MeguriHomeMapBackdrop(
                     cameraPosition: $cameraPosition,
+                    selectedKind: selectedMapKind,
                     grooms: mapGrooms,
                     threads: threads,
                     currentCoordinate: currentCoordinate,
                     viewerID: viewer?.id,
                     onSelectGroom: onSelectGroom,
-                    onSelectThread: onSelectThread
+                    onSelectThread: onSelectThread,
+                    onTapCoordinate: onTapMapCoordinate,
+                    pendingCreationCoordinate: pendingCreationCoordinate,
+                    onCreateGroomAtPendingCoordinate: onCreateGroomAtPendingCoordinate,
+                    onCreateThreadAtPendingCoordinate: onCreateThreadAtPendingCoordinate,
+                    onCancelPendingCreationCoordinate: onCancelPendingCreationCoordinate
                 )
                 .ignoresSafeArea()
 
                 VStack(spacing: 0) {
                     HStack {
+                        MeguriHomeMapKindCycleButton(selectedKind: $selectedMapKind)
                         Spacer()
-                        VStack(spacing: 10) {
-                            MeguriMapRecenterButton(
-                                isRequesting: isRequestingLocation,
-                                action: onRecenterMap
-                            )
-                            MeguriGroomArchiveButton(action: onOpenGroomArchive)
-                        }
                     }
                     .padding(.horizontal, 18)
-                    .padding(.top, 78)
+                    .padding(.top, 30)
 
                     if let notice {
                         MeguriHomeNoticeCard(notice: notice, action: onNoticeAction)
@@ -64,23 +65,155 @@ struct MeguriHomeContent: View {
                     Spacer()
                 }
 
-                MeguriBoardBottomSheet(
-                    detent: $boardSheetDetent,
-                    viewportHeight: proxy.size.height,
-                    threads: threads,
-                    grooms: grooms,
-                    replyCounts: replyCounts,
-                    isLoading: isLoading,
-                    selectedScope: selectedScope,
-                    selectedPrefecture: selectedPrefecture,
-                    onChangeScope: onChangeScope,
-                    onOpenPrefecture: onOpenPrefecture,
-                    onOpenGroomComposer: onOpenGroomComposer,
-                    onOpenThreadComposer: onOpenThreadComposer,
-                    onOpenThread: onSelectThread
+                HStack {
+                    MeguriHomeSelfProfileButton(
+                        viewer: viewer,
+                        meguriProfile: meguriProfile,
+                        action: onOpenMeguriProfile
+                    )
+                    .padding(.leading, 8)
+                    Spacer()
+                }
+                .frame(maxHeight: .infinity, alignment: .center)
+
+                MeguriHomeBottomUtilityRow(
+                    unreadMessageCount: unreadMessageCount,
+                    isRequestingLocation: isRequestingLocation,
+                    onOpenMessages: onOpenMessages,
+                    onRecenterMap: onRecenterMap,
+                    onOpenGroomArchive: onOpenGroomArchive
                 )
-                .frame(height: MeguriBoardSheetLayout.expandedHeight(in: proxy.size.height), alignment: .top)
+                .padding(.horizontal, 18)
+                .padding(.bottom, max(proxy.safeAreaInsets.bottom - 44, 0))
             }
+        }
+    }
+}
+
+private struct MeguriHomeMapKindCycleButton: View {
+    @Binding var selectedKind: MeguriMapKind
+
+    var body: some View {
+        Button {
+            withAnimation(.smooth(duration: 0.18)) {
+                selectedKind = selectedKind.nextHomeKind
+            }
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: selectedKind.homeSystemImage)
+                    .font(.system(size: 18, weight: .heavy))
+                Text(selectedKind.homeDisplayLabel)
+                    .font(.system(size: 12, weight: .black, design: .rounded))
+            }
+            .foregroundStyle(.white)
+            .frame(height: 48)
+            .padding(.horizontal, 16)
+            .background(
+                LinearGradient(
+                    colors: selectedKind.homeAccentColors,
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ),
+                in: Capsule()
+            )
+            .overlay {
+                Capsule()
+                    .stroke(.white.opacity(0.74), lineWidth: 1)
+            }
+            .shadow(color: selectedKind.homeShadowColor.opacity(0.24), radius: 14, y: 7)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("めぐり地図の表示を\(selectedKind.homeDisplayLabel)に切り替え中")
+    }
+}
+
+private struct MeguriHomeBottomUtilityRow: View {
+    var unreadMessageCount: Int
+    var isRequestingLocation: Bool
+    var onOpenMessages: () -> Void
+    var onRecenterMap: () -> Void
+    var onOpenGroomArchive: () -> Void
+
+    var body: some View {
+        HStack(alignment: .bottom) {
+            VStack(spacing: 12) {
+                MeguriMapRecenterButton(
+                    isRequesting: isRequestingLocation,
+                    size: 54,
+                    iconSize: 20,
+                    action: onRecenterMap
+                )
+
+                MeguriMessageInboxButton(
+                    unreadCount: unreadMessageCount,
+                    size: 88,
+                    iconSize: 34,
+                    action: onOpenMessages
+                )
+
+                MeguriGroomArchiveButton(action: onOpenGroomArchive)
+                    .frame(width: 88, alignment: .center)
+            }
+
+            Spacer()
+        }
+    }
+}
+
+private struct MeguriHomeSelfProfileButton: View {
+    var viewer: UserProfile?
+    var meguriProfile: MeguriProfile?
+    var action: () -> Void
+
+    private var displayName: String {
+        meguriProfile?.displayName.nilIfBlank
+            ?? viewer?.displayName.nilIfBlank
+            ?? "めぐり"
+    }
+
+    private var avatarID: String {
+        meguriProfile?.avatarID.nilIfBlank ?? "avatar_1"
+    }
+
+    var body: some View {
+        Button(action: action) {
+            MeguriProfileAvatarView(
+                avatarID: avatarID,
+                avatarURL: viewer?.avatarURL,
+                fallback: displayName,
+                size: 54
+            )
+            .overlay {
+                Circle()
+                    .stroke(.white.opacity(0.82), lineWidth: 2)
+            }
+            .shadow(color: MegrumTheme.ink.opacity(0.18), radius: 14, y: 7)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("めぐりプロフィールを設定")
+    }
+}
+
+private extension MeguriMapKind {
+    var homeAccentColors: [Color] {
+        switch self {
+        case .all:
+            [Color(red: 0.21, green: 0.77, blue: 0.82), Color(red: 0.16, green: 0.72, blue: 0.54)]
+        case .grooms:
+            [Color(red: 1.00, green: 0.52, blue: 0.55), Color(red: 1.00, green: 0.70, blue: 0.30)]
+        case .boards:
+            [Color(red: 0.27, green: 0.56, blue: 1.00), Color(red: 0.35, green: 0.79, blue: 0.96)]
+        }
+    }
+
+    var homeShadowColor: Color {
+        switch self {
+        case .all:
+            Color(red: 0.08, green: 0.58, blue: 0.52)
+        case .grooms:
+            Color(red: 0.94, green: 0.34, blue: 0.38)
+        case .boards:
+            Color(red: 0.12, green: 0.43, blue: 0.90)
         }
     }
 }

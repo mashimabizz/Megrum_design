@@ -24,6 +24,8 @@ public final class MegrumAppState: ObservableObject {
     @Published public internal(set) var groomRepliesByPostID: [UUID: [GroomReply]] = [:]
     @Published public internal(set) var groomReactionsByPostID: [UUID: [GroomReaction]] = [:]
     @Published public internal(set) var meguriMessages: [MeguriMessage] = []
+    @Published public internal(set) var meguriProfile: MeguriProfile?
+    @Published public internal(set) var meguriProfilesByUserID: [UUID: MeguriProfile] = [:]
     @Published public internal(set) var grooms: [GroomPost] = []
     @Published public internal(set) var groomMapPosts: [GroomPost] = []
     @Published public internal(set) var ownGroomArchive: [GroomPost] = []
@@ -39,13 +41,18 @@ public final class MegrumAppState: ObservableObject {
     @Published public internal(set) var publicProfilesByUserID: [UUID: PublicUserProfile] = [:]
     @Published public internal(set) var publicTradeGoodsByUserID: [UUID: [GoodsItem]] = [:]
     @Published public internal(set) var publicListingsByUserID: [UUID: [IndividualListing]] = [:]
+    @Published public internal(set) var publicExchangeSettingsByUserID: [UUID: HomeDefaultExchangeSettings] = [:]
     @Published public internal(set) var userEvaluationsByUserID: [UUID: [UserEvaluation]] = [:]
     @Published public internal(set) var mailingAddress: MailingAddress?
     @Published public internal(set) var paymentSettings: UserPaymentSettings?
+    @Published public internal(set) var exchangeSettings: HomeDefaultExchangeSettings?
     @Published public internal(set) var subscriptionState: UserSubscriptionState = .free
     @Published public internal(set) var blockedUsers: [BlockedUser] = []
+    @Published public internal(set) var blockedContentUserIDs: Set<UUID> = []
     @Published public internal(set) var notifications: [MegrumNotification] = []
     @Published public internal(set) var pushNotificationsEnabled = true
+    @Published public internal(set) var groomActivityPushNotificationsEnabled = true
+    @Published public internal(set) var chatroomActivityPushNotificationsEnabled = true
     @Published public internal(set) var isLoading = false
     @Published public internal(set) var isLoadingOshiGroups = false
     @Published public internal(set) var isLoadingOshiCharacters = false
@@ -57,6 +64,7 @@ public final class MegrumAppState: ObservableObject {
     @Published public internal(set) var loadingEvaluationsUserID: UUID?
     @Published public internal(set) var isLoadingMailingAddress = false
     @Published public internal(set) var isLoadingPaymentSettings = false
+    @Published public internal(set) var isLoadingExchangeSettings = false
     @Published public internal(set) var isLoadingSubscriptionState = false
     @Published public internal(set) var isLoadingBlockedUsers = false
     @Published public internal(set) var isLoadingNotifications = false
@@ -64,12 +72,15 @@ public final class MegrumAppState: ObservableObject {
     @Published public internal(set) var isRegisteringNativePushDevice = false
     @Published public internal(set) var isRevokingNativePushDevice = false
     @Published public internal(set) var isLoadingMeguri = false
+    @Published public internal(set) var isLoadingMeguriProfile = false
+    @Published public internal(set) var isSavingMeguriProfile = false
     @Published public internal(set) var isLoadingGroomMap = false
     @Published public internal(set) var isLoadingGroomArchive = false
     @Published public internal(set) var isLoadingMeguriMessages = false
     @Published public internal(set) var isLookingUpPostalCode = false
     @Published public internal(set) var isSavingMailingAddress = false
     @Published public internal(set) var isSavingPaymentSettings = false
+    @Published public internal(set) var isSavingExchangeSettings = false
     @Published public internal(set) var isCreatingGoodsEntry = false
     @Published public internal(set) var isLoadingIndividualListings = false
     @Published public internal(set) var isCreatingIndividualListing = false
@@ -85,6 +96,10 @@ public final class MegrumAppState: ObservableObject {
     @Published public internal(set) var filingDisputeProposalID: UUID?
     @Published public internal(set) var isCreatingGroomPost = false
     @Published public internal(set) var isCreatingBoardThread = false
+    @Published public internal(set) var reportingGroomPostID: UUID?
+    @Published public internal(set) var blockingGroomUserID: UUID?
+    @Published public internal(set) var reportingUserID: UUID?
+    @Published public internal(set) var blockingUserID: UUID?
     @Published public internal(set) var loadingMessagesProposalID: UUID?
     @Published public internal(set) var loadingEvidencePhotosProposalID: UUID?
     @Published public internal(set) var loadingSchedulesProposalID: UUID?
@@ -110,6 +125,7 @@ public final class MegrumAppState: ObservableObject {
     var repository: any MegrumRepository
     var activeSearchRequestID: UUID?
     var registeredNativePushDeviceToken: String?
+    var hasLoadedBlockedContentUserIDs = false
     private static weak var activeInstanceStorage: MegrumAppState?
 
     static var activeInstance: MegrumAppState? {
@@ -123,6 +139,39 @@ public final class MegrumAppState: ObservableObject {
 
     public var unreadNotificationCount: Int {
         NotificationReadStateReducer.unreadCount(in: notifications)
+    }
+
+    public var meguriUnreadMessageCount: Int {
+        guard let viewer else {
+            return 0
+        }
+        return MeguriMessageReadStateReducer.unreadIncomingCount(meguriMessages, viewerID: viewer.id)
+    }
+
+    public var meguriPendingReplyCount: Int {
+        guard let viewer else {
+            return 0
+        }
+        return MeguriMessageReadStateReducer.pendingReplyThreadCount(meguriMessages, viewerID: viewer.id)
+    }
+
+    public var meguriMessageThreads: [MeguriMessageThread] {
+        guard let viewer else {
+            return []
+        }
+        return MeguriMessageReadStateReducer.conversationThreads(
+            from: meguriMessages,
+            viewerID: viewer.id,
+            publicProfilesByUserID: publicProfilesByUserID,
+            meguriProfilesByUserID: meguriProfilesByUserID
+        )
+    }
+
+    public func meguriProfile(for userID: UUID) -> MeguriProfile? {
+        if userID == viewer?.id {
+            return meguriProfile ?? meguriProfilesByUserID[userID]
+        }
+        return meguriProfilesByUserID[userID]
     }
 
     public func messages(for proposalID: UUID) -> [TradeMessage] {
@@ -175,6 +224,16 @@ public final class MegrumAppState: ObservableObject {
         likedGroomIDs.contains(postID)
     }
 
+    public func groomLikeCount(_ postID: UUID, fallback: Int = 0) -> Int {
+        groomPost(postID)?.likeCount ?? fallback
+    }
+
+    private func groomPost(_ postID: UUID) -> GroomPost? {
+        grooms.first { $0.id == postID }
+            ?? groomMapPosts.first { $0.id == postID }
+            ?? ownGroomArchive.first { $0.id == postID }
+    }
+
     public func loadInitialData() async {
         guard !isLoading else {
             return
@@ -186,8 +245,11 @@ public final class MegrumAppState: ObservableObject {
         do {
             let snapshot = try await repository.loadInitialSnapshot()
             apply(snapshot)
+            await loadBlockedContentUserIDs(reportsFailure: false)
             await loadHomeCandidates(fallbackInventory: snapshot.inventory)
             await loadSubscriptionState(reportsFailure: false)
+            await loadMeguriProfile(reportsFailure: false)
+            await loadMeguriMessages(reportsFailure: false)
         } catch {
             errorMessage = "データを読み込めませんでした"
         }
@@ -204,8 +266,11 @@ public final class MegrumAppState: ObservableObject {
         do {
             let snapshot = try await repository.loadInitialSnapshot()
             apply(snapshot)
+            await loadBlockedContentUserIDs(reportsFailure: false)
             await loadHomeCandidates(fallbackInventory: snapshot.inventory)
             await loadSubscriptionState(reportsFailure: false)
+            await loadMeguriProfile(reportsFailure: false)
+            await loadMeguriMessages(reportsFailure: false)
         } catch {
             errorMessage = "ホームを更新できませんでした"
         }
@@ -213,6 +278,7 @@ public final class MegrumAppState: ObservableObject {
 
     public func refreshHomeCandidates(reportsFailure: Bool = false) async {
         do {
+            await loadBlockedContentUserIDsIfNeeded(reportsFailure: false)
             let sections = try await repository.loadHomeCandidateSections()
             applyHomeCandidateSections(sections, fallbackInventory: inventory)
         } catch {
@@ -243,24 +309,28 @@ public final class MegrumAppState: ObservableObject {
     }
 
     private func apply(_ snapshot: MegrumAppSnapshot) {
-        viewer = snapshot.viewer
-        inventory = snapshot.inventory
-        wishes = snapshot.wishes
-        listings = snapshot.listings
-        proposals = snapshot.proposals
-        grooms = snapshot.grooms
-        groomMapPosts = snapshot.grooms
-        viewedGroomIDs = GroomInteractionStateReducer.visibleViewedIDs(
-            viewedGroomIDs,
-            in: snapshot.grooms
+        let state = MegrumAppInitialSnapshotState(
+            snapshot: snapshot,
+            previousViewedGroomIDs: viewedGroomIDs
         )
-        likedGroomIDs = GroomInteractionStateReducer.likedIDs(from: snapshot.grooms)
-        threads = snapshot.threads
-        subscriptionState = snapshot.subscriptionState
+        viewer = state.viewer
+        inventory = state.inventory
+        wishes = state.wishes
+        listings = state.listings
+        proposals = state.proposals
+        grooms = state.grooms
+        groomMapPosts = state.groomMapPosts
+        viewedGroomIDs = state.viewedGroomIDs
+        likedGroomIDs = state.likedGroomIDs
+        threads = state.threads
+        subscriptionState = state.subscriptionState
     }
 
     private func applyHomeCandidateSections(_ sections: HomeCandidateSections, fallbackInventory: [GoodsItem]) {
-        let resolved = sections.resolvedWithFallbackInventory(fallbackInventory)
+        let resolved = BlockedUserContentFilter.homeSections(
+            sections.resolvedWithFallbackInventory(fallbackInventory),
+            blockedUserIDs: blockedContentUserIDs
+        )
         homeMatchedItems = resolved.matchedItems
         homePossibleItems = resolved.possibleItems
         homeCandidateConditionSignals = resolved.conditionSignalsByItemID

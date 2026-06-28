@@ -43,8 +43,28 @@ public extension SupabaseMegrumRepository {
         try await groomClient.setLiked(userID: viewerID, postID: postID, isLiked: isLiked)
     }
 
+    func reportGroom(_ input: GroomReportCreateInput) async throws -> GroomReportTicket {
+        try await groomClient.reportPost(reporterID: viewerID, input: input)
+    }
+
+    func blockGroomUser(_ userID: UUID) async throws {
+        try await groomClient.blockUser(blockerID: viewerID, blockedID: userID)
+    }
+
     func sendGroomReply(_ input: GroomReplyCreateInput) async throws -> GroomReply {
         try await groomClient.sendReply(input)
+    }
+
+    func loadMeguriProfile(userID: UUID) async throws -> MeguriProfile? {
+        try await meguriProfileClient.loadProfile(userID: userID)
+    }
+
+    func loadMeguriProfiles(userIDs: Set<UUID>) async throws -> [MeguriProfile] {
+        try await meguriProfileClient.loadProfiles(userIDs: userIDs)
+    }
+
+    func saveMeguriProfile(_ input: MeguriProfileUpdateInput) async throws -> MeguriProfile {
+        try await meguriProfileClient.saveProfile(input)
     }
 
     func loadMeguriMessages() async throws -> [MeguriMessage] {

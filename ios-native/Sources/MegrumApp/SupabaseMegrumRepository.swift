@@ -11,6 +11,7 @@ public struct SupabaseMegrumRepository: MegrumRepository {
     let goodsInventoryClient: SupabaseGoodsInventoryClient
     let goodsEntryPersistence: SupabaseGoodsEntryPersistence
     let goodsReportClient: SupabaseGoodsReportClient
+    let userReportClient: SupabaseUserReportClient
     let listingClient: SupabaseListingClient
     let mailingAddressClient: SupabaseMailingAddressClient
     let postalCodeAddressClient: PostalCodeAddressClient
@@ -22,11 +23,13 @@ public struct SupabaseMegrumRepository: MegrumRepository {
     let tradeSchedulePersistence: SupabaseTradeSchedulePersistence
     let homeLocalModePersistence: SupabaseHomeLocalModePersistence
     let groomClient: SupabaseGroomClient
+    let meguriProfileClient: SupabaseMeguriProfileClient
     let meguriMessageClient: SupabaseMeguriMessageClient
     let boardClient: SupabaseBoardClient
     let publicProfilePersistence: SupabasePublicProfilePersistence
     let homeClient: SupabaseHomeClient
     let paymentSettingsPersistence: SupabasePaymentSettingsPersistence
+    let exchangeSettingsClient: SupabaseExchangeSettingsClient
     let faceRecognitionClient: SupabaseFaceRecognitionClient
     let chatPhotoStorage: SupabaseChatPhotoStorage
     let entitlementClient: SupabaseEntitlementClient
@@ -52,6 +55,7 @@ public struct SupabaseMegrumRepository: MegrumRepository {
             userID: viewerID
         )
         self.goodsReportClient = SupabaseGoodsReportClient(client: client)
+        self.userReportClient = SupabaseUserReportClient(client: client)
         let listingClient = SupabaseListingClient(client: client)
         self.listingClient = listingClient
         self.mailingAddressClient = SupabaseMailingAddressClient(client: client)
@@ -72,6 +76,7 @@ public struct SupabaseMegrumRepository: MegrumRepository {
         )
         let groomClient = SupabaseGroomClient(client: client)
         self.groomClient = groomClient
+        self.meguriProfileClient = SupabaseMeguriProfileClient(client: client)
         self.meguriMessageClient = SupabaseMeguriMessageClient(client: client)
         let boardClient = SupabaseBoardClient(client: client)
         self.boardClient = boardClient
@@ -81,6 +86,7 @@ public struct SupabaseMegrumRepository: MegrumRepository {
         )
         self.homeClient = SupabaseHomeClient(client: client)
         self.paymentSettingsPersistence = SupabasePaymentSettingsPersistence(client: client)
+        self.exchangeSettingsClient = SupabaseExchangeSettingsClient(client: client)
         self.faceRecognitionClient = SupabaseFaceRecognitionClient(client: client)
         self.chatPhotoStorage = SupabaseChatPhotoStorage(client: client)
         self.entitlementClient = SupabaseEntitlementClient(client: client)
@@ -109,7 +115,11 @@ public struct SupabaseMegrumRepository: MegrumRepository {
     }
 
     public func loadHomeCandidateSections() async throws -> HomeCandidateSections {
-        let composition = try await homeClient.loadHomeComposition(userID: viewerID)
-        return HomeCandidateComposer.sections(from: composition)
+        async let composition = homeClient.loadHomeComposition(userID: viewerID)
+        async let oshiSelections = oshiClient.loadUserSelections(userID: viewerID)
+        return HomeCandidateComposer.sections(
+            from: try await composition,
+            viewerOshiSelections: (try? await oshiSelections) ?? []
+        )
     }
 }

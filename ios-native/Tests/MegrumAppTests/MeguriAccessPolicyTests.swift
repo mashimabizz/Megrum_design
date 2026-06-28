@@ -46,7 +46,7 @@ final class MeguriAccessPolicyTests: XCTestCase {
         let nearby = BoardThread(
             id: UUID(),
             authorID: otherID,
-            title: "近くの掲示板",
+            title: "近くのチャットルーム",
             body: "駅前広場の情報です",
             audience: .nearby3km,
             latitude: 35.684236,
@@ -55,7 +55,7 @@ final class MeguriAccessPolicyTests: XCTestCase {
         let far = BoardThread(
             id: UUID(),
             authorID: otherID,
-            title: "遠い掲示板",
+            title: "遠いチャットルーム",
             body: "別会場の情報です",
             audience: .nearby3km,
             latitude: 35.701236,
@@ -64,7 +64,7 @@ final class MeguriAccessPolicyTests: XCTestCase {
         let mine = BoardThread(
             id: UUID(),
             authorID: viewerID,
-            title: "自分の掲示板",
+            title: "自分のチャットルーム",
             body: "自分で立てたものです",
             audience: .samePrefecture
         )
@@ -132,8 +132,120 @@ final class MeguriAccessPolicyTests: XCTestCase {
     }
 
     func testMeguriMapRangeCirclesUseOneKilometerRadius() {
+        XCTAssertEqual(MeguriMapKind.all.radiusMeters, 1_000, accuracy: 0.1)
         XCTAssertEqual(MeguriMapKind.grooms.radiusMeters, 1_000, accuracy: 0.1)
         XCTAssertEqual(MeguriMapKind.boards.radiusMeters, 1_000, accuracy: 0.1)
+    }
+
+    func testMeguriHomeMapInitialCameraFitsOneKilometerCircle() {
+        XCTAssertEqual(MeguriHomeMapCamera.focusedSpan.latitudeDelta, 0.032, accuracy: 0.0001)
+        XCTAssertEqual(MeguriHomeMapCamera.focusedSpan.longitudeDelta, 0.032, accuracy: 0.0001)
+    }
+
+    func testMapCreationPromptPositionStaysInsideRightEdge() {
+        let viewport = CGSize(width: 393, height: 852)
+        let tapPoint = CGPoint(x: 380, y: 360)
+        let position = MeguriMapCreationPromptLayout.position(for: tapPoint, in: viewport)
+
+        XCTAssertNotEqual(MeguriMapCreationPromptLayout.placement(for: tapPoint, in: viewport), .trailing)
+        XCTAssertGreaterThanOrEqual(position.x - MeguriMapCreationPromptLayout.calloutSize.width / 2, 0)
+        XCTAssertLessThanOrEqual(position.x + MeguriMapCreationPromptLayout.calloutSize.width / 2, viewport.width)
+    }
+
+    func testMapCreationPromptPositionStaysInsideLeftEdge() {
+        let viewport = CGSize(width: 393, height: 852)
+        let tapPoint = CGPoint(x: 12, y: 360)
+        let position = MeguriMapCreationPromptLayout.position(for: tapPoint, in: viewport)
+
+        XCTAssertEqual(MeguriMapCreationPromptLayout.placement(for: tapPoint, in: viewport), .trailing)
+        XCTAssertGreaterThanOrEqual(position.x - MeguriMapCreationPromptLayout.calloutSize.width / 2, 0)
+        XCTAssertLessThanOrEqual(position.x + MeguriMapCreationPromptLayout.calloutSize.width / 2, viewport.width)
+    }
+
+    func testMapCreationPromptPositionLeavesBottomControlsClear() {
+        let viewport = CGSize(width: 393, height: 852)
+        let tapPoint = CGPoint(x: 280, y: 820)
+        let position = MeguriMapCreationPromptLayout.position(for: tapPoint, in: viewport)
+
+        XCTAssertEqual(MeguriMapCreationPromptLayout.placement(for: tapPoint, in: viewport), .above)
+        XCTAssertLessThanOrEqual(position.y + MeguriMapCreationPromptLayout.calloutSize.height / 2, 632)
+    }
+
+    func testMapCreationPromptAvoidsPinWhenClampedNearLeftEdge() {
+        let viewport = CGSize(width: 393, height: 852)
+        let tapPoint = CGPoint(x: 4, y: 520)
+        let calloutFrame = MeguriMapCreationPromptLayout.calloutFrame(for: tapPoint, in: viewport)
+        let pinFrame = MeguriMapCreationPromptLayout.pinAvoidanceFrame(for: tapPoint)
+
+        XCTAssertFalse(calloutFrame.intersects(pinFrame))
+    }
+
+    func testMapCreationPromptAvoidsLeftFloatingControls() {
+        let viewport = CGSize(width: 393, height: 852)
+        let tapPoint = CGPoint(x: 24, y: 520)
+        let calloutFrame = MeguriMapCreationPromptLayout.calloutFrame(for: tapPoint, in: viewport)
+        let leftFloatingControlsFrame = CGRect(x: 0, y: 382, width: 138, height: 250)
+
+        XCTAssertFalse(calloutFrame.intersects(leftFloatingControlsFrame))
+    }
+
+    func testMapCreationPromptPointerTracksPinWhenCalloutIsClamped() {
+        let viewport = CGSize(width: 393, height: 852)
+        let tapPoint = CGPoint(x: 20, y: 520)
+        let placement = MeguriMapCreationPromptLayout.placement(for: tapPoint, in: viewport)
+        let position = MeguriMapCreationPromptLayout.position(for: tapPoint, in: viewport)
+        let pointerOffset = MeguriMapCreationPromptLayout.pointerOffset(for: tapPoint, in: viewport)
+
+        XCTAssertEqual(placement, .trailing)
+        XCTAssertEqual(position.y + pointerOffset, tapPoint.y - 36, accuracy: 0.1)
+    }
+
+    func testGroomArchiveOverviewMetricsFitFreeArchiveOnOneScreen() {
+        let freeMetrics = GroomArchiveOverviewGridMetrics.metrics(itemCount: 10, availableWidth: 340)
+        XCTAssertEqual(freeMetrics.columns.count, 5)
+        XCTAssertEqual(GroomArchiveOverviewGridMetrics.containerHeight(itemCount: 10), 150)
+
+        let plusMetrics = GroomArchiveOverviewGridMetrics.metrics(itemCount: 18, availableWidth: 340)
+        XCTAssertEqual(plusMetrics.columns.count, 6)
+        XCTAssertEqual(GroomArchiveOverviewGridMetrics.containerHeight(itemCount: 18), 190)
+        XCTAssertLessThanOrEqual(plusMetrics.thumbnailSize, freeMetrics.thumbnailSize)
+    }
+
+    func testGroomMapClustersNearbyPostsAndKeepsNewestFirst() {
+        let older = GroomPost(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000201")!,
+            authorID: UUID(uuidString: "00000000-0000-0000-0000-000000000301")!,
+            imageURL: URL(string: "https://example.com/older.jpg")!,
+            latitude: 35.000,
+            longitude: 139.000,
+            createdAt: Date(timeIntervalSince1970: 100)
+        )
+        let newer = GroomPost(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000202")!,
+            authorID: UUID(uuidString: "00000000-0000-0000-0000-000000000302")!,
+            imageURL: URL(string: "https://example.com/newer.jpg")!,
+            latitude: 35.001,
+            longitude: 139.001,
+            createdAt: Date(timeIntervalSince1970: 200)
+        )
+        let distant = GroomPost(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000203")!,
+            authorID: UUID(uuidString: "00000000-0000-0000-0000-000000000303")!,
+            imageURL: URL(string: "https://example.com/distant.jpg")!,
+            latitude: 35.040,
+            longitude: 139.040,
+            createdAt: Date(timeIntervalSince1970: 300)
+        )
+
+        let clusters = GroomMapCluster.clusters(from: [older, distant, newer], cellDegrees: 0.01)
+        let grouped = try! XCTUnwrap(clusters.first { $0.posts.count == 2 })
+        let single = try! XCTUnwrap(clusters.first { $0.posts.count == 1 })
+
+        XCTAssertEqual(grouped.title, "2件のグルーム")
+        XCTAssertEqual(grouped.posts.map(\.id), [newer.id, older.id])
+        XCTAssertEqual(grouped.coordinate.latitude, 35.0005, accuracy: 0.0001)
+        XCTAssertEqual(grouped.coordinate.longitude, 139.0005, accuracy: 0.0001)
+        XCTAssertEqual(single.id, distant.id.uuidString)
     }
 
     func testGroomFeedOrderingPrioritizesUnreadLatestAndExcludesViewerPost() {
@@ -209,6 +321,6 @@ final class MeguriAccessPolicyTests: XCTestCase {
         XCTAssertEqual(servicesOff, .servicesDisabled)
         XCTAssertEqual(MegrumLocationState.meguriNotice(phase: .requesting, errorMessage: nil)?.message, "現在地を確認しています")
         XCTAssertEqual(MegrumLocationState.meguriNotice(phase: .denied, errorMessage: nil)?.actionTitle, "設定")
-        XCTAssertEqual(MegrumLocationState.meguriNotice(phase: .notDetermined, errorMessage: nil)?.message, "現在地を許可すると、近くのグルームと1km圏内の掲示板を表示できます")
+        XCTAssertEqual(MegrumLocationState.meguriNotice(phase: .notDetermined, errorMessage: nil)?.message, "現在地を許可すると、近くのグルームと1km圏内のチャットルームを表示できます")
     }
 }

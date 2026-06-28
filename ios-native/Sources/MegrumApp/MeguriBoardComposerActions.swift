@@ -6,6 +6,22 @@ import UIKit
 #endif
 
 extension BoardThreadComposerSheet {
+    func hydrateMeguriProfileDefaults() async {
+        guard anonymousDisplayName == Self.defaultAnonymousDisplayName,
+              anonymousAvatarID == Self.defaultAnonymousAvatarID
+        else {
+            return
+        }
+        if appState.meguriProfile == nil {
+            await appState.loadMeguriProfile(reportsFailure: false)
+        }
+        guard let profile = appState.meguriProfile else {
+            return
+        }
+        anonymousDisplayName = profile.displayName
+        anonymousAvatarID = profile.avatarID
+    }
+
     func loadThumbnail(_ item: PhotosPickerItem?) {
         guard let item else {
             return
@@ -82,13 +98,15 @@ extension BoardThreadComposerSheet {
                 latitude: submitLatitude,
                 longitude: submitLongitude,
                 prefecture: submitPrefecture,
-                thumbnailUpload: thumbnailUpload
+                thumbnailUpload: thumbnailUpload,
+                anonymousDisplayName: anonymousDisplayName,
+                anonymousAvatarID: anonymousAvatarID
             )
             if let created {
                 onCreated(created)
                 dismiss()
             } else {
-                let message = appState.errorMessage ?? "掲示板を作成できませんでした"
+                let message = appState.errorMessage ?? "チャットルームを作成できませんでした"
                 showToast(message)
                 appState.clearErrorMessage()
             }

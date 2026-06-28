@@ -28,8 +28,14 @@ extension MegrumAppState {
                 prefecture: selectedPrefecture,
                 scope: scope
             )
-            grooms = try await loadedGrooms
-            threads = try await loadedThreads
+            let nextGrooms = try await loadedGrooms
+            let nextThreads = try await loadedThreads
+            grooms = nextGrooms
+            threads = nextThreads
+            await loadMeguriProfiles(
+                userIDs: Set(nextGrooms.map(\.authorID) + nextThreads.map(\.authorID)),
+                reportsFailure: false
+            )
         } catch {
             errorMessage = "めぐりを読み込めませんでした"
         }
@@ -69,7 +75,7 @@ extension MegrumAppState {
                 replies: replies
             )
         } catch {
-            errorMessage = "掲示板の返信を読み込めませんでした"
+            errorMessage = "チャットルームの返信を読み込めませんでした"
         }
         loadingBoardRepliesThreadID = nil
     }
@@ -112,7 +118,7 @@ extension MegrumAppState {
             sendingBoardReplyThreadID = nil
             return true
         } catch {
-            errorMessage = "掲示板に返信できませんでした"
+            errorMessage = "チャットルームに返信できませんでした"
             sendingBoardReplyThreadID = nil
             return false
         }
@@ -125,7 +131,9 @@ extension MegrumAppState {
         latitude: Double? = nil,
         longitude: Double? = nil,
         prefecture: String? = nil,
-        thumbnailUpload: GoodsPhotoUpload? = nil
+        thumbnailUpload: GoodsPhotoUpload? = nil,
+        anonymousDisplayName: String? = nil,
+        anonymousAvatarID: String? = nil
     ) async -> Bool {
         await createBoardThreadRecord(
             title: title,
@@ -134,7 +142,9 @@ extension MegrumAppState {
             latitude: latitude,
             longitude: longitude,
             prefecture: prefecture,
-            thumbnailUpload: thumbnailUpload
+            thumbnailUpload: thumbnailUpload,
+            anonymousDisplayName: anonymousDisplayName,
+            anonymousAvatarID: anonymousAvatarID
         ) != nil
     }
 
@@ -145,7 +155,9 @@ extension MegrumAppState {
         latitude: Double? = nil,
         longitude: Double? = nil,
         prefecture: String? = nil,
-        thumbnailUpload: GoodsPhotoUpload? = nil
+        thumbnailUpload: GoodsPhotoUpload? = nil,
+        anonymousDisplayName: String? = nil,
+        anonymousAvatarID: String? = nil
     ) async -> BoardThread? {
         guard !isCreatingBoardThread else {
             return nil
@@ -167,6 +179,7 @@ extension MegrumAppState {
         }
 
         let normalizedPrefecture = boardPrefecture(explicitPrefecture: prefecture)
+        let creationPrefecture = normalizedPrefecture ?? (scope == .nearby3km ? "未設定" : nil)
         switch scope {
         case .nearby3km:
             guard latitude != nil, longitude != nil else {
@@ -194,15 +207,17 @@ extension MegrumAppState {
                     audience: scope,
                     latitude: latitude,
                     longitude: longitude,
-                    prefecture: normalizedPrefecture,
-                    thumbnailUpload: thumbnailUpload
+                    prefecture: creationPrefecture,
+                    thumbnailUpload: thumbnailUpload,
+                    anonymousDisplayName: MegrumAppStateInputNormalizer.optionalText(anonymousDisplayName),
+                    anonymousAvatarID: MegrumAppStateInputNormalizer.optionalText(anonymousAvatarID)
                 )
             )
             threads = MeguriFeedStateReducer.upsertingBoardThread(created, into: threads)
             isCreatingBoardThread = false
             return created
         } catch {
-            errorMessage = "掲示板を作成できませんでした"
+            errorMessage = "チャットルームを作成できませんでした"
             isCreatingBoardThread = false
             return nil
         }

@@ -7,15 +7,22 @@ import UIKit
 #endif
 
 struct BoardThreadComposerSheet: View {
+    static let defaultAnonymousDisplayName = "めぐりさん"
+    static let defaultAnonymousAvatarID = BoardAnonymousAvatarOption.options.first?.id ?? "avatar_1"
+
     @ObservedObject var appState: MegrumAppState
     @ObservedObject var locationState: MegrumLocationState
     var fallbackCoordinate: MegrumLocationCoordinate?
+    var initialCreationCoordinate: MegrumLocationCoordinate?
+    var locksCreationCoordinate: Bool
     var selectedPrefecture: String?
     var onCreated: (BoardThread) -> Void
 
     @Environment(\.dismiss) var dismiss
     @State var title = ""
     @State var bodyText = ""
+    @State var anonymousDisplayName = BoardThreadComposerSheet.defaultAnonymousDisplayName
+    @State var anonymousAvatarID = BoardThreadComposerSheet.defaultAnonymousAvatarID
     @State var thumbnailItem: PhotosPickerItem?
     @State var thumbnailUpload: GoodsPhotoUpload?
     @State var thumbnailErrorMessage: String?
@@ -31,14 +38,20 @@ struct BoardThreadComposerSheet: View {
         appState: MegrumAppState,
         locationState: MegrumLocationState,
         fallbackCoordinate: MegrumLocationCoordinate? = nil,
+        initialCreationCoordinate: MegrumLocationCoordinate? = nil,
+        locksCreationCoordinate: Bool = false,
         selectedPrefecture: String?,
         onCreated: @escaping (BoardThread) -> Void = { _ in }
     ) {
         self.appState = appState
         self.locationState = locationState
         self.fallbackCoordinate = fallbackCoordinate
+        self.initialCreationCoordinate = initialCreationCoordinate
+        self.locksCreationCoordinate = locksCreationCoordinate
         self.selectedPrefecture = selectedPrefecture
         self.onCreated = onCreated
+        _selectedCoordinate = State(initialValue: initialCreationCoordinate)
+        _isShowingLocationStep = State(initialValue: locksCreationCoordinate)
     }
 
     var body: some View {
@@ -59,7 +72,7 @@ struct BoardThreadComposerSheet: View {
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
-            .navigationTitle("掲示板")
+            .navigationTitle("チャットルーム")
             .megrumInlineNavigationTitle()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -72,6 +85,7 @@ struct BoardThreadComposerSheet: View {
                 loadThumbnail(item)
             }
             .task {
+                await hydrateMeguriProfileDefaults()
                 if baseCoordinate == nil {
                     locationState.requestCurrentLocation()
                 }
@@ -88,9 +102,12 @@ struct BoardThreadComposerSheet: View {
         BoardThreadComposerContent(
             title: $title,
             bodyText: $bodyText,
+            anonymousDisplayName: $anonymousDisplayName,
+            anonymousAvatarID: $anonymousAvatarID,
             thumbnailItem: $thumbnailItem,
             missingContextMessage: missingContextMessage,
             isShowingLocationStep: isShowingLocationStep,
+            locksCreationCoordinate: locksCreationCoordinate,
             hasThumbnail: thumbnailUpload != nil,
             currentCoordinate: baseCoordinate,
             isRequestingLocation: locationState.isRequestingLocation,
@@ -107,9 +124,12 @@ struct BoardThreadComposerSheet: View {
         BoardThreadComposerContent(
             title: $title,
             bodyText: $bodyText,
+            anonymousDisplayName: $anonymousDisplayName,
+            anonymousAvatarID: $anonymousAvatarID,
             thumbnailItem: $thumbnailItem,
             missingContextMessage: missingContextMessage,
             isShowingLocationStep: isShowingLocationStep,
+            locksCreationCoordinate: locksCreationCoordinate,
             hasThumbnail: thumbnailUpload != nil,
             currentCoordinate: baseCoordinate,
             isRequestingLocation: locationState.isRequestingLocation,

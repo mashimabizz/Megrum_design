@@ -8,24 +8,20 @@ struct BoardThreadDetailPostHeader: View {
     var threadBody: String
     var authorName: String
     var authorAvatarURL: URL?
+    var authorAvatarID: String?
     var authorInitial: String
     var authorRelativeTime: String
+    var remainingTimeText: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(detailTagTitle)
-                .font(.system(size: 11.5, weight: .heavy, design: .rounded))
-                .foregroundStyle(MegrumTheme.lavender)
-                .padding(.horizontal, 13)
-                .frame(height: 23)
-                .background(
-                    LinearGradient(
-                        colors: [MegrumTheme.lavender.opacity(0.20), MegrumTheme.lavender.opacity(0.07)],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    ),
-                    in: Capsule()
-                )
+            HStack(spacing: 8) {
+                BoardThreadDetailPill(text: detailTagTitle, tint: MegrumTheme.lavender)
+
+                if let remainingTimeText {
+                    BoardThreadDetailPill(text: remainingTimeText, tint: MegrumTheme.pink)
+                }
+            }
 
             Text(title)
                 .font(.system(size: 23, weight: .black, design: .rounded))
@@ -35,6 +31,7 @@ struct BoardThreadDetailPostHeader: View {
 
             HStack(alignment: .top, spacing: 12) {
                 BoardThreadDetailAvatar(
+                    avatarID: authorAvatarID,
                     imageURL: authorAvatarURL,
                     initial: authorInitial,
                     size: 42
@@ -59,6 +56,27 @@ struct BoardThreadDetailPostHeader: View {
                 }
             }
         }
+    }
+}
+
+private struct BoardThreadDetailPill: View {
+    var text: String
+    var tint: Color
+
+    var body: some View {
+        Text(text)
+            .font(.system(size: 11.5, weight: .heavy, design: .rounded))
+            .foregroundStyle(tint)
+            .padding(.horizontal, 13)
+            .frame(height: 23)
+            .background(
+                LinearGradient(
+                    colors: [tint.opacity(0.20), tint.opacity(0.07)],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                ),
+                in: Capsule()
+            )
     }
 }
 
