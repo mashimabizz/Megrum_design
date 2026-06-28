@@ -31,6 +31,7 @@ public struct SupabaseMegrumRepository: MegrumRepository {
     let paymentSettingsPersistence: SupabasePaymentSettingsPersistence
     let exchangeSettingsClient: SupabaseExchangeSettingsClient
     let faceRecognitionClient: SupabaseFaceRecognitionClient
+    let goodsSeriesSuggestionClient: SupabaseGoodsSeriesSuggestionClient
     let chatPhotoStorage: SupabaseChatPhotoStorage
     let entitlementClient: SupabaseEntitlementClient
     let viewerID: UUID
@@ -88,6 +89,7 @@ public struct SupabaseMegrumRepository: MegrumRepository {
         self.paymentSettingsPersistence = SupabasePaymentSettingsPersistence(client: client)
         self.exchangeSettingsClient = SupabaseExchangeSettingsClient(client: client)
         self.faceRecognitionClient = SupabaseFaceRecognitionClient(client: client)
+        self.goodsSeriesSuggestionClient = SupabaseGoodsSeriesSuggestionClient(client: client)
         self.chatPhotoStorage = SupabaseChatPhotoStorage(client: client)
         self.entitlementClient = SupabaseEntitlementClient(client: client)
         self.viewerID = viewerID

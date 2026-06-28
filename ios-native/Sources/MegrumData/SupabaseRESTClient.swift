@@ -145,6 +145,21 @@ public final class SupabaseRESTClient: @unchecked Sendable {
         }
     }
 
+    public func invokeFunction<Payload: Encodable & Sendable, Value: Decodable & Sendable>(
+        name: String,
+        payload: Payload
+    ) async throws -> Value {
+        let request = try makeFunctionRequest(name: name, payload: payload)
+        let (data, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw SupabaseRESTError.unexpectedStatus(-1)
+        }
+        guard (200..<300).contains(httpResponse.statusCode) else {
+            throw SupabaseRESTError.unexpectedStatus(httpResponse.statusCode)
+        }
+        return try decoder.decode(Value.self, from: data)
+    }
+
     public func deleteRows(
         from table: String,
         queryItems: [URLQueryItem]

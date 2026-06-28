@@ -4,6 +4,60 @@
 
 ---
 
+## イテレーション1226.98：画像からシリーズ候補を提示
+
+### 背景・問題意識
+
+マイグッズ登録・Wish登録でシリーズを手入力する負担が残っていた。登録済み画像からシリーズ名の候補を出せれば、ユーザーは候補を選ぶだけで登録でき、既存の手入力・候補チップ操作も維持できる。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/GoodsBulkTagSheet.swift`
+- 既存候補チップの下に「画像からシリーズ名称の候補を出す」ボタンを追加した。
+- 画像候補取得中は `ProgressView` を出し、失敗時はシート内に短いエラー文を表示するようにした。
+- 既存候補と画像候補を重複除去し、同じ候補チップ一覧から選べるようにした。
+
+#### `ios-native/Sources/MegrumApp/GoodsEditorSheetSeriesSuggestions.swift`
+#### `ios-native/Sources/MegrumApp/GoodsEditorScreen.swift`
+- Wish単体登録とマイグッズ複数画像登録の両方で、選択画像・保存済み画像URL・グループ・メンバー・グッズ種別を候補取得入力にまとめるようにした。
+- シートを開くたびに前回の画像候補をリセットし、別の登録操作に候補が混ざらないようにした。
+
+#### `ios-native/Sources/MegrumCore/GoodsSeriesSuggestionModels.swift`
+#### `ios-native/Sources/MegrumData/SupabaseGoodsSeriesSuggestionClient.swift`
+#### `ios-native/Sources/MegrumData/SupabaseREST*`
+#### `ios-native/Sources/MegrumApp/MegrumRepository*`
+- 画像候補取得用の入力モデルとRepository APIを追加した。
+- Supabase Edge Function `/functions/v1/suggest-goods-series` を呼ぶ共通REST処理を追加した。
+- ローカル画像はbase64、保存済み画像はURLとして送れるようにした。
+
+#### `supabase/functions/suggest-goods-series/*`
+- ログイン済みJWTを `/auth/v1/user` で確認してからOpenAI Responses APIを呼び、シリーズ候補を返すEdge Functionを追加した。
+- `OPENAI_API_KEY` はサーバー側secretとして使い、iOSアプリ内には持たせない構成にした。
+
+### 影響範囲
+
+- マイグッズ登録のシリーズ一括登録シート
+- Wish登録のシリーズ登録シート
+- Supabase Edge Function呼び出し基盤
+
+状態名や取引状態は変更していないため `notes/09_state_machines.md` は更新しない。既存の「シリーズ」用語内の機能追加であり、新しいユーザー向け用語は追加していないため `notes/10_glossary.md` は更新しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-build`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1`
+  - passed（1194 tests, 3 skipped, 0 failures）
+- `npx -y -p typescript tsc --noEmit --target es2022 --lib es2022,dom --module nodenext --moduleResolution nodenext --skipLibCheck supabase/functions/suggest-goods-series/index.ts`
+  - passed
+
+### セルフレビュー結果
+
+- ✅ 既存の候補チップ・手入力・登録確定の操作は維持した。
+- ✅ iOSアプリへOpenAI APIキーを入れず、サーバー側Edge Functionに閉じ込めた。
+- ✅ 画像がない場合は候補検索を無効化し、誤操作時もシート内の案内に留めた。
+- ✅ 候補は自動登録せず、ユーザーが選んだものだけがシリーズとして追加される。
+
 ## イテレーション1226.97：めぐり読込とプロフィール保存改善
 
 ### 背景・問題意識

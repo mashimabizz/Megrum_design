@@ -29,6 +29,17 @@ extension SupabaseRESTClient {
         )
     }
 
+    public func makeFunctionRequest<Payload: Encodable & Sendable>(
+        name: String,
+        payload: Payload
+    ) throws -> URLRequest {
+        try makeMutationRequest(
+            path: "/functions/v1/\(name)",
+            method: "POST",
+            body: encoder.encode(payload)
+        )
+    }
+
     public func makeInsertRequest<Payload: Encodable & Sendable>(
         into table: String,
         values: [Payload],

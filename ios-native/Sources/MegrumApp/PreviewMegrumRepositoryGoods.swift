@@ -91,6 +91,22 @@ public extension PreviewMegrumRepository {
         )
     }
 
+    func suggestGoodsSeriesNamesFromImage(_ input: GoodsSeriesSuggestionInput) async throws -> [String] {
+        let baseNames = [
+            input.memberName,
+            input.groupName,
+            input.goodsTypeName
+        ]
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+
+        let contextual = baseNames.isEmpty ? [] : [
+            "\(baseNames[0]) ランダム",
+            "\(baseNames[0]) 会場限定"
+        ]
+        return Array((contextual + ["初回限定", "特典", "ラキドロ"]).prefix(6))
+    }
+
     func searchGoods(_ input: GoodsSearchInput) async throws -> [GoodsItem] {
         let query = input.query.trimmingCharacters(in: .whitespacesAndNewlines)
         return NativePreviewData.inventory.filter { item in

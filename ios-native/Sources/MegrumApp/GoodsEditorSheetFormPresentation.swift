@@ -39,7 +39,7 @@ extension GoodsEditorSheet {
             onRemoveTag: removeTag,
             onAddTag: addCurrentTag,
             onAddSuggestedTag: addSuggestedTag,
-            onOpenTagSheet: draft.entryKind == .wish ? { isShowingTagSelectionSheet = true } : nil,
+            onOpenTagSheet: draft.entryKind == .wish ? { showDraftTagSheet() } : nil,
             onShowCreateOshiPicker: showCreateOshiMasterSheet,
             onCommonNext: goToCreateShoot,
             onPickCamera: startInventoryCreateCamera,

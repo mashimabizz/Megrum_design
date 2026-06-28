@@ -64,6 +64,7 @@ extension GoodsEditorSheet {
             return
         }
         createError = nil
+        resetImageSeriesSuggestions()
         isShowingCreateBulkTagSelectionSheet = true
     }
 

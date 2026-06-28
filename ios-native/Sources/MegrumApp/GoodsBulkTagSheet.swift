@@ -18,6 +18,11 @@ struct GoodsBulkTagSheet: View {
     var textFieldPlaceholder = "例：会場限定"
     var footerText: String?
     var confirmationTitle = "追加"
+    var imageSuggestionNames: [String] = []
+    var isSuggestingFromImage = false
+    var imageSuggestionError: String?
+    var canSuggestFromImage = true
+    var onSuggestFromImage: (() -> Void)?
     var onApply: (String) -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -28,13 +33,17 @@ struct GoodsBulkTagSheet: View {
         tagDraft.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    private var combinedCandidateNames: [String] {
+        TagNameNormalizer.uniquePreservingOrder(candidateNames + imageSuggestionNames, limit: 18)
+    }
+
     var body: some View {
         NavigationStack {
             Form {
-                if !candidateNames.isEmpty {
+                if !combinedCandidateNames.isEmpty {
                     Section {
                         TagCandidatePreviewSelector(
-                            candidateNames: candidateNames,
+                            candidateNames: combinedCandidateNames,
                             previewItemsByTag: previewItemsByTag,
                             selectedNames: $selectedCandidateNames,
                             maxSelection: 1,
@@ -45,6 +54,40 @@ struct GoodsBulkTagSheet: View {
                         Text("候補")
                     } footer: {
                         Text("候補はもう一度タップすると入力欄に入ります。")
+                    }
+                }
+
+                if onSuggestFromImage != nil {
+                    Section {
+                        Button {
+                            MegrumHaptics.performSelectionChanged {
+                                onSuggestFromImage?()
+                            }
+                        } label: {
+                            HStack(spacing: 10) {
+                                if isSuggestingFromImage {
+                                    ProgressView()
+                                } else {
+                                    Image(systemName: "sparkles")
+                                }
+                                Text("画像からシリーズ名称の候補を出す")
+                                    .fontWeight(.semibold)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .disabled(isSuggestingFromImage || !canSuggestFromImage)
+
+                        if let imageSuggestionError, !imageSuggestionError.isEmpty {
+                            Text(imageSuggestionError)
+                                .font(.footnote.weight(.semibold))
+                                .foregroundStyle(.red)
+                        }
+                    } footer: {
+                        if canSuggestFromImage {
+                            Text("登録した画像と選択中のグループ情報を使って候補を検索します。")
+                        } else {
+                            Text("画像を登録すると、画像からシリーズ候補を検索できます。")
+                        }
                     }
                 }
 

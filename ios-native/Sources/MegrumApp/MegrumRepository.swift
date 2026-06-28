@@ -139,6 +139,7 @@ public protocol MegrumRepository: Sendable {
     func loadGoodsTypes(limit: Int) async throws -> [GoodsType]
     func createGoodsEntry(_ input: GoodsEntryInput) async throws -> GoodsItem
     func updateGoodsEntry(itemID: UUID, kind: GoodsEntryKind, input: GoodsEntryUpdateInput) async throws -> GoodsItem
+    func suggestGoodsSeriesNamesFromImage(_ input: GoodsSeriesSuggestionInput) async throws -> [String]
     func searchGoods(_ input: GoodsSearchInput) async throws -> [GoodsItem]
     func archiveGoodsItem(itemID: UUID) async throws
     func deleteGoodsItem(itemID: UUID) async throws

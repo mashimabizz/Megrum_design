@@ -73,6 +73,10 @@ public extension MegrumRepository {
         throw MegrumRepositoryError.unsupportedMutation
     }
 
+    func suggestGoodsSeriesNamesFromImage(_ input: GoodsSeriesSuggestionInput) async throws -> [String] {
+        []
+    }
+
     func searchGoods(_ input: GoodsSearchInput) async throws -> [GoodsItem] {
         []
     }

@@ -93,6 +93,10 @@ extension MegrumAppState {
         }
     }
 
+    public func suggestGoodsSeriesNamesFromImage(_ input: GoodsSeriesSuggestionInput) async throws -> [String] {
+        try await repository.suggestGoodsSeriesNamesFromImage(input)
+    }
+
     public func searchGoods(
         query: String,
         groupID: UUID? = nil,

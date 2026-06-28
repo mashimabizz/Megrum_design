@@ -48,6 +48,10 @@ public extension SupabaseMegrumRepository {
         try await goodsEntryPersistence.updateGoodsEntry(itemID: itemID, input: input)
     }
 
+    func suggestGoodsSeriesNamesFromImage(_ input: GoodsSeriesSuggestionInput) async throws -> [String] {
+        try await goodsSeriesSuggestionClient.suggestSeriesNames(input: input)
+    }
+
     func searchGoods(_ input: GoodsSearchInput) async throws -> [GoodsItem] {
         try await goodsInventoryClient.searchGoods(viewerID: viewerID, input: input)
     }

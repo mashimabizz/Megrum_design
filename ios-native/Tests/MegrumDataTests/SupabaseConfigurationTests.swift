@@ -111,6 +111,29 @@ final class SupabaseConfigurationTests: XCTestCase {
         XCTAssertEqual(json["expiresIn"] as? Int, 7200)
     }
 
+    func testBuildsFunctionRequest() throws {
+        let configuration = SupabaseConfiguration(
+            projectURL: URL(string: "https://example.supabase.co")!,
+            publishableKey: "sb_publishable_test",
+            accessToken: "session_token"
+        )
+        let client = SupabaseRESTClient(configuration: configuration)
+
+        let request = try client.makeFunctionRequest(
+            name: "suggest-goods-series",
+            payload: FunctionRequestPayload(groupName: "BTS")
+        )
+        let body = try XCTUnwrap(request.httpBody)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+
+        XCTAssertEqual(request.httpMethod, "POST")
+        XCTAssertEqual(request.url?.absoluteString, "https://example.supabase.co/functions/v1/suggest-goods-series")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "apikey"), "sb_publishable_test")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer session_token")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "application/json")
+        XCTAssertEqual(json["group_name"] as? String, "BTS")
+    }
+
     func testCreateSignedURLResolvesStorageRelativeObjectPath() async throws {
         let sessionConfiguration = URLSessionConfiguration.ephemeral
         sessionConfiguration.protocolClasses = [StorageSignedURLMockURLProtocol.self]
@@ -154,6 +177,10 @@ private enum StorageSignedURLMockError: Error {
     case missingURL
     case missingHandler
     case unexpectedRequest(String)
+}
+
+private struct FunctionRequestPayload: Encodable, Sendable {
+    var groupName: String
 }
 
 private final class StorageSignedURLMockURLProtocol: URLProtocol {
