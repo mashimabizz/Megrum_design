@@ -4,6 +4,78 @@
 
 ---
 
+## イテレーション1226.102：めぐりメッセージのロック表示
+
+### 背景・問題意識
+
+めぐりでメッセージやいいねが届いた時の見え方を確認できる実データが必要だった。また、無料状態で届いためぐりメッセージは本文を直接見せない設計だが、Swift Native側では「表示できません」という文言に寄っており、ユーザーにはロックされたメッセージとしての期待とMegrum プレミアム導線が伝わりにくかった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MeguriMessageViews.swift`
+- メッセージ一覧で、ロック済み最新メッセージのプレビュー部分を本文テキストではなくモザイク表示にした。
+- ロック済みスレッドのアクセシビリティラベルを、プレミアムで表示できるメッセージとして読めるようにした。
+
+#### `ios-native/Sources/MegrumApp/MeguriMessageConversationViews.swift`
+#### `ios-native/Sources/MegrumApp/MeguriLockedMessageViews.swift`
+- 会話画面で、ロック済み受信メッセージをメッセージ単位のグラデーション付きモザイクカードとして表示するようにした。
+- モザイクカードをタップすると `SubscriptionSettingsScreen` を開き、「Megrum プレミアム」導線へつなぐようにした。
+
+#### `ios-native/Sources/MegrumApp/MeguriMessageReadStateReducer.swift`
+#### `ios-native/Tests/MegrumAppTests/MeguriMessageReadStateReducerTests.swift`
+- ロック済みスレッドの内部プレビュー文言を「Megrum プレミアムで表示できます」に変更し、テストで固定した。
+
+#### `supabase/migrations/20260628153000_unlock_meguri_messages_for_megrum_plus.sql`
+- `list_meguri_messages_for_viewer()`、`meguri_messages` select policy、`can_view_meguri_message_object()` の解除条件に現行 `megrum_plus` を追加した。
+- 旧 `meguri_plus` / `premium` は互換として残し、無料ユーザーの本文・画像パス非表示は維持した。
+
+#### remote Supabase
+- `michilion` アカウント向けに、未読のめぐりメッセージ3件、グルームいいね3件、対応するアプリ内通知6件を確認用データとして作成した。
+- remote DBが一部古いmigration状態だったため、既存migration `20260627103000_add_meguri_notification_events.sql` と通知actor helperを直接反映し、`groom_liked` / `meguri_message` 通知を作れる状態へ補完した。
+
+#### `notes/05_data_model.md`
+#### `notes/09_state_machines.md`
+- めぐりメッセージの有料解除条件を現行 `megrum_plus` 優先に更新し、Swift Nativeのモザイク表示とMegrum プレミアム導線を記録した。
+
+### 影響範囲
+
+- めぐりメッセージ一覧
+- めぐりメッセージ会話画面
+- Megrum プレミアム導線
+- めぐりメッセージ本文・画像パスの解除条件
+- remote Supabaseの確認用データとMeguri通知関数
+
+取引チャット、チャットルーム、グルーム投稿作成、通常のメッセージ送信境界は変更していない。
+
+### 確認方法
+
+- `git diff --check`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-meguri-locked-message-test --enable-xctest --disable-swift-testing -j 1 --filter MeguriMessageReadStateReducerTests`
+  - passed（8 tests, 0 failures）
+- `xcodebuild -list -project ios-native/MegrumNative.xcodeproj`
+  - passed（scheme `MegrumNative` を確認）
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'platform=iOS Simulator,id=C70DDDBB-2602-49E0-8F95-1F043BCCED76' -derivedDataPath /tmp/megrum-native-meguri-premium-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+  - passed
+- `xcrun simctl install C70DDDBB-2602-49E0-8F95-1F043BCCED76 /tmp/megrum-native-meguri-premium-xcodebuild/Build/Products/Debug-iphonesimulator/MegrumNative.app`
+  - passed
+- `xcrun simctl launch --terminate-running-process C70DDDBB-2602-49E0-8F95-1F043BCCED76 tokyo.megrum.native.preview`
+  - passed
+- `xcrun simctl io C70DDDBB-2602-49E0-8F95-1F043BCCED76 screenshot /tmp/megrum-meguri-premium-launch.png`
+  - passed（ログイン画面表示を確認）
+- `supabase db query --linked`
+  - 確認用データ作成: メッセージ3件、いいね3件
+  - 通知確認: `meguri_message` 3件、`groom_liked` 3件
+  - RPC確認: 無料状態では `locked=true/body=null` が3件、`megrum_plus` 付与トランザクション内では `locked=false/body is not null` が3件
+
+### セルフレビュー結果
+
+- ✅ 無料ユーザーにはサーバーから本文・画像パスを返さず、アプリ側にも実本文を持たせない。
+- ✅ 一覧ではプレビュー部分だけをモザイクにし、スレッドタップで会話へ進む流れを維持した。
+- ✅ 会話内のロック済みメッセージをタップするとMegrum プレミアム画面へ進める。
+- ✅ 現行の `megrum_plus` 権限で解除できるようにし、旧 `meguri_plus` / `premium` 互換も残した。
+- ✅ 確認用データは `michilion` 向けに作成し、通知一覧でもメッセージ・いいね到着が確認できる。
+
 ## イテレーション1226.101：めぐりチャット表示と作成RPC
 
 ### 背景・問題意識

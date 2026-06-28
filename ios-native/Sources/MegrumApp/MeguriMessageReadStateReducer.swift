@@ -14,7 +14,7 @@ public struct MeguriMessageThread: Identifiable, Hashable, Sendable {
 
     public var lastMessagePreview: String {
         if lastMessage.locked {
-            return "このメッセージは現在表示できません"
+            return "Megrum プレミアムで表示できます"
         }
         if let body = lastMessage.body?.trimmingCharacters(in: .whitespacesAndNewlines), !body.isEmpty {
             return body

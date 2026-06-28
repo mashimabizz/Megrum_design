@@ -7,6 +7,7 @@ struct MeguriMessageList: View {
     var messages: [MeguriMessage]
     var viewerID: UUID?
     var isLoading: Bool
+    var onOpenPremium: () -> Void = {}
 
     var body: some View {
         ScrollView {
@@ -19,7 +20,8 @@ struct MeguriMessageList: View {
                     ForEach(messages) { message in
                         MeguriMessageBubble(
                             message: message,
-                            isMine: message.senderID == viewerID
+                            isMine: message.senderID == viewerID,
+                            onOpenPremium: onOpenPremium
                         )
                         .id(message.id)
                     }
@@ -65,18 +67,27 @@ private struct MeguriMessageEmptyState: View {
 struct MeguriMessageBubble: View {
     var message: MeguriMessage
     var isMine: Bool
+    var onOpenPremium: () -> Void = {}
 
     var body: some View {
         VStack(alignment: isMine ? .trailing : .leading, spacing: 4) {
-            Text(messageText)
-                .font(.system(size: 15, weight: .bold, design: .rounded))
-                .foregroundStyle(isMine ? .white : MegrumTheme.ink)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-                .background(
-                    isMine ? AnyShapeStyle(MegrumTheme.lavender) : AnyShapeStyle(.white.opacity(0.9)),
-                    in: RoundedRectangle(cornerRadius: 18, style: .continuous)
-                )
+            if message.locked && !isMine {
+                Button(action: onOpenPremium) {
+                    MeguriLockedMessageBubbleContent()
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("プレミアムでメッセージを表示")
+            } else {
+                Text(messageText)
+                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .foregroundStyle(isMine ? .white : MegrumTheme.ink)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+                    .background(
+                        isMine ? AnyShapeStyle(MegrumTheme.lavender) : AnyShapeStyle(.white.opacity(0.9)),
+                        in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    )
+            }
 
             Text(message.createdAt.formatted(date: .omitted, time: .shortened))
                 .font(.system(size: 11, weight: .bold, design: .rounded))

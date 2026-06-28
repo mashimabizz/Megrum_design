@@ -3,13 +3,14 @@
 > **目的**：Megrum の全エンティティのDBスキーマ設計と、状態・マッチング・取引のデータフロー定義。
 > 実装の正解集。`09_state_machines.md` と完全に整合させ、`10_glossary.md` の用語を使う。
 
-最終更新: 2026-06-28
-ステータス: Draft v2.53（iter1226.93 めぐりプロフィールを追加）
+最終更新: 2026-06-29
+ステータス: Draft v2.54（iter1226.102 めぐりメッセージの現行プレミアム解除条件を追加）
 
 ## 最新化履歴
 
 | Rev | 日付 | 変更 |
 |---|---|---|
+| **v2.54** | **2026-06-29** | **iter1226.102 反映（`list_meguri_messages_for_viewer()` とメディア閲覧権限で、旧 `meguri_plus` だけでなく現行 `megrum_plus` / 互換 `premium` でもロック解除できるように追加）** |
 | **v2.53** | **2026-06-28** | **iter1226.93 反映（めぐり内の表示名・アイコンを保存する `meguri_profiles` と保存RPCを追加。表示名は全ユーザー一意、変更は1ヶ月に1回まで）** |
 | **v2.52** | **2026-06-27** | **iter1226.14 反映（`notifications.kind='groom_liked'`、`notifications.groom_reaction_id`、グルーム/チャットルームカテゴリ別プッシュ設定、グルーム返信/めぐりメッセージ/チャットルーム通知のDBトリガー化を追加）** |
 | **v2.51** | **2026-06-27** | **iter1225 / iter1226.101 反映（グルームいいねで `expires_at` を3時間延長するRPC、グルーム通報/ブロック操作、掲示板匿名プロフィール、掲示板7日失効・1000返信ロック・1日20件作成上限を追加）** |
@@ -586,7 +587,7 @@ iter1225 以降、いいね操作は `set_groom_like_for_viewer(p_post_id,p_is_l
 | `created_at` | timestamptz | |
 
 `notifications.kind='meguri_message'` と `notifications.meguri_message_id` を使い、受信者に通知を残す。iter1226.14以降、通常めぐりメッセージの通知行はDB triggerで作成し、タイトルは「表示名さんからメッセージが届きました！」形式、bodyにはメッセージプレビューを入れない。`source_groom_reply_id` がある行は `groom_reply` 通知と重複させない。
-iter168.43 以降、無料受信者に本文・画像パスを直接返さないため、通常表示は `list_meguri_messages_for_viewer()` RPC を使う。直接 `meguri_messages` をSELECTできるのは送信者本人、または `user_entitlements(feature_key='meguri_plus', active=true)` を持つ受信者に限定する。
+iter168.43 以降、無料受信者に本文・画像パスを直接返さないため、通常表示は `list_meguri_messages_for_viewer()` RPC を使う。直接 `meguri_messages` をSELECTできるのは送信者本人、または `user_entitlements(feature_key in ('megrum_plus','meguri_plus','premium'), active=true)` を持つ受信者に限定する。iter1226.102 以降、Swift Nativeの導線は現行表記の「Megrum プレミアム」へつなぐため、現行 `megrum_plus` を優先し、旧 `meguri_plus` / `premium` は互換として残す。
 
 ### `meguri_board_threads`（スポット掲示板スレッド / iter168.73）
 
@@ -1332,6 +1333,7 @@ iter45 で追加。`notes/16_monetization.md` の戦略に対応するテーブ�
 > iter168.43: めぐりPlusは Premium とは別権限として `user_entitlements(feature_key='meguri_plus', active=true)` を参照する。`meguri_plus_monthly` の webhook は `meguri_plus` 権限を更新する。
 > iter731: Swift Native版も同じ方針に合わせ、アプリ内の広告非表示・有料導線は `user_entitlements(feature_key in ('premium','meguri_plus'))` の有効行を読む。Apple StoreKit、Stripe、管理者手動付与のどれで発生しても、最終的には `user_entitlements` へ集約する。
 > iter1223: 現行課金プランを **メグルムプラス** に統一し、`subscriptions.plan_type='megrum_plus_monthly'` / `user_entitlements.feature_key='megrum_plus'` を追加する。個別募集無料3件上限、ホーム/検索優先表示、グルームアーカイブ無料10件上限の判定はこの権限キーを見る。旧 `premium` / `meguri_plus` は互換用に残す。
+> iter1226.102: めぐりメッセージの本文・画像パス解除も、現行 `megrum_plus` を正とし、旧 `premium` / `meguri_plus` を互換として許可する。
 
 #### StoreKit product id 候補（iter1223）
 

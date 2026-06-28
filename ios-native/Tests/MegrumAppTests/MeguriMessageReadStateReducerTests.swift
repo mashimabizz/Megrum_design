@@ -59,6 +59,27 @@ final class MeguriMessageReadStateReducerTests: XCTestCase {
         )
     }
 
+    func testLockedThreadPreviewUsesPremiumLabel() {
+        let viewerID = UUID(uuidString: "00000000-0000-0000-0000-000000000231")!
+        let peerID = UUID(uuidString: "00000000-0000-0000-0000-000000000232")!
+        let messages = [
+            makeMessage(
+                senderID: peerID,
+                recipientID: viewerID,
+                body: nil,
+                locked: true
+            )
+        ]
+
+        let threads = MeguriMessageReadStateReducer.conversationThreads(
+            from: messages,
+            viewerID: viewerID
+        )
+
+        XCTAssertEqual(threads.first?.lastMessagePreview, "Megrum プレミアムで表示できます")
+        XCTAssertTrue(threads.first?.lastMessage.locked == true)
+    }
+
     func testPendingReplyThreadCountCountsThreadsWhereLatestMessageIsIncoming() {
         let viewerID = UUID(uuidString: "00000000-0000-0000-0000-000000000226")!
         let pendingUnreadPeerID = UUID(uuidString: "00000000-0000-0000-0000-000000000227")!
@@ -219,9 +240,10 @@ final class MeguriMessageReadStateReducerTests: XCTestCase {
         id: UUID = UUID(),
         senderID: UUID,
         recipientID: UUID,
-        body: String = "こんにちは",
+        body: String? = "こんにちは",
         readAt: Date? = nil,
         createdAt: Date = Date(timeIntervalSince1970: 0),
+        locked: Bool = false,
         senderDisplayName: String? = nil,
         senderHandle: String? = nil
     ) -> MeguriMessage {
@@ -233,6 +255,7 @@ final class MeguriMessageReadStateReducerTests: XCTestCase {
             body: body,
             readAt: readAt,
             createdAt: createdAt,
+            locked: locked,
             senderDisplayName: senderDisplayName,
             senderHandle: senderHandle
         )

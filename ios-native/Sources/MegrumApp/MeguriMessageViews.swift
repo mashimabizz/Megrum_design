@@ -104,10 +104,14 @@ private struct MeguriMessageThreadRow: View {
                 }
 
                 HStack(spacing: 8) {
-                    Text(thread.lastMessagePreview)
-                        .font(.system(size: 13, weight: thread.unreadCount > 0 ? .black : .semibold, design: .rounded))
-                        .foregroundStyle(thread.unreadCount > 0 ? MegrumTheme.ink : MegrumTheme.muted)
-                        .lineLimit(1)
+                    if thread.lastMessage.locked {
+                        MeguriLockedMessagePreview()
+                    } else {
+                        Text(thread.lastMessagePreview)
+                            .font(.system(size: 13, weight: thread.unreadCount > 0 ? .black : .semibold, design: .rounded))
+                            .foregroundStyle(thread.unreadCount > 0 ? MegrumTheme.ink : MegrumTheme.muted)
+                            .lineLimit(1)
+                    }
 
                     Spacer(minLength: 6)
 
@@ -124,6 +128,15 @@ private struct MeguriMessageThreadRow: View {
         }
         .padding(.vertical, 4)
         .accessibilityElement(children: .combine)
+        .accessibilityLabel(accessibilityLabel)
+    }
+
+    private var accessibilityLabel: String {
+        let unreadText = thread.unreadCount > 0 ? "、未読\(thread.unreadCount)件" : ""
+        if thread.lastMessage.locked {
+            return "\(thread.displayName)、プレミアムで表示できるメッセージ\(unreadText)"
+        }
+        return "\(thread.displayName)、\(thread.lastMessagePreview)\(unreadText)"
     }
 }
 
@@ -168,6 +181,7 @@ struct MeguriMessagesScreen: View {
     @ObservedObject var appState: MegrumAppState
     var peerID: UUID
     @State private var draft = ""
+    @State private var isShowingMegrumPlus = false
 
     private var messages: [MeguriMessage] {
         appState.meguriMessages(with: peerID)
@@ -179,7 +193,8 @@ struct MeguriMessagesScreen: View {
                 MeguriMessageList(
                     messages: messages,
                     viewerID: appState.viewer?.id,
-                    isLoading: appState.isLoadingMeguriMessages
+                    isLoading: appState.isLoadingMeguriMessages,
+                    onOpenPremium: openMegrumPlus
                 )
                 .onChange(of: messages.count) { _, _ in
                     guard let lastID = messages.last?.id else {
@@ -202,6 +217,13 @@ struct MeguriMessagesScreen: View {
         .background(MegrumTheme.canvas.ignoresSafeArea())
         .navigationTitle(peerTitle)
         .megrumInlineNavigationTitle()
+        .sheet(isPresented: $isShowingMegrumPlus) {
+            NavigationStack {
+                SubscriptionSettingsScreen(appState: appState)
+            }
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
+        }
         .task {
             await appState.loadMeguriMessages()
             await appState.markMeguriMessagesRead(peerID: peerID)
@@ -215,6 +237,10 @@ struct MeguriMessagesScreen: View {
                 draft = ""
             }
         }
+    }
+
+    private func openMegrumPlus() {
+        isShowingMegrumPlus = true
     }
 
     private var peerTitle: String {
