@@ -16,7 +16,7 @@ struct HomeDiscoveryCandidateButton: View {
                 onSearch(candidate, selectedGoods ?? candidate.goods.first)
             } label: {
                 Text(cardTitle)
-                    .font(.system(size: 14.5, weight: .heavy))
+                    .font(.system(size: 14.5, weight: .regular))
                     .foregroundStyle(MegrumTheme.ink)
                     .lineLimit(1)
                     .minimumScaleFactor(0.68)
@@ -48,7 +48,7 @@ struct HomeDiscoveryCandidateButton: View {
             HomeDiscoveryCandidateConditionTags(
                 conditionTags: candidate.conditionTags(for: selectedGoods)
             )
-            .padding(.top, 4)
+            .padding(.top, 2)
         }
         .onAppear {
             selectedGoods = selectedGoods ?? candidate.goods.first

@@ -55,6 +55,7 @@ struct HomeDiscoverySection: View {
                 }
             }
         }
+        .padding(.bottom, layout == .grid ? 8 : 6)
     }
 
     private func openFirstCandidate() {
@@ -77,7 +78,7 @@ private struct HomeDiscoverySectionHeader: View {
             if layout == .rail || showsGridHeaderTitle {
                 Text(title)
                     .font(.system(size: layout == .rail ? 20 : 18, weight: .heavy))
-                    .foregroundStyle(MegrumTheme.lavender)
+                    .foregroundStyle(MegrumTheme.ink)
                     .lineLimit(1)
                     .minimumScaleFactor(0.78)
             }
