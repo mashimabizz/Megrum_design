@@ -173,24 +173,12 @@ private extension MeguriHomeMapBackdrop {
                 guard let point = proxy.convert(annotation.coordinate, to: .local) else {
                     continue
                 }
-                if abs(location.x - point.x) <= 94, abs(location.y - point.y) <= 48 {
+                if abs(location.x - point.x) <= 116, abs(location.y - point.y) <= 78 {
                     return true
                 }
             }
         }
 
         return false
-    }
-}
-
-private extension BoardThread {
-    var shortMapTitle: String {
-        if title.contains("物販") {
-            return "物販列"
-        }
-        if title.contains("駅") || title.contains("広場") {
-            return "駅前広場"
-        }
-        return String(title.prefix(4))
     }
 }

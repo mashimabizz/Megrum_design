@@ -85,10 +85,9 @@ public final class SupabaseBoardClient: @unchecked Sendable {
 
     public func createThread(_ input: BoardThreadCreateInput) async throws -> BoardThread {
         let imagePaths = try await boardImagePaths(for: input)
-        let rows: [BoardThreadRow] = try await client.insertRows(
-            into: "meguri_board_threads",
-            values: [BoardThreadInsertPayload(input: input, imagePaths: imagePaths)],
-            select: Self.threadSelect
+        let rows: [BoardThreadRow] = try await client.rpcRows(
+            function: "create_meguri_board_thread_for_viewer",
+            payload: BoardThreadCreatePayload(input: input, imagePaths: imagePaths)
         )
         guard let row = rows.first else {
             throw SupabaseBoardClientError.malformedResponse
@@ -144,10 +143,9 @@ public final class SupabaseBoardClient: @unchecked Sendable {
     }
 
     public func makeCreateThreadRequest(_ input: BoardThreadCreateInput) throws -> URLRequest {
-        try client.makeInsertRequest(
-            into: "meguri_board_threads",
-            values: [BoardThreadInsertPayload(input: input, imagePaths: input.imagePaths)],
-            select: Self.threadSelect
+        try client.makeRPCRequest(
+            function: "create_meguri_board_thread_for_viewer",
+            payload: BoardThreadCreatePayload(input: input, imagePaths: input.imagePaths)
         )
     }
 

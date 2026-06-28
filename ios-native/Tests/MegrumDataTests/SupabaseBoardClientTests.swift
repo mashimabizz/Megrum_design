@@ -241,25 +241,20 @@ final class SupabaseBoardClientTests: XCTestCase {
             )
         )
         let body = try XCTUnwrap(request.httpBody)
-        let rows = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [[String: Any]])
-        let json = try XCTUnwrap(rows.first)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
 
         XCTAssertEqual(request.httpMethod, "POST")
-        XCTAssertTrue(request.url?.absoluteString.hasPrefix("https://example.supabase.co/rest/v1/meguri_board_threads?select=id,author_id,title,body,audience_scope,origin_lat,origin_lng,prefecture,image_paths,status,reply_count,latest_activity_at,expires_at,created_at,anonymous_display_name,anonymous_avatar_id") == true)
-        XCTAssertEqual(request.value(forHTTPHeaderField: "Prefer"), "return=representation")
-        XCTAssertEqual(json["author_id"] as? String, authorID.uuidString.uppercased())
-        XCTAssertEqual(json["title"] as? String, "物販列どのくらい？")
-        XCTAssertEqual(json["body"] as? String, "北口側が動いています")
-        XCTAssertEqual(json["audience_scope"] as? String, "nearby_3km")
-        XCTAssertEqual(json["category"] as? String, "chat")
-        XCTAssertEqual((json["image_paths"] as? [String]) ?? ["unexpected"], ["board_threads/22222222-2222-2222-2222-222222222222/thumb.jpg"])
-        XCTAssertTrue(json["anonymous_display_name"] is NSNull)
-        XCTAssertTrue(json["anonymous_avatar_id"] is NSNull)
-        XCTAssertEqual(json["origin_lat"] as? Double, 35.681236)
-        XCTAssertEqual(json["origin_lng"] as? Double, 139.767125)
-        XCTAssertEqual(json["prefecture"] as? String, "東京都")
-        XCTAssertTrue(json["spot_key"] is NSNull)
-        XCTAssertTrue(json["spot_label"] is NSNull)
+        XCTAssertEqual(request.url?.absoluteString, "https://example.supabase.co/rest/v1/rpc/create_meguri_board_thread_for_viewer")
+        XCTAssertNil(request.value(forHTTPHeaderField: "Prefer"))
+        XCTAssertEqual(json["p_title"] as? String, "物販列どのくらい？")
+        XCTAssertEqual(json["p_body"] as? String, "北口側が動いています")
+        XCTAssertEqual(json["p_scope"] as? String, "nearby_3km")
+        XCTAssertEqual((json["p_image_paths"] as? [String]) ?? ["unexpected"], ["board_threads/22222222-2222-2222-2222-222222222222/thumb.jpg"])
+        XCTAssertTrue(json["p_anonymous_display_name"] is NSNull)
+        XCTAssertTrue(json["p_anonymous_avatar_id"] is NSNull)
+        XCTAssertEqual(json["p_origin_lat"] as? Double, 35.681236)
+        XCTAssertEqual(json["p_origin_lng"] as? Double, 139.767125)
+        XCTAssertEqual(json["p_prefecture"] as? String, "東京都")
     }
 
     func testBuildsBoardThreadCreateRequestWithAnonymousProfile() throws {
@@ -280,11 +275,10 @@ final class SupabaseBoardClientTests: XCTestCase {
             )
         )
         let body = try XCTUnwrap(request.httpBody)
-        let rows = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [[String: Any]])
-        let json = try XCTUnwrap(rows.first)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
 
-        XCTAssertEqual(json["anonymous_display_name"] as? String, "まくはり民")
-        XCTAssertEqual(json["anonymous_avatar_id"] as? String, "avatar_3")
+        XCTAssertEqual(json["p_anonymous_display_name"] as? String, "まくはり民")
+        XCTAssertEqual(json["p_anonymous_avatar_id"] as? String, "avatar_3")
     }
 
     func testAppendReplyThrowsMalformedResponseWhenRPCReturnsNoRows() throws {
@@ -326,7 +320,7 @@ final class SupabaseBoardClientTests: XCTestCase {
         }
     }
 
-    func testCreateThreadThrowsMalformedResponseWhenInsertReturnsNoRows() throws {
+    func testCreateThreadThrowsMalformedResponseWhenRPCReturnsNoRows() throws {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [BoardMockURLProtocol.self]
         let session = URLSession(configuration: configuration)
@@ -337,8 +331,8 @@ final class SupabaseBoardClientTests: XCTestCase {
             guard let url = request.url else {
                 throw BoardMockError.missingURL
             }
-            XCTAssertEqual(url.path, "/rest/v1/meguri_board_threads")
-            return (BoardMockURLProtocol.response(for: url, statusCode: 201), Data("[]".utf8))
+            XCTAssertEqual(url.path, "/rest/v1/rpc/create_meguri_board_thread_for_viewer")
+            return (BoardMockURLProtocol.response(for: url, statusCode: 200), Data("[]".utf8))
         }
         defer {
             BoardMockURLProtocol.requestHandler = nil

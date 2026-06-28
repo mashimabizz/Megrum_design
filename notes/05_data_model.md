@@ -12,7 +12,7 @@
 |---|---|---|
 | **v2.53** | **2026-06-28** | **iter1226.93 反映（めぐり内の表示名・アイコンを保存する `meguri_profiles` と保存RPCを追加。表示名は全ユーザー一意、変更は1ヶ月に1回まで）** |
 | **v2.52** | **2026-06-27** | **iter1226.14 反映（`notifications.kind='groom_liked'`、`notifications.groom_reaction_id`、グルーム/チャットルームカテゴリ別プッシュ設定、グルーム返信/めぐりメッセージ/チャットルーム通知のDBトリガー化を追加）** |
-| **v2.51** | **2026-06-27** | **iter1225 反映（グルームいいねで `expires_at` を3時間延長するRPC、グルーム通報/ブロック操作、掲示板匿名プロフィール、掲示板7日失効・1000返信ロック・1日2件作成上限を追加）** |
+| **v2.51** | **2026-06-27** | **iter1225 / iter1226.101 反映（グルームいいねで `expires_at` を3時間延長するRPC、グルーム通報/ブロック操作、掲示板匿名プロフィール、掲示板7日失効・1000返信ロック・1日20件作成上限を追加）** |
 | **v2.50** | **2026-06-27** | **iter1223 反映（メグルムプラス `megrum_plus_monthly` / `megrum_plus` を追加。個別募集無料3件上限、ホーム/検索優先表示、グルームアーカイブ無料10件上限、StoreKit購入同期RPCを定義）** |
 | v1.0 | 2026-04-27 | 初版（マスタ階層、availability_windows、proposals 等） |
 | **v2.0** | **2026-05-01** | **iter24/29/33/34 反映（meetup, outfit, location_share, 状態名統一、deals リネーム）** |
@@ -626,7 +626,7 @@ iter168.43 以降、無料受信者に本文・画像パスを直接返さない
 
 > **参加中判定（iter188）**：`list_meguri_board_threads_for_viewer()` は `viewer_participated` を返す。閲覧者がスレッド作成者、または `status='visible'` の返信を書いている場合に true とする。通知購読 `viewer_subscribed` とは別概念。
 
-> **期限・上限（iter1225）**：スレッドは最後の書き込みから7日で `archived` 化する。返信追加時は `latest_activity_at` と `expires_at` を更新し、返信数が1000件に到達したら `locked` にする。スレッド作成はユーザー1人あたり1日2件までDBトリガーで制限する。
+> **期限・上限（iter1225 / iter1226.101）**：スレッドは最後の書き込みから7日で `archived` 化する。返信追加時は `latest_activity_at` と `expires_at` を更新し、返信数が1000件に到達したら `locked` にする。スレッド作成はユーザー1人あたり1日20件までDBトリガーで制限する。作成は `create_meguri_board_thread_for_viewer()` RPCでログインユーザーを確定してから行う。
 
 ### `meguri_board_replies`（スポット掲示板返信 / iter168.73）
 

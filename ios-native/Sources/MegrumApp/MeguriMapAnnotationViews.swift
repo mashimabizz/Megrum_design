@@ -39,18 +39,24 @@ struct BoardMapPin: View {
     var isOutOfRange: Bool = false
 
     var body: some View {
-        Text(thread.title)
-            .font(.system(size: 12, weight: .heavy, design: .rounded))
-            .foregroundStyle(.white)
-            .lineLimit(1)
-            .padding(.horizontal, 12)
-            .frame(height: 34)
-            .background(isOutOfRange ? MegrumTheme.muted.opacity(0.78) : MegrumTheme.lavender, in: Capsule())
-            .overlay(alignment: .bottom) {
-                Triangle()
-                    .fill(isOutOfRange ? MegrumTheme.muted.opacity(0.78) : MegrumTheme.lavender)
-                    .frame(width: 14, height: 8)
-                    .offset(y: 6)
+        VStack(spacing: 0) {
+            HStack(alignment: .top, spacing: 8) {
+                BoardMapPinThumbnail(url: thread.thumbnailURL, isOutOfRange: isOutOfRange)
+
+                Text(thread.title)
+                    .font(.system(size: 12, weight: .heavy, design: .rounded))
+                    .foregroundStyle(.white)
+                    .lineLimit(3)
+                    .lineSpacing(1)
+                    .multilineTextAlignment(.leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(8)
+            .frame(minWidth: 182, maxWidth: 182, minHeight: 76, alignment: .topLeading)
+            .background(pinBackground, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .strokeBorder(pinStroke, lineWidth: 1.2)
             }
             .overlay(alignment: .topTrailing) {
                 if isOutOfRange {
@@ -62,10 +68,87 @@ struct BoardMapPin: View {
                         .offset(x: 5, y: -7)
                 }
             }
-            .shadow(color: MegrumTheme.ink.opacity(0.2), radius: 12, y: 7)
-            .saturation(isOutOfRange ? 0.35 : 1)
-            .opacity(isOutOfRange ? 0.72 : 1)
-            .accessibilityLabel(isOutOfRange ? "1km圏外のチャットルーム \(thread.title)" : "チャットルーム \(thread.title)")
+
+            Triangle()
+                .fill(pinBackground)
+                .frame(width: 16, height: 9)
+                .offset(y: -1)
+        }
+        .shadow(color: MegrumTheme.ink.opacity(0.22), radius: 14, y: 8)
+        .saturation(isOutOfRange ? 0.35 : 1)
+        .opacity(isOutOfRange ? 0.72 : 1)
+        .accessibilityLabel(isOutOfRange ? "1km圏外のチャットルーム \(thread.title)" : "チャットルーム \(thread.title)")
+    }
+
+    private var pinBackground: AnyShapeStyle {
+        if isOutOfRange {
+            AnyShapeStyle(MegrumTheme.muted.opacity(0.82))
+        } else {
+            AnyShapeStyle(
+                LinearGradient(
+                    colors: [
+                        MegrumTheme.sky,
+                        MegrumTheme.lavender,
+                        MegrumTheme.pink
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+        }
+    }
+
+    private var pinStroke: AnyShapeStyle {
+        AnyShapeStyle(Color.white.opacity(isOutOfRange ? 0.45 : 0.68))
+    }
+}
+
+private struct BoardMapPinThumbnail: View {
+    var url: URL?
+    var isOutOfRange: Bool
+
+    var body: some View {
+        Group {
+            if let url {
+                AsyncImage(url: url, transaction: Transaction(animation: .smooth(duration: 0.18))) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .scaledToFill()
+                    case .failure:
+                        placeholder
+                    case .empty:
+                        placeholder
+                            .redacted(reason: .placeholder)
+                    @unknown default:
+                        placeholder
+                    }
+                }
+            } else {
+                placeholder
+            }
+        }
+        .frame(width: 50, height: 50)
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.68), lineWidth: 1.3)
+        }
+        .saturation(isOutOfRange ? 0.35 : 1)
+        .accessibilityHidden(true)
+    }
+
+    private var placeholder: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color.white.opacity(0.22))
+
+            Image(systemName: "bubble.left.and.bubble.right.fill")
+                .font(.system(size: 20, weight: .bold))
+                .foregroundStyle(.white)
+                .shadow(color: MegrumTheme.ink.opacity(0.16), radius: 3, y: 1)
+        }
     }
 }
 

@@ -4,6 +4,73 @@
 
 ---
 
+## イテレーション1226.101：めぐりチャット表示と作成RPC
+
+### 背景・問題意識
+
+めぐり地図上のチャットルーム表示がタイトルだけの小さなカプセルで、グルームや他の地図要素と比べて内容が伝わりにくかった。また、チャットルーム作成はアプリからテーブルへ直接insertしており、RLS・作成上限・author確定の責務がクライアント寄りで、作成失敗の原因になりやすかった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MeguriMapAnnotationViews.swift`
+- チャットルームの地図ピンを、サムネイルとタイトル3行までを含むカード表示へ変更した。
+- 背景をMegrumアイコンに近い水色・紫・ピンクのグラデーションにし、画像がない場合はチャットアイコンのプレースホルダーを表示するようにした。
+
+#### `ios-native/Sources/MegrumApp/MeguriHomeMapBackdrop.swift`
+- 新しいチャットカードサイズに合わせ、地図タップ時の注釈ヒット判定を拡張した。
+- 未使用になっていた短縮タイトル用のprivate extensionを削除した。
+
+#### `ios-native/Sources/MegrumData/SupabaseBoardClient.swift`
+#### `ios-native/Sources/MegrumData/SupabaseBoardRows.swift`
+- チャットルーム作成を `meguri_board_threads` への直接insertから `create_meguri_board_thread_for_viewer()` RPC呼び出しへ変更した。
+- 作成payloadをRPC引数形式にし、アプリ側から `author_id` や `category` を直接送らない形にした。
+
+#### `supabase/migrations/20260628063000_add_meguri_board_create_rpc.sql`
+- `create_meguri_board_thread_for_viewer()` を追加し、DB側で `auth.uid()` をauthorとして確定してから作成するようにした。
+- チャットルーム作成上限を1日2件から1日20件へ緩和した。
+
+#### `ios-native/Tests/MegrumDataTests/SupabaseBoardClientTests.swift`
+- チャットルーム作成リクエストがRPC URLと `p_*` 引数を使うことをテストで固定した。
+- RPCが空配列を返した場合に malformed response として扱うテスト名と期待パスを更新した。
+
+#### `notes/05_data_model.md`
+#### `notes/09_state_machines.md`
+- チャットルーム作成RPCと1日20件上限を記録した。
+
+### 影響範囲
+
+- めぐり地図上のチャットルーム注釈表示
+- めぐりホームの地図タップ判定
+- チャットルーム作成API
+- DBのチャットルーム作成上限
+
+新しいユーザー向け用語は追加していないため `notes/10_glossary.md` は更新しない。
+
+### 確認方法
+
+- `git diff --check`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-board-rpc-test --enable-xctest --disable-swift-testing -j 1 --filter SupabaseBoardClientTests`
+  - passed（11 tests, 0 failures）
+- `xcodebuild -list -project ios-native/MegrumNative.xcodeproj`
+  - passed（scheme `MegrumNative` を確認）
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'platform=iOS Simulator,id=C70DDDBB-2602-49E0-8F95-1F043BCCED76' -derivedDataPath /tmp/megrum-native-board-rpc-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+  - passed
+- `xcrun simctl install C70DDDBB-2602-49E0-8F95-1F043BCCED76 /tmp/megrum-native-board-rpc-xcodebuild/Build/Products/Debug-iphonesimulator/MegrumNative.app`
+  - passed
+- `xcrun simctl launch --terminate-running-process C70DDDBB-2602-49E0-8F95-1F043BCCED76 tokyo.megrum.native.preview`
+  - passed
+- `xcrun simctl io C70DDDBB-2602-49E0-8F95-1F043BCCED76 screenshot /tmp/megrum-board-rpc-launch-2.png`
+  - passed（ログイン画面表示を確認）
+
+### セルフレビュー結果
+
+- ✅ チャットルームの地図表示は画像がある場合もない場合も破綻しない。
+- ✅ タイトルは最大3行まで見せ、地図上で内容を把握しやすくした。
+- ✅ 作成はDB RPC経由に寄せ、ログインユーザーのauthor確定をDB側に集約した。
+- ✅ 作成上限は撤廃せず、スパム抑止を残したまま通常利用・検証で詰まりにくい20件へ緩和した。
+- ✅ 既存の返信RPC、閲覧範囲、1km圏内制御、7日失効、1000返信ロックは変更していない。
+
 ## イテレーション1226.100：マイグッズX共有導線
 
 ### 背景・問題意識

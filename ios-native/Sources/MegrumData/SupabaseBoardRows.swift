@@ -148,88 +148,72 @@ struct BoardThreadRow: Decodable, Sendable {
     }
 }
 
-struct BoardThreadInsertPayload: Encodable, Sendable {
-    var authorId: UUID
-    var audienceScope: String
-    var body: String
-    var category: String
-    var imagePaths: [String]
-    var anonymousAvatarID: String?
-    var anonymousDisplayName: String?
-    var originLat: Double?
-    var originLng: Double?
-    var prefecture: String?
-    var spotKey: String?
-    var spotLabel: String?
-    var title: String
+struct BoardThreadCreatePayload: Encodable, Sendable {
+    var pTitle: String
+    var pBody: String
+    var pScope: String
+    var pOriginLat: Double?
+    var pOriginLng: Double?
+    var pPrefecture: String?
+    var pImagePaths: [String]
+    var pAnonymousDisplayName: String?
+    var pAnonymousAvatarID: String?
 
     init(input: BoardThreadCreateInput, imagePaths: [String]) {
-        self.authorId = input.authorID
-        self.audienceScope = input.audience.rawValue
-        self.body = SupabaseTextNormalizer.trimmed(input.body)
-        self.category = "chat"
-        self.imagePaths = imagePaths
-        self.anonymousAvatarID = SupabaseTextNormalizer.optional(input.anonymousAvatarID)
-        self.anonymousDisplayName = SupabaseTextNormalizer.optional(input.anonymousDisplayName)
-        self.originLat = input.latitude
-        self.originLng = input.longitude
-        self.prefecture = SupabaseTextNormalizer.optional(input.prefecture)
-        self.spotKey = nil
-        self.spotLabel = nil
-        self.title = SupabaseTextNormalizer.trimmed(input.title)
+        self.pTitle = SupabaseTextNormalizer.trimmed(input.title)
+        self.pBody = SupabaseTextNormalizer.trimmed(input.body)
+        self.pScope = input.audience.rawValue
+        self.pOriginLat = input.latitude
+        self.pOriginLng = input.longitude
+        self.pPrefecture = SupabaseTextNormalizer.optional(input.prefecture)
+        self.pImagePaths = imagePaths
+        self.pAnonymousDisplayName = SupabaseTextNormalizer.optional(input.anonymousDisplayName)
+        self.pAnonymousAvatarID = SupabaseTextNormalizer.optional(input.anonymousAvatarID)
     }
 
     enum CodingKeys: String, CodingKey {
-        case authorId
-        case audienceScope
-        case body
-        case category
-        case imagePaths
-        case anonymousAvatarID
-        case anonymousDisplayName
-        case originLat
-        case originLng
-        case prefecture
-        case spotKey
-        case spotLabel
-        case title
+        case pTitle
+        case pBody
+        case pScope
+        case pOriginLat
+        case pOriginLng
+        case pPrefecture
+        case pImagePaths
+        case pAnonymousDisplayName
+        case pAnonymousAvatarID
     }
 
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(authorId, forKey: .authorId)
-        try container.encode(audienceScope, forKey: .audienceScope)
-        try container.encode(body, forKey: .body)
-        try container.encode(category, forKey: .category)
-        try container.encode(imagePaths, forKey: .imagePaths)
-        if let anonymousAvatarID {
-            try container.encode(anonymousAvatarID, forKey: .anonymousAvatarID)
+        try container.encode(pTitle, forKey: .pTitle)
+        try container.encode(pBody, forKey: .pBody)
+        try container.encode(pScope, forKey: .pScope)
+        if let pOriginLat {
+            try container.encode(pOriginLat, forKey: .pOriginLat)
         } else {
-            try container.encodeNil(forKey: .anonymousAvatarID)
+            try container.encodeNil(forKey: .pOriginLat)
         }
-        if let anonymousDisplayName {
-            try container.encode(anonymousDisplayName, forKey: .anonymousDisplayName)
+        if let pOriginLng {
+            try container.encode(pOriginLng, forKey: .pOriginLng)
         } else {
-            try container.encodeNil(forKey: .anonymousDisplayName)
+            try container.encodeNil(forKey: .pOriginLng)
         }
-        if let originLat {
-            try container.encode(originLat, forKey: .originLat)
+        if let pPrefecture {
+            try container.encode(pPrefecture, forKey: .pPrefecture)
         } else {
-            try container.encodeNil(forKey: .originLat)
+            try container.encodeNil(forKey: .pPrefecture)
         }
-        if let originLng {
-            try container.encode(originLng, forKey: .originLng)
+        try container.encode(pImagePaths, forKey: .pImagePaths)
+        if let pAnonymousDisplayName {
+            try container.encode(pAnonymousDisplayName, forKey: .pAnonymousDisplayName)
         } else {
-            try container.encodeNil(forKey: .originLng)
+            try container.encodeNil(forKey: .pAnonymousDisplayName)
         }
-        if let prefecture {
-            try container.encode(prefecture, forKey: .prefecture)
+        if let pAnonymousAvatarID {
+            try container.encode(pAnonymousAvatarID, forKey: .pAnonymousAvatarID)
         } else {
-            try container.encodeNil(forKey: .prefecture)
+            try container.encodeNil(forKey: .pAnonymousAvatarID)
         }
-        try container.encodeNil(forKey: .spotKey)
-        try container.encodeNil(forKey: .spotLabel)
-        try container.encode(title, forKey: .title)
     }
 }
 
