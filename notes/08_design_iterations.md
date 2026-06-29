@@ -4,6 +4,45 @@
 
 ---
 
+## イテレーション1226.198：個別募集WantedOption一致Policy分離
+
+### 背景・問題意識
+
+`HomeCandidateListingWantedOptionFactory` は、wanted optionの表示値組み立てに加えて、viewer inventoryとの一致抽出、一覧表示で選択可能かどうか、条件指定の有無判定も同時に担っていた。表示値生成を残しつつ、一致判定だけを専用Policyへ寄せ、今後の個別募集マッチ条件変更をFactoryから切り離す必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeCandidateListingWantedOptionMatchPolicy.swift`
+- wanted optionに一致するviewer goodsの抽出を専用Policyとして追加した。
+- 一覧用wanted optionが選択可能かどうかの判定を追加し、空一致と `atLeast` 最小数不足の既存条件を維持した。
+- detail用の条件指定有無判定を追加し、wish ID、group、goods type の既存判定順序を維持した。
+
+#### `ios-native/Sources/MegrumApp/HomeCandidateListingWantedOptionFactory.swift`
+- viewer goodsのfilter、選択可能判定、条件指定有無判定を `HomeCandidateListingWantedOptionMatchPolicy` へ委譲した。
+- cash/goods/condition分類、タイトル/サブタイトル、preview item生成、matching goods IDの出力は変更していない。
+
+### 影響範囲
+
+- ホーム候補の個別募集wanted option一致判定内部に影響する。
+- ユーザー表示文言、画面レイアウト、ナビゲーション、Supabase API、DB schema、通知、認証、課金、取引状態、保存順序は変更していない。
+- 状態遷移、用語、データモデルに変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` は更新不要と判断した。
+
+### 確認方法
+- `git diff --check -- ios-native/Sources/MegrumApp/HomeCandidateListingWantedOptionFactory.swift ios-native/Sources/MegrumApp/HomeCandidateListingWantedOptionMatchPolicy.swift`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-wanted-match --enable-xctest --disable-swift-testing -j 1 --filter HomeCandidateComposerTests`
+  - passed：22 tests, 0 failures
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-wanted-match --enable-xctest --disable-swift-testing -j 1 --filter 'HomeCandidateComposerTests|HomeDiscoveryMatchPolicyTests|HomeMutualMatchConditionPoliciesTests|HomeScreenFlowTests'`
+  - passed：160 tests, 0 failures
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild-refactor-home-wanted-match CODE_SIGNING_ALLOWED=NO build`
+  - passed
+
+### セルフレビュー結果
+- ✅ 一致抽出と選択可能判定だけを切り出し、wanted optionの表示値生成は維持した。
+- ✅ `atLeast` の最小数不足、cash option、detail preview fallbackの既存挙動は対象テストで維持確認した。
+- ✅ DB/API、保存処理、状態遷移、通知、認証、課金、取引状態、表示文言は変更していない。
+- ✅ 既存の未コミット変更は戻していない。
+
 ## イテレーション1226.197：個別募集WantedOptionPreview分離
 
 ### 背景・問題意識

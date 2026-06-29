@@ -18,13 +18,15 @@ enum HomeCandidateListingWantedOptionFactory {
             return cashWantedOption(option: option, logic: logic)
         }
 
-        let matchingItems = viewerInventory.filter { viewerItem in
-            HomeCandidateListingMatchPolicy.optionWantsViewerGoods(option, viewerItem: viewerItem)
-        }
-        guard !matchingItems.isEmpty else {
-            return nil
-        }
-        if logic == .atLeast, matchingItems.count < max(1, option.minCount ?? 1) {
+        let matchingItems = HomeCandidateListingWantedOptionMatchPolicy.matchingItems(
+            for: option,
+            in: viewerInventory
+        )
+        guard HomeCandidateListingWantedOptionMatchPolicy.isSelectable(
+            option: option,
+            logic: logic,
+            matchingItems: matchingItems
+        ) else {
             return nil
         }
 
@@ -57,16 +59,17 @@ enum HomeCandidateListingWantedOptionFactory {
             return cashWantedOption(option: option, logic: logic)
         }
 
-        let matchingItems = viewerInventory.filter { viewerItem in
-            HomeCandidateListingMatchPolicy.optionWantsViewerGoods(option, viewerItem: viewerItem)
-        }
+        let matchingItems = HomeCandidateListingWantedOptionMatchPolicy.matchingItems(
+            for: option,
+            in: viewerInventory
+        )
         let previews = HomeCandidateListingWantedOptionPreviewBuilder.previewItems(
             for: option,
             matchingItems: matchingItems,
             previewInventory: previewInventory,
             tagsByInventoryID: tagsByInventoryID
         )
-        let hasConfiguredCondition = !option.wishIds.isEmpty || option.wishGroupId != nil || option.wishGoodsTypeId != nil
+        let hasConfiguredCondition = HomeCandidateListingWantedOptionMatchPolicy.hasConfiguredGoodsCondition(option)
         guard hasConfiguredCondition || !previews.isEmpty else {
             return nil
         }
