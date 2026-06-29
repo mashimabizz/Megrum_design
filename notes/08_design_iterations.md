@@ -4,6 +4,43 @@
 
 ---
 
+## イテレーション1226.202：MutualMatch入力Resolver分離
+
+### 背景・問題意識
+
+`HomeMutualMatchCandidateComposer` は、相互マッチ候補の評価・表示データ生成に加えて、active listing抽出、譲る候補行の解決、goods row lookup生成も同じ場所で担っていた。候補生成の主処理を読みやすく保ち、入力整形だけを安全に変更できるよう、相互マッチ用のlisting入力解決を専用Resolverへ分離する必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeMutualMatchListingInputResolver.swift`
+- active listing抽出を専用Resolverへ移した。
+- `haveIds` 指定時と条件指定時の譲る候補行解決を専用Resolverへ移した。
+- `rowsByID` の重複時先勝ちlookup生成を専用Resolverへ移した。
+
+#### `ios-native/Sources/MegrumApp/HomeMutualMatchCandidateComposer.swift`
+- 相互マッチ候補生成時の入力整形を `HomeMutualMatchListingInputResolver` へ委譲した。
+- wanted side評価、condition評価、payment評価、candidate score、表示データ生成、件数上限は変更していない。
+
+### 影響範囲
+
+- ホーム相互マッチ候補生成の内部入力整形に影響する。
+- ユーザー表示文言、画面レイアウト、ナビゲーション、Supabase API、DB schema、通知、認証、課金、取引状態、保存順序は変更していない。
+- 状態遷移、用語、データモデルに変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` は更新不要と判断した。
+
+### 確認方法
+- `git diff --check -- ios-native/Sources/MegrumApp/HomeMutualMatchListingInputResolver.swift ios-native/Sources/MegrumApp/HomeMutualMatchCandidateComposer.swift notes/08_design_iterations.md`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-mutual-inputs --enable-xctest --disable-swift-testing -j 1 --filter 'HomeCandidateComposerTests|HomeDiscoveryMatchPolicyTests|HomeMutualMatchConditionPoliciesTests|HomeScreenFlowTests'`
+  - passed
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild-refactor-home-mutual-inputs CODE_SIGNING_ALLOWED=NO build`
+  - passed
+
+### セルフレビュー結果
+- ✅ active listing抽出、offered rows解決、row lookup生成だけをResolverへ切り出した。
+- ✅ 相互マッチ評価、候補スコア、表示データ、ユーザー表示文言は変更していない。
+- ✅ DB/API、保存処理、状態遷移、通知、認証、課金、取引状態、ユーザー表示文言は変更していない。
+- ✅ 既存の未コミット変更は戻していない。
+
 ## イテレーション1226.201：ListingOfferedItems Builder分離
 
 ### 背景・問題意識

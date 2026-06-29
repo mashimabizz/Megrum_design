@@ -11,7 +11,7 @@ extension HomeCandidateComposer {
     ) -> [HomeMutualMatchCandidateData] {
         let viewerInventory = composition.viewerInventory.filter(HomeCandidateRowMapper.isMarketAvailable)
         let partnerInventory = composition.partnerInventory.filter(HomeCandidateRowMapper.isMarketAvailable)
-        let rowsByID = goodsRowsByID(
+        let rowsByID = HomeMutualMatchListingInputResolver.goodsRowsByID(
             composition.viewerInventory
                 + composition.viewerWishes
                 + composition.partnerInventory
@@ -20,14 +20,23 @@ extension HomeCandidateComposer {
         var result: [HomeMutualMatchCandidateData] = []
         var seenCandidateIDs: Set<UUID> = []
 
-        for viewerListing in activeListings(composition.viewerListings) {
-            let viewerOffers = offeredRows(for: viewerListing, inventory: viewerInventory)
+        let viewerListings = HomeMutualMatchListingInputResolver.activeListings(composition.viewerListings)
+        let partnerListings = HomeMutualMatchListingInputResolver.activeListings(composition.partnerListings)
+
+        for viewerListing in viewerListings {
+            let viewerOffers = HomeMutualMatchListingInputResolver.offeredRows(
+                for: viewerListing,
+                inventory: viewerInventory
+            )
             guard !viewerOffers.isEmpty else {
                 continue
             }
 
-            for partnerListing in activeListings(composition.partnerListings) {
-                let partnerOffers = offeredRows(for: partnerListing, inventory: partnerInventory)
+            for partnerListing in partnerListings {
+                let partnerOffers = HomeMutualMatchListingInputResolver.offeredRows(
+                    for: partnerListing,
+                    inventory: partnerInventory
+                )
                 guard !partnerOffers.isEmpty else {
                     continue
                 }
@@ -173,36 +182,4 @@ extension HomeCandidateComposer {
             .map { $0 }
     }
 
-    private static func activeListings(_ listings: [SupabaseHomeListingRow]) -> [SupabaseHomeListingRow] {
-        listings.filter { listing in
-            guard let status = listing.status?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
-                  !status.isEmpty
-            else {
-                return true
-            }
-            return status == IndividualListingStatus.active.rawValue
-        }
-    }
-
-    private static func offeredRows(
-        for listing: SupabaseHomeListingRow,
-        inventory: [SupabaseHomeGoodsRow]
-    ) -> [SupabaseHomeGoodsRow] {
-        if !listing.haveIds.isEmpty {
-            return inventory.filter { listing.haveIds.contains($0.id) }
-        }
-        guard listing.haveGroupId != nil || listing.haveGoodsTypeId != nil else {
-            return []
-        }
-        return inventory.filter { row in
-            HomeCandidateGoodsMatchPolicy.fieldMatches(listing.haveGroupId, row.groupId)
-                && HomeCandidateGoodsMatchPolicy.fieldMatches(listing.haveGoodsTypeId, row.goodsTypeId)
-        }
-    }
-
-    private static func goodsRowsByID(_ rows: [SupabaseHomeGoodsRow]) -> [UUID: SupabaseHomeGoodsRow] {
-        rows.reduce(into: [UUID: SupabaseHomeGoodsRow]()) { result, row in
-            result[row.id] = result[row.id] ?? row
-        }
-    }
 }
