@@ -4,6 +4,45 @@
 
 ---
 
+## イテレーション1226.196：個別募集SelectionFactory分離
+
+### 背景・問題意識
+
+`HomeCandidateListingMatchPolicy.firstSelection` は、個別募集が候補に該当するかのpolicyに加えて、wanted optionの並び替え、詳細表示用option、メモ表示、`HomeIndividualListingSelectionContext` とdetail contextの組み立てまで担っていた。マッチ判定policyと表示/提案開始用selection context構築の責務を分け、今後の個別募集表示条件の変更を安全にする必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeCandidateListingSelectionFactory.swift`
+- 個別募集一覧から最初のselection contextを作る処理を専用Factoryとして追加した。
+- optionのposition/id順ソート、wanted option/detail wanted option生成、listing note抽出、detail context生成の既存順序を維持した。
+
+#### `ios-native/Sources/MegrumApp/HomeCandidateListingMatchPolicy.swift`
+- `firstSelection` の外部APIは残し、内部実装を `HomeCandidateListingSelectionFactory.firstSelection` への委譲にした。
+- `listingWantsViewerGoods`、`listingIncludesCandidate`、`optionWantsViewerGoods`、`wantedOption` の判定/委譲は変更していない。
+
+### 影響範囲
+
+- ホーム候補の個別募集selection context生成内部に影響する。
+- ユーザー表示文言、画面レイアウト、ナビゲーション、Supabase API、DB schema、通知、認証、課金、取引状態、保存順序は変更していない。
+- 状態遷移、用語、データモデルに変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` は更新不要と判断した。
+
+### 確認方法
+- `git diff --check -- ios-native/Sources/MegrumApp/HomeCandidateListingMatchPolicy.swift ios-native/Sources/MegrumApp/HomeCandidateListingSelectionFactory.swift`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-listing-selection-retry --enable-xctest --disable-swift-testing -j 1 --filter HomeCandidateComposerTests`
+  - passed：22 tests, 0 failures
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-listing-selection-retry --enable-xctest --disable-swift-testing -j 1 --filter 'HomeCandidateComposerTests|HomeDiscoveryMatchPolicyTests|HomeMutualMatchConditionPoliciesTests|HomeScreenFlowTests'`
+  - passed：160 tests, 0 failures
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild-refactor-home-listing-selection CODE_SIGNING_ALLOWED=NO build`
+  - passed
+- 初回の `HomeCandidateComposerTests` は `/tmp` の容量不足でSwift compileが失敗したため、今回のHome refactor用scratchを削除してから再実行した。
+
+### セルフレビュー結果
+- ✅ マッチ判定policyからselection context構築を分離し、policy側は既存API互換の薄い委譲にした。
+- ✅ optionのソート順、wanted/detail option生成、listing note、detail context、candidate filterは移動のみで維持した。
+- ✅ DB/API、保存処理、状態遷移、通知、認証、課金、取引状態、表示文言は変更していない。
+- ✅ 既存の未コミット変更は戻していない。
+
 ## イテレーション1226.195：ホーム候補Viewer需要Summary分離
 
 ### 背景・問題意識

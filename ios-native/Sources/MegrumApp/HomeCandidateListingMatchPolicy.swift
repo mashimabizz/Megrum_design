@@ -56,68 +56,16 @@ enum HomeCandidateListingMatchPolicy {
         candidate: SupabaseHomeGoodsRow? = nil,
         includesCash: Bool = false
     ) -> HomeIndividualListingSelectionContext? {
-        for listing in listings {
-            if let candidate, !listingIncludesCandidate(listing, candidate: candidate) {
-                continue
-            }
-
-            let sortedOptions = optionsByListingID[listing.id, default: []]
-                .sorted { lhs, rhs in
-                    if lhs.position == rhs.position {
-                        return lhs.id.uuidString < rhs.id.uuidString
-                    }
-                    return lhs.position < rhs.position
-                }
-            let wantedOptions = sortedOptions.compactMap { option in
-                wantedOption(
-                    from: option,
-                    viewerInventory: viewerInventory,
-                    previewInventory: listingWantedInventory,
-                    tagsByInventoryID: tagsByInventoryID,
-                    includesCash: includesCash
-                )
-            }
-            guard let firstOption = wantedOptions.first else {
-                continue
-            }
-
-            let detailWantedOptions = sortedOptions.compactMap { option in
-                HomeCandidateListingWantedOptionFactory.detailWantedOption(
-                    from: option,
-                    viewerInventory: viewerInventory,
-                    previewInventory: listingWantedInventory,
-                    tagsByInventoryID: tagsByInventoryID,
-                    includesCash: includesCash
-                )
-            }
-
-            let wantedLogic = firstOption.logic
-            let offeredLogic = ListingLogic(rawValue: listing.haveLogic ?? "") ?? .all
-            let wantedMinimumCount = firstOption.minimumCount
-            let offeredMinimumCount = listing.haveMinCount ?? 1
-            let listingNote = IndividualListingNotePresentation.userMemo(from: listing.note)
-            let detail = HomeCandidateListingDetailContextFactory.detailContext(
-                listing: listing,
-                wantedLogic: wantedLogic,
-                offeredLogic: offeredLogic,
-                wantedMinimumCount: wantedMinimumCount,
-                offeredMinimumCount: offeredMinimumCount,
-                wantedOptions: detailWantedOptions.isEmpty ? wantedOptions : detailWantedOptions,
-                listingInventory: listingInventory,
-                candidate: candidate
-            )
-
-            return HomeIndividualListingSelectionContext(
-                wantedLogic: wantedLogic,
-                offeredLogic: offeredLogic,
-                wantedMinimumCount: wantedMinimumCount,
-                offeredMinimumCount: offeredMinimumCount,
-                wantedOptions: wantedOptions,
-                listingNote: listingNote,
-                detail: detail
-            )
-        }
-        return nil
+        HomeCandidateListingSelectionFactory.firstSelection(
+            listings: listings,
+            optionsByListingID: optionsByListingID,
+            viewerInventory: viewerInventory,
+            listingInventory: listingInventory,
+            listingWantedInventory: listingWantedInventory,
+            tagsByInventoryID: tagsByInventoryID,
+            candidate: candidate,
+            includesCash: includesCash
+        )
     }
 
     static func optionWantsViewerGoods(
