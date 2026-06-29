@@ -4,6 +4,54 @@
 
 ---
 
+## イテレーション1226.190：グルーム投稿ストーリー編集
+
+### 背景・問題意識
+
+グルームで写真を撮影またはアルバムから選択した後、従来は位置確認とキャプション入力の縦スクロール画面だった。横長写真でもストーリーズ風に中央配置し、任意位置へ文字を置いて投稿できる編集体験にする必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/GroomStoryComposerViews.swift`
+- 写真選択後は旧来の最終確認ステップではなく、ストーリー編集画面へ切り替えるようにした。
+- 投稿時に編集キャンバスをJPEG化し、既存のグルーム投稿APIへ渡すようにした。
+
+#### `ios-native/Sources/MegrumApp/GroomStoryEditorView.swift`
+#### `ios-native/Sources/MegrumApp/GroomStoryPhotoCanvas.swift`
+#### `ios-native/Sources/MegrumApp/GroomStoryTextOverlay.swift`
+#### `ios-native/Sources/MegrumApp/GroomStoryExportRenderer.swift`
+- 写真をぼかし背景＋前面写真のストーリーキャンバスとして表示する編集UIを追加した。
+- 閉じる、文字追加、投稿矢印だけのシンプルなクロームにし、右側の追加ツール群と下部のストーリーズ/親しい友達系ボタンは出さないようにした。
+- 任意位置タップまたはAaボタンから文字入力へ入り、文字色を選べるようにした。
+- 文字レイヤーはドラッグで移動、ピンチで拡大縮小、下部削除ターゲットへドラッグして削除できるようにした。
+- 投稿時は1080x1920のJPEGとして書き出し、横長写真も背景込みの1枚画像として保存されるようにした。
+
+#### `ios-native/Sources/MegrumApp/GroomStoryComposerPresentationState.swift`
+- 投稿時のキャプションに文字レイヤーの本文を反映できるようにした。
+- 写真リセット時に文字レイヤーもクリアするようにした。
+
+### 影響範囲
+
+- グルームの写真選択後から投稿までの編集体験に影響する。
+- 既存のグルーム投稿API、Supabaseスキーマ、地図上の投稿位置チェックは維持した。
+- グルーム閲覧、リアクション、メッセージ、通知導線には触れていない。
+
+### 確認方法
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-build-groom-editor`
+  - passed
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'platform=iOS Simulator,id=C70DDDBB-2602-49E0-8F95-1F043BCCED76' -derivedDataPath /tmp/megrum-native-groom-editor-build CODE_SIGNING_ALLOWED=NO build`
+  - passed
+- `xcrun simctl io C70DDDBB-2602-49E0-8F95-1F043BCCED76 screenshot /tmp/megrum-groom-editor-landscape-clear.png`
+  - passed：一時的なQA起動で、横長写真がストーリーキャンバス中央に収まり、閉じる/Aa/投稿矢印以外の不要なツールが表示されないことを目視確認した。
+
+### セルフレビュー結果
+- ✅ 写真選択後の画面をストーリー編集UIへ差し替えた。
+- ✅ 文字の色変更、移動、ピンチ拡大縮小、削除ターゲットを追加した。
+- ✅ 投稿画像は編集結果を焼き込んだJPEGとして既存投稿処理へ渡すため、DB/API変更は不要。
+- ✅ Simulator確認は `simctl` の起動/スクリーンショットで行い、ユーザー側のマウス操作を奪わないようにした。
+- ⚠️ `simctl` にはタップ入力がないため、任意位置タップやドラッグ操作そのものはコードレビューとビルドで確認し、目視はVisual QAの直接起動画面で確認した。
+- ⚠️ 作業ツリーに多数の未コミット変更があるため、今回の対象外差分は戻していない。
+
 ## イテレーション1226.168：近距離公開境界
 
 ### 背景・問題意識

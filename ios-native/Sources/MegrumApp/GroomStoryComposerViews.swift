@@ -1,4 +1,5 @@
 import MegrumDesign
+import MegrumCore
 import PhotosUI
 import SwiftUI
 
@@ -18,9 +19,7 @@ struct GroomStoryComposerScreen: View {
     var onPublish: (Data, String, String?, MegrumLocationCoordinate) async -> Bool
     var onDiscard: () -> Void
     @Environment(\.dismiss) private var dismiss
-    @State private var captionText = ""
-    @State private var toastMessage: String?
-    @State private var toastID = UUID()
+    @State private var presentationState = GroomStoryComposerPresentationState()
 
     private var hasPhotoDraft: Bool {
         draftPhotoData != nil
@@ -37,45 +36,47 @@ struct GroomStoryComposerScreen: View {
         ZStack {
             Color.black.ignoresSafeArea()
 
-            VStack(spacing: 0) {
-                GroomStoryComposerHeader(
-                    hasPhotoDraft: hasPhotoDraft,
-                    onClose: closeComposer
+            if let draftPhotoData {
+                GroomStoryEditorView(
+                    photoData: draftPhotoData,
+                    textOverlays: $presentationState.textOverlays,
+                    isCreating: isCreating,
+                    onClose: closeComposer,
+                    onPublish: publishDraftPhoto
                 )
-
-                ScrollView {
-                    GroomStoryComposerStepContent(
-                        selectedPhotoItem: $selectedPhotoItem,
-                        selectedCreationCoordinate: $selectedCreationCoordinate,
-                        captionText: $captionText,
-                        draftPhotoData: draftPhotoData,
-                        isPreparingPhoto: isPreparingPhoto,
-                        isCreating: isCreating,
-                        canUseCamera: canUseCamera,
-                        cameraSubtitle: cameraSubtitle,
-                        locksCreationCoordinate: locksCreationCoordinate,
-                        currentCoordinate: currentCoordinate,
-                        isRequestingLocation: isRequestingLocation,
-                        canCreateAtSelectedLocation: canCreateAtSelectedLocation,
-                        onRequestLocation: onRequestLocation,
-                        onOpenCamera: openCameraIfPossible,
-                        onOutOfRange: showToast,
-                        onSelectPhotoData: prepareLibraryGroomPhoto,
-                        onPublish: publishDraftPhoto,
-                        onResetPhotoDraft: resetPhotoDraft,
-                        onPrepareFinalStep: seedSelectedCoordinateForFinalStepIfNeeded
+            } else {
+                VStack(spacing: 0) {
+                    GroomStoryComposerHeader(
+                        hasPhotoDraft: hasPhotoDraft,
+                        onClose: closeComposer
                     )
+
+                    ScrollView {
+                        GroomStoryPhotoSelectionStep(
+                            selectedPhotoItem: $selectedPhotoItem,
+                            isPreparingPhoto: isPreparingPhoto,
+                            isCreating: isCreating,
+                            canUseCamera: canUseCamera,
+                            cameraSubtitle: cameraSubtitle,
+                            locksCreationCoordinate: locksCreationCoordinate,
+                            onOpenCamera: openCameraIfPossible,
+                            onSelectPhotoData: prepareLibraryGroomPhoto
+                        )
+                    }
+
+                    Spacer()
+
+                    GroomStoryComposerPrivacyFooter()
                 }
-
-                Spacer()
-
-                GroomStoryComposerPrivacyFooter()
             }
 
-            GroomStoryComposerToastOverlay(message: toastMessage)
+            GroomStoryComposerToastOverlay(message: presentationState.toastMessage)
         }
         .onAppear(perform: seedSelectedCoordinateForFinalStepIfNeeded)
         .onChange(of: currentCoordinate) { _, _ in
+            seedSelectedCoordinateForFinalStepIfNeeded()
+        }
+        .onChange(of: draftPhotoData) { _, _ in
             seedSelectedCoordinateForFinalStepIfNeeded()
         }
     }
@@ -123,10 +124,15 @@ struct GroomStoryComposerScreen: View {
             return
         }
         Task {
+            let photoUpload = renderedGroomPhotoUpload(from: draftPhotoData)
+            guard let photoUpload else {
+                showToast("編集した写真を作成できませんでした")
+                return
+            }
             let published = await onPublish(
-                draftPhotoData,
-                draftPhotoContentType,
-                captionText.nilIfBlank,
+                photoUpload.data,
+                photoUpload.contentType,
+                presentationState.captionForPublish,
                 selectedCreationCoordinate
             )
             guard published else {
@@ -134,6 +140,19 @@ struct GroomStoryComposerScreen: View {
             }
             onDiscard()
             dismiss()
+        }
+    }
+
+    @MainActor
+    private func renderedGroomPhotoUpload(from draftPhotoData: Data) -> GoodsPhotoUpload? {
+        do {
+            let renderedData = try GroomStoryExportRenderer.renderedJPEGData(
+                photoData: draftPhotoData,
+                textOverlays: presentationState.textOverlays
+            )
+            return normalizedPhotoUpload(from: renderedData)
+        } catch {
+            return nil
         }
     }
 
@@ -161,7 +180,7 @@ struct GroomStoryComposerScreen: View {
         draftPhotoContentType = "image/jpeg"
         selectedPhotoItem = nil
         selectedCreationCoordinate = nil
-        captionText = ""
+        presentationState.clearCaptionAfterPhotoReset()
     }
 
     private func closeComposer() {
@@ -171,17 +190,13 @@ struct GroomStoryComposerScreen: View {
 
     private func showToast(_ message: String) {
         let toastID = UUID()
-        self.toastID = toastID
         withAnimation(.smooth(duration: 0.18)) {
-            toastMessage = message
+            presentationState.showToast(message, toastID: toastID)
         }
         Task { @MainActor in
             try? await Task.sleep(for: .seconds(2.4))
-            guard self.toastID == toastID else {
-                return
-            }
             withAnimation(.smooth(duration: 0.18)) {
-                toastMessage = nil
+                presentationState.clearToast(ifMatching: toastID)
             }
         }
     }
