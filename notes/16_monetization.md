@@ -3,8 +3,8 @@
 > **目的**：Megrum の収益化戦略。メグルムプラス・広告・ブースト・アフィリエイト・公式コラボの設計と Phase別ロードマップ。
 > ファン層に嫌われない健全なマネタイズを実現する。
 
-最終更新: 2026-06-27（iter1223）
-ステータス: Draft v1.2（メグルムプラス月額500円を現行課金プランとして追加）
+最終更新: 2026-06-29（iter1226.166）
+ステータス: Draft v1.3（メグルムプラス月額500円 / 手動有料権限・権限上書き境界を反映）
 
 ---
 
@@ -316,7 +316,7 @@ Megrum MVP〜2年で運用する収益モデル：
 | 1ブーストの有効時間 | 24時間 |
 | 残数表示 | 常時マイページに表示 |
 | 未成年購入 | 不可（規約で年齢確認必須） |
-| 払い戻し | 未使用分のみ可（30日以内） ⚠️ |
+| 払い戻し | App Storeの返金手続、利用規約、法令、返金/取消イベントとサーバー残数調整に従う。未使用分の返金を画面やFAQで一律保証しない |
 
 ### 6-5. ブースト発動シーン
 
@@ -414,6 +414,8 @@ Swift Native iOSの現行サブスクは **メグルムプラス** に統一す�
 
 DB側では `list_megrum_plus_user_ids_for_viewer()` によりホーム/検索ランキング用のPlusユーザーIDを返し、`enforce_individual_listing_free_limit()` により無料ユーザーの個別募集3件上限をサーバー側でも守る。StoreKit購入後は `sync_megrum_plus_purchase_for_viewer()` で `subscriptions` と `user_entitlements` へ同期する。本番前には App Store Server API によるサーバー側署名検証を追加する。
 
+管理者画面の手動有料権限上書きは、`plan_overrides` と `user_entitlements.source='manual_override'` を使う運用上の暫定・補正手段とする。購入又は復元の同期不具合、返金/取消/チャージバック、キャンペーン、トライアル、障害対応、規約違反、セキュリティ対応、検証又は公開前テスト等で使う場合でも、購入完了、返金確定、補償又は無償提供継続を意味しない。対象ユーザー、feature key、active/inactive、期限、理由、変更前後、作成者、監査ログを必須確認にする。
+
 ### 7-4b. めぐりPlus（iter168.43）
 
 旧設計。Premium 会員とは別の、めぐり機能専用サブスク。iter1223以降の新規訴求はメグルムプラスを正とし、この節は互換・履歴として残す。
@@ -452,6 +454,7 @@ subscriptions table:
 - iOSアプリ内でデジタル機能を解放する購入は、Apple In-App Purchase / StoreKitを前提にする。
 - アプリの機能判定は、決済プロバイダーの生ステータスではなく `user_entitlements` を見る。
 - `subscriptions` は決済・更新・解約・返金などの原本、`user_entitlements` はアプリが見る利用権の集約結果とする。
+- `plan_overrides` と `manual_override` はサポート又は運営上の暫定・補正手段であり、購入証明、返金確定、補償又は無償提供継続として扱わない。
 - メグルムプラスの現行3特典は `user_entitlements.feature_key='megrum_plus'` が有効な時だけ発火する。
 - 旧Premium会員の広告非表示は `user_entitlements.feature_key='premium'` が有効な時だけ発火する。
 - 旧めぐりPlusは `premium` / `megrum_plus` に含めず、`feature_key='meguri_plus'` として分離する。
@@ -567,6 +570,7 @@ Phase δ で本格化：
 ❌ ガチャ要素のあるブースト（ランダム性で煽る）
 ❌ 課金しないと使い物にならない設計
 ❌ 解約しづらいUX（dark pattern）
+❌ ブーストを現金、ポイント、前払式支払手段、資金移動、預り金、決済手段、譲渡可能資産、取引成立保証、閲覧数保証、返信保証のように見せる
 ```
 
 ### 11-2. 後発で検討するもの（廃案候補）

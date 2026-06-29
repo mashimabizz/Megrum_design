@@ -1,8 +1,8 @@
 # 64. リリース証跡フォルダ索引
 
-最終更新: 2026-05-31
+最終更新: 2026-06-29
 
-ステータス: Draft v0.1（提出前・証跡保存ルール）
+ステータス: Draft v0.2（ローカルenv・Vercel env・Supabase secrets・server-only key境界を反映・提出前・証跡保存ルール）
 
 ## 目的
 
@@ -30,6 +30,7 @@ App Store初回提出、審査中対応、承認後の手動公開、公開初�
 - 実ユーザー、実取引、実問い合わせ、実通報、実事故の個人情報
 - 個人住所、個人電話番号、個人メールアドレス
 - 公開前の実代表者情報、所在地、電話番号
+- `.env.local`、`.vercel/.env.production.local`、`web/.env.local`、Supabase secrets、Vercel env、APNs private key、OAuth client secret、Stripe webhook secret、OpenAI API key、service role keyの実値又はスクショ
 
 ## 2. フォルダ構成案
 
@@ -78,6 +79,7 @@ YYYY-MM-DD_hhmm_appstore_vX.Y_buildN_area_short-description.ext
 - 画像は必要最小限にする。
 - 実メール、実住所、内部ID、debug表示が写った画像は保存前に除外又はマスクする。
 - 実パスワードやsecretが写った画像は保存しない。
+- `.env.local`、`.vercel/.env.production.local`、`web/.env.local`、Supabase secrets、Vercel env、APNs private key、OAuth client secret、Stripe webhook secret、OpenAI API key、service role keyの実値又はスクショは保存しない。
 - ファイル名に個人名、個人メール、実ユーザーIDを入れない。
 
 ## 4. `00_manifest.md` テンプレート
@@ -221,11 +223,13 @@ YYYY-MM-DD_hhmm_appstore_vX.Y_buildN_area_short-description.ext
 |---|---|---|
 | SEC-001 | RLS確認結果 | md |
 | SEC-002 | Storage公開範囲確認 | md |
-| SEC-003 | secret露出確認 | md |
+| SEC-003 | secret露出確認 | md。キー名、保管場所、権限者、確認日時、Pass/Failだけ |
 | SEC-004 | APNs/通知送信権限確認 | md |
 | SEC-005 | リリース権限台帳のP0確認 | md |
+| SEC-006 | `.env.local` / Vercel env / Supabase secrets境界確認 | md。実値なし |
 
 secret実値や管理画面の認証情報は保存しない。
+`supabase secrets list`、Vercel env、Apple Developer Keys、Stripe webhook、Google OAuth等の確認は、実値表示なしのキー名一覧又は手入力のPass/Failだけを残す。
 
 ### 5.10 `10_submission/`
 
@@ -313,6 +317,8 @@ secret実値や管理画面の認証情報は保存しない。
 | 実ユーザーのデータが写っている | 保存しない |
 | Review Notesに実パスワードが入っている | リポジトリには残さず、App Store Connectと安全な保管場所だけ |
 | URL疎通結果に内部IPや認証情報が出た | 保存しない。公開URLだけ再取得 |
+| `.env.local`、`.vercel`、secret manager画面が必要 | 実値を保存しない。キー名、環境、権限者、確認日時、Pass/Failだけをmanifestに書く |
+| AdMob app idやad unit idが写っている | secretではないが広告SDK設定として扱い、App Privacy/ATT/test ads確認とセットで保存可否を判断する |
 
 ## 7. 提出直前チェック
 
@@ -320,6 +326,7 @@ secret実値や管理画面の認証情報は保存しない。
 - [ ] Build、TestFlight、URL、App Privacy、Review Notesの最低証跡がある
 - [ ] デモアカウントの実パスワードを保存していない
 - [ ] secret、API key、tokenを保存していない
+- [ ] `.env.local`、`.vercel/.env.production.local`、Supabase/Vercel/Apple/Stripe/Google/OpenAI等のsecret実値又はスクショを保存していない
 - [ ] 実ユーザー又は実取引の個人情報を保存していない
 - [ ] スクショに内部ID、debug表示、未完成機能がない
 - [ ] `notes/36_submission_evidence_checklist.md` のEV-001〜EV-013と対応している

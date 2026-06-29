@@ -1,8 +1,8 @@
 # 31. App Store Connect 入力ワークシート
 
-最終更新: 2026-05-31
+最終更新: 2026-06-29
 
-ステータス: Draft（提出画面へ入力する前の作業表）
+ステータス: Draft v0.5（会員間支払い・金融規制境界 / 成立後支払い情報スナップショット / 手動有料権限・権限上書き / UGC・App Review 1.2 / 未成年・生年月日・年齢表示 / Apple標準EULA / 広告通報反映前提の作業表）
 
 ## 目的
 
@@ -23,8 +23,10 @@ App Store Connectへ実際に入力した後の最終差分照合は `notes/71_a
 | Primary Category | Lifestyle 又は Social Networking | `Info.plist` はSocial Networking。App Store上の見え方で最終判断 |
 | Secondary Category | Social Networking 又は Lifestyle | Primaryと逆にする案 |
 | Made for Kids | No | UGC、取引チャット、位置情報があるため |
+| 生年月日 / 年齢表示 | 自己申告年齢として説明 | Age Assurance、Parental Controls、FAQ、Review Notesと矛盾させない |
+| 会員間支払い | 出す場合はPayment Infoと金融/決済サービス非関与を説明 | 口座情報、PayPay対応可否、現金交換、金額指定、成立後支払い情報スナップショットが見えるなら、送金/収納代行/回収/返金/チャージバック/エスクロー/本人確認/口座名義確認/支払能力確認ではない説明がP0 |
 | 外部AI | 初回は出さない又はオンデバイス限定推奨 | 外部AI送信は説明/同意/Privacy回答が重くなる |
-| 有料機能 | IAPが固まるまで隠す選択もあり | 出すならIAP、特商法、スクショ、審査メモがP0 |
+| 有料機能 | IAPが固まるまで隠す選択もあり | 出すならIAP、特商法、スクショ、審査メモ、手動有料権限上書きの非保証説明がP0 |
 | 現地外の交換手段 | 初回は隠す | 現地交換に集中するため |
 | 配信地域 / EU DSA | 初回はJapanのみ候補。EU配信はDSA trader情報確認後 | `notes/68_app_store_territory_dsa_iap_availability.md` で判断 |
 
@@ -158,9 +160,13 @@ Megrum is a goods exchange app for fan communities. Users can register items the
 
 The app does not sell physical goods directly. It provides matching and communication tools for user-to-user exchanges. Paid features, if enabled in this build, are limited to app functionality such as premium features or boosts and use Apple's in-app purchase where required.
 
+If user-to-user payment details are enabled in this build, the app may show payment method summaries before agreement and agreement-time payment information snapshots only to the trade parties after agreement. The app does not receive, hold, transfer, collect, refund, charge back, escrow, verify account ownership, verify identity, verify payment capacity, or validate external payment IDs, transfer links, or QR codes.
+
 User-generated content areas include profiles, item images, trade chat, Groom posts, and the spot board. The app provides reporting/blocking flows and operational moderation for inappropriate content or users.
 
 If AI-assisted item registration is available in this build, it is used to help extract item information from user-provided images/text. External AI processing, if enabled, is disclosed to the user before transmission.
+
+The app may ask users to enter their birthdate during profile setup and may show derived age or age-range information in profile/discovery surfaces. This is self-reported information and is not official identity verification, age assurance, parental consent verification, or ID document verification.
 
 Demo account:
 Email: [TODO]
@@ -179,6 +185,7 @@ Suggested review path:
 - 未完成機能を説明しない。
 - AIを出さないならAI段落を削る。
 - 有料機能を出さないならPaid features段落を削る。
+- 会員間支払いを出さないならpayment details段落を削る。出す場合はPayment Info回答、Terms/Privacy/FAQと一致させる。
 - 住所登録系の未完成導線が残る場合は、説明文・スクショ・App Privacyと一致するまで提出しない。
 
 ## 7. Age Rating 回答メモ
@@ -192,15 +199,17 @@ App Store Connectの年齢制限指定は質問票で決まる。MegrumはKids�
 | Messaging and Chat | Yes | 取引チャット、めぐりメッセージ等がある |
 | Unrestricted Web Access | No候補 | 任意Webブラウザを提供しない前提 |
 | Advertising | 初回広告なしならNo | 広告導入時はYes |
-| In-App Purchases | 有料機能を出すならYes | Premium、めぐりPlus、ブースト |
+| In-App Purchases | 有料機能を出すならYes | メグルムプラス、ブースト |
 | Gambling / Loot Boxes | No | 交換/ブーストはギャンブルではない整理 |
 | Mature/Sexual/Violence/Drug content | No又はInfrequent | UGC上は投稿可能性があるためモデレーション前提で回答 |
-| Age Assurance | No候補 | 初回リリースで年齢確認機構なし |
+| Age Assurance | No候補 | 初回リリースで公的年齢確認、身分証確認、保護者同意確認なし。生年月日/年齢は自己申告 |
 | Parental Controls | No候補 | 初回リリースで保護者管理機能なし |
 
 注意:
 - UGCとチャットがあるため、低年齢向けアプリとして扱わない。
+- UGCを出す場合は、投稿前/投稿時の不適切コンテンツ対策、通報、ブロック、公開連絡先、運用SOPをReview Notesで実装済み範囲だけ説明する。ランダム/匿名チャット、出会い、外見評価、脅迫、いじめ用途に見える文言やスクショは入れない。
 - 利用規約で未成年は保護者同意前提。
+- 生年月日又は年齢表示が見える場合でも、年齢確認済み、本人確認済み、保護者同意確認済みと説明しない。
 - 算出結果が低すぎる/説明と合わない場合は、AppleのOverride to Higher Age Ratingを検討する。
 
 ## 8. Content Rights 回答メモ
@@ -248,7 +257,7 @@ Megrumはユーザーがグッズ写真や投稿をアップロードするた�
 - [ ] Age Rating質問票が実機能と一致している
 - [ ] Review Notesのレビュー経路が実際に辿れる
 - [ ] デモアカウントでログインできる
-- [ ] アカウント削除、通報、ブロック、問い合わせが説明どおり
+- [ ] アカウント削除、通報、ブロック、問い合わせが説明どおり。掲示板等で画面内通報ボタンがない対象はsupport@フォールバックを説明できる
 - [ ] URLが404ではない
 
 ## 12. 公式参照

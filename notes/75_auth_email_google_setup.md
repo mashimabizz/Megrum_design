@@ -1,8 +1,8 @@
 # 75. Authメール送信元・Googleログイン設定ランブック
 
-最終更新: 2026-06-27
+最終更新: 2026-06-29
 
-ステータス: Draft v0.1（Supabase / Zoho / Google Cloud 管理画面設定待ち）
+ステータス: Draft v0.3（Keychain session・refresh token・logout確認を追加 / カスタムURL scheme・認証リダイレクト・ディープリンクの提出前No-Goを追加 / Supabase / Zoho / Google Cloud 管理画面設定待ち）
 
 ## 目的
 
@@ -15,6 +15,9 @@
 - Swift Native iOS版はメール/パスワード登録、パスワードリセット送信、Appleログイン、Google OAuth導線を持つ。
 - Google OAuthは `ASWebAuthenticationSession` で `https://megrum.jp/auth/oauth/authorize?provider=google` を開き、Web側Route HandlerでSupabase `/auth/v1/authorize` へ転送する。iOS確認ダイアログにSupabase project refを直接出さず、戻り先は `megrum-preview://auth/callback` または `megrum://auth/callback` にする。
 - メール認証で `https://megrum.jp/auth/callback?next=mobile&scheme=...` を経由した場合、Web callbackがSupabase sessionへ交換してからnative callbackへ返す。
+- native callbackのfragmentにはaccess token、refresh token、expires情報、token type等が含まれ得る。これらをスクリーンショット、証跡、ログ、FAQ、問い合わせ返信へ不用意に残さない。
+- live authでは `KeychainAuthSessionStore` がAuthSessionを端末内Keychainへ保存し、期限切れ又は期限間近のsessionはrefresh tokenで更新される。現行コード確認では `kSecAttrAccessible` / ThisDeviceOnly方針は未明示のため、公開前に方針確認が必要。
+- ログアウト時は端末内sessionを先にclearし、その後Supabase logout APIを呼ぶ。リモートlogout失敗時も端末内画面はログアウトへ戻るが、他端末session、OSバックアップ、ブラウザ、メール、外部認証事業者側sessionの即時完全削除は保証しない。
 - 新規登録でメール確認待ちになった場合、Swift側は「確認メールを送信しました」と表示し、未認証sessionを保存しない。
 
 ## 2. Zoho / DNS
@@ -78,6 +81,14 @@ https://megrum.jp/auth/oauth/authorize
 このRouteは `provider=google` と `megrum://auth/callback` / `megrum-preview://auth/callback` だけを許可し、Supabase `/auth/v1/authorize` へリダイレクトする。`megrum.jp` のWeb環境には `NEXT_PUBLIC_SUPABASE_URL` を設定しておく。
 
 Supabase Custom Domainを別途設定する場合は、`MEGRUM_SUPABASE_URL` をその公式ドメインへ差し替えることで、Google側やSupabase側で見えるcallbackホストもさらにMegrum名義へ寄せられる。
+
+No-Go:
+- `MEGRUM_URL_SCHEME`、`MEGRUM_AUTH_EMAIL_REDIRECT_URL`、`MEGRUM_AUTH_OAUTH_AUTHORIZE_URL`、Supabase Redirect URLs、Google Cloud OAuth redirect、Web中継Route、App Store Review Notesが一致していない。
+- 本番提出buildで `megrum-preview://auth/callback` だけに戻る、又はpreview buildで `megrum://auth/callback` だけに戻る。
+- 認証callbackのaccess token、refresh token、認証code、password reset token、SMTP password、Google OAuth secretを証跡、公開ページ、スクショ、問い合わせテンプレート又はリポジトリに残す。
+- Keychain保存session JSON、refresh token、access tokenをログ、サポート証跡、スクショ、CI出力、公開FAQ又はPRへ残す。
+- `kSecAttrAccessible`方針、ThisDeviceOnly要否、バックアップ/復元/端末紛失時案内、他端末session失効、logout時clearの確認なしに、logout又は退会で全session/tokenが即時完全削除されると説明する。
+- カスタムURL schemeをUniversal Linksや本人確認済みリンクと同等に安全保証する説明をする。
 
 ### Email
 

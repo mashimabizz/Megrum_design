@@ -1,8 +1,8 @@
 # 32. TestFlight / App Review 提出ランブック
 
-最終更新: 2026-05-31
+最終更新: 2026-06-29
 
-ステータス: Draft（完成ビルド後に使う手順）
+ステータス: Draft v0.2（顔候補付け / Sensitive Info候補を反映・完成ビルド後に使う手順）
 
 ## 目的
 
@@ -28,7 +28,7 @@
 | 開発セッション | ビルド作成、署名、アップロード、P0修正 |
 | Codex準備セッション | 文書、メタデータ、チェックリスト、審査対応整理 |
 | テスター | TestFlightで実機確認 |
-| 法務 | 規約、プライバシー、特商法、AI/UGC/現地交換レビュー |
+| 法務 | 規約、プライバシー、特商法、AI/顔候補付け/UGC/現地交換レビュー |
 
 ## 3. ビルド受領時チェック
 
@@ -79,6 +79,7 @@ Please test:
 
 Known focus:
 - Confirm that no unfinished 3D, unfinished external AI, or incomplete paid feature appears in this build unless explicitly enabled for review.
+- Confirm that any face/member candidate suggestion, if visible, is explained as non-Face ID and non-identity verification and is aligned with App Privacy.
 - Confirm Terms, Privacy Policy, and Support links open correctly.
 ```
 
@@ -101,7 +102,7 @@ Known focus:
 | SM-011 | Safety | 通報、ブロック | 入口と送信/反映を確認 | RL-030 |
 | SM-012 | Account | アカウント削除入口 | アプリ内で開始できる | RL-031 |
 | SM-013 | Privacy | App Privacy対象データ | 実装と回答が矛盾しない | RL-029 |
-| SM-014 | Scope | 未完成機能露出 | 3D/外部AI/未完成有料が出ない | RL-017, RL-028 |
+| SM-014 | Scope | 未完成機能露出 | 3D/外部AI/顔候補付け/未完成有料が出ない、又は出す場合の説明がある | RL-017, RL-028 |
 
 合格証跡:
 - Build番号
@@ -139,7 +140,7 @@ Apple公式上、外部テスターは最大10,000人まで招待できるが、
 | UGC | 通報、ブロック、連絡先、モデレーション説明あり | `notes/26` |
 | Account Deletion | アプリ内削除開始導線あり | `notes/26` |
 | IAP | 有料機能が見える場合、IAPと特商法が一致 | `notes/25`, `notes/31` |
-| AI | 外部AIが見える場合、説明/同意/Privacy回答あり | `notes/24`, `notes/27` |
+| AI / 顔候補付け | 外部AI又は顔候補付けが見える場合、説明/同意又は任意性/Privacy回答あり | `notes/24`, `notes/27`, `notes/56` |
 
 ## 8. Submit for Review 手順
 
@@ -201,6 +202,7 @@ Response draft:
 - アカウント作成できるのにアプリ内削除がない
 - UGCがあるのに通報/ブロック/公開連絡先がない
 - 外部AIへ個人情報を送るのに説明/同意がない
+- 顔候補付け、顔特徴量又は画像特徴量保存が見えるのにSensitive Info回答又はFace ID非利用説明がない
 - App Privacyで未申告のデータ収集がある
 - 有料機能が見えるのにIAP未設定
 - 住所登録又は住所表示の未完成導線が見える

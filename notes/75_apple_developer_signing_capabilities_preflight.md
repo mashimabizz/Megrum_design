@@ -56,7 +56,7 @@ No-Go:
 |---|---|---|
 | Sign in with Apple | 出すなら必要 | Apple DeveloperのApp ID、Xcode target、Supabase Auth、削除時revoke方針が一致 |
 | Push Notifications | 通知を出すなら必要 | App ID、Xcode target entitlement、APNs key、production/development環境が一致 |
-| In-App Purchase | 有料機能を出すなら必要 | explicit App ID、Paid Apps契約、IAP商品、価格、復元、Availabilityが一致 |
+| In-App Purchase | 有料機能を出すなら必要 | explicit App ID、Paid Apps契約、IAP商品、価格、復元、Availability、Server API/Notifications、アプリ内固定文言が一致 |
 | Associated Domains | Universal Links等を出す場合のみ | domain、AASA、entitlement、公開URLが一致 |
 | Maps / Location | capabilityではなく権限・App Privacy側で確認 | Info.plist、アプリ内説明、App Privacyが一致 |
 | Camera / Photos | capabilityではなく権限・App Privacy側で確認 | Info.plist、写真/カメラ導線、App Privacyが一致 |
@@ -67,7 +67,7 @@ No-Go:
 - 使っていないCapabilitiesを「念のため」有効化する。
 - Sign in with Appleが画面に見えるのにCapability又はSupabase設定が未確認。
 - 通知許可画面や通知設定が見えるのにPush Notifications / APNs credentialが未確認。
-- 有料機能が見えるのにIAP商品、契約、復元、Availabilityが未確認。
+- 有料機能が見えるのにIAP商品、契約、復元、Availability、価格固定文言、返金/取消/期限切れ/請求失敗同期が未確認。
 
 ## 5. Provisioning / certificate確認
 
@@ -99,7 +99,7 @@ No-Go:
 | APNS-004 | APNs private keyはsecret manager又はSupabase secretsだけに保存 | TODO |
 | APNS-005 | production buildでproduction APNs endpointへ送る | TODO |
 | APNS-006 | 通知payloadに正確な場所、個人情報、内部IDを含めない | TODO |
-| APNS-007 | token失効時の無効化又は再登録を説明できる | TODO |
+| APNS-007 | token失効時の無効化又は再登録を説明できる。ログアウト時revokeと退会申請/削除完了時のtoken無効化の差分を説明できる | TODO |
 
 詳細なpayload、secret、Edge Function、ログ監査は `notes/54_prelaunch_security_audit_checklist.md` を使う。
 

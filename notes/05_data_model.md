@@ -4,12 +4,15 @@
 > 実装の正解集。`09_state_machines.md` と完全に整合させ、`10_glossary.md` の用語を使う。
 
 最終更新: 2026-06-29
-ステータス: Draft v2.54（iter1226.102 めぐりメッセージの現行プレミアム解除条件を追加）
+ステータス: Draft v2.57（iter1226.112 評価・通報・ブロック・モデレーションの法務前提を追加）
 
 ## 最新化履歴
 
 | Rev | 日付 | 変更 |
 |---|---|---|
+| **v2.57** | **2026-06-29** | **iter1226.112 反映（`user_evaluations` / `reports` / `goods_reports` / `groom_reports` / `meguri_board_reports` / `disputes` / `groom_user_blocks` は安全対応・表示制御・監査用データであり、本人確認・安全確認・信用保証・緊急通報・削除保証を意味しない法務前提を追記）** |
+| **v2.56** | **2026-06-29** | **iter1226.111 反映（`users.gender` / `users.primary_area` / 評価 / 支払い方法要約は公開プロフィール・候補表示の参考情報であり、本人確認・法的性別確認・安全確認・支払能力確認を意味しない法務前提を追記）** |
+| **v2.55** | **2026-06-29** | **iter1226.110 反映（`users.birth_date` / `users.age` は自己申告年齢として扱い、公的年齢確認・身分証確認・保護者同意確認を意味しない法務前提を追記）** |
 | **v2.54** | **2026-06-29** | **iter1226.102 反映（`list_meguri_messages_for_viewer()` とメディア閲覧権限で、旧 `meguri_plus` だけでなく現行 `megrum_plus` / 互換 `premium` でもロック解除できるように追加）** |
 | **v2.53** | **2026-06-28** | **iter1226.93 反映（めぐり内の表示名・アイコンを保存する `meguri_profiles` と保存RPCを追加。表示名は全ユーザー一意、変更は1ヶ月に1回まで）** |
 | **v2.52** | **2026-06-27** | **iter1226.14 反映（`notifications.kind='groom_liked'`、`notifications.groom_reaction_id`、グルーム/チャットルームカテゴリ別プッシュ設定、グルーム返信/めぐりメッセージ/チャットルーム通知のDBトリガー化を追加）** |
@@ -297,9 +300,11 @@ iter24 で「推し2階層」（グループ/作品 → メンバー/キャラ�
 RLS / 権限（iter278）：
 - `anon` / `authenticated` に公開する `users` のSELECT列は、公開プロフィール表示に使う `id, handle, display_name, bio, avatar_url, gender, primary_area, age, account_status, created_at` に限定する。
 - `birth_date` は本人編集用の非公開列であり、公開プロフィールやホーム候補には直接返さない。公開表示が必要な場合は `age` のみを使う。
-- `payment_methods` / `payment_note` は公開プロフィール表示には使わない。ホーム候補・打診前確認など、authenticated の取引前表示経路だけで参照する。
+- `birth_date` / `age` は自己申告年齢として扱う。これらの保存又は表示は、公的本人確認、年齢認証、身分証確認、保護者同意確認又は保護者管理機能が完了したことを意味しない。
+- `gender` / `primary_area` / `age` / 評価サマリ / 完了取引数 / `payment_methods` / `payment_note` は、公開プロフィール、ホーム候補、交換条件又は打診前確認の参考情報であり、本人確認、法的性別確認、居住地確認、安全確認、信用保証、支払能力確認又は運営者による推薦を意味しない。
+- `payment_methods` / `payment_note` は詳細口座情報ではなく支払い方法要約として扱う。ホーム候補・打診前確認など、authenticated の取引前表示経路だけで参照する。
 - `email_verified_at` / `deletion_requested_at` / `last_login_at` / `updated_at` などの内部運用列は公開SELECT権限を付与しない。
-- 公開プロフィール読み取りは `account_status not in ('deleted', 'suspended')` のユーザーだけに限定する。
+- 公開プロフィール、ホーム候補、評価一覧等の読み取りは `account_status not in ('deleted', 'suspended', 'deletion_requested')` のユーザーだけを表示対象にする。個別のRLS/関数実装がこの方針と一致しているか提出前に確認する。
 - 本人更新ポリシーは `using (auth.uid() = id)` に加えて `with check (auth.uid() = id)` を必須にし、直接API操作で `id` を別ユーザーへ移す更新を拒否する。
 
 ### `account_deletion_requests`（退会申請 / iter1221）
@@ -322,6 +327,7 @@ RLS / 権限（iter278）：
 - `proposals.status in ('sent', 'negotiating', 'agreement_one_side', 'agreed')` の進行中取引が1件でもある場合、退会申請は作成しない。
 - 申請時に `users.account_status='deletion_requested'`、`users.deletion_requested_at=now()` を更新する。
 - 本人は自分の申請行だけSELECTできる。作成はRPC経由に限定し、クライアントから直接INSERTしない。
+- 2026-06-29時点のコード確認では、30日後に実削除又は匿名化を行うジョブ、`status='completed'` 更新処理、`status='cancelled'` 更新処理、ログインによる復旧処理は未確認。法務文面では削除予定日を処理予定の目安として扱う。
 
 ### `user_mailing_addresses`（住所 / iter168.71）
 
@@ -533,6 +539,10 @@ iter1225 以降、いいね操作は `set_groom_like_for_viewer(p_post_id,p_is_l
 
 グルーム/めぐり文脈のユーザーブロック。`blocker_id` と `blocked_id` のどちらかに該当する関係では、相互にグルーム表示・めぐりメッセージ送信・スポット掲示板のスレッド/返信表示・掲示板通知を抑制する。
 
+法務メモ（iter1226.112）：
+- ブロック関係は表示、候補、メッセージ、返信、通知等を抑制するための安全操作ログであり、相手への法的通知、取引キャンセル、過去記録削除、過去評価削除、通報取消、異議申し立て終了を自動で意味しない。
+- 安全対応、監査、法令対応、虚偽通報/嫌がらせ対策のため、ブロック後又は解除後もブロック関係や関連ログを保持する場合がある。
+
 | カラム | 型 | 説明 |
 |---|---|---|
 | `blocker_id` | uuid | → users。PKの一部 |
@@ -542,6 +552,10 @@ iter1225 以降、いいね操作は `set_groom_like_for_viewer(p_post_id,p_is_l
 ### `groom_reports`（グルーム通報 / iter165）
 
 不適切なグルーム投稿の通報。ユーザーは自分の通報だけ参照できる。
+
+法務メモ（iter1226.112）：
+- `groom_reports` はUGCモデレーションの受付記録であり、投稿削除、返信停止、補償、相手への処分、通報者秘匿又は調査結果通知を保証しない。
+- 緊急の危険、犯罪、医療上の問題は、アプリ内通報ではなく警察、消防、医療機関、会場スタッフ等へ連絡する前提で扱う。
 
 | カラム | 型 | 説明 |
 |---|---|---|
@@ -695,6 +709,10 @@ iter168.43 以降、無料受信者に本文・画像パスを直接返さない
 ### `meguri_board_hidden_threads` / `meguri_board_reports`（非表示・通報 / iter171）
 
 ユーザー単位の非表示は `meguri_board_hidden_threads`、通報は `meguri_board_reports` に保存する。通報はスレッドまたは返信のどちらか一方を対象にし、運営側で `open` / `reviewing` / `resolved` / `rejected` を管理する。iter179以降、アプリ側では `reason` を `spam` / `harassment` / `privacy` / `unsafe` / `off_topic` / `other` から選ばせる。
+
+法務メモ（iter1226.112）：
+- `meguri_board_reports.status` は運営処理状態であり、対象投稿の違反確定、無違反確定、法的責任、削除保証を意味しない。
+- `hidden` やブロックで本人の表示から外れても、監査、モデレーション、法令対応、再発防止のため、スレッド、返信、通報、ブロック関係、既読/通知関連ログを保持する場合がある。
 
 ### スポット掲示板下書き（端末内状態 / iter180）
 
@@ -1170,6 +1188,11 @@ iter34 で到着ステータス・サブステート追加。
 - 相手プロフィールの表示には `get_public_user_profile_for_viewer(p_user_id)` と `list_user_evaluations_for_profile(p_user_id, p_limit)` を使い、公開してよいプロフィールサマリ・評価者公開情報・星・コメントだけを返す。
 - `account_status in ('suspended', 'deletion_requested', 'deleted')` の評価対象/評価者はプロフィール評価一覧から除外する。
 
+法務メモ（iter1226.112）：
+- 評価コメントはユーザー入力UGCであり、公開プロフィール、評価一覧、取引チャット内カード、通知等で表示され得る。住所、連絡先、勤務先/学校、銀行口座、正確な待ち合わせ場所、顔写真、第三者情報、名誉毀損、権利侵害、虚偽又は報復目的の記載を入れない前提で扱う。
+- `stars`、評価平均、評価件数、評価コメント、完了取引数は参考情報であり、本人確認、安全確認、信用保証、支払能力確認、商品品質保証、真実性確認又は運営推薦を意味しない。
+- 評価は削除・非表示・アカウント制限・法令対応・監査の対象になり得るが、運営が全評価を事前審査し、真実性を保証し、特定の評価を削除/訂正/再投稿する義務を負うものではない。
+
 ⚠️ 要確認：
 - 細分化評価（punctuality/item_condition/communication）を MVPで採用するか後フェーズか
 
@@ -1209,6 +1232,11 @@ RLS:
 - `target_user_id` がある場合は `reporter_id <> target_user_id` を必須にし、自分自身へのユーザー通報を禁止する。
 - 管理者画面は service role + `reports.read` / `reports.moderate` で横断閲覧・状態更新する。
 
+法務メモ（iter1226.112）：
+- 通報は安全対応、問い合わせ対応、監査、法令対応、虚偽/報復通報対策のための記録であり、緊急通報、警察/消防/医療機関/法律相談、公的救済手続の代替ではない。
+- 通報者IDは通常ユーザー向けに直接表示しない前提だが、対象行為の文脈、当事者間の状況、法令・裁判所・捜査機関・App Store審査・外部サービス対応により、通報者又は関連情報が推測又は開示される場合がある。
+- `status` は運営処理状態であり、対象者の法的責任、信用、安全性、危険性、違反確定又は無違反確定を意味しない。虚偽、嫌がらせ、報復目的の通報はアカウント制限対象にする。
+
 ### `goods_reports`（グッズ通報 / iter353）
 
 取引成立前でも、不適切なグッズ表示を運営確認へ回すためのグッズ単位の通報。取引異常時の `disputes` とは分ける。
@@ -1230,6 +1258,10 @@ RLS:
 - `reporter_id <> reported_user_id` を必須にし、自分のグッズ通報を禁止する。
 - 対象 `goods_inventory` は `reported_user_id` 所有かつ `status in ('active','reserved')` の行に限定する。
 - `unique (reporter_id, goods_inventory_id)` により同じグッズへの重複通報を防ぐ。
+
+法務メモ（iter1226.112）：
+- `goods_reports` は不適切表示、権利侵害、偽物疑い、個人情報、危険行為等を運営確認へ回すための記録であり、商品の真正性、権利処理、品質、交換可否を運営が保証するものではない。
+- 通報済み又はレビュー中であっても、対象グッズの表示停止、取引停止、削除、補償、紛争解決を保証しない。必要に応じて非表示、削除、アカウント制限、外部機関対応の対象にする。
 
 ---
 
@@ -1286,6 +1318,11 @@ iter12-18 の D-flow に対応するスキーマ（旧版未定義だったの�
 - Swift Native版は既存migration `20260503270000_add_disputes.sql` の `disputes` テーブルへ直接接続する。
 - Native送信時は `proposal_id` / `reporter_id` / `respondent_id` / `category` / `fact_memo` / `evidence_photo_urls` / `ticket_no` をinsertし、DB既定の `status='submitted'` を使う。
 - 申告作成後は取引チャットの `messages` にsystem messageを残す。
+
+法務メモ（iter1226.112）：
+- `disputes` は取引異常時の事実確認と運営対応のための記録であり、裁判、行政救済、警察/消防/医療機関、法律相談、損害賠償、返金、補償、エスクロー、強制執行の代替ではない。
+- `fact_memo`、証跡URL、status、operator_comment、outcome等は、当事者説明、再発防止、アカウント制限、法令対応、監査のため保存する場合がある。
+- `status`、`outcome`、`operator_comment` は運営上の対応記録であり、最終的な法的責任、真実性、商品価値、信用又は安全性を確定するものではない。
 
 ⚠️ 要確認：
 - 反論機会期限が 24h or 4h はカテゴリで変わるか（09 未確定項目#3）

@@ -329,11 +329,12 @@ Google OAuth経由ログイン or 新規登録。
 
 ### DELETE /api/v1/accounts/me/delete-request
 
-削除申請キャンセル（猶予期間中）。
+削除申請キャンセル（猶予期間中）の設計候補。
 
 - **Auth**: 必須
 - **Response 200**: `{ account_status: "active" }`
 - **State**: `deletion_requested → active`
+- **Current implementation note（2026-06-29）**: 現行Swift Native / Supabase RPCでは、退会申請作成 `request_account_deletion_for_viewer()` は確認済みだが、キャンセルAPI、ログイン復旧、自動削除完了処理は未確認。公開文面とApp Review Notesでは、キャンセル又は30日後完了を保証しない。
 
 ### GET /api/v1/accounts/me/blocks
 

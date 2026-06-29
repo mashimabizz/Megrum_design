@@ -1,8 +1,8 @@
 # 47. ドメイン・メール・公開URL運用ランブック
 
-最終更新: 2026-05-31
+最終更新: 2026-06-29
 
-ステータス: Draft v0.1（公開作業前）
+ステータス: Draft v0.2（顔候補付け / Sensitive Info候補を反映・公開作業前）
 
 ## 目的
 
@@ -35,7 +35,7 @@ App Store提出前に必要な `megrum.jp` の公開URL、`support@megrum.jp` �
 | `https://megrum.jp/support/account-deletion` | アカウント削除ヘルプ | ログイン不要、アプリ内削除案内あり |
 | `https://megrum.jp/support/privacy-request` | 個人情報請求 | ログイン不要、受付先あり |
 | `https://megrum.jp/support/report` | 通報・安全 | UGCを出すなら必須 |
-| `https://megrum.jp/support/ai` | AI機能説明 | AI機能を出すなら必須 |
+| `https://megrum.jp/support/ai` | AI機能説明 | AI機能又は顔候補付けを出すなら必須 |
 
 ## 3. DNSチェック
 
@@ -134,13 +134,13 @@ curl -I https://megrum.jp/support/ai
 | ページ | 確認 |
 |---|---|
 | Support | 問い合わせ先、カテゴリ、緊急時案内、法務リンク |
-| Privacy | App Privacy回答、AI、位置情報、写真、問い合わせ窓口 |
-| Terms | 現地交換MVP、禁止事項、通報、AI、IAP候補 |
+| Privacy | App Privacy回答、AI、顔候補付け、位置情報、写真、問い合わせ窓口 |
+| Terms | 現地交換MVP、禁止事項、通報、AI、顔候補付け、IAP候補 |
 | Commerce | 有料機能を出す場合の価格、支払、解約、返金、代表者情報方針 |
 | Account Deletion | アプリ内削除入口、削除対象、保持対象、IAP解約 |
 | Privacy Request | 開示等請求、本人確認、受付先 |
 | Report | 通報対象、ブロック、緊急時案内 |
-| AI | 外部AIを出す場合の送信情報、目的、学習利用 |
+| AI | 外部AIを出す場合の送信情報、目的、学習利用。顔候補付けを出す場合のFace ID非利用、第三者画像禁止、Sensitive Info候補 |
 
 ## 7. 証跡保存
 
@@ -162,6 +162,7 @@ curl -I https://megrum.jp/support/ai
 - 公開ページの内容が初回ビルドと矛盾している。
 - アカウント削除又は個人情報請求ページへログインなしで辿れない。
 - 有料機能を出すのに特商法表示が未公開。
+- 顔候補付けを出すのにAI説明、Privacy、App Privacy回答、Review Notesが未整合。
 - 公開ページに実住所、実パスワード、秘密鍵、内部IDが出ている。
 
 ## 9. 関連文書

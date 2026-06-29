@@ -1,8 +1,8 @@
 # 68. App Store配信地域・EU DSA・IAP Availabilityチェックリスト
 
-最終更新: 2026-05-31
+最終更新: 2026-06-29
 
-ステータス: Draft v0.1（App Store Connect入力前）
+ステータス: Draft v0.3（StoreKit・IAP販売可否・復元失敗 / EU DSA trader status / Japan-only初回配信 / 公開連絡先非露出 / IAP Availability No-Goを反映・App Store Connect入力前）
 
 ## 目的
 
@@ -16,9 +16,11 @@ App Store初回提出で、配信地域、EU Digital Services Act（DSA）のtra
 
 Apple公式ヘルプ上、App Store Connectでは提出前にアプリのAvailabilityを設定し、All Countries or Regions、Specific Countries or Regions、Pre-Order等から選ぶ。
 
-EU DSAについて、Appleは、EUでアプリを配信するtraderについて連絡先情報を確認し、App Storeの商品ページに表示する旨を案内している。EUに配信しない場合でも、App Store Connect上でtrader statusの申告が求められる。
+EU DSAについて、Appleは、EUでアプリを配信するtraderについて連絡先情報を確認し、App Storeの商品ページに表示する旨を案内している。Appleは開発者がtraderかどうかを判断しないため、運営者又は弁護士が自己判断する必要がある。EUに配信しない場合でも、App Store Connect上でtrader statusの申告が求められる。
 
-IAPは、アプリ本体とは別に国・地域ごとのAvailabilityを設定する。初回で有料機能を隠す場合、IAP提供地域の設定は後回しにできるが、有料導線が見える場合はApp Store Connect商品、価格、Availability、特商法表示、App Privacyを一致させる。
+Appleの案内では、EUで配信されるアプリについて、必要なtrader statusと連絡先情報が未提供又は未確認の場合、EUのApp Storeから削除されるリスクがある。初回を日本向けMVPに絞る場合も、App Store Connect上のDSA status申告画面、EU territoriesを含めない判断、商品ページに表示されるProvider/Seller/contact情報を証跡として残す。
+
+IAPは、アプリ本体とは別に国・地域ごとのAvailabilityを設定する。初回で有料機能を隠す場合、IAP提供地域の設定は後回しにできるが、有料導線が見える場合はApp Store Connect商品、価格、Availability、販売地域、販売停止状態、購入開始、承認待ち、キャンセル、復元失敗、サーバー同期失敗、特商法表示、App Privacyを一致させる。
 
 ## 2. 初回提出の推奨
 
@@ -27,6 +29,7 @@ IAPは、アプリ本体とは別に国・地域ごとのAvailabilityを設定�
 | App Availability | 初回はJapanのみ候補 | 日本語UI、日本語Support、現地交換MVP、法務/サポート負荷を絞る |
 | EU配信 | 初回は見送り候補 | DSA trader情報、英語/現地語サポート、公開連絡先の確認が増える |
 | DSA trader status | App Store Connectで必ず申告準備 | EU配信しない場合でも申告を求められるため |
+| DSA公開連絡先 | リポジトリに実値を書かず、App Store Connect画面とオーナー管理の証跡に限定 | 代表者名、住所、電話番号の非公表方針と衝突し得るため |
 | IAP Availability | 有料機能を隠すなら未設定/未提出で可 | StoreKit/IAP/特商法/サーバー検証を後回しにできる |
 | All Countries or Regions | 初回は非推奨 | サポート、法務、税務、ローカライズ、DSA、IAP表示の範囲が広がる |
 | Pre-Order | 初回は不要 | 審査提出と実機確認を優先 |
@@ -54,12 +57,17 @@ IAPは、アプリ本体とは別に国・地域ごとのAvailabilityを設定�
 | DSA-005 | 代表者情報非公表方針とDSA表示が矛盾しないか確認した | TODO |
 | DSA-006 | EU配信しない場合でも、trader status申告の控えを証跡保存した | TODO |
 | DSA-007 | DSA表示に使う連絡先が個人情報として不必要に露出しない | TODO |
+| DSA-008 | EU配信しない場合、EU 27 territoriesを含めないAvailability設定のスクショ又は記録を保存した | TODO |
+| DSA-009 | trader contact informationと、特商法の「請求があれば開示」方針の差分をオーナーが理解した | TODO |
+| DSA-010 | App Store商品ページに表示されるProvider/Seller/contact情報を提出前に確認した | TODO |
 
 No-Go:
 - EU配信するのにtrader status未申告。
 - traderとして表示される住所、電話番号、メールをオーナーが確認していない。
 - 特商法では非公表方針なのに、EU DSA表示で公開される情報の扱いを把握していない。
 - DSA表示用の実連絡先をリポジトリへ書く。
+- EU配信しない方針なのに、All Countries or Regions又はEU 27 territoriesを含むAvailabilityで提出する。
+- trader statusや公開連絡先の入力値を、App Store Connect画面だけでなく公開FAQ、Review Notes、証跡、特商法方針と照合せず提出する。
 
 ## 5. 連絡先情報の扱い
 
@@ -102,18 +110,22 @@ No-Go:
 |---|---|---|
 | IAP-AV-101 | IAP商品がApp Store Connectで作成済み | TODO |
 | IAP-AV-102 | IAP AvailabilityがApp Availabilityと矛盾しない | TODO |
-| IAP-AV-103 | 価格、通貨、地域、開始日が確定 | TODO |
+| IAP-AV-103 | 価格、通貨、地域、開始日が確定し、アプリ内固定文言、特商法、FAQ、Review Notesと一致 | TODO |
 | IAP-AV-104 | サブスクリプションのグループと商品IDが確定 | TODO |
-| IAP-AV-105 | StoreKit購入、復元、期限切れ、返金、サーバー検証が通る | TODO |
+| IAP-AV-105 | StoreKit商品情報照会、価格取得、購入開始、承認待ち、未完了、キャンセル、商品未取得、購入失敗、復元、復元失敗、期限切れ、返金、取消、請求失敗、猶予期間、サーバー検証、サーバー同期失敗時の扱いが確認済み | TODO |
 | IAP-AV-106 | 特商法表示、利用規約、Support、FAQ、Review Notesが一致 | TODO |
-| IAP-AV-107 | App PrivacyでPurchasesを回答している | TODO |
+| IAP-AV-107 | App PrivacyでPurchasesを回答し、商品情報照会、価格取得、購入開始、承認待ち、キャンセル、商品未取得、購入失敗、復元失敗、サーバー同期失敗、販売地域、販売停止をPurchases/Identifiers/Other Dataのどこで扱うか整理済み | TODO |
 | IAP-AV-108 | IAPをApp ReviewのSubmissionへ同時に含める必要があるか確認した | TODO |
 
 No-Go:
 - アプリ本体はJapanのみなのに、IAP Availabilityが広く開いている。
+- EU配信しない方針なのに、IAPだけEUを含む地域で販売可能になっている。
 - IAP価格と特商法表示が違う。
+- IAP価格とアプリ内固定文言、特商法表示、FAQ、Review Notesが違う。
 - IAPが見えるのにPurchasesをApp Privacyで回答していない。
+- 購入ボタン、復元ボタン、価格、購入/復元状態又は権限状態が見えるのに、購入開始、承認待ち、キャンセル、商品未取得、購入失敗、復元失敗、サーバー同期失敗、販売地域、販売停止をApp Privacy/Privacy/Supportで整理していない。
 - IAP商品がReady to Submit相当でないのに有料導線が見える。
+- App Store Server API又はServer Notificationsによる返金、取消、期限切れ、請求失敗、猶予期間の同期が未確認なのに有料導線が見える。
 
 ## 7. App Store Connect入力前チェック
 
@@ -128,6 +140,8 @@ No-Go:
 | AV-007 | Primary Languageと追加localizationが配信地域と矛盾しない | TODO |
 | AV-008 | IAP AvailabilityとApp Availabilityの整合を確認した | TODO |
 | AV-009 | 配信地域、DSA、IAPの証跡を `notes/64` のmanifestへ入れる | TODO |
+| AV-010 | App Store商品ページに表示されるProvider/Seller/contact情報をオーナーが確認した | TODO |
+| AV-011 | Japan-onlyで提出する場合、All Countries or Regionsを選んでいない証跡を保存した | TODO |
 
 ## 8. Go / No-Go
 
@@ -136,14 +150,16 @@ Go:
 - DSA trader status申告の要否と内容を確認済み。
 - EU配信する場合、公開される連絡先情報をオーナーが確認済み。
 - IAPを隠す場合、アプリ、FAQ、Review Notes、スクショから有料導線を外している。
-- IAPを出す場合、IAP Availability、価格、特商法、App Privacy、Review Notesが一致している。
+- IAPを出す場合、IAP Availability、価格、販売地域、販売停止状態、特商法、App Privacy、Review Notes、復元失敗、サーバー同期失敗時の説明が一致している。
 
 No-Go:
 - 配信地域が未決。
 - EU配信するのにDSA情報が未確認。
 - App Store商品ページに表示される連絡先情報を把握していない。
+- 初回Japan-only方針なのに、EU又はAll Countries or Regionsを含むAvailabilityで提出する。
 - IAP Availabilityとアプリ本体Availabilityが矛盾。
 - 有料機能が見えるのにIAP/特商法/App Privacyが未整備。
+- 有料機能が見えるのに復元失敗、サーバー同期失敗、ローカル有効表示とサーバー最終権限の差分をサポート・Privacy・Review Notesで説明できない。
 
 ## 9. 関連文書
 

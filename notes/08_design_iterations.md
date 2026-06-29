@@ -4,6 +4,4364 @@
 
 ---
 
+## イテレーション1226.168：近距離公開境界
+
+### 背景・問題意識
+
+現行Swift Nativeでは、`MegrumLocationState` が `CLLocationManager` を `kCLLocationAccuracyNearestTenMeters`、`distanceFilter = 10` で利用し、`CLGeocoder.reverseGeocodeLocation` により場所名へ変換する。取引チャットの `location` message、待ち合わせ候補、現地交換モード、グルーム、スポット掲示板では、緯度経度、場所名、作成位置、閲覧者位置、半径、距離、公開範囲、投稿時刻又は返信可否を扱い得る。
+
+これらは現地交換や近くの投稿を便利にする一方、1km/3km、同じスポット、同じ都道府県等が匿名化、安全確認、本人確認、所在確認、ストーカー防止又は推測防止を保証するように見えると、生活圏推測、未成年者の安全、スクリーンショット/通知/相手保存、App Privacyの過少回答、公開Web短縮Privacyとの不一致がリスクになる。そのため、コード変更は禁止のまま、規約、Privacy、Word改訂案、App Privacy、FAQ、サポート、Security、Go/No-Go、App Store提出資料を横断して、近距離公開・作成位置情報の法務境界を補強した。
+
+### 変更内容
+
+#### `notes/legal/01_terms_of_service_draft.md`
+- 第15条を補強し、現地交換モード、待ち合わせ候補、現在地共有、位置情報メッセージ、到着状況、グルーム、スポット掲示板、近距離の投稿/返信範囲判定で、精密な緯度経度、作成位置、閲覧者の現在地、半径、距離、時刻等を扱い得ることを追加した。
+- 自宅、勤務先、学校、宿泊先、座席番号、未成年者の居場所等を入力、投稿又は共有しない義務を追加した。
+- 近距離公開、1km圏内、3km圏内、同じ都道府県、同じスポット等が匿名化、秘匿化、安全確認、本人確認、所在確認、ストーカー防止又は第三者による推測防止を保証しないことを明確化した。
+- 相手会員又は閲覧可能な会員によるスクリーンショット、端末保存、転記、外部共有又は目的外利用を完全に防止できないことを補強した。
+
+#### `notes/legal/02_privacy_policy_draft.md`
+- 取得情報へ、めぐり/グルーム/スポット掲示板の作成時緯度経度、閲覧者緯度経度、公開範囲、距離、現地交換モードの最終/設定座標、活動ウィンドウ中心座標を追加した。
+- 1km圏内、3km圏内、同じ都道府県、同じスポット等の表示でも、内部処理、サーバー送信、DB保存、距離計算、地図表示、キャッシュ又はログでは精密座標を扱い得ることを明確化した。
+- 位置情報権限OFF又は現地交換モードOFF後も、過去の取引、投稿、ログ、端末内設定、バックアップ、通報、異議申し立て又は法令対応に必要な情報が直ちに全て削除されるとは限らないことを追加した。
+
+#### `利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+#### `利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+- Markdownの規約・Privacyと同じ近距離公開・作成位置情報の境界をWord改訂案へ同期した。
+- PDF/PNGへ変換し、近距離公開、作成位置、現地交換モード、1km/3km、匿名化、推測防止等の重要文言がレンダリング後の本文に残ることを確認した。
+
+#### `notes/17_legal_alignment.md`
+#### `notes/10_glossary.md`
+#### `notes/24_app_store_submission_pack.md`
+#### `notes/25_public_legal_support_pages.md`
+#### `notes/27_app_privacy_data_inventory.md`
+#### `notes/40_app_store_connect_copy_paste_sheet.md`
+#### `notes/43_app_privacy_connect_answer_sheet.md`
+#### `notes/46_app_store_questionnaire_answer_sheet.md`
+#### `notes/50_release_go_no_go_decision_matrix.md`
+#### `notes/52_data_retention_deletion_matrix.md`
+#### `notes/54_prelaunch_security_audit_checklist.md`
+#### `notes/55_public_help_faq_draft.md`
+#### `notes/56_in_app_legal_safety_copy_deck.md`
+#### `notes/59_initial_release_scope_exposure_audit.md`
+#### `notes/62_app_review_manual_submission_checklist.md`
+#### `notes/63_public_page_redaction_qa.md`
+#### `notes/66_legal_review_publication_runbook.md`
+#### `notes/67_support_inbox_triage_runbook.md`
+#### `notes/71_app_store_connect_final_input_reconciliation.md`
+- App Privacy、公開FAQ、アプリ内コピー、保持削除表、Security、Go/No-Go、公開Web同期QA、手動提出チェック、ASC最終照合、サポートトリアージへ、作成位置、閲覧者位置、現地交換モード、待ち合わせ候補、1km/3km非保証、生活圏推測リスク、保持/削除例外を同期した。
+
+### 影響範囲
+
+- 利用規約、プライバシーポリシー、Word改訂案、法務整合メモ、用語集、App Privacyデータ台帳、App Store提出資料、公開FAQ、アプリ内法務コピー、データ保持削除表、セキュリティ監査、リリース判定、公開前QA、レビュー提出前チェックリスト、サポート受信トリアージ
+
+Swift Native、Web、Supabase、DB migration、Edge Functionのコードは変更していない。既存の位置情報、近距離公開、現地交換モード、グルーム/掲示板の実装事実を前提にした法務・運用文書の更新であり、取引状態遷移そのものを変更していないため、`notes/09_state_machines.md` は更新していない。新しい説明用語が必要になったため、`notes/10_glossary.md` は更新した。データモデル実体は変更していないため、`notes/05_data_model.md` は更新していない。
+
+### 確認方法
+
+- `unzip -t '利用規約など/01_Megrum利用規約_20260629改訂案.docx'`
+  - passed
+- `unzip -t '利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx'`
+  - passed
+- `render_docx.py '利用規約など/01_Megrum利用規約_20260629改訂案.docx' --output_dir /tmp/megrum-legal-render-location/terms --emit_pdf`
+  - passed（38ページ）
+- `render_docx.py '利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx' --output_dir /tmp/megrum-legal-render-location/privacy --emit_pdf`
+  - passed（33ページ）
+- `pdftotext ... && rg -n "近距離公開|作成位置|現在地共有|1km圏内|3km圏内|匿名化|スクリーンショット|現地交換モード|閲覧者|活動ウィンドウ|推測防止|秘匿" /tmp/megrum-legal-render-location/terms.txt /tmp/megrum-legal-render-location/privacy.txt`
+  - passed
+- PNG非空白チェック
+  - passed（利用規約38ページ、プライバシーポリシー33ページ）
+- PNG目視確認: `/tmp/megrum-legal-render-location/terms_contact.png`, `/tmp/megrum-legal-render-location/terms/page-20.png`, `/tmp/megrum-legal-render-location/terms/page-21.png`, `/tmp/megrum-legal-render-location/privacy_contact.png`, `/tmp/megrum-legal-render-location/privacy/page-5.png`, `/tmp/megrum-legal-render-location/privacy/page-29.png`
+  - passed
+
+### セルフレビュー結果
+
+- ✅ 取引チャットの現在地共有だけでなく、待ち合わせ候補、現地交換モード、グルーム/掲示板の作成座標、閲覧者座標、距離判定まで法務文言へ反映した。
+- ✅ 近く、1km圏内、3km圏内、同じスポット、同じ都道府県が匿名化、安全確認、本人確認、所在確認、ストーカー防止又は推測防止ではないことを横断文書に同期した。
+- ✅ 自宅、学校、勤務先、宿泊先、座席番号、未成年者の居場所を共有しない注意、相手保存/スクリーンショット/通知/キャッシュ/保持例外を明記した。
+- ✅ App PrivacyではPrecise Location候補として、現在地、作成位置、閲覧者位置、活動ウィンドウ中心座標、待ち合わせ候補を広めに回答する前提へ寄せた。
+- ✅ 状態遷移、DB、Swift Native、Web、Edge Function、App Store Connect実入力は変更していない。
+
+---
+
+## イテレーション1226.167：会員間支払い境界
+
+### 背景・問題意識
+
+現行Swift Nativeでは、`PaymentSettingsScreen` / `PaymentSettingsDraft` / `UserPaymentModels` により、銀行振込、PayPay、現金交換、その他支払い方法の対応可否、銀行名、支店名、口座種別、口座番号、口座名義、補足メモを扱う。Supabase migration `20260626004000_add_proposal_payment_snapshots.sql` では、打診が合意済みになった時点で、送信者/受信者の支払い設定を `sender_payment_settings` / `receiver_payment_settings` として取引にスナップショット保存する。`TradeAgreementDisclosureSheet` では、成立後の相手に銀行名、支店名、口座種別、口座番号、口座名義等が表示され得る。
+
+この実装事実は、利用者にとっては取引履行の補助である一方、運営者が資金移動、収納代行、決済代行、エスクロー、債権回収、本人確認、口座名義確認、支払能力確認、返金又はチャージバック対応を行うように誤認されると、金融規制、App Store審査、サポート対応、詐欺・フィッシング、個人情報管理、紛争責任のリスクになる。そのため、コード変更は禁止のまま、利用規約、プライバシーポリシー、Word改訂案、App Privacy、App Review、FAQ、サポート、安全監査及び公開前QA資料を横断して、会員間支払いの法務境界を補強した。
+
+### 変更内容
+
+#### `notes/legal/01_terms_of_service_draft.md`
+- ステータスへ `会員間支払い・金融規制境界` 及び `成立後支払い情報スナップショット` を追加した。
+- 取引成立前は支払い方法や支払いメモ等の要約又はマスク表示に限られ得る一方、取引成立後は当事者に限り、銀行名、支店名、口座種別、口座番号、口座名義、金額指定その他取引成立時点の支払い情報スナップショットが表示され得ることを明確化した。
+- 運営者が、資金の受領、保管、送金、収納代行、立替、精算、返金、チャージバック対応、本人確認、口座名義確認、信用審査、支払能力確認、残高確認、債権回収、前払式支払手段の発行、資金移動、暗号資産交換、金融商品取引又はエスクローを行わないことを追加した。
+- 外部決済サービスのアカウント、リンク、QRコード、外部ID、本人確認、口座名義、残高、送金可否、受領可否、返金可否、チャージバック可否、不正利用の有無又は支払能力を確認又は保証しないことを追加した。
+- 口座情報、本人確認書類、カード情報、金融機関又は決済サービスのログイン情報、認証コード、暗証番号、送金用QRコード、送金リンク、外部サービスIDその他危険情報の要求を禁止し、公式サポートもこれらを求めないことを補強した。
+
+#### `notes/legal/02_privacy_policy_draft.md`
+- ステータスへ `会員間支払い・金融規制境界` 及び `成立後支払い情報スナップショット` を追加した。
+- 取得情報へ、会員間支払いに関する金額、金額指定の対象、支払い方法、支払いメモ、銀行名、支店名、口座種別、口座番号、口座名義、外部決済サービス名、外部ID、送金リンク又はQRコードを含み得るメモを追加した。
+- 取引成立時点で固定される送信者及び受信者の支払い情報スナップショットを追加し、支払い設定の変更又は削除後も、当該取引の履行、問い合わせ、異議申し立て、通報、不正利用防止、会計、監査又は法令対応に必要な範囲で保存され得ることを明確化した。
+- 会員間支払いに関して、運営者が金融機関、資金移動業者、決済代行業者、収納代行業者、前払式支払手段発行者、暗号資産交換業者、金融商品取引業者又はエスクロー事業者として関与しないことを追加した。
+
+#### `利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+#### `利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+- Markdownの利用規約・プライバシーポリシーと同じ会員間支払い・金融規制境界をWord改訂案へ同期した。
+- PDF/PNGへ変換し、支払い情報スナップショット、収納代行、口座名義確認、送金リンク、外部サービスID等の重要文言がレンダリング後の本文に残ることを確認した。
+
+#### `notes/17_legal_alignment.md`
+#### `notes/10_glossary.md`
+#### `notes/24_app_store_submission_pack.md`
+#### `notes/25_public_legal_support_pages.md`
+#### `notes/27_app_privacy_data_inventory.md`
+#### `notes/31_app_store_connect_metadata_worksheet.md`
+#### `notes/34_support_response_templates.md`
+#### `notes/40_app_store_connect_copy_paste_sheet.md`
+#### `notes/43_app_privacy_connect_answer_sheet.md`
+#### `notes/46_app_store_questionnaire_answer_sheet.md`
+#### `notes/48_external_service_vendor_register.md`
+#### `notes/50_release_go_no_go_decision_matrix.md`
+#### `notes/52_data_retention_deletion_matrix.md`
+#### `notes/53_app_review_guideline_compliance_matrix.md`
+#### `notes/54_prelaunch_security_audit_checklist.md`
+#### `notes/55_public_help_faq_draft.md`
+#### `notes/56_in_app_legal_safety_copy_deck.md`
+#### `notes/59_initial_release_scope_exposure_audit.md`
+#### `notes/62_app_review_manual_submission_checklist.md`
+#### `notes/63_public_page_redaction_qa.md`
+#### `notes/66_legal_review_publication_runbook.md`
+#### `notes/67_support_inbox_triage_runbook.md`
+#### `notes/71_app_store_connect_final_input_reconciliation.md`
+- App Privacy、App Review、公開Web同期メモ、FAQ、サポート返信、セキュリティ監査、リリース判定、外部サービス台帳、公開前赤入れQA、レビュー提出前チェックリストへ、Payment Info、成立後支払い情報スナップショット、口座情報、外部決済サービス非関与、送金リンク/QR/外部サービスID注意、支払能力・口座名義・本人性非保証を同期した。
+- 関東財務局及び金融庁の資金移動業・資金決済法関連の公表情報を踏まえ、Megrumは資金の受領、保管、送金、収納代行、債権回収、返金、チャージバック又はエスクローに関与しない説明へ寄せた。
+
+### 影響範囲
+
+- 利用規約、プライバシーポリシー、Word改訂案、法務整合メモ、用語集、App Privacyデータ台帳、App Store提出資料、サポート返信テンプレート、FAQ、アプリ内法務コピー、安全監査、リリース判定、外部サービス台帳、公開前QA、レビュー提出前チェックリスト
+
+Swift Native、Web、Supabase、DB migration、Edge Functionのコードは変更していない。既存の成立後支払い情報スナップショット実装を前提にした法務・運用文書の更新であり、取引状態遷移そのものを変更していないため、`notes/09_state_machines.md` は更新していない。新しい説明用語が必要になったため、`notes/10_glossary.md` は更新した。データモデル実体は変更していないため、`notes/05_data_model.md` は更新していない。
+
+### 確認方法
+
+- `rg -n "決済/送金/エスクロー|送金/返金/エスクロー|決済代行・送金・返金|送金用QRコードを求める|Payment Info、外部決済サービス非関与|支払い情報、通知|Megrumは送金、返金|資金の受領、保管、送金、返金|サポート.*送金用QRコードを送る" notes --glob '!08_design_iterations.md'`
+  - passed（弱い旧表現の残存なし）
+- `rg -n "送金用QRコードその他|送金用QRコードを求める|送金リンク、外部サービスID" notes/legal/01_terms_of_service_draft.md notes/legal/02_privacy_policy_draft.md notes/55_public_help_faq_draft.md notes/56_in_app_legal_safety_copy_deck.md notes/34_support_response_templates.md`
+  - passed
+- `unzip -t '利用規約など/01_Megrum利用規約_20260629改訂案.docx'`
+  - passed
+- `unzip -t '利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx'`
+  - passed
+- `render_docx.py '利用規約など/01_Megrum利用規約_20260629改訂案.docx' --output_dir /tmp/megrum-legal-render-member-payments/terms --emit_pdf`
+  - passed
+- `render_docx.py '利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx' --output_dir /tmp/megrum-legal-render-member-payments/privacy --emit_pdf`
+  - passed
+- `pdftotext /tmp/megrum-legal-render-member-payments/terms/01_Megrum利用規約_20260629改訂案.pdf /tmp/megrum-legal-render-member-payments/terms.txt && rg -n "支払い情報スナップショット|口座名義確認|収納代行|チャージバック|送金リンク|外部サービスID|成立後支払い情報|資金移動" /tmp/megrum-legal-render-member-payments/terms.txt`
+  - passed
+- `pdftotext /tmp/megrum-legal-render-member-payments/privacy/02_Megrumプライバシーポリシー_20260629改訂案.pdf /tmp/megrum-legal-render-member-payments/privacy.txt && rg -n "支払い情報スナップショット|口座名義確認|収納代行|チャージバック|送金リンク|外部サービスID|成立後支払い情報|資金移動" /tmp/megrum-legal-render-member-payments/privacy.txt`
+  - passed
+- PNG目視確認: `/tmp/megrum-legal-render-member-payments/terms_contact.png`, `/tmp/megrum-legal-render-member-payments/terms/page-18.png`, `/tmp/megrum-legal-render-member-payments/privacy_contact.png`, `/tmp/megrum-legal-render-member-payments/privacy/page-15.png`, `/tmp/megrum-legal-render-member-payments/privacy/page-21.png`
+  - passed
+- PNG非空白チェック
+  - passed（利用規約37ページ、プライバシーポリシー32ページ）
+- `git diff --check -- notes notes/legal '利用規約など'`
+  - passed
+- `git diff --name-only -- ':!notes/**' ':!利用規約など/**'`
+  - passed（非ドキュメント差分なし）
+
+### セルフレビュー結果
+
+- ✅ 会員間支払いの実装事実を、支払い方法表示、銀行口座情報、成立後スナップショット、相手会員による保存・スクリーンショット可能性まで含めて説明した。
+- ✅ Megrumが、資金移動、収納代行、決済代行、返金、チャージバック、債権回収、前払式支払手段、暗号資産交換、金融商品取引又はエスクローを行わない境界を明確にした。
+- ✅ 外部決済サービスID、送金リンク、QRコード、本人確認、口座名義、残高、送金可否、受領可否、返金可否、不正利用有無及び支払能力を確認又は保証しないことを、規約、Privacy、FAQ、サポート、App Review、App Privacy資料へ同期した。
+- ✅ 金融機関ログイン情報、暗証番号、認証コード、カード番号、送金用QRコード、送金リンク、外部サービスIDを求めるように読める文言を禁止方向へ揃えた。
+- ✅ 状態遷移、DB、Swift Native、Web、Edge Function、App Store Connect実入力は変更していない。
+
+---
+
+## イテレーション1226.166：手動有料権限境界
+
+### 背景・問題意識
+
+現行Web管理画面では、`entitlements.manage` 権限を持つ管理者が、`plan_overrides` と `user_entitlements.source='manual_override'` を通じて、有料権限を手動で付与、停止、有効化、無効化、期限設定又は補正できる。Swift Native側の最終的な有料機能判定は `user_entitlements` に集約されているため、管理者の暫定対応や補正も、アプリ上のメグルムプラス等の表示・利用可否に影響し得る。
+
+この経路が、購入完了、返金確定、補償、無償提供継続又はApp Store決済取消の保証に見えると、利用者説明、App Store審査、返金対応、監査ログ、内部統制のリスクになる。そのため、コード変更は禁止のまま、利用規約、プライバシーポリシー、Word改訂案、提出・運用資料を横断して、手動有料権限上書きの法務境界を補強した。
+
+### 変更内容
+
+#### `notes/legal/01_terms_of_service_draft.md`
+- ステータスへ `手動有料権限・権限上書き` を追加した。
+- 第7条へ、問い合わせ対応、購入又は復元の同期不具合、返金、取消、チャージバック、請求失敗、キャンペーン、トライアル、障害、不正利用調査、規約違反、アカウント制限、セキュリティ、会計、法令対応、検証又は公開前テスト等のため、有料サービスに関する権限、残数、特典、バッジ又は表示状態を手動で付与、停止、有効化、無効化、期限設定、修正、復旧、取消又は調整できることを追加した。
+- 手動の付与、一時表示又は暫定対応が、購入完了、返金、補償、無償提供継続、販売継続、利用資格又は将来の権限維持を保証しないこと、及び運営者が事実確認、アプリストア又は指定決済事業者の記録、法令、規約、会計処理又は安全上の必要に応じて撤回、訂正、停止又は再調整できることを追加した。
+
+#### `notes/legal/02_privacy_policy_draft.md`
+- ステータスへ `手動有料権限・権限上書き` を追加した。
+- 取得情報、決済情報、管理者操作、保存期間へ、feature key、source、manual override、plan override、override ID、手動権限上書き、付与又は停止理由、作成者、`expires_at`、変更前後の状態、監査ログ、IPアドレス、User-Agentを追加した。
+- 手動権限上書きに関する情報が、権限管理、購入復元、不正決済防止、会計処理、問い合わせ対応、監査及び法令対応のため、退会又はサブスクリプション終了後も合理的に必要な期間保存され得ることを明確化した。
+
+#### `利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+#### `利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+- Markdownの利用規約・プライバシーポリシーと同じ手動有料権限・権限上書き境界をWord改訂案へ同期した。
+
+#### `notes/17_legal_alignment.md`
+#### `notes/10_glossary.md`
+#### `notes/16_monetization.md`
+#### `notes/27_app_privacy_data_inventory.md`
+#### `notes/31_app_store_connect_metadata_worksheet.md`
+#### `notes/33_iap_product_setup_worksheet.md`
+#### `notes/34_support_response_templates.md`
+#### `notes/40_app_store_connect_copy_paste_sheet.md`
+#### `notes/43_app_privacy_connect_answer_sheet.md`
+#### `notes/46_app_store_questionnaire_answer_sheet.md`
+#### `notes/48_external_service_vendor_register.md`
+#### `notes/50_release_go_no_go_decision_matrix.md`
+#### `notes/52_data_retention_deletion_matrix.md`
+#### `notes/53_app_review_guideline_compliance_matrix.md`
+#### `notes/54_prelaunch_security_audit_checklist.md`
+#### `notes/55_public_help_faq_draft.md`
+#### `notes/56_in_app_legal_safety_copy_deck.md`
+- 手動有料権限上書きを、サポート又は運営上の暫定・補正手段として同期した。
+- 購入証明、返金確定、補償又は無償提供継続として説明しないこと、対象ユーザー、feature key、active/inactive、期限、理由、変更前後、作成者、監査ログを確認することを、App Privacy、App Review、FAQ、サポート返信、提出前監査、リリース判定、保持削除表へ反映した。
+
+### 影響範囲
+
+- 利用規約、プライバシーポリシー、Word改訂案、法務整合メモ、用語集、収益化メモ、App Privacyデータ台帳、App Store提出資料、IAP商品設定作業表、サポート返信テンプレート、FAQ、アプリ内コピー、安全監査、リリース判定、保持削除表、外部サービス台帳
+
+Swift Native、Web、Supabase、DB migration、Edge Functionのコードは変更していない。既存の `notes/09_state_machines.md` には `manual_override` / `adminGrant` / `adminRevoke` 相当の境界が記載済みで、状態遷移実装を変更していないため更新していない。データモデル自体も変更していないため、`notes/05_data_model.md` は更新していない。
+
+### 確認方法
+
+- `rg -n "手動有料権限|manual_override|plan_overrides|plan override|手動上書き|購入証明|返金確定|無償提供|override id|付与又は停止理由|expires_at" notes notes/legal`
+  - passed
+- `unzip -t '利用規約など/01_Megrum利用規約_20260629改訂案.docx'`
+  - passed
+- `unzip -t '利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx'`
+  - passed
+- `render_docx.py '利用規約など/01_Megrum利用規約_20260629改訂案.docx' --output_dir /tmp/megrum-legal-render-manual-entitlement/terms --emit_pdf`
+  - passed
+- `render_docx.py '利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx' --output_dir /tmp/megrum-legal-render-manual-entitlement/privacy --emit_pdf`
+  - passed
+- `pdftotext -f 13 -l 13 /tmp/megrum-legal-render-manual-entitlement/terms/01_Megrum利用規約_20260629改訂案.pdf - | rg -n '手動|購入完了|返金|補償|無償提供|付与又は停止|監査ログ'`
+  - passed
+- `pdftotext -f 8 -l 8 /tmp/megrum-legal-render-manual-entitlement/privacy/02_Megrumプライバシーポリシー_20260629改訂案.pdf - | rg -n 'manual override|plan override|override ID|付与又は停止|expires_at'`
+  - passed
+- `pdftotext -f 24 -l 24 /tmp/megrum-legal-render-manual-entitlement/privacy/02_Megrumプライバシーポリシー_20260629改訂案.pdf - | rg -n '手動|manual override|plan override|override ID|操作理由|監査ログ|User-Agent'`
+  - passed
+- `pdftotext -f 33 -l 33 /tmp/megrum-legal-render-manual-entitlement/privacy/02_Megrumプライバシーポリシー_20260629改訂案.pdf - | rg -n '手動権限上書き|plan override|付与又は停止理由|変更前後|合理的に必要な期間'`
+  - passed
+- PNG目視確認: `/tmp/megrum-legal-render-manual-entitlement/terms/page-13.png`, `/tmp/megrum-legal-render-manual-entitlement/privacy/page-8.png`, `/tmp/megrum-legal-render-manual-entitlement/privacy/page-24.png`, `/tmp/megrum-legal-render-manual-entitlement/privacy/page-33.png`
+  - passed
+- PNG非空白チェック
+  - passed（利用規約45ページ、プライバシーポリシー38ページ）
+- `git diff --check -- notes notes/legal '利用規約など'`
+  - passed
+- `git diff --name-only -- ':!notes/**' ':!利用規約など/**'`
+  - passed（非ドキュメント差分なし）
+
+### セルフレビュー結果
+
+- ✅ 管理者による手動有料権限付与/停止/期限設定/補正を、購入完了、返金確定、補償又は無償提供継続と誤認させない境界にした。
+- ✅ 対象ユーザー、feature key、active/inactive、期限、理由、変更前後、作成者、監査ログ、IPアドレス、User-Agentを、Privacy及び監査資料側へ反映した。
+- ✅ App Store審査、IAP商品設定、App Privacy、FAQ、サポート返信、リリース判定、保持削除表の説明を、利用規約・Privacyと一致させた。
+- ✅ 有料機能の最終判定が `user_entitlements` に集約される現行実装を前提にしつつ、手動上書きはあくまでサポート又は運営上の暫定・補正手段として説明した。
+- ✅ コード、DB、Edge Function、Swift Native、Web管理画面実装、状態遷移実装、App Store Connect実入力、IAP商品設定は変更していない。
+
+---
+
+## イテレーション1226.165：運営通知本文統制
+
+### 背景・問題意識
+
+現行Web管理画面では、`notifications.send` 権限を持つ管理者が、指定ユーザー又は全有効ユーザーへ `admin_announcement` を作成できる。作成された通知は `notifications` の title/body/link_path として保存され、APNs配送Functionでは title/body/linkPath が端末通知payloadに反映される。
+
+そのため、運営通知の本文はアプリ内通知だけでなく、ロック画面、通知センター、連携端末、管理画面の直近通知表示、ログ又は監査記録に出得る。規約・プライバシーポリシーと提出前監査資料側に、全体送信、誤送信、本文過剰表示、監査ログ、送信理由、対象件数、Incident対応の境界を追加した。
+
+### 変更内容
+
+#### `notes/legal/01_terms_of_service_draft.md`
+- ステータスへ `運営通知・通知本文統制` を追加した。
+- 第40条へ、障害告知、規約又はポリシー変更、安全上の注意、通報又は異議申し立て対応、課金又は権限、個別サポート、サービス運営等のため、全有効会員、一部会員又は特定会員へ運営通知を送る場合があることを追加した。
+- 運営通知の送信対象、タイトル、本文、リンク先、送信理由、対象件数、送信日時等の保存、及び助言・措置・返金・補償・復旧・問題解決・対応結果を保証しないことを追加した。
+
+#### `notes/legal/02_privacy_policy_draft.md`
+- ステータスへ `運営通知・通知本文統制` を追加した。
+- 第2.7条、第2.12条、第11条、第13条へ、運営通知の宛先区分、対象ユーザー、対象者検索値、対象件数、通知タイトル、本文、リンク先、送信理由、作成者、監査ログ、配信結果、開封又は既読状態、ロック画面又は管理画面表示、保存期間を追加した。
+
+#### `利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+#### `利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+- Markdownの利用規約・プライバシーポリシーと同じ運営通知本文統制をWord改訂案へ同期した。
+
+#### `notes/17_legal_alignment.md`
+- 現行コード事実、APNs payload、管理画面監査ログ、通知行/直近通知表示の境界を、法務整合メモへ追加した。
+
+#### `notes/48_external_service_vendor_register.md`
+#### `notes/53_app_review_guideline_compliance_matrix.md`
+#### `notes/54_prelaunch_security_audit_checklist.md`
+#### `notes/55_public_help_faq_draft.md`
+#### `notes/56_in_app_legal_safety_copy_deck.md`
+#### `notes/67_support_inbox_triage_runbook.md`
+#### `notes/10_glossary.md`
+- 運営通知の全体送信、通知本文の機微情報排除、宛先区分、対象件数、送信理由、監査ログ、誤送信時Incident対応、ロック画面からの完全回収非保証を同期した。
+
+### 影響範囲
+
+- 利用規約、プライバシーポリシー、Word改訂案、法務整合メモ、外部サービス台帳、App Review適合マトリクス、セキュリティ監査チェックリスト、公開FAQ、アプリ内コピー集、サポート受信トリアージRunbook、用語集
+
+Swift Native、Web、Supabase、DB migration、Edge Functionのコードは変更していない。状態遷移及びデータモデルの実装変更はないため、`notes/09_state_machines.md` と `notes/05_data_model.md` は更新していない。
+
+### 確認方法
+
+- `rg -n "運営通知・通知本文統制|全有効会員|対象件数|送信理由|ロック画面|admin_announcement|notifications\\.send|二重確認|Incident" notes/legal/01_terms_of_service_draft.md notes/legal/02_privacy_policy_draft.md notes/17_legal_alignment.md notes/48_external_service_vendor_register.md notes/53_app_review_guideline_compliance_matrix.md notes/54_prelaunch_security_audit_checklist.md notes/55_public_help_faq_draft.md notes/56_in_app_legal_safety_copy_deck.md notes/67_support_inbox_triage_runbook.md notes/10_glossary.md`
+  - passed
+- `unzip -t '利用規約など/01_Megrum利用規約_20260629改訂案.docx'`
+  - passed
+- `unzip -t '利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx'`
+  - passed
+- `render_docx.py ... --output_dir /tmp/megrum-legal-render-admin-notification/terms --emit_pdf`
+  - passed
+- `render_docx.py ... --output_dir /tmp/megrum-legal-render-admin-notification/privacy --emit_pdf`
+  - passed
+- `pdftotext -f 34 -l 34 /tmp/megrum-legal-render-admin-notification/terms/01_Megrum利用規約_20260629改訂案.pdf -`
+  - passed（運営通知、全有効会員、送信理由、対象件数、ロック画面を確認）
+- `pdftotext -f 23 -l 23 /tmp/megrum-legal-render-admin-notification/privacy/02_Megrumプライバシーポリシー_20260629改訂案.pdf -`
+  - passed（運営通知、全有効会員、送信理由、対象件数、ロック画面を確認）
+- PNG目視確認: `/tmp/megrum-legal-render-admin-notification/terms/page-34.png`, `/tmp/megrum-legal-render-admin-notification/privacy/page-23.png`
+  - passed
+- PNG非空白チェック
+  - passed
+- `git diff --check -- notes notes/legal 利用規約など`
+  - passed
+- `git diff --name-only -- ':!notes/**' ':!利用規約など/**'`
+  - passed（非ドキュメント差分なし）
+
+### セルフレビュー結果
+
+- ✅ 運営通知が全有効会員、一部会員、特定会員へ送られ得ることを、規約・Privacy・FAQ・コピー・提出前監査へ同期した。
+- ✅ 通知本文がAPNs payload、ロック画面、通知センター、連携端末、管理画面の直近通知表示、ログ又は監査記録に出得ることを明示した。
+- ✅ 運営通知の全体送信について、宛先区分、対象件数、本文、リンク先、送信理由、監査ログ、Incident手順をNo-Goにした。
+- ✅ 住所、銀行口座、認証コード、本人確認書類、通報/異議申し立て詳細本文、secret、内部ID等を通知本文へ含めない統制を追加した。
+- ✅ コード、DB、Edge Function、管理画面実装、Swift Native実装は変更していない。
+
+---
+
+## イテレーション1226.164：IAP App Privacy同期
+
+### 背景・問題意識
+
+iter1226.163で、メグルムプラスの購入ボタン、復元ボタン、StoreKit価格表示、販売地域/販売停止、復元失敗、サーバー同期失敗等を、利用規約・プライバシーポリシー・Word改訂案・公開法務ページ原稿へ反映した。
+
+一方、App Privacyインベントリ、App Store Connect回答シート、Privacy Manifest/SDK監査台帳、IAP Availabilityチェックリスト側が「購入・復元がある」程度の粒度に残ると、Privacy本文だけが広く、App Store Connect回答が狭い状態になる。公開後又は審査時に過少申告・説明不一致へ見えるため、コード変更禁止の指示を守り、提出・監査資料側だけを同期した。
+
+### 変更内容
+
+#### `notes/27_app_privacy_data_inventory.md`
+- ステータスをDraft v0.25へ更新し、`StoreKit・IAP販売可否・復元失敗` を反映した。
+- StoreKit/IAP事実、Purchases行、外部サービス行、提出前質問、推奨回答メモへ、商品情報照会、価格取得、購入ボタン表示、復元ボタン表示、購入開始、承認待ち、未完了、キャンセル、商品未取得、購入失敗、復元失敗、サーバー同期失敗、販売地域、販売停止を追加した。
+
+#### `notes/43_app_privacy_connect_answer_sheet.md`
+- ステータスをDraft v0.22へ更新し、IAP確認事実、Data Types選択条件、Purchases回答例、No-Goを補強した。
+- 有料導線が見える場合、Purchasesだけで足りない情報をIdentifiers又はOther Dataとして扱う必要があるか、App Store Connectの最新UIで確認する前提を追加した。
+
+#### `notes/44_privacy_manifest_sdk_audit.md`
+- ステータスをDraft v0.13へ更新し、StoreKit監査欄、SDK/Framework監査、通信先監査、監査結果記録欄、No-Goへ、購入開始、復元失敗、サーバー同期失敗、販売地域、販売停止を追加した。
+
+#### `notes/68_app_store_territory_dsa_iap_availability.md`
+- ステータスをDraft v0.3へ更新し、IAP Availability確認へ、価格/地域だけでなく、購入開始、承認待ち、キャンセル、復元失敗、サーバー同期失敗、販売地域、販売停止、ローカル有効表示とサーバー最終権限の差分を追加した。
+
+#### `notes/17_legal_alignment.md`
+- StoreKit・IAP販売可否・復元失敗境界に、App Privacyインベントリ、App Store Connect回答シート、Privacy Manifest/SDK監査台帳、IAP Availabilityチェックリストへ同期した事実を追記した。
+
+### 影響範囲
+
+- App Privacyデータ台帳、App Store Connect App Privacy回答シート、Privacy Manifest/SDK監査台帳、App Store配信地域・IAP Availabilityチェックリスト、法務整合メモ
+
+Swift Native、Web、Supabase、DB、利用規約本文、プライバシーポリシー本文、Word改訂案、App Store Connect実入力、IAP商品設定は変更していない。状態遷移、データモデル、用語の正式定義は変更していないため、`notes/09_state_machines.md`、`notes/05_data_model.md`、`notes/10_glossary.md` は更新していない。
+
+### 確認方法
+
+- `rg -n "StoreKit・IAP販売可否・復元失敗|IAP App Privacy同期|商品情報照会|価格取得|購入開始|承認待ち|未完了|キャンセル|商品未取得|購入失敗|復元失敗|サーバー同期失敗|販売地域|販売停止|Purchases" notes/27_app_privacy_data_inventory.md notes/43_app_privacy_connect_answer_sheet.md notes/44_privacy_manifest_sdk_audit.md notes/68_app_store_territory_dsa_iap_availability.md notes/17_legal_alignment.md notes/08_design_iterations.md`
+  - passed
+- `git diff --check -- notes notes/legal 利用規約など`
+  - passed
+- `git diff --name-only -- ':!notes/**' ':!利用規約など/**'`
+  - passed（非ドキュメント差分なし）
+
+### セルフレビュー結果
+
+- ✅ Privacy本文に追加済みのIAPイベントを、App Privacy回答表とデータ台帳へ同期した。
+- ✅ StoreKitの商品情報照会、価格取得、購入開始、承認待ち、キャンセル、商品未取得、購入失敗、復元失敗、サーバー同期失敗、販売地域、販売停止を過少申告しない確認項目にした。
+- ✅ Purchasesだけで整理できない場合に、Identifiers又はOther Dataの扱いをApp Store Connect最新UIで確認する前提を残した。
+- ✅ コード、Web実装、Swift Native、Supabase、DB、利用規約本文、プライバシーポリシー本文、Word改訂案、App Store Connect実入力、IAP商品設定は変更していない。
+- ✅ docs-onlyのため、アプリビルド、Swiftテスト、web build、DOCX再レンダーは未実行。
+
+---
+
+## イテレーション1226.163：IAP販売可否境界
+
+### 背景・問題意識
+
+現行Swift Nativeコードでは、`SubscriptionSettingsContent` にメグルムプラスの購入ボタン、復元ボタン、StoreKit価格表示、フッター固定文言「価格は月額500円です。App Storeのサブスクリプションとして更新・解約できます。」が存在する。`SubscriptionSettingsScreen` では、購入成功後にサーバー同期を行い、同期失敗時に「購入は確認できました。サーバー同期は次回起動時に再確認してください。」と表示する経路もある。
+
+一方、設定内の「特定商取引法に基づく表記」は現行コード上、正式な法的本文ではなく公開前レビュー後の原文へ差し替えるための要約表示である。購入導線、復元導線、価格、特典説明又は状態表示が見える場合に、App Store Connect商品、IAP Availability、正式な公開特商法ページ、FAQ、Review Notes、Privacy/App Privacy、サーバー検証、返金/取消/期限切れ同期が未整備だと、審査上も公開後も不利益が大きい。
+
+コード変更禁止の指示を守り、規約・プライバシーポリシー、Word改訂案、公開ページ原稿、IAPワークシート、Go/No-Go表、QA表、法務整合メモ、用語集だけを更新した。
+
+### 変更内容
+
+#### `notes/legal/01_terms_of_service_draft.md`
+- ステータスへ `StoreKit・IAP販売可否・復元失敗` を追加した。
+- 第7条へ、有料サービス名、価格、購入ボタン、復元ボタン、特典説明、ステータス、特定商取引法に基づく表記への入口又はサポート案内が表示される場合でも、App Store Connectの商品状態、審査状態、販売地域、価格設定、販売停止、会員のアカウント地域、支払方法、通信環境、年齢又は保護者承認、サーバー検証、アカウント状態等により、購入、復元、利用又は権限反映ができない場合があることを追加した。
+- 同条へ、有料サービスの常時提供、購入可能性、販売継続、復元成功、表示価格での提供又は特典継続を保証しないことを追加した。
+
+#### `notes/legal/02_privacy_policy_draft.md`
+- ステータスへ `StoreKit・IAP販売可否・復元失敗` を追加した。
+- 第2.9条と第10条へ、商品情報照会、価格取得、購入ボタン又は復元ボタン表示、購入開始、承認待ち、未完了、キャンセル、商品未取得、購入失敗、復元失敗、サーバー同期失敗、販売地域、販売停止状態等を扱うことを追加した。
+
+#### `利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+#### `利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+- Markdown利用規約・プライバシーポリシーと同じIAP販売可否・復元失敗境界をWord版へ同期した。
+
+#### `notes/25_public_legal_support_pages.md`
+- ステータスをDraft v0.19へ更新した。
+- 特商法表示下書きへ、アプリ内要約又は設定内入口を正式な公開特商法ページとして扱わないこと、購入ボタン/復元ボタン/価格/特典説明が見える場合のIAP・特商法・App Privacy同期No-Goを追加した。
+
+#### `notes/33_iap_product_setup_worksheet.md`
+- ステータスをDraft v0.5へ更新した。
+- 購入成功後のサーバー同期失敗、設定内特商法要約、購入/復元/キャンセル/復元失敗/サーバー同期失敗ログを、IAP準備条件とApp Privacy確認へ追加した。
+
+#### `notes/63_public_page_redaction_qa.md`
+- ステータスをDraft v0.9へ更新した。
+- LC-007、LC-008、LC-009を追加し、正式公開特商法ページ、固定価格/StoreKit価格/Review Notes一致、購入開始・復元失敗・サーバー同期失敗のPrivacy整合をQA化した。
+
+#### `notes/37_public_url_publication_checklist.md`
+- 特商法表示の必須項目とNo-Goへ、有料導線が見える場合の購入/復元/価格/StoreKit/App Store Connect/IAP Availability/サーバー検証/Privacy/App Privacy一致を追加した。
+
+#### `notes/50_release_go_no_go_decision_matrix.md`
+- ステータスをDraft v1.9へ更新した。
+- G8 IAPとConditional Goの有料機能欄を、購入ボタン、復元ボタン、固定価格、正式公開特商法ページ、Purchases回答、購入開始/キャンセル/復元失敗/サーバー同期失敗のPrivacy反映まで含める形へ更新した。
+
+#### `notes/66_legal_review_publication_runbook.md`
+- 有料機能/IAPのNo-Goへ、購入ボタン、復元ボタン、固定価格、StoreKit価格、サーバー同期失敗、Privacy/App Privacyの不一致を追加した。
+
+#### `notes/17_legal_alignment.md`
+- StoreKit・IAP販売可否・復元失敗境界セクションを追加した。
+- Apple公式IAP参照、現行Swift Nativeの購入/復元/同期失敗/設定内特商法要約、規約・Privacy・公開ページ・IAPワークシート・QA表の対応関係を記録した。
+
+#### `notes/10_glossary.md`
+- `StoreKit・IAP販売可否・復元失敗` を用語として追加した。
+
+### 影響範囲
+
+- 利用規約、プライバシーポリシー、Word版法務文書、公開法務ページ原稿、IAP商品設定ワークシート、公開URL公開チェックリスト、公開ページレダクションQA、法務レビュー後公開Runbook、Go/No-Go判定表、法務整合メモ、用語集
+
+Swift Native、Web、Supabase、DB、App Store Connect実入力、IAP商品設定は変更していない。状態遷移及びデータモデルは変更していないため、`notes/09_state_machines.md`、`notes/05_data_model.md` は更新していない。
+
+### 確認方法
+
+- Apple In-App Purchase（https://developer.apple.com/in-app-purchase/）
+  - checked
+- Apple In-App Purchase information（https://developer.apple.com/help/app-store-connect/reference/in-app-purchase-information/）
+  - checked
+- Apple Auto-renewable subscription information（https://developer.apple.com/help/app-store-connect/reference/auto-renewable-subscription-information/）
+  - checked
+- Apple Set availability for In-App Purchases（https://developer.apple.com/help/app-store-connect/manage-in-app-purchases/set-availability-for-in-app-purchases/）
+  - checked
+- `rg -n "StoreKit・IAP販売可否・復元失敗|購入ボタン|復元ボタン|販売地域|販売停止|サーバー同期失敗|復元失敗|常時提供|復元成功|月額500円|正式な公開特商法ページ|IAP Availability" notes/legal/01_terms_of_service_draft.md notes/legal/02_privacy_policy_draft.md notes/17_legal_alignment.md notes/10_glossary.md notes/25_public_legal_support_pages.md notes/33_iap_product_setup_worksheet.md notes/37_public_url_publication_checklist.md notes/50_release_go_no_go_decision_matrix.md notes/63_public_page_redaction_qa.md notes/66_legal_review_publication_runbook.md`
+  - passed
+- `unzip -t 利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+  - passed
+- `unzip -t 利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+  - passed
+- `render_docx.py` をPython経由で実行し、Word版利用規約を `/tmp/megrum-legal-render-iap-boundary/terms` へPDF/PNGレンダー
+  - passed（48 pages）
+- `render_docx.py` をPython経由で実行し、Word版プライバシーポリシーを `/tmp/megrum-legal-render-iap-boundary/privacy` へPDF/PNGレンダー
+  - passed（40 pages）
+- bundled Poppler `pdftotext` によるPDFキーワード検査
+  - passed（利用規約で `購入ボタン`、`復元ボタン`、`販売地域`、`販売停止`、`常時提供`、`復元成功`、プライバシーポリシーで `復元失敗`、`サーバー同期失敗`、`販売停止`）
+- レンダーPNGの全ページ検査
+  - passed（利用規約48 pages、プライバシーポリシー40 pages。全ページ非空）
+- 追加箇所付近のレンダー画像目視
+  - checked（利用規約第7条、プライバシーポリシー第2.9条、第10条）
+- `git diff --check -- notes notes/legal 利用規約など`
+  - passed
+- `git diff --name-only -- ':!notes/**' ':!利用規約など/**'`
+  - passed（非ドキュメント差分なし）
+
+### セルフレビュー結果
+
+- ✅ 有料導線が見える場合でも、購入、復元、販売継続、権限反映、表示価格提供を保証しない境界を利用規約へ追加した。
+- ✅ 購入開始、承認待ち、未完了、キャンセル、商品未取得、購入失敗、復元失敗、サーバー同期失敗、販売地域、販売停止をPrivacyの取得・保存対象へ追加した。
+- ✅ アプリ内特商法要約を正式公開ページ扱いしないNo-Goを、公開ページ原稿、QA表、URLチェックリスト、Runbook、Go/No-Go表へ反映した。
+- ✅ Word版利用規約・プライバシーポリシーへ同期し、PDFレンダー、キーワード抽出、PNG非空チェック、目視確認まで実施した。
+- ✅ コード、Web実装、Swift Native、Supabase、DB、App Store Connect実入力、IAP商品設定は変更していない。
+- ✅ docs-onlyのため、アプリビルド、Swiftテスト、web buildは未実行。
+
+---
+
+## イテレーション1226.162：公開法務同期No-Go
+
+### 背景・問題意識
+
+2026-06-29版の利用規約、プライバシーポリシー、FAQ、サポート文面、App Review関連メモは、Keychain/session保存、外部AI、AdMob、位置情報、写真メタデータ、郵送交換、会員間支払い、顔候補付け、UGC・App Review 1.2、App Store評価・公開レビュー返信、漏えい等初動・事故疑い、広告宣伝メール・販促通知、公式連絡・フィッシング等を追加済みである。一方、コード読み取りでは現行Webの公開ルートは `/terms`、`/privacy`、`/support` が中心で、Terms/Privacyのページ内更新日は `2026年6月26日` だった。
+
+この状態でMarkdown又はWord改訂案だけを提出根拠にすると、App Store ConnectのPrivacy Policy URL、アプリ内同意リンク、Support関連リンク、Review Notes、App Privacy回答が、ユーザーの実際に読める本文と分裂する。コード変更禁止の指示を守り、公開Web同期の提出前No-Goを文書へ明示した。
+
+### 変更内容
+
+#### `notes/25_public_legal_support_pages.md`
+- ステータスをDraft v0.18へ更新し、UGC・App Review 1.2、公開レビュー返信、事故初動、販促通知、公式連絡・フィッシングを公開Web同期監査へ追加した。
+- 現行 `/terms` と `/privacy` が2026-06-29版の最新法務論点を網羅していないこと、`/legal/*` と `/terms` / `/privacy` の到達先分裂を公開前No-Goとして補強した。
+
+#### `notes/63_public_page_redaction_qa.md`
+- ステータスをDraft v0.8へ更新した。
+- IMPL-009、IMPL-010、SP-011、TM-011、PP-011を追加し、公開Terms/Privacy/Support/FAQが最新法務論点、公式連絡・フィッシング注意、販促停止説明を含むかをQA項目化した。
+
+#### `notes/37_public_url_publication_checklist.md`
+- ステータスをDraft v0.6へ更新した。
+- 現行Web実装同期監査へ、UGC・App Review 1.2、公開レビュー返信、事故初動、販促通知、公式連絡・フィッシング、SLA非保証、責任上限の反映未確認を追加した。
+
+#### `notes/66_legal_review_publication_runbook.md`
+- ステータスをDraft v0.7へ更新した。
+- Markdown原稿とWord改訂案を更新しても、公開Web、アプリ内同意リンク、App Store Connect入力値が古い短縮本文を指す限り提出可能と扱わない原則を追加した。
+- 論点別反映マップへ公開法務ページ同期、公開レビュー返信、事故初動、販促通知、公式連絡・フィッシングを追加した。
+
+#### `notes/17_legal_alignment.md`
+- 最終更新欄へ公開法務ページ同期No-Goを追加した。
+- 現行Webの `/terms`、`/privacy`、`/support`、アプリ内同意リンク、公開原稿の `/legal/*` との分裂リスクを、法務整合メモの上部へ記録した。
+
+### 影響範囲
+
+- 公開法務ページ原稿、公開URL公開チェックリスト、公開ページレダクションQA、法務レビュー後公開Runbook、法務整合メモ
+
+コード、Web実装、Swift Native、Supabase、DB、App Store Connect実入力、Word改訂案本文は変更していない。公開前No-Goの文書化だけなので、状態遷移、データモデル、API仕様、用語集は更新していない。
+
+### 確認方法
+
+- `rg -n "公開法務ページ同期|公開法務同期|2026年6月26日|UGC・App Review 1\\.2|App Store評価・公開レビュー返信|漏えい等初動・事故疑い|広告宣伝メール・販促通知|公式連絡・フィッシング|古い短縮本文|旧短縮ページ|/legal/privacy|/privacy" notes/25_public_legal_support_pages.md notes/37_public_url_publication_checklist.md notes/63_public_page_redaction_qa.md notes/66_legal_review_publication_runbook.md notes/17_legal_alignment.md`
+  - passed
+- `git diff --check -- notes notes/legal`
+  - passed
+- `git diff --name-only`
+  - checked（差分は `notes/` と `notes/legal/` 配下のみ）
+
+### セルフレビュー結果
+
+- ✅ 最新の法務ドラフトと現行Web短縮Terms/Privacyのズレを、公開前に止めるNo-Goとして横断文書へ反映した。
+- ✅ `/legal/terms` / `/legal/privacy` と `/terms` / `/privacy` のURL分裂、アプリ内同意リンク、Support関連リンク、App Store Connect入力値の同期リスクを明示した。
+- ✅ UGC、公開レビュー返信、事故初動、販促通知、公式連絡・フィッシングの5論点を、公開Terms/Privacy/Support/FAQのQA対象へ追加した。
+- ✅ コード、Web実装、Swift Native、Supabase、DB、App Store Connect実入力は変更していない。
+- ✅ docs-onlyのため、アプリビルド、Swiftテスト、web build、DOCX再レンダーは未実行。
+
+---
+
+## イテレーション1226.161：公式連絡境界
+
+### 背景・問題意識
+
+Megrumはメール認証、パスワードリセット、Google/Appleログイン、カスタムURL scheme、通知linkPath、運営通知、会員間支払い情報を扱う。公式サポート、キャンペーン、返金、安全確認、本人確認を装う連絡で、パスワード、認証コード、認証リンク、金融機関ログイン情報、暗証番号、送金用QRコード等を求められると、利用者のアカウント乗っ取りや金銭被害につながり、開発者側も「公式連絡に見えた」と主張されるリスクがある。
+
+既存規約には認証リンク共有禁止や秘密情報送信禁止はあったが、運営者が公式連絡で何を求めないかを、規約、プライバシーポリシー、FAQ、アプリ内コピー、サポート返信、App Review No-Goへ横断的に揃えた。コード変更禁止の指示を守り、法務文書、サポート文書、審査文書、用語集、Word改訂案のみ更新した。
+
+### 変更内容
+
+#### `notes/legal/01_terms_of_service_draft.md`
+- ステータス行へ `公式連絡・フィッシング` を追加した。
+- 第24条の禁止事項へ、本アプリ、運営者、アプリストア、金融機関、配送事業者、会場、権利者、公式アカウント、サポート、キャンペーン、決済、返金、本人確認等を装う虚偽案内、フィッシング、外部サイト誘導、外部チャット誘導、秘密情報提供要求を追加した。
+- 第40条へ、運営者がサポート、本人確認、返金、キャンペーン、広告、決済又は安全確認の名目で、パスワード、認証コード、認証リンク、access token、refresh token、API key、secret、秘密鍵、金融機関ログイン情報、暗証番号、クレジットカード番号、送金用QRコード等の不要な秘密情報を求めないことを追加した。
+- 同条へ、会員はメール、SMS、Push通知、アプリ内通知、外部チャット、外部SNS又はWebサイト上の案内について、公式ドメイン、アプリ内導線、送信元、リンク先及び内容を確認し、不審な連絡ではリンクを開かず、情報を入力又は送信しないことを追加した。
+
+#### `notes/legal/02_privacy_policy_draft.md`
+- ステータス行へ `公式連絡・フィッシング` を追加した。
+- 第2.10条へ、不審な連絡、フィッシング、なりすまし又は外部誘導に関する報告内容、送信元、メールヘッダー、URL、リンク先、公式ドメイン確認状況、スクリーンショット、通知画像、外部チャット内容、発生日時、相手アカウント、関係する取引又は投稿、調査結果及び対応履歴を追加した。
+- 第3条へ、不審な連絡、フィッシング、なりすまし、外部誘導又は公式連絡を装う行為への調査及び注意喚起を利用目的として追加した。
+
+#### `notes/55_public_help_faq_draft.md`
+- ステータスをDraft v2.5へ更新し、`公式連絡・フィッシング` を追加した。
+- Megrum公式からパスワードや認証コードを聞かれることはあるか、というFAQを追加した。
+- 不審なメール、SMS、Push通知、アプリ内通知、外部SNS、外部チャット、Webサイトではリンクを開かず、情報を入力せず、送信元、URL、スクリーンショット、発生日時を添えてサポートへ連絡する案内を追加した。
+
+#### `notes/56_in_app_legal_safety_copy_deck.md`
+- ステータスをDraft v2.1へ更新し、`公式連絡・フィッシング` を追加した。
+- 基本方針へOfficial Contact行を追加した。
+- ログイン/認証まわりに、不審な認証・サポート連絡の注意文を追加した。
+- サポート・問い合わせへ不審な連絡の報告文を追加し、No-Goへサポート、返金、キャンペーン、安全確認、本人確認の名目で秘密情報を求めるように読める表現を追加した。
+
+#### `notes/34_support_response_templates.md`
+- ステータスをDraft v0.5へ更新し、`公式連絡・フィッシング` を追加した。
+- ログイン・登録問い合わせテンプレートへ、Megrumサポートがパスワード、認証コード、認証リンク、金融機関ログイン情報、暗証番号、クレジットカード番号、送金用QRコードを尋ねないこと、不審連絡はリンクを開かず証跡を送ることを追加した。
+- 言わないことへ、認証コード/認証リンク、金融機関ログイン情報/暗証番号を求めない行を追加した。
+- 個人情報又はセキュリティ問い合わせテンプレートへ、認証リンクや金融機関ログイン情報等をメールで送らない注意を追加した。
+
+#### `notes/53_app_review_guideline_compliance_matrix.md`
+- ステータスをDraft v1.9へ更新し、`公式連絡・フィッシング` を追加した。
+- No-Goへ、Review Notes、公開レビュー返信、FAQ、サポート返信、アプリ内コピー、広告又はキャンペーン文面で、Megrum公式がパスワード、認証コード、認証リンク、金融機関ログイン情報、暗証番号、送金用QRコードを求めるように読める状態を追加した。
+
+#### `notes/17_legal_alignment.md`
+- 公式連絡・フィッシング境界セクションを追加した。
+- IPA情報セキュリティ安心相談窓口、現行の認証/通知/運営通知/支払い情報経路、規約・プライバシーポリシー・FAQ・アプリ内コピー・サポートテンプレート・App Review表の対応関係を記録した。
+
+#### `notes/10_glossary.md`
+- `公式連絡・フィッシング` を用語として追加した。
+
+#### `利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+#### `利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+- Markdown利用規約・プライバシーポリシーと同じ公式連絡・フィッシング境界をWord版へ同期した。
+
+### 影響範囲
+
+- 利用規約、プライバシーポリシー、Word版法務文書、公開FAQ、アプリ内認証/サポートコピー、サポート返信テンプレート、App Review No-Go、法務整合メモ、用語集
+
+Swift Native、Web、Supabase、DB、公開URL、App Store Connect実入力は変更していない。状態遷移及びデータモデルは変更していないため、`notes/09_state_machines.md`、`notes/05_data_model.md` は更新していない。
+
+### 確認方法
+
+- IPA 情報セキュリティ安心相談窓口（https://www.ipa.go.jp/security/anshin/）
+  - checked
+- `rg -n "公式連絡・フィッシング|フィッシング|認証リンク|金融機関ログイン情報|暗証番号|送金用QRコード|公式ドメイン|不審な連絡" notes/legal/01_terms_of_service_draft.md notes/legal/02_privacy_policy_draft.md notes/17_legal_alignment.md notes/10_glossary.md notes/55_public_help_faq_draft.md notes/56_in_app_legal_safety_copy_deck.md notes/34_support_response_templates.md notes/53_app_review_guideline_compliance_matrix.md`
+  - passed
+- `unzip -t 利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+  - passed
+- `unzip -t 利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+  - passed
+- `render_docx.py` をPython経由で実行し、Word版利用規約を `/tmp/megrum-legal-render-official-contact-phishing/terms` へPDF/PNGレンダー
+  - passed（34 pages）
+- `render_docx.py` をPython経由で実行し、Word版プライバシーポリシーを `/tmp/megrum-legal-render-official-contact-phishing/privacy` へPDF/PNGレンダー
+  - passed（30 pages）
+- bundled Poppler `pdftotext` によるPDFキーワード検査
+  - passed（利用規約・プライバシーポリシー双方で `公式連絡・フィッシング`、`フィッシング`、`認証リンク`、`金融機関ログイン情報`、`暗証番号`、`送金用QRコード`、`公式ドメイン`）
+- レンダーPNGの全ページ検査
+  - passed（利用規約34 pages、プライバシーポリシー30 pages。全ページ非空）
+- 追加箇所付近のレンダー画像目視
+  - checked（利用規約第24条、第40条、プライバシーポリシー第2.10条、第3条）
+- `git diff --check -- notes notes/legal`
+  - passed
+
+### セルフレビュー結果
+
+- ✅ Megrum公式がサポート、本人確認、返金、キャンペーン、安全確認等の名目で不要な秘密情報を求めないことを規約、FAQ、アプリ内コピー、サポートテンプレートへ揃えた。
+- ✅ フィッシング、なりすまし、外部サイト誘導、外部チャット誘導、秘密情報提供要求を禁止行為として補強した。
+- ✅ 不審連絡の報告時に扱う送信元、メールヘッダー、URL、公式ドメイン確認状況、スクリーンショット、外部チャット内容等をプライバシーポリシーへ追加した。
+- ✅ Review Notes、公開レビュー返信、FAQ、サポート返信、アプリ内コピー、広告又はキャンペーン文面で秘密情報を求めるように読める状態をNo-Go化した。
+- ✅ Word版利用規約・プライバシーポリシーへ同期し、PDFレンダー、キーワード抽出、PNG非空チェック、目視確認まで実施した。
+- ✅ コード、Web実装、iOS実装、Supabase、DB、公開URL、App Store Connect実入力は変更していない。
+- ✅ docs-onlyのためアプリビルド、Swiftテスト、web buildは未実行。
+
+---
+
+## イテレーション1226.160：販促通知同意境界
+
+### 背景・問題意識
+
+現行Swift Nativeには通知一覧、通知設定、APNs端末登録、通知既読管理があり、Supabase/Webには `admin_announcement` と `notifications.send` 権限による運営通知送信経路がある。現状の中心は取引、安全、めぐり、運営連絡だが、将来の広告、キャンペーン、プロモーション、直接マーケティングへ通知やメールを拡張する場合、同意、送信者情報、問い合わせ先、配信停止、停止後の抑止が曖昧だと、特定電子メール法、App Review 4.5.4、利用者苦情、審査説明のリスクになる。
+
+取引、安全、認証、課金、規約変更、法令対応などの必要連絡と、広告宣伝メール・販促通知を明確に分け、配信停止後も必要連絡が残り得ることを説明できるようにする。コード変更禁止の指示を守り、法務文書、FAQ、アプリ内コピー、App Review表、法務整合メモ、用語集、Word改訂案のみ更新した。
+
+### 変更内容
+
+#### `notes/legal/01_terms_of_service_draft.md`
+- ステータス行へ `広告宣伝メール・販促通知` を追加した。
+- 第40条へ、プロモーション、キャンペーン、広告宣伝又は直接マーケティング目的の電子メール、プッシュ通知、アプリ内通知その他の連絡について、必要に応じて事前の同意、同意記録、送信者情報、問い合わせ先、配信停止手段、配信停止後の反映その他必要な措置を講じる旨を追加した。
+- 配信停止又は通知設定変更後も、取引、安全、認証、課金、規約変更、法令対応その他本アプリの提供又は会員保護に必要な連絡は送信又は表示され得る旨を追加した。
+
+#### `notes/legal/02_privacy_policy_draft.md`
+- ステータス行へ `広告宣伝メール・販促通知` を追加した。
+- 第2.7条へ、販促連絡に関する同意状態、同意日時、同意取得画面、同意文言又はポリシーのバージョン、配信停止履歴、抑止リスト、配信結果、開封又はクリック、不達又はエラー、送信者情報及び問い合わせ先表示の記録を追加した。
+- 第3条、第11条、第13条へ、広告宣伝メール又は販促通知の同意管理、配信停止、停止反映、抑止リスト管理、保存期間、必要連絡との切り分けを追加した。
+- 既存の委託先番号重複を整理した。
+
+#### `notes/55_public_help_faq_draft.md`
+- ステータスをDraft v2.4へ更新し、`広告宣伝メール・販促通知` を追加した。
+- 広告やキャンペーンのメール・Push通知に関するFAQを、事前同意、送信者情報、問い合わせ先、配信停止又は通知設定変更、停止後も必要連絡が残り得る説明へ更新した。
+
+#### `notes/56_in_app_legal_safety_copy_deck.md`
+- ステータスをDraft v2.0へ更新し、`広告宣伝メール・販促通知` を追加した。
+- 広告・キャンペーン通知の同意前コピー、停止後コピーを追加した。
+- No-Goへ、販促メール、販促Push、アプリ内販促通知を明示的同意、同意記録、送信者情報、問い合わせ先又は停止手段なしに送らないこと、必要連絡と販促同意を同じON/OFFとして誤認させないことを追加した。
+
+#### `notes/53_app_review_guideline_compliance_matrix.md`
+- ステータスをDraft v1.8へ更新し、`広告宣伝メール・販促通知` を追加した。
+- Guideline 4.5.4と通知本文/ロック画面メモへ、販促Pushだけでなく広告宣伝メール、アプリ内販促通知の同意記録、送信者情報、問い合わせ先、停止手段を追加した。
+- No-Goへ、販促Push又は広告宣伝メールに同意記録、停止手段、送信者情報、問い合わせ先がない状態を追加した。
+
+#### `notes/17_legal_alignment.md`
+- 広告宣伝メール・販促通知の同意/停止境界セクションを追加した。
+- 消費者庁の特定電子メール法ページ、e-Gov法令、Apple App Review Guidelines、現行Swift Native/Supabase/Web通知経路、規約・プライバシーポリシー・FAQ・アプリ内コピー・App Review表の対応関係を記録した。
+
+#### `notes/10_glossary.md`
+- `広告宣伝メール・販促通知` を用語として追加し、必要連絡と区別して同意記録、送信者情報、問い合わせ先、配信停止又は通知設定変更、停止後抑止を管理する法務カテゴリとして定義した。
+
+#### `利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+#### `利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+- Markdown利用規約・プライバシーポリシーと同じ広告宣伝メール・販促通知境界をWord版へ同期した。
+
+### 影響範囲
+
+- 利用規約、プライバシーポリシー、Word版法務文書、公開FAQ、アプリ内通知許可/停止コピー、広告・キャンペーン通知コピー、App Review 4.5.4説明、法務整合メモ、用語集
+
+Swift Native、Web、Supabase、DB、公開URL、App Store Connect実入力は変更していない。状態遷移及びデータモデルは変更していないため、`notes/09_state_machines.md`、`notes/05_data_model.md` は更新していない。
+
+### 確認方法
+
+- 消費者庁 特定電子メールの送信の適正化等に関する法律（https://www.caa.go.jp/policies/policy/consumer_transaction/specifed_email/）
+  - checked
+- e-Gov 特定電子メールの送信の適正化等に関する法律（https://laws.e-gov.go.jp/law/414AC0000000026）
+  - checked
+- Apple App Review Guidelines（https://developer.apple.com/app-store/review/guidelines/）
+  - checked
+- `rg -n "広告宣伝メール・販促通知|特定電子メール法|配信停止|同意記録|直接マーケティング|停止手段|抑止リスト|送信者情報|問い合わせ先|販促通知" notes/legal/01_terms_of_service_draft.md notes/legal/02_privacy_policy_draft.md notes/17_legal_alignment.md notes/55_public_help_faq_draft.md notes/56_in_app_legal_safety_copy_deck.md notes/53_app_review_guideline_compliance_matrix.md`
+  - passed
+- `unzip -t 利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+  - passed
+- `unzip -t 利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+  - passed
+- `render_docx.py` をPython経由で実行し、Word版利用規約を `/tmp/megrum-legal-render-marketing-notifications/terms` へPDF/PNGレンダー
+  - passed（34 pages）
+- `render_docx.py` をPython経由で実行し、Word版プライバシーポリシーを `/tmp/megrum-legal-render-marketing-notifications/privacy` へPDF/PNGレンダー
+  - passed（29 pages）
+- bundled Poppler `pdftotext` によるPDFキーワード検査
+  - passed（利用規約・プライバシーポリシー双方で `広告宣伝メール・販促通知`、`特定電子メール法`、`配信停止`、`同意記録`、`直接マーケティング`、`停止手段`、`送信者情報`）
+- レンダーPNGの全ページ検査
+  - passed（利用規約34 pages、プライバシーポリシー29 pages。全ページ非空）
+- 追加箇所付近のレンダー画像目視
+  - checked（利用規約第40条、プライバシーポリシー第2.7条、第3条、第11条、第13条）
+- `git diff --check -- notes notes/legal`
+  - passed
+
+### セルフレビュー結果
+
+- ✅ 広告宣伝メール・販促通知について、同意、同意記録、送信者情報、問い合わせ先、停止手段、停止後抑止の境界を規約・プライバシーポリシーへ追加した。
+- ✅ 配信停止後も、取引、安全、認証、課金、規約変更、法令対応など必要連絡が残り得ることを、規約、プライバシーポリシー、FAQ、アプリ内コピーに揃えた。
+- ✅ App Review 4.5.4の販促Push論点を、広告宣伝メールとアプリ内販促通知にも広げ、提出前No-Goへ反映した。
+- ✅ Word版利用規約・プライバシーポリシーへ同期し、PDFレンダー、キーワード抽出、PNG非空チェック、目視確認まで実施した。
+- ✅ コード、Web実装、iOS実装、Supabase、DB、公開URL、App Store Connect実入力は変更していない。
+- ✅ docs-onlyのためアプリビルド、Swiftテスト、web buildは未実行。
+
+---
+
+## イテレーション1226.159：事故初動責任境界
+
+### 背景・問題意識
+
+個人情報保護委員会の公式情報では、個人の権利利益を害するおそれがある一定の漏えい等について、報告及び本人通知が必要になる場合がある。Megrumには、Keychain session、access token、refresh token、APNs token、Storage公開URL/署名URL、公開証跡、Function logs、OSLog、管理者権限、監査ログ、RLS、service role key、外部AI、AdMob、App Store審査証跡など、個人情報漏えい等又は事故疑いの初動対象になり得る情報と運用がある。
+
+事故疑い時に、運営者が必要な調査、一時制限、証跡保全、本人通知、関係機関報告を迅速にできるようにする一方、初動連絡、通知、公表又は受付番号が、漏えい等への該当性、法的責任、補償、返金、復旧、原因確定、再発防止の完全性を認めたものと読まれないようにする必要がある。コード変更禁止の指示を守り、利用規約、プライバシーポリシー、事故初動Runbook、FAQ、法務整合メモ、Word改訂案のみ更新した。
+
+### 変更内容
+
+#### `notes/legal/01_terms_of_service_draft.md`
+- ステータス行へ `漏えい等初動・事故疑い` を追加した。
+- 第27条のアカウント制限事由へ、個人情報、認証情報、token、secret、API key、署名URL、通知token、支払い情報、郵送先情報、位置情報、証跡その他保護すべき情報の漏えい、誤表示、誤送信、不正アクセス、改ざん、外部サービスへの想定外送信、第三者閲覧又はこれらのおそれがある場合を追加した。
+- 同条へ、事故疑い時に、原因及び影響範囲の調査、証跡保全、ログ又はスクリーンショットの必要最小限の保存、対象機能の一時停止、アカウント又は投稿の一時制限、token、secret、API key等の無効化又は更新、外部サービス照会、関係者連絡、本人通知、関係機関報告、公表、再発防止策等を行うことがある旨を追加した。
+- 同条へ、これらの対応が、漏えい等への該当性、運営者の法的責任、損害賠償義務、補償、返金、復旧、原因の確定、再発防止の完全性又は一定期間内の調査完了を認め、又は保証するものではない旨を追加した。
+
+#### `notes/legal/02_privacy_policy_draft.md`
+- ステータス行へ `漏えい等初動・事故疑い` を追加した。
+- 第12条へ、事故疑い時の調査、証跡保全、ログ又はスクリーンショットの必要最小限の保存、対象機能の一時停止、アカウント又は投稿の一時制限、認証情報の無効化又は更新、外部サービス照会、本人通知、関係機関報告、公表、再発防止策の取扱いを追加した。
+- 同条へ、事故疑いに関する問い合わせ、初動連絡、本人通知、報告又は公表は、法令上必要な対応、被害拡大防止又は事実確認のために行うものであり、漏えい等への該当性、運営者の法的責任、補償、返金、復旧、原因確定、再発防止の完全性又は一定期間内の調査完了を保証しない旨を追加した。
+
+#### `notes/49_privacy_security_incident_response_runbook.md`
+- ステータスをDraft v0.2へ更新し、`漏えい等初動・事故疑いの責任承認境界` を追加した。
+- PPC公式情報の確認日と、実際の期限、様式、報告先、判断基準は事案発覚時点の公式情報と弁護士確認に従う方針を追加した。
+- 初動連絡・公表の法務トーンを追加し、言うこと、言わないこと、使いやすい表現、避ける表現を整理した。
+- サポート一次返信テンプレートへ、受付は事実確認及び被害拡大防止のための初動対応であり、漏えい等への該当性、原因、責任、補償、返金又は復旧を確定するものではない旨を追加した。
+- No-Goへ、初動連絡、本人通知、公開レビュー返信又はSNSで、法務確認前に責任、補償、返金、復旧、相手会員への措置、原因、再発防止の完全性を断定しないこと、個別事故情報を公開しないことを追加した。
+
+#### `notes/55_public_help_faq_draft.md`
+- ステータスをDraft v2.3へ更新し、`漏えい等初動・事故疑い` を追加した。
+- 不具合・問い合わせFAQへ、個人情報やセキュリティに関する連絡は、事実確認と被害拡大防止のために受け付けるものであり、初回返信や受付番号は、漏えい等への該当性、原因、責任、補償、返金、復旧又は再発防止を確定するものではない旨を追加した。
+
+#### `notes/17_legal_alignment.md`
+- 漏えい等初動・事故疑いの責任承認境界セクションを追加した。
+- PPC公式情報、現行Swift Native/Supabase/Webで初動対象になり得る情報、規約・プライバシーポリシー・Runbook・FAQの対応関係を記録した。
+
+#### `利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+#### `利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+- Markdown利用規約・プライバシーポリシーと同じ漏えい等初動・事故疑い境界をWord版へ同期した。
+
+### 影響範囲
+
+- 利用規約、プライバシーポリシー、Word版法務文書、個人情報・セキュリティ事故初動Runbook、公開FAQ、法務整合メモ、サポート一次返信、本人通知、公表文、公開レビュー返信、PPC報告判断、外部サービス照会、事故証跡管理
+
+Swift Native、Web、Supabase、DB、公開URL、App Store Connect実入力は変更していない。状態遷移、用語、データモデルの変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の追加更新は行っていない。
+
+### 確認方法
+
+- 個人情報保護委員会 漏えい等の対応とお役立ち資料（https://www.ppc.go.jp/personalinfo/legal/leakAction/）
+  - checked
+- 個人情報保護委員会 漏えい等報告・本人への通知の義務化（https://www.ppc.go.jp/news/kaiseihou_feature/roueitouhoukoku_gimuka/）
+  - checked
+- `rg -n "漏えい等初動・事故疑い|セキュリティ事故|事故疑い|責任、補償、返金、復旧|一定期間内の調査完了|個人情報保護委員会|PPC|二度と起きません" notes/legal/01_terms_of_service_draft.md notes/legal/02_privacy_policy_draft.md notes/17_legal_alignment.md notes/49_privacy_security_incident_response_runbook.md notes/55_public_help_faq_draft.md`
+  - passed
+- `unzip -t 利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+  - passed
+- `unzip -t 利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+  - passed
+- `render_docx.py` をPython経由で実行し、Word版利用規約を `/tmp/megrum-legal-render-security-incident/terms` へPDF/PNGレンダー
+  - passed（33 pages）
+- `render_docx.py` をPython経由で実行し、Word版プライバシーポリシーを `/tmp/megrum-legal-render-security-incident/privacy` へPDF/PNGレンダー
+  - passed（29 pages）
+- bundled Poppler `pdftotext` によるPDFキーワード検査
+  - passed（利用規約・プライバシーポリシー双方で `漏えい等初動・事故疑い`、`セキュリティ事故`、`事故疑い`、`原因及び影響範囲`、`一定期間内の調査完了`、`token、secret、APIkey`）
+- レンダーPNGの全ページ検査
+  - passed（利用規約33 pages、プライバシーポリシー29 pages。全ページ非空）
+- 追加箇所付近のレンダー画像目視
+  - checked（利用規約第27条、プライバシーポリシー第12条）
+- `git diff --check -- notes notes/legal`
+  - passed
+
+### セルフレビュー結果
+
+- ✅ 事故疑い時にアカウント、投稿、取引、チャット、有料サービス等を一時制限できる根拠を規約へ追加した。
+- ✅ 調査、証跡保全、ログ最小保存、機能停止、token/secret/API key無効化又は更新、本人通知、関係機関報告、公表、再発防止策の実施余地を明確化した。
+- ✅ 初動連絡や受付番号が、漏えい等への該当性、法的責任、補償、返金、復旧、原因確定、再発防止完全性、調査完了期限を認めるものではない境界を、規約、プライバシーポリシー、Runbook、FAQに揃えた。
+- ✅ PPC公式情報を参照しつつ、期限や様式は事案発覚時点の公式情報と弁護士確認に従う前提を維持した。
+- ✅ Word版利用規約・プライバシーポリシーへ同期し、PDFレンダー、キーワード抽出、PNG非空チェック、目視確認まで実施した。
+- ✅ コード、Web実装、iOS実装、Supabase、DB、公開URL、App Store Connect実入力は変更していない。
+- ✅ docs-onlyのためアプリビルド、Swiftテスト、web buildは未実行。
+
+## イテレーション1226.158：公開レビュー返信境界
+
+### 背景・問題意識
+
+App Store公開後は、星評価、ユーザーレビュー、レビュー要約、開発者返信、concern report、overview rating resetを扱う。Apple公式ヘルプでは、開発者返信がApp Store product page上で公開され、返信の表示に時間がかかる場合があり、編集又は削除できること、低評価、技術的問題、不具合、改善要望、誤解があるレビューへの返信を優先しつつ、返信に個人情報、マーケティング表現、スパム、攻撃的又は不適切な表現を含めない運用が示されている。
+
+Megrumは取引、通報、郵送先、支払い情報、認証情報、証跡URL、スクリーンショット、アカウント状態など、公開レビューに混入すると危険な情報が多い。公開レビュー返信で個別事実を認めたり、相手会員への措置、返金、補償、事故認定、内部ログを示すと、開発者側の法務・審査・プライバシーリスクが高い。コード変更禁止の指示を守り、利用規約、プライバシーポリシー、レビュー返信Runbook、App Review適合マトリクス、法務整合メモ、Word改訂案のみ更新した。
+
+### 変更内容
+
+#### `notes/legal/01_terms_of_service_draft.md`
+- ステータス行へ `App Store評価・公開レビュー返信` を追加した。
+- 第40条へ、App Storeその他アプリストア上の評価、レビュー、レビュー要約、開発者返信、concern report、overview rating resetその他アプリストア上の機能は、当該アプリストアの規約、ポリシー及び技術仕様に従うことを追加した。
+- 会員がアプリストアのレビューその他公開欄に投稿した内容及び運営者が行う開発者返信は公開される場合があり、氏名、住所、電話番号、メールアドレス、取引相手、取引ID、注文番号、認証情報、金融機関情報、本人確認書類、証跡URL、スクリーンショットその他公開に適しない情報を含めないことを追加した。
+- 運営者の公開レビュー返信は、公開の一般的な案内、問い合わせ窓口への誘導又は事実確認中である旨を示すことがあり、個別サポート、本人確認、事故認定、法的責任の承認、補償、返金、相手会員への措置、復旧、削除又は解決を保証しないことを追加した。
+
+#### `notes/legal/02_privacy_policy_draft.md`
+- ステータス行へ `App Store評価・公開レビュー返信` を追加した。
+- 第2.10条へ、アプリストア上の評価、レビュー本文、レビュー要約、レビュアー表示名、国又は地域、対象アプリバージョン、評価日時、編集又は返信状態、開発者返信案及び返信履歴、concern reportの理由及び提出履歴、overview rating resetの検討記録等を取得情報として追加した。
+- 利用目的へ、アプリストア上の評価・レビューへの公開返信、concern report、レビュー要約確認、レビュー対応記録管理を追加した。
+- 委託先及び外部サービス、外部送信、保存期間及び削除へ、App Storeその他アプリストア上の評価・レビュー・開発者返信・concern report・overview rating resetの外部プラットフォーム依存、保存、公開、削除、表示、要約、保持の境界を追加した。
+
+#### `notes/74_app_store_ratings_reviews_response_runbook.md`
+- ステータスをDraft v0.2へ更新し、`App Store評価・公開レビュー返信の個人情報境界` を追加した。
+- Apple公式ヘルプに基づく公開返信の基本前提を追加した。
+- 返信前チェックへ、個人情報、取引情報、認証情報、金融機関情報、証跡URL、スクリーンショットを引用又は再掲しないこと、マーケティング、値引き、レビュー変更依頼、レビュー対価、スパム、攻撃的表現がないこと、レビュー本文に個人情報又は秘密情報がある場合はconcern report又はサポート誘導を検討することを追加した。
+- 公開返信と個別サポートの境界を追加し、公開返信でできること、しないこと、レビュー本文に公開不適切情報がある場合の手順を整理した。
+
+#### `notes/53_app_review_guideline_compliance_matrix.md`
+- ステータスをDraft v1.7へ更新し、`App Store評価・公開レビュー返信` を追加した。
+- Guideline 5.6行へ、レビュー返信に個人情報、秘密情報、マーケティング、スパム、攻撃的表現を入れないこと、concern reportと `notes/74` を確認対象にすることを追加した。
+- No-Goへ、公開レビュー又は開発者返信で、個人情報、取引情報、認証情報、金融機関情報、証跡URL、スクリーンショット、内部ログ、相手会員への措置、返金/補償断定、評価変更依頼、値引き誘導、マーケティング又は攻撃的表現を出さないことを追加した。
+
+#### `notes/17_legal_alignment.md`
+- App Store評価・公開レビュー返信の境界を補強するセクションを追加した。
+- Apple公式ヘルプ、利用規約第40条、プライバシーポリシー第2.10/3/8/11/13、公開前No-Goの対応関係を整理した。
+
+#### `利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+#### `利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+- Markdown利用規約・プライバシーポリシーと同じApp Store評価・公開レビュー返信境界をWord版へ同期した。
+
+### 影響範囲
+
+- 利用規約、プライバシーポリシー、Word版法務文書、App Store評価・レビュー返信Runbook、App Review Guideline適合マトリクス、法務整合メモ、公開レビュー返信、concern report、overview rating reset、サポート誘導、App Store審査対応、レビュー証跡管理
+
+Swift Native、Web、Supabase、DB、公開URL、App Store Connect実入力は変更していない。状態遷移、用語、データモデルの変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の追加更新は行っていない。
+
+### 確認方法
+
+- Apple Respond to reviews（https://developer.apple.com/help/app-store-connect/monitor-ratings-and-reviews/respond-to-reviews/）
+  - checked
+- Apple Ratings and reviews overview（https://developer.apple.com/help/app-store-connect/monitor-ratings-and-reviews/ratings-and-reviews-overview/）
+  - checked
+- `rg -n "App Store評価・公開レビュー返信|公開レビュー|開発者返信|concern report|overview rating reset|レビュー要約|評価変更依頼|証跡URL" notes/legal/01_terms_of_service_draft.md notes/legal/02_privacy_policy_draft.md notes/17_legal_alignment.md notes/53_app_review_guideline_compliance_matrix.md notes/74_app_store_ratings_reviews_response_runbook.md`
+  - passed
+- `unzip -t 利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+  - passed
+- `unzip -t 利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+  - passed
+- `render_docx.py` をPython経由で実行し、Word版利用規約を `/tmp/megrum-legal-render-appstore-reviews/terms` へPDF/PNGレンダー
+  - passed（33 pages）
+- `render_docx.py` をPython経由で実行し、Word版プライバシーポリシーを `/tmp/megrum-legal-render-appstore-reviews/privacy` へPDF/PNGレンダー
+  - passed（29 pages）
+- bundled Poppler `pdftotext` によるPDFキーワード検査
+  - passed（利用規約・プライバシーポリシー双方で `AppStore評価・公開レビュー返信`、`公開レビュー`、`開発者返信`、`concernreport`、`overviewratingreset`、`レビュー要約`、`証跡URL`）
+- レンダーPNGの全ページ検査
+  - passed（利用規約33 pages、プライバシーポリシー29 pages。全ページ非空）
+- 追加箇所付近のレンダー画像目視
+  - checked（利用規約第40条、プライバシーポリシー第2.10条、第11条、第13条）
+- `git diff --check -- notes notes/legal`
+  - passed
+
+### セルフレビュー結果
+
+- ✅ App Store等の公開レビュー欄に個人情報、取引情報、認証情報、金融機関情報、証跡URL、スクリーンショットを入れないユーザー側注意を規約とプライバシーポリシーに反映した。
+- ✅ 開発者返信が公開返信であり、個別サポート、本人確認、事故認定、法的責任承認、補償、返金、相手会員への措置、復旧、削除又は解決の保証ではないことを明確化した。
+- ✅ App Storeレビュー運用で扱うメタデータ、返信履歴、concern report、overview rating reset記録をプライバシーポリシーの取得情報、利用目的、外部サービス、外部送信、保持に反映した。
+- ✅ Guideline 5.6のレビュー返信No-Goと運用Runbookを同じ方向に揃えた。
+- ✅ Word版利用規約・プライバシーポリシーへ同期し、PDFレンダー、キーワード抽出、PNG非空チェック、目視確認まで実施した。
+- ✅ コード、Web実装、iOS実装、Supabase、DB、公開URL、App Store Connect実入力は変更していない。
+- ✅ docs-onlyのためアプリビルド、Swiftテスト、web buildは未実行。
+
+## イテレーション1226.157：UGC審査境界補強
+
+### 背景・問題意識
+
+Apple App Review Guidelinesは2026-06-29時点で2026-06-08更新版を確認した。Guideline 1.2では、UGC又はソーシャルネットワークを含むアプリについて、不適切投稿を防ぐ方法、攻撃的コンテンツの通報と適時対応、濫用ユーザーのブロック、ユーザーが容易に連絡できる公開連絡先が必要とされる。また、ポルノ、Chatroulette風体験、ランダム又は匿名チャット、実在人物の外見評価、脅迫、いじめを主目的とするUGCサービスはApp Storeに適さない旨が示されている。
+
+現行Swift Nativeには、プロフィール、グッズ画像、グルーム、スポット掲示板、取引チャット、証跡、評価コメント、通報、ブロック、通報/ブロックに関するSwift画面、`groom_reports`、`meguri_board_reports`、汎用 `reports`、管理画面の通報対応権限がある。一方で、投稿前/投稿時の不適切コンテンツフィルタ、NGワード、自動検知、投稿保留、投稿拒否の実装範囲は提出前の実ビルド照合が必要なため、コード変更禁止の指示を守り、利用規約、FAQ、アプリ内安全コピー案、App Review提出資料、法務整合メモ、Word改訂案のみ更新した。
+
+### 変更内容
+
+#### `notes/legal/01_terms_of_service_draft.md`
+- ステータス行へ `UGC・App Review 1.2` を追加した。
+- 第24条へ、不適切投稿又は濫用を防止するため、投稿前後の注意喚起、入力制限、投稿頻度制限、URL、画像、添付形式、位置範囲、アカウント状態、通報履歴、NGワードその他の条件に基づくフィルタリング、自動検知、ルールベース判定、人手確認、投稿保留、投稿拒否、返信停止、表示制限、削除、アカウント制限その他合理的な措置を行うことがある旨を追加した。
+- 同条へ、全ての不適切投稿を投稿前に検知、審査又は削除することを保証しない旨を追加した。
+- 同条へ、めぐり、グルーム、スポット掲示板、取引チャット等は会員登録に基づく推し活グッズ交換及び関連情報共有のための機能であり、わいせつコンテンツ、ランダムチャット、匿名チャット、出会い、性的接触、実在人物の外見評価、脅迫、いじめ、嫌がらせ、晒し、危険行為又はこれらを主目的とする利用のための機能ではないことを追加した。
+- 第26条の禁止行為へ、出会い、交際、性的接触、ランダムチャット、匿名チャット、実在人物の外見評価又は個人的接触を主目的とする行為を明記した。
+
+#### `notes/55_public_help_faq_draft.md`
+- ステータスをDraft v2.2へ更新し、`UGC・App Review 1.2` を追加した。
+- めぐり、グルーム、スポット掲示板、取引チャットは推し活グッズ交換や現地状況共有を補助する機能であり、ランダムチャット、匿名チャット、出会い、性的接触、実在人物の外見評価、脅迫、いじめ、嫌がらせ、晒し目的の利用は禁止であることを追加した。
+- 入力制限、通報、ブロック、非表示、削除、返信停止、アカウント制限の可能性と、全ての不適切投稿を投稿前に検知できる保証はないことを説明した。
+
+#### `notes/56_in_app_legal_safety_copy_deck.md`
+- ステータスをDraft v1.9へ更新し、`UGC・App Review 1.2` を追加した。
+- 基本方針表へUGCの説明を追加した。
+- 通報・ブロック節へ、投稿前の注意文案と投稿できない場合の文案を追加した。
+- No-Goへ、UGC機能をランダム/匿名チャット、出会い、性的接触、外見評価、脅迫、いじめ、嫌がらせ、晒し目的に見せないこと、投稿前注意、入力制限、通報、ブロック、サポート連絡先の確認前にUGCスクリーンショット又はReview Notesを出さないことを追加した。
+
+#### `notes/53_app_review_guideline_compliance_matrix.md`
+- ステータスをDraft v1.6へ更新し、`UGC・App Review 1.2` を追加した。
+- Guideline 1.2行を、投稿前/投稿時のフィルタ又は制限、通報、対応、ブロック、公開連絡先、ランダム/匿名チャット、Chatroulette風体験、実在人物の外見評価、脅迫、いじめのNo-Goを含む形へ拡張した。
+- UGC提出時は、実ビルドで使っている注意喚起、入力制限、投稿頻度制限、URL/画像/添付形式/アカウント状態/通報履歴/NGワード等に基づくフィルタリング、自動検知、手動確認、投稿保留又は投稿拒否の範囲だけをReview Notesに書く方針を追加した。
+
+#### `notes/24_app_store_submission_pack.md`
+- ステータスをDraft v2.0へ更新し、`UGC・App Review 1.2` を追加した。
+- グルーム、スポット掲示板、取引チャット、評価コメント、プロフィール、グッズ画像等のUGCを提出する場合、投稿前/投稿時の不適切コンテンツ対策、通報入口、ブロック入口、公開連絡先、運用SOP、対応目安を実ビルドとReview Notesで説明できる状態にすることを前提へ追加した。
+- 未実装のフィルタ又は即時監視をReview Notesへ書かないこと、ランダム/匿名チャット、出会い、性的接触、実在人物の外見評価、脅迫、いじめ、嫌がらせ、晒し目的に見えるスクリーンショット、説明、デモデータを出さないことを追加した。
+
+#### `notes/17_legal_alignment.md`
+- UGCとApp Review Guideline 1.2境界のセクションを追加した。
+- Apple App Review Guidelinesの確認日、現行コードで確認したUGC/通報/ブロック/管理側の事実、提出前に照合すべき投稿前/投稿時制御の未確定範囲、公開前No-Goを整理した。
+
+#### `notes/31_app_store_connect_metadata_worksheet.md`
+- ステータスをDraft v0.3へ更新し、`UGC・App Review 1.2` を追加した。
+- Age Ratingメモへ、UGCを出す場合は実装済み範囲だけをReview Notesで説明し、ランダム/匿名チャット、出会い、外見評価、脅迫、いじめ用途に見える文言やスクリーンショットを入れないことを追加した。
+
+#### `notes/62_app_review_manual_submission_checklist.md`
+- ステータスをDraft v1.4へ更新し、`UGC・App Review 1.2` を追加した。
+- `SS-006`、提出前No-Go、Review Notes必須事項へ、投稿前/投稿時の不適切コンテンツ対策、通報、ブロック、公開連絡先、運用SOP、未実装フィルタを書かない方針を追加した。
+
+#### `利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+- Markdown利用規約と同じUGC・App Review 1.2境界をWord版へ同期した。
+
+### 影響範囲
+
+- 利用規約、Word版利用規約、FAQ、アプリ内安全コピー案、App Review Guideline適合マトリクス、App Store審査提出パック、App Store Connectメタデータ作業表、手動提出チェックリスト、法務整合メモ
+- プロフィール、グッズ画像、グルーム、スポット掲示板、取引チャット、証跡、評価コメント、通報、ブロック、公開連絡先、モデレーションSOP、Review Notes、スクリーンショット、デモデータ
+
+プライバシーポリシー、Swift Native、Web、Supabase、DB、公開URL、App Store Connect実入力は変更していない。今回の変更は新しい個人情報カテゴリの追加ではなく、UGCの利用目的、禁止目的、投稿制御、提出前説明の境界整理であるため、`notes/legal/02_privacy_policy_draft.md` は追加更新しなかった。状態遷移、用語、データモデルの変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の追加更新は行っていない。
+
+### 確認方法
+
+- Apple App Review Guidelines Guideline 1.2 User-Generated Content（https://developer.apple.com/app-store/review/guidelines/）
+  - checked（2026-06-29時点、ページ更新日2026-06-08）
+- `rg -n "UGC・App Review 1\\.2|App Review 1\\.2|Guideline 1\\.2|不適切コンテンツ対策|フィルタリング|ランダム/匿名チャット|匿名チャット|外見評価|Chatroulette|投稿保留|投稿拒否" notes/legal/01_terms_of_service_draft.md notes/17_legal_alignment.md notes/24_app_store_submission_pack.md notes/31_app_store_connect_metadata_worksheet.md notes/53_app_review_guideline_compliance_matrix.md notes/55_public_help_faq_draft.md notes/56_in_app_legal_safety_copy_deck.md notes/62_app_review_manual_submission_checklist.md`
+  - passed
+- `unzip -t 利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+  - passed
+- `render_docx.py /Users/michitaka/Desktop/Megrum/利用規約など/01_Megrum利用規約_20260629改訂案.docx --output_dir /tmp/megrum-legal-render-ugc-app-review/terms --emit_pdf`
+  - passed（33 pages）
+- bundled Poppler `pdftotext` によるPDFキーワード検査
+  - passed（`UGC・AppReview1.2`、`フィルタリング`、`投稿保留`、`投稿拒否`、`ランダムチャット`、`匿名チャット`、`外見評価`）
+- レンダーPNGの全ページ検査
+  - passed（利用規約33 pages。全ページ非空）
+- 追加箇所付近のレンダー画像目視
+  - checked（利用規約第24条、第26条）
+- `git diff --check -- notes notes/legal`
+  - passed
+- `git diff --name-only` のdocs外差分確認
+  - passed（docs以外なし）
+
+### セルフレビュー結果
+
+- ✅ UGCを、推し活グッズ交換及び関連情報共有のためのアカウントベース機能として定義し、ランダム/匿名チャット、出会い、性的接触、実在人物の外見評価、脅迫、いじめ、嫌がらせ、晒し目的に見えないよう補強した。
+- ✅ 不適切投稿対策として使う可能性のある手段を規約に広く確保しつつ、全ての不適切投稿を投稿前に検知、審査又は削除する保証はしない境界を明確化した。
+- ✅ Review Notes、スクリーンショット、デモデータでは実装済み範囲だけを説明し、未実装のフィルタ、自動検知、即時監視を主張しないNo-Goを複数文書へ反映した。
+- ✅ Word版利用規約へ同期し、PDFレンダー、キーワード抽出、PNG非空チェック、目視確認まで実施した。
+- ✅ コード、Web実装、iOS実装、Supabase、DB、公開URL、App Store Connect実入力は変更していない。
+- ✅ プライバシーポリシーは新規取得情報カテゴリの追加ではないため、今回の追加更新は不要と判断した。
+- ✅ docs-onlyのためアプリビルド、Swiftテスト、web buildは未実行。
+
+## イテレーション1226.156：サポート非保証境界
+
+### 背景・問題意識
+
+現行の公開FAQ、サポート返信テンプレート、サポート受信トリアージRunbookには、`support@megrum.jp`、App Store Support URL、問い合わせ受付、通報、削除申出、個人情報請求、購入/IAP問い合わせ、App Review連絡、安全相談、事故疑い、公開レビュー返信の運用がある。少人数運用では「原則2営業日以内」「24時間以内」「当日中」「1営業日以内」等の目安を出す必要があるが、これが固定SLA、問題解決保証、削除保証、復旧保証、返金保証、相手会員への措置保証又は個別理由開示保証として読まれるリスクがある。
+
+また、サポート回答が法律、税務、医療、防犯、金融、配送、権利処理、真贋鑑定、入場資格等の専門判断又は代理に見えると、運営者が本来負うべきでない専門責任を負ったように扱われるおそれがある。コード変更禁止の指示を守り、利用規約、FAQ、サポート運用文書、アプリ内安全コピー案、法務整合メモ、Word改訂案のみ更新した。
+
+### 変更内容
+
+#### `notes/legal/01_terms_of_service_draft.md`
+- ステータス行へ `サポートSLA・専門助言非保証` を追加した。
+- 第40条へ、FAQ、サポートページ、アプリ内表示、メール又は個別返信において示す返信目安、対応目安、確認予定、優先度、受付番号、エスカレーション先又は対応方針は、運営上の目安であり、法令上必要な場合を除き、一定期間内の返信、回答、調査、削除、復旧、返金、補償、相手会員への措置、結果の実現又は個別理由の開示を保証しないことを追加した。
+- 第40条へ、ヘルプ、FAQ、サポート返信、Review Notes、アプリ内安全案内、課金案内、通報又は問い合わせへの回答は、本アプリの利用方法、運営方針又は一般的注意の説明であり、法律、税務、会計、医療、警備、防犯、金融、配送、権利処理、本人確認、真贋鑑定、入場資格等についての助言、鑑定、保証又は代理ではないことを追加した。
+
+#### `notes/55_public_help_faq_draft.md`
+- ステータスをDraft v2.1へ更新し、`サポートSLA・専門助言非保証` を追加した。
+- FAQトップへ、通常問い合わせは原則2営業日以内、安全・危険関連はできるだけ早い確認を目標にするが、内容、本人確認、事実確認、法令上の確認、外部サービスやアプリストアの手続、混雑状況等により時間がかかる場合があることを追加した。
+- 返信目安、受付番号、優先度、対応方針は運営上の目安であり、返信、調査、削除、復旧、返金、補償、相手への措置、問題解決又は個別理由開示を保証しないことを追加した。
+- サポート回答はアプリの使い方や一般的注意の案内であり、専門判断が必要な場合は弁護士、税理士、警察、消防、消費生活センター、金融機関、配送事業者、会場又は施設管理者等へ相談する案内を追加した。
+
+#### `notes/34_support_response_templates.md`
+- ステータスをDraft v0.4へ更新し、`サポートSLA・専門助言非保証` を追加した。
+- 運用ルールの `初回返信SLA` を `初回返信目安` に変更し、原則2営業日以内は目標であって保証表現にしない方針へ修正した。
+- 新規問い合わせ受付テンプレートの「原則2営業日以内にご返信します」を「原則2営業日以内を目標にご返信します」へ変更した。
+- テンプレート本文へ、返信目安は期限ではないこと、サポート回答は専門的な助言や判断ではないことを追加した。
+
+#### `notes/67_support_inbox_triage_runbook.md`
+- ステータスをDraft v0.4へ更新し、`サポートSLA・専門助言非保証` を追加した。
+- 基本ルール、No-Go、エスカレーション表、返信で言わないことを、返信期限保証ではなく目安として扱う表現へ修正した。
+- 法律、税務、医療、防犯、金融、配送、権利処理、真贋鑑定、入場資格等について、Megrumが専門判断、代理、鑑定、保証又は公的救済を行うように説明しないNo-Goを追加した。
+
+#### `notes/56_in_app_legal_safety_copy_deck.md`
+- ステータスをDraft v1.8へ更新し、`サポートSLA・専門助言非保証` を追加した。
+- サポート・問い合わせ節を追加し、問い合わせは原則2営業日以内を目標に確認すること、内容や本人確認等により時間がかかる場合があること、サポート回答は専門判断ではないことを追加した。
+- No-Goへ、返信目安を期限保証に見せないこと、サポート回答を法律相談、税務相談、医療相談、防犯保証、返金保証、配送保証、真贋鑑定、入場資格保証等に見せないことを追加した。
+- 既存の有料機能セクションのコードフェンス崩れを修正し、章番号を連番に整えた。
+
+#### `notes/17_legal_alignment.md`
+- サポートSLA・専門助言非保証セクションを追加した。
+- 公開前No-Goとして、`原則2営業日以内`、`24時間以内`、`当日中`、`1営業日以内` 等を、必ず返信する期限、SLA確定、法的義務、削除保証、復旧保証、返金保証、補償保証、相手への処分保証又は即時安全対応保証のように説明しないことを明記した。
+
+#### `利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+- Markdown利用規約と同じサポートSLA・専門助言非保証の説明をWord版へ同期した。
+
+### 影響範囲
+
+- 利用規約、Word版利用規約、FAQ、サポート返信テンプレート、サポート受信トリアージRunbook、アプリ内安全コピー案、法務整合メモ、Support URL、公開FAQ、Review Notes、公開レビュー返信、通報/削除申出/個人情報請求/購入問い合わせ運用
+
+プライバシーポリシー、Swift Native、Web、Supabase、DB、公開URL、App Store Connect実入力は変更していない。状態遷移、用語、データモデルの変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の追加更新は行っていない。
+
+### 確認方法
+
+- `rg -n 'サポートSLA・専門助言非保証|返信目安|専門的な助言|原則2営業日以内を目標|法律、税務、医療、防犯|SLA確定' notes/legal/01_terms_of_service_draft.md notes/17_legal_alignment.md notes/55_public_help_faq_draft.md notes/34_support_response_templates.md notes/67_support_inbox_triage_runbook.md notes/56_in_app_legal_safety_copy_deck.md`
+  - passed
+- `rg -n '^## [0-9]+\\.' notes/56_in_app_legal_safety_copy_deck.md`
+  - passed（章番号の連番を確認）
+- `unzip -t 利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+  - passed
+- `render_docx.py /Users/michitaka/Desktop/Megrum/利用規約など/01_Megrum利用規約_20260629改訂案.docx --output_dir /tmp/megrum-legal-render-support-sla/terms --emit_pdf`
+  - passed（32 pages）
+- bundled Poppler `pdftotext` によるPDFキーワード検査
+  - passed（`サポート SLA・専門助言非保証`、`返信目安`、`一定期間内の返信`、`専門的事項`、`弁護士、税理士、医師`）
+- レンダーPNGの全ページ検査
+  - passed（利用規約32 pages。全ページ非空）
+- 追加箇所付近のレンダー画像目視
+  - checked（利用規約第40条）
+- `git diff --check -- notes notes/legal`
+  - passed
+- `git diff --name-only` のdocs外差分確認
+  - passed（docs以外なし）
+
+### セルフレビュー結果
+
+- ✅ サポート返信目安を固定SLA、期限保証、削除保証、復旧保証、返金保証、補償保証、相手への措置保証として読まれないよう補強した。
+- ✅ サポート回答を、法律、税務、医療、防犯、金融、配送、権利処理、真贋鑑定、入場資格等の専門助言又は代理に見せない境界を明確化した。
+- ✅ FAQ、サポートテンプレート、トリアージRunbook、アプリ内コピー案、法務整合メモを同じ方向に揃えた。
+- ✅ Word版利用規約へ同期し、PDFレンダー、キーワード抽出、PNG非空チェック、目視確認まで実施した。
+- ✅ コード、Web実装、iOS実装、Supabase、DB、公開URL、App Store Connect実入力は変更していない。
+- ✅ docs-onlyのためアプリビルド、Swiftテスト、web buildは未実行。
+
+## イテレーション1226.155：有料権限非決済境界
+
+### 背景・問題意識
+
+現行Swift Nativeでは、StoreKit経路、メグルムプラス、有料権限、広告非表示、ブースト、優先表示、作成上限拡張、保存枠拡張、サーバー側の権限同期候補が存在する。これらはアプリ内の機能利用権として設計されているが、画面、FAQ、App Store表示、Review Notes又はサポート文面で「ポイント」「残高」「特典」「ブースト残数」等として見えると、現金価値、前払式支払手段、決済手段、譲渡可能資産、取引成立保証、閲覧数保証又は返金保証のように誤読されるリスクがある。
+
+コード変更禁止の指示を守り、利用規約、プライバシーポリシー、FAQ、アプリ内安全コピー案、IAP設定ワークシート、収益化メモ、法務整合メモ、Word改訂案のみ更新した。
+
+### 変更内容
+
+#### `notes/legal/01_terms_of_service_draft.md`
+- ステータス行へ `有料権限・ブースト非決済手段` を追加した。
+- 第7条へ、ブースト、優先表示、広告非表示、作成上限拡張、保存枠拡張その他有料サービスに関する権限、残数、特典、バッジ又は表示上の状態は、本アプリ内でのみ利用できるサービス上の利用権であり、現金、金券、電子マネー、暗号資産、ポイント、前払式支払手段、資金移動、預り金、投資商品、決済手段又は第三者への支払手段ではないことを追加した。
+- 第7条へ、有料権限等は、別途明示的に認める場合を除き、譲渡、貸与、相続、担保設定、換金、払い戻し請求権化、再販売、交換、外部サービスへの持ち出し又はアカウント間移転ができないことを追加した。
+- 第7条へ、有料権限等は、法令、アプリストア規約、返金、取消、期限切れ、アカウント制限、規約違反、機能終了、仕様変更又は運営上の必要により、失効、消費、停止、取消、調整又は削除される場合があることを追加した。
+
+#### `notes/legal/02_privacy_policy_draft.md`
+- ステータス行へ `有料権限・ブースト` を追加した。
+- 取得情報へ、ブースト残数、付与数、消費数、発動履歴、対象、効果時間、優先表示状態、広告非表示、作成上限、保存枠、バッジ、期限、権限停止、取消、調整その他有料サービスに関する情報を追加した。
+
+#### `notes/55_public_help_faq_draft.md`
+- ステータスをDraft v2.0へ更新し、`有料権限・ブースト` を追加した。
+- 有料機能FAQへ、ブーストや優先表示はMegrum内の表示補助であり、取引成立、閲覧数、返信、評価、売買、交換を保証しないこと、現金化、譲渡、売買、アカウント間移転又は外部サービスへの持ち出しはできないことを追加した。
+
+#### `notes/56_in_app_legal_safety_copy_deck.md`
+- ステータスをDraft v1.7へ更新し、`有料権限・ブースト` を追加した。
+- 有料機能コピーへ、ブーストや優先表示がMegrum内の表示補助であり、取引成立、閲覧数、返信、評価を保証しない短文案を追加した。
+- No-Goへ、ブースト又は優先表示を現金価値、譲渡可能資産、決済手段、取引成立保証、閲覧数保証、返信保証のように見せないことを追加した。
+
+#### `notes/33_iap_product_setup_worksheet.md`
+- ステータスをDraft v0.4へ更新し、`有料権限・ブースト非決済手段` を追加した。
+- ブースト設計表へ、ブーストはMegrum内の表示補助特典であり、現金、ポイント、前払式支払手段、資金移動、預り金、決済手段又は譲渡可能資産として説明しないことを追加した。
+- 未使用残数の扱いについて、期限切れ、消費、停止、取消、調整、削除、返金/取消イベントとの同期、現金化、譲渡、再販売、アカウント間移転、外部持ち出し、結果保証を否定する説明を追加した。
+
+#### `notes/16_monetization.md`
+- ブーストの払い戻し欄を、App Storeの返金手続、利用規約、法令、返金/取消イベントとサーバー残数調整に従う説明へ修正し、未使用分の返金を画面やFAQで一律保証しない方針にした。
+- Absolute No-Goへ、ブーストを現金、ポイント、前払式支払手段、資金移動、預り金、決済手段、譲渡可能資産、取引成立保証、閲覧数保証、返信保証のように見せないことを追加した。
+
+#### `notes/17_legal_alignment.md`
+- 有料権限・ブーストの非決済手段境界セクションを追加した。
+- Apple In-App Purchase、資金決済に関する法律、StoreKit経路、Megrum Plus、ブースト、優先表示、返金/取消/期限切れ同期、App Store表示、FAQ、Review Notesで揃えるべき境界を記録した。
+
+#### `利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+- Markdown利用規約と同じ有料権限・ブースト非決済手段の説明をWord版へ同期した。
+
+#### `利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+- Markdownプライバシーポリシーと同じ有料権限・ブースト関連データの説明をWord版へ同期した。
+
+### 影響範囲
+
+- 利用規約、プライバシーポリシー、Word版法務文書、FAQ、アプリ内安全コピー案、IAP設定ワークシート、収益化メモ、法務整合メモ、メグルムプラス、ブースト、優先表示、広告非表示、作成上限、保存枠、App Store Connect、Review Notes、サーバー側の返金/取消/期限切れ同期方針
+
+Swift Native、Web、Supabase、DB、公開URL、App Store Connect実入力は変更していない。既存の有料権限・ブースト設計の法務説明を補強しただけで、状態遷移、用語、データモデルの追加変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の追加更新は行っていない。
+
+### 確認方法
+
+- Apple Developer In-App Purchase（https://developer.apple.com/in-app-purchase/）
+  - checked
+- 資金決済に関する法律（https://laws.e-gov.go.jp/law/421AC0000000059）
+  - checked
+- `rg -n '有料権限・ブースト|有料権限・ブースト非決済手段|前払式支払手段|譲渡、貸与、相続|ブースト残数|現金化、譲渡、売買|閲覧数保証|未使用分の返金' notes notes/legal`
+  - passed
+- `unzip -t 利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+  - passed
+- `unzip -t 利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+  - passed
+- `render_docx.py /Users/michitaka/Desktop/Megrum/利用規約など/01_Megrum利用規約_20260629改訂案.docx --output_dir /tmp/megrum-legal-render-paid-entitlements/terms --emit_pdf`
+  - passed（41 pages）
+- `render_docx.py /Users/michitaka/Desktop/Megrum/利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx --output_dir /tmp/megrum-legal-render-paid-entitlements/privacy --emit_pdf`
+  - passed（34 pages）
+- bundled Poppler `pdftotext` によるPDFキーワード検査
+  - passed（利用規約: `有料権限・ブースト非決済手段`、`前払式支払手段`、`譲渡、貸与、相続`。プライバシーポリシー: `有料権限・ブースト`、`ブースト残数`、`発動履歴`）
+- レンダーPNGの全ページ検査
+  - passed（利用規約41 pages、プライバシーポリシー34 pages。全ページ非空）
+- 追加箇所付近のレンダー画像目視
+  - checked（利用規約第7条、プライバシーポリシー第2条）
+- `git diff --check -- notes notes/legal`
+  - passed
+- `git diff --name-only` のdocs外差分確認
+  - passed（docs以外なし）
+
+### セルフレビュー結果
+
+- ✅ ブースト、優先表示、広告非表示、上限拡張、保存枠、バッジ、残数を、アプリ内のサービス利用権に限定し、現金価値、ポイント、前払式支払手段、決済手段、譲渡可能資産、投資商品に見えない境界を補強した。
+- ✅ 譲渡、貸与、相続、担保設定、換金、払い戻し請求権化、再販売、交換、外部持ち出し、アカウント間移転を原則不可として明確化した。
+- ✅ 取引成立、閲覧数、返信、評価、売買又は交換の保証に見えないよう、FAQ、アプリ内コピー案、IAP設定ワークシート、収益化メモにも同じ境界を同期した。
+- ✅ Word版利用規約・プライバシーポリシーへ同期し、PDFレンダー、キーワード抽出、PNG非空チェック、目視確認まで実施した。
+- ✅ コード、Web実装、iOS実装、Supabase、DB、公開URL、App Store Connect実入力は変更していない。
+- ✅ docs-onlyのためアプリビルド、Swiftテスト、web buildは未実行。
+
+## イテレーション1226.154：会場施設ルール境界
+
+### 背景・問題意識
+
+現行Swift Nativeでは、現地交換モード、場所メモ、会場名、駅名、会場周辺、会場横、東京ドーム22ゲート前、会場ロビー等の表示・プレビュー・入力欄がある。ユーザー体験としては自然だが、イベント主催者、興行主、会場、駅、商業施設、公共空間、交通機関又は店舗がMegrum上の交換を承認、公認、提携、許可、推奨又は安全確認したように読まれるリスクがある。
+
+コード変更禁止の指示を守り、利用規約、FAQ、アプリ内安全コピー案、法務整合メモ、Word改訂案のみ更新した。
+
+### 変更内容
+
+#### `notes/legal/01_terms_of_service_draft.md`
+- ステータス行へ `会場・施設ルール` を追加した。
+- 第15条へ、現地交換、待ち合わせ、場所メモ、会場情報、現在地共有又は周辺掲示を利用する場合、イベント主催者、興行主、会場、施設、駅、商業施設、公共空間、交通機関、警備会社、店舗、自治体その他関係者が定める利用規則、掲示、案内、警備員又はスタッフの指示、撮影禁止、交換、譲渡、物販、金銭授受、滞留、行列、荷物、通行、立入り、営業時間その他の制限を会員自身が確認し従うことを追加した。
+- 第15条へ、通行妨害、滞留、騒音、周辺住民又は来場者への迷惑、無許可営業、無許可の物販、勧誘、転売、チラシ配布、禁止エリアへの立入り、施設設備の占有、会場又は施設の運営妨害、警備員、スタッフ又は管理者の指示違反を禁止する説明を追加した。
+- 第15条へ、イベント名、会場名、駅名、店舗名、施設名、場所名、地図、距離、周辺情報又は会場情報が表示されても、当該イベント、主催者、興行主、会場、施設、店舗、交通機関又は権利者がMegrum、現地交換、会員間取引、待ち合わせ又は投稿を承認、公認、提携、許可、推奨又は安全確認したことを意味しないことを追加した。
+- 第26条の禁止行為へ、会場・施設・駅・イベント等のルール、掲示、案内、警備員又はスタッフ指示に反し、通行妨害、滞留、無許可営業、無許可の物販、勧誘、転売、禁止エリア立入り、撮影禁止違反、施設設備占有等を行うことを追加した。
+
+#### `notes/55_public_help_faq_draft.md`
+- ステータスをDraft v1.9へ更新し、`会場・施設ルール` を追加した。
+- 現地交換FAQへ、会場、施設、駅、商業施設、イベント主催者、警備員、スタッフなどのルールや案内に従うこと、Megrum上に会場名、駅名、地図、場所メモが表示されても、その場所での交換が公認、許可又は安全確認済みであることを意味しないことを追加した。
+
+#### `notes/56_in_app_legal_safety_copy_deck.md`
+- ステータスをDraft v1.6へ更新し、`会場・施設ルール` を追加した。
+- 現地交換の安全コピーへ、会場、駅、施設、イベント主催者、スタッフのルールに従うこと、表示された場所が交換を公認又は許可しているとは限らないことを追加した。
+- No-Goへ、会場、駅、施設又はイベント主催者がMegrum上の交換を公認、許可又は安全確認済みであるように見せないことを追加した。
+
+#### `notes/17_legal_alignment.md`
+- 会場・施設ルールとイベント主催者非関与の責任境界セクションを追加した。
+- 公開前No-Goとして、会場名、駅名、施設名、イベント名、地図、場所メモ、現地交換モード、グルーム又はスポット掲示板を、会場公認の交換場所、主催者提携サービス、施設許可済み導線、滞留や物販の許可、警備員確認済み、安全確認済みスポット、会場ルール適合保証のように説明しないことを明記した。
+
+#### `利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+- Markdown利用規約と同じ会場・施設ルールの説明をWord版へ同期した。
+
+### 影響範囲
+
+- 利用規約、Word版利用規約、FAQ、アプリ内安全コピー案、法務整合メモ、現地交換、場所メモ、会場名/駅名/施設名表示、めぐり、グルーム、スポット掲示板、Review Notes、サポート返信方針
+
+プライバシーポリシー、Swift Native、Web、Supabase、DB、公開URL、App Store Connect実入力は変更していない。状態遷移、用語、データモデルの変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の追加更新は行っていない。
+
+### 確認方法
+
+- `rg -n '会場・施設ルール|通行妨害|無許可営業|公認又は許可|承認、公認、提携、許可|イベント主催者、興行主|撮影禁止違反' notes/legal/01_terms_of_service_draft.md notes/17_legal_alignment.md notes/55_public_help_faq_draft.md notes/56_in_app_legal_safety_copy_deck.md`
+  - passed
+- `unzip -t 利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+  - passed
+- `render_docx.py /Users/michitaka/Desktop/Megrum/利用規約など/01_Megrum利用規約_20260629改訂案.docx --output_dir /tmp/megrum-legal-render-venue-rules/terms --emit_pdf`
+  - passed（40 pages）
+- bundled Poppler `pdftotext` によるPDFキーワード検査
+  - passed（`会場・施設ルール`、`通行妨害`、`無許可営業`、`承認、公認、提携、許可`、`撮影禁止違反`）
+- レンダーPNGの全ページ検査
+  - passed（利用規約40 pages。全ページ非空）
+- 追加箇所付近のレンダー画像目視
+  - checked（利用規約第15条）
+- `git diff --check -- notes notes/legal`
+  - passed
+- `git diff --name-only` のdocs外差分確認
+  - passed（docs以外なし）
+
+### セルフレビュー結果
+
+- ✅ 会場名、駅名、施設名、地図、場所メモが、主催者公認・施設許可済み・安全確認済みのように読まれない境界を補強した。
+- ✅ 通行妨害、滞留、無許可営業、無許可物販、勧誘、転売、禁止エリア立入り、撮影禁止違反、警備員/スタッフ指示違反を禁止行為として明確化した。
+- ✅ FAQとアプリ内コピー案にも、ユーザー向けに短く同じ注意が出るよう同期した。
+- ✅ Word版利用規約へ同期し、PDFレンダー、キーワード抽出、PNG非空チェック、目視確認まで実施した。
+- ✅ コード、Web実装、iOS実装、Supabase、DB、公開URL、App Store Connect実入力は変更していない。
+- ✅ docs-onlyのためアプリビルド、Swiftテスト、web buildは未実行。
+
+## イテレーション1226.153：緊急時安全責任境界
+
+### 背景・問題意識
+
+現行Swift Nativeでは、現地交換、待ち合わせ候補、位置情報共有、服装写真共有、到着状況、取引チャット、通報、ブロック、異議申し立て、評価、証跡が存在する。これらは安全補助として重要だが、警察、消防、医療機関、警備、付き添い、身元確認、所在確認、常時監視、事故防止又は救助の代替に見えると、緊急時の期待値と運営者責任が過度に膨らむリスクがある。
+
+コード変更禁止の指示を守り、利用規約、プライバシーポリシー、法務整合メモ、Word改訂案のみ更新した。
+
+### 変更内容
+
+#### `notes/legal/01_terms_of_service_draft.md`
+- ステータス行へ `緊急時・安全対応非代替` を追加した。
+- 第15条へ、身体の危険、犯罪被害、差し迫った脅迫、ストーカー行為、詐欺、盗難、暴行、医療上の緊急事態、災害、会場又は施設内トラブル等では、アプリ内の通報、問い合わせ、ブロック、位置情報共有、服装写真共有、到着状況又は安全案内を待たず、警察、消防、医療機関、会場スタッフ、施設管理者、消費生活センターその他適切な公的機関又は専門機関へ連絡又は相談することを追加した。
+- 第15条へ、通報、ブロック、異議申し立て、問い合わせ、位置情報共有、服装写真共有、到着状況、安全案内その他の機能は、緊急通報、救助、警備、警察対応、医療対応、法律相談、身元確認、所在確認、常時監視、付き添い、事故防止又は公的救済手段の代替ではないことを追加した。
+- 運営者が緊急時の即時監視、即時返信、現場対応、関係機関への連絡、会員の保護、救助又は被害防止を保証しないことを明記した。
+
+#### `notes/legal/02_privacy_policy_draft.md`
+- ステータス行へ `緊急時・生命身体財産保護` を追加した。
+- 第3条の利用目的へ、生命、身体又は財産の保護、緊急時の安全確保補助を追加した。
+- 第6条へ、通報、異議申し立て、ブロック、問い合わせ又はモデレーション情報について、警察、消防、医療機関、会場又は施設の管理者その他必要な相手へ、調査、安全確保、規約違反対応、法令遵守、権利保護又は生命、身体若しくは財産の保護のため必要な範囲で確認又は提供されることがある旨を追加した。
+- 第7条へ、本人又は第三者の生命、身体又は財産の保護のため必要があり本人同意取得が困難な場合等、個人情報保護法その他法令により認められる場合には、必要な範囲で個人データを第三者提供し得ることを追加した。
+
+#### `notes/17_legal_alignment.md`
+- 緊急時・安全対応の非代替と生命身体財産保護のセクションを追加した。
+- 公開前No-Goとして、Megrumの通報、ブロック、位置情報、服装写真、到着状況、安全案内、モデレーション又はサポートを、緊急通報、警察・消防・医療への自動連絡、警備、付き添い、本人確認、安全確認済み、事故防止、ストーカー防止、詐欺防止、救助保証又は即時対応保証のように説明しないことを明記した。
+
+#### `利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+- Markdown利用規約と同じ緊急時・安全対応非代替の説明をWord版へ同期した。
+
+#### `利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+- Markdownプライバシーポリシーと同じ生命身体財産保護・第三者提供例外の説明をWord版へ同期した。
+
+### 影響範囲
+
+- 利用規約、プライバシーポリシー、Word版法務文書、法務整合メモ、現地交換、通報、ブロック、位置情報、服装写真、到着状況、安全案内、FAQ、アプリ内安全コピー、サポート返信方針
+
+Swift Native、Web、Supabase、DB、公開URL、App Store Connect実入力は変更していない。状態遷移、用語、データモデルの変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の追加更新は行っていない。
+
+### 確認方法
+
+- 個人情報保護法（https://laws.e-gov.go.jp/law/415AC0000000057）
+  - checked
+- `rg -n '緊急時・安全対応非代替|緊急時・生命身体財産保護|緊急通報、救助、警備|即時監視、即時返信|生命、身体又は財産の保護|警察、消防、医療機関、会場又は施設の管理者|本人又は第三者の生命、身体又は財産' notes/legal/01_terms_of_service_draft.md notes/legal/02_privacy_policy_draft.md notes/17_legal_alignment.md`
+  - passed
+- `unzip -t 利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+  - passed
+- `unzip -t 利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+  - passed
+- `render_docx.py /Users/michitaka/Desktop/Megrum/利用規約など/01_Megrum利用規約_20260629改訂案.docx --output_dir /tmp/megrum-legal-render-emergency-safety-v2/terms --emit_pdf`
+  - passed（40 pages）
+- `render_docx.py /Users/michitaka/Desktop/Megrum/利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx --output_dir /tmp/megrum-legal-render-emergency-safety-v2/privacy --emit_pdf`
+  - passed（34 pages）
+- bundled Poppler `pdftotext` によるPDFキーワード検査
+  - passed（利用規約: `緊急時・安全対応非代替`、`緊急通報`、`即時監視`。プライバシーポリシー: `緊急時・生命身体財産保護`、`生命、身体又は財産`、`警察、消防、医療機関`）
+- レンダーPNGの全ページ検査
+  - passed（利用規約40 pages、プライバシーポリシー34 pages。全ページ非空）
+- 追加箇所付近のレンダー画像目視
+  - checked（利用規約第15条、プライバシーポリシー第7条）
+- `git diff --check -- notes notes/legal`
+  - passed
+- `git diff --name-only` のdocs外差分確認
+  - passed（docs以外なし）
+
+### セルフレビュー結果
+
+- ✅ 現地交換・位置情報・服装写真・通報・ブロックを安全補助に限定し、緊急通報や救助の代替に見えないよう補強した。
+- ✅ 危険時はアプリ内対応を待たず公的機関、専門機関、会場スタッフ又は施設管理者へ相談する導線を規約へ明記した。
+- ✅ プライバシーポリシー側では、生命身体財産保護時の利用目的と第三者提供例外を個人情報保護法の枠に合わせて追加した。
+- ✅ Word版の利用規約・プライバシーポリシーへ同期し、PDFレンダー、キーワード抽出、PNG非空チェック、目視確認まで実施した。
+- ✅ コード、Web実装、iOS実装、Supabase、DB、公開URL、App Store Connect実入力は変更していない。
+- ✅ docs-onlyのためアプリビルド、Swiftテスト、web buildは未実行。
+
+## イテレーション1226.152：第三者SDKライセンス境界
+
+### 背景・問題意識
+
+現行Swift Nativeの `ios-native/Package.swift` はGoogle Mobile Ads SDKをSwiftPM依存として取り込み、`MegrumApp` targetで `GoogleMobileAds` productをiOS条件付きでlinkしている。Web側にはNext.js、React、Tailwind、ESLint等多数のnpm依存とライセンスファイルが存在する。利用規約上、Megrum本体の知的財産権と、第三者SDK、OSS、API、フォント、素材、外部サービスのライセンス境界を明確にしておかないと、Megrum規約だけで第三者権利物の再利用権まで許諾したように読まれる余地がある。
+
+コード変更禁止の指示を守り、利用規約、法務整合メモ、Word改訂案のみ更新した。
+
+### 変更内容
+
+#### `notes/legal/01_terms_of_service_draft.md`
+- ステータス行へ `第三者SDK・OSSライセンス` を追加した。
+- 第31条へ、本アプリにはOS、アプリストア、外部SDK、クラウドサービス、広告SDK、地図、認証、決済、AI、通知、フォント、画像処理、オープンソースソフトウェアその他第三者が権利を有するソフトウェア、ライブラリ、API、データ、フォント又は素材が含まれ、又は連携し得ることを追加した。
+- 第三者要素の知的財産権、利用条件、ライセンス表示、禁止事項、責任制限、更新、停止又は終了は、各権利者、提供者、アプリストア又は外部サービスが定めるライセンス、規約、ポリシー又は技術仕様に従うことを明記した。
+- 本規約は、第三者のソフトウェア、SDK、API、データ、商標、ロゴ、フォント又は素材について、本アプリの通常利用に必要な範囲を超える権利を許諾しないこと、第三者の権利表示、ライセンス表示又は技術的保護手段を削除、改変、回避又は無効化してはならないことを追加した。
+
+#### `notes/17_legal_alignment.md`
+- 第三者SDK・OSSライセンスの責任境界セクションを追加した。
+- Google Mobile Ads SDK、Web npm依存、OSS notice、SDK attribution、第三者権利表示の確認がリリース前論点であることを記録した。
+- 公開前No-Goとして、OSS/SDKのライセンス表示又は第三者権利表示を不要と判断しないこと、Google Mobile Ads、Apple/Google/Supabase/OpenAI等のロゴ、SDK、API、データ又は商標について、Megrum規約だけで再利用権を許諾しているように説明しないことを明記した。
+
+#### `利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+- Markdown利用規約と同じ第三者SDK・OSSライセンスの説明をWord版へ同期した。
+
+### 影響範囲
+
+- 利用規約、Word版利用規約、法務整合メモ、OSS notice、SDK attribution、アプリ内/公開Web/審査資料の第三者権利表示方針
+
+プライバシーポリシー、Swift Native、Web、Supabase、DB、App Store Connect実入力は変更していない。状態遷移、用語、データモデルの変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の追加更新は行っていない。
+
+### 確認方法
+
+- `sed -n '1,140p' ios-native/Package.swift`
+  - checked（`swift-package-manager-google-mobile-ads` / `GoogleMobileAds`）
+- `find . -maxdepth 4 -iname '*license*' -o -iname 'Package.resolved' -o -iname 'NOTICE*'`
+  - checked（Web npm依存のライセンスファイルと `ios-native/Package.resolved` を確認）
+- `rg -n '第三者SDK・OSSライセンス|外部SDK、クラウドサービス、広告SDK|オープンソースソフトウェア|ライセンス表示|技術的保護手段|GoogleMobileAds|Package\\.swift' notes/legal/01_terms_of_service_draft.md notes/17_legal_alignment.md ios-native/Package.swift`
+  - passed
+- `unzip -t 利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+  - passed
+- `render_docx.py /Users/michitaka/Desktop/Megrum/利用規約など/01_Megrum利用規約_20260629改訂案.docx --output_dir /tmp/megrum-legal-render-third-party-licenses/terms --emit_pdf`
+  - passed（29 pages）
+- bundled Poppler `pdftotext` によるPDFキーワード検査
+  - passed（`第三者 SDK・OSS ライセンス`、`外部 SDK`、`オープンソースソフトウェア`、`ライセンス表示`、`技術的保護手段` を確認）
+- レンダーPNGの全ページ検査
+  - passed（利用規約29 pages。全ページ非空）
+
+### セルフレビュー結果
+
+- ✅ Megrum本体の権利と、第三者SDK/OSS/API/フォント/素材の権利境界を利用規約上分けた。
+- ✅ 第三者ライセンス、規約、ポリシー、技術仕様が優先的に適用され得ることを明記した。
+- ✅ Megrum規約だけで第三者権利物の再利用権を許諾したように読まれない文言にした。
+- ✅ Word版利用規約へ同期し、PDFレンダーと非空チェックまで確認した。
+- ✅ コード、Web実装、iOS実装、Supabase、DB、App Store Connect実入力は変更していない。
+- ✅ docs-onlyのためアプリビルド、Swiftテスト、web buildは未実行。
+
+## イテレーション1226.151：未成年広告境界補強
+
+### 背景・問題意識
+
+現行Swift Nativeでは、アカウント設定フローで生年月日入力が必須であり、年齢又は年代表示を生成し得る。一方で、最低年齢制限、公的年齢確認、身分証確認、保護者同意確認、保護者管理機能は未確認である。また、Google Mobile Ads SDK / AdMob構成があり、現行検索ではATT要求、UMP同意管理、非パーソナライズ広告指定、Publisher First-Party ID制御、mediation制御、child-directed treatment、users under age of consent向け設定、test device id指定は未確認である。
+
+そのため、子ども向け専用サービス、年齢確認済みサービス、保護者同意確認済みサービス、広告年齢適合性確認済みサービスのように読まれないよう、コード変更禁止の指示を守って利用規約、プライバシーポリシー、法務整合メモ、Word改訂案のみ補強した。
+
+### 変更内容
+
+#### `notes/legal/01_terms_of_service_draft.md`
+- ステータス行の `未成年・生年月日` を `未成年・生年月日・広告年齢制限` へ更新した。
+- 第3条へ、Megrumは別段の明示がない限りApp StoreのKids Categoryその他子ども向け専用カテゴリを対象とするサービスではなく、実年齢、法定代理人同意、保護者管理、年齢確認又は広告適合性が常に確認済みであることを保証しないことを追加した。
+- 第8条へ、自己申告年齢、生年月日、年齢区分、端末、OS、アプリストア、広告配信事業者の設定、同意状態、地域、法令又はプラットフォームポリシーに応じて、広告リクエスト、パーソナライズ広告、トラッキング、広告カテゴリ、広告表示、レコメンド又はProduct Personalizationを制限、停止又は変更し得ることを追加した。
+- 広告配信事業者の年齢区分判定又は全ての広告内容の年齢適合性を常時確認又は保証しないことを明記した。
+
+#### `notes/legal/02_privacy_policy_draft.md`
+- ステータス行の `未成年・生年月日` を `未成年・生年月日・広告年齢制限` へ更新した。
+- 第16条へ、Megrumは別段の明示がない限りApp StoreのKids Categoryその他子ども向け専用カテゴリを対象とするサービスではないことを追加した。
+- 第16条へ、自己申告された生年月日又は年齢、年齢区分、同意状態、地域、端末、OS、アプリストア、広告配信事業者又は外部サービスの設定、法令又はプラットフォームポリシーに応じて、広告表示、広告リクエスト、パーソナライズ広告、トラッキング、広告カテゴリ、レコメンド、Product Personalization、AI機能、外部送信、位置情報、会員間連絡、会員間支払い等を制限、停止又は変更し得ることを追加した。
+- 生年月日又は年齢の入力及び表示は、広告配信事業者による年齢区分判定又は全ての広告内容の年齢適合性確認が完了したことを意味しないことを追加した。
+
+#### `notes/17_legal_alignment.md`
+- 未成年・生年月日・広告年齢制限の責任境界セクションを追加した。
+- child-directed treatment、users under age of consent向け設定、非パーソナライズ広告指定等が未確認であることを記録した。
+- 公開前No-Goとして、MegrumをKids Category対象、子ども向け専用、年齢確認済み、保護者同意確認済み、広告内容を年齢別に全件確認済み、不適切広告が出ない、又はAdMobのchild-directed/under-age設定が完了済みであるかのように説明しないことを明記した。
+
+#### `利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+- Markdown利用規約と同じ未成年・広告年齢制限の説明をWord版へ同期した。
+
+#### `利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+- Markdownプライバシーポリシーと同じ未成年・広告年齢制限の説明をWord版へ同期した。
+
+### 影響範囲
+
+- 利用規約、プライバシーポリシー、Word版法務文書、法務整合メモ、App Privacy、Age Rating、広告設定、FAQ、Review Notes、アプリ内安全コピーの未成年・広告説明方針
+
+Swift Native、Web、Supabase、DB、App Store Connect実入力は変更していない。状態遷移、用語、データモデルの変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の追加更新は行っていない。
+
+### 確認方法
+
+- Apple App Review Guidelines Kids Category（https://developer.apple.com/app-store/review/guidelines/#kids-category）
+  - checked
+- Google AdMob child-directed treatment（https://support.google.com/admob/answer/6223431）
+  - checked
+- Google AdMob users under age of consent（https://support.google.com/admob/answer/9004919）
+  - checked
+- `rg -n '未成年|13歳|16歳|18歳|子ども|児童|生年月日|年齢|保護者|法定代理人|広告|パーソナライズ|トラッキング|child|children|age|NSUserTracking|AdMob|MobileAds|tagForChild|underAge|UMP' notes/legal/01_terms_of_service_draft.md notes/legal/02_privacy_policy_draft.md notes/17_legal_alignment.md notes/43_app_privacy_connect_answer_sheet.md notes/44_privacy_manifest_sdk_audit.md notes/55_public_help_faq_draft.md ios-native/Sources ios-native/App`
+  - checked
+- `rg -n '未成年・生年月日・広告年齢制限|Kids Category|子ども向け専用|広告リクエスト|年齢区分|広告配信事業者による年齢区分判定|child-directed|under age of consent' notes/legal/01_terms_of_service_draft.md notes/legal/02_privacy_policy_draft.md notes/17_legal_alignment.md`
+  - passed
+- `unzip -t 利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+  - passed
+- `unzip -t 利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+  - passed
+- `render_docx.py /Users/michitaka/Desktop/Megrum/利用規約など/01_Megrum利用規約_20260629改訂案.docx --output_dir /tmp/megrum-legal-render-minor-ads/terms --emit_pdf`
+  - passed（29 pages）
+- `render_docx.py /Users/michitaka/Desktop/Megrum/利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx --output_dir /tmp/megrum-legal-render-minor-ads/privacy --emit_pdf`
+  - passed（26 pages）
+- bundled Poppler `pdftotext` によるPDFキーワード検査
+  - passed（`Kids Category`、`子ども向け専用`、`広告リクエスト`、`年齢区分` を確認。ステータス行の `未成年・生年月日・広告年齢制限` はPDF抽出時に `広告` と `年齢制限` の間で改行されることを確認）
+- レンダーPNGの全ページ検査
+  - passed（利用規約29 pages、プライバシーポリシー26 pages。全ページ非空）
+
+### セルフレビュー結果
+
+- ✅ 子ども向け専用、年齢確認済み、保護者同意確認済み、広告年齢適合性確認済みという過剰保証を避けた。
+- ✅ 年齢や生年月日に応じて広告、レコメンド、AI、外部送信、位置情報、会員間連絡、会員間支払い等を制限し得る余地を明確化した。
+- ✅ AdMobのchild-directed/under-age関連設定が未確認であることを法務整合メモに残した。
+- ✅ Word版の利用規約・プライバシーポリシーへ同期し、PDFレンダーと非空チェックまで確認した。
+- ✅ コード、Web実装、iOS実装、Supabase、DB、App Store Connect実入力は変更していない。
+- ✅ docs-onlyのためアプリビルド、Swiftテスト、web buildは未実行。
+
+## イテレーション1226.150：登録禁止グッズ補強
+
+### 背景・問題意識
+
+現行Swift Nativeでは、グッズ登録、在庫情報、wish、個別募集、取引打診、検索、AI候補、画像登録、タグ付け等で、会員がグッズ名、説明、画像、カテゴリ、状態、交換可否、金額指定等を登録できる。利用規約第12条には登録できないグッズの大枠があったが、危険物、本人確認書類、医薬品、酒類、たばこ、食品、SIM、認証情報、QR/バーコード、生き物等をより具体的に列挙し、運営者が表示制限、削除、取引停止、アカウント制限を判断しやすい文言へ補強した。
+
+コード変更禁止の指示を守り、利用規約、法務整合メモ、Word改訂案のみ更新した。
+
+### 変更内容
+
+#### `notes/legal/01_terms_of_service_draft.md`
+- ステータス行へ `登録禁止グッズ・規制物品` を追加した。
+- 第12条へ、火薬類、銃砲刀剣類、武器、毒物、劇物、危険物、発火、爆発、漏えい、腐食、感染、有害物質又は配送事故のおそれがあるものを明記した。
+- 医薬品、医薬部外品、医療機器、化粧品、コンタクトレンズ、衛生用品、食品、飲料、サプリメント、酒類、たばこ、電子たばこ、年齢確認、資格、許認可、届出又は専門的管理を要するものを禁止対象として明記した。
+- 本人確認書類、学生証、社員証、会員証、保険証、個人番号、クレジットカード、キャッシュカード、SIMカード、電話番号、メールアドレス、ログイン情報、認証コード、バーコード、QRコード等を禁止対象として明記した。
+- 住所、注文履歴、配送伝票、追跡番号、位置情報、学校名、勤務先、顔写真等、公開又は取引対象化に適しない情報を含むものを禁止対象として明記した。
+- 生き物、遺体、遺骨、血液、体液、人体、人体由来物、宗教的又は祭祀的に慎重な取扱いを要するもの、仕入れ転売、代理販売、業としての取引等も明記した。
+
+#### `notes/17_legal_alignment.md`
+- 登録禁止グッズ・規制物品の列挙補強セクションを追加した。
+- 現行コード上、全ての禁止品、年齢制限品、規制品、本人確認書類、チケット情報、QR/バーコード、配送伝票等を登録前に網羅的に自動判定する前提にはできないことを記録した。
+- 公開前No-Goとして、FAQ、サポート返信、アプリ内コピー、Review Notes、広告説明で、Megrumが規制物品、年齢制限品、本人確認書類、決済/通信/入場用媒体、危険物、医薬品、食品、酒類、たばこ、SIM、アカウント等の交換を許可又は保証しているように説明しないことを明記した。
+
+#### `利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+- Markdown利用規約と同じ登録禁止グッズ・規制物品の説明をWord版へ同期した。
+
+### 影響範囲
+
+- 利用規約ドラフト、Word版利用規約、法務整合メモ、FAQ/Review Notes/アプリ内安全コピー/サポート対応の禁止品判断方針
+
+プライバシーポリシー、Swift Native、Web、Supabase、DB、App Store Connect実入力は変更していない。状態遷移、用語、データモデルの変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の追加更新は行っていない。
+
+### 確認方法
+
+- e-Gov関連法令（薬機法、銃砲刀剣類所持等取締法、毒物及び劇物取締法、酒税法、たばこ事業法）
+  - checked
+- `rg -n '禁止|出品|交換対象|盗品|チケット|危険物|医薬品|酒|たばこ|本人確認|身分証|現金|金券|有価証券|偽造|模倣|権利侵害|反社会|法令|年齢制限' notes/legal/01_terms_of_service_draft.md notes/legal/02_privacy_policy_draft.md notes/17_legal_alignment.md notes/02_system_requirements.md notes/05_data_model.md ios-native/Sources supabase/migrations`
+  - checked
+- `rg -n '登録禁止グッズ・規制物品|火薬類、銃砲刀剣類|医薬品、医薬部外品|本人確認書類、学生証|生き物、遺体|仕入れ転売|薬機法|銃砲刀剣類所持等取締法|毒物及び劇物取締法' notes/legal/01_terms_of_service_draft.md notes/17_legal_alignment.md`
+  - passed
+- `unzip -t 利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+  - passed
+- `render_docx.py /Users/michitaka/Desktop/Megrum/利用規約など/01_Megrum利用規約_20260629改訂案.docx --output_dir /tmp/megrum-legal-render-prohibited-goods/terms --emit_pdf`
+  - passed（29 pages）
+- bundled Poppler `pdftotext` によるPDFキーワード検査
+  - passed（`登録禁止グッズ・規制物品`、`火薬類、銃砲刀剣類`、`医薬品、医薬部外品`、`本人確認書類、学生証`、`生き物、遺体`、`仕入れ転売` を確認）
+- レンダーPNGの全ページ検査
+  - passed（利用規約29 pages。全ページ非空）
+
+### セルフレビュー結果
+
+- ✅ 第12条の禁止対象を、現行Megrumの画像登録、AI候補、郵送交換、現地交換、会員間支払い、通報運用に耐える粒度へ補強した。
+- ✅ 規制物品、年齢制限品、本人確認書類、決済/通信/入場用媒体、危険物、医薬品、食品、酒類、たばこ、生き物等について、運営者が許可又は保証したように読まれない文言にした。
+- ✅ 登録前の自動判定を保証せず、通報・表示制限・削除・取引停止・アカウント制限の根拠にしやすい整理を残した。
+- ✅ Word版利用規約へ同期し、PDFレンダーと非空チェックまで確認した。
+- ✅ コード、Web実装、iOS実装、Supabase、DB、App Store Connect実入力は変更していない。
+- ✅ docs-onlyのためアプリビルド、Swiftテスト、web buildは未実行。
+
+## イテレーション1226.149：国外移転説明補強
+
+### 背景・問題意識
+
+現行Swift Native及び運用メモでは、Supabase、Apple、Google、OpenAI、Google Mobile Ads / AdMob、APNs、MapKit / CoreLocation / CLGeocoder、ZipCloud、ホスティング、CDN、メール/サポート、App Store、外部SNS、外部決済サービス、金融機関等の外部サービス利用が確認されている。プライバシーポリシーには外国第三者提供の条項が既にあったが、外部サービスの再委託先、サブプロセッサ、保守、監視、障害対応又はサポート拠点を通じて国外保存・国外アクセス・国外処理が生じ得ること、及び全ての処理が日本国内で完結する保証をしないことの説明を明確化した。
+
+コード変更禁止の指示を守り、プライバシーポリシー、法務整合メモ、Word改訂案のみ更新した。
+
+### 変更内容
+
+#### `notes/legal/02_privacy_policy_draft.md`
+- ステータス行へ `国外移転・外国第三者提供・国外アクセス` を追加した。
+- 委託先及び外部サービスの説明へ、委託先、外部サービス、再委託先、サブプロセッサ、運用、保守、サポート、監視、障害対応、広告配信、AI処理、通知配信、地図、認証、決済、ホスティング、CDN等が外国に所在し、又は外国から個人データにアクセス、保存若しくは処理する場合があることを追加した。
+- 本アプリに関する全ての保存、処理、閲覧、保守又はサポートが日本国内で完結することを保証しないことを明記した。
+- 外国にある第三者への提供条項で、アカウント情報、識別子、認証情報、プロフィール、ユーザーコンテンツ、画像、位置情報、検索又は利用履歴、広告又は診断情報、問い合わせ内容、ログ、証跡、決済又は購読状態が外国にある第三者又はその再委託先で保存、閲覧、解析、処理又は保守され得ることを明記した。
+- 移転先国又は処理拠点は、外部サービス、データセンター、配信先、広告配信先、利用者所在地、再委託先又はサブプロセッサ変更等により変動し、事前に一律特定できない場合があること、その場合も合理的に可能な範囲で情報提供することを追加した。
+
+#### `notes/17_legal_alignment.md`
+- 国外移転・外国第三者提供・国外アクセスの説明補強セクションを追加した。
+- 個人情報保護法及び個人情報保護委員会の外国第三者提供ガイドラインの観点を踏まえ、移転先国が特定できない場合の理由・参考情報・保護措置の説明が論点になることを記録した。
+- 公開前No-Goとして、「Megrumの個人データはすべて日本国内だけで保存・処理される」「国外の委託先・再委託先・サブプロセッサからアクセスされない」「OpenAI、Google、Apple、Supabase、広告、通知、地図、ホスティング、サポート等への国外移転は一切ない」と説明しないことを明記した。
+
+#### `利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+- Markdownプライバシーポリシーと同じ国外移転・外国第三者提供・国外アクセスの説明をWord版へ同期した。
+
+### 影響範囲
+
+- プライバシーポリシードラフト、Word版プライバシーポリシー、法務整合メモ、App Privacy/外部サービス台帳/FAQ/Review Notesの国外移転説明方針
+
+利用規約本文、Swift Native、Web、Supabase、DB、App Store Connect実入力は変更していない。状態遷移、用語、データモデルの変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の追加更新は行っていない。
+
+### 確認方法
+
+- 個人情報保護法（https://laws.e-gov.go.jp/law/415AC0000000057）
+  - checked
+- 個人情報保護委員会 外国にある第三者への提供編（https://www.ppc.go.jp/personalinfo/legal/guidelines_offshore/）
+  - checked
+- `rg -n 'Supabase|OpenAI|AdMob|APNs|MapKit|CoreLocation|ZipCloud|外部サービス|国外|外国|委託先|PrivacyInfo|NSPrivacy|SKAdNetwork|ATT' ios-native notes/legal notes/17_legal_alignment.md notes/27_app_privacy_data_inventory.md notes/43_app_privacy_connect_answer_sheet.md notes/44_privacy_manifest_sdk_audit.md`
+  - checked
+- `rg -n '国外移転・外国第三者提供・国外アクセス|全ての保存、処理、閲覧、保守又はサポートが日本国内で完結|全ての移転先国、制度又は保護措置を事前に一律|合理的に可能な範囲|外部サービスの規約及びプライバシーポリシー|外国第三者提供ガイドライン' notes/legal/02_privacy_policy_draft.md notes/17_legal_alignment.md`
+  - passed
+- `unzip -t 利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+  - passed
+- `render_docx.py /Users/michitaka/Desktop/Megrum/利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx --output_dir /tmp/megrum-legal-render-cross-border/privacy --emit_pdf`
+  - passed（25 pages）
+- bundled Poppler `pdftotext` によるPDFキーワード検査
+  - passed（`国外移転・外国第三者提供・国外アクセス`、`日本国内で完結することを保証しません`、`全ての移転先国`、`合理的に可能な範囲` を確認）
+- レンダーPNGの全ページ検査
+  - passed（プライバシーポリシー25 pages。全ページ非空）
+- `git diff --check -- notes notes/legal`
+  - passed
+
+### セルフレビュー結果
+
+- ✅ 外部サービス、再委託先、サブプロセッサ、保守、監視、障害対応、サポート拠点による国外アクセス可能性を明記した。
+- ✅ 日本国内完結を保証しない境界を明確化し、運営者に不利な過剰保証を避けた。
+- ✅ 移転先国や保護措置を事前に一律特定できない場合の情報提供方針を追加した。
+- ✅ 外部SNS、外部決済、金融機関、地図、アプリストア等を利用者が自ら使う場合は、当該外部サービスの規約・Privacyに従うことを明記した。
+- ✅ Word版プライバシーポリシーへ同期し、PDFレンダーと非空チェックまで確認した。
+- ✅ コード、Web実装、iOS実装、Supabase、DB、App Store Connect実入力は変更していない。
+- ✅ docs-onlyのためアプリビルド、Swiftテスト、web buildは未実行。
+
+## イテレーション1226.148：端末内ローカル保存
+
+### 背景・問題意識
+
+現行Swift Nativeでは、`PrivacyInfo.xcprivacy` が `NSPrivacyAccessedAPICategoryUserDefaults` / `CA92.1` を申告しており、`@AppStorage` により交換条件、活動都道府県、日程条件、郵送条件、近くモードの有効状態、活動場所名、緯度経度、開始時刻、継続時間、半径、持参グッズID、掲示板の都道府県又は閲覧範囲等が端末内UserDefaults系保存領域に残り得る。また `MegrumRemoteImageCache` は `URLCache` のdisk cacheとしてリモート画像を端末内にキャッシュする。Keychainは既に反映済みだったが、UserDefaults/AppStorage/URLCacheのローカル保存は説明が薄かったため、コード変更禁止の指示を守ってプライバシーポリシー・法務整合メモ・Word改訂案のみ補強した。
+
+### 変更内容
+
+#### `notes/legal/02_privacy_policy_draft.md`
+- ステータス行へ `UserDefaults・端末内ローカル設定` を追加した。
+- 取得情報へ、UserDefaults、AppStorage、URLCacheその他端末内の保存領域又はキャッシュを利用し、交換方法の希望、同一都道府県又は日程重複の条件、活動都道府県、選択日、郵送条件、近くモードの有効状態、活動場所名、緯度経度、開始時刻、継続時間、半径、持参グッズID、掲示板の都道府県又は閲覧範囲、画像キャッシュ等を端末内に保存し得ることを追加した。
+- 外部送信/端末保存の説明へ、UserDefaults、AppStorage、URLCache等に保存される情報は端末又はOSの管理下にあり、バックアップ、復元、共有端末、OS設定、キャッシュ削除、アプリ削除又は再インストールにより取扱いが異なることを追加した。
+- 保存期間及び削除へ、端末内KeychainだけでなくUserDefaults、AppStorage、URLCache、ローカル設定、画像キャッシュについても、ログアウト又はアカウント削除後に直ちに全削除されるとは限らないことを追加した。
+
+#### `notes/17_legal_alignment.md`
+- UserDefaults・AppStorage・URLCacheの端末内保存セクションを追加した。
+- Privacy ManifestのRequired Reason API申告と、App Privacy/公開Privacyのデータ説明は役割が異なることを記録した。
+- 公開前No-Goとして、UserDefaults Required Reasonがあるだけで公開PrivacyやApp Privacy説明不要と判断しないこと、近くモードの緯度経度や活動場所等が端末内に残り得るのに「端末内に個人情報や位置情報は保存しない」と説明しないことを明記した。
+
+#### `利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+- Markdownプライバシーポリシーと同じUserDefaults・端末内ローカル設定の説明をWord版へ同期した。
+
+### 影響範囲
+
+- プライバシーポリシードラフト、Word版プライバシーポリシー、法務整合メモ、App Privacy/Privacy Manifest/FAQ/Review Notesの端末内保存説明方針
+
+利用規約本文、Swift Native、Web、Supabase、DB、App Store Connect実入力は変更していない。状態遷移やデータモデルの変更はないため、`notes/09_state_machines.md` と `notes/05_data_model.md` の追加更新は行っていない。
+
+### 確認方法
+
+- `rg -n '@AppStorage|UserDefaults|URLCache|HomeExchangeSettingsStorageKeys|HomeLocalCoordinateStorageCodec|MegrumRemoteImageCache' ios-native/Sources ios-native/App`
+  - checked
+- `plutil -p ios-native/App/PrivacyInfo.xcprivacy`
+  - checked（`NSPrivacyAccessedAPICategoryUserDefaults` / `CA92.1`、`NSPrivacyTracking=false`）
+- Apple Describing use of required reason API（https://developer.apple.com/documentation/bundleresources/describing-use-of-required-reason-api）
+  - checked
+- `rg -n 'UserDefaults・端末内ローカル設定|UserDefaults、AppStorage、URLCache|近くモードの有効状態|MegrumRemoteImages|CA92\\.1|端末内ローカル設定' notes/legal/02_privacy_policy_draft.md notes/17_legal_alignment.md`
+  - passed
+- `unzip -t 利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+  - passed
+- `render_docx.py /Users/michitaka/Desktop/Megrum/利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx --output_dir /tmp/megrum-legal-render-local-storage/privacy --emit_pdf`
+  - passed（25 pages）
+- bundled Poppler `pdftotext` によるPDFキーワード検査
+  - passed（`UserDefaults`、`AppStorage`、`URLCache`、`近くモード`、`画像キャッシュ`、`ローカル設定` を確認）
+- レンダーPNGの全ページ検査
+  - passed（プライバシーポリシー25 pages。全ページ非空）
+- `git diff --check -- notes notes/legal`
+  - passed
+- `git diff --name-only | rg -v '^(notes/|利用規約など/)'`
+  - no output（Git管理上の差分はnotes配下のみ。DOCX成果物はGit管理外）
+
+### セルフレビュー結果
+
+- ✅ Keychain以外の端末内保存として、UserDefaults/AppStorage/URLCacheを明示した。
+- ✅ 近くモードの緯度経度・活動場所・半径・持参グッズID、交換条件、掲示板範囲、画像キャッシュが端末内に残り得ることを説明した。
+- ✅ ログアウト、アカウント削除、アプリ削除、OSバックアップ/復元で即時完全削除を保証しない境界を明確にした。
+- ✅ Word版プライバシーポリシーへ同期し、PDFレンダーと非空チェックまで確認した。
+- ✅ コード、Web実装、iOS実装、Supabase、DB、App Store Connect実入力は変更していない。
+- ✅ docs-onlyのためアプリビルド、Swiftテスト、web buildは未実行。
+
+## イテレーション1226.147：待ち合わせ候補日程公開
+
+### 背景・問題意識
+
+現行Swift Nativeでは、`ProposalMeetupInput` が `startAt`、`endAt`、`placeName`、`latitude`、`longitude` を保持し、打診作成時に `meetupCandidates` として複数候補を扱う。`SupabaseProposalPayloads` は `meetup_start_at`、`meetup_end_at`、`meetup_place_name`、`meetup_lat`、`meetup_lng`、`meetup_candidates`、`expose_calendar` をpayload化している。これはOSのCalendar/EventKitを読むものではないが、会員の活動予定、空き時間、候補場所、緯度経度、生活パターン又は居場所推測につながり得るため、コード変更禁止の指示を守って規約・プライバシーポリシー・法務整合メモ・Word改訂案のみ補強した。
+
+### 変更内容
+
+#### `notes/legal/01_terms_of_service_draft.md`
+- ステータス行へ `待ち合わせ候補・日程公開` を追加した。
+- 第13条へ、現地交換の待ち合わせ候補には、候補日時、開始時刻、終了時刻、場所名、緯度経度、複数候補、カレンダー形式での表示可否その他候補調整に必要な情報が含まれ得ることを追加した。
+- 第14条へ、会員が入力又は選択した待ち合わせ候補、活動予定、空き時間、カレンダー表示又は日程候補が、相手会員による検討、ネゴ、条件確認、取引成立、異議申し立て、通報対応その他運営上必要な範囲で表示、保存又は利用され得ることを追加した。
+- 第15条へ、待ち合わせ候補、活動予定、空き時間、候補日時、候補場所及びカレンダー表示に関する情報は、当該取引における条件調整、合流及び安全確認の目的に限って利用するものとし、相手会員の目的外利用を禁止する文言を追加した。
+
+#### `notes/legal/02_privacy_policy_draft.md`
+- ステータス行へ `待ち合わせ候補・日程公開` を追加した。
+- 取得情報として、現地交換における待ち合わせ日時、開始時刻、終了時刻、場所、場所名、緯度経度、複数の待ち合わせ候補、活動予定、空き時間、カレンダー形式での表示可否を明記した。
+- 利用目的として、待ち合わせ候補、複数候補、活動予定、空き時間、カレンダー表示、日程調整、合流、安全確保及びトラブル対応を明記した。
+
+#### `notes/17_legal_alignment.md`
+- 待ち合わせ候補・日程公開の取扱いセクションを追加した。
+- `ProposalCreateModels.swift` と `SupabaseProposalPayloads.swift` の確認結果を記録し、OSカレンダー/連絡先/端末上の全予定を読み取る説明をしないこと、反対にMegrum内候補日時・場所・緯度経度・表示フラグを扱うことを隠さないことをNo-Goにした。
+
+#### `利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+- Markdown規約と同じ待ち合わせ候補・日程公開条項をWord版へ同期した。
+
+#### `利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+- Markdownプライバシーポリシーと同じ待ち合わせ候補・日程公開の取得情報・利用目的をWord版へ同期した。
+
+### 影響範囲
+
+- 利用規約ドラフト、プライバシーポリシードラフト、Word版利用規約、Word版プライバシーポリシー、法務整合メモ、FAQ/Review Notes/App Privacy/アプリ内コピーの日程・位置情報説明方針
+
+Swift Native、Web、Supabase、DB、App Store Connect実入力は変更していない。状態遷移やデータモデルの変更はないため、`notes/09_state_machines.md` と `notes/05_data_model.md` の追加更新は行っていない。
+
+### 確認方法
+
+- `rg -n 'exposeCalendar|meetupCandidates|ProposalMeetupInput|meetupStartAt|meetupLat|meetupLng' ios-native/Sources/MegrumCore ios-native/Sources/MegrumData ios-native/Sources/MegrumApp supabase/migrations`
+  - checked
+- `rg -n '待ち合わせ候補・日程公開|複数の待ち合わせ候補|カレンダー形式での表示可否|候補日時、開始時刻、終了時刻|expose_calendar|OSのカレンダーアプリ' notes/legal/01_terms_of_service_draft.md notes/legal/02_privacy_policy_draft.md notes/17_legal_alignment.md`
+  - passed
+- `unzip -t 利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+  - passed
+- `unzip -t 利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+  - passed
+- `render_docx.py /Users/michitaka/Desktop/Megrum/利用規約など/01_Megrum利用規約_20260629改訂案.docx --output_dir /tmp/megrum-legal-render-meetup-schedule/terms --emit_pdf`
+  - passed（28 pages）
+- `render_docx.py /Users/michitaka/Desktop/Megrum/利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx --output_dir /tmp/megrum-legal-render-meetup-schedule/privacy --emit_pdf`
+  - passed（24 pages）
+- bundled Poppler `pdftotext` によるPDFキーワード検査
+  - passed（利用規約: `待ち合わせ候補`、`複数候補`、`カレンダー形式`、`条件調整` / Privacy: `活動予定、空き時間`、`カレンダー形式`、`日程調整` を確認）
+- レンダーPNGの全ページ検査
+  - passed（利用規約28 pages、プライバシーポリシー24 pages。全ページ非空）
+- `git diff --check -- notes notes/legal`
+  - passed
+- `git diff --name-only | rg -v '^(notes/|利用規約など/)'`
+  - no output（Git管理上の差分はnotes配下のみ。DOCX成果物はGit管理外）
+
+### セルフレビュー結果
+
+- ✅ Megrum内の候補日時・場所・緯度経度・カレンダー表示フラグを、位置情報及び取引情報として明示した。
+- ✅ OSカレンダーや端末上の全予定を読み取るものではない境界を法務整合メモへ残した。
+- ✅ 相手会員による目的外保存、転載、SNS投稿、第三者開示を禁止する範囲に待ち合わせ候補・空き時間・候補場所を含めた。
+- ✅ Word版利用規約・Word版プライバシーポリシーへ同期し、PDFレンダーと非空チェックまで確認した。
+- ✅ コード、Web実装、iOS実装、Supabase、DB、App Store Connect実入力は変更していない。
+- ✅ docs-onlyのためアプリビルド、Swiftテスト、web buildは未実行。
+
+## イテレーション1226.146：TestFlightベータ責任境界
+
+### 背景・問題意識
+
+Apple公式のTestFlight資料では、TestFlightはベータビルド配布、テスター管理、フィードバック収集、クラッシュや利用状況の確認に使われる。Megrumは、取引、会員間支払い、郵送先、位置情報、写真、通知、AI、広告、StoreKit等を含むため、TestFlight、開発版、検証版、ベータ版、プレビュー版、段階公開又は実験機能に、実在の取引、実在の支払い、郵送先、精密な現在地、機密情報又は不要な個人情報が混入すると、正式リリース前でもトラブル、漏えい、誤請求、審査資料混入、外部サービス送信のリスクがある。コード変更禁止の指示を守り、規約・プライバシーポリシー・法務整合メモ・Word改訂案のみ補強した。
+
+### 変更内容
+
+#### `notes/legal/01_terms_of_service_draft.md`
+- ステータス行へ `TestFlight・ベータ機能` を追加した。
+- 第6条へ、TestFlight、開発版、検証版、ベータ版、プレビュー版、段階公開、実験機能その他正式提供前又は限定提供中の機能では、仕様、画面、データ構造、表示範囲、提供地域、対象者、料金、広告、通知、AI機能、有料サービス、データ保存期間又はサポート範囲が予告なく変更、中断、非表示、削除、リセット又は終了され得ることを追加した。
+- 正式提供、継続提供、互換性、データ保存、取引成立、収益、広告表示、権限反映又は不具合がないことを保証しないこと、テスト利用者が実取引、実支払い、郵送先、精密な現在地、機密情報又は不要な個人情報を入力してはならないことを明記した。
+
+#### `notes/legal/02_privacy_policy_draft.md`
+- ステータス行へ `TestFlight・ベータ機能` を追加した。
+- 取得情報へ、TestFlight等でクラッシュログ、診断ログ、端末/OS情報、アプリバージョン、ビルド番号、起動状況、操作履歴、テスター情報、フィードバック本文、スクリーンショット、画面録画、問い合わせ内容、添付ファイル等を取得し得ることを追加した。
+- 外部送信へ、これらの情報がApple、App Store Connect、TestFlight、アプリストア、外部テスト配布サービス、クラウド基盤又は外部SDKへ送信又は共有され得ることを追加した。
+
+#### `notes/17_legal_alignment.md`
+- TestFlight・ベータ機能・段階公開の責任境界セクションを追加した。
+- 公開前No-Goとして、ベータ版データの正式版引き継ぎ保証、仕様固定、本番同等の安全性、診断ログ/スクリーンショットに個人情報が入らないこと、App Store ConnectやTestFlight feedbackにテスター/端末/利用状況情報が表示されないことを保証する説明をしない方針を明記した。
+- 参照元としてAppleのTestFlight Overview、TestFlight tester information、Beta tester feedbackを記録した。
+
+#### `利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+- Markdown規約と同じTestFlight・ベータ機能条項をWord版へ同期した。
+
+#### `利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+- Markdownプライバシーポリシーと同じTestFlight・ベータ機能の取得情報・外部送信説明をWord版へ同期した。
+
+### 影響範囲
+
+- 利用規約ドラフト、プライバシーポリシードラフト、Word版利用規約、Word版プライバシーポリシー、法務整合メモ、TestFlight案内/外部テスター募集/FAQ/Review Notes/サポート返信の説明方針
+
+Swift Native、Web、Supabase、DB、App Store Connect実入力は変更していない。状態遷移やデータモデルの変更はないため、`notes/09_state_machines.md` と `notes/05_data_model.md` の追加更新は行っていない。
+
+### 確認方法
+
+- Apple TestFlight Overview（https://developer.apple.com/help/app-store-connect/test-a-beta-version/testflight-overview/）
+  - checked
+- Apple TestFlight tester information（https://developer.apple.com/help/app-store-connect/reference/testflight/testflight-tester-information）
+  - checked
+- Apple Beta tester feedback（https://developer.apple.com/help/app-store-connect/reference/testflight/beta-tester-feedback）
+  - checked
+- `rg -n 'TestFlight・ベータ機能|TestFlight、開発版|正式提供、継続提供|クラッシュログ、診断ログ|App Store Connect、TestFlight|ベータ版のデータが必ず正式版' notes/legal/01_terms_of_service_draft.md notes/legal/02_privacy_policy_draft.md notes/17_legal_alignment.md`
+  - passed
+- `unzip -t 利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+  - passed
+- `unzip -t 利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+  - passed
+- `render_docx.py /Users/michitaka/Desktop/Megrum/利用規約など/01_Megrum利用規約_20260629改訂案.docx --output_dir /tmp/megrum-legal-render-beta/terms --emit_pdf`
+  - passed（28 pages）
+- `render_docx.py /Users/michitaka/Desktop/Megrum/利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx --output_dir /tmp/megrum-legal-render-beta/privacy --emit_pdf`
+  - passed（24 pages）
+- bundled Poppler `pdftotext` によるPDFキーワード検査
+  - passed（利用規約: `TestFlight・ベータ機能`、`TestFlight、開発版、検証版、ベータ版`、`正式提供、継続提供`、`実在の取引、実在の支払い` / Privacy: `TestFlight・ベータ機能`、`フィードバック本文、スクリーンショット`、`App Store Connect、TestFlight` を確認）
+- レンダーPNGの全ページ検査
+  - passed（利用規約28 pages、プライバシーポリシー24 pages。全ページ非空）
+- `git diff --check -- notes notes/legal`
+  - passed
+- `git diff --name-only | rg -v '^(notes/|利用規約など/)'`
+  - no output（Git管理上の差分はnotes配下のみ。DOCX成果物はGit管理外）
+
+### セルフレビュー結果
+
+- ✅ ベータ/段階公開/実験機能の仕様変更、停止、データ削除/リセット、正式提供非保証を明示した。
+- ✅ TestFlight等でクラッシュログ、診断情報、フィードバック、スクリーンショット、テスター/端末/ビルド情報が扱われ得ることをPrivacyへ反映した。
+- ✅ テスト利用者が実取引、実支払い、郵送先、精密な現在地、機密情報又は不要な個人情報を入れないよう規約・Privacy双方で明示した。
+- ✅ Word版利用規約・Word版プライバシーポリシーへ同期し、PDFレンダーと非空チェックまで確認した。
+- ✅ コード、Web実装、iOS実装、Supabase、DB、App Store Connect実入力は変更していない。
+- ✅ docs-onlyのためアプリビルド、Swiftテスト、web buildは未実行。
+
+## イテレーション1226.145：会員間支払い税務責任
+
+### 背景・問題意識
+
+現行規約は、会員間支払いについて、運営者が資金の受領、保管、送金、収納代行、立替、精算、返金、チャージバック対応、本人確認、信用審査、支払能力確認又はエスクローを行わないこと、税務処理その他支払い事項を保証しないことを定めていた。一方で、銀行振込、PayPay、現金交換、差額精算、送料負担、金額指定が見える場合、ユーザーがMegrumを税務・会計・法律上の助言者、領収書発行者、支払証跡管理者、又は申告支援者と誤解するリスクがある。国税庁のネットオークション等の副収入に関する案内も踏まえ、コード変更禁止の指示を守って規約文書のみ補強した。
+
+### 変更内容
+
+#### `notes/legal/01_terms_of_service_draft.md`
+- ステータス行へ `会員間支払い税務責任` を追加した。
+- 第14条へ、会員間支払い、差額精算、送料負担、現金交換、グッズの譲渡又は交換その他会員間取引に関連する税務申告、所得区分、収支記録、領収書又は支払証跡の管理、手数料、消費税その他租税公課の取扱いは、会員自身の責任で確認することを追加した。
+- 運営者は、会員間取引に関する税務、会計又は法律上の助言、申告書類の作成、領収書発行、支払調書その他税務書類の発行を行わないことを明記した。
+
+#### `notes/17_legal_alignment.md`
+- 会員間支払いの税務責任に関する追記セクションを追加した。
+- 公開前No-Goとして、FAQ、サポート返信、アプリ内コピー、Review Notesで、Megrumが会員間取引の税務処理、領収書発行、支払調書発行、収支記録管理又は税務相談を行うように説明しないことを明記した。
+- 参照元として国税庁のネットオークション等の副収入ページを記録した。
+
+#### `利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+- Markdown規約と同じ会員間支払い税務責任条項をWord版へ同期した。
+
+### 影響範囲
+
+- 利用規約ドラフト、Word版利用規約、法務整合メモ、FAQ/サポート返信/アプリ内コピーの会員間支払い説明方針
+
+プライバシーポリシー本文、Swift Native、Web、Supabase、DB、App Store Connect実入力は変更していない。状態遷移やデータモデルの変更はないため、`notes/09_state_machines.md` と `notes/05_data_model.md` の追加更新は行っていない。
+
+### 確認方法
+
+- 国税庁「ネットオークション等の副収入を得た場合」（https://www.nta.go.jp/taxes/shiraberu/taxanswer/shotoku/1906.htm）
+  - checked
+- `unzip -t 利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+  - passed
+- `render_docx.py /Users/michitaka/Desktop/Megrum/利用規約など/01_Megrum利用規約_20260629改訂案.docx --output_dir /tmp/megrum-legal-render-tax/terms --emit_pdf`
+  - passed（28 pages）
+- bundled Poppler `pdftotext` によるPDFキーワード検査
+  - passed（`会員間支払い税務責任`、`税務申告`、`所得区分`、`収支記録`、`支払証跡`、`支払調書` を確認）
+- レンダーPNGの全ページ検査
+  - passed（利用規約28 pages。全ページ非空）
+- `rg -n '会員間支払い税務責任|税務申告、所得区分|収支記録|支払証跡|税務署、税理士|支払調書|国税庁 ネットオークション' notes/legal/01_terms_of_service_draft.md notes/17_legal_alignment.md`
+  - passed
+- `git diff --check -- notes notes/legal`
+  - passed
+- `git diff --name-only | rg -v '^(notes/|利用規約など/)'`
+  - no output（Git管理上の差分はnotes配下のみ。DOCX成果物はGit管理外）
+
+### セルフレビュー結果
+
+- ✅ Megrumが会員間取引の税務・会計・法律助言者、領収書発行者、支払調書発行者、収支記録管理者として見えないよう補強した。
+- ✅ 税務申告、所得区分、支払証跡、手数料、消費税等を会員自身の確認事項として明確化した。
+- ✅ Word版利用規約へ同期し、PDFレンダーと非空チェックまで確認した。
+- ✅ コード、Web実装、iOS実装、Supabase、DB、App Store Connect実入力は変更していない。
+- ✅ docs-onlyのためアプリビルド、Swiftテスト、web buildは未実行。
+
+## イテレーション1226.144：UGC削除後利用の明確化
+
+### 背景・問題意識
+
+第25条（ユーザーコンテンツの権利）は、ユーザーコンテンツの権利留保、運営者への無償・非独占・再許諾可能・譲渡可能な利用許諾、非公開コンテンツの署名URL/端末キャッシュ/通報対応/法令対応での保存可能性、著作者人格権不行使、第三者権利侵害時の責任分界を定めていた。一方で、会員がコンテンツを削除し、又は退会した後に、削除前に表示、通知、共有、送信、保存、生成又は外部サービス連携されたコンテンツ等がどう扱われるかは、開発者保護の観点で明示を強める余地があった。
+
+### 変更内容
+
+#### `notes/legal/01_terms_of_service_draft.md`
+- ステータス行へ `UGC削除後利用` を追加した。
+- 第25条へ、ユーザーコンテンツ削除又は退会後であっても、削除又は退会前に本アプリ上で表示、通知、共有、送信、保存、生成又は外部サービスへ連携されたユーザーコンテンツ、サムネイル、共有用画像、共有用文面、通報、異議申し立て、証跡、監査ログ、バックアップ、キャッシュ、検索又は表示履歴、統計化又は匿名化された情報等が、法令遵守、安全確保、不正利用防止、紛争対応、権利侵害対応、監査、障害対応又は本アプリの運営に必要な範囲で引き続き利用、保存又は表示される場合があることを追加した。
+- 既存の著作者人格権不行使と第三者権利侵害時の責任分界を後続項として維持した。
+
+#### `notes/17_legal_alignment.md`
+- UGC削除後の証跡・共有済み利用に関する追記セクションを追加した。
+- 公開前No-Goとして、ユーザーコンテンツ削除又は退会により、外部SNS共有、相手会員側保存、スクリーンショット、端末キャッシュ、署名URL、通報/証跡/監査ログ、統計化又は匿名化済み情報まで即時完全削除されるように説明しないことを明記した。
+
+#### `利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+- Markdown規約と同じUGC削除後利用の追加項をWord版へ同期した。
+
+### 影響範囲
+
+- 利用規約ドラフト、Word版利用規約、法務整合メモ、FAQ/サポート返信/アプリ内コピーの削除・退会説明方針
+
+プライバシーポリシー本文、Swift Native、Web、Supabase、DB、App Store Connect実入力は変更していない。状態遷移やデータモデルの変更はないため、`notes/09_state_machines.md` と `notes/05_data_model.md` の追加更新は行っていない。
+
+### 確認方法
+
+- `unzip -t 利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+  - passed
+- `render_docx.py /Users/michitaka/Desktop/Megrum/利用規約など/01_Megrum利用規約_20260629改訂案.docx --output_dir /tmp/megrum-legal-render-ugc-retention/terms --emit_pdf`
+  - passed（28 pages）
+- bundled Poppler `pdftotext` によるPDFキーワード検査
+  - passed（`ユーザーコンテンツを削除`、`外部サービスへ連携`、`統計化又は匿名化`、`法令遵守、安全確保` を確認）
+- レンダーPNGの全ページ検査
+  - passed（利用規約28 pages。全ページ非空）
+- `rg -n 'UGC削除後利用|会員がユーザーコンテンツを削除し|統計化又は匿名化|削除又は退会前|外部サービスへ連携|第25条へ' notes/legal/01_terms_of_service_draft.md notes/17_legal_alignment.md`
+  - passed
+- `git diff --check -- notes notes/legal`
+  - passed
+- `git diff --name-only | rg -v '^(notes/|利用規約など/)'`
+  - no output（Git管理上の差分はnotes配下のみ。DOCX成果物はGit管理外）
+
+### セルフレビュー結果
+
+- ✅ 削除・退会後に、共有済みコンテンツ、証跡、監査ログ、バックアップ、キャッシュ、統計化/匿名化済み情報等が必要範囲で残り得ることを明示した。
+- ✅ ユーザー向け説明で即時完全削除と誤認させないNo-Goを追加した。
+- ✅ Word版利用規約へ同期し、PDFレンダーと非空チェックまで確認した。
+- ✅ コード、Web実装、iOS実装、Supabase、DB、App Store Connect実入力は変更していない。
+- ✅ docs-onlyのためアプリビルド、Swiftテスト、web buildは未実行。
+
+## イテレーション1226.143：退会後の存続条項
+
+### 背景・問題意識
+
+利用規約には、退会後又は削除申請中の情報保存、アカウント制限、知的財産権、責任制限、損害賠償、準拠法及び管轄が個別に定められていた。一方で、会員の退会、アカウント抹消、本規約終了又は本アプリ提供終了後も、どの条項が存続するかをまとめた条項はなかった。Megrumでは退会後も、取引、評価、通報、異議申し立て、郵送先又は支払い情報のスナップショット、Storage画像、通知履歴、ログ、監査記録、AI入力/出力、削除申出対応、権利侵害申立て、課金履歴等を、法令遵守、不正利用防止、紛争対応、監査、会計、問い合わせ対応等のために一定期間保持し得るため、コード変更禁止の指示を守って規約文書のみ補強した。
+
+### 変更内容
+
+#### `notes/legal/01_terms_of_service_draft.md`
+- ステータス行を `責任上限・利用者補償・存続条項` へ更新した。
+- 第43条（存続条項）を追加し、会員の退会、アカウントの制限、停止、抹消、本規約の終了又は本アプリの提供終了後も、性質上存続すべき条項が引き続き有効に存続することを明記した。
+- 存続対象の例として、会員間取引及び第三者との責任分界、個人情報及び秘密情報の取扱い、情報の保存及び削除、知的財産権、ユーザーコンテンツの権利許諾、禁止事項、非保証、免責及び責任制限、損害賠償及び利用者補償、譲渡、事業譲渡、通知、分離可能性、準拠法及び管轄等を挙げた。
+
+#### `notes/17_legal_alignment.md`
+- 退会後・終了後の存続条項に関する追記セクションを追加した。
+- 公開前No-Goとして、退会又はアカウント削除により、過去取引、相手会員側表示、通報/異議/証跡、補償義務、知的財産権、免責/責任制限、準拠法/管轄が全て消えるようにFAQ、サポート返信、アプリ内コピーで説明しないことを明記した。
+
+#### `利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+- Markdown規約と同じ第43条（存続条項）をWord版へ同期した。
+
+### 影響範囲
+
+- 利用規約ドラフト、Word版利用規約、法務整合メモ、FAQ/サポート返信/アプリ内コピーの退会後説明方針
+
+プライバシーポリシー本文、Swift Native、Web、Supabase、DB、App Store Connect実入力は変更していない。状態遷移やデータモデルの変更はないため、`notes/09_state_machines.md` と `notes/05_data_model.md` の追加更新は行っていない。
+
+### 確認方法
+
+- `unzip -t 利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+  - passed
+- `render_docx.py /Users/michitaka/Desktop/Megrum/利用規約など/01_Megrum利用規約_20260629改訂案.docx --output_dir /tmp/megrum-legal-render-survival/terms --emit_pdf`
+  - passed（28 pages）
+- bundled Poppler `pdftotext` によるPDFキーワード検査
+  - passed（`責任上限・利用者補償・存続条項`、`第43条`、`存続条項`、`損害賠償及び利用者補償`、`準拠法及び管轄` を確認）
+- レンダーPNGの全ページ検査
+  - passed（利用規約28 pages。全ページ非空）
+- `rg -n '責任上限・利用者補償・存続条項|第43条|存続条項|会員の退会、アカウントの制限|損害賠償及び利用者補償|準拠法及び管轄その他' notes/legal/01_terms_of_service_draft.md notes/17_legal_alignment.md`
+  - passed
+- `git diff --check -- notes notes/legal`
+  - passed
+- `git diff --name-only | rg -v '^(notes/|利用規約など/)'`
+  - no output（Git管理上の差分はnotes配下のみ。DOCX成果物はGit管理外）
+
+### セルフレビュー結果
+
+- ✅ 退会、アカウント抹消、規約終了、サービス終了後も残るべき条項を明示した。
+- ✅ 退会で過去取引、証跡、補償義務、免責/責任制限、準拠法/管轄が全て消えるような説明をNo-Go化した。
+- ✅ Word版利用規約へ同期し、PDFレンダーと非空チェックまで確認した。
+- ✅ コード、Web実装、iOS実装、Supabase、DB、App Store Connect実入力は変更していない。
+- ✅ docs-onlyのためアプリビルド、Swiftテスト、web buildは未実行。
+
+## イテレーション1226.142：運営者情報開示の整理
+
+### 背景・問題意識
+
+代表者名、所在地、電話番号を公開ページ上で常時掲示しない原典方針は、個人運営者のプライバシー及び安全の観点では維持したい。一方で、個人情報保護法上の保有個人データに関する事項、開示等請求、苦情相談、特定商取引法上の販売事業者表示その他法令上必要な運営者情報について、Privacyが「理由を明示した問い合わせがある場合のみ回答」と読めると、本人の権利行使や法令上必要な開示を不当に制限するように見える。コード変更禁止の指示を守り、公開非公表方針と法令開示の両立を文書上で明確化した。
+
+### 変更内容
+
+#### `notes/legal/02_privacy_policy_draft.md`
+- ステータス行へ `運営者情報開示` を追加した。
+- 問い合わせ窓口の対象を、運営者の氏名又は名称、住所、法人の場合の代表者氏名、特定商取引法上の販売事業者表示その他法令上必要な運営者情報へ広げた。
+- 代表者名、住所、電話番号その他常時掲示が代表者のプライバシー又は安全に関わる情報は公開ページ上では非公表とする場合がある一方、個人情報保護法、特定商取引法その他法令に基づき開示が必要な場合、又は正当な請求がある場合は、本人確認、請求内容確認、安全確保のうえ遅滞なく回答する文言へ更新した。
+
+#### `notes/17_legal_alignment.md`
+- 運営者情報の非公表方針と法令開示を両立する追記セクションを追加した。
+- 公開前No-Goとして、代表者情報を「一切回答しない」「理由がないと法令上必要な開示もしない」と読ませない一方、公開ページや証跡ファイルへ実住所、個人電話番号、代表者個人情報を不要に掲載しないことを明記した。
+
+#### `利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+- Markdown Privacyと同じ運営者情報開示の窓口文言をWord版へ同期した。
+
+### 影響範囲
+
+- プライバシーポリシードラフト、Word版プライバシーポリシー、法務整合メモ、公開ページ/Support/特商法/サポート返信の運営者情報開示方針
+
+利用規約本文、Swift Native、Web、Supabase、DB、App Store Connect実入力は変更していない。状態遷移やデータモデルの変更はないため、`notes/09_state_machines.md` と `notes/05_data_model.md` の追加更新は行っていない。
+
+### 確認方法
+
+- e-Gov 個人情報の保護に関する法律（https://laws.e-gov.go.jp/law/415AC0000000057）
+  - checked（保有個人データ、開示等請求、運営者情報開示の前提確認）
+- e-Gov 特定商取引に関する法律（https://laws.e-gov.go.jp/law/351AC0000000057）
+  - checked（販売事業者表示の前提確認）
+- `unzip -t 利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+  - passed
+- `render_docx.py /Users/michitaka/Desktop/Megrum/利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx --output_dir /tmp/megrum-legal-render-operator-info/privacy --emit_pdf`
+  - passed（24 pages）
+- bundled Poppler `pdftotext` によるPDFキーワード検査
+  - passed（`運営者情報開示`、`氏名又は名称`、`特定商取引法上の販売事業者表示`、`公開ページ上では非公表`、`正当な請求` を確認）
+- レンダーPNGの全ページ検査
+  - passed（プライバシーポリシー24 pages。全ページ非空）
+- `rg -n '運営者情報開示|氏名又は名称|法人の場合の代表者氏名|特定商取引法上の販売事業者表示|正当な請求|公開ページ上では非公表|本人確認、請求内容の確認' notes/legal/02_privacy_policy_draft.md notes/17_legal_alignment.md`
+  - passed
+- `git diff --check -- notes notes/legal`
+  - passed
+
+### セルフレビュー結果
+
+- ✅ 代表者情報非公表方針を維持しつつ、法令上必要な開示を妨げない文言にした。
+- ✅ 公開ページに代表者個人情報を不用意に出すリスクと、法令上必要な開示を拒むリスクの両方をNo-Go化した。
+- ✅ Word版Privacyへ同期し、PDFレンダーと非空チェックまで確認した。
+- ✅ コード、Web実装、iOS実装、Supabase、DB、App Store Connect実入力は変更していない。
+- ✅ docs-onlyのためアプリビルド、Swiftテスト、web buildは未実行。
+
+## イテレーション1226.141：責任上限と利用者補償
+
+### 背景・問題意識
+
+現行の利用規約は、会員間取引、現地交換、郵送交換、会員間支払い、UGC、広告、外部AI、通報、削除申出などの個別リスクを広く免責・非保証として整理していた。一方で、無料利用者が多いサービスで運営者が軽過失責任を負う場合の金額上限と、利用者の違反に起因して第三者請求、削除申出、調査、外部サービス対応、弁護士費用等が発生した場合の利用者補償がやや薄かった。消費者契約法上の全面免責・故意又は重過失免責が無効になり得る点を維持しつつ、コード変更禁止の指示を守って規約文書のみ補強した。
+
+### 変更内容
+
+#### `notes/legal/01_terms_of_service_draft.md`
+- ステータス行へ `責任上限・利用者補償` を追加した。
+- 第34条（免責及び責任制限）に、無料利用又は過去6か月の支払額がない場合の運営者責任上限を1万円とする条項を追加した。
+- 第34条の強行法規留保を、運営者又は代表者若しくは使用者の故意又は重過失には責任制限及び免責を適用しない文言へ補強した。
+- 第36条（損害賠償）を3項構成にし、第三者請求、削除申出、権利侵害申立て、通報、捜査又は行政対応、アプリストア/外部サービス/決済事業者対応、調査、証跡保全、削除、復旧、再発防止、合理的な弁護士費用、和解金、賠償金等を利用者側補償の対象として明記した。
+- 利用者が運営者に義務、責任、支払い又は表示変更を負わせる和解、合意又は回答を、運営者の事前承諾なく行わない条項を追加した。
+
+#### `notes/17_legal_alignment.md`
+- 責任上限・利用者補償の追記セクションを追加し、消費者契約法の強行法規前提、無料利用者の責任上限、利用者補償、弁護士レビュー重点項目を整理した。
+- 参照元として e-Gov 消費者契約法を記録した。
+
+#### `利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+- Markdown規約と同じ責任上限・利用者補償条項をWord版へ同期した。
+
+### 影響範囲
+
+- 利用規約ドラフト、Word版利用規約、法務整合メモ、弁護士レビュー観点
+
+プライバシーポリシー本文、Swift Native、Web、Supabase、DB、App Store Connect実入力は変更していない。状態遷移やデータモデルの変更はないため、`notes/09_state_machines.md` と `notes/05_data_model.md` の追加更新は行っていない。
+
+### 確認方法
+
+- e-Gov 消費者契約法（https://laws.e-gov.go.jp/law/412AC0000000061）
+  - checked（全面免責・故意又は重過失免責が無効になり得る前提で条項を補強）
+- `unzip -t 利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+  - passed
+- `render_docx.py /Users/michitaka/Desktop/Megrum/利用規約など/01_Megrum利用規約_20260629改訂案.docx --output_dir /tmp/megrum-legal-render-liability/terms --emit_pdf`
+  - passed（27 pages）
+- bundled Poppler `pdftotext` によるPDFキーワード検査
+  - passed（`責任上限・利用者補償`、`有料サービス以外の利用`、`本条の責任制限`、`合理的な弁護士費用`、`事前の書面又は電磁的方法` を確認）
+- レンダーPNGの全ページ検査
+  - passed（利用規約27 pages。全ページ非空）
+- `rg -n '責任上限・利用者補償|有料サービス以外の利用|上限額は1万円|本条の責任制限及び免責|合理的な弁護士費用|事前の書面又は電磁的方法' notes/legal/01_terms_of_service_draft.md notes/17_legal_alignment.md`
+  - passed
+- `git diff --check -- notes notes/legal`
+  - passed
+- `git diff --name-only | rg -v '^(notes/|利用規約など/)'`
+  - no output（Git管理上の差分はnotes配下のみ。DOCX成果物はGit管理外）
+
+### セルフレビュー結果
+
+- ✅ 消費者契約法上の強行法規留保を残し、全面免責として読まれない形で責任制限を補強した。
+- ✅ 無料利用者についても軽過失責任の上限を明記し、開発者側の予見可能性を高めた。
+- ✅ 利用者違反に起因する第三者請求、調査、外部サービス対応、合理的な弁護士費用等を補償対象として明確化した。
+- ✅ コード、Web実装、iOS実装、Supabase、DB、App Store Connect実入力は変更していない。
+- ✅ docs-onlyのためアプリビルド、Swiftテスト、web buildは未実行。
+
+## イテレーション1226.140：法務表示ステータス同期
+
+### 背景・問題意識
+
+legacy Expo範囲を現行Swift Native初回提出から切り離し、通知はAPNs主線、Expo Pushは過去又は別環境で利用する場合の条件付き確認として整理した。一方で、利用規約/PrivacyのMarkdownヘッダーや一部提出資料のステータス文に、APNsのみを示す旧Push通知ラベルが残っていた。本文やDOCXとの読み違いを避けるため、コード変更禁止の指示を守り、文書ステータスと公開前QAだけを同期した。
+
+### 変更内容
+
+#### `notes/legal/01_terms_of_service_draft.md`
+#### `notes/legal/02_privacy_policy_draft.md`
+- ステータス行を `APNs主線・legacy Expo条件付き・Push通知4.5.4` へ更新し、本文及びDOCXで整理済みの通知前提と揃えた。
+
+#### `notes/17_legal_alignment.md`
+#### `notes/24_app_store_submission_pack.md`
+#### `notes/53_app_review_guideline_compliance_matrix.md`
+- 法務整合、提出パック、App Review準拠表のステータス行を、APNs主線・legacy Expo条件付きの表現へ揃えた。
+
+#### `notes/63_public_page_redaction_qa.md`
+- ステータスを Draft v0.7へ更新した。
+- 現行Web短縮Terms/Privacy、登録同意リンク、アプリ内法務要約の確認項目に、`web/src/app/terms/page.tsx`、`web/src/app/privacy/page.tsx`、`ios-native/Sources/MegrumApp/AuthLegalConsentNotice.swift`、`ios-native/Sources/MegrumApp/LegalDocumentContent.swift`、`SettingsLegalViews.swift` のファイル名を明記した。
+
+### 影響範囲
+
+- 利用規約/Privacyドラフトのステータス表示、法務整合メモ、App Store提出パック、App Review準拠表、公開ページレダクションQA
+
+コード、Web実装、iOS実装、Supabase、DB、App Store Connect実入力、DOCX成果物は変更していない。本文の権利義務や状態遷移は変えていないため、`notes/09_state_machines.md` と `notes/10_glossary.md` の追加更新は行っていない。
+
+### 確認方法
+
+- `rg -n 'APNs通知本文・Push通知4\.5\.4' notes notes/legal --glob '!notes/08_design_iterations.md'`
+  - passed（no output）
+- `rg -n 'APNs主線・legacy Expo条件付き・Push通知4\.5\.4|web/src/app/terms/page\.tsx|web/src/app/privacy/page\.tsx|ios-native/Sources/MegrumApp/AuthLegalConsentNotice\.swift|ios-native/Sources/MegrumApp/LegalDocumentContent\.swift|SettingsLegalViews\.swift|Draft v0\.7' notes/legal/01_terms_of_service_draft.md notes/legal/02_privacy_policy_draft.md notes/17_legal_alignment.md notes/24_app_store_submission_pack.md notes/53_app_review_guideline_compliance_matrix.md notes/63_public_page_redaction_qa.md`
+  - passed
+- `git diff --check -- notes notes/legal`
+  - passed
+- `git diff --name-only | rg -v '^(notes/|利用規約など/)'`
+  - no output（Git管理上の差分はnotes配下のみ。DOCX成果物は今回未変更）
+
+### セルフレビュー結果
+
+- ✅ Markdownヘッダーや提出資料の旧ラベルが、本文/DOCXのAPNs主線・legacy Expo条件付き整理と矛盾しないよう揃えた。
+- ✅ 公開Web短縮ページとアプリ内要約表示を正式本文として扱わないNo-Goを、ファイル名つきで追跡できるようにした。
+- ✅ コード、Web実装、iOS実装、Supabase、DB、App Store Connect実入力、DOCX成果物は変更していない。
+- ✅ docs-onlyのためアプリビルド、Swiftテスト、web buildは未実行。
+
+## イテレーション1226.139：Web外部通信先整理
+
+### 背景・問題意識
+
+利用規約・Privacy・App Privacyの前提を現行コードへ寄せるため、`web/src`、`ios-native/Sources`、`supabase/functions`、`supabase/migrations` の外部URLと外部SDK候補を横断確認した。台帳上はWebにMapTiler、Leaflet、Nominatim proxyが存在するように読める記述が残っていたが、2026-06-29時点の現行 `web/src` と `supabase/functions` には該当実装が見つからなかった。一方で `web/src/app/layout.tsx` は `next/font/google` を使っていたため、公開WebでGoogle Fontsがブラウザ直通信にならないことを提出前証跡に含めるよう、コード変更禁止の指示を守って文書のみ更新した。
+
+### 変更内容
+
+#### 実装確認
+- `ios-native/Sources` の実URL候補は、`megrum.jp` の法務/認証URL、preview用画像URL、ZipCloud郵便番号検索が中心。
+- `supabase/functions` の実URL候補は、OpenAI Responses API、APNs production / sandbox endpoint。
+- `web/src` はSupabase SSR/Auth Cookie、Next.js公開ページ、Stripe webhook候補、`next/font/google` を扱う。`web/src` でMapTiler、Leaflet、Nominatim / OpenStreetMap geocode proxyは未検出。
+- `web/.env.local.example` にはMapTiler key placeholderが残るため、MapTilerを完全不存在とは扱わず、再導入又は別ブランチで使う場合の再監査対象として残した。
+- ローカルNext.js 16 docsでは、`next/font/google` はGoogle FontsのCSS/フォントファイルをビルド時に取得してself-hostし、ブラウザからGoogleへrequestを送らない説明になっている。ただし実デプロイ成果物のHTML/Networkで `fonts.googleapis.com` / `fonts.gstatic.com` が出ないことは公開前に確認する。
+
+#### `notes/27_app_privacy_data_inventory.md`
+- Web / 運用節を、Supabase SSR/Auth Cookie、Next.js公開ページ、Stripe webhook候補、`next/font/google`、Map系ライブラリ未検出という現行事実に更新した。
+- `next/font/google` はself-host前提だが、公開前に実NetworkでGoogle Fonts直通信がないことを確認する注意を追加した。
+- MapTiler、Leaflet、Nominatim / OpenStreetMap geocode proxyは、現行未検出だが `web/.env.local.example` のplaceholderや再導入時にはLocation / 外部地図APIとして再監査する方針を追加した。
+
+#### `notes/48_external_service_vendor_register.md`
+- Web現行事実、Legacy Expo行、初回提出方針を現行コードに合わせて更新した。
+- Next.js / 公開Web hostingとNext.js Google Fonts / `next/font/google` の行を追加した。
+- MapTiler / Nominatimを現行使用サービスではなく、未検出のWeb地図/ジオコーディング候補として整理した。
+- 位置情報のApp Privacy反映表とNo-Goを、MapTiler/Nominatim再導入時の条件付き確認へ修正した。
+
+#### `notes/36_submission_evidence_checklist.md`
+- `EV-003.5 Public Web External Assets` を追加し、公開WebのHTML/Networkに `fonts.googleapis.com` / `fonts.gstatic.com`、MapTiler、Nominatim等の未使用外部サービスが出ないことを証跡化するようにした。
+- `EV-003 Legal URL` を、Terms / Privacy / Support / Commerceが開くだけでなく、提出に使う最新版ドラフトと本文・最終更新日・URLが一致する確認へ引き上げた。
+- 未説明の外部アセットや外部地図/ジオコーディングへのブラウザ直通信をNo-Goへ追加した。
+
+#### `notes/63_public_page_redaction_qa.md`
+- `CM-016` とNo-Goを追加し、公開ページが未説明の外部フォント、外部地図、外部ジオコーディング、外部解析又は広告タグを読み込まないことをQA項目にした。
+
+### 影響範囲
+
+- 公開Web、管理画面、認証callback、公開法務/サポートページ、App Privacy台帳、外部サービス台帳、提出証跡、公開ページQA
+
+コード、Web実装、Supabase Functions、DB、env example、公開URL、App Store Connect実入力は変更していない。利用規約/Privacy本文とDOCXは、現行文言で外部画像ホスト/CDNや外部サービス一般を既に含むため、このiterでは変更していない。
+
+### 確認方法
+
+- `rg -n "https?://" ios-native web/src supabase/functions supabase/migrations --glob '!web/node_modules/**' --glob '!web/.next/**' --glob '!*.map'`
+  - passed（実通信候補、テストURL、過去migrationのExpo endpointを確認）
+- `rg -n "MapTiler|maptiler|Leaflet|leaflet|Nominatim|nominatim|OpenStreetMap|osm|geocode|geocoding|zipcloud|PostalCodeAddressClient|next/font/google|Noto_Sans_JP|Inter_Tight|Google Fonts|font/google" . --glob '!web/node_modules/**' --glob '!web/.next/**' --glob '!*.map' --glob '!notes/**' --glob '!ios-native/Tests/**'`
+  - passed（現行 `web/src` ではMapTiler/Leaflet/Nominatim未検出、`web/.env.local.example` にMapTiler placeholderあり、`next/font/google` は検出）
+- `rg -n "next/font|Google Fonts|self-host|fonts.googleapis|fonts.gstatic" web/node_modules/next/dist/docs web/.next web/src 2>/dev/null`
+  - passed（ローカルNext docs上、`next/font` は外部network requestを除き、Google Fontsはbuild時取得・self-host、ブラウザからGoogleへrequestを送らない説明を確認）
+- `rg -n 'Web外部通信先|Public Web External Assets|next/font/google|Google Fonts|fonts\.googleapis|fonts\.gstatic|MapTiler|Nominatim|未検出|self-host|ブラウザからGoogle|公開Web外部アセット|Legacy Expo' notes/27_app_privacy_data_inventory.md notes/36_submission_evidence_checklist.md notes/48_external_service_vendor_register.md notes/63_public_page_redaction_qa.md`
+  - passed
+- `git diff --check -- notes notes/legal`
+  - passed
+- `git diff --name-only | rg -v '^(notes/|利用規約など/)'`
+  - no output（Git管理上の差分はnotes配下のみ。DOCX成果物はGit管理外）
+
+### セルフレビュー結果
+
+- ✅ Web地図系サービスを、現行利用中ではなく再導入時の条件付き確認へ修正した。
+- ✅ `next/font/google` のプライバシー上の扱いを、ローカルNext docsと実装に基づいて、self-host前提かつデプロイ成果物で要確認と整理した。
+- ✅ 公開Webの未説明外部アセットが提出前No-Goになるよう、証跡チェックリストと公開ページQAへ反映した。
+- ✅ コード、Web実装、Supabase Functions、DB、env example、利用規約/Privacy本文、DOCXは変更していない。
+- ✅ docs-onlyのためアプリビルド、Swiftテスト、web buildは未実行。
+
+## イテレーション1226.138：Legacy Expo範囲整理
+
+### 背景・問題意識
+
+AGENTSと `notes/22_swift_native_migration.md` では、旧React Native / Expo版の `mobile/` と旧JSX mockupは iter1214 で削除済みで、ユーザー向けiOS体験は `ios-native/` を正とする方針になっている。一方で、法務・App Privacy・提出証跡の台帳には、Expo Pushやlegacy Expo SDKが現行Swift Native初回提出の対象のように読める表現が残っていた。現行コードとDB履歴を分け、Swift Native提出ではAPNsを主線にしつつ、DB互換列や過去/別環境のExpo配送を使う場合の再監査条件を残すため、コード変更禁止の指示を守って文書のみ更新した。
+
+### 変更内容
+
+#### 実装確認
+- `find . -maxdepth 2` で現行の主ディレクトリは `ios-native/`、`web/`、`supabase/` のみで、`mobile/` と旧 `Megrum/` mockupディレクトリは存在しないことを確認した。
+- `notes/22_swift_native_migration.md` は、Expo / React Native版、旧JSX mockup、旧画面案素材が iter1214 で削除済みで、通常作業では参照元・rollback線として扱わないと明記している。
+- Supabase migration / data model側には、legacy Expo互換の `push_provider='expo'` やExpo push token列/履歴が残り得るため、Expoという語は全削除せず、過去又は別環境で利用する場合の条件付き再監査対象として整理した。
+
+#### `notes/10_glossary.md`
+- `legacy Expo版` を、現行実装やApp Store初回提出の前提ではなく、削除済み旧実装・バックアップ・DB互換・過去ビルド用語として再定義した。
+- `モバイル通知` を、現行Swift NativeではAPNs device tokenを主線とし、Expo Pushは過去又は別環境の再監査対象として扱う定義へ更新した。
+
+#### `notes/legal/01_terms_of_service_draft.md`
+- 通知条項で、通知配信サービスをAPNs主線に直し、Expo Pushは「過去又は別環境で利用する場合」として条件付きにした。
+
+#### `notes/legal/02_privacy_policy_draft.md`
+- 取得情報、委託先、通知配信、外部サービス保存の各条項で、APNs device tokenを現行主線、Expo push tokenを過去又は別環境の条件付き対象として整理した。
+
+#### `notes/27_app_privacy_data_inventory.md`
+- Legacy Expo / React Native節を、`mobile/` 削除済みとSwift Native初回提出ではExpo SDK/権限/OTA/Expo Pushを足さない方針に更新した。
+- APNs token、Device ID、退会時token無効化、Supabase Edge Function / APNs行を、Swift NativeではAPNs主線、Expoは過去又は別環境で使う場合の再監査対象に揃えた。
+
+#### `notes/48_external_service_vendor_register.md`
+- Expo Notifications / Updates / Camera等の行を、現行Swift Native初回提出では対象外のlegacyサービスとして整理した。
+- 通知token、退会申請、外部連携解除、App Privacy反映の記述をAPNs主線へ更新した。
+
+#### `notes/24_app_store_submission_pack.md`
+#### `notes/36_submission_evidence_checklist.md`
+#### `notes/43_app_privacy_connect_answer_sheet.md`
+#### `notes/50_release_go_no_go_decision_matrix.md`
+#### `notes/52_data_retention_deletion_matrix.md`
+- Push通知、Device ID、削除/無効化、Go/No-Go、提出証跡をAPNs主線へ揃え、Expo Pushは過去又は別環境で使う場合にのみ別途確認する条件付き表現へ修正した。
+
+#### `利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+#### `利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+- Markdownドラフトに合わせて、APNs主線・legacy Expo条件付きの表現を既存DOCXへ同期した。
+- PDFレンダーに、`APNs主線`、`legacy Expo条件付き`、`過去又は別環境でExpo Push` が入ることを確認した。
+
+### 影響範囲
+
+- Swift Native初回提出のApp Privacy、利用規約、プライバシーポリシー、提出証跡、Go/No-Go、データ保持・削除、外部サービス台帳、用語集
+
+コード、DB、Supabase migration、Edge Function、Xcode設定、App Store Connect実入力は変更していない。状態遷移そのものは変更していないため、`notes/09_state_machines.md` の更新は行っていない。
+
+### 確認方法
+
+- `find . -maxdepth 2 -type d \( -name mobile -o -name Megrum -o -name web -o -name ios-native -o -name supabase \) | sort`
+  - passed（`ios-native/`、`supabase/`、`web/` のみ）
+- `git ls-files | rg '^(mobile/|Megrum/)|Expo|expo|eas'`
+  - passed（旧 `mobile/` / `Megrum/` のtracked sourceなし。Expo語はnotesとSupabase migration等の履歴に残る）
+- `rg -n 'APNs/Expo|APNs / Expo|APNs又はExpo|APNs、Expo|Expo Pushその他|Expo push token|Expo通知|mobile/.*で実装されている|Expo提出時だけ' notes/legal/01_terms_of_service_draft.md notes/legal/02_privacy_policy_draft.md notes/24_app_store_submission_pack.md notes/27_app_privacy_data_inventory.md notes/36_submission_evidence_checklist.md notes/43_app_privacy_connect_answer_sheet.md notes/48_external_service_vendor_register.md notes/50_release_go_no_go_decision_matrix.md notes/52_data_retention_deletion_matrix.md notes/10_glossary.md`
+  - passed（残存するExpo push token表現は、過去又は別環境の条件付き確認として残したもののみ）
+- `unzip -t 利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+  - passed
+- `unzip -t 利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+  - passed
+- `render_docx.py /Users/michitaka/Desktop/Megrum/利用規約など/01_Megrum利用規約_20260629改訂案.docx --output_dir /tmp/megrum-legal-render-legacy-scope/terms --emit_pdf`
+  - passed（27 pages）
+- `render_docx.py /Users/michitaka/Desktop/Megrum/利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx --output_dir /tmp/megrum-legal-render-legacy-scope/privacy --emit_pdf`
+  - passed（24 pages）
+- bundled Poppler `pdftotext` によるPDFキーワード検査
+  - passed（`APNs主線`、`legacy Expo条件付き`、`過去又は別環境でExpo Push` を確認）
+- レンダーPNGの全ページ検査
+  - passed（利用規約27 pages、Privacy 24 pages。全ページ非空）
+- `git diff --check -- notes notes/legal`
+  - passed
+- `git diff --name-only | rg -v '^(notes/|利用規約など/)'`
+  - no output（Git管理上の差分はnotes配下のみ。DOCX成果物はGit管理外）
+
+### セルフレビュー結果
+
+- ✅ 現行Swift Native初回提出の法務・App Privacy回答が、削除済みlegacy Expo SDKに引きずられないよう整理した。
+- ✅ Expo Pushを完全に消さず、DB互換列、過去ビルド、別環境又は再導入版を扱う場合の再監査条件として残した。
+- ✅ 利用規約/PrivacyのMarkdownとDOCXを同期し、PDFレンダーと非空チェックまで確認した。
+- ✅ コード、DB、Supabase migration、Edge Function、Xcode設定、App Store Connect実入力は変更していない。
+- ✅ docs-onlyのためアプリビルド、Swiftテスト、web buildは未実行。
+
+## イテレーション1226.137：Web Cookie法務整理
+
+### 背景・問題意識
+
+現行Webは管理者コンソールと公開法務/サポートページを持ち、Supabase SSR client、Next.js proxy、認証callback、password reset、Google OAuth中継を使う。これによりWeb Auth Cookie、session refresh、認証code交換、Cookie設定/更新/削除が発生し得る。PrivacyにCookie一般条項はあったが、Supabase Auth CookieとWeb管理画面のログイン維持、Cookie無効時の制限、Cookie値/token実値の証跡混入防止を明確にするため、コード変更禁止の指示を守って文書のみ更新した。
+
+### 変更内容
+
+#### 実装確認
+- `web/src/lib/supabase/middleware.ts` は `createServerClient` のCookie adapterを使い、request/responseのCookieを読み書きし、`supabase.auth.getUser()` によりリクエストごとにsession refreshを行う。
+- `web/src/proxy.ts` は静的ファイル等を除くリクエストで `updateSession` を呼び出す。
+- `web/src/lib/supabase/server.ts` はServer Component / Route Handler用にCookie経由のSupabase clientを作り、service role clientはCookie不使用・`persistSession=false` である。
+- `web/src/lib/supabase/client.ts` はbrowser clientを作成し、公開keyでブラウザ側からSupabaseへアクセスする。
+- `web/src/app/auth/callback/route.ts` はWeb callbackでcodeをsessionへ交換し、mobile callbackではaccess token / refresh token等をfragmentへ載せてnative schemeへ戻す経路がある。
+- `web/src/app/auth/actions.ts` はメール/パスワードlogin、Google OAuth、password reset、logoutを扱い、logout時にSupabase auth signOutを呼ぶ。
+- `web/src/app/auth/oauth/authorize/route.ts` はGoogle OAuthのみを許可し、`megrum` / `megrum-preview` のnative callback schemeを正規化してSupabase authorize URLへredirectする。
+
+#### `notes/legal/02_privacy_policy_draft.md`
+- アカウント及び認証情報に、Web版又は管理者画面で利用するSupabase Auth Cookie、session refresh結果、Cookie設定/更新/削除結果を追加した。
+- Cookie条項に、Supabase Auth/SSR Cookie、proxy/middlewareによるsession refresh、認証callbackでのcode交換、Cookie無効時のWeb管理画面・password reset・外部認証の制限を追加した。
+- session保存、logout、ログ/証跡secret混入防止の条項へCookie/Cookie値を追加した。
+
+#### `notes/27_app_privacy_data_inventory.md`
+- Web Auth Cookie / Supabase SSR sessionをApp Privacy候補に追加した。
+- 送信/保存される可能性が高いデータに、Web Auth Cookie / browser sessionを追加した。
+
+#### `notes/48_external_service_vendor_register.md`
+- Supabase SSR / Web Auth Cookieをサービス別台帳へ追加した。
+- App Privacy反映表にWeb Auth Cookie / browser sessionを追加した。
+
+#### `notes/52_data_retention_deletion_matrix.md`
+- 基本方針とデータ保持マトリクスにWeb Auth Cookie / browser sessionを追加した。
+- Cookie値、access token、refresh token、認証codeを秘密情報として扱い、公開証跡に残さない方針を明確化した。
+
+#### `利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+- Markdownドラフトの変更に合わせ、既存DOCXへWeb Auth Cookie関連の項目追加と段落置換を反映した。
+- DOCX/PDFレンダーに、Supabase Auth Cookie、session refresh、proxy又はmiddleware、Cookie値が入ることを確認した。
+
+### 影響範囲
+
+- Web管理画面、公開Web、Supabase Auth、Supabase SSR Cookie、Next.js proxy/middleware、認証callback、password reset、Google OAuth、logout、App Privacy、データ保持/削除、Privacy DOCX成果物
+
+Swift Native、Web、Supabase、Edge Function、DB、App Store Connect実入力、利用規約本文は変更していない。状態遷移と用語の意味変更はないため、`notes/09_state_machines.md` と `notes/10_glossary.md` の追加更新は行っていない。
+
+### 確認方法
+
+- `rg -n "cookies\\(|cookie|createServerClient|middleware|auth\\.getSession|auth\\.getUser|persistSession" web/src web --glob '!web/node_modules/**' --glob '!web/.next/**' --glob '!*.map'`
+  - passed（`web/middleware.ts` は存在せず、現行は `web/src/proxy.ts`）
+- `rg -n "Supabase Auth Cookie|session refresh結果|proxy又はmiddleware|Cookieを設定又は更新|Web管理画面、ログイン状態の維持|Cookie値|Web Auth Cookie" notes/legal/02_privacy_policy_draft.md notes/27_app_privacy_data_inventory.md notes/48_external_service_vendor_register.md notes/52_data_retention_deletion_matrix.md`
+  - passed
+- `unzip -t 利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+  - passed
+- `python-docx` によるDOCXキーワード検査
+  - passed
+- `render_docx.py /Users/michitaka/Desktop/Megrum/利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx --output_dir /tmp/megrum-legal-render-web-cookie/privacy --emit_pdf`
+  - passed（24 pages）
+- bundled Poppler `pdftotext` によるPDFキーワード検査
+  - passed
+- レンダーPNGの全ページ検査
+  - passed（24 pages。全ページ非空）
+- `git diff --check -- notes notes/legal`
+  - passed
+- `git diff --name-only | rg -v '^(notes/|利用規約など/)'`
+  - no output（Git管理上の差分はnotes配下のみ。DOCX成果物はGit管理外）
+
+### セルフレビュー結果
+
+- ✅ Web Auth Cookieを、単なるアクセス解析Cookieではなくログイン状態維持、session refresh、認証callbackに関わる秘密性の高い情報として整理した。
+- ✅ Cookie無効時にWeb管理画面、password reset、外部認証が利用できない可能性をPrivacyへ明記した。
+- ✅ Cookie値をaccess tokenやrefresh tokenと同様、ログや提出証跡に残さない秘密情報として扱った。
+- ✅ コード、DB、Supabase設定、App Store Connect実入力、利用規約本文は変更していない。
+- ✅ docs-onlyのためアプリビルド、Swiftテスト、web buildは未実行。
+
+## イテレーション1226.136：管理者運用Privacy整理
+
+### 背景・問題意識
+
+Web管理画面は、service role clientを使ってユーザー状態、管理者ロール、有料権限、通報/異議、推し追加リクエスト、運営通知、監査ログを扱う。これは運用上必要だが、プライバシーポリシー上の説明が抽象的すぎると、運営担当者がどの情報を検索・閲覧・更新し得るか、なぜ監査ログへ残るか、全体通知や手動権限上書きの記録がどこまで残るかが曖昧になる。コード変更禁止の指示を守り、実装事実を確認したうえでPrivacyドラフトとDOCX成果物のみを最小更新した。
+
+### 変更内容
+
+#### 実装確認
+- `web/src/lib/admin/permissions.ts` は `owner`, `support`, `trust_safety`, `billing`, `viewer` と、`users.read`, `users.update_status`, `roles.*`, `billing.read`, `entitlements.manage`, `reports.*`, `oshi_requests.*`, `notifications.send`, `audit.read` 等の権限を定義していることを確認した。
+- 管理者コンテキストは通常Supabase auth userを確認した後、service role clientで `admin_roles` を読み、`requires_mfa` がtrueの場合はJWT claim `aal` が `aal2` であることを要求する。
+- `writeAdminAuditLog` は `actor_user_id`, `action`, `target_type`, `target_id`, `reason`, `before_state`, `after_state`, `request_ip`, `user_agent`, `metadata` を `admin_audit_logs` へ保存する。
+- `web/src/app/admin/actions.ts` は、ユーザー状態変更、管理者ロール変更、手動有料権限付与/停止、通報/異議ステータス更新、推し/メンバー追加リクエスト承認/統合/却下、全体又は個別の運営通知送信を行い、理由と監査ログを残す。
+- 対象ユーザー解決では、UUID、`@handle`、メールアドレスが使われ、メールアドレスの場合は `auth.admin.listUsers` から照合する経路がある。
+- `web/src/app/admin/users/page.tsx` は、ユーザー一覧でメール、ハンドル、表示名、活動エリア、アカウント状態、有料権限を表示する。
+- `web/src/app/admin/audit/page.tsx` は、監査ログのbefore/after/metadata/User-AgentをJSON表示する。
+
+#### `notes/legal/02_privacy_policy_draft.md`
+- 管理者操作に関する取得情報へ、対象者検索に用いるユーザーID、ハンドル、メールアドレスを追加した。
+- 運営通知について、全体又は個別の送信先、対象者数、タイトル、本文、リンク先及び送信理由を扱うことを明確化した。
+- 運営担当者が確認し得る情報に、対象者検索結果を追加した。
+- 利用目的の番号重複を修正し、「上記各号に付随又は関連する目的」を18番へ整えた。
+
+#### `利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+- Markdownドラフトの変更に合わせ、既存DOCXの該当段落を同期した。
+- DOCX/PDFレンダーに、対象者検索に用いるユーザーID、全体又は個別の運営通知、対象者数、対象者検索結果が入ることを確認した。
+
+### 影響範囲
+
+- Web管理画面、support/Trust & Safety運用、管理者権限、MFA、監査ログ、ユーザー検索、ユーザー状態変更、有料権限の手動上書き、運営通知、通報/異議対応、推し追加リクエスト運用、プライバシーポリシー
+
+Swift Native、Web、Supabase、Edge Function、DB、App Store Connect実入力、利用規約本文は変更していない。状態遷移と用語の意味変更はないため、`notes/09_state_machines.md` と `notes/10_glossary.md` の追加更新は行っていない。
+
+### 確認方法
+
+- `rg -n "createServiceRoleClient|admin_roles|admin_audit_logs|requires_mfa|writeAdminAuditLog|users\\.read|users\\.update_status|roles\\.manage|reports\\.moderate|notifications\\.send|billing\\.read|entitlements\\.manage|audit\\.read" web/src --glob '!web/node_modules/**' --glob '!web/.next/**'`
+  - passed
+- `rg -n "対象者検索に用いるユーザーID|全体又は個別の運営通知|対象者数|対象者検索結果|18\\. 上記各号" notes/legal/02_privacy_policy_draft.md`
+  - passed
+- `unzip -t 利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+  - passed
+- `python-docx` によるDOCXキーワード検査
+  - passed
+- `render_docx.py /Users/michitaka/Desktop/Megrum/利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx --output_dir /tmp/megrum-legal-render-admin-privacy/privacy --emit_pdf`
+  - passed（23 pages）
+- bundled Poppler `pdftotext` によるPDFキーワード検査
+  - passed
+- レンダーPNGの全ページ検査
+  - passed（23 pages。全ページ非空）
+- `git diff --check -- notes notes/legal`
+  - passed
+- `git diff --name-only | rg -v '^(notes/|利用規約など/)'`
+  - no output（Git管理上の差分はnotes配下のみ。DOCX成果物はGit管理外）
+
+### セルフレビュー結果
+
+- ✅ service roleと管理者権限の存在を過度に隠さず、利用者へ説明すべき検索・閲覧・更新・監査ログの範囲をPrivacyへ反映した。
+- ✅ 内部担当者名、内部権限設定、判断基準、監査ログ全文を常に開示する義務までは書かず、運営者防御の余地を残した。
+- ✅ 運営通知の全体送信や手動有料権限上書きが、理由と監査ログを伴う運用対象であることを明確化した。
+- ✅ コード、DB、Supabase設定、App Store Connect実入力、利用規約本文は変更していない。
+- ✅ docs-onlyのためアプリビルド、Swiftテスト、web buildは未実行。
+
+## イテレーション1226.135：Secrets設定境界整理
+
+### 背景・問題意識
+
+MegrumはSupabase service role、OpenAI API key、APNs private key、Stripe webhook secret、OAuth secret、Vercel env等の強い秘密情報をserver/Edge Function/ローカルenv側で扱う。これらは実装上必要だが、App Review提出証跡、公開ページ、PR、チャット、サポート返信、ログへ混入すると、運営者側の権限乗っ取り、通知濫用、ユーザーデータ漏えい、事故報告義務、審査リスクにつながる。コード変更禁止の指示を守り、実値入り `.env.local` や `.vercel/.env.production.local` は開かず、テンプレート、README、コード参照、設定ファイルだけを確認して、提出/監査/公開QA文書を更新した。
+
+### 変更内容
+
+#### 実装確認
+- `web/.env.local.example` はplaceholderで、`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` は公開可、`SUPABASE_SECRET_KEY` はサーバー専用・絶対公開不可、`STRIPE_WEBHOOK_SECRET` はwebhook署名検証用として整理されていることを確認した。
+- `web/src/lib/supabase/server.ts` は通常clientとservice role clientを分け、service roleは `SUPABASE_SECRET_KEY` をserver側だけで使う設計であることを確認した。
+- `supabase/functions/send-apns-notification/README.md` は `SUPABASE_SERVICE_ROLE_KEY`、APNs private key、dispatch secretをSupabase secretsへ入れ、dispatch secretをmigration/source controlへ残さない方針を書いていることを確認した。
+- `supabase/functions/suggest-goods-series/README.md` は `SUPABASE_SERVICE_ROLE_KEY` と `OPENAI_API_KEY` をRequired secretsとしていることを確認した。
+- seed系scriptは `web/.env.local` から `SUPABASE_SECRET_KEY` を読み、service role相当で実DBを操作し得ることを確認した。
+- `ios-native/Config/MegrumNative.xcconfig` にはAdMob app id、test ad unit id、一部production ad unit idが入る。これはsecretではないが、広告SDK設定、test ads除去、App Privacy、ATT、Google公式開示、広告通報導線とセットで扱うべき情報として確認した。
+
+#### `notes/54_prelaunch_security_audit_checklist.md`
+- ステータスをv0.6へ更新し、ローカルenv、Vercel env、Supabase secrets、server-only key境界を追加した。
+- 現行リポジトリ事実に `.env.local` / `.vercel` / `web/.env.local`、seed script、AdMob checked-in configの確認結果を追加した。
+- SEC-006、Secret / Key監査、No-Go、静的確認コマンド案を、実値ではなくキー名、環境、権限、確認日時だけを残す方針へ更新した。
+
+#### `notes/36_submission_evidence_checklist.md`
+- 証跡保管方針にenv/secret実値の保存禁止を追加した。
+- EV-002.8としてSecret / Env Boundaryを追加し、App Review提出証跡、PR、公開ページにsecret実値やスクショを残さないことをNo-Goへ追加した。
+
+#### `notes/48_external_service_vendor_register.md`
+- Local / deploy env、Server-only secrets、Local env / secret managerを台帳化した。
+- 開発者secretはApp Privacy直接対象外だが、漏えい時はセキュリティ事故・安全管理措置・委託先管理の対象になると整理した。
+
+#### `notes/63_public_page_redaction_qa.md`
+- 公開しない情報と共通QAへ `.env.local`、`.vercel`、Supabase/Vercel/Apple/Stripe/Google/OpenAI等のsecret実値又は管理画面情報を追加した。
+- 公開前検索パターンに `env.local` と `.vercel` を追加し、実値入りenvファイルは検索/証跡対象に含めない注意を追加した。
+
+#### `notes/64_release_evidence_folder_index.md`
+- 最終更新日とステータスを更新し、証跡フォルダに置かない情報、セキュリティ監査証跡、迷った時の判断、提出直前チェックへsecret/env境界を追加した。
+
+### 影響範囲
+
+- App Review提出証跡、公開ページQA、リリース証跡フォルダ、セキュリティ監査、外部サービス台帳、secret運用、AdMob設定確認、seed script運用
+
+Swift Native、Web、Supabase、Edge Function、DB、App Store Connect実入力、利用規約/プライバシーポリシー本文は変更していない。Terms/Privacyのsecret混入防止条項はイテレーション1226.134の内容を維持し、今回の変更は提出・監査・公開QA文書に限定した。状態遷移と用語の意味変更はないため、`notes/09_state_machines.md` と `notes/10_glossary.md` の追加更新は行っていない。
+
+### 確認方法
+
+- `rg -n "env\\.local|\\.vercel|SUPABASE_SERVICE_ROLE_KEY|SUPABASE_SECRET_KEY|OPENAI_API_KEY|MEGRUM_APNS_PRIVATE_KEY|MEGRUM_APNS_DISPATCH_SECRET|STRIPE_WEBHOOK_SECRET|SMTP|OAuth client secret|S3 secret|AdMob app id|secret実値|公開証跡|キー名だけ|supabase secrets list" notes/36_submission_evidence_checklist.md notes/48_external_service_vendor_register.md notes/54_prelaunch_security_audit_checklist.md notes/63_public_page_redaction_qa.md notes/64_release_evidence_folder_index.md`
+  - passed
+- `git diff --check -- notes notes/legal`
+  - passed
+- `git diff --name-only | rg -v '^(notes/|利用規約など/)'`
+  - no output（Git管理上の差分はnotes配下のみ）
+
+### セルフレビュー結果
+
+- ✅ 実値入り `.env.local` や `.vercel/.env.production.local` を開かず、実装上の参照先とテンプレートだけでsecret境界を確認した。
+- ✅ Supabase service role、OpenAI API key、APNs private key、Stripe webhook secret、OAuth secret、Vercel env等を、証跡にはキー名だけ残す運用へ寄せた。
+- ✅ AdMob app id / ad unit idはsecretではないが、広告SDK設定としてApp Privacy/ATT/test ads除去と一緒に確認する扱いにした。
+- ✅ コード、Edge Function、Web管理画面、DB、Supabase設定、App Store Connect実入力、Terms/Privacy本文は変更していない。
+- ✅ docs-onlyのためアプリビルド、Swiftテスト、web build、DOCX再生成は未実行。
+
+## イテレーション1226.134：ログ証跡法務整理
+
+### 背景・問題意識
+
+現行コードには、Swift DEBUGログ、Supabase Edge Functionのエラーdetail、Web管理画面の監査ログJSON表示があり、運用・審査・障害調査には有用である一方、`access token`、`refresh token`、認証code、署名URL、画像URL、通知本文、通報本文、削除申出本文、secret等が不用意にログ、スクショ、サポート返信、App Review証跡へ残ると、秘密情報漏えいや二次利用リスクになる。コード変更禁止の指示を守り、実装事実を確認したうえで、利用規約、プライバシーポリシー、App Privacy/セキュリティ/証跡台帳、DOCX成果物のみを更新した。
+
+### 変更内容
+
+#### 実装確認
+- `MegrumAppLogger.general` と `NativePush` loggerがあり、DEBUG時に `privacy: .public` で `String(describing: error)` 又は `error.localizedDescription` を出す箇所を確認した。確認箇所はAPNs登録失敗、顔候補付け解析失敗、推し保存失敗、初期snapshot section失敗、member face profile取得失敗、個別募集load/create/update/archive失敗。
+- `suggest-goods-series` Edge Functionは、OpenAI失敗時に `openai_failed:${status}:${await response.text()}` を作り、`messageOf(error)` をJSON responseの `detail` に返す経路があることを確認した。
+- `send-apns-notification` Edge Functionは、Supabase response textを含むエラーを作り、`messageOf(error)` を返す経路があることを確認した。
+- `web/src/app/admin/audit/page.tsx` は `before_state`、`after_state`、`metadata`、`user_agent` をJSON表示し、`writeAdminAuditLog` は操作理由、IP、User-Agent、before/after state、metadataを保存することを確認した。
+
+#### `notes/legal/01_terms_of_service_draft.md`
+- ステータスへデバッグログ、Edge Functionエラー、公開証跡secret混入防止を追加した。
+- 禁止行為に、問い合わせ、通報、AI機能、証跡、スクリーンショット、ログ、公開証跡へ、token、認証code、API key、secret、パスワード、秘密鍵、金融機関ログイン情報、本人確認書類等を送信、掲載又は共有する行為を追加した。
+
+#### `notes/legal/02_privacy_policy_draft.md`
+- 取得情報に、OSLog、Function logs、外部API応答本文、署名URL又は画像URLの一部、device token末尾、通知配信結果、AI/広告/診断SDK由来のログを追加した。
+- 利用目的に、エラーログ、Function logs、外部API応答、SDK診断、OSLog、サーバー通信記録、監査ログ及び提出証跡を確認する目的を追加した。
+- 外部送信・保持・安全管理措置に、ログや提出証跡へ秘密情報実値を残さない、混入した場合はアクセス権限限定、マスキング、分離保存、削除又は匿名化に努める方針を追加した。
+- 外部送信条項の番号重複を解消した。
+
+#### 提出・App Privacy・保持/削除・セキュリティ文書
+- `notes/27_app_privacy_data_inventory.md` に、Swift DEBUG OSLog、Edge Function error detail、管理者監査JSONの現行確認事実とApp Privacy分類上の注意を追加した。
+- `notes/43_app_privacy_connect_answer_sheet.md` に、Logs / Diagnostics / Evidenceの確認事実とOther Data候補を追加した。
+- `notes/54_prelaunch_security_audit_checklist.md` に、`privacy: .public` 箇所、Function `messageOf(error)`、外部API `response.text()`、管理者監査JSONのNo-Goを追加した。
+- `notes/48_external_service_vendor_register.md` に、Edge Function logs/error detailとログ/証跡のP0整合方針を追加した。
+- `notes/52_data_retention_deletion_matrix.md` に、DEBUGログ、Function error detail、提出証跡の保持/削除行を追加した。
+- `notes/36_submission_evidence_checklist.md` に、ログ/エラー証跡で貼らない情報とEV-002.7を追加した。
+
+#### `利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+#### `利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+- MarkdownドラフトからGit管理外DOCX成果物を再生成した。
+- DOCX/PDFレンダーに `デバッグログ`、`Edge Function`、`Function logs`、`OSLog`、`外部API応答本文`、`公開証跡`、`access token`、`refresh token`、`API key`、`secret`、`マスキング` が入ることを確認した。
+
+### 影響範囲
+
+- Swift DEBUGログ、Supabase Edge Function、OpenAI候補生成、APNs配送、Web管理画面、管理者監査ログ、App Review証跡、サポート返信、提出前セキュリティ監査、App Privacy回答、データ保持/削除説明、事故対応
+
+Swift Native、Web、Supabase、Edge Function、Info.plist、xcconfig、App Store Connect実入力は変更していない。状態遷移と用語の意味変更はないため、`notes/09_state_machines.md` と `notes/10_glossary.md` の追加更新は行っていない。
+
+### 確認方法
+
+- `rg -n "デバッグログ|Edge Function|response\\.text|Function logs|OSLog|privacy:\\s*\\.public|公開証跡|secret混入|外部API error|Logs / Error Evidence|DEBUGログ|messageOf\\(error\\)|signed URL|通知本文|削除申出本文" notes/legal/01_terms_of_service_draft.md notes/legal/02_privacy_policy_draft.md notes/27_app_privacy_data_inventory.md notes/36_submission_evidence_checklist.md notes/43_app_privacy_connect_answer_sheet.md notes/48_external_service_vendor_register.md notes/52_data_retention_deletion_matrix.md notes/54_prelaunch_security_audit_checklist.md`
+  - passed
+- `unzip -t 利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+  - passed
+- `unzip -t 利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+  - passed
+- `python-docx` によるDOCXキーワード検査
+  - passed（利用規約: `デバッグログ`, `Edge Function`, `公開証跡`, `access token`, `refresh token`, `API key`, `secret`, `禁止行為` / Privacy: `デバッグログ`, `Edge Function`, `Function logs`, `外部API応答本文`, `OSLog`, `公開証跡`, `access token`, `refresh token`, `マスキング`）
+- `render_docx.py /Users/michitaka/Desktop/Megrum/利用規約など/01_Megrum利用規約_20260629改訂案.docx --output_dir /tmp/megrum-legal-render-logs/terms --emit_pdf`
+  - passed（27 pages）
+- `render_docx.py /Users/michitaka/Desktop/Megrum/利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx --output_dir /tmp/megrum-legal-render-logs/privacy --emit_pdf`
+  - passed（23 pages）
+- bundled Poppler `pdftotext` によるPDFキーワード検査
+  - passed
+- レンダーPNGの全ページ検査
+  - passed（利用規約 27 pages / プライバシーポリシー 23 pages。全ページ非空）
+- `git diff --check -- notes notes/legal`
+  - passed
+- `git diff --name-only | rg -v '^(notes/|利用規約など/)'`
+  - no output（Git管理上の差分はnotes配下のみ。DOCX成果物はGit管理外）
+
+### セルフレビュー結果
+
+- ✅ ログ、外部APIエラー、監査JSON、提出証跡の秘密情報混入を、ユーザー禁止行為と運営側安全管理の両面から整理した。
+- ✅ `privacy: .public` や `response.text()` の存在をコード事実として残しつつ、実装済みのマスキングや削除保証を過大に書いていない。
+- ✅ App Review証跡やサポート返信には、実値ではなくキー名、status、Pass/Fail、確認日時だけを残す方針へ寄せた。
+- ✅ コード、Edge Function、Web管理画面、DB、Supabase設定、App Store Connect実入力は変更していない。
+- ✅ docs-onlyのためアプリビルド、Swiftテスト、web buildは未実行。
+
+## イテレーション1226.133：公開法務同期整理
+
+### 背景・問題意識
+
+利用規約・プライバシーポリシーのMarkdown/DOCXドラフトを最新化しても、App Store ConnectのPrivacy Policy URL、登録同意リンク、Support関連リンク、アプリ内法務要約、公開Webページが古い短縮本文を指したままだと、審査時・ユーザー同意時・問い合わせ時に「どの本文が正式か」が分裂する。2026-06-29時点のコード読み取りでは、Webの `/terms` / `/privacy` は `2026年6月26日` 更新の短縮ページ、iOS登録同意は `https://megrum.jp/terms` と `https://megrum.jp/privacy`、アプリ内法務表示は正式本文ではない要約表示だった。コード変更禁止の指示を守り、公開前No-Goと提出チェックのみを更新した。
+
+### 変更内容
+
+#### 実装確認
+- `web/src/app/terms/page.tsx` は `/terms` の短縮Termsであり、2026-06-29版の最新法務ドラフト全文ではないことを確認した。
+- `web/src/app/privacy/page.tsx` は `/privacy` の短縮Privacyであり、Keychain/session保存、access token、refresh token、認証callback、通知linkPath、精密位置、写真メタデータ、外部AI/web_search、AdMob/ATT等の最新追加論点が未反映で、現在地共有/服装写真の30日削除又は非表示を強く読める文言が残ることを確認した。
+- `web/src/app/support/page.tsx` は `/support` で、関連リンクが `/privacy` と `/terms` を指すことを確認した。個別の `/support/account-deletion`、`/support/privacy-request`、`/support/report`、`/support/ai`、`/support/faq`、`/support/ads` の実装は未確認として残した。
+- `AuthLegalConsentNotice.swift` は登録同意リンクとして `https://megrum.jp/terms` と `https://megrum.jp/privacy` を使うことを確認した。
+- `LegalDocumentContent.swift` / `SettingsLegalViews.swift` は、アプリ内法務表示が正式本文ではなく要約である旨を表示していることを確認した。
+
+#### `notes/37_public_url_publication_checklist.md`
+- 現行 `/terms` / `/privacy` / `/support` と公開予定 `/legal/terms` / `/legal/privacy` の分裂を、提出前No-Goとして明確化した。
+- 公開PrivacyにKeychain/session保存、access token、refresh token、認証callback、通知linkPath、精密位置、写真メタデータ、外部AI/web_search、AdMob/ATT等が反映されないまま提出しないチェックを追加した。
+
+#### `notes/63_public_page_redaction_qa.md`
+- Web公開Terms/Privacyが短縮版ではなく、2026-06-29版のリスクを含むかをIMPL/PPチェックへ追加した。
+- 登録同意画面とSupport関連リンクが、同じ正式Terms/Privacy本文又は明示リダイレクトへ到達する確認を追加した。
+
+#### `notes/25_public_legal_support_pages.md`
+- 現行Webの短縮Privacyが最新ドラフトを網羅していないこと、現行Supportリンクも `/privacy` / `/terms` 系であることを同期注意へ追加した。
+- 短縮PrivacyをApp Store ConnectのPrivacy Policy URLとして提出しないNo-Goを追加した。
+
+#### `notes/66_legal_review_publication_runbook.md`
+- 弁護士回答後の公開実装同期チェックに、`/terms` / `/privacy` / `/legal/terms` / `/legal/privacy` の到達本文又はリダイレクト一致を追加した。
+- Web Terms/Privacy/Supportの同期観点へKeychain/session保存、認証callback、広告報告、最新Terms/Privacy導線を追加した。
+
+#### `notes/24_app_store_submission_pack.md`
+- App Store提出URL欄に、現行Webの `/terms` / `/privacy` が2026-06-26短縮版であり正式本文として未同期であることを追加した。
+- 公開URLチェックへ、現行URLと `/legal/*` が2026-06-29版本文又は同等リダイレクトへ同期済みであることを追加した。
+
+#### `notes/59_initial_release_scope_exposure_audit.md`
+- 初回提出露出監査へ、Keychain/session保存、refresh token更新、logout時local clear、最新公開Terms/Privacy到達確認を追加した。
+
+### 影響範囲
+
+- App Store Connect Privacy Policy URL、Support URL、利用規約URL、登録同意リンク、Support関連リンク、Settings内法務要約、公開Web Terms/Privacy、公開FAQ、Review Notes、App Privacy回答、公開前Go/No-Go判定
+
+Swift Native、Web、Supabase、Info.plist、xcconfig、App Store Connect実入力は変更していない。状態遷移と用語の意味変更はないため、`notes/09_state_machines.md` と `notes/10_glossary.md` の追加更新は行っていない。
+
+### 確認方法
+
+- `rg -n "2026年6月26日|/terms|/privacy|/legal/terms|/legal/privacy|Keychain|session保存|refresh token|正式な法的本文ではありません|AuthLegalConsentNotice|LegalDocumentContent|短縮Privacy|短縮Terms|30日削除|公開Web|2026-06-26短縮|2026-06-29版" notes/25_public_legal_support_pages.md notes/37_public_url_publication_checklist.md notes/63_public_page_redaction_qa.md notes/66_legal_review_publication_runbook.md notes/24_app_store_submission_pack.md notes/59_initial_release_scope_exposure_audit.md`
+  - passed
+- `git diff --check -- notes notes/legal`
+  - passed
+- `git diff --name-only | rg -v '^(notes/|利用規約など/)'`
+  - no output（Git管理上の差分はnotes配下とGit管理外DOCX成果物のみ）
+
+### セルフレビュー結果
+
+- ✅ 最新法務ドラフトと現行公開Webの差分を、公開前No-Goとして複数の提出チェックへ反映した。
+- ✅ App Store Connect、登録同意、Support関連リンク、公開リダイレクトのURL分裂を提出前に検出できるようにした。
+- ✅ アプリ内法務要約を正式本文として扱わない整理を維持した。
+- ✅ コード、公開Web実装、App Store Connect実入力、DNS、メール設定は変更していない。
+- ✅ docs-onlyのためアプリビルド、Swiftテスト、web buildは未実行。
+
+## イテレーション1226.132：Session保存法務整理
+
+### 背景・問題意識
+
+現行Swift Nativeでは、live authで `AuthSession` を端末内Keychainへ保存し、保存済みsessionを起動時に復元し、期限切れ又は期限間近のsessionをrefresh tokenで更新し、ログアウト時に端末内sessionを先に削除してからSupabase logout APIを呼ぶ。access token / refresh token はアカウント利用に直結する秘密情報であり、端末紛失、共有端末、OSバックアップ、端末復元、他端末session、外部認証事業者側sessionの扱いを「即時完全削除保証」として説明すると、ユーザー事故時・審査時・問い合わせ時のリスクが高い。コード変更禁止の指示を守り、利用規約、プライバシーポリシー、App Privacy/提出文書、FAQ、アプリ内コピー、DOCX成果物のみを更新した。
+
+### 変更内容
+
+#### 実装確認
+- `AuthSession` は `accessToken`、`refreshToken`、`expiresIn`、`expiresAt`、`tokenType`、`AuthUser` を保持することを確認した。
+- `KeychainAuthSessionStore` は `kSecClassGenericPassword`、service `jp.megrum.auth`、account `primary` でAuthSession JSONをKeychainへ保存・復元・削除する。2026-06-29時点のコード確認では `kSecAttrAccessible` やThisDeviceOnly方針の明示は未確認。
+- `MegrumAuthState.refreshSessionIfNeeded()` は期限切れ/期限間近/legacy expiryなしsessionをrefresh対象にし、refresh後のsessionを保存し直すことを確認した。
+- `SupabaseAuthClient` は `grant_type=refresh_token` でrefresh requestを作り、`/auth/v1/logout` にはaccess tokenをBearerとして送ることを確認した。
+- `MegrumAuthState.signOut()` は、先に `sessionStore.clear()` で端末内sessionを削除し、その後リモートlogoutを試す。リモートlogout失敗又はtimeoutでもauthenticated shellに閉じ込めないテストがあることを確認した。
+
+#### `notes/legal/01_terms_of_service_draft.md`
+- ログイン状態維持、セッション復元、通信認証のために、端末内の安全な保存領域（iOS Keychain等）へaccess token、refresh token、有効期限、ユーザーID、メールアドレス等を保存し得ることを追加した。
+- 会員が端末ロック、OSアカウント、バックアップ、共有端末、紛失/盗難時対応を管理する責任を明記した。
+- ログアウト、アカウント削除申請、端末変更、アプリ削除、OSバックアップ/復元、外部認証事業者側session失効等は外部仕様に依存し、全端末・外部サービス・他端末上のsession/token/履歴が即時完全削除されることを保証しない文言を追加した。
+
+#### `notes/legal/02_privacy_policy_draft.md`
+- 取得情報に、端末内Keychain等に保存される認証session、access token、refresh token、有効期限、token type、ユーザーID、メールアドレス、保存/更新/削除結果を追加した。
+- 利用目的に、端末内session保存、refresh tokenによるsession更新、ログアウト処理を追加した。
+- 外部サービス欄に、refresh tokenによるsession更新、logout API処理を追加した。
+- 外部送信欄に、Keychain保存session、refresh token送信、access tokenを使う認証API呼び出し、logout request、端末/OS/バックアップ/他端末sessionにより即時完全削除されない可能性を追加した。
+- 保持削除欄に、端末内Keychain、OSバックアップ、端末復元、ブラウザ履歴、メールアプリ、認証事業者、他端末sessionの残存可能性を追加した。
+
+#### 提出・App Privacy・公開文書
+- `notes/17_legal_alignment.md` に、Keychain session保存・refresh tokenを公開前No-Goとして追加した。
+- `notes/24_app_store_submission_pack.md`、`notes/27_app_privacy_data_inventory.md`、`notes/36_submission_evidence_checklist.md`、`notes/43_app_privacy_connect_answer_sheet.md`、`notes/48_external_service_vendor_register.md`、`notes/50_release_go_no_go_decision_matrix.md`、`notes/52_data_retention_deletion_matrix.md`、`notes/54_prelaunch_security_audit_checklist.md`、`notes/62_app_review_manual_submission_checklist.md`、`notes/71_app_store_connect_final_input_reconciliation.md`、`notes/75_auth_email_google_setup.md` に、Keychain accessibility、ThisDeviceOnly要否、refresh token rotation、logout時local clear、tokenログ混入防止、端末紛失/バックアップ/他端末session説明を追加した。
+- `notes/45_account_deletion_privacy_request_runbook.md` に、退会申請時点では全端末Auth session失効、Supabase Auth削除/無効化、Apple/Google連携解除、Keychain復元/バックアップ/他端末sessionの即時完全削除は未確認であることを追加した。
+- `notes/55_public_help_faq_draft.md`、`notes/56_in_app_legal_safety_copy_deck.md` に、ログイン状態の端末内保存、共有端末でのログアウト、紛失/不正ログイン時の対応案内を追加した。
+
+#### `利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+#### `利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+- MarkdownドラフトからGit管理外DOCX成果物を再生成した。
+- DOCX/PDFレンダーに `Keychain`、`session`、`access token`、`refresh token`、`端末のロック`、`紛失`、`logout request`、`端末復元`、`バックアップ`、`完全に削除又は失効` が入ることを確認した。
+
+### 影響範囲
+
+- メール/パスワード認証、Appleログイン、Google OAuth、保存済みsession復元、refresh token更新、ログアウト、退会申請、端末紛失/共有端末、App Privacy、Review Notes、FAQ、アプリ内注意文、提出前No-Go、保持/削除説明
+
+Swift Native、Web、Supabase、Info.plist、xcconfig、App Store Connect実入力は変更していない。状態遷移と用語の意味変更はないため、`notes/09_state_machines.md` と `notes/10_glossary.md` の追加更新は行っていない。
+
+### 確認方法
+
+- `rg -n "Keychain|AuthSession|refresh token|access token|logout API|logout request|session保存|session更新|端末内session|端末内Keychain|kSecAttrAccessible|ThisDeviceOnly|バックアップ|端末復元|他端末session|完全に削除又は失効" notes notes/legal 利用規約など`
+  - passed
+- `unzip -t 利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+  - passed
+- `unzip -t 利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+  - passed
+- `python-docx` によるDOCXキーワード検査
+  - passed（利用規約: `Keychain`, `session`, `access token`, `refresh token`, `端末のロック`, `紛失`, `即時かつ完全に削除又は失効することを保証しません` / Privacy: `Keychain`, `認証session`, `access token`, `refresh token`, `logout request`, `端末復元`, `バックアップ`, `即時かつ完全に削除又は失効するとは限りません`）
+- `render_docx.py /Users/michitaka/Desktop/Megrum/利用規約など/01_Megrum利用規約_20260629改訂案.docx --output_dir /tmp/megrum-legal-render-keychain/terms --emit_pdf`
+  - passed（36 pages）
+- `render_docx.py /Users/michitaka/Desktop/Megrum/利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx --output_dir /tmp/megrum-legal-render-keychain/privacy --emit_pdf`
+  - passed（30 pages）
+- bundled Poppler `pdftotext` によるPDFキーワード検査
+  - passed
+- レンダーPNGの全ページ検査
+  - passed（利用規約 36 pages / プライバシーポリシー 30 pages。全ページ非空）
+- `git diff --check -- notes notes/legal`
+  - passed
+- `git diff --name-only | rg -v '^(notes/|利用規約など/)'`
+  - no output（Git管理上の差分はnotes配下とGit管理外DOCX成果物のみ）
+
+### セルフレビュー結果
+
+- ✅ access token / refresh token / Keychain保存sessionを秘密情報として扱い、ログ、スクショ、公開証跡、問い合わせテンプレートへ出さないNo-Goを追加した。
+- ✅ logoutや退会申請で全端末・外部サービス・OSバックアップ・Keychain復元上のsession/tokenが即時完全削除されるように見える説明を避けた。
+- ✅ `kSecAttrAccessible` / ThisDeviceOnly方針はコード上未確認として残し、法務文面で実装済み保証をしていない。
+- ✅ コード、DB、Info.plist、xcconfig、Supabase設定、web route、App Store Connect実入力は変更していない。
+- ✅ docs-onlyのためアプリビルド、Swiftテスト、web buildは未実行。
+
+## イテレーション1226.131：認証リンク法務整理
+
+### 背景・問題意識
+
+現行Swift Nativeでは、メール認証、パスワードリセット、Google OAuth、native callback、通知 `linkPath`、ID付きdeep linkが、OS、ブラウザ、メールアプリ、Supabase Auth、Web中継Route、カスタムURL schemeにまたがって動く。認証callbackには `access token` / `refresh token` 等が含まれ得るため、利用者が認証リンク、認証コード、callback URL、通知linkPath、ID付きdeep linkを第三者へ共有してよいように見えると、アカウント乗っ取り、誤遷移、提出説明不一致のリスクがある。コード変更禁止の指示を守り、利用規約、プライバシーポリシー、App Privacy/提出文書、FAQ、アプリ内コピー、DOCX成果物のみを更新した。
+
+### 変更内容
+
+#### 実装確認
+- `ios-native/App/Info.plist` が `CFBundleURLSchemes=$(MEGRUM_URL_SCHEME)`、`MegrumAuthEmailRedirectURL`、`MegrumAuthOAuthAuthorizeURL` を持つことを確認した。
+- `MegrumRootView.onOpenURL` はURLを `MegrumAuthState.handleOpenURL` へ渡し、`SupabaseAuthRedirectParser` がquery又はfragment内のtoken情報を読み、`SupabaseAuthClient.session(fromRedirectURL:)` が `/auth/v1/user` でsessionを復元することを確認した。parser自体はscheme/host制限を担っていないため、法務文言ではcustom URL schemeをUniversal Links同等の安全保証として扱わない方針にした。
+- Google OAuthは `ASWebAuthenticationSession` で `https://megrum.jp/auth/oauth/authorize` を開き、Web側 `auth/oauth/authorize` Routeが `provider=google` と `megrum://auth/callback` / `megrum-preview://auth/callback` を許可してSupabase authorizeへ転送することを確認した。
+- Web callbackは `next=mobile` の場合、Supabase codeをsessionへ交換してからnative callback fragmentへtoken群を返すことを確認した。
+- APNs通知payloadの `linkPath` と `NotificationRouteIntent` は `/trades/...`、`/disputes/...`、`/meguri-board-thread?...`、`/users/...` 等を画面遷移へ変換し、未知のpathはfallback tabへ落とすことを確認した。
+
+#### `notes/legal/01_terms_of_service_draft.md`
+- メール認証、パスワードリセット、Appleログイン、Googleログイン、認証リダイレクト、カスタムURL scheme、ディープリンクの利用と、公式ドメイン確認、認証コード/認証リンク/秘密情報の共有禁止を追加した。
+- 認証リンク、通知リンク先、deep linkにはセッション復元又は画面遷移に必要な情報が含まれ得ること、第三者共有・公開・スクリーンショット共有がアカウント乗っ取り等につながり得ることを追加した。
+- custom URL scheme / deep linkはOS、端末、インストール済みアプリ、認証事業者、ブラウザ、メールアプリ、通知サービス、通信環境に依存し、常に正しいアプリ又は画面を開く保証ではないことを追加した。
+
+#### `notes/legal/02_privacy_policy_draft.md`
+- 取得情報に、認証code、access token、refresh token、token type、expires、provider、error、callback時刻、セッション復元結果、URL scheme、deep link、path、query、fragment、通知linkPath等を追加した。
+- 外部送信・第三者サービス欄に、認証callback、外部ブラウザ、アプリ内ブラウザ、OS、メールアプリ、カスタムURL scheme、deep link、通知リンク先の処理と、リンク/トークンの共有禁止を追加した。
+
+#### 提出・App Privacy・公開文書
+- `notes/17_legal_alignment.md` に、カスタムURL scheme、認証リダイレクト、deep linkを公開前No-Goとして追加した。
+- `notes/24_app_store_submission_pack.md`、`notes/27_app_privacy_data_inventory.md`、`notes/43_app_privacy_connect_answer_sheet.md`、`notes/48_external_service_vendor_register.md`、`notes/53_app_review_guideline_compliance_matrix.md`、`notes/54_prelaunch_security_audit_checklist.md`、`notes/75_auth_email_google_setup.md` に、URL scheme / redirect / OAuth / token fragment / Review Notes整合を追加した。
+- `notes/36_submission_evidence_checklist.md`、`notes/50_release_go_no_go_decision_matrix.md`、`notes/59_initial_release_scope_exposure_audit.md`、`notes/62_app_review_manual_submission_checklist.md`、`notes/71_app_store_connect_final_input_reconciliation.md` に、認証リンク、callback token、通知linkPath、ID付きdeep link、Supabase Redirect URLs、Google OAuth設定、Web中継Routeの不一致をNo-Goとして追加した。
+- `notes/55_public_help_faq_draft.md`、`notes/56_in_app_legal_safety_copy_deck.md`、`notes/52_data_retention_deletion_matrix.md` に、認証メール、パスワードリセット、Googleログイン、リンクが開けない時の注意文と保持/外部処理の説明を追加した。
+
+#### `利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+#### `利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+- Markdownドラフトの認証リンク・URL scheme・deep link整理をDOCX成果物へ反映した。
+- DOCX/PDFレンダーに `カスタムURL scheme`、`認証リダイレクト`、`ディープリンク`、`Googleログイン`、`認証コード`、`認証リンク`、`access token`、`refresh token`、`callback`、`fragment` が入ることを確認した。
+
+### 影響範囲
+
+- メール認証、パスワードリセット、Appleログイン、Googleログイン、Supabase Auth、Web OAuth中継Route、native callback、カスタムURL scheme、deep link、通知linkPath、App Privacy、Review Notes、FAQ、アプリ内注意文、提出前No-Go、保持/削除説明
+
+Swift Native、Web、Supabase、Info.plist、xcconfig、App Store Connect実入力は変更していない。状態遷移と用語の意味変更はないため、`notes/09_state_machines.md` と `notes/10_glossary.md` の追加更新は行っていない。
+
+### 確認方法
+
+- `rg -n "カスタムURL scheme|認証リダイレクト|ディープリンク|Auth Links|URL Scheme|deep link|linkPath|ASWebAuthenticationSession|MegrumAuthEmailRedirectURL|MEGRUM_URL_SCHEME|access token|refresh token|callback URL|認証リンク|認証コード|Supabase Redirect URLs|Google OAuth設定|Web中継Route" notes notes/legal 利用規約など`
+  - passed
+- `unzip -t 利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+  - passed
+- `unzip -t 利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+  - passed
+- `python-docx` によるDOCXキーワード検査
+  - passed（利用規約: `カスタムURL scheme`, `認証リダイレクト`, `ディープリンク`, `Googleログイン`, `認証コード`, `認証リンク`, `公式ドメイン`, `リンク先情報` / Privacy: `カスタムURL scheme`, `認証リダイレクト`, `ディープリンク`, `access token`, `refresh token`, `callback`, `provider`, `path`, `fragment`）
+- `render_docx.py /Users/michitaka/Desktop/Megrum/利用規約など/01_Megrum利用規約_20260629改訂案.docx --output_dir /tmp/megrum-legal-render-authlinks/terms --emit_pdf`
+  - passed（29 pages）
+- `render_docx.py /Users/michitaka/Desktop/Megrum/利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx --output_dir /tmp/megrum-legal-render-authlinks/privacy --emit_pdf`
+  - passed（24 pages）
+- bundled Poppler `pdftotext` によるPDFキーワード検査
+  - passed
+- レンダーPNGの全ページ検査
+  - passed（利用規約 29 pages / プライバシーポリシー 24 pages。全ページ非空）
+- `git diff --check -- notes notes/legal`
+  - passed
+- `git diff --name-only | rg -v '^(notes/|利用規約など/)'`
+  - no output（Git管理上の差分はnotes配下とGit管理外DOCX成果物のみ）
+
+### セルフレビュー結果
+
+- ✅ custom URL schemeをUniversal Links同等の安全保証として説明しない文面へ寄せた。
+- ✅ 認証リンク、認証コード、callback URL、access token、refresh token、通知linkPath、ID付きdeep linkを第三者へ共有してよいように見える説明を避けた。
+- ✅ URL scheme、Redirect URL、Google OAuth、Web中継Route、Review Notesが不一致ならNo-Goにする導線を提出資料へ入れた。
+- ✅ コード、DB、Info.plist、xcconfig、Supabase config、web route、App Store Connect実入力は変更していない。
+- ✅ docs-onlyのためアプリビルド、Swiftテスト、web buildは未実行。
+
+## イテレーション1226.130：写真共有法務整理
+
+### 背景・問題意識
+
+現行Swift Nativeでは、カメラ、写真ライブラリ、写真アップロード、共有シートが、グッズ写真、プロフィール画像、取引チャット写真、服装写真、証跡写真、グルーム画像、スポット掲示板画像、共有用画像など複数の導線で使われる。写真ライブラリ由来の元画像データにはEXIF、GPS位置情報、撮影日時、端末情報などの画像メタデータが残る可能性があり、共有シート経由で外部SNS等へ渡した後はMegrum側で公開範囲、保存、再共有、削除、広告利用、アクセス解析、メタデータ利用を管理できない。コード変更禁止の指示を守り、利用規約、プライバシーポリシー、App Privacy/提出文書、FAQ、アプリ内コピー、DOCX成果物のみを更新した。
+
+### 変更内容
+
+#### 実装確認
+- `ios-native/App/Info.plist` の `NSCameraUsageDescription` は証跡写真とグルーム投稿の写真撮影中心、`NSPhotoLibraryUsageDescription` はグッズ写真、証跡写真、グルーム投稿中心の文言であり、現行コード上のプロフィール画像、取引チャット写真、服装写真、スポット掲示板画像、共有用画像、AI/顔候補付け用途まで含む説明としては狭い可能性があることを確認した。
+- `NativeCameraCaptureView` はカメラ撮影画像を `UIImage.jpegData(compressionQuality: 0.88)` でJPEG化する経路がある一方、端末、OS、処理経路、共有先仕様によりメタデータ取扱いを断定しない方針にした。
+- `PhotosPickerItem.loadTransferable(type: Data.self)` で読み込む写真ライブラリ画像は、`normalizedPhotoUpload` / `normalizedChatPhotoUpload` が対応形式かつサイズ上限内なら元データのまま保存し得るため、EXIF、GPS位置情報、撮影日時、端末情報などが残るリスクを明記した。
+- `GoodsShareActivitySheet` は `UIActivityViewController` で共有用テキストと生成画像を外部アプリへ渡す。共有物には表示名、グッズ画像、グッズ名、グループ名、メンバー名、グッズ種別、タグ、ハッシュタグ等が含まれ得ることを確認した。
+
+#### `notes/legal/01_terms_of_service_draft.md`
+- 共有用文章又は画像に、表示名、グッズ画像、グッズ名、グループ名、メンバー名、グッズ種別、タグ、ハッシュタグ等が含まれ得ることを追加した。
+- 共有先選択後の投稿、保存、編集、再共有、公開範囲、削除可否、外部サービス上の反応又はトラブルを運営者が管理又は保証しないことを追加した。
+- カメラ又は写真ライブラリからの画像が、グッズ写真、プロフィール画像、取引チャット写真、服装写真、証跡写真、グルーム画像、スポット掲示板画像、共有用画像等に使われ得ることを追加した。
+- 写真ライブラリ元画像のEXIF、GPS位置情報、撮影日時、端末情報その他画像メタデータが、処理、形式、アップロード経路又は外部共有先仕様により保存、表示、共有又は解析される可能性を追加した。
+
+#### `notes/legal/02_privacy_policy_draft.md`
+- 取得情報に、カメラ又は写真ライブラリから撮影、選択又は読み込まれる各種画像、元画像データ、再圧縮後画像、サムネイル、プレビュー、content type、ファイルサイズ、読み込み又はアップロード失敗情報を追加した。
+- 写真ライブラリ画像が元データのまま保存される場合とJPEG等へ再圧縮される場合があり、全ての画像メタデータが常に削除されるとは保証しないことを追加した。
+- OS共有機能、共有シート、外部SNS、外部ブラウザ、外部チャット等へ情報を共有する場合、共有後の保存、公開、再共有、削除、広告利用、アクセス解析、メタデータ利用は共有先規約に従うことを追加した。
+
+#### 提出・App Privacy・公開文書
+- `notes/17_legal_alignment.md` に、カメラ・写真ライブラリ・共有シートを公開前No-Goとして追加した。
+- `notes/24_app_store_submission_pack.md`、`notes/27_app_privacy_data_inventory.md`、`notes/43_app_privacy_connect_answer_sheet.md`、`notes/48_external_service_vendor_register.md` に、Info.plist権限文言、写真ライブラリ元画像データ、画像メタデータ、共有用生成画像/テキスト、外部共有後の非管理を追加した。
+- `notes/36_submission_evidence_checklist.md`、`notes/50_release_go_no_go_decision_matrix.md`、`notes/53_app_review_guideline_compliance_matrix.md`、`notes/59_initial_release_scope_exposure_audit.md`、`notes/62_app_review_manual_submission_checklist.md`、`notes/71_app_store_connect_final_input_reconciliation.md` に、権限文言が実用途より狭い状態、写真メタデータの残存経路未確認、外部共有後の非管理説明不足をNo-Goとして追加した。
+- `notes/55_public_help_faq_draft.md`、`notes/56_in_app_legal_safety_copy_deck.md`、`notes/52_data_retention_deletion_matrix.md` に、外部SNS等への共有、共有用生成画像/テキスト、共有後の保存・削除非管理、画像メタデータ注意を追加した。
+
+#### `利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+#### `利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+- MarkdownドラフトからGit管理外DOCX成果物を再生成した。
+- DOCX/PDFレンダーに `カメラ`、`写真ライブラリ`、`共有用画像`、`共有シート`、`EXIF`、`GPS位置情報`、`画像メタデータ`、`元画像データ`、`外部サービス` が入ることを確認した。
+
+### 影響範囲
+
+- カメラ、写真ライブラリ、写真アップロード、グッズ写真、プロフィール画像、取引チャット写真、服装写真、証跡写真、グルーム画像、スポット掲示板画像、共有用生成画像、共有用テキスト、共有シート、外部SNS等、App Privacy、Info.plist権限説明、Review Notes、FAQ、アプリ内注意文
+
+Swift Native、Web、Supabase、Info.plist、PrivacyInfo.xcprivacy、App Store Connect実入力は変更していない。状態遷移と用語の意味変更はないため、`notes/09_state_machines.md` と `notes/10_glossary.md` の追加更新は行っていない。
+
+### 確認方法
+
+- `rg -n "カメラ・写真ライブラリ|共有シート|Info\\.plist|PhotosPicker|元画像|共有用生成画像|共有用画像|外部共有後|EXIF|GPS位置情報|UIActivityViewController|共有先" notes notes/legal`
+  - passed
+- `unzip -t 利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+  - passed
+- `unzip -t 利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+  - passed
+- `python-docx` によるDOCXキーワード検査
+  - passed（利用規約: `カメラ`, `写真ライブラリ`, `共有用画像`, `ハッシュタグ`, `EXIF`, `GPS位置情報`, `画像メタデータ`, `外部サービス` / Privacy: `カメラ`, `写真ライブラリ`, `元画像データ`, `再圧縮`, `共有シート`, `生成画像`, `EXIF`, `GPS位置情報`, `content type`）
+- `render_docx.py --output_dir /tmp/megrum-legal-render-photo-share/terms --emit_pdf 利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+  - passed（28 pages）
+- `render_docx.py --output_dir /tmp/megrum-legal-render-photo-share/privacy --emit_pdf 利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+  - passed（23 pages）
+- bundled Poppler `pdftotext` によるPDFキーワード検査
+  - passed
+- レンダーPNGの全ページ検査
+  - passed（利用規約 28 pages / プライバシーポリシー 23 pages。全ページ非空）
+- `git diff --check -- notes notes/legal`
+  - passed
+- `git diff --name-only | rg -v '^(notes/|利用規約など/)'`
+  - no output（Git管理上の差分はnotes配下のみ）
+
+### セルフレビュー結果
+
+- ✅ 写真ライブラリ元データのEXIF、GPS位置情報、撮影日時、端末情報が常に削除されるとは書かず、残存し得る経路を規約、Privacy、App Privacy、FAQ、提出文書に反映した。
+- ✅ 共有シート経由の外部SNS等について、Megrumが共有後の公開範囲、保存、再共有、削除、広告利用、アクセス解析、画像メタデータ利用を管理できるように見えない文面へ寄せた。
+- ✅ Info.plist権限文言が現行用途より狭い可能性をNo-Goとして残し、コード修正は行っていない。
+- ✅ コード、DB、Info.plist、PrivacyInfo.xcprivacy、App Store Connect実入力は変更していない。
+- ✅ docs-onlyのためアプリビルド、Swiftテスト、web buildは未実行。
+
+## イテレーション1226.129：候補検索推薦法務整理
+
+### 背景・問題意識
+
+現行Swift Nativeでは、ホーム候補、検索結果、マッチ/条件一致ラベル、検索候補、表示順が、在庫、wish、個別条件、タグ、交換方法、活動エリア、日程、支払い方法要約、評価、完了取引数、ブロック関係、通知状態、メグルムプラス有効状態等に基づいて変動する。これらの表示が「本人確認済み」「安全確認済み」「信用保証」「真贋確認済み」「取引成立保証」「運営推薦」に見えると、審査・法務・事故時説明リスクが高い。コード変更禁止の指示を守り、利用規約、プライバシーポリシー、App Privacy/提出文書、FAQ、アプリ内コピー、DOCX成果物のみを更新した。
+
+### 変更内容
+
+#### 実装確認
+- `HomeCandidateComposer` / `SupabaseHomeClient` で、閲覧者と相手会員の在庫、wish、個別募集、listing wish options、推し、タグ、活動予定、local mode settings、支払い方法要約、評価、完了取引数、未読通知、メグルムプラス有効ユーザー、ブロック関係、テストアカウント除外を用いる候補生成を確認した。
+- `HomeDiscoveryCandidateSorter` で、メグルムプラス優先、タグ一致、グッズ条件、交換条件、支払い条件、リンク数、タイトル等による表示順調整を確認した。
+- `HomeDiscoveryMatchPolicy` / `HomeMutualMatchConditionReviewPolicy` で、wish一致、個別募集一致、郵送交換可否、現地交換の都道府県/日程一致、支払い方法互換性等から「全一致」等の参考ラベルを作る経路を確認した。
+- `SearchResultFilterPolicy` / `SearchSuggestionBuilder` / `GoodsSearchModels` で、検索結果の絞り込み、メグルムプラス優先表示、検索候補、「マッチしてるよ！」「交換できるかも？」bucket表示を確認した。
+- `search_query_logs` / `record_search_query` / `get_popular_search_terms` のDB/RPC基盤は検索語、`normalized_term`、`result_count`、30日人気検索集計を扱うが、2026-06-29時点のSwift検索ではRPC呼び出し未確認として残した。
+
+#### `notes/legal/01_terms_of_service_draft.md`
+- ホーム候補、検索結果、マッチ表示、条件一致表示、検索候補、人気検索、表示順、レコメンド、メグルムプラス優先表示、広告挿入が、自動処理又は運営上の表示制御により変動することを追加した。
+- 「マッチしてるよ！」「交換できるかも？」「全一致」等は参考表示であり、所有権、真贋、在庫確保、価格、支払い、発送、受領、現地合流、日程、場所、本人性、安全性、信用、支払能力、取引意思、取引成立又は履行を保証しないことを追加した。
+- 非保証条項に、候補表示、検索結果、表示順、レコメンド、検索候補、人気検索、有料サービスによる優先表示、広告挿入、条件一致表示を追加した。
+
+#### `notes/legal/02_privacy_policy_draft.md`
+- 取得情報に、検索語、検索条件、検索結果件数、検索時刻、検索候補、人気検索集計、`normalized_term`、`result_count`、候補表示/表示順に利用するプロフィール、在庫、wish、個別条件、タグ、交換方法、活動エリア、位置又は日程設定、支払い方法要約、評価、完了取引数、ブロック関係、通知状態、有料権限等を追加した。
+- 利用目的に、検索、候補表示、表示順、Product Personalization、検索候補、人気検索、広告挿入、有料サービスによる優先表示を追加した。
+- 取引相手への表示及び提供、保存期間及び削除に、候補表示・検索ログ・内部評価情報の利用、保持、集計又は匿名化を追加した。
+
+#### 提出・App Privacy・公開文書
+- `notes/17_legal_alignment.md` に、ホーム候補・検索・レコメンド・Product Personalizationを公開前No-Goとして追加した。
+- `notes/24_app_store_submission_pack.md`、`notes/27_app_privacy_data_inventory.md`、`notes/43_app_privacy_connect_answer_sheet.md`、`notes/48_external_service_vendor_register.md` に、Search History / Usage Data / Product Personalization、Plus優先表示、広告挿入、検索ログ保存有無の確認を追加した。
+- `notes/36_submission_evidence_checklist.md`、`notes/50_release_go_no_go_decision_matrix.md`、`notes/53_app_review_guideline_compliance_matrix.md`、`notes/59_initial_release_scope_exposure_audit.md`、`notes/62_app_review_manual_submission_checklist.md`、`notes/71_app_store_connect_final_input_reconciliation.md` に、候補表示や検索結果が本人確認・安全確認・信用保証・取引成立保証に見える状態をNo-Goとして追加した。
+- `notes/55_public_help_faq_draft.md`、`notes/56_in_app_legal_safety_copy_deck.md` に、ユーザー向けの候補表示/検索ログ説明とアプリ内短文コピーを追加した。
+
+#### `利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+#### `利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+- MarkdownドラフトからGit管理外DOCX成果物を再生成した。
+- DOCX/PDFレンダーに `Product Personalization`、`ホーム候補`、`表示順`、`メグルムプラス`、`検索結果`、`normalized_term`、`result_count`、`人気検索` が入ることを確認した。
+
+### 影響範囲
+
+- ホーム候補、検索結果、検索候補、人気検索、マッチ表示、条件一致表示、表示順、レコメンド、Product Personalization、メグルムプラス優先表示、広告挿入、検索ログ、App Privacy、Review Notes、FAQ、アプリ内説明
+
+Swift Native、Web、Supabase schema/function、Info.plist、PrivacyInfo.xcprivacy、App Store Connect実入力は変更していない。状態遷移と用語の意味変更はないため、`notes/09_state_machines.md` と `notes/10_glossary.md` の追加更新は行っていない。
+
+### 確認方法
+
+- `rg -n "ホーム候補|Product Personalization|normalized_term|result_count|マッチしてるよ|全一致|Plus優先|Plus優先表示|メグルムプラス優先|検索ログ" notes/legal notes/17_legal_alignment.md notes/24_app_store_submission_pack.md notes/27_app_privacy_data_inventory.md notes/36_submission_evidence_checklist.md notes/43_app_privacy_connect_answer_sheet.md notes/48_external_service_vendor_register.md notes/50_release_go_no_go_decision_matrix.md notes/53_app_review_guideline_compliance_matrix.md notes/55_public_help_faq_draft.md notes/56_in_app_legal_safety_copy_deck.md notes/59_initial_release_scope_exposure_audit.md notes/62_app_review_manual_submission_checklist.md notes/71_app_store_connect_final_input_reconciliation.md`
+  - passed
+- `unzip -t 利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+  - passed
+- `unzip -t 利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+  - passed
+- `python-docx` によるDOCXキーワード検査
+  - passed（利用規約: `Product Personalization`, `ホーム候補`, `表示順`, `メグルムプラス`, `検索結果`, `参考表示`, `取引成立`, `全一致` / Privacy: `Product Personalization`, `検索語`, `normalized_term`, `result_count`, `ホーム候補`, `メグルムプラス`, `表示順`, `自動処理`, `人気検索`）
+- `render_docx.py --output_dir /tmp/megrum-legal-render-recommend/terms --emit_pdf 利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+  - passed（28 pages）
+- `render_docx.py --output_dir /tmp/megrum-legal-render-recommend/privacy --emit_pdf 利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+  - passed（23 pages）
+- bundled Poppler `pdftotext` によるPDFキーワード検査
+  - passed
+- レンダーPNGの全ページ検査
+  - passed（利用規約 28 pages / プライバシーポリシー 23 pages。全ページ非空）
+- `git diff --check -- notes notes/legal`
+  - passed
+- `git diff --name-only | rg -v '^(notes/|利用規約など/)'`
+  - no output（Git管理上の差分はnotes配下のみ）
+
+### セルフレビュー結果
+
+- ✅ 候補表示・検索結果・条件一致ラベルを、保証や推薦ではなく参考表示として規約、Privacy、FAQ、提出文書に横断反映した。
+- ✅ Search History / Usage Data / Product PersonalizationのApp Privacy候補を追加し、DB/RPC基盤はあるがSwift呼び出し未確認という事実を残した。
+- ✅ メグルムプラス優先表示と広告挿入が表示順に影響する前提を、公開前No-Goと提出証跡に追加した。
+- ✅ コード、DB、Info.plist、PrivacyInfo.xcprivacy、App Store Connect実入力は変更していない。
+- ✅ docs-onlyのためアプリビルド、Swiftテスト、web buildは未実行。
+
+## イテレーション1226.128：Push通知法務整理
+
+### 背景・問題意識
+
+現行Swift Nativeでは、ログイン後に `UNUserNotificationCenter` で通知許可を確認し、許可済み又は許可された場合にAPNs登録を行う。APNs device tokenは `notification_devices` に保存され、`send-apns-notification` Edge Functionは `notifications.title/body/link_path`、未読数、通知ID、リンク先をAPNs alert payloadとして送る。取引チャットのテキスト本文は短縮プレビューとして通知bodyに入り得て、写真、服装写真、現在地共有、到着状況、証跡、評価、キャンセル要請等は出来事の概要が通知へ出る。通知はロック画面、通知センター、連携端末、OS通知プレビュー、APNs/Expo Push等の外部サービス仕様により表示又は保存され得るため、Apple App Review Guidelines 4.5.4とApp Privacyの観点を文書側に反映した。コード変更禁止の指示を守り、法務文書、App Store提出文書、No-Go条件、DOCX成果物のみを更新した。
+
+### 変更内容
+
+#### 実装確認
+- `ios-native/App/MegrumNativeApp.swift` で、ログイン後の通知許可確認、`registerForRemoteNotifications()`、APNs device token受領、通知タップ時の `notificationId` / `linkPath` ルーティングを確認した。
+- `SupabaseNotificationClient.swift`、`SupabaseNotificationClientRequests.swift`、`SupabaseNotificationPayloads.swift` で、`notification_devices` への `platform='ios'`、`push_provider='apns'`、`native_device_token`、`app_version`、`last_seen_at`、`revoked_at` 保存経路を確認した。
+- `supabase/functions/send-apns-notification/index.ts` で、APNs payloadに `title`、`body`、`badge`、`sound`、`notificationId`、`linkPath` を含める経路と、APNs失効応答時に端末登録をrevokeする経路を確認した。
+- `supabase/migrations/20260627003000_add_trade_event_notifications.sql` と `20260627103000_add_meguri_notification_events.sql` で、取引チャット本文の短縮プレビュー、写真/服装写真/現在地/到着状況/証跡/評価/キャンセル要請の概要通知、グルーム/めぐり/掲示板のタイトル中心通知を確認した。
+
+#### `notes/legal/01_terms_of_service_draft.md`
+- プッシュ通知又は端末通知に、相手会員の表示名、取引チャット本文の一部、写真共有、服装写真共有、現在地共有、到着状況、通知ID、リンク先、未読バッジ等が含まれる場合があることを追加した。
+- 通知に表示されたくない機密情報、住所、詳細な位置情報、金融機関情報、認証コード、本人確認書類、チケット情報、第三者の個人情報等をメッセージや投稿に入力しない注意を追加した。
+- Push通知の許可はアプリ利用条件ではないこと、通知を止めてもアプリ内確認導線が残る場合がある一方で重要な確認が遅れる場合があること、販促又は直接マーケティングPushは必要な同意と停止手段を設けることを追加した。
+
+#### `notes/legal/02_privacy_policy_draft.md`
+- 取得情報に、APNs device token、Expo push token、push provider、アプリバージョン、最終確認日時、`revoked_at`、通知ID、通知本文、未読バッジ、通知開封、通知配信結果等を追加した。
+- APNs/Expo Pushへ、通知タイトル、本文、未読数又はバッジ、通知ID、リンク先、sound、端末及び通信情報が送られ得ることを追加した。
+- 現行Swift NativeのAPNs端末登録、通知配送、失効時revoke経路を明記し、取引チャット本文の短縮プレビューや写真/服装写真/現在地共有等の概要が通知へ出ることを追加した。
+- Push通知は利用条件ではなく、アプリ内通知行はPush設定とは別に作成又は保持される場合があること、販促又は直接マーケティングPushには必要な同意と停止手段を設けることを追加した。
+
+#### `notes/17_legal_alignment.md`, `notes/24_app_store_submission_pack.md`, `notes/27_app_privacy_data_inventory.md`, `notes/43_app_privacy_connect_answer_sheet.md`, `notes/48_external_service_vendor_register.md`, `notes/53_app_review_guideline_compliance_matrix.md`
+- Apple App Review Guidelines 4.5.4の観点として、Push通知をアプリ利用の必須条件にしない、機微な個人情報又は秘密情報をPush本文へ入れない、販促Pushは同意と停止手段を用意する方針を追加した。
+- App Privacyでは、APNs/Expo tokenだけでなく、通知タイトル/本文/リンク先/未読バッジ/通知ID/sound、User Content、Usage Data、ロック画面表示、連携端末表示まで照合する方針を追加した。
+- 外部サービス台帳で、Supabase Edge Function、Apple APNs、Expo Notificationsのpayload最小化、secrets管理、ロック画面/通知センター/連携端末表示、退会時無効化未確認を整理した。
+
+#### `notes/36_submission_evidence_checklist.md`, `notes/50_release_go_no_go_decision_matrix.md`, `notes/55_public_help_faq_draft.md`, `notes/56_in_app_legal_safety_copy_deck.md`, `notes/62_app_review_manual_submission_checklist.md`, `notes/71_app_store_connect_final_input_reconciliation.md`
+- 提出証跡、Go/No-Go、公開FAQ、アプリ内コピー、手動提出、App Store Connect最終照合に、Push通知の任意性、通知本文の機微情報禁止、販促Push同意/停止手段、APNs/Expo token、通知ID、linkPath、sound、未読バッジ、ロック画面/通知センター/連携端末表示を追加した。
+
+#### `利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+#### `利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+- MarkdownドラフトからGit管理外DOCX成果物を再生成した。
+- 利用規約DOCX/PDFレンダーに `APNs`、`Expo Push`、`通知ID`、`未読バッジ`、`利用条件ではありません`、`プロモーション`、`直接マーケティング`、`認証コード`、`本人確認書類` が入ることを確認した。
+- プライバシーポリシーDOCX/PDFレンダーに `APNs device token`、`push provider`、`アプリバージョン`、`revoked_at`、`sound`、`通知ID`、`現行Swift Native`、`直接マーケティング`、`取引チャットのテキストメッセージ` が入ることを確認した。
+
+### 影響範囲
+
+- APNs端末登録、Expo Push legacy経路、通知本文、通知ID、linkPath、未読バッジ、通知設定、通知開封/配信ログ、取引チャット、写真/服装写真/現在地共有、グルーム、めぐり、スポット掲示板、運営通知、App Privacy、Review Notes、FAQ、アプリ内通知説明
+
+Swift Native、Web、Supabase、Info.plist、PrivacyInfo.xcprivacy、App Store Connect実入力は変更していない。
+
+### 確認方法
+
+- `rg -n "Push通知4\\.5\\.4|Push通知を許可しない|通知\\s*ID|push provider|sound|直接マーケティング|プロモーション|APNs通知本文" notes/legal notes/17_legal_alignment.md notes/24_app_store_submission_pack.md notes/27_app_privacy_data_inventory.md notes/36_submission_evidence_checklist.md notes/43_app_privacy_connect_answer_sheet.md notes/48_external_service_vendor_register.md notes/50_release_go_no_go_decision_matrix.md notes/53_app_review_guideline_compliance_matrix.md notes/55_public_help_faq_draft.md notes/56_in_app_legal_safety_copy_deck.md notes/62_app_review_manual_submission_checklist.md notes/71_app_store_connect_final_input_reconciliation.md -S`
+  - passed
+- `git diff --check -- notes notes/legal`
+  - passed
+- `unzip -t 利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+  - passed
+- `unzip -t 利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+  - passed
+- `python-docx` によるDOCXキーワード検査
+  - passed（利用規約: `APNs`, `Expo Push`, `通知ID`, `未読バッジ`, `利用条件ではありません`, `プロモーション`, `直接マーケティング`, `認証コード`, `本人確認書類` / Privacy: `APNs device token`, `push provider`, `アプリバージョン`, `revoked_at`, `sound`, `通知ID`, `現行Swift Native`, `直接マーケティング`, `取引チャットのテキストメッセージ`）
+- `render_docx.py --output_dir /tmp/megrum-legal-render-push/terms --emit_pdf 利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+  - passed（27 pages）
+- `render_docx.py --output_dir /tmp/megrum-legal-render-push/privacy --emit_pdf 利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+  - passed（22 pages）
+- bundled Poppler `pdftotext` によるPDFキーワード検査
+  - passed（PDF抽出では `通知ID`、`現行Swift Native` が空白付きで抽出されるため空白許容で確認）
+- レンダーPNGの全ページ検査
+  - passed（利用規約 27 pages / プライバシーポリシー 22 pages。全ページ非空）
+
+### セルフレビュー結果
+
+- ✅ APNs device tokenだけではなく、通知本文、通知ID、linkPath、sound、未読バッジ、ロック画面/連携端末表示までApp Privacy・FAQ・提出文書に反映した。
+- ✅ Push通知をアプリ利用の必須条件にしないこと、機微情報を通知本文に出さないこと、販促Pushには同意と停止手段を置くことをNo-Go化した。
+- ✅ 現行実装で本文が入る通知と、タイトル中心の通知を分けて記載しつつ、タイトルだけでも文脈が推測されるリスクを残した。
+- ✅ コード、DB、Info.plist、PrivacyInfo.xcprivacy、App Store Connect実入力は変更していない。
+- ✅ docs-onlyのためアプリビルド、Swiftテスト、web buildは未実行。
+
+## イテレーション1226.127：古物チケット禁止法務整理
+
+### 背景・問題意識
+
+Megrumはユーザー同士のグッズ交換を補助するサービスとして設計されているが、現行のグッズ登録、交換打診、チャット、外部SNS/決済への誘導可能性がある画面構成では、説明や禁止事項が弱いと、古物営業、古物市場、古物競りあっせん、オークション、買取、販売代理、委託売買、チケット譲渡、盗品又は不正取得品の流通を許すサービスに見えるリスクがある。e-Govで古物営業法とチケット不正転売禁止法を確認し、コード変更禁止の指示を守り、利用規約、App Store提出文書、FAQ、アプリ内安全コピー、No-Go条件、DOCX成果物のみを更新した。
+
+### 変更内容
+
+#### 法令確認
+- e-Govの古物営業法で、盗品等の売買防止及び速やかな発見を目的とすること、古物、古物営業、古物商、古物市場、古物競りあっせん業者、許可又は届出、相手方確認努力義務に関する規定を確認した。
+- e-Govのチケット不正転売禁止法で、興行、興行入場券、特定興行入場券、不正転売の禁止、不正転売目的の譲受け禁止に関する規定を確認した。
+
+#### `notes/legal/01_terms_of_service_draft.md`
+- Megrumは、古物商、古物市場、古物競りあっせん業者、オークション、競り、販売マーケット、買取、委託売買・交換、販売代理、配送保管者ではないことを明記した。
+- 会員が、本サービスを古物営業法上の古物営業、古物商間取引、古物市場、古物競りあっせん、反復継続的な売買、仕入れ転売、代理販売、委託売買又は委託交換のために利用してはならないことを追加した。
+- 会員は、対象物の所有権、処分権限、取得経路、盗品・詐欺取得品・遺失物等でないこと、必要な許認可又は権利者許諾を自ら確認する義務を負うことを追加した。
+- 運営者は、取得経路、所有権、利用目的、権利関係の説明又は資料を求め、表示停止、取引停止、アカウント制限、関係機関への協力を行えることを追加した。
+- 特定興行入場券、チケット、電子チケット、入場用QRコード、抽選権、整理番号、会員権、アカウント、本人確認と紐づく入場資格等の登録、交換、譲渡、売買、外部誘導を禁止した。
+- 盗品、不正取得品、権利侵害品、真贋不明品、取得経路又は処分権限が疑わしい物について、会員が自己判断で進めてはならないことを追加した。
+
+#### `notes/17_legal_alignment.md`, `notes/24_app_store_submission_pack.md`, `notes/50_release_go_no_go_decision_matrix.md`
+- 古物営業、チケット不正転売、盗品又は不正取得品のリスクを公開前No-Goへ追加した。
+- App Store説明では、Megrumをマーケットプレイス、古物商、買取、販売代理、オークション、チケット譲渡、決済代行として説明しない方針を追加した。
+- 初回提出時に、古物営業、チケット譲渡、現金・金券類、売買目的、外部決済への誘導が見える状態をNo-Goにした。
+
+#### `notes/55_public_help_faq_draft.md`, `notes/56_in_app_legal_safety_copy_deck.md`
+- チケット、入場用QRコード、抽選権、盗品、不正取得品、権利侵害品、現金・金券類、売買目的又は古物営業に当たるものを登録できないFAQとアプリ内安全コピーを追加した。
+- 「Megrumはユーザー同士のグッズ交換を補助するサービスであり、買取、販売代理、オークション、チケット譲渡、決済代行は行わない」旨を、公開FAQとアプリ内コピーへ反映した。
+- 売る、買う、購入、出品、入札など、売買・競り・マーケットプレイスに見えるCTAや説明をNo-Goにした。
+
+#### `notes/36_submission_evidence_checklist.md`, `notes/40_app_store_connect_copy_paste_sheet.md`, `notes/62_app_review_manual_submission_checklist.md`, `notes/71_app_store_connect_final_input_reconciliation.md`
+- App Store転記、提出証跡、手動提出、最終照合に、禁止取引、古物営業非該当の説明、チケット譲渡禁止、売買・決済代行ではないことの確認項目を追加した。
+- App Store Connectの説明文候補に、Megrumがマーケットプレイス、古物商、買取、販売代理、オークション、チケット譲渡、決済代行ではない旨を入れた。
+
+#### `利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+- MarkdownドラフトからGit管理外DOCX成果物を再生成した。
+- DOCX/PDFレンダーに `古物商`、`古物市場`、`古物競りあっせん`、`オークション`、`入場用QRコード`、`チケット不正転売禁止法`、`不正取得品` が入ることを確認した。
+
+### 影響範囲
+
+- グッズ登録、交換打診、取引チャット、公開FAQ、アプリ内禁止事項、App Store説明、Review Notes、提出証跡、Go/No-Go、最終照合、利用規約DOCX
+
+Swift Native、Web、Supabase、PrivacyInfo.xcprivacy、Info.plist、App Store Connect実入力は変更していない。
+
+### 確認方法
+
+- `rg -n "古物商|古物市場|古物競り|オークション|買取|販売代理|委託売買|チケット譲渡|入場用QR|入場資格|盗品|不正取得品|反復継続" notes notes/legal -S`
+  - passed
+- `git diff --check -- notes notes/legal`
+  - passed
+- `unzip -t 利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+  - passed
+- `python-docx` によるDOCXキーワード検査
+  - passed（`古物商`, `古物市場`, `古物競りあっせん`, `オークション`, `入場用QRコード`, `チケット不正転売禁止法`, `不正取得品`）
+- `render_docx.py --output_dir /tmp/megrum-legal-render-kobutsu-ticket/terms --emit_pdf 利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+  - passed（33 pages）
+- bundled Poppler `pdftotext` によるPDFキーワード検査
+  - passed（`入場用QRコード` はPDF抽出で空白が入り得るため空白許容で確認）
+- レンダーPNGの全ページ検査
+  - passed（利用規約 33 pages。全ページ非空）
+
+### セルフレビュー結果
+
+- ✅ Megrumが古物商、古物市場、古物競りあっせん業者、オークション、買取、販売代理、チケット譲渡、決済代行に見えないように、規約、FAQ、App Store提出文書、アプリ内コピーを横断整理した。
+- ✅ 盗品、不正取得品、取得経路不明品、チケット、入場用QRコード、抽選権、会員権、本人確認付き入場資格などを禁止対象として明記した。
+- ✅ 運営者が説明要求、表示停止、取引停止、アカウント制限、関係機関協力を行える余地を規約へ入れた。
+- ✅ コード、DB、Info.plist、PrivacyInfo.xcprivacy、App Store Connect実入力は変更していない。
+- ✅ docs-onlyのためアプリビルド、Swiftテスト、web buildは未実行。
+
+## イテレーション1226.126：精密位置地図法務整理
+
+### 背景・問題意識
+
+現行Swift Nativeでは、`MegrumLocationState` が `CLLocationManager` を `kCLLocationAccuracyNearestTenMeters`、`distanceFilter=10` で利用し、`CLGeocoder.reverseGeocodeLocation` で座標を場所名へ変換する。`HomeLocalCoordinateStorageCodec` は緯度経度を小数8桁で保持でき、取引チャットの現在地共有、近くのグルーム、スポット掲示板の閲覧・作成・返信範囲判定では緯度経度をサーバーへ送る経路がある。画面上は「近く」「1km圏内」「3km圏内」と見えても、App Privacyや公開文面で粗い地域情報だけの扱いにすると、Apple審査、プライバシー表示、事故時説明のリスクが高い。コード変更禁止の指示を守り、法務文書、App Store提出文書、No-Go条件、DOCX成果物のみを更新した。
+
+### 変更内容
+
+#### 実装確認
+- `ios-native/Sources/MegrumApp/MegrumLocationState.swift` で、CoreLocation、MapKit関連処理、`CLGeocoder`、10m相当精度、10m `distanceFilter` を確認した。
+- `TradeDetailScreenActions.swift`、`BoardThreadDetailScreen.swift`、`MegrumAppStateMeguriActions.swift`、`HomeLocalLocationModels.swift`、`SupabaseGroomPayloads.swift`、`SupabaseBoardScopeQueryContext.swift` で、現在地共有、近くのグルーム、スポット掲示板、投稿/返信範囲判定に緯度経度を使う経路を確認した。
+- `ios-native/App/Info.plist` の位置情報利用目的文言が、取引チャットの現在地共有、近くのグルーム、掲示板表示を対象にしていることを確認した。
+
+#### `notes/legal/01_terms_of_service_draft.md`
+- 地図表示、現在地、場所名、近接表示、距離表示、検索結果、逆ジオコーディングは参考情報であり、正確性、継続性、安全性、到達可能性、現地状況を保証しない条項を追加した。
+- 現地交換では、現在地、場所名、地図、距離、到着状況がMapKit、CoreLocation、ジオコーディング、通信環境、会員操作等により誤差、遅延又は不一致を含み得ること、表示だけに依存せず実際の周囲や会場ルールを確認する義務を追加した。
+
+#### `notes/legal/02_privacy_policy_draft.md`
+- 位置情報として、現在地共有、投稿位置、近隣表示、地図表示、スポット掲示板の作成又は返信範囲判定、グルーム表示、逆ジオコーディングで使う緯度経度、精度、時刻、場所名を明記した。
+- 位置情報を許可した場合、端末、OS、MapKit、CoreLocation、CLGeocoder等を通じて精密な緯度経度を取得、表示、送信、保存又は場所名へ変換し得ることを追加した。
+- 画面上で「近く」「1km圏内」「3km圏内」と表示される場合でも、内部処理やサーバー送信では精密座標を扱い得ることを追加した。
+- 地図、位置情報、逆ジオコーディング、場所名表示に関わる情報が、OS、MapKit、CoreLocation、CLGeocoder、地図又は位置情報関連サービスへ送信又は処理され得ることを追加した。
+
+#### `notes/17_legal_alignment.md`, `notes/24_app_store_submission_pack.md`, `notes/27_app_privacy_data_inventory.md`, `notes/43_app_privacy_connect_answer_sheet.md`, `notes/48_external_service_vendor_register.md`
+- 精密座標、MapKit、CoreLocation、CLGeocoder、逆ジオコーディング、App PrivacyのPrecise Location回答を公開前No-Goへ追加した。
+- App Privacyで、近くのグルーム、スポット掲示板、現在地共有、地図表示、逆ジオコーディングが見えるビルドはPrecise Location寄りで回答する方針を明確化した。
+- 外部サービス台帳で、OS/地図関連処理、サーバー送信/保存、保持/削除例外、地図/距離/場所名の非保証を整理した。
+
+#### `notes/25_public_legal_support_pages.md`, `notes/53_app_review_guideline_compliance_matrix.md`, `notes/55_public_help_faq_draft.md`, `notes/56_in_app_legal_safety_copy_deck.md`, `notes/59_initial_release_scope_exposure_audit.md`
+- FAQ、公開サポート、アプリ内安全コピー、App Review Guideline表、初回提出露出監査に、精密座標、地図サービス、逆ジオコーディング、距離/場所名の非保証を反映した。
+
+#### `notes/36_submission_evidence_checklist.md`, `notes/40_app_store_connect_copy_paste_sheet.md`, `notes/46_app_store_questionnaire_answer_sheet.md`, `notes/50_release_go_no_go_decision_matrix.md`, `notes/62_app_review_manual_submission_checklist.md`, `notes/71_app_store_connect_final_input_reconciliation.md`
+- 提出証跡、App Store転記、質問票、Go/No-Go、手動提出、App Store Connect最終照合に、Precise Location、MapKit/CoreLocation/CLGeocoder、精密座標の送信/保存、保持/削除例外、地図/距離/場所名の非保証を追加した。
+- 内部で精密座標を使う実装なのに、Coarse Locationのみ、又は位置情報なしとして転記する状態をNo-Goにした。
+
+#### `利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+#### `利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+- MarkdownドラフトからGit管理外DOCX成果物を再生成した。
+- 利用規約DOCX/PDFレンダーに `MapKit`、`CoreLocation`、`ジオコーディング`、`近接判定`、`場所名`、`安全性` が入ることを確認した。
+- プライバシーポリシーDOCX/PDFレンダーに `MapKit`、`CoreLocation`、`CLGeocoder`、`精密な緯度経度`、`1km圏内`、`3km圏内`、`逆ジオコーディング` が入ることを確認した。
+
+### 影響範囲
+
+- 取引チャットの現在地共有、めぐり、グルーム、スポット掲示板、地図表示、逆ジオコーディング、場所名表示、距離/近接判定、App Privacy、Review Notes、FAQ、公開サポート、アプリ内位置情報説明
+
+Swift Native、Web、Supabase、Info.plist、PrivacyInfo.xcprivacy、App Store Connect実入力は変更していない。
+
+### 確認方法
+
+- `rg -n "精密位置|精密な緯度経度|Precise Location|MapKit|CoreLocation|CLGeocoder|逆ジオコーディング|地図/距離/場所名|場所名又は距離" notes notes/legal -S`
+  - passed
+- `git diff --check -- notes notes/legal`
+  - passed
+- `unzip -t 利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+  - passed
+- `unzip -t 利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+  - passed
+- `python-docx` によるDOCXキーワード検査
+  - passed（利用規約: `MapKit`, `CoreLocation`, `ジオコーディング`, `近接判定`, `場所名`, `安全性` / Privacy: `MapKit`, `CoreLocation`, `CLGeocoder`, `精密な緯度経度`, `1km圏内`, `逆ジオコーディング`）
+- `render_docx.py --output_dir /tmp/megrum-legal-render-mapkit-precise/terms --emit_pdf 利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+  - passed（32 pages）
+- `render_docx.py --output_dir /tmp/megrum-legal-render-mapkit-precise-privacy/privacy --emit_pdf 利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+  - passed（26 pages）
+- bundled Poppler `pdftotext` によるPDFキーワード検査
+  - passed（PDF抽出では `1km圏内` / `3km圏内` が `1km 圏内` / `3km 圏内` と空白付きで抽出されるため空白許容で確認）
+- レンダーPNGの全ページ検査
+  - passed（利用規約 32 pages / プライバシーポリシー 26 pages。全ページ非空）
+- `git diff --name-only | rg -v '^(notes/|利用規約など/)'`
+  - passed（Git上の差分はnotes配下のみ。DOCX成果物はGit管理外）
+
+### セルフレビュー結果
+
+- ✅ 位置情報を「近くの表示」ではなく、実装上の精密座標、外部地図サービス、サーバー送信/保存の観点で整理した。
+- ✅ App Privacyでは、内部で精密座標を使う導線が見える場合にPrecise Location回答を落とさないNo-Goを追加した。
+- ✅ 地図、距離、場所名、到着状況は安全又は正確性を保証しない補助情報として、利用規約、FAQ、Review Notes、アプリ内コピーへ横断反映した。
+- ✅ コード、DB、Info.plist、PrivacyInfo.xcprivacy、App Store Connect実入力は変更していない。
+- ✅ docs-onlyのためアプリビルド、Swiftテスト、web buildは未実行。
+
+## イテレーション1226.125：EU DSA配信地域法務整理
+
+### 背景・問題意識
+
+初回App Store提出でAll Countries or Regions又はEU 27 territoriesを含めると、EU DSA trader status、App Store商品ページに表示されるProvider/Seller/contact情報、英語/現地語サポート、IAP Availability、代表者情報非公表方針との整合が追加で必要になる。Megrumの初回スコープは日本語UI・日本語Support・現地交換MVPであり、代表者名、住所、電話番号は「請求があれば遅滞なく開示」方針のため、EU DSA表示で公開される情報を把握しないまま提出すると開発者側のプライバシー・運用・審査リスクが高い。コード変更禁止の指示を守り、App Store提出文書とNo-Goだけを更新した。
+
+### 変更内容
+
+#### `notes/68_app_store_territory_dsa_iap_availability.md`
+- 初回App AvailabilityをJapanのみ候補へ明確化し、EU又はAll Countries or Regionsを選ぶ場合の追加確認を強化した。
+- Appleは開発者がtraderかどうかを判断しないため、運営者又は弁護士の自己判断が必要であることを追加した。
+- EUで必要なtrader statusと連絡先情報が未提供又は未確認の場合、EUのApp Storeから削除されるリスクがあることを追加した。
+- DSA用の住所、電話番号、本人確認情報、App Store Connect上の実連絡先はリポジトリに書かず、App Store Connect画面又はオーナー管理の証跡に限定する方針を追加した。
+- Japan-only方針なのにEU又はAll Countries or Regionsを含む、又はIAPだけ広域販売される状態をNo-Goへ追加した。
+
+#### `notes/17_legal_alignment.md`, `notes/24_app_store_submission_pack.md`, `notes/36_submission_evidence_checklist.md`, `notes/40_app_store_connect_copy_paste_sheet.md`, `notes/46_app_store_questionnaire_answer_sheet.md`, `notes/50_release_go_no_go_decision_matrix.md`, `notes/62_app_review_manual_submission_checklist.md`, `notes/71_app_store_connect_final_input_reconciliation.md`
+- App Availability、EU DSA trader status、商品ページ表示連絡先、IAP Availabilityを提出前確認・証跡・最終照合へ追加した。
+- App Store転記用シートでは、DSA用の住所、電話番号、本人確認情報などの実値を書かない注意を追加した。
+- Go/No-Goと手動提出チェックでは、初回Japan-only方針なのにEU又はAll Countries or Regionsを含むApp Availability、未確認のDSA trader status、広すぎるIAP Availabilityで提出する状態をNo-Goにした。
+
+### 影響範囲
+
+- App Store Connect App Availability、EU DSA trader status、Provider/Seller/contact表示、IAP Availability、App Review提出証跡、代表者情報非公表方針、特商法方針
+
+利用規約・プライバシーポリシー本文、DOCX成果物、Swift Native、Web、Supabase、App Store Connect実入力は変更していない。
+
+### 確認方法
+
+- `rg -n "EU DSA|DSA trader|trader status|Japan-only|All Countries or Regions|IAP Availability|商品ページ表示連絡先|Provider/Seller/contact|EU 27|公開連絡先" notes/17_legal_alignment.md notes/24_app_store_submission_pack.md notes/36_submission_evidence_checklist.md notes/40_app_store_connect_copy_paste_sheet.md notes/46_app_store_questionnaire_answer_sheet.md notes/50_release_go_no_go_decision_matrix.md notes/62_app_review_manual_submission_checklist.md notes/68_app_store_territory_dsa_iap_availability.md notes/71_app_store_connect_final_input_reconciliation.md -S`
+  - passed
+- `git diff --check -- notes notes/legal`
+  - passed
+- `git diff --name-only | rg -v '^notes/'`
+  - passed（tracked差分はnotes配下のみ。DOCX成果物は今回未変更）
+
+### セルフレビュー結果
+
+- ✅ 初回Japan-only方針を、App Availability、DSA、IAP Availabilityの3点でNo-Go化した。
+- ✅ 代表者情報非公表方針と、EU DSAで商品ページに表示され得る連絡先の差分を提出前確認にした。
+- ✅ DSA用の住所、電話番号、本人確認情報をリポジトリやReview Notesに書かない方針を明記した。
+- ✅ 利用規約・プライバシーポリシー本文は変更していないため、DOCX再生成は未実行。
+- ✅ docs-onlyのためアプリビルド、Swiftテスト、web buildは未実行。
+
+## イテレーション1226.124：公式非提携権利物法務整理
+
+### 背景・問題意識
+
+現行Swift NativeとSupabaseには、`groups_master` / `characters_master`、グッズ登録、検索、ホーム候補、画像シリーズ候補、顔候補付け等を通じて、実在のアーティスト、グループ、メンバー、作品、キャラクター、商品名、商標その他権利物を検索・分類・識別の文脈で扱い得る導線がある。`suggest-goods-series` Edge Functionは画像又は画像URLと推し文脈をOpenAI Responses APIへ送り、`web_search` で公式商品情報、販売ページ、中古市場、告知記事、画像検索結果に近い表記を照合するため、名称や候補が「公式」「公認」「提携」「権利者承認済み」「真贋確認済み」「取引可能確認済み」に見えるリスクがある。コード変更禁止の指示を守り、規約、FAQ、App Store提出文書、審査No-Goだけを更新した。
+
+### 変更内容
+
+#### 実装確認
+- `supabase/migrations/*` と `ios-native/Sources/MegrumData/SupabaseOshiClientRequests.swift` で、`groups_master` / `characters_master` がオンボーディング、グッズ、Wish、検索フィルタ等の推し選択に使われることを確認した。
+- `supabase/functions/suggest-goods-series/index.ts` は `tools: [{ type: "web_search" }]` を必須実行し、プロンプト上も公式商品情報、販売ページ、中古市場、告知記事、画像検索結果に近い表記を照合することを確認した。
+- `ios-native/Sources/MegrumCore/GoodsReportModels.swift` と `UserReportModels.swift` には「偽物・説明と違う」があり、権利物・真贋・説明不一致の通報理由が既に存在することを確認した。
+
+#### `notes/legal/01_terms_of_service_draft.md`
+- Megrumが、別段の明示がない限り、アーティスト、タレント、キャラクター、作品、芸能事務所、レーベル、出版社、制作会社、イベント主催者、興行主、販売者、権利者、公式ファンクラブその他第三者の公式サービス、公認サービス、提携サービス又は代理サービスではない条項を追加した。
+- グループ名、メンバー名、作品名、キャラクター名、商品名、商標、ロゴその他第三者の名称又は標章は、検索、分類、識別又は説明の便宜であり、第三者による承認、協賛、推奨、権利許諾、真贋確認又は取引可能性を意味しないことを追加した。
+
+#### `notes/17_legal_alignment.md`, `notes/24_app_store_submission_pack.md`, `notes/25_public_legal_support_pages.md`, `notes/40_app_store_connect_copy_paste_sheet.md`, `notes/46_app_store_questionnaire_answer_sheet.md`, `notes/53_app_review_guideline_compliance_matrix.md`, `notes/55_public_help_faq_draft.md`, `notes/56_in_app_legal_safety_copy_deck.md`, `notes/59_initial_release_scope_exposure_audit.md`
+- 公開FAQ、公開サポート、App Store提出素材、Content Rights回答、Review Notes、審査ガイドライン表、初回提出スコープ監査、アプリ内安全文言に、公式非提携、権利確認責任、真贋非保証、取引可否非保証を追加した。
+- 実在IP、商標、公式名称、AI/検索候補、外部画像URLが見えるのに、公式/公認/提携/代理ではない説明、権利確認責任、真贋非保証、取引可否非保証を揃えていない状態を公開前No-Goへ追加した。
+- App Storeのスクショ、初期データ、メタデータ、Keywords、Review Notesでは、実在IPや公式/公認/提携/代理を連想させる語を原則避ける方針を強化した。
+
+#### `利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+#### `利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+- Markdownドラフトから再生成し、利用規約DOCX/PDFレンダーに `公式サービス`、`公認サービス`、`提携サービス`、`権利許諾`、`真贋確認`、`取引可能性`、`公式ファンクラブ` が入ることを確認した。
+
+### 影響範囲
+
+- 推しマスタ、グッズ登録、Wish、検索、ホーム候補、AIシリーズ候補、外部画像URL、顔候補付け、権利侵害通報、App Store Content Rights、Review Notes、公開FAQ、公開サポート、アプリ内安全コピー
+
+Swift Native、Web、Supabase migration、Edge Function、PrivacyInfo.xcprivacy、Info.plist、App Store Connect実入力は変更していない。
+
+### 確認方法
+
+- `rg -n "groups_master|characters_master|suggest-goods-series|web_search|公式|series" supabase ios-native notes/17_legal_alignment.md -S`
+  - passed
+- `rg -n "偽物|説明と違う|権利侵害|なりすまし|商標|著作権|公式画像|Content Rights" ios-native/Sources supabase notes/legal/01_terms_of_service_draft.md notes/55_public_help_faq_draft.md -S`
+  - passed
+- `rg -n "公式非提携|公式サービス|公認サービス|提携サービス|公式/公認|official, endorsed|権利許諾|真贋確認|取引可能性|所属事務所|公式ファンクラブ|Content Rights" notes notes/legal -S`
+  - passed
+- `render_docx.py --output_dir /tmp/megrum-legal-render-ip/terms --emit_pdf 利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+  - passed（22 pages）
+- `render_docx.py --output_dir /tmp/megrum-legal-render-ip/privacy --emit_pdf 利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+  - passed（18 pages）
+- `unzip -t` によるDOCX破損確認
+  - passed
+- `python-docx` と bundled Poppler `pdftotext` によるDOCX/PDFキーワード検査
+  - passed（利用規約: `公式サービス`, `公認サービス`, `提携サービス`, `権利許諾`, `真贋確認`, `取引可能性`, `公式ファンクラブ` / Privacy: `Google Mobile Ads SDK`, `OpenAI`, `署名URL`, `支払い情報`, `顔特徴量`, `APNs`）
+- レンダーPNGの全ページ検査
+  - passed（利用規約 22 pages / プライバシーポリシー 18 pages。全ページ非空）
+- `git diff --check -- notes notes/legal`
+  - passed
+- `git diff --name-only | rg -v '^notes/'`
+  - passed（tracked差分はnotes配下のみ。DOCX成果物はgit管理外）
+
+### セルフレビュー結果
+
+- ✅ 公式非提携条項を、規約本文、公開FAQ、公開サポート、App Store Content Rights、Review Notes、審査No-Go、アプリ内安全コピーへ横断反映した。
+- ✅ 実在名称の表示を、検索・分類・識別の便宜に限定し、承認、協賛、権利許諾、真贋確認、取引可能性の非保証を明示した。
+- ✅ AI/検索候補と外部画像URLが、公式情報や権利確認済み素材に見えるリスクを提出前No-Goへ追加した。
+- ✅ コード、DB migration、Edge Function、公開Web実装、App Store Connect実入力は変更していない。
+- ✅ docs-onlyのためアプリビルド、Swiftテスト、web buildは未実行。
+
+## イテレーション1226.123：AdMob追跡法務整理
+
+### 背景・問題意識
+
+現行Swift NativeにはGoogle Mobile Ads SDK、AdMob app id、SKAdNetworkItems、広告表示slotがあり、チェックイン既定値では `MEGRUM_ADS_ENABLED=YES`、`MEGRUM_ADMOB_TEST_ADS_ENABLED=YES` になっている。検索結果native広告とやりとり一覧上部bannerにはproduction unit idも設定されているが、test ads有効時はbanner/nativeがGoogleデモunit idへ差し替わる。一方、現行検索ではATT要求、`NSUserTrackingUsageDescription`、UMP同意管理、非パーソナライズ広告指定、Publisher First-Party ID制御、mediation制御は未確認だった。公開ビルドで広告SDK初期化、広告リクエスト、test ads、IDFA/Tracking、App Privacy回答がずれると、App Review、Google広告ポリシー、個人情報保護上のリスクが高いため、コード変更禁止の指示を守り、法務文言と提出前No-Goを実設定ベースへ更新した。
+
+### 変更内容
+
+#### 実装確認
+- `ios-native/Package.swift` は `GoogleMobileAds` 13.6.0以降に依存し、`MegrumNativeApp.init()` は `MegrumMobileAdsBootstrap.shouldStartSDK` がtrueの場合に `MobileAds.shared.start()` を呼ぶことを確認した。
+- `ios-native/Config/MegrumNative.xcconfig` は `MEGRUM_ADS_ENABLED=YES`、`MEGRUM_AD_PROVIDER=admob`、実AdMob app id、`MEGRUM_ADMOB_TEST_ADS_ENABLED=YES`、Googleデモbanner/native unit id、`MEGRUM_ADMOB_SEARCH_NATIVE_UNIT_ID`、`MEGRUM_ADMOB_TRADES_BANNER_UNIT_ID` を持つことを確認した。
+- `AdRuntimeConfiguration.unitID(for:)` はtest ads有効時、banner/nativeのconfigured unit idをGoogleデモunit idへ差し替える。検索結果native広告、やりとり一覧上部banner、preview viewer向けhome banner fallbackが広告リクエスト候補であることを確認した。
+- `AdBannerSlot` と `AdMobNativeCardView` はGoogle Mobile Ads SDKの `Request()` をそのまま使う。`AppTrackingTransparency`、`ATTrackingManager.requestTrackingAuthorization`、`NSUserTrackingUsageDescription`、`UserMessagingPlatform` / UMP、非パーソナライズ広告指定、Publisher First-Party ID制御、mediation制御、child-directed treatment、test device id指定は現行検索では未確認だった。
+- `AdInterstitialPresenterModifier` はplaceholder以外でGoogle interstitial SDKロードに接続しておらず、現行既定ではproduction interstitial unit idも空であるため、主な広告外部通信リスクはbanner/native表示面にあると整理した。
+
+#### `notes/legal/01_terms_of_service_draft.md`
+- IDFA、Publisher First-Party ID、パーソナライズ広告、広告メディエーション、第三者広告目的のデータ利用又は同意管理が必要な広告配信は、必要な表示、同意取得、設定反映又はオプトアウト手段が整備されていない状態では公開ビルドで有効にしない文言を追加した。
+- テスト広告、デモ広告unit、プレビュー対象者向け広告枠又はplaceholderを、一般利用者向けの実広告として公開ビルドに表示しない文言を追加した。
+- 取引チャット、マッチング内容、現在地共有、服装写真、異議申し立て、通報内容、本人確認されていない年齢・性別・活動エリア、郵送先、支払い情報等の中核的な取引・安全情報を広告会社へ販売しない文言を強化した。
+
+#### `notes/legal/02_privacy_policy_draft.md`
+- Google Mobile Ads SDKその他広告SDKが、IP、端末識別子、広告識別子、Advertising Data、Product Interaction、クラッシュ、性能、診断、広告レスポンス、広告効果測定情報等を収集又は送信し得ることを追加した。
+- SKAdNetworkを使う場合でも広告SDK初期化、広告リクエスト、広告表示又は広告クリックに伴う外部送信が別途発生し得ることを明記した。
+- ATT、IDFA、Publisher First-Party ID、パーソナライズ広告、広告メディエーション、第三者広告目的のデータ利用又は同意管理が必要な場合は同意取得を行うこと、テスト広告を一般公開ビルドの実広告として扱わないことを追加した。
+
+#### `notes/17_legal_alignment.md`, `notes/24_app_store_submission_pack.md`, `notes/27_app_privacy_data_inventory.md`, `notes/43_app_privacy_connect_answer_sheet.md`, `notes/44_privacy_manifest_sdk_audit.md`, `notes/48_external_service_vendor_register.md`, `notes/50_release_go_no_go_decision_matrix.md`, `notes/53_app_review_guideline_compliance_matrix.md`, `notes/59_initial_release_scope_exposure_audit.md`, `notes/62_app_review_manual_submission_checklist.md`, `notes/71_app_store_connect_final_input_reconciliation.md`
+- AdMob実設定、SDK初期化条件、test ads有効、Googleデモunit id、production unit id、`NSPrivacyTracking=false`、`NSUserTrackingUsageDescription`なし、ATT/Tracking、SKAdNetworkItems、Google公式データ開示、Privacy Manifest、UMP等の同意管理要否を提出前No-Goへ追加した。
+- 広告を隠す場合でも、SDK初期化又は広告リクエストが発生しないことを確認する条件を追加した。
+
+#### `notes/25_public_legal_support_pages.md`, `notes/37_public_url_publication_checklist.md`, `notes/40_app_store_connect_copy_paste_sheet.md`, `notes/46_app_store_questionnaire_answer_sheet.md`, `notes/55_public_help_faq_draft.md`, `notes/56_in_app_legal_safety_copy_deck.md`
+- 公開FAQ、Support広告ページ、App Store転記用文面、質問票、アプリ内コピー案に、広告SDK送信、SKAdNetwork、IDFA/Tracking/パーソナライズ広告の同意、中核的な取引・安全情報を広告会社へ販売しない説明、test ads除去、広告通報導線を反映した。
+
+#### `利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+#### `利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+- Markdownドラフトから再生成し、広告、ATT、IDFA、Publisher First-Party ID、パーソナライズ広告、広告メディエーション、テスト広告、SKAdNetwork、Advertising Data、Product Interactionの文言がDOCX/PDFレンダーへ入ることを確認した。
+
+### 影響範囲
+
+- Google Mobile Ads SDK、AdMob、広告banner/native、検索結果広告、やりとり一覧上部広告、preview viewer向けhome広告、SKAdNetwork、ATT、IDFA、Publisher First-Party ID、パーソナライズ広告、広告メディエーション、test ads、App Privacy、Privacy Manifest、Review Notes、公開FAQ、広告通報導線
+
+Swift Native、Web、Supabase migration、Edge Function、PrivacyInfo.xcprivacy、Info.plist、xcconfigのコード/設定ファイルは変更していない。
+
+### 確認方法
+
+- `rg -n "GoogleMobileAds|AdMob|MEGRUM_ADS_ENABLED|MEGRUM_ADMOB_TEST_ADS_ENABLED|NSUserTrackingUsageDescription|AppTrackingTransparency|UserMessagingPlatform|Publisher First-Party|SKAdNetwork" ios-native/Sources ios-native/App ios-native/Config ios-native/Package.swift`
+  - passed
+- `rg -n "AdMob実設定|MEGRUM_ADS_ENABLED|MEGRUM_ADMOB_TEST_ADS_ENABLED|NSUserTrackingUsageDescription|Publisher First-Party|パーソナライズ広告|Googleデモ|test ads|ATT/Tracking|Google公式データ開示" notes notes/legal -S`
+  - passed
+- `render_docx.py --output_dir /tmp/megrum-legal-render-admob/terms --emit_pdf 利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+  - passed（21 pages。最終ページは「以上」のみ）
+- `render_docx.py --output_dir /tmp/megrum-legal-render-admob/privacy --emit_pdf 利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+  - passed（17 pages）
+- `unzip -t` によるDOCX破損確認
+  - passed
+- `python-docx` と bundled Poppler `pdftotext` によるDOCX/PDFキーワード検査
+  - passed（利用規約: `IDFA`, `Publisher First-Party ID`, `パーソナライズ広告`, `広告メディエーション`, `テスト広告`, `中核的な取引・安全情報` / Privacy: `Google Mobile Ads SDK`, `Advertising Data`, `Product Interaction`, `SKAdNetwork`, `IDFA`, `Publisher First-Party ID`, `テスト広告`）
+- レンダーPNGの全ページ検査
+  - passed（利用規約 21 pages / プライバシーポリシー 17 pages。利用規約の最終ページは `以上` のみで白紙ではない）
+- `git diff --check -- notes notes/legal`
+  - passed
+- `git diff --name-only | rg -v '^notes/'`
+  - passed（tracked差分はnotes配下のみ。DOCX成果物はgit管理外）
+
+### セルフレビュー結果
+
+- ✅ 広告を「見える/見えない」だけでなく、SDK初期化と広告リクエストの有無まで提出前確認対象にした。
+- ✅ 現行既定の `MEGRUM_ADS_ENABLED=YES` / `MEGRUM_ADMOB_TEST_ADS_ENABLED=YES` を明記し、test adsやGoogleデモunit idを一般公開しないNo-Goを追加した。
+- ✅ `NSPrivacyTracking=false`、`NSUserTrackingUsageDescription`なしの状態と、IDFA/Tracking/PFPI/パーソナライズ/メディエーション/同意管理の不整合をNo-Go化した。
+- ✅ 広告SDK由来のAdvertising Data、Product Interaction、Diagnostics、Performance Data候補をApp Privacy文書群へ反映した。
+- ✅ コード、DB migration、Edge Function、PrivacyInfo.xcprivacy、Info.plist、xcconfigは変更していない。
+- ✅ docs-onlyのためアプリビルド、Swiftテスト、web buildは未実行。
+
+## イテレーション1226.122：外部AI顔特徴量法務整理
+
+### 背景・問題意識
+
+現行実装には、グッズ画像からシリーズ名称候補を出す外部AI経路と、顔検出・メンバー候補付けのための顔特徴量DB境界がある。`suggest-goods-series` はOpenAI Responses APIへ画像又は画像URLを送り、Web検索を必須実行する一方、Swift Nativeの導線文言は送信先、Web検索、保持、学習利用、第三者画像禁止を十分に説明していない。また `member_face_profiles` はembedding/source image URLをauthenticated userへ読ませる設計で、補正履歴の学習データ追加フラグが既定trueの経路もある。コード変更禁止の指示を守り、利用規約、プライバシーポリシー、App Review資料、公開FAQ、Go/No-Goへ提出前No-Goとして反映した。
+
+### 変更内容
+
+#### 実装確認
+- `supabase/functions/suggest-goods-series/index.ts` は、認証済みユーザー確認後、最大3件の画像データ又は画像URL、グループ名、メンバー名、グッズ種別、既存候補名をOpenAI Responses APIへ送り、`web_search` を必須実行することを確認した。
+- `SupabaseGoodsSeriesSuggestionClient` と `GoodsBulkTagSheet` は、ローカル写真又は既存画像URLからシリーズ候補を取得する。現行UIでは「画像からシリーズ名称の候補を出す」と説明されるが、OpenAI、外部AI、Web検索、保持、学習利用、第三者/未成年/権利未処理画像禁止の送信前説明は未確認。
+- `VisionFaceDetectionService` はApple Visionの顔矩形検出であり、Face ID又は端末の生体認証APIではないことを確認した。
+- `member_face_profiles` は `embedding`、`embedding_model`、`source_image_url`、`consent_recorded_at` を持ち、RLS上active profileをauthenticated userが読める。実在人物データを入れる場合はSensitive Info / biometric data相当として高リスク。
+- `FaceTaggingCorrectionDraft.shouldAddTrainingData` と `face_match_corrections.should_add_training_data` は既定trueの経路がある一方、現行GoodsEditorの候補確認はdraftのmemberID反映に留まり、補正履歴DB保存呼び出しは未確認。
+
+#### `notes/legal/01_terms_of_service_draft.md`
+- 外部AIサービスへ画像、画像URL、文脈情報を送る場合、Web検索又は外部情報参照を使い得ること、送信してはいけない第三者顔写真、未成年者、住所、チケット、注文履歴、QR/バーコード、本人確認書類、金融情報、認証コード、秘密情報、権利未処理画像を追記した。
+- 外部AIや検索候補が、公式性、権利処理、正確性、削除、保持、学習不使用、安全性を保証しないことを明確化した。
+
+#### `notes/legal/02_privacy_policy_draft.md`
+- 画像シリーズ候補で送る可能性がある最大3件の画像又は画像URL、グループ/メンバー/グッズ種別、候補名、Web検索参照、AI出力/エラーを取得情報へ追加した。
+- OpenAI等の外部AIにおける濫用監視、安全対策、セキュリティ、契約又は法令対応のための保持可能性、削除可否、学習利用の説明を追加した。
+- 顔特徴量、候補スコア、補正履歴、学習データ追加可否は、任意性、同意、保持、削除/利用停止、App Privacy回答が揃うまで公開前No-Goとした。
+
+#### `notes/17_legal_alignment.md`, `notes/24_app_store_submission_pack.md`, `notes/27_app_privacy_data_inventory.md`, `notes/43_app_privacy_connect_answer_sheet.md`, `notes/44_privacy_manifest_sdk_audit.md`, `notes/48_external_service_vendor_register.md`, `notes/50_release_go_no_go_decision_matrix.md`, `notes/52_data_retention_deletion_matrix.md`, `notes/53_app_review_guideline_compliance_matrix.md`, `notes/59_initial_release_scope_exposure_audit.md`, `notes/62_app_review_manual_submission_checklist.md`, `notes/66_legal_review_publication_runbook.md`
+- OpenAI Responses API、`web_search`、画像/画像URL、推し文脈、外部AI保持、濫用監視ログ、削除可否、学習利用、第三者/未成年/権利未処理画像禁止をApp Reviewと公開前チェックへ追加した。
+- 顔候補付けはFace ID/本人確認ではないこと、Sensitive Info候補であること、`member_face_profiles` の読み取り範囲、`shouldAddTrainingData` / `should_add_training_data` の任意性・削除/利用停止を提出前確認へ追加した。
+
+#### `notes/25_public_legal_support_pages.md`, `notes/37_public_url_publication_checklist.md`, `notes/55_public_help_faq_draft.md`, `notes/56_in_app_legal_safety_copy_deck.md`
+- 画像シリーズ候補の公開FAQ/サポート文面と送信前コピー案を、OpenAI、Web検索、画像又は画像URL送信、保持、濫用監視、学習利用、送信禁止情報を含む形へ更新した。
+- 顔候補付けのFAQ/コピー案を、Face IDや本人確認ではない説明、学習データ追加の任意性、削除/利用停止、第三者画像禁止を含む形へ更新した。
+
+#### `notes/10_glossary.md`
+- 外部AIサービスの定義を、Web検索等の有無、保持期間、削除可否、濫用監視・安全対策ログ、学習利用の明示まで含む定義へ更新した。
+
+#### `利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+#### `利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+- Markdownドラフトから再生成し、外部AI、Web検索、顔特徴量、Sensitive Info、濫用監視、学習データ追加可否の文言がDOCX/PDFレンダーへ入ることを確認した。
+
+### 影響範囲
+
+- グッズ登録、Wish登録、画像シリーズ候補、OpenAI Responses API、Web検索、外部AI保持/学習利用、外部画像URL、顔検出、顔特徴量、メンバー候補付け、補正履歴、App Privacy / Sensitive Info、公開FAQ、Review Notes、Go/No-Go
+
+Swift Native、Web、Supabase migration、Edge Function、PrivacyInfo.xcprivacyのコードは変更していない。
+
+### 確認方法
+
+- `rg -n "画像からシリーズ名称の候補を出す|member_face_profiles|shouldAddTrainingData|should_add_training_data|web_search|OpenAI Responses API" notes notes/legal -S`
+  - passed
+- `render_docx.py --output_dir /tmp/megrum-legal-render-ai/terms --emit_pdf 利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+  - passed（20 pages）
+- `render_docx.py --output_dir /tmp/megrum-legal-render-ai/privacy --emit_pdf 利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+  - passed（17 pages）
+- `unzip -t` によるDOCX破損確認
+  - passed
+- `python-docx` と bundled Poppler `pdftotext` によるDOCX/PDFキーワード検査
+  - passed（利用規約: `OpenAI`, `Web検索`, `学習利用`, `顔特徴量`, `送信することが不適切`, `権利処理` / Privacy: `OpenAI`, `Web検索`, `最大3件`, `濫用監視`, `学習データ追加可否`, `Sensitive Info`, `任意性`）
+- レンダーPNGの全ページ非白紙ピクセル検査
+  - passed（利用規約 20 pages / プライバシーポリシー 17 pages、blank pageなし）
+- `git diff --check -- notes notes/legal`
+  - passed
+- `git diff --name-only | rg -v '^notes/'`
+  - passed（tracked差分はnotes配下のみ。DOCX成果物はgit管理外）
+
+### セルフレビュー結果
+
+- ✅ 外部AI送信について、OpenAI、画像又は画像URL、Web検索、保持、濫用監視、削除可否、学習利用、第三者/未成年/権利未処理画像禁止を横断文書へ反映した。
+- ✅ 顔候補付けについて、Face ID/本人確認ではないこと、Sensitive Info候補、`member_face_profiles` の読み取り範囲、補正履歴の学習データ追加可否をNo-Goへ反映した。
+- ✅ 現行GoodsEditorでは補正履歴DB保存が未確認であるため、保存済みと断定せず、将来接続時の同意・任意性・削除/利用停止条件として整理した。
+- ✅ コード、DB migration、Edge Function、PrivacyInfo.xcprivacyは変更していない。
+- ✅ docs-onlyのためアプリビルド、Swiftテスト、web buildは未実行。
+
+## イテレーション1226.121：会員間支払い法務整理
+
+### 背景・問題意識
+
+現行Swift NativeとSupabaseには、郵送交換の郵送先情報、電話番号、合意後スナップショット、会員間支払いの支払い方法、銀行口座情報、金額指定、合意後の支払い情報表示がある。銀行振込、PayPay、現金交換などが表示される一方、現行コード上Megrumが送金、決済代行、収納代行、返金、エスクロー、本人確認、支払能力確認、外部決済アカウント/リンク/QRコード/残高/送金可否/受領可否を確認する経路は確認していない。公開文面やApp Review資料が、Megrumを資金移動業者、決済代行業者、エスクロー事業者、住所確認又は本人確認事業者のように見せると、法務・審査・紛争対応上のリスクが高いため、コード変更禁止の指示を守り、法務文言と提出チェックを非関与・非保証へ寄せた。
+
+### 変更内容
+
+#### 実装確認
+- `user_mailing_addresses` は宛名、郵便番号、住所、電話番号を本人専用に保存し、郵送交換成立時に `proposals` へ郵送先スナップショットを持つ設計であることを確認した。
+- `PostalCodeAddressClient` が郵便番号検索のため `https://zipcloud.ibsnet.co.jp/api/search` へ7桁郵便番号を送信する経路を確認した。
+- `user_payment_settings` は支払い方法、銀行名、支店名、口座種別、口座番号、口座名義、その他メモを本人専用に保存し、金額指定取引の成立時に `proposals.sender_payment_settings` / `receiver_payment_settings` へスナップショットする経路を確認した。
+- Swift Nativeの `UserPaymentMethod` は `bank_transfer`、`paypay`、`cash_exchange`、`other` を扱う。PayPayは「リンク登録なし。対応可否だけを表示します」とされ、現行コード上PayPayアカウント、送金リンク、QRコード、残高、送金可否をMegrumが扱う経路は確認していない。
+- 公式確認として、Apple App Review Guidelinesとe-Govの資金決済に関する法律を参照し、会員間支払い表示をApp Privacy / Payment Info候補と非決済代行説明へ整理した。
+
+#### `notes/legal/01_terms_of_service_draft.md`
+- 銀行振込、PayPay、現金交換その他外部サービスへの対応可否が表示される場合でも、運営者が外部アカウント、リンク、QRコード、本人確認、残高、送金可否、受領可否、返金可否、不正利用の有無を確認又は保証しないことを追記した。
+- 会員間支払いを、違法送金、資金洗浄、貸付、投資、賭博、換金、資金移動業、前払式支払手段、暗号資産、金融商品取引、税法違反、古物営業等に利用しない禁止を維持した。
+
+#### `notes/legal/02_privacy_policy_draft.md`
+- 会員間支払いについて、Megrumが資金の受領、保管、送金、収納代行、決済代行、返金、エスクローを行わないことを明確化した。
+- クレジットカード番号、金融機関ログイン情報、暗証番号、認証コード、送金用QRコード等の不要な機微情報を入力又は送信しない注意を追記した。
+- 外部決済サービス名、対応可否、支払いメモ、口座情報又は金額指定が表示されても、送金、本人確認、残高、受領、返金、不正利用調査は外部サービス及び会員間の責任範囲で処理されることを明記した。
+
+#### `notes/24_app_store_submission_pack.md`, `notes/27_app_privacy_data_inventory.md`, `notes/43_app_privacy_connect_answer_sheet.md`, `notes/50_release_go_no_go_decision_matrix.md`, `notes/52_data_retention_deletion_matrix.md`, `notes/62_app_review_manual_submission_checklist.md`
+- 郵送先住所、電話番号、郵便番号検索を出す場合の Contact Info / Physical Address / Phone Number、ZipCloud外部送信、住所確認・配送保証ではない説明を追加した。
+- 銀行口座、PayPay、現金交換、金額指定、合意後の支払い情報表示を出す場合の Financial Info / Payment Info、外部決済サービス非関与、送金/返金/エスクロー/本人確認/支払能力確認の非保証を提出前No-Goへ追加した。
+- 郵送先情報と支払い情報の設定情報・合意済み取引スナップショットについて、アカウント削除や個別削除後も異議、通報、法令対応、監査に必要な範囲で分離保存され得ることを保持マトリクスへ追加した。
+
+#### `notes/25_public_legal_support_pages.md`, `notes/55_public_help_faq_draft.md`, `notes/56_in_app_legal_safety_copy_deck.md`
+- 郵送先情報は自己入力であり、本人確認、住所確認、居住確認、受領可能性、配送完了、配送事故補償を保証しない説明を追加した。
+- 会員間支払いでは、Megrumが送金、返金、決済代行、エスクローを行わず、外部アカウント、送金リンク、QRコード、残高、送金可否、受領可否、返金可否、不正利用の有無又は支払能力を確認しない説明を追加した。
+- 支払い前・支払い情報入力時のアプリ内コピー案として、カード番号、金融機関ログイン情報、暗証番号、認証コード、送金用QRコードを送らない注意を追加した。
+
+#### `利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+#### `利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+- Markdownドラフトから再生成し、支払い・郵送リスク文言がDOCXとPDFレンダーに入ることを確認した。
+
+### 影響範囲
+
+- 郵送交換、郵送先住所、電話番号、郵便番号検索、ZipCloud、支払い方法設定、銀行振込、PayPay、現金交換、金額指定、合意後の支払い情報表示、App Privacy / Payment Info、公開FAQ、Review Notes、Go/No-Go
+
+Swift Native、Web、Supabase migration、Edge Function、PrivacyInfo.xcprivacyのコードは変更していない。
+
+### 確認方法
+
+- `rg -n "外部.*決済|PayPay|QRコード|送金可否|受領可否|エスクロー|支払能力|資金移動|Payment Info|銀行振込、PayPay|Megrumは送金|住所確認" notes/legal/01_terms_of_service_draft.md notes/legal/02_privacy_policy_draft.md notes/17_legal_alignment.md notes/43_app_privacy_connect_answer_sheet.md notes/50_release_go_no_go_decision_matrix.md notes/55_public_help_faq_draft.md notes/56_in_app_legal_safety_copy_deck.md`
+  - passed
+- `render_docx.py --output_dir /tmp/megrum-legal-render-payment/terms --emit_pdf 利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+  - passed（22 pages）
+- `render_docx.py --output_dir /tmp/megrum-legal-render-payment/privacy --emit_pdf 利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+  - passed（17 pages）
+- `unzip -t` によるDOCX破損確認
+  - passed
+- `python-docx` と bundled Poppler `pdftotext` によるDOCX/PDFキーワード検査
+  - passed（利用規約: `QRコード`, `送金可否`, `受領可否`, `エスクロー`, `支払能力確認`, `資金移動業`, `PayPay` / Privacy: `QRコード`, `送金可否`, `受領可否`, `不正利用`, `資金移動業者`, `PayPay`, `署名URL`）
+- レンダーPNGの全ページ非白紙ピクセル検査
+  - passed（利用規約 22 pages / プライバシーポリシー 17 pages、blank pageなし）
+- `git diff --check -- notes notes/legal`
+  - passed
+- `git diff --name-only | rg -v '^notes/'`
+  - passed（tracked差分はnotes配下のみ）
+
+### セルフレビュー結果
+
+- ✅ Megrumが決済代行、資金移動、収納代行、返金、エスクロー、本人確認、住所確認、支払能力確認を行うように読める文言を避けた。
+- ✅ PayPayは現行実装上「リンク登録なしの対応可否表示」として扱い、外部アカウント、QRコード、残高、送金可否の確認をしない前提を明記した。
+- ✅ 郵送先情報と支払い情報の目的外利用禁止、合意後スナップショット、削除後の例外保持をPrivacy/App Privacy/保持表へ反映した。
+- ✅ App Review提出時にContact Info / Financial Info回答を落とさないためのNo-Goを追加した。
+- ✅ コード、DB migration、Edge Function、PrivacyInfo.xcprivacyは変更していない。
+- ✅ docs-onlyのためアプリビルド、Swiftテスト、web buildは未実行。
+
+## イテレーション1226.120：位置共有保持法務整理
+
+### 背景・問題意識
+
+現地交換の現在地共有、服装写真、取引チャット写真は、安全な合流を助ける一方で、精密位置、顔や服装、周辺人物、座席、住所等が含まれ得る。現行コードでは、現在地共有は取引チャットメッセージとして追記保存され、服装写真や証跡写真は `chat-photos` のprivate bucketと署名URLで表示される経路があるが、30日後の自動削除又は非表示ジョブは確認できなかった。公開文面が「30日で確実に消える」と読めると、プライバシー請求、App Review、事故対応時に運営者の説明リスクが高いため、コード変更禁止の指示を守り、法務文言を運用目標と例外保持の整理へ寄せた。
+
+### 変更内容
+
+#### 実装確認
+- `messages` は `text`、`photo`、`outfit_photo`、`location`、`arrival_status`、`system` を扱い、位置メッセージは緯度経度とラベルを保存することを確認した。
+- `SupabaseMessagePayloadBuilder` で位置情報の有限値、緯度経度範囲、ラベル必須、写真メッセージとの相互排他を検証していることを確認した。
+- `SupabaseChatPhotoStorage` で `chat-photos` に服装写真を保存し、署名URLの有効期限が長期になり得ることを確認した。
+- 現行検索では、現在地共有、服装写真、取引チャット写真を取引終了後30日で自動削除又は非表示化するジョブは確認できなかった。
+- `web/src/app/privacy/page.tsx` の短縮Privacyに、現在地共有及び服装写真を30日で削除又は非表示化すると強く読める文言が残ることを確認した。コード変更禁止のため、Web実装は変更せず提出前No-Goとして整理した。
+
+#### `notes/legal/02_privacy_policy_draft.md`
+- 現地交換の現在地共有及び服装写真について、取引終了後30日を目安に削除又は非表示化する「運用目標」とし、バックアップ、署名URL、端末キャッシュ、相手会員による保存、通報、異議申し立て、事故、法令対応、監査等により反映遅延又は例外保持がある文言へ修正した。
+
+#### `notes/17_legal_alignment.md`, `notes/52_data_retention_deletion_matrix.md`
+- 30日後の自動削除又は非表示ジョブは未確認であり、即時削除、完全削除、自動削除完了を保証しないことを、法務整合性メモと保持削除表へ反映した。
+
+#### `notes/24_app_store_submission_pack.md`, `notes/25_public_legal_support_pages.md`, `notes/27_app_privacy_data_inventory.md`, `notes/37_public_url_publication_checklist.md`, `notes/43_app_privacy_connect_answer_sheet.md`, `notes/46_app_store_questionnaire_answer_sheet.md`, `notes/50_release_go_no_go_decision_matrix.md`, `notes/55_public_help_faq_draft.md`, `notes/56_in_app_legal_safety_copy_deck.md`, `notes/62_app_review_manual_submission_checklist.md`, `notes/63_public_page_redaction_qa.md`, `notes/66_legal_review_publication_runbook.md`
+- Privacy、FAQ、Review Notes、App Privacy、公開Web、アプリ内コピーで、現在地共有/服装写真の保存期間を30日後自動削除保証として説明しないチェックを追加した。
+- 現行Web短縮Privacyを最新ドラフトへ同期しないままPrivacy Policy URLとして提出することをNo-Go化した。
+- 現在地共有や服装写真の送信前コピーに、相手端末への表示、スクリーンショットや保存を完全には防げない注意を追加した。
+
+#### `利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+#### `利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+- Markdownドラフトから再生成し、位置共有保持文言、既存のUGC通報、退会、通知、課金、Storage署名URLの文言が共存することを確認した。
+
+### 影響範囲
+
+- 現地交換、取引チャット、現在地共有、服装写真、証跡写真、Storage署名URL、端末キャッシュ、相手保存、通報/異議申し立て/事故対応
+- Privacy Policy URL、FAQ、Review Notes、App Privacy、公開Web反映、提出前Go/No-Go
+
+Swift Native、Web、Supabase migration、Edge Function、PrivacyInfo.xcprivacyのコードは変更していない。
+
+### 確認方法
+
+- `rg -n "取引終了後30日|30日経過後|自動削除|完全削除|即時反映|削除又は非表示化します|原則として取引終了後30日" notes/legal/02_privacy_policy_draft.md notes/17_legal_alignment.md notes/52_data_retention_deletion_matrix.md notes/25_public_legal_support_pages.md notes/55_public_help_faq_draft.md notes/56_in_app_legal_safety_copy_deck.md notes/62_app_review_manual_submission_checklist.md notes/46_app_store_questionnaire_answer_sheet.md notes/50_release_go_no_go_decision_matrix.md notes/37_public_url_publication_checklist.md notes/63_public_page_redaction_qa.md notes/66_legal_review_publication_runbook.md notes/27_app_privacy_data_inventory.md notes/43_app_privacy_connect_answer_sheet.md notes/24_app_store_submission_pack.md web/src/app/privacy/page.tsx`
+  - passed（保証文言はNo-Go又は否定文として残し、公開ドラフト本文は運用目標へ変更。`web/src/app/privacy/page.tsx` はコード変更禁止のためNo-Goとして記録）
+- `render_docx.py /Users/michitaka/Desktop/Megrum/利用規約など/01_Megrum利用規約_20260629改訂案.docx --output_dir /tmp/megrum-legal-render-location/terms --emit_pdf`
+  - passed（19 pages）
+- `render_docx.py /Users/michitaka/Desktop/Megrum/利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx --output_dir /tmp/megrum-legal-render-location/privacy --emit_pdf`
+  - passed（15 pages）
+- `unzip -t` によるDOCX破損確認
+  - passed
+- `python-docx` と bundled Poppler `pdftotext` によるDOCX/PDFキーワード検査
+  - passed（利用規約: `サポート窓口その他運営者が指定する方法`, `一時的な表示又はローカル状態`, `削除申請中の状態として取り扱われ` / Privacy: `取引終了後30日を目安に削除又は非表示化する運用を目標`, `署名URL`, `相手会員による保存`, `Original Transaction ID`, `APNs device token`）
+- レンダーPNGの全ページ非白紙ピクセル検査
+  - passed（利用規約 19 pages / プライバシーポリシー 15 pages、全ページ同寸法、sparse pageなし）
+
+### セルフレビュー結果
+
+- ✅ 現在地共有と服装写真について、30日後自動削除又は完全削除を保証しない文言へ修正した。
+- ✅ 実装未確認の保持削除ジョブを「ある」と扱わず、公開前No-Goとして残した。
+- ✅ Web短縮Privacyの古い文言はコード変更禁止のため触らず、提出時の同期必須項目として明記した。
+- ✅ 相手会員による保存、スクリーンショット、署名URL、端末キャッシュ、通報/法令対応の例外保持を横断文書へ反映した。
+- ✅ コード、DB migration、Edge Function、PrivacyInfo.xcprivacyは変更していない。
+- ✅ docs-onlyのためアプリビルド、Swiftテスト、web buildは未実行。
+
+## イテレーション1226.119：UGC通報導線法務整理
+
+### 背景・問題意識
+
+App StoreのUGC要件では、不適切コンテンツの抑止、通報、対応、ブロック、連絡先が審査上見られやすい。また日本法上も、権利侵害、名誉毀損、プライバシー侵害等の削除申出、送信防止措置、発信者確認又は通知の説明を過剰保証しない整理が必要になる。現行Megrumでは通報テーブルと管理画面は整備されている一方、掲示板のSwift Native画面からDB側通報RPCへ到達する導線は検索上未確認だったため、コード変更禁止の指示を守り、公開文面の保証範囲を現行実装に合わせた。
+
+### 変更内容
+
+#### 実装確認
+- `reports`、`goods_reports`、`groom_reports`、`meguri_board_reports` が存在し、ユーザー/取引/メッセージ、グッズ、グルーム、掲示板の通報を別テーブルで受ける設計を確認した。
+- 各通報は本人insert/selectを基本とし、管理画面はservice roleと `reports.read` / `reports.moderate` 権限で横断確認、status更新、監査ログ記録を行うことを確認した。
+- Swift Nativeでは、プロフィール通報、グッズ通報、グルーム通報、ユーザーブロック、ブロック一覧/解除、検索/ホーム/プロフィール等のブロック相手除外が実装されていることを確認した。
+- 掲示板はDB側に `report_meguri_board_thread` / `report_meguri_board_reply` RPCがあるが、現行検索ではSwift Native画面からこれらを呼ぶ通報導線を確認できなかった。
+
+#### `notes/legal/01_terms_of_service_draft.md`
+- 第18条に、対象画面又は機能によっては、画面内の通報又はブロックボタンではなく、問い合わせフォーム、サポート窓口その他運営者が指定する方法で受け付ける場合があることを追記した。
+
+#### `notes/55_public_help_faq_draft.md`
+- 通報できる内容のFAQへ、直接の通報ボタンがない画面では対象情報を添えて `support@megrum.jp` へ連絡するフォールバックを追記した。
+
+#### `notes/17_legal_alignment.md`, `notes/24_app_store_submission_pack.md`, `notes/26_trust_safety_release_sop.md`, `notes/31_app_store_connect_metadata_worksheet.md`, `notes/36_submission_evidence_checklist.md`, `notes/37_public_url_publication_checklist.md`, `notes/40_app_store_connect_copy_paste_sheet.md`, `notes/50_release_go_no_go_decision_matrix.md`, `notes/53_app_review_guideline_compliance_matrix.md`, `notes/59_initial_release_scope_exposure_audit.md`, `notes/62_app_review_manual_submission_checklist.md`
+- 掲示板等で画面内通報ボタンがない対象はsupport@フォールバックを説明すること、掲示板を初回提出で出す場合はスレッド/返信のSwift通報導線又はフォールバックを確認することを、Review Notes、提出証跡、Go/No-Go、公開URL、Trust & Safety SOPへ反映した。
+
+#### `利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+#### `利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+- Markdownドラフトから再生成し、通報フォールバック文言と既存の退会、通知、課金文言が共存することを確認した。
+
+### 影響範囲
+
+- UGC、プロフィール、グッズ画像、グルーム、スポット掲示板、取引チャット、評価、削除申出、送信防止措置、ブロック、管理者モデレーション
+- App Review Notes、FAQ、Trust & Safety SOP、提出証跡、公開URL、Go/No-Go
+
+Swift Native、Web、Supabase migration、Edge Function、PrivacyInfo.xcprivacyのコードは変更していない。
+
+### 確認方法
+
+- `rg -n "report_meguri_board|meguri_board_reports|reportThread|reportReply|hide_meguri_board|block" ios-native/Sources/MegrumApp ios-native/Sources/MegrumData ios-native/Sources/MegrumCore`
+  - passed（DB側掲示板通報RPCはあるがSwift呼び出し導線は未確認）
+- `render_docx.py /Users/michitaka/Desktop/Megrum/利用規約など/01_Megrum利用規約_20260629改訂案.docx --output_dir /tmp/megrum-legal-render-ugc/terms --emit_pdf`
+  - passed（28 pages）
+- `render_docx.py /Users/michitaka/Desktop/Megrum/利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx --output_dir /tmp/megrum-legal-render-ugc/privacy --emit_pdf`
+  - passed（22 pages）
+- bundled Poppler `pdftotext` と `python-docx` によるDOCX/PDFキーワード検査
+  - passed（利用規約: `サポート窓口その他運営者が指定する方法`, `一時的な表示又はローカル状態`, `請求失敗`, `削除申請中の状態として取り扱われ` / Privacy: `Original Transaction ID`, `APNs device token`, `サーバー同期`）
+- レンダーPNGのページ数・寸法・最小ファイルサイズ確認
+  - passed（利用規約 28 pages / プライバシーポリシー 22 pages、全ページ同寸法、極端なsparse pageなし）
+
+### セルフレビュー結果
+
+- ✅ 全UGC対象に画面内通報ボタンがあると断定しない表現へ調整した。
+- ✅ 掲示板を初回提出で出す場合の未確認項目を、Swift通報導線又はsupport@フォールバックとしてNo-Go化した。
+- ✅ 通報者秘匿、削除、発信者情報開示、常時監視、緊急通報代替を過剰保証しない既存方針を維持した。
+- ✅ コード、DB migration、Edge Function、PrivacyInfo.xcprivacyは変更していない。
+- ✅ docs-onlyのためアプリビルド、Swiftテスト、web buildは未実行。
+
+## イテレーション1226.118：StoreKit課金法務整理
+
+### 背景・問題意識
+
+現行Swift NativeにはメグルムプラスのStoreKit購入・復元導線と `sync_megrum_plus_purchase_for_viewer()` RPCがある一方、App Store Server APIによるサーバー検証、App Store Server Notificationsによる更新/返金/取消/期限切れ/請求失敗/猶予期間同期は未確認だった。また購入ボタンはStoreKitの商品価格を表示するが、画面フッターに「月額500円」の固定文言が残っており、App Store Connect価格、特商法、FAQ、Review Notesとずれると審査・消費者対応・返金対応で運営側リスクが高い。コード変更禁止の指示を守り、課金表示と権限反映を断定しすぎない法務文言へ整理した。
+
+### 変更内容
+
+#### 実装確認
+- `MegrumPlusPurchaseClient` で、`Product.products`、`Product.purchase()`、`Transaction.currentEntitlements`、`AppStore.sync()` による購入・復元経路を確認した。
+- `SubscriptionSettingsScreen` と `SubscriptionSettingsContent` で、StoreKit商品価格を購入ボタンに表示する一方、フッターに「価格は月額500円です」と固定表示することを確認した。
+- `MegrumAppStateSubscriptionActions` で、購入後のサーバー同期失敗時にローカルでメグルムプラス有効表示へ倒すフォールバックがあることを確認した。
+- `20260627023000_add_megrum_plus_subscription_foundation.sql` で、`megrum.plus.monthly`、transaction id、original transaction id、expiration dateを保存して `user_entitlements` を更新するが、migrationコメント上App Store Server APIによるサーバー検証は本番前追加であることを確認した。
+- 現行検索では、App Store Server Notificationsによる更新、返金、取消、期限切れ、請求失敗、猶予期間同期は確認できなかった。
+
+#### `notes/legal/01_terms_of_service_draft.md`
+- 有料サービス条項に、アプリ内説明・キャンペーン表示・固定文言と、アプリストア購入確認画面、サブスクリプション管理画面又は領収書が異なる場合の優先関係を追加した。
+- サーバー同期、購入情報検証、返金、取消、期限切れ、請求失敗、猶予期間、アカウント状態により、権限反映が遅延、失敗、一時反映、停止又は取消となる場合があることを明記した。
+- アプリ上の一時的な表示又はローカル状態は、永続的な権利付与を保証しないことを追加した。
+
+#### `notes/legal/02_privacy_policy_draft.md`
+- App Storeの取引ID、Original Transaction ID、期限、返金、取消、期限切れ、請求失敗、猶予期間、復元、サーバー同期、検証状態を取得・保存し得る情報として整理した。
+- 退会又はサブスクリプション終了後も、権限管理、購入復元、不正決済防止、会計、問い合わせ、監査及び法令対応のため、課金関連情報を合理的に必要な期間保存し得ることを追記した。
+
+#### `notes/17_legal_alignment.md`, `notes/24_app_store_submission_pack.md`, `notes/25_public_legal_support_pages.md`, `notes/27_app_privacy_data_inventory.md`, `notes/33_iap_product_setup_worksheet.md`, `notes/34_support_response_templates.md`, `notes/40_app_store_connect_copy_paste_sheet.md`, `notes/43_app_privacy_connect_answer_sheet.md`, `notes/44_privacy_manifest_sdk_audit.md`, `notes/48_external_service_vendor_register.md`, `notes/50_release_go_no_go_decision_matrix.md`, `notes/52_data_retention_deletion_matrix.md`, `notes/55_public_help_faq_draft.md`, `notes/56_in_app_legal_safety_copy_deck.md`, `notes/68_app_store_territory_dsa_iap_availability.md`, `notes/75_apple_developer_signing_capabilities_preflight.md`
+- メグルムプラス、StoreKit購入・復元、価格固定文言、App Store Connect価格、App Store Server API、Server Notifications、返金/取消/期限切れ/請求失敗/猶予期間同期、ローカル一時表示とサーバー上の最終権限の区別を、提出前台帳、App Privacy回答、外部サービス台帳、FAQ、サポート文面、Go/No-Goへ反映した。
+
+#### `利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+#### `利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+- Markdownドラフトから再生成し、App Store表示優先、一時的なローカル表示、請求失敗、猶予期間、Original Transaction ID、サーバー同期、課金情報の保存期間を反映した。
+
+### 影響範囲
+
+- メグルムプラス、ブースト、App Store IAP、購入復元、サブスクリプション解約、返金/取消/期限切れ/請求失敗/猶予期間
+- App Store Connect商品設定、特商法表記、Review Notes、FAQ、サポート回答、App Privacy、外部サービス台帳、提出前Go/No-Go
+
+Swift Native、Web、Supabase migration、Edge Function、PrivacyInfo.xcprivacyのコードは変更していない。
+
+### 確認方法
+
+- `render_docx.py /Users/michitaka/Desktop/Megrum/利用規約など/01_Megrum利用規約_20260629改訂案.docx --output_dir /tmp/megrum-legal-render-storekit/terms --emit_pdf`
+  - passed（28 pages）
+- `render_docx.py /Users/michitaka/Desktop/Megrum/利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx --output_dir /tmp/megrum-legal-render-storekit/privacy --emit_pdf`
+  - passed（22 pages）
+- bundled Poppler `pdftotext` と `python-docx` によるDOCX/PDFキーワード検査
+  - passed（利用規約: `アプリストアの購入確認画面`, `一時的な表示又はローカル状態`, `請求失敗`, `猶予期間` / Privacy: `Original Transaction ID`, `猶予期間`, `サーバー同期`, `APNs device token`）
+- レンダーPNGのページ数・寸法・最小ファイルサイズ確認
+  - passed（利用規約 28 pages / プライバシーポリシー 22 pages、全ページ同寸法、極端なsparse pageなし）
+
+### セルフレビュー結果
+
+- ✅ App Store上の価格・購入確認・領収書とアプリ内固定文言の不一致リスクをNo-Goへ落とし込んだ。
+- ✅ サーバー同期失敗時のローカル有効表示を、恒久的な権限付与として説明しない文言へ整理した。
+- ✅ 返金、取消、期限切れ、請求失敗、猶予期間の同期未確認を、公開前チェックとApp Privacy/サポート文面へ反映した。
+- ✅ 退会だけではApp Storeサブスクリプション解約にならない点と、退会後も課金監査情報を保存し得る点を整理した。
+- ✅ コード、DB migration、Edge Function、PrivacyInfo.xcprivacyは変更していない。
+- ✅ docs-onlyのためアプリビルド、Swiftテスト、web buildは未実行。
+
+## イテレーション1226.117：退会完了法務整理
+
+### 背景・問題意識
+
+現行Swift Nativeには設定画面からの退会申請導線と `request_account_deletion_for_viewer()` RPCがある一方、30日後の実削除、Auth削除、Storage削除、外部認証連携解除、削除完了通知、申請取消、全機能ブロックの実装は未確認だった。またAPNs tokenは失効経路が一部実装済みだが、退会申請又は削除完了に連動して全端末tokenを無効化する処理までは確認できなかった。公開文面が実装より強くなると、App Review、個人情報請求、問い合わせ、紛争時に運営側の説明リスクが大きくなるため、コード変更禁止の指示を守り、法務文書と監査台帳を「申請中」「利用制限」「完了未確認」に分けて整理した。
+
+### 変更内容
+
+#### 実装確認
+- `supabase/migrations/20260627012000_add_account_deletion_requests.sql` で、退会申請が `account_deletion_requests` に理由、任意メモ、申請日時、30日後の削除予定日、`status='requested'` を保存し、`users.account_status='deletion_requested'` と `deletion_requested_at` を更新することを確認した。
+- 同RPCが進行中取引（`sent` / `negotiating` / `agreement_one_side` / `agreed`）を拒否し、理由1〜8件、任意メモ500文字に制限することを確認した。
+- `AccountDeletionScreen`、`MegrumAppStateAccountDeletionActions`、`MegrumRootAuthenticatedContent` を読み、申請成功後に `viewer.accountStatus = .deletionRequested` へ更新して設定画面を閉じるが、全画面の強制ログアウト又は全機能ブロックは未確認と整理した。
+- `MegrumAppStateNotificationActions`、`SupabaseNotificationClientRequests`、`send-apns-notification` で、ログアウト時のAPNs token revokeとAPNs失効応答時の `revoked_at` 更新経路を確認した。ただし、退会申請/削除完了への連動、Expo tokenを含む全端末token無効化は未確認とした。
+- `SupabaseAuthClient`、`MegrumAuthRepositories`、Web管理画面検索で、Sign in with Apple token revoke、Google連携解除、Supabase Authユーザー削除、削除完了ジョブは確認できなかった。
+
+#### `notes/legal/01_terms_of_service_draft.md`
+- 第9条を、退会申請後に「通常の会員向け機能を利用できなくなります」と断定する表現から、削除申請中状態として取り扱われ、表示、検索、打診、取引、投稿、通知等を制限することがある表現へ修正した。
+
+#### `notes/legal/02_privacy_policy_draft.md`
+- 保存期間及び削除の通知token項目を、退会処理、端末変更、通知拒否又はトークン失効等に応じて、合理的な範囲で端末トークンを削除又は無効化することがある表現に改め、OS、通知配信サービス、バックアップ、ログ等により反映に時間を要する場合があることを追記した。
+
+#### `notes/17_legal_alignment.md`, `notes/27_app_privacy_data_inventory.md`, `notes/45_account_deletion_privacy_request_runbook.md`, `notes/48_external_service_vendor_register.md`, `notes/50_release_go_no_go_decision_matrix.md`, `notes/52_data_retention_deletion_matrix.md`, `notes/54_prelaunch_security_audit_checklist.md`, `notes/75_apple_developer_signing_capabilities_preflight.md`
+- 退会申請、削除予定日、利用制限、削除完了未確認、Apple/Google連携解除未確認、Auth/Storage削除未確認、APNs token一部revoke確認済み、退会申請/削除完了への全端末token無効化未確認を、ランブック、App Privacy、委託先台帳、Go/No-Go、保持削除、セキュリティ監査、Apple Developer事前確認へ反映した。
+
+#### `利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+#### `利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+- Markdownドラフトから再生成し、退会申請中状態、通常機能の一部制限、削除予定日の非保証、通知token削除/無効化の非断定表現を反映した。
+
+### 影響範囲
+
+- アカウント退会申請、削除予定日、削除申請中状態
+- Supabase Auth、Apple/Googleログイン連携、APNs / Expo token、Storage削除、バックアップ/ログ
+- App Review Notes、公開ページ、FAQ、個人情報請求、サポート運用、App Privacy、外部サービス台帳、提出前セキュリティ監査
+
+Swift Native、Web、Supabase migration、Edge Function、PrivacyInfo.xcprivacyのコードは変更していない。
+
+### 確認方法
+
+- `rg -n "account_deletion|deletion_requested|request_account_deletion|revokeRegisteredNativePushDeviceToken|auth\\.admin|unlink|deleteUser|revoked_at" ios-native/Sources ios-native/App web/src supabase --glob '!web/.next/**' --glob '!**/node_modules/**'`
+  - passed
+- `render_docx.py /Users/michitaka/Desktop/Megrum/利用規約など/01_Megrum利用規約_20260629改訂案.docx --output_dir /tmp/megrum-legal-render-deletion/terms --emit_pdf`
+  - passed（29 pages）
+- `render_docx.py /Users/michitaka/Desktop/Megrum/利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx --output_dir /tmp/megrum-legal-render-deletion/privacy --emit_pdf`
+  - passed（22 pages）
+- レンダーPNGの全ページ非白紙ピクセル検査
+  - passed（利用規約 29 pages / プライバシーポリシー 22 pages、sparse pageなし）
+- bundled Poppler `pdftotext` によるPDFキーワード確認
+  - passed（利用規約: `削除申請中の状態として取り扱われ`, `通常の会員向け機能の全部又は一部を制限`, `削除予定日` / Privacy: `退会処理`, `端末トークン`, `APNs device token`, `Storage、公開URL及び署名URL`）
+- `python3` によるDOCXキーワード検査
+  - passed（利用規約・Privacyとも反映確認、`80. 会員は` なし）
+
+### セルフレビュー結果
+
+- ✅ 退会申請受付、削除予定日、削除完了、Auth/Storage削除、外部認証解除を混同しない文言へ整理した。
+- ✅ APNs tokenは一部revoke経路を確認済みとしつつ、退会申請/削除完了との連動は未確認として残した。
+- ✅ 退会申請後に全機能が確実に停止するとは断定せず、削除申請中状態と利用制限として表現した。
+- ✅ App Review Notesや公開ページで「30日後に必ず削除」「ログインで復旧可能」「外部連携解除済み」「全通知token無効化済み」と書かないNo-Goを明確化した。
+- ✅ コード、DB migration、Edge Function、PrivacyInfo.xcprivacyは変更していない。
+- ✅ docs-onlyのためアプリビルド、Swiftテスト、web buildは未実行。
+
+## イテレーション1226.116：Storage外部送信法務整理
+
+### 背景・問題意識
+
+現行Supabase StorageとEdge Functionには、公開bucket、private bucket、長期signed URL、外部AI画像送信、顔候補付けデータの保存境界がある。公開画像はURLやキャッシュ経由で再共有され得る一方、参加者限定画像もsigned URLや相手保存により完全秘匿を保証できない。さらに `suggest-goods-series` はOpenAI Responses APIへ画像又は画像URLを送り、`web_search` を必須実行する。コード変更禁止の指示を守り、公開前の利用規約、プライバシーポリシー、App Privacy、外部サービス台帳、セキュリティ監査で説明漏れが出ないよう文書側を更新した。
+
+### 変更内容
+
+#### 実装確認
+- `supabase/migrations/20260501190000_setup_goods_photos_storage.sql` と `20260505000000_avatars_bucket.sql` で、`goods-photos` と `avatars` がpublic bucketであることを確認した。
+- `ios-native/Sources/MegrumCore/GoodsPhotoURLResolver.swift` と `ios-native/Sources/MegrumApp/SupabaseProfilePhotoStorage.swift` で、グッズ写真とプロフィール画像の公開Storage URL生成経路を確認した。
+- `supabase/migrations/20260503230000_chat_photos_bucket.sql` と `ios-native/Sources/MegrumApp/SupabaseChatPhotoStorage.swift`、`ios-native/Sources/MegrumData/SupabaseProposalEvidenceClient.swift` で、`chat-photos` はproposal参加者限定private bucketだが、取引チャット写真、服装写真、証跡写真のsigned URLが365日で生成される経路を確認した。
+- `supabase/migrations/20260524143000_harden_groom_privacy_and_messages.sql` で、`groom-posts` のprivate化と `meguri-message-media` の送受信者限定policyを確認した。
+- `supabase/migrations/20260530231500_add_meguri_board_image_attachments.sql` と `ios-native/Sources/MegrumData/SupabaseBoardClient.swift` で、`meguri-board-media` はprivate bucketだがStorage policy上authenticated user全体selectで、アプリ側が表示可能thread/replyのpathだけsigned URL化する設計を確認した。
+- `supabase/functions/suggest-goods-series/index.ts` で、認証済みユーザー確認後、最大3件の画像データ又は画像URL、グループ名、メンバー名、グッズ種別、既存候補をOpenAI Responses APIへ送り、`web_search` を必須実行することを確認した。
+
+#### `notes/legal/01_terms_of_service_draft.md`
+- 第11条に、グッズ写真、プロフィール画像、公開投稿画像等が公開URL、署名URL、端末キャッシュ、共有機能、スクリーンショット等により保存、再共有又は転載され得ることを追加した。
+- 第25条に、非公開又は参加者限定のユーザーコンテンツであっても、閲覧権限者、署名URL、端末キャッシュ、通知、バックアップ、通報対応、法令対応等により保存又は閲覧され得ること、相手会員による保存や再共有を完全に防止しないことを追加した。
+
+#### `notes/legal/02_privacy_policy_draft.md`
+- `2.12 Storage、公開URL及び署名URLに関する情報` を追加し、Storage bucket/path、公開URL、署名URL、画像キャッシュ、公開画像、参加者限定画像、削除後の残存可能性を取得情報として整理した。
+- 位置情報・写真等の取扱い、取引相手への表示及び提供、保存期間に、公開URL、signed URL、端末キャッシュ、相手保存、通報/証跡コピー、バックアップ上のファイルが残る可能性を追記した。
+
+#### `notes/17_legal_alignment.md`, `notes/27_app_privacy_data_inventory.md`, `notes/48_external_service_vendor_register.md`, `notes/50_release_go_no_go_decision_matrix.md`, `notes/52_data_retention_deletion_matrix.md`, `notes/54_prelaunch_security_audit_checklist.md`
+- Storage bucketごとの公開範囲、`chat-photos` の365日signed URL、`meguri-board-media` のauthenticated select、OpenAI画像送信と `web_search` 必須実行を、法務整合性、App Privacy、委託先台帳、Go/No-Go、保持削除、提出前セキュリティ監査へ反映した。
+
+#### `利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+#### `利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+- Markdownドラフトから再生成し、Storage公開範囲、公開URL、署名URL、OpenAI、web search、一定期間残る文言の反映を確認した。
+- 番号付きリストはWord自動番号ではなく本文番号として固定し、前回検出した `80. 会員は` のような番号崩れがないことを確認した。
+
+### 影響範囲
+
+- Supabase Storageの画像保存、公開URL、署名URL、端末キャッシュ、削除/非表示
+- グッズ写真、プロフィール画像、取引チャット写真、服装写真、証跡写真、グルーム画像、スポット掲示板画像、めぐりメッセージ画像
+- OpenAI Responses API、Edge Function secret、外部AI送信、web search利用
+- Privacy、Terms、App Privacy回答、外部サービス台帳、提出前セキュリティ監査、保持削除、Go/No-Go
+
+Swift Native、Web実装、Supabase migration、Edge Function、PrivacyInfo.xcprivacyのコードは変更していない。
+
+### 確認方法
+
+- `rg -n "Storage公開範囲|署名URL|signed URL|meguri-board-media|authenticated select|365日|OpenAI Responses|web search|public bucket|公開URL|完全秘匿|即時消去" notes/legal/01_terms_of_service_draft.md notes/legal/02_privacy_policy_draft.md notes/17_legal_alignment.md notes/27_app_privacy_data_inventory.md notes/48_external_service_vendor_register.md notes/50_release_go_no_go_decision_matrix.md notes/52_data_retention_deletion_matrix.md notes/54_prelaunch_security_audit_checklist.md`
+  - passed
+- `unzip -t 利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+  - passed
+- `unzip -t 利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+  - passed
+- `python3` によるDOCXキーワード検査
+  - passed（利用規約: `Storage公開範囲`, `公開URL`, `署名URL`, `完全に防止`, `外部AI送信` / プライバシーポリシー: `Storage、公開URL及び署名URL`, `OpenAI`, `公開URL`, `署名URL`, `一定期間残る`, `web search` を確認、`80. 会員は` なし）
+- `render_docx.py 利用規約など/01_Megrum利用規約_20260629改訂案.docx --emit_pdf`
+  - passed（27 pages）
+- `render_docx.py 利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx --emit_pdf`
+  - passed（21 pages）
+- レンダーPNGの全ページ非白紙ピクセル検査と代表ページ目視
+  - passed（利用規約 27 pages / プライバシーポリシー 21 pages、sparse pageなし。利用規約第11条/第25条、Privacy 2.12/4章/13章を目視）
+- `git diff --check -- notes notes/legal`
+  - passed
+- `git diff --name-only | rg -v '^(notes/|利用規約など/)' || true`
+  - passed（コードファイル差分なし）
+
+### セルフレビュー結果
+
+- ✅ 公開画像と参加者限定画像のリスクを分け、公開URL、signed URL、端末キャッシュ、相手保存、再共有を保証除外として整理した。
+- ✅ `goods-photos` / `avatars` のpublic bucket、`chat-photos` の365日signed URL、`meguri-board-media` のauthenticated selectを提出前No-Goにした。
+- ✅ OpenAIへ送る画像又は画像URL、`web_search` 利用、学習利用/保持/削除可否/同意をApp PrivacyとReview Notesで確認する導線にした。
+- ✅ 旧メモの `web_search_preview` 表記を現行コードの `web_search` に修正した。
+- ✅ コード、DB migration、Edge Function、PrivacyInfo.xcprivacyは変更していない。
+- ✅ docs-onlyのためアプリビルド、Swiftテスト、web buildは未実行。
+
+## イテレーション1226.115：管理者監査法務整理
+
+### 背景・問題意識
+
+現行Web管理画面には、ユーザー一覧、通報/異議申し立て、推し追加リクエスト、運営通知、有料権限、管理者権限、監査ログを扱う運用画面がある。これらはサーバー側のservice role clientを通じてRLSを迂回し得るため、公開前のPrivacy、利用規約、セキュリティ監査で、運営担当者アクセス、MFA、最小権限、監査ログ、IP/User-Agent、退会後保持を説明できないと、内部アクセス濫用、誤操作、監査ログ内個人情報、secret漏えい時の責任が大きくなる。コード変更禁止の指示を守り、文書側に運営者アクセスと監査ログの扱いを反映した。
+
+### 変更内容
+
+#### 実装確認
+- `web/src/lib/admin/permissions.ts` で、`owner`、`support`、`trust_safety`、`billing`、`viewer` の管理者ロール、`users.read`、`users.update_status`、`roles.*`、`reports.*`、`notifications.send`、`billing.read`、`entitlements.manage`、`audit.read` 等の権限、MFA要求、監査ログ保存を確認した。
+- `web/src/app/admin/actions.ts` で、ユーザー状態変更、管理者ロール変更、手動有料権限付与/停止、通報/異議申し立てステータス更新、推し追加リクエスト承認/統合/却下、運営通知送信が監査ログへ記録されることを確認した。
+- `web/src/app/admin/users/page.tsx`、`operations/page.tsx`、`billing/page.tsx`、`roles/page.tsx`、`audit/page.tsx` で、メール、表示名、ハンドル、活動エリア、アカウント状態、有料権限、通報本文、証跡URL、異議申し立て本文、運営コメント、通知本文、サブスクリプション、監査ログの閲覧範囲を確認した。
+- `supabase/migrations/20260524200000_add_admin_security_and_billing.sql` と `20260627015000_add_admin_operations_console_support.sql` で、`admin_roles`、`admin_audit_logs`、`subscriptions`、`plan_overrides`、`user_entitlements`、`reports`、`admin_announcement` のDB境界を確認した。
+
+#### `notes/legal/01_terms_of_service_draft.md`
+- 第18条に、通報対応、削除申出、問い合わせ、課金、権限付与、アカウント状態変更、運営通知、セキュリティ、法令対応、監査のため、権限を付与された運営担当者が管理画面、サポートツール又はサーバー側の特権的処理で必要範囲の情報を確認、更新又は保存することを追加した。
+- 管理者操作は操作理由、変更前後の状態、IPアドレス、User-Agent等とともに監査ログへ記録され得ること、法令上必要な場合を除き、個別担当者名、内部権限、監査ログ全文、内部判断基準、全ての対応理由の開示義務を負わないことを追加した。
+
+#### `notes/legal/02_privacy_policy_draft.md`
+- 取得情報に、管理者ロール、権限、MFA要求、管理者操作、操作理由、変更前後の状態、IPアドレス、User-Agent、手動有料権限、運営通知、Webhook/決済同期、監査ログを追加した。
+- 利用目的に、管理者権限、運営担当者アクセス権、MFA、監査ログ、手動権限付与、運営通知、Webhook及び決済同期の管理、不正アクセス/権限濫用/誤操作/内部統制対応を追加した。
+- `3.1 運営管理及び管理者アクセス` を追加し、運営担当者が確認し得る情報、管理者ロールと権限管理、監査ログ内容、常時監視を約束しないことを整理した。
+- 安全管理措置と保存期間に、管理者権限、監査ログ、IPアドレス、User-Agent、手動権限付与、運営通知、Webhook又は決済同期ログの扱いを追加した。
+
+#### `notes/17_legal_alignment.md`, `notes/27_app_privacy_data_inventory.md`, `notes/43_app_privacy_connect_answer_sheet.md`, `notes/48_external_service_vendor_register.md`, `notes/50_release_go_no_go_decision_matrix.md`, `notes/52_data_retention_deletion_matrix.md`, `notes/54_prelaunch_security_audit_checklist.md`
+- 管理画面のservice role、MFA、最小権限、owner冗長性、監査ログ、IP/User-Agent、退会後保持、App PrivacyではiOS収集実態中心に見ることを、法務整合性、App Privacy、委託先台帳、Go/No-Go、保持削除、提出前セキュリティ監査へ反映した。
+
+#### `利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+#### `利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+- Markdownドラフトから再生成し、管理者権限、監査ログ、MFA、IPアドレス、User-Agent、変更前後の状態、手動有料権限の反映を確認した。
+- 初回再生成でWord自動番号がPDF抽出上 `80. 会員は` のように崩れる問題を検出したため、番号付きリストを本文番号として固定してDOCXを再生成した。
+
+### 影響範囲
+
+- 管理者画面、サポート、Trust & Safety、課金/権限、運営通知、監査ログ
+- service role、MFA、管理者ロール、最小権限、secret管理
+- Privacy、Terms、App Privacy回答、提出前セキュリティ監査、保持削除、Go/No-Go
+
+Swift Native、Web実装、Supabase migration、PrivacyInfo.xcprivacyのコードは変更していない。
+
+### 確認方法
+
+- `unzip -t 利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+  - passed
+- `unzip -t 利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+  - passed
+- `python3` によるDOCXキーワード検査
+  - passed（利用規約: `管理者権限`, `監査ログ`, `IPアドレス`, `User-Agent`, `通報者`, `削除申出` / プライバシーポリシー: `管理者権限`, `監査ログ`, `MFA`, `IPアドレス`, `User-Agent`, `変更前後の状態`, `手動有料権限` を確認、`80. 会員は` なし）
+- `render_docx.py 利用規約など/01_Megrum利用規約_20260629改訂案.docx --emit_pdf`
+  - passed（31 pages）
+- `render_docx.py 利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx --emit_pdf`
+  - passed（23 pages）
+- PDFテキスト抽出による重要文言検査
+  - passed（利用規約: `管理者権限`, `監査ログ`, `User-Agent`, `削除申出` / プライバシーポリシー: `管理者権限`, `監査ログ`, `MFA`, `User-Agent`, `変更前後の状態`, `手動有料権限` を確認、`80. 会員は` なし。`IPアドレス` はPDF抽出上 `IP アドレス` に分割されるがDOCX本文とPNG目視で確認）
+- レンダーPNGの全ページ非白紙ピクセル検査と代表ページ目視
+  - passed（利用規約 31 pages / プライバシーポリシー 23 pages、sparse pageなし。利用規約第18条12項、Privacy 2.11/3.1/12章/13章を目視）
+- `git diff --check -- notes notes/legal`
+  - passed
+- `git diff --name-only | rg -v '^(notes/|利用規約など/)' || true`
+  - passed（コードファイル差分なし）
+
+### セルフレビュー結果
+
+- ✅ 管理者画面がservice roleでRLSを迂回し得る点を、Privacy、利用規約、セキュリティ監査、Go/No-Goへ明示した。
+- ✅ 管理者MFA、最小権限、owner冗長性、監査ログ、IP/User-Agent、退会後保持を提出前No-Goとして扱えるようにした。
+- ✅ 監査ログ全文、内部判断基準、個別担当者名、全ての対応理由を法令上必要な場合以外に開示保証しない形へそろえた。
+- ✅ App Privacyでは、Web運用の内部監査ログとiOSアプリ経由の収集実態を混同しない注意を追加した。
+- ✅ コード、DB migration、Web管理画面、PrivacyInfo.xcprivacyは変更していない。
+- ✅ docs-onlyのためアプリビルド、Swiftテスト、web buildは未実行。
+
+## イテレーション1226.114：公開法務同期監査
+
+### 背景・問題意識
+
+2026-06-29版の利用規約・プライバシーポリシードラフトは、郵送交換、会員間支払い情報、顔候補付け、通知本文、広告、公開プロフィール、年齢/性別/活動エリア、評価/通報/ブロック、削除申出・送信防止措置まで反映済みになった。一方で、現行Web実装とアプリ内リンクが同じ最新版本文へ到達するかを確認しないままApp Store ConnectへURLを入力すると、404でなくても古い短縮ページや別URLを提出してしまうリスクがある。コード変更禁止の指示を守り、公開Web/アプリ内法務表示/PrivacyInfo/App Privacyの同期漏れを公開前No-Goとして文書化した。
+
+### 変更内容
+
+#### 実装確認
+- `web/src/app/terms/page.tsx` は `/terms` の短縮Termsで、ページ内更新日は `2026年6月26日` だった。
+- `web/src/app/privacy/page.tsx` は `/privacy` の短縮Privacyで、ページ内更新日は `2026年6月26日` だった。
+- `web/src/app/support/page.tsx` は `/support` のみ確認でき、`/support/account-deletion`、`/support/privacy-request`、`/support/report`、`/support/ai`、`/support/faq` の個別ページ実装は未確認だった。
+- `ios-native/Sources/MegrumApp/AuthLegalConsentNotice.swift` は登録同意リンクとして `https://megrum.jp/terms` と `https://megrum.jp/privacy` を指していた。
+- `ios-native/Sources/MegrumApp/LegalDocumentContent.swift` / `SettingsLegalViews.swift` は法務要約を表示し、正式な法的本文ではない旨を出していた。
+- `ios-native/App/PrivacyInfo.xcprivacy` は `NSPrivacyTracking=false` とUserDefaults Required Reason APIのみを記載していた。
+
+#### `notes/37_public_url_publication_checklist.md`
+- 現行実装同期監査を追加し、公開予定の `/legal/*` と現行実装の `/terms` / `/privacy` / `/support`、アプリ内同意リンクの差分を提出前No-Goとして明記した。
+
+#### `notes/63_public_page_redaction_qa.md`
+- Web公開ページ、アプリ内リンク、App Store Connect入力値、法務ドラフト、App Privacy回答が同じ本文へ到達するかを確認するQA項目を追加した。
+
+#### `notes/66_legal_review_publication_runbook.md`
+- 弁護士レビュー後の反映フローに、Web公開実装、アプリ内同意リンク、法務要約、Privacy Manifest、App Privacy回答の同期確認を追加した。
+
+#### `notes/71_app_store_connect_final_input_reconciliation.md`
+- Privacy Policy URLとTerms URLについて、URLが200応答するだけでなく、最新版本文、登録同意リンク、Supportリンク、App Privacy回答と一致するかを照合する行を追加した。
+
+#### `notes/50_release_go_no_go_decision_matrix.md`
+- `G5 Legal URL` と `G16 Legal Publication` のNo-Go条件を、旧短縮本文、別URL、アプリ内リンク分裂まで含む形へ更新した。
+
+#### `notes/17_legal_alignment.md`, `notes/25_public_legal_support_pages.md`
+- 公開Webとアプリ内法務表示の同期リスクをLegal Alignmentと公開ページ文面パックへ追記し、この文書群は原稿であり現行Web実装と未同期であることを明示した。
+
+### 影響範囲
+
+- 公開URL、Support URL、Privacy Policy URL、利用規約URL
+- アプリ内登録同意リンク、Settings内法務要約
+- App Store Connect入力値、Review Notes、App Privacy回答
+- 公開ページ反映Runbook、レダクションQA、Go/No-Go判定
+
+Swift Native、Web実装、Supabase migration、PrivacyInfo.xcprivacyのコードは変更していない。
+
+### 確認方法
+
+- `git diff --check -- notes notes/legal`
+  - passed
+- `rg -n "公開法務同期監査|現行実装同期監査|AuthLegalConsentNotice|/legal/privacy|/privacy" notes/08_design_iterations.md notes/37_public_url_publication_checklist.md notes/63_public_page_redaction_qa.md notes/66_legal_review_publication_runbook.md notes/71_app_store_connect_final_input_reconciliation.md`
+  - passed
+- `git diff --name-only | rg -v '^(notes/|利用規約など/)' || true`
+  - passed（コードファイル差分なし）
+
+### セルフレビュー結果
+
+- ✅ 404でない旧短縮ページを公開済み法務本文として扱うリスクをNo-Go化した。
+- ✅ App Store Connect、公開Web、登録同意リンク、Supportリンク、アプリ内要約、App Privacy回答の同期観点を追加した。
+- ✅ Privacy Manifestが最小であることを、App Privacy回答不要の根拠にしないよう明記した。
+- ✅ 今回はコード変更禁止のため、Web route追加、アプリ内リンク修正、PrivacyInfo.xcprivacy更新は実施していない。
+- ✅ docs-onlyのためアプリビルド、Swiftテスト、web buildは未実行。
+
+## イテレーション1226.113：削除申出法務整理
+
+### 背景・問題意識
+
+現行Swift Native実装では、プロフィール、グッズ画像、グルーム、スポット掲示板、取引チャット、証跡写真、評価コメント等のUGCが存在し、ユーザー通報、グッズ通報、掲示板通報、取引異議申し立て、問い合わせ経由で、名誉毀損、プライバシー侵害、権利侵害その他違法又は不適切情報に関する削除申出を受け得る。2025-04-01施行の情報流通プラットフォーム対処法により、大規模特定電気通信役務提供者には追加の透明化・迅速化義務が置かれているが、Megrumが現時点で大規模指定事業者である前提にはできない。コード変更禁止の指示を守り、削除申出、送信防止措置、発信者確認又は通知の運用を説明可能にしつつ、一定期間内回答、申出どおりの削除、発信者情報開示、常時監視を未確認のまま約束しないよう文書を横断更新した。
+
+### 変更内容
+
+#### 法令・運用前提確認
+- e-Gov法令検索で「特定電気通信による情報の流通によって発生する権利侵害等への対処に関する法律」を参照し、UGCプラットフォームで削除申出・送信防止措置・大規模指定事業者向け義務の該当性を提出前に確認すべき論点として整理した。
+- 現行コードの通報・問い合わせ・モデレーション記録の範囲を前回確認した結果を前提に、削除申出は通常の通報・モデレーション記録と関連するが、法令対応証跡として別分類でも追えるようにした。
+
+#### `notes/legal/01_terms_of_service_draft.md`
+- 第18条に、権利侵害、名誉毀損、プライバシー侵害その他違法又は不適切情報に関する削除申出、送信防止措置の申出、発信者への確認又は通知について、適用法令、ガイドライン及び運営基準に従って対応することを追加した。
+- 法令上必要な場合を除き、一定期間内の回答、削除、非表示、発信者情報の開示、申出どおりの措置又は個別理由開示を保証しないことを追加し、通報・ブロック条項の連番を修正した。
+
+#### `notes/legal/02_privacy_policy_draft.md`
+- 取得情報に、削除申出、送信防止措置の申出、発信者への確認又は通知、法令上必要な照会、回答、判断及び対応履歴を追加した。
+- 利用目的と取引相手等への表示/提供説明に、権利侵害又は違法情報対応のため申出者、対象会員、発信者、関係取引相手、委託先、弁護士、裁判所、捜査機関、公的機関等へ必要な範囲で情報を確認又は提供し得ることを追加した。
+
+#### `notes/17_legal_alignment.md`, `notes/26_trust_safety_release_sop.md`
+- 情報流通プラットフォーム対処法を公開前No-Goとして追加し、Megrumを大規模指定事業者と断定しないこと、指定可能性が出た場合に申出窓口、削除基準、通知、運用状況公表、担当体制を再確認することを追加した。
+- Trust & Safety SOPに、権利侵害・削除申出対応の受付情報、本人/権利者確認、対象特定、発信者確認又は通知、記録保存、No-Goを追加した。
+
+#### `notes/25_public_legal_support_pages.md`, `notes/55_public_help_faq_draft.md`, `notes/34_support_response_templates.md`, `notes/67_support_inbox_triage_runbook.md`
+- 公開サポート、FAQ、一次返信テンプレ、受信箱トリアージへ、削除申出時に必要な情報、保証しない範囲、緊急時外部連絡、受付番号分類、エスカレーション先を追加した。
+
+#### `notes/27_app_privacy_data_inventory.md`, `notes/43_app_privacy_connect_answer_sheet.md`, `notes/44_privacy_manifest_sdk_audit.md`, `notes/52_data_retention_deletion_matrix.md`
+- App PrivacyとPrivacy Manifest監査で、削除申出本文、送信防止措置希望、発信者確認又は通知の対応状態を、Customer Support / Other User Content / Other Data Types / Product Interactionの候補として明示した。
+- データ保持・削除マトリクスに、削除申出・送信防止措置の例外保持、発信者確認又は通知履歴、対象コンテンツ削除後も必要期間保持し得る記録を追加した。
+
+#### `notes/50_release_go_no_go_decision_matrix.md`, `notes/53_app_review_guideline_compliance_matrix.md`
+- Safety / UGC / MetadataのNo-Goに、削除申出を7日以内削除、申出どおり削除、発信者情報開示、常時監視として過剰保証しないことを追加した。
+
+#### `利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+#### `利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+- Markdownドラフトから再生成し、削除申出、送信防止措置、発信者、一定期間内の回答、通報者、モデレーション、ブロック関係の反映を確認した。
+
+### 影響範囲
+
+- 法務公開前ドラフト
+- 削除申出、送信防止措置、発信者確認又は通知、権利侵害/違法情報対応
+- Trust & Safety運用、サポート返信、FAQ、受信箱トリアージ
+- App Privacy / Privacy Manifest / データ保持削除 / App Review Guideline / Go-No-Go
+
+Swift Native、Supabase migration、Web公開ページ実装、PrivacyInfo.xcprivacy、アプリ内法務表示のコードは変更していない。
+
+### 確認方法
+
+- `unzip -t 利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+  - passed
+- `unzip -t 利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+  - passed
+- `python3` によるDOCXキーワード検査
+  - passed（利用規約: `削除申出`, `送信防止措置`, `発信者`, `一定期間内の回答`, `常時監視`, `評価コメント`, `通報者` / プライバシーポリシー: `削除申出`, `送信防止措置`, `発信者`, `一定期間内の回答`, `通報者`, `モデレーション`, `ブロック関係` を確認、`80. 会員は` なし）
+- `render_docx.py 利用規約など/01_Megrum利用規約_20260629改訂案.docx --emit_pdf`
+  - passed（20 pages）
+- `render_docx.py 利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx --emit_pdf`
+  - passed（14 pages）
+- PDFテキスト抽出による重要文言検査
+  - passed（上記キーワードを確認、`80. 会員は` なし）
+- レンダーPNGの全ページ非白紙ピクセル検査と代表ページ目視
+  - passed（利用規約 20 pages / プライバシーポリシー 14 pages、sparse pageなし。利用規約第18条、プライバシーポリシー2.9/6章を目視）
+
+### セルフレビュー結果
+
+- ✅ 削除申出・送信防止措置を通常通報とは別に追える法務/運用/Privacy/App Review論点として明示した。
+- ✅ Megrumを大規模指定事業者と断定せず、該当可能性が出た場合の再確認をNo-Go化した。
+- ✅ 7日以内対応、申出どおり削除、発信者情報開示、常時監視、個別理由開示を未確認のまま保証しない文言にそろえた。
+- ✅ 削除申出本文と対応状態をCustomer Support / Other User Content / Other Data Types / Product Interaction候補としてApp Privacy文書へ反映した。
+- ✅ コード、DB migration、Web公開ページ、PrivacyInfo.xcprivacy、アプリ内法務表示は変更していない。
+- ✅ docs-onlyのためアプリビルドとSwiftテストは未実行。
+
+## イテレーション1226.112：評価通報法務整理
+
+### 背景・問題意識
+
+現行Swift Native実装では、取引完了後の星評価・評価コメント、公開プロフィール上の評価一覧、ユーザー通報、グッズ通報、取引の異議申し立て、グルーム/スポット掲示板の通報、ユーザーブロック、ブロック関係による検索・ホーム候補・通知等の抑制が存在する。評価コメントや通報補足は自由入力であり、名誉毀損、プライバシー侵害、虚偽・報復目的の通報、緊急時対応の誤認、運営者による常時監視義務の誤認につながる可能性がある。コード変更禁止の指示を守り、運営者が本人性・信用・安全性・評価内容・通報内容・モデレーション結果を保証しているように見えないよう、法務・審査・公開サポート文書を横断更新した。
+
+### 変更内容
+
+#### 実装確認
+- `ios-native/Sources/MegrumCore/UserReportModels.swift`、`GoodsReportModels.swift`、`BlockedUserModels.swift`、`TradeDisputeModels.swift` で、ユーザー通報、グッズ通報、ブロック、取引異議申し立ての入力項目と理由カテゴリを確認した。
+- `ios-native/Sources/MegrumApp/TradeEvaluationSheet.swift`、`TradeMessageSystemPresentations.swift`、`TradeMessageEvaluationPresentations.swift`、`PublicUserProfileContentViews.swift`、`ios-native/Sources/MegrumData/SupabaseUserProfileClient.swift` で、星評価、評価コメント、評価者情報、公開プロフィール評価一覧、評価通知の表示経路を確認した。
+- `ios-native/Sources/MegrumApp/PublicUserProfileModerationViews.swift`、`SearchResultGridViews.swift`、`GoodsGridDisplayViews.swift`、`TradeDisputeSheet.swift`、`DisputeTradeRequestSheet.swift`、`MegrumAppStateAccountSettingsActions.swift`、`BlockedUserContentFilter.swift` で、通報・ブロック・異議申し立ての画面導線とローカル除外範囲を確認した。
+- `supabase/migrations/20260503220000_proposal_evidence_and_evaluations.sql`、`20260503270000_add_disputes.sql`、`20260524143000_harden_groom_privacy_and_messages.sql`、`20260530174000_expand_meguri_board_threads.sql`、`20260531012000_add_goods_reports.sql`、`20260627015000_add_admin_operations_console_support.sql` で、評価、異議申し立て、グルーム/掲示板通報、グッズ通報、管理者用通報レコードのDB制約とRLSを確認した。
+
+#### `notes/legal/01_terms_of_service_draft.md`
+- 評価条項に、星評価、評価コメント、評価者情報が取引チャット、公開プロフィール、評価一覧、通知等に表示され得ること、住所、連絡先、勤務先、学校名、金融情報、待ち合わせ場所、顔、第三者情報その他の私的情報を書いてはいけないことを追加した。
+- 評価は主観的参考情報であり、本人確認、安全確認、信用評価、支払能力、取引履行、グッズ品質、将来の取引結果を保証しないことを追加した。
+- 通報、異議申し立て、ブロックは緊急通報、警察、消防、医療、法律相談、公的救済手段の代替ではないことを追加した。
+- 通報者情報を相手会員へ直接知らせないよう努める一方、申告内容、証跡、取引状況、法令対応により通報者が推測され得ることを追加した。
+- 虚偽又は報復目的の評価、通報、異議申し立て、ブロック機能の濫用を禁止事項とアカウント制限事由に追加した。
+- 運営者は手動確認に加えAI、自動検知、ルールベース判定を利用し得るが、全投稿、取引、評価、通報、会員間連絡を常時監視する義務を負わないことを追加した。
+
+#### `notes/legal/02_privacy_policy_draft.md`
+- 取得情報に、評価、星の数、評価コメント、評価者情報、通報理由、通報補足、証跡URL、ブロック関係、チケット番号、対応ステータス、運営対応履歴、管理者コメント等を追加した。
+- 利用目的に、評価、通報、ブロック、非表示、アカウント制限、モデレーション、優先度判定、不正利用検知及び補助的な自動処理又は手動確認を追加した。
+- 評価コメントの表示、通報・異議申し立て・ブロック・問い合わせ・モデレーション情報の確認又は提供範囲、通報者推測リスク、退会後も保持され得るモデレーション記録を追加した。
+
+#### `notes/25_public_legal_support_pages.md`, `notes/55_public_help_faq_draft.md`, `notes/34_support_response_templates.md`
+- 通報・ブロック案内に、調査、返信、削除、補償、解決を保証しないこと、緊急時は警察、消防、医療機関、消費生活センター等の外部機関へ連絡することを追加した。
+- 評価を書く際の注意、虚偽又は嫌がらせ目的の評価・通報が制限対象になること、通報者秘匿の限界、ブロックしても過去の取引、チャット、証跡、評価、通報、異議申し立て、法令上必要な記録が消えないことを追加した。
+
+#### `notes/26_trust_safety_release_sop.md`, `notes/56_in_app_legal_safety_copy_deck.md`
+- UGC審査、通報、ブロック、評価コメント、緊急連絡、虚偽通報、モデレーションAI/自動検知の説明を、App Store審査とアプリ内コピーで過剰保証しない形へ更新した。
+- アプリ内表示候補として、評価入力前の注意、通報送信前の虚偽申告警告、通報完了後の緊急時外部連絡案内、ブロック実行時の保持記録説明を追加した。
+
+#### `notes/27_app_privacy_data_inventory.md`, `notes/43_app_privacy_connect_answer_sheet.md`, `notes/44_privacy_manifest_sdk_audit.md`, `notes/40_app_store_connect_copy_paste_sheet.md`, `notes/46_app_store_questionnaire_answer_sheet.md`, `notes/50_release_go_no_go_decision_matrix.md`, `notes/53_app_review_guideline_compliance_matrix.md`, `notes/59_initial_release_scope_exposure_audit.md`, `notes/62_app_review_manual_submission_checklist.md`, `notes/71_app_store_connect_final_input_reconciliation.md`
+- App Privacy、Review Notes、質問票、提出前Go/No-Goに、評価、通報、ブロック、モデレーション記録を `Other User Content`、`Other Data Types`、`Product Interaction`、`Customer Support` 等の候補として扱う必要があることを追加した。
+- App Store提出時に、通報者完全秘匿、評価の正確性、常時監視、緊急対応、法的判断、本人性・安全性・信用性の保証を説明しないNo-Goを追加した。
+
+#### `notes/05_data_model.md`, `notes/09_state_machines.md`, `notes/10_glossary.md`, `notes/17_legal_alignment.md`, `notes/52_data_retention_deletion_matrix.md`, `notes/48_external_service_vendor_register.md`, `notes/66_legal_review_publication_runbook.md`
+- `user_evaluations`、`reports`、`goods_reports`、`groom_user_blocks`、`groom_reports`、`meguri_board_reports`、`disputes` を、評価・通報・ブロック・モデレーション記録として整理した。
+- 状態遷移上、評価又は通報だけで法的責任、本人性、信用、安全性、取引結果の最終判断を作らないことを追加した。
+- 用語集に「公開評価」と「モデレーション記録」を追加し、「評価」を主観的参考情報として更新した。
+- 法務公開Runbookと保持削除表に、対象コンテンツ又はアカウント削除後もモデレーション記録を保持し得ることを追加した。
+
+#### `利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+#### `利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+- Markdownドラフトから再生成し、評価コメント、虚偽又は報復目的の評価、緊急通報、常時監視、通報者、ブロック、モデレーション、ブロック関係、通報理由、管理者コメントの反映を確認した。
+
+### 影響範囲
+
+- 法務公開前ドラフト
+- 評価、公開プロフィール評価一覧、取引チャット内評価表示、評価通知
+- ユーザー通報、グッズ通報、取引異議申し立て、グルーム/スポット掲示板通報
+- ブロック、検索・ホーム候補・プロフィール・通知等の表示制限説明
+- App Store Connect App Privacy / Review Notes / 質問票 / 提出前Go-No-Go
+- 公開サポート、FAQ、サポート返信、アプリ内法務・安全コピー
+- データモデル、状態遷移、用語集、保持削除、法務公開Runbook
+
+Swift Native、Supabase migration、Web公開ページ実装、PrivacyInfo.xcprivacy、アプリ内法務表示のコードは変更していない。
+
+### 確認方法
+
+- `git diff --check -- notes notes/legal`
+  - passed
+- `unzip -t 利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+  - passed
+- `unzip -t 利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+  - passed
+- `python3` によるDOCXキーワード検査
+  - passed（利用規約: `評価コメント`, `虚偽又は報復目的の評価`, `緊急通報`, `常時監視`, `通報者`, `ブロック`, `モデレーション` / プライバシーポリシー: `評価コメント`, `ブロック関係`, `通報理由`, `管理者コメント`, `モデレーション`, `通報者`, `推測できる場合` を確認、`80. 会員は` なし）
+- `render_docx.py 利用規約など/01_Megrum利用規約_20260629改訂案.docx --emit_pdf`
+  - passed（28 pages）
+- `render_docx.py 利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx --emit_pdf`
+  - passed（20 pages）
+- PDFテキスト抽出による重要文言検査
+  - passed（上記キーワードを確認。プライバシーポリシーの `管理者コメント` はPDF抽出上 `管理\n者コメント` に分割されたが、DOCX本文とレンダーPNGで表示を確認）
+- レンダーPNGの全ページ非白紙ピクセル検査と代表ページ目視
+  - passed（利用規約 28 pages / プライバシーポリシー 20 pages、sparse pageなし）
+
+### セルフレビュー結果
+
+- ✅ 評価コメントを、主観的参考情報かつ公開又は関係者表示され得るユーザー入力として整理した。
+- ✅ 虚偽又は報復目的の評価、通報、異議申し立て、ブロック機能濫用を禁止事項、制限事由、サポート文面、アプリ内コピー候補へ反映した。
+- ✅ 通報者秘匿、削除、調査、返信、補償、問題解決、緊急対応、常時監視を保証しない文言へ統一した。
+- ✅ ブロックは検索結果、ホーム候補、プロフィール、通知等を制限し得るが、過去又は進行中の取引、チャット、証跡、評価、通報、異議申し立て、監査記録を自動削除しない前提にそろえた。
+- ✅ App Privacy / Review Notes / FAQ / アプリ内コピーが、評価、通報、ブロック、モデレーション記録の取得・利用・保持・表示範囲から外れないよう更新した。
+- ⚠️ 公開Webページ、iOSアプリ内法務表示、PrivacyInfo.xcprivacyはコード変更禁止のため未更新。リリース前に `web/src/app/terms/page.tsx`、`web/src/app/privacy/page.tsx`、`ios-native/Sources/MegrumApp/LegalDocumentContent.swift`、`ios-native/App/PrivacyInfo.xcprivacy` を最新ドラフトと同期する必要がある。
+- ✅ コード、DB migration、Web公開ページ、PrivacyInfo.xcprivacy、アプリ内法務表示は変更していない。
+- ✅ docs-onlyのためアプリビルドとSwiftテストは未実行。
+
+## イテレーション1226.111：公開プロフィール法務整理
+
+### 背景・問題意識
+
+現行Swift Native実装では、初回設定とプロフィール編集で性別、活動エリア、生年月日から算出される年齢、表示名、ハンドル、プロフィール文、推し、評価、完了取引数、交換条件、支払い方法要約等が、公開プロフィール、ホーム候補、検索、めぐり、交換条件画面などで相手会員又は閲覧対象者に表示され得る。一方で、2026-06-29時点のコード確認では、これらは原則としてユーザー入力又は利用状況に基づく表示であり、公的本人確認、法的性別確認、居住地確認、年齢認証、安全確認、信用保証、支払能力確認又は運営者推薦を意味する実装ではない。コード変更禁止の指示を守り、プロフィール表示が過剰な信頼表示又は差別・外部照合の材料に見えないよう、法務・審査・公開サポート文書を横断更新した。
+
+### 変更内容
+
+#### 実装確認
+- `ios-native/Sources/MegrumCore/UserProfileModels.swift` で `gender`、`prefecture`、`birthDate`、`age`、`paymentMethods`、`paymentNote`、評価・完了取引数を含むプロフィールモデルを確認した。
+- `ios-native/Sources/MegrumApp/AccountSetupModels.swift`、`AccountSetupStepViews.swift`、`OwnProfileEditFormViews.swift`、`OwnProfileEditDraft.swift`、`OwnProfileEditValidation.swift` で、初回設定/プロフィール編集時の生年月日、性別、活動エリアの入力・検証・表示導線を確認した。
+- `ios-native/Sources/MegrumData/SupabaseHomeUserRows.swift`、`SupabaseUserProfileClient.swift`、`ios-native/Sources/MegrumApp/PublicUserProfileContentViews.swift`、`PublicUserProfileScreenDerivedState.swift`、`PublicExchangeConditionsScreen.swift` で、公開プロフィール、ホーム候補、交換条件画面への表示項目を確認した。
+
+#### `notes/legal/01_terms_of_service_draft.md`
+- 会員登録条項に、生年月日、年齢、性別、活動エリア、プロフィール情報の入力又は表示が、公的本人確認、年齢認証、法的性別確認、居住地確認、保護者同意確認を意味しないことを追加した。
+- 本アプリの内容条項に、公開プロフィール、検索結果、ホーム候補、めぐり、評価、交換条件、支払い方法要約は参考情報であり、本人確認済み、安全確認済み、法的性別確認済み、支払能力確認済み、信用保証、取引成立保証又は運営者推薦を意味しないことを追加した。
+- 禁止事項に、プロフィール、年齢、性別、活動エリア、評価、支払い条件等を用いた差別、嫌がらせ、過度な詮索、外部照合、スクレイピング、データセット化、AI学習等を追加した。
+
+#### `notes/legal/02_privacy_policy_draft.md`
+- 取得情報に、表示名、ハンドル、プロフィール文、プロフィール画像、活動エリア、都道府県、性別、生年月日、年齢又は年代等の派生情報を追加した。
+- 取引相手への表示及び提供に、公開プロフィール、活動エリア、性別、派生年齢、推し、評価、完了取引数、交換条件、支払い方法要約等を追加した。
+- 表示情報が本人性、法的性別、年齢、居住地、支払能力、安全性、信用又は取引意思の確認・保証ではないこと、相手会員の情報を外部照合、転載、第三者提供、データセット化、差別、嫌がらせ、過度な詮索へ使わないことを追加した。
+
+#### `notes/17_legal_alignment.md`, `notes/25_public_legal_support_pages.md`, `notes/27_app_privacy_data_inventory.md`, `notes/40_app_store_connect_copy_paste_sheet.md`, `notes/43_app_privacy_connect_answer_sheet.md`, `notes/44_privacy_manifest_sdk_audit.md`, `notes/46_app_store_questionnaire_answer_sheet.md`, `notes/50_release_go_no_go_decision_matrix.md`, `notes/55_public_help_faq_draft.md`, `notes/56_in_app_legal_safety_copy_deck.md`, `notes/59_initial_release_scope_exposure_audit.md`, `notes/62_app_review_manual_submission_checklist.md`
+- App Privacy、Review Notes、公開FAQ、公開サポート、アプリ内法務・安全コピー、提出前Go/No-Goへ、公開プロフィール・性別・活動エリア・評価・完了取引数・支払い方法要約の表示範囲と非保証を反映した。
+- App Store提出時に、性別/活動エリア/年齢/評価/支払い方法要約を、法的性別確認、本人確認、安全確認、信用評価、支払能力確認、運営者推薦として説明しないNo-Goを追加した。
+
+#### `notes/05_data_model.md`, `notes/09_state_machines.md`, `notes/10_glossary.md`
+- `gender`、`primary_area`、`age`、評価、完了取引数、`payment_methods`、`payment_note` を、本人確認・法的性別確認・居住地確認・安全確認・信用評価・支払能力確認を意味しない参考情報として整理した。
+- 状態遷移上、プロフィール表示や候補表示だけで verified 相当の状態を作らないことを追加した。
+- 用語集に「自己申告プロフィール情報」を追加した。
+
+#### `利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+#### `利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+- Markdownドラフトから再生成し、公開プロフィール、性別、活動エリア、法的性別確認非該当、外部照合禁止、データセット化禁止の反映を確認した。
+
+### 影響範囲
+
+- 法務公開前ドラフト
+- 公開プロフィール、ホーム候補、検索、めぐり、交換条件、評価、完了取引数、支払い方法要約の説明
+- App Store Connect App Privacy / Review Notes / 質問票の下書き
+- 公開サポート、FAQ、アプリ内法務・安全コピー
+- データモデル、状態遷移、用語集の法務前提
+
+Swift Native、Supabase、Web公開ページ実装、Privacy Manifest、アプリ内法務表示のコードは変更していない。
+
+### 確認方法
+
+- `git diff --check -- notes notes/legal`
+  - passed
+- `unzip -t 利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+  - passed
+- `unzip -t 利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+  - passed
+- `python3` によるDOCXキーワード検査
+  - passed（利用規約: `公開プロフィール`, `性別`, `活動エリア`, `法的性別確認`, `安全確認済み`, `支払能力確認`, `本人確認済み` / プライバシーポリシー: `公開プロフィール`, `活動エリア`, `性別`, `法的性別確認`, `自己入力`, `外部照合`, `データセット化` を確認、TODO/FIXMEなし）
+- `render_docx.py 利用規約など/01_Megrum利用規約_20260629改訂案.docx --emit_pdf`
+  - passed（21 pages）
+- `render_docx.py 利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx --emit_pdf`
+  - passed（15 pages）
+- PDFテキスト抽出による重要文言検査
+  - passed（上記キーワードを確認、`80. 会員は` なし）
+- レンダーPNGの全ページ非白紙ピクセル検査と代表ページ目視
+  - passed
+
+### セルフレビュー結果
+
+- ✅ 公開プロフィール、性別、活動エリア、年齢、評価、完了取引数、支払い方法要約を、本人確認済み又は安全確認済みの表示ではなく参考情報として整理した。
+- ✅ 性別表示を法的性別確認又は性自認・性的指向・健康情報の確認と誤認させない文言を追加した。
+- ✅ 相手会員情報の外部照合、転載、第三者提供、商用利用、スクレイピング、データセット化、AI学習、差別、嫌がらせ、過度な詮索を禁止又はNo-Go化した。
+- ✅ App Privacy / Review Notes / FAQ / アプリ内コピーが、公開プロフィール表示範囲と非保証の説明から外れないよう更新した。
+- ✅ `notes/09_state_machines.md` と `notes/10_glossary.md` は更新済み。新しい状態IDは追加していない。
+- ✅ コード、DB migration、Web公開ページ、PrivacyInfo.xcprivacy、アプリ内法務表示は変更していない。
+
+## イテレーション1226.110：未成年年齢表示法務整理
+
+### 背景・問題意識
+
+現行Swift Native実装では、初回設定で生年月日入力が必須で、入力値から年齢を算出・保存し、プロフィール、ホーム、検索、めぐり等で年齢又は年代等の派生情報が表示され得る。一方で、2026-06-29時点のコード確認では、最低年齢ゲート、公的年齢確認、身分証確認、保護者同意確認、保護者管理機能は未確認だった。コード変更禁止の指示を守り、Megrumが年齢確認済みサービスに見えないよう、利用規約、プライバシーポリシー、App Store提出文書、公開サポート、運用テンプレートを自己申告年齢前提へ揃えた。
+
+### 変更内容
+
+#### `notes/legal/01_terms_of_service_draft.md`
+- 第3条（会員登録）に、未成年者の法定代理人同意、保護者同伴又は事前相談、真実正確な生年月日/年齢登録、年齢入力が公的本人確認・年齢認証・身分証確認・保護者同意確認を意味しないことを追加した。
+- 現地交換条項に、未成年者の保護者相談・同伴推奨、安全上の会員間連絡/取引制限可能性を追加した。
+
+#### `notes/legal/02_privacy_policy_draft.md`
+- 取得情報と利用目的に、生年月日、算出年齢又は年代、年齢に基づくプロフィール表示・安全確認・利用制限を追加した。
+- 第16章（未成年者の個人情報）で、自己申告年齢、公的本人確認/年齢認証/保護者同意確認の非保証、虚偽年齢疑い時の確認・制限を明記した。
+
+#### `notes/25_public_legal_support_pages.md`, `notes/55_public_help_faq_draft.md`, `notes/34_support_response_templates.md`, `notes/67_support_inbox_triage_runbook.md`
+- 公開ヘルプ、FAQ、サポート返信、受信箱分類に、未成年/年齢カテゴリ、自己申告年齢説明、現地交換時の保護者相談・同伴推奨、年齢確認済みと断定しない運用を追加した。
+
+#### `notes/24_app_store_submission_pack.md`, `notes/31_app_store_connect_metadata_worksheet.md`, `notes/36_submission_evidence_checklist.md`, `notes/40_app_store_connect_copy_paste_sheet.md`, `notes/43_app_privacy_connect_answer_sheet.md`, `notes/44_privacy_manifest_sdk_audit.md`, `notes/46_app_store_questionnaire_answer_sheet.md`, `notes/50_release_go_no_go_decision_matrix.md`, `notes/53_app_review_guideline_compliance_matrix.md`, `notes/56_in_app_legal_safety_copy_deck.md`, `notes/59_initial_release_scope_exposure_audit.md`, `notes/62_app_review_manual_submission_checklist.md`, `notes/71_app_store_connect_final_input_reconciliation.md`
+- App Store Age Rating、Age Assurance、Parental Controls、App PrivacyのOther Data Types候補、Review Notes、Go/No-Go、提出証跡、アプリ内コピーを、自己申告年齢・年齢確認なし・Kidsカテゴリなしの前提へ揃えた。
+
+#### `notes/17_legal_alignment.md`, `notes/27_app_privacy_data_inventory.md`, `notes/44_privacy_manifest_sdk_audit.md`, `notes/52_data_retention_deletion_matrix.md`
+- 法務整合メモ、App Privacyインベントリ、SDK監査、保持削除表へ、生年月日/年齢表示の収集・保存・削除・匿名化・過剰保証禁止を追加した。
+
+#### `notes/05_data_model.md`, `notes/09_state_machines.md`, `notes/10_glossary.md`
+- `users.birth_date` / `users.age` を自己申告年齢として扱い、年齢確認又は保護者同意確認を意味しない法務前提を追加した。
+- 用語集に「自己申告年齢」を追加した。
+
+#### `利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+#### `利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+- Markdownドラフトから再生成し、未成年・生年月日・年齢表示の反映を確認した。
+
+### 影響範囲
+
+- 法務公開前ドラフト
+- 未成年者の利用説明、生年月日/年齢表示、現地交換安全説明
+- App Store Age Rating / App Privacy / Review Notes / Questions / Go-No-Go
+- 公開サポート、FAQ、サポート返信、受信箱分類
+- データモデル、状態遷移、用語集の法務前提
+
+Swift Native、Supabase、Web公開ページ実装、Privacy Manifest、アプリ内法務表示のコードは変更していない。
+
+### 確認方法
+
+- `rg -n "年齢確認済み|本人確認済み|保護者同意確認済み" notes`
+  - passed（No-Go/注意文脈以外の過剰保証なし）
+- `unzip -t 利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+  - passed
+- `unzip -t 利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+  - passed
+- `python3` によるDOCXキーワード検査
+  - passed（`未成年・生年月日`, `法定代理人`, `年齢認証`, `保護者同意確認`, `自己申告` を確認、TODO/FIXMEなし）
+- `render_docx.py 利用規約など/01_Megrum利用規約_20260629改訂案.docx --emit_pdf`
+  - passed（31 pages）
+- `render_docx.py 利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx --emit_pdf`
+  - passed（21 pages）
+- `pdftotext` による第3条、第15条、第16章本文検査
+  - passed（番号崩れ、`80. 会員は` なし）
+- レンダーPNGの全ページ非白紙ピクセル検査と代表ページ目視
+  - passed
+- `git diff --check -- notes notes/legal`
+  - passed
+
+### セルフレビュー結果
+
+- ✅ 生年月日/年齢を、本人確認済み又は年齢認証済みではなく自己申告情報として整理した。
+- ✅ 未成年者の現地交換、位置情報、服装写真、郵送先情報、会員間支払い情報、取引チャットについて、保護者相談・同伴推奨と安全上の制限可能性を明記した。
+- ✅ App Store Age Assurance / Parental Controls / Kidsカテゴリ / App Privacy回答が、現行コードの未確認事項と矛盾しないようNo-Go化した。
+- ✅ `notes/09_state_machines.md` と `notes/10_glossary.md` は更新済み。状態ID追加はなく、自己申告年齢の用語追加のみ。
+- ✅ コード、DB migration、Web公開ページ、PrivacyInfo.xcprivacy、アプリ内法務表示は変更していない。
+
+## イテレーション1226.109：退会申請法務整理
+
+### 背景・問題意識
+
+現行Swift Native実装では、設定画面から退会理由と任意メモを送信し、Supabase RPC `request_account_deletion_for_viewer()` が `users.account_status='deletion_requested'` と `account_deletion_requests.deletion_scheduled_at` を保存する。一方で、2026-06-29時点のコード確認では、30日後の実削除ジョブ、申請取消/復旧API、Sign in with Apple token revoke、Google連携解除、APNs token無効化完了は未確認だった。コード変更禁止の指示を守り、削除予定日や復旧可能性を過剰保証しないよう法務・審査文書へ反映した。
+
+### 変更内容
+
+#### `notes/legal/01_terms_of_service_draft.md`
+- 第9条（退会）を、退会申請、削除申請中、削除予定日、進行中取引等の保留条件、任意メモの禁止情報、復旧/再登録/同一ID再利用の非保証、有料サービス解約別手続に合わせて更新した。
+
+#### `notes/legal/02_privacy_policy_draft.md`
+- 取得情報に退会申請理由、任意メモ、申請日時、削除予定日、申請状態、取消又は完了日時を追加した。
+- 保存期間及び削除に、削除予定日が処理予定の目安であり、Auth、外部認証連携、端末トークン、バックアップ、ログ、外部サービス上の情報が当日に全て削除される保証ではないことを追加した。
+
+#### `notes/09_state_machines.md`, `notes/13_api_spec.md`, `notes/05_data_model.md`
+- `deletion_requested -> deleted` と `deletion_requested -> active` を未確認の完了/取消処理として整理し、ログイン復旧や30日後自動削除を保証しない注記を追加した。
+- 退会申請テーブルに、実削除ジョブ、完了/取消更新処理、ログイン復旧処理が未確認であることを追記した。
+
+#### `notes/25_public_legal_support_pages.md`, `notes/34_support_response_templates.md`, `notes/45_account_deletion_privacy_request_runbook.md`, `notes/52_data_retention_deletion_matrix.md`, `notes/55_public_help_faq_draft.md`, `notes/67_support_inbox_triage_runbook.md`
+- 公開サポート、FAQ、サポート返信、削除ランブック、保持削除マトリクスを、削除申請中、削除予定日の目安性、復旧/取消非保証、外部連携解除未確認、任意メモへの不要個人情報禁止に合わせて更新した。
+
+#### `notes/17_legal_alignment.md`, `notes/24_app_store_submission_pack.md`, `notes/26_trust_safety_release_sop.md`, `notes/27_app_privacy_data_inventory.md`, `notes/36_submission_evidence_checklist.md`, `notes/40_app_store_connect_copy_paste_sheet.md`, `notes/43_app_privacy_connect_answer_sheet.md`, `notes/46_app_store_questionnaire_answer_sheet.md`, `notes/48_external_service_vendor_register.md`, `notes/50_release_go_no_go_decision_matrix.md`, `notes/53_app_review_guideline_compliance_matrix.md`, `notes/62_app_review_manual_submission_checklist.md`, `notes/66_legal_review_publication_runbook.md`, `notes/71_app_store_connect_final_input_reconciliation.md`
+- App Store提出前No-Go、App Privacy、Review Notes、外部サービス台帳、法務公開Runbookへ、削除予定日の過剰保証禁止、30日後実削除/取消/外部連携解除/端末トークン無効化の未確認事項を追加した。
+
+#### `利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+#### `利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+- Markdownドラフトから再生成し、退会申請・削除予定日・復旧非保証の反映を確認した。
+
+### 影響範囲
+
+- 法務公開前ドラフト
+- アカウント削除、個人情報請求、サポート返信、FAQ
+- App Store Connect App Privacy / Review Notes / 質問票の下書き
+- 状態遷移、API仕様、データ保持、提出前Go/No-Go、証跡、法務レビュー後公開Runbook
+
+Swift Native、Supabase、Web公開ページ実装、Privacy Manifest、アプリ内法務表示のコードは変更していない。
+
+### 確認方法
+
+- `rg -n "30日後自動削除|ログインでキャンセル|ログインで復帰|30日で必ず|必ず削除|復旧できる場合|猶予期間を過ぎると復旧できません" notes notes/legal`
+  - passed（No-Go引用以外の過剰保証なし）
+- `unzip -t 利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+  - passed
+- `unzip -t 利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+  - passed
+- `python3` によるDOCXキーワード検査
+  - passed（`退会申請`, `削除申請中`, `削除予定日`, `任意メモ`, `端末トークン` を確認、Markdown fence/TODOなし）
+- `render_docx.py 利用規約など/01_Megrum利用規約_20260629改訂案.docx --emit_pdf`
+  - passed（31 pages）
+- `render_docx.py 利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx --emit_pdf`
+  - passed（22 pages、最終ページは「以上」のみ）
+- `pdftotext` による第9条、2.1、13章の本文検査
+  - passed（Word自動番号の連番化を修正済み）
+- レンダーPNGの代表ページ目視と非白紙ピクセル検査
+  - passed
+- `git diff --check -- notes notes/legal`
+  - passed
+
+### セルフレビュー結果
+
+- ✅ 退会申請を、即時削除ではなく「削除申請中」「削除予定日」「通常利用停止」として現行コードに合わせた。
+- ✅ 30日後実削除、申請取消/復旧、Apple/Google連携解除、APNs token無効化の未確認事項を公開前No-Goへ追加した。
+- ✅ 任意メモに第三者個人情報、取引相手特定情報、パスワード、認証コード、金融機関ログイン情報を書かせない文言を入れた。
+- ✅ アプリ削除、ログアウト、退会申請だけでは有料サービスの自動更新が止まらないことを第9条にも明記した。
+- ✅ コード、DB migration、Web公開ページ、PrivacyInfo.xcprivacy、アプリ内法務表示は変更していない。
+- ✅ `notes/10_glossary.md` は既存用語範囲で説明できるため更新不要と判断した。
+
+## イテレーション1226.108：通知本文表示法務整理
+
+### 背景・問題意識
+
+現行Swift Native実装では、ログイン後に `UNUserNotificationCenter` で通知許可を求め、許可済みの場合はAPNs tokenを保存する。Supabase Edge Functionは `notifications` の `title`、`body`、`link_path`、未読数をAPNs alert payloadとして送信し、取引チャット本文、写真共有、現在地共有、到着状況、めぐり、掲示板等の概要が通知に含まれ得る。コード変更禁止の指示を守り、ロック画面、通知センター、連携端末、APNs/Expo Push外部送信、App Privacy回答のリスクを法務・審査文書へ反映した。
+
+### 変更内容
+
+#### `notes/legal/01_terms_of_service_draft.md`
+- プッシュ通知又は端末通知に、タイトル、本文、未読数、リンク先その他通知に必要な情報が含まれることを追加した。
+- 通知がOS、APNs、Expo Push、ロック画面、通知センター、連携端末等により表示、保存又は転送される可能性と、会員側の通知プレビュー管理責任を追加した。
+- 通知到達、表示タイミング、秘匿性、第三者閲覧防止、通知設定反映を保証しないことを追加した。
+
+#### `notes/legal/02_privacy_policy_draft.md`
+- 取得情報に通知ID、通知タイトル、通知本文、リンク先、未読数/バッジ、通知設定、配信結果、開封履歴を追加した。
+- APNs/Expo Push等へ通知token、タイトル/本文、未読バッジ、通知ID、リンク先が送信され得ることを追記した。
+- 通知履歴、通知設定、APNs token、配信結果、開封履歴の保持/削除を追加した。
+
+#### `notes/17_legal_alignment.md`, `notes/24_app_store_submission_pack.md`, `notes/25_public_legal_support_pages.md`, `notes/27_app_privacy_data_inventory.md`, `notes/36_submission_evidence_checklist.md`, `notes/40_app_store_connect_copy_paste_sheet.md`, `notes/43_app_privacy_connect_answer_sheet.md`, `notes/44_privacy_manifest_sdk_audit.md`, `notes/46_app_store_questionnaire_answer_sheet.md`, `notes/48_external_service_vendor_register.md`, `notes/50_release_go_no_go_decision_matrix.md`, `notes/52_data_retention_deletion_matrix.md`, `notes/53_app_review_guideline_compliance_matrix.md`, `notes/55_public_help_faq_draft.md`, `notes/56_in_app_legal_safety_copy_deck.md`, `notes/59_initial_release_scope_exposure_audit.md`, `notes/62_app_review_manual_submission_checklist.md`, `notes/66_legal_review_publication_runbook.md`, `notes/71_app_store_connect_final_input_reconciliation.md`
+- 通知本文、未読バッジ、APNs/Expo token、ロック画面表示、App PrivacyのIdentifiers / User Content / Usage Data影響を提出前No-Go又は証跡条件として追加した。
+- FAQとアプリ内安全コピーに、プッシュ通知OFFとアプリ内通知履歴が別であること、ロック画面/通知センター/連携端末に表示され得ることを追加した。
+
+### 影響範囲
+
+- 法務公開前ドラフト
+- App Store Connect App Privacy / Review Notes / 質問票の下書き
+- 公開サポート、FAQ、アプリ内法務・安全コピー
+- データ保持、提出前Go/No-Go、証跡、法務レビュー後公開Runbook
+
+Swift Native、Supabase、Web公開ページ実装、Privacy Manifest、アプリ内法務表示のコードは変更していない。
+
+### 確認方法
+
+- `rg -n "APNs通知本文|通知本文|未読バッジ|ロック画面|Expo push token|User Content / Usage Data" notes notes/legal`
+  - passed
+- `git diff --check -- notes notes/legal`
+  - passed
+- `unzip -t 利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+  - passed
+- `unzip -t 利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+  - passed
+- `python3` によるDOCXキーワード検査
+  - passed（`APNs通知本文`, `通知本文`, `未読数又はバッジ`, `Expo push token`, `通知センター`, `通知開封` を確認、Markdown fence/TODOなし）
+- `render_docx.py 利用規約など/01_Megrum利用規約_20260629改訂案.docx --emit_pdf`
+  - passed（31 pages）
+- `render_docx.py 利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx --emit_pdf`
+  - passed（22 pages、最終ページは「以上」のみ）
+- レンダーPNGの代表ページ目視と非白紙ピクセル検査
+  - passed
+
+### セルフレビュー結果
+
+- ✅ 通知をAPNs tokenだけの論点にせず、通知本文、リンク先、未読バッジ、開封履歴、外部通知サービス、OS表示の論点として横断整理した。
+- ✅ 通知本文に正確な位置、住所、銀行口座、内部ID、通報/異議申し立ての詳細本文を出さないNo-Go条件を追加した。
+- ✅ プッシュ通知OFFとアプリ内通知履歴が別であることをFAQ/安全コピーへ反映した。
+- ✅ コード、DB、Web公開ページ、PrivacyInfo.xcprivacy、アプリ内法務表示は変更していない。
+- ✅ `notes/09_state_machines.md` は状態遷移の追加・変更がないため更新不要と判断した。
+- ✅ `notes/10_glossary.md` は既存用語範囲で説明できるため更新不要と判断した。
+- ✅ `notes/05_data_model.md` はスキーマ変更がないため更新不要と判断した。
+
+## イテレーション1226.107：写真メタデータ法務整理
+
+### 背景・問題意識
+
+現行Swift Native実装では、写真ライブラリから選択したJPEG/PNG/GIF/WebPが対応形式かつサイズ上限内の場合、元データをそのままアップロードに回す経路がある。カメラ撮影やサイズ超過時の再エンコード経路ではメタデータが落ちる可能性がある一方、元データ保存経路ではEXIF、撮影日時、GPS位置情報、端末情報等の画像メタデータが残り得る。コード変更禁止の指示を守り、写真の写り込みだけでなく画像メタデータのプライバシーリスクを法務・審査文書へ反映した。
+
+### 変更内容
+
+#### `notes/legal/01_terms_of_service_draft.md`
+- 外部SNS共有時のユーザー確認対象に画像メタデータを追加した。
+- 投稿又は画像に、EXIF、GPS位置情報、撮影日時、端末情報その他画像メタデータを含む第三者の権利、プライバシー又は安全を害する情報を含めてはならないことを追加した。
+
+#### `notes/legal/02_privacy_policy_draft.md`
+- 取得情報に、EXIF、撮影日時、GPS位置情報、端末情報その他画像ファイルに含まれることがあるメタデータを追加した。
+- 写真アップロードでは、処理、端末設定、画像形式、アップロード経路によってメタデータが削除されず保存又は相手会員に表示される可能性があることを追加した。
+- 画像メタデータを保存期間/削除の対象として明記した。
+
+#### `notes/17_legal_alignment.md`, `notes/24_app_store_submission_pack.md`, `notes/25_public_legal_support_pages.md`, `notes/27_app_privacy_data_inventory.md`, `notes/36_submission_evidence_checklist.md`, `notes/43_app_privacy_connect_answer_sheet.md`, `notes/50_release_go_no_go_decision_matrix.md`, `notes/52_data_retention_deletion_matrix.md`, `notes/53_app_review_guideline_compliance_matrix.md`, `notes/55_public_help_faq_draft.md`, `notes/56_in_app_legal_safety_copy_deck.md`, `notes/62_app_review_manual_submission_checklist.md`, `notes/66_legal_review_publication_runbook.md`
+- 写真メタデータの残存経路、削除可否、ユーザー向け注意、App Privacy上のPhotos or Videos / Location / Device Info回答要否を提出前No-Go又は証跡条件として追加した。
+- FAQ、公開サポート、アプリ内注意文に、顔・住所・QRコード等の写り込みに加えて、EXIF、GPS位置情報、撮影日時、端末情報の確認を追加した。
+
+#### `利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+#### `利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+- Markdownドラフトから再生成し、写真メタデータ、EXIF、GPS位置情報、撮影日時、端末情報、外部画像URL、広告通報、Apple標準EULA方針、顔候補付けの反映を確認した。
+
+### 影響範囲
+
+- 法務公開前ドラフト
+- App Store Connect App Privacy / Review Notes / 質問票の下書き
+- 公開サポート、FAQ、アプリ内法務・安全コピー
+- データ保持、提出前Go/No-Go、証跡、法務レビュー後公開Runbook
+
+Swift Native、Supabase、Web公開ページ実装、Privacy Manifest、アプリ内法務表示のコードは変更していない。
+
+### 確認方法
+
+- `unzip -t 利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+  - passed
+- `unzip -t 利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+  - passed
+- `python3` によるDOCXキーワード検査
+  - passed（`画像メタデータ`, `写真メタデータ`, `EXIF`, `GPS位置情報`, `撮影日時`, `外部画像URL`, `外部画像ホスト`, `Storage path`, `IPアドレス` を確認、Markdown fence/TODOなし）
+- `render_docx.py 利用規約など/01_Megrum利用規約_20260629改訂案.docx --emit_pdf`
+  - passed（21 pages）
+- `render_docx.py 利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx --emit_pdf`
+  - passed（14 pages）
+- レンダーPNGの代表ページ目視と非白紙ピクセル検査
+  - passed
+
+### セルフレビュー結果
+
+- ✅ 写真メタデータを、ユーザーの確認責任、Privacy上の取得情報、保持/削除、App Privacy回答の4論点として横断整理した。
+- ✅ 写真ライブラリの元データ保存経路と再エンコード経路が混在する現状を、公開前No-Goとして実機確認対象にした。
+- ✅ 写り込み注意だけでは拾えないEXIF/GPS/撮影日時/端末情報を、FAQ、公開サポート、アプリ内コピーへ反映した。
+- ✅ コード、DB、Web公開ページ、PrivacyInfo.xcprivacy、アプリ内法務表示は変更していない。
+- ✅ `notes/09_state_machines.md` は状態遷移の追加・変更がないため更新不要と判断した。
+- ✅ `notes/10_glossary.md` は既存用語範囲で説明できるため更新不要と判断した。
+- ✅ `notes/05_data_model.md` はスキーマ変更がないため更新不要と判断した。
+
+## イテレーション1226.106：外部画像URL法務整理
+
+### 背景・問題意識
+
+現行Swift Native実装では、グッズ画像はSupabase Storageの公開URLに正規化される一方、ユーザーが保持又はコピーした絶対URLも画像URLとして保存・表示され得る。`GoodsRemoteImageDataLoader` はURLSessionで当該URLを読み込むため、外部画像ホスト/CDNへIPアドレス、端末/アプリ通信情報、アクセス時刻等が送信される可能性がある。また、AI/検索候補画像が公式素材又は権利確認済み素材のように見えると、App Store Content Rights、ユーザー投稿画像の権利侵害、Privacy説明漏れのリスクになる。コード変更禁止の指示を守り、法務・審査文書だけを更新した。
+
+### 変更内容
+
+#### `notes/legal/01_terms_of_service_draft.md`
+- AI機能、検索機能、外部情報参照機能で表示される候補、画像、名称、説明、リンクは参考情報であり、公式情報、権利者承認、権利処理済み素材、正確な商品情報又は取引可能性を保証しないことを追加した。
+- 会員が登録した画像URL又は外部リンクを本アプリ内で表示する場合、外部サービスから読み込まれることがあり、運営者が外部サービス上の画像、権利処理、通信品質、安全性又はプライバシー取扱いを保証しないことを追加した。
+- ユーザーコンテンツの対象に画像URLを明記した。
+
+#### `notes/legal/02_privacy_policy_draft.md`
+- 取得情報にStorage path、署名URL又は公開URL、外部画像URL、画像取得又は表示に関する情報を追加した。
+- 外部画像ホスト/CDNを外部サービス候補へ追加し、外部画像URL表示時にIPアドレス、端末/アプリ通信情報、アクセス時刻等が当該画像ホスト又はCDNへ送信され得ることを追加した。
+- 外部画像ホスト側の保存又は削除は当該外部サービスの規約、プライバシーポリシー及び技術仕様に従うことを明記した。
+
+#### `notes/17_legal_alignment.md`, `notes/24_app_store_submission_pack.md`, `notes/25_public_legal_support_pages.md`, `notes/27_app_privacy_data_inventory.md`, `notes/36_submission_evidence_checklist.md`, `notes/40_app_store_connect_copy_paste_sheet.md`, `notes/43_app_privacy_connect_answer_sheet.md`, `notes/44_privacy_manifest_sdk_audit.md`, `notes/46_app_store_questionnaire_answer_sheet.md`, `notes/48_external_service_vendor_register.md`, `notes/50_release_go_no_go_decision_matrix.md`, `notes/52_data_retention_deletion_matrix.md`, `notes/53_app_review_guideline_compliance_matrix.md`, `notes/55_public_help_faq_draft.md`, `notes/56_in_app_legal_safety_copy_deck.md`, `notes/59_initial_release_scope_exposure_audit.md`, `notes/62_app_review_manual_submission_checklist.md`, `notes/66_legal_review_publication_runbook.md`, `notes/71_app_store_connect_final_input_reconciliation.md`
+- 外部画像URL又はAI/検索候補画像を出す場合、外部ホスト通信、第三者ポリシー、Content Rights、権利確認責任、Privacy回答、FAQ/Review Notes整合を提出前No-Go又は証跡条件として追加した。
+- App Privacy、Privacy Manifest、外部サービス台帳、保持/削除表、公開FAQ、アプリ内安全コピーに、外部画像ホスト/CDN、端末キャッシュ、画像URL保存、権利未確認画像の扱いを反映した。
+
+#### `利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+#### `利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+- Markdownドラフトから再生成し、外部画像URL、外部画像ホスト、Content Rights、Apple標準EULA方針、広告通報、顔候補付け、会員間支払い情報、郵送交換の反映を確認した。
+
+### 影響範囲
+
+- 法務公開前ドラフト
+- App Store Connect Content Rights / App Privacy / Review Notes / 質問票の下書き
+- 公開サポート、FAQ、AI説明、アプリ内法務・安全コピー
+- データ保持、提出前Go/No-Go、証跡、公開URL/レダクションQA
+
+Swift Native、Supabase、Web公開ページ実装、Privacy Manifest、アプリ内法務表示のコードは変更していない。
+
+### 確認方法
+
+- `unzip -t 利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+  - passed
+- `unzip -t 利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+  - passed
+- `python3` によるDOCXキーワード検査
+  - passed（`外部画像URL`, `権利処理済み素材`, `外部画像ホスト`, `CDN`, `Storage path`, `IPアドレス`, `広告通報`, `Apple標準EULA方針`, `顔候補付け`, `会員間支払い`, `郵送交換` を確認、Markdown fence/TODOなし）
+- `render_docx.py 利用規約など/01_Megrum利用規約_20260629改訂案.docx --emit_pdf`
+  - passed（21 pages）
+- `render_docx.py 利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx --emit_pdf`
+  - passed（14 pages）
+- レンダーPNGの代表ページ目視と非白紙ピクセル検査
+  - passed
+
+### セルフレビュー結果
+
+- ✅ 外部画像URLを、規約上の権利確認責任、Privacy上の外部ホスト通信、App Store上のContent Rightsの3論点として横断整理した。
+- ✅ AI/検索候補画像を公式又は権利確認済み素材のように扱わないNo-Goを、提出、FAQ、アプリ内コピー、App Store質問票へ反映した。
+- ✅ Megrum側でURL記録やキャッシュを削除できても、外部画像ホスト/CDN側の保存・削除は当該サービス仕様に従うことを保持/削除表へ反映した。
+- ✅ コード、DB、Web公開ページ、PrivacyInfo.xcprivacy、アプリ内法務表示は変更していない。
+- ✅ `notes/09_state_machines.md` は状態遷移の追加・変更がないため更新不要と判断した。
+- ✅ `notes/10_glossary.md` は既存用語範囲で説明できるため更新不要と判断した。
+- ✅ `notes/05_data_model.md` はスキーマ変更がないため更新不要と判断した。
+
 ## イテレーション1226.105：SwiftUI状態境界の整理
 
 ### 背景・問題意識
@@ -63,6 +4421,79 @@
 - ✅ `notes/10_glossary.md` は新しい用語追加がないため更新不要と判断した。
 - ✅ `notes/05_data_model.md` はデータモデル変更がないため更新不要と判断した。
 
+## イテレーション1226.104：法務文書の顔候補付け反映
+
+### 背景・問題意識
+
+現行Swift Native実装には、Apple Visionによる顔矩形検出、顔特徴量モデル境界、`member_face_profiles` / `face_uploaded_images` / `detected_faces` / `face_match_candidates` / `face_match_corrections` の保存境界がある。利用規約、プライバシーポリシー、App Store提出準備文書がこの実装状態を十分に説明しないままだと、Face ID/本人確認との誤認、Sensitive Info回答漏れ、第三者画像や未成年者画像の不適切利用、公開文面とApp Privacyの不一致が起きる。
+
+加えて、App Store配布ではApple標準EULA又は独自EULAの選択、独自EULA時のApple Minimum Terms照合、AdMob広告表示時の不適切又は年齢に合わない広告の報告導線が審査と責任分界のリスクになる。コード変更禁止の指示を守りつつ、法務・審査文書側を先に更新した。
+
+### 変更内容
+
+#### `notes/legal/01_terms_of_service_draft.md`
+- 顔候補付けデータの定義、Face ID/本人確認ではない説明、第三者の顔写真・私的写真・未成年者写真・無許諾画像の禁止、無断の特徴量収集/解析/学習/外部送信禁止を追加した。
+- App Store配布時のApple標準EULA/Apple Media Services利用規約との関係、Appleが会員間取引・UGC・広告・サポート等の当事者ではない責任境界を追加した。
+- 不適切、年齢に合わない、誤解を招く広告の通報導線、広告枠/表示日時/スクリーンショット確認、広告配信事業者への報告可能性を追加した。
+
+#### `notes/legal/02_privacy_policy_draft.md`
+- 顔検出結果、候補、補正履歴、顔特徴量又は画像特徴量を取得情報・利用目的・保持/削除・Sensitive Info候補として明記した。
+- 顔候補付けは本人確認、年齢確認、Face ID認証、出入場管理、真贋鑑定、信用判断ではないことを追記した。
+- 広告通報に伴う表示日時、表示画面、広告枠、広告識別子、スクリーンショット、端末情報の取得と、広告配信事業者への報告又は照会可能性を追記した。
+
+#### `notes/17_legal_alignment.md`
+- 現行コード確認事実と、公開Web本文・アプリ内法務表示・App Privacy回答を未同期のNo-Goとして整理した。
+- 初回提出ではApple標準EULA推奨、独自EULAならApple Minimum Terms照合必須、広告を出すなら広告通報導線とApp Privacy回答をNo-Goとして整理した。
+
+#### `notes/24_app_store_submission_pack.md`, `notes/25_public_legal_support_pages.md`, `notes/27_app_privacy_data_inventory.md`, `notes/43_app_privacy_connect_answer_sheet.md`, `notes/44_privacy_manifest_sdk_audit.md`, `notes/48_external_service_vendor_register.md`
+- App Review Notes、App Privacy、Privacy Manifest、外部サービス台帳、公開AI説明ページへ、顔候補付け/Sensitive Info候補/Face ID非利用の確認項目を反映した。
+- Apple標準EULA/独自EULA照合、広告通報、広告通報データ、広告SDK回答、広告配信事業者への報告手順を反映した。
+
+#### `notes/26_trust_safety_release_sop.md`, `notes/32_testflight_review_submission_runbook.md`, `notes/36_submission_evidence_checklist.md`, `notes/37_public_url_publication_checklist.md`, `notes/40_app_store_connect_copy_paste_sheet.md`, `notes/46_app_store_questionnaire_answer_sheet.md`, `notes/50_release_go_no_go_decision_matrix.md`, `notes/52_data_retention_deletion_matrix.md`, `notes/53_app_review_guideline_compliance_matrix.md`, `notes/55_public_help_faq_draft.md`, `notes/56_in_app_legal_safety_copy_deck.md`, `notes/59_initial_release_scope_exposure_audit.md`, `notes/62_app_review_manual_submission_checklist.md`, `notes/63_public_page_redaction_qa.md`, `notes/66_legal_review_publication_runbook.md`, `notes/71_app_store_connect_final_input_reconciliation.md`
+- 初回提出・公開URL・FAQ・アプリ内文言・Go/No-Go・証跡・レダクションQAで、顔候補付けを出す場合に止める条件を追加した。
+- 広告を出す場合、不適切又は年齢に合わない広告の通報導線、サポート説明、Review Notes、証跡、App Privacy回答が揃っていなければ止める条件を追加した。
+- License Agreementは初回Apple標準EULA推奨、独自EULAならApple Minimum Termsと弁護士レビュー照合必須として整理した。
+
+#### `利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+#### `利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+- Markdownドラフトから再生成し、顔候補付け、Face ID非利用、Sensitive Info候補、会員間支払い情報、郵送交換、Apple標準EULA方針、広告通報の反映を確認した。
+
+### 影響範囲
+
+- 法務公開前ドラフト
+- App Store Connect App Privacy / Review Notes / 質問票の下書き
+- 公開サポート、FAQ、AI説明、アプリ内法務・安全コピー
+- Trust & Safety、データ保持、提出前Go/No-Go、公開URL/レダクションQA
+
+Swift Native、Supabase、Web公開ページ実装、Privacy Manifest、アプリ内法務表示のコードは変更していない。
+
+### 確認方法
+
+- `git diff --check -- notes notes/legal`
+  - passed
+- `unzip -t 利用規約など/01_Megrum利用規約_20260629改訂案.docx`
+  - passed
+- `unzip -t 利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx`
+  - passed
+- `python3` によるDOCXキーワード検査
+  - passed（`Apple標準EULA方針`, `標準EULA`, `Apple Media Services`, `広告通報`, `年齢に合わない`, `顔候補付け`, `Face ID`, `顔特徴量`, `画像特徴量`, `支払い情報`, `口座番号`, `郵送交換` を確認、Markdown fence/TODOなし）
+- `render_docx.py 利用規約など/01_Megrum利用規約_20260629改訂案.docx --emit_pdf`
+  - passed（21 pages）
+- `render_docx.py 利用規約など/02_Megrumプライバシーポリシー_20260629改訂案.docx --emit_pdf`
+  - passed（14 pages）
+- レンダーPNGの代表ページ目視と非白紙ピクセル検査
+  - passed
+
+### セルフレビュー結果
+
+- ✅ 顔候補付けを本人確認、年齢確認、Face ID認証、出入場管理、真贋鑑定、信用判断ではないものとして横断明記した。
+- ✅ 顔特徴量又は画像特徴量を扱う導線が見える場合、App PrivacyのSensitive Info候補として回答する必要があることを提出前No-Goにした。
+- ✅ 第三者の顔写真、私的写真、未成年者写真、無許諾画像、無断学習・外部送信の禁止をTerms/FAQ/アプリ内コピー/安全運用へ反映した。
+- ✅ 初回提出のLicense AgreementはApple標準EULA推奨とし、独自EULAを選ぶ場合のApple Minimum Terms照合をNo-Goにした。
+- ✅ AdMob広告を出す場合、不適切又は年齢に合わない広告の通報導線、広告通報データ、サポート説明、Review Notes、App Privacy回答をNo-Goにした。
+- ✅ `notes/09_state_machines.md` は状態遷移の追加・変更がないため更新不要と判断した。
+- ✅ `notes/10_glossary.md` は既存の顔検出、顔特徴量、メンバー候補付け用語を使ったため更新不要と判断した。
+- ✅ `notes/05_data_model.md` は既存のface系テーブルを参照しただけでスキーマ変更がないため更新不要と判断した。
 
 ## イテレーション1226.103：画像からシリーズ候補のWeb画像検索化
 

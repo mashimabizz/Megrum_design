@@ -3,8 +3,8 @@
 > **目的**：Megrum で使う用語の定義を一元化。実装・デザイン・仕様書で「同じ用語を同じ意味で」使うための基準。
 > 新環境（別Claudeセッション・別エンジニア）でも、これだけ読めばコンテキストがつかめる。
 
-最終更新: 2026-06-25
-ステータス: Draft v4.01（iter995 プロフィール自己紹介・生年月日を追加）
+最終更新: 2026-06-29
+ステータス: Draft v4.09（iter1226.168 近距離公開・作成位置情報を反映）
 
 ---
 
@@ -47,16 +47,23 @@
 | **Megrum** | メグルム、正式サービス名 | 推し活グッズ交換・推しすれ違いプラットフォーム名 | iter158 |
 | **Web管理画面** | Web版、運用画面 | `web/` で実装する Next.js 版 Megrum。通常ユーザー向けWeb版ではなく、`/admin` 配下の管理者コンソール、認証、運用Webhookだけを残す | iter168.63, iter416 |
 | **Swift Native iOS版** | iOSネイティブ版、Swift版 | `ios-native/` で実装する Swift / SwiftUI / UIKit 版 Megrum。iter299以降のユーザー向けiOS体験の主対象で、Apple標準の遷移・通知・地図・カメラ・Liquid Glass表現を担う | iter299 |
-| **legacy Expo版** | 旧iOSアプリ版、React Native版、Expo版 | `mobile/` で実装されている移行元アプリ。Swift Native版が機能同等になるまで、バックアップ・仕様参照・緊急修正の対象として残す | iter168.63, iter299 |
+| **legacy Expo版** | 旧iOSアプリ版、React Native版、Expo版 | Swift Native移行前の旧実装。`mobile/` は iter1214 で削除済みで、現在のユーザー向け実装、App Store初回提出、法務表示、審査回答の前提にはしない。バックアップやDB互換列、過去ビルドを扱う場合だけ、現行Swift Nativeとは分けて再確認する | iter168.63, iter299, iter1214, iter1226.138 |
 | **Appleログイン** | Sign in with Apple | Swift Native iOS版でApple標準の `SignInWithAppleButton` から認証し、Apple identity tokenとraw nonceをSupabase Authへ渡してMegrum sessionを作る認証経路 | iter343 |
 | **Googleログイン** | Google OAuth | Swift Native iOS版でiOS標準の `ASWebAuthenticationSession` からSupabase OAuth authorize URLを開き、`megrum-preview://auth/callback` / `megrum://auth/callback` のsessionを既存のredirect復元へ渡してMegrum sessionを作る認証経路 | iter369, iter1226.13 |
-| **モバイル通知** | push notification, 端末通知 | iOS/Android端末に届くMegrumの通知。Expo版はExpo Push Token、Swift Native iOS版はAPNs device tokenを `notification_devices` に登録し、`notifications` の新規行を端末へ配送する | iter276, iter338 |
+| **モバイル通知** | push notification, 端末通知 | iOS端末に届くMegrumの通知。現行Swift Native iOS版はAPNs device tokenを `notification_devices` に登録し、`notifications` の新規行を端末へ配送する。DBにはlegacy Expo互換のpush provider/token列が残り得るが、初回Swift Native提出の法務・App Privacy回答ではAPNsを主線として確認し、Expo Pushを使う過去又は別環境のビルドを出す場合は別途再監査する | iter276, iter338, iter1226.138 |
+| **広告宣伝メール・販促通知** | marketing email, promotional notification | プロモーション、キャンペーン、広告宣伝又は直接マーケティング目的のメール、Push通知、アプリ内通知。取引、安全、認証、課金、規約変更、法令対応などの必要連絡とは区別し、必要に応じて同意記録、送信者情報、問い合わせ先、配信停止又は通知設定変更の手段、停止後の抑止を管理する | iter1226.160 |
+| **公式連絡・フィッシング** | official contact / phishing | Megrum公式、サポート、キャンペーン、決済、返金、安全確認等を装う不審連絡への注意カテゴリ。Megrum公式はパスワード、認証コード、認証リンク、金融機関ログイン情報、暗証番号、送金用QRコード等を求めない前提で、公式ドメイン、アプリ内導線、送信元、リンク先を確認する | iter1226.161 |
+| **運営通知・通知本文統制** | admin notification payload control | 管理者画面又はサーバー側処理から作成される運営通知について、全有効会員、一部会員又は特定会員への送信、通知タイトル/本文/リンク先、送信理由、対象件数、監査ログ、ロック画面/通知センター/連携端末表示、誤送信時のIncident対応を一体で確認する法務・運用カテゴリ | iter1226.165 |
+| **StoreKit・IAP販売可否・復元失敗** | StoreKit / IAP availability / restore failure | メグルムプラス、ブースト等のアプリ内デジタル機能について、App Store Connect商品、価格、Availability、審査状態、販売停止、購入開始、承認待ち、キャンセル、復元失敗、サーバー同期失敗、権限反映、返金/取消/期限切れ同期、特商法、Privacy/App Privacyの整合を確認する法務・審査カテゴリ | iter1226.163 |
+| **手動有料権限・権限上書き** | manual entitlement override | 管理画面又は運営処理により、`user_entitlements`、`plan_overrides`、`manual_override` を通じて有料権限を一時付与、停止、期限設定、修正又は取消する運用カテゴリ。購入完了、返金確定、補償、無償提供継続又はApp Store決済取消を意味せず、対象ユーザー、feature key、理由、期限、変更前後、作成者、監査ログを確認する | iter1226.166 |
+| **会員間支払い・金融規制境界** | peer-to-peer payment / financial regulation boundary | 金額指定、銀行振込、PayPay、現金交換、支払い情報スナップショット等を扱うが、Megrumが資金の受領、保管、送金、収納代行、決済代行、返金、口座名義確認、支払能力確認、前払式支払手段発行、資金移動、暗号資産交換、金融商品取引又はエスクローを行わない境界 | iter1226.167 |
+| **成立後支払い情報スナップショット** | post-agreement payment snapshot | 金額指定取引等が成立した時点で、`user_payment_settings` から `proposals.sender_payment_settings` / `receiver_payment_settings` へ固定され、当事者向け取引詳細で表示され得る支払い方法、銀行名、支店名、口座種別、口座番号、口座名義等の情報。設定変更後も異議、通報、監査、法令対応等で必要な範囲保存され得る | iter1226.167 |
 | **APNs device token** | native device token, APNsトークン | Swift Native iOS版がApple Push Notification serviceから受け取る端末トークン。`notification_devices.push_provider='apns'` / `native_device_token` に保存する | iter338 |
 | **APNs配送Function** | `send-apns-notification` | 信頼済みサーバー側から `notification_id` を受け取り、対象ユーザーの有効APNs端末へ通知を配送するSupabase Edge Function。DB設定値が揃っていれば `notifications` 作成triggerから呼ばれ、無効端末は `revoked_at` で止める | iter344, iter345 |
 | **通知一覧** | notification center | アプリ内で受信通知を確認する一覧。未読/既読を `notifications.read_at` で管理し、通知タップで対象画面へ遷移する | iter92, iter276 |
 | **通知バッジ** | unread badge | 未読通知数を示す小さな件数表示。左ドロワーの「通知」項目やアプリアイコンバッジで使う | iter276 |
 | **AI機能** | AI feature, automated processing | 人工知能、機械学習、画像解析、自然言語処理、生成AIその他自動処理技術を用いて、グッズ登録補助、画像切り出し、カテゴリ推定、検索、マッチング、文章作成補助、不正利用検知、通報又は問い合わせ対応補助などを行う機能。外部AIサービスへ個人情報を送る場合は明示と必要な同意が必要 | iter384 |
-| **外部AIサービス** | third-party AI service | Megrum外の事業者が提供するAI処理基盤。会員の個人情報、投稿内容、画像、取引情報、問い合わせ内容などを送信する場合は、送信情報、利用目的、送信先、保存期間、学習利用の有無を明示する | iter384 |
+| **外部AIサービス** | third-party AI service | Megrum外の事業者が提供するAI処理基盤。会員の個人情報、投稿内容、画像、画像URL、取引情報、問い合わせ内容などを送信し、又は外部AI側のWeb検索・外部情報参照を使う場合は、送信情報、利用目的、送信先、Web検索等の有無、保持期間、削除可否、濫用監視・安全対策ログ、学習利用の有無を明示する | iter384, iter1226.122 |
 | **顔検出** | face detection | アップロード画像から顔の位置を検出する処理。Swift Native版ではApple Visionで矩形検出だけを行い、Face IDや端末の生体認証APIは使わない | iter613 |
 | **顔特徴量** | face embedding | 検出顔を数値ベクトル化したもの。`member_face_profiles.embedding` に保存し、モデル識別子 `embedding_model` と一緒に扱う。モデルはCore MLまたは信頼済みサーバ実装へ差し替える | iter613 |
 | **メンバー候補付け** | member face suggestion | 顔特徴量と運営管理のメンバー顔プロフィールを照合し、`characters_master` の候補を提示する機能。ユーザー確認・手動補正を前提にする | iter613 |
@@ -66,6 +73,9 @@
 | **相手プロフィール** | public user profile | 他ユーザーの公開プロフィール。Swift Native版ではグッズパネルの相手所有物タップから開き、上半分にアイコン・表示名・handle・自己紹介・都道府県・性別・年齢・評価サマリ・完了取引数を表示する | iter346, iter995 |
 | **プロフィール自己紹介** | bio | ユーザーが自由入力する公開プロフィール文。`users.bio` に保存し、自分/相手プロフィールのスケジュールボタン付近に表示する | iter995 |
 | **生年月日** | birth date | 本人編集用の非公開プロフィール項目。`users.birth_date` に保存し、公開プロフィールには直接表示せず、必要な場合は `users.age` だけを表示する | iter995 |
+| **自己申告年齢** | self-reported age | 会員が入力した生年月日又は年齢から算出・表示される年齢情報。公的本人確認、年齢認証、身分証確認、保護者同意確認が完了したことを意味しない | iter1226.110 |
+| **自己申告プロフィール情報** | self-reported profile data | 表示名、ユーザーID、プロフィール文、性別、活動エリア、生年月日、年齢又は年代等、支払い方法要約など、会員入力又は利用状況から表示されるプロフィール関連情報。本人確認、法的性別確認、居住地確認、安全確認、支払能力確認又は運営推薦を意味しない | iter1226.111 |
+| **公開評価** | public evaluation | 公開プロフィール、評価一覧、取引チャット内カード等で表示され得る評価者公開情報、星、コメント、評価日。本人確認、安全確認、信用保証、支払能力確認、商品品質保証又は運営推薦を意味しない | iter1226.112 |
 | **評価一覧** | user evaluations | 相手プロフィールの評価サマリから開く一覧。評価者アイコン、ユーザーネーム、評価日、星、コメントを表示する。Swift Native版では公開RPC経由で読み込む | iter277, iter346 |
 | **共通ロジック** | shared core | Web/iOSで挙動を揃えるため `packages/core/` に切り出す状態判定・マッチング優先度・市場残数などの処理 | iter154.75 |
 | **OTA配信** | EAS Update, over-the-air update | App Store / TestFlightへ新しいバイナリをUploadせず、既存ビルドの同一runtimeへJS/アセット更新を配信する仕組み。ネイティブモジュール追加・Info.plist変更・Bundle ID変更は対象外 | iter168.88 |
@@ -173,7 +183,7 @@
 | **掲示板本文日時詳細** | thread timestamp detail | スポット掲示板詳細の本文カードで、相対時刻をタップして作成日時と更新日時を正確に確認する表示操作 | iter261 |
 | **掲示板本文カード通報ボタン** | thread hero report button | スポット掲示板詳細の本文カードから、他人のスレッドを通報理由選択へ直接送るボタン | iter262 |
 | **掲示板本文カードブロックボタン** | thread hero block button | スポット掲示板詳細の本文カードから、他人のスレッド投稿者を確認アラート経由でブロックするボタン | iter263 |
-| **掲示板の公開範囲** | board audience | スレッドが見える人の範囲。MVPでは `nearby_3km`（互換維持のraw値。現在のめぐり画面では作成地点から1km圏内だけ詳細閲覧可）/ `same_prefecture`（同じ都道府県）の2択を使う。`same_spot` / `global` は過去データ互換のlegacy扱い | iter168.72, iter168.73, iter168.89, iter708 |
+| **掲示板の公開範囲** | board audience | スレッドが見える人の範囲。MVPでは `nearby_3km`（互換維持のraw値。RPC/一覧では3km系の近距離判定が残り、現在のめぐり画面では詳細閲覧や作成場所選択に1km系の制限も使う）/ `same_prefecture`（同じ都道府県）の2択を使う。`same_spot` / `global` は過去データ互換のlegacy扱い。距離表示は安全性や匿名性の保証ではない | iter168.72, iter168.73, iter168.89, iter708, iter1226.168 |
 | **掲示板下書き** | board draft | スポット掲示板のスレッド作成中または返信中の未送信内容。端末内に自動保存し、投稿/返信成功時に削除する。DBには保存しない | iter180 |
 | **自分のスレッド** | my threads | スポット掲示板で、自分が立てたスレッドだけを表示する一覧モード。検索・カテゴリ絞り込みと併用できる | iter181 |
 | **掲示板添付画像プレビュー** | board image preview | スポット掲示板のスレッド詳細で、スレッド本文または返信の添付画像をタップして大きく確認する表示 | iter182 |
@@ -228,13 +238,14 @@
 | **証跡撮影** | evidence | 物理交換後に交換したグッズを撮影し、取引完了判断の材料にする操作。Swift Native版ではiOSカメラまたは写真選択から `chat-photos` へ画像を保存し、`proposal_evidence_photos` と `proposals.evidence_photo_url` に反映する | C-3, iter347, iter348 |
 | **取引写真拡大** | trade photo preview | 取引チャットに共有された写真や証跡写真をタップし、黒背景の全画面ビューアで確認する操作 | iter350 |
 | **両者承認** | dual approve | 証跡撮影後に送信者・受信者が内容を確認する操作。Swift Native版では `proposal_evidence_photos.approved_by_sender` / `approved_by_receiver` を画像ごとに更新し、全画像の双方承認がそろうと集約値として `proposals.approved_by_sender` / `approved_by_receiver` をtrueにして `completed` にする | C-3, iter347, iter1205 |
-| **評価** | rating | 完了した取引に対する1-5 stars＋コメント。Swift Native版では取引完了後に `user_evaluations` へ投稿する | C-3, iter347 |
+| **評価** | rating | 完了した取引に対する1-5 stars＋コメント。Swift Native版では取引完了後に `user_evaluations` へ投稿する。評価コメントはUGCであり、個人情報、名誉毀損、権利侵害、虚偽又は報復目的の記載は禁止 | C-3, iter347, iter1226.112 |
 | **dispute** | 異議、申告、通報、D-flow | 取引異常時の申し立てフロー。Swift Native版では取引詳細sheet右上の `通報` から理由と内容を入力し、`disputes` に `submitted` として作成する | D-flow / iter168.87 / iter351 |
 | **反論** | reply | dispute 申告に対する弁明 | D-flow |
 | **仲裁** | arbitration | 運営による決定 | D-flow |
 | **凍結** | freeze | dispute 中に新規打診を停止 | iter14 |
 | **服装写真** | outfit photo | 合流時の見つけやすさのため共有する自身の服装写真 | iter34 |
-| **現在地共有** | location sharing | 当日に位置情報をチャットで送る機能 | iter34 |
+| **現在地共有** | location sharing | 当日に位置情報を取引チャットで送る機能。精密な緯度経度、場所名、送信時刻、通知、相手会員の端末表示又は保存を伴い得るため、自宅、学校、勤務先、宿泊先、座席番号、未成年者の居場所等では使わない前提で説明する | iter34, iter1226.168 |
+| **近距離公開・作成位置情報** | nearby visibility / creation location | グルーム、スポット掲示板、現地交換モード、近くの表示、作成/返信/閲覧範囲判定に使う位置情報。投稿又は作成地点の緯度経度、閲覧者の現在地、半径、距離、公開範囲、時刻から居場所や行動予定が推測され得るため、匿名化又は安全確認済みを意味しない | iter1226.168 |
 
 ## E. マッチング関連
 
@@ -683,7 +694,8 @@ iter46 で整理した以下を弁護士に再レビュー依頼：
 | **管理者ページ** | admin console | `/admin` 配下の運営用Web画面。ユーザー管理、運用管理、管理者権限、有料プラン、監査ログを扱う | iter166, iter1222 |
 | **運用管理** | admin operations | `/admin/operations` で扱う最低限の運用画面。通報窓口、推し追加リクエスト承認、運営通知送信をまとめる | iter1222 |
 | **通報窓口** | moderation reports | アプリ内から届くユーザー/取引/グッズ/めぐり/掲示板の通報を管理者が横断確認し、状態を更新する運用領域 | iter1222 |
-| **運営通知** | admin announcement | 管理者が任意ユーザーまたは有効ユーザー全体へ送る通知。`notifications.kind='admin_announcement'` としてアプリ内通知一覧と既存モバイル通知配送に乗せる | iter1222 |
+| **モデレーション記録** | moderation record | 通報、異議申し立て、ブロック、評価、非表示、削除、アカウント制限、運営対応status、管理者コメント等の安全対応・監査用記録。緊急通報、法的判断、本人確認、安全確認、信用保証又は削除保証を意味しない | iter1226.112 |
+| **運営通知** | admin announcement | 管理者が任意ユーザーまたは有効ユーザー全体へ送る通知。`notifications.kind='admin_announcement'` としてアプリ内通知一覧と既存モバイル通知配送に乗せる。通知タイトル、本文、リンク先はロック画面、通知センター、連携端末、直近通知表示又はログに出得るため、送信理由、対象件数、監査ログ、本文の機微情報排除を確認する | iter1222, iter1226.165 |
 | **管理者ロール** | admin role | `admin_roles.role`。`owner` / `support` / `trust_safety` / `billing` / `viewer` の5種類 | iter166 |
 | **管理者権限** | permission | `users.read` などの細分化された操作権限。`owner` または `*` は全権限 | iter166 |
 | **MFA必須管理者** | AAL2 required admin | `admin_roles.requires_mfa=true` の管理者。Supabase Auth の AAL2 セッションでのみ管理者ページへ入れる | iter166 |
