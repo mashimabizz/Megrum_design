@@ -4,6 +4,42 @@
 
 ---
 
+## イテレーション1226.194：ホーム候補相手需要Summary分離
+
+### 背景・問題意識
+
+`HomeCandidatePartnerOfferEvaluation` は、相手候補1件の評価に加えて、相手のWishや個別募集が自分の提示物に当たるか、リンク件数や個別募集の選択contextをどう作るかまで直接持っていた。候補分類とcondition signal生成を読みやすく保つため、相手需要判定を小さなpure summaryへ分離する必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeCandidatePartnerDemandSummary.swift`
+- 相手Wishヒット数、相手個別募集ヒット数、Wishに当たった自分の提示物ID、個別募集selection context、link counts、相手が自分のグッズを欲しいかの判定をまとめるsummaryを追加した。
+- 既存の `HomeCandidateListingMatchPolicy` と `HomeCandidateComposer.wishRow` を使い、判定順序と条件は維持した。
+
+#### `ios-native/Sources/MegrumApp/HomeCandidatePartnerOfferEvaluation.swift`
+- 相手需要判定のローカル処理を `HomeCandidatePartnerDemandSummary` 生成へ差し替えた。
+- bucket分類と `HomeCandidateConditionSignalsBuilder` への入力値はsummaryから読む形にした。
+
+### 影響範囲
+
+- ホーム候補の相手候補評価内部に影響する。
+- ユーザー表示文言、画面レイアウト、ナビゲーション、Supabase API、DB schema、通知、認証、課金、取引状態、保存順序は変更していない。
+- 状態遷移、用語、データモデルに変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` は更新不要と判断した。
+
+### 確認方法
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-partner-demand --enable-xctest --disable-swift-testing -j 1 --filter HomeCandidateComposerTests`
+  - passed：22 tests, 0 failures
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-partner-demand-wide --enable-xctest --disable-swift-testing -j 1 --filter 'HomeCandidateComposerTests|HomeDiscoveryMatchPolicyTests|HomeMutualMatchConditionPoliciesTests|HomeScreenFlowTests'`
+  - passed：160 tests, 0 failures
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild-refactor-home-partner-demand CODE_SIGNING_ALLOWED=NO build`
+  - passed
+
+### セルフレビュー結果
+- ✅ 相手候補評価からWish/個別募集需要判定を切り出し、候補分類とsignal入力の流れを薄くした。
+- ✅ Wishヒット、個別募集ヒット、link counts、selection context、matched/possible分類は既存Homeテストで維持確認した。
+- ✅ DB/API、保存処理、状態遷移、通知、認証、課金、取引状態、表示文言は変更していない。
+- ✅ 既存の未コミット変更は戻していない。
+
 ## イテレーション1226.193：ホーム候補SignalsBuilder分離
 
 ### 背景・問題意識

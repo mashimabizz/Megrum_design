@@ -36,40 +36,7 @@ struct HomeCandidatePartnerOfferEvaluation {
             matchingRows: matchingViewerWishes,
             tagsByInventoryID: context.tagsByInventoryID
         )
-        let partnerWishesForCandidate = context.partnerScope.wishesByUser[candidate.userId, default: []]
-        let partnerWishHitRows = partnerWishesForCandidate.filter { partnerWish in
-            context.availableViewerInventory.contains { viewerItem in
-                HomeCandidateComposer.wishRow(partnerWish, matches: viewerItem)
-            }
-        }
-        let partnerWishMatchedOfferItems = context.availableViewerInventory.filter { viewerItem in
-            partnerWishesForCandidate.contains { partnerWish in
-                HomeCandidateComposer.wishRow(partnerWish, matches: viewerItem)
-            }
-        }
-        let partnerWishHitCount = partnerWishHitRows.count
-        let partnerListingHitCount = context.partnerScope.listingsByUser[candidate.userId, default: []].filter { listing in
-            HomeCandidateListingMatchPolicy.listingIncludesCandidate(listing, candidate: candidate)
-                && HomeCandidateListingMatchPolicy.listingHasSelectableWantedOption(
-                    listing: listing,
-                    options: context.listingOptionsByListingID[listing.id, default: []],
-                    viewerInventory: context.availableViewerInventory,
-                    includesCash: true
-                )
-        }.count
-        let partnerWishHit = partnerWishHitCount > 0
-        let partnerListingHit = partnerListingHitCount > 0
-        let partnerWantsViewerGoods = partnerWishHit || partnerListingHit
-        let individualListingSelection = HomeCandidateListingMatchPolicy.firstSelection(
-            listings: context.partnerScope.listingsByUser[candidate.userId, default: []],
-            optionsByListingID: context.listingOptionsByListingID,
-            viewerInventory: context.availableViewerInventory,
-            listingInventory: context.partnerScope.inventory,
-            listingWantedInventory: partnerWishesForCandidate + context.availableViewerInventory,
-            tagsByInventoryID: context.tagsByInventoryID,
-            candidate: candidate,
-            includesCash: true
-        )
+        let partnerDemand = HomeCandidatePartnerDemandSummary(candidate: candidate, context: context)
 
         signals = HomeCandidateConditionSignalsBuilder.signals(
             candidate: candidate,
@@ -79,24 +46,21 @@ struct HomeCandidatePartnerOfferEvaluation {
             viewerUser: context.viewerUser,
             viewerAllowsMail: context.viewerAllowsMail,
             viewerAllowsLocal: context.viewerAllowsLocal,
-            hasIndividualListingHit: partnerListingHit,
-            hasWishHit: partnerWishHit,
+            hasIndividualListingHit: partnerDemand.hasListingHit,
+            hasWishHit: partnerDemand.hasWishHit,
             matchesViewerWish: satisfiesViewerWish,
             matchesViewerWishCharacter: satisfiesViewerWishCharacter,
             tagMatchCount: tagMatchCount,
-            linkCounts: HomeCandidateLinkCounts(
-                wishCount: partnerWishHitCount,
-                listingCount: partnerListingHitCount
-            ),
-            individualListingSelection: individualListingSelection,
-            wishMatchedOfferGoodsIDs: partnerWishMatchedOfferItems.map(\.id),
-            wishMatchedPartnerUserIDs: partnerWishHit ? [candidate.userId] : [],
+            linkCounts: partnerDemand.linkCounts,
+            individualListingSelection: partnerDemand.individualListingSelection,
+            wishMatchedOfferGoodsIDs: partnerDemand.wishMatchedOfferGoodsIDs,
+            wishMatchedPartnerUserIDs: partnerDemand.wishMatchedPartnerUserIDs,
             ownerHasMegrumPlus: context.composition.megrumPlusUserIDs.contains(candidate.userId)
         )
 
-        if satisfiesViewerWish && partnerWantsViewerGoods {
+        if satisfiesViewerWish && partnerDemand.partnerWantsViewerGoods {
             bucket = .matched
-        } else if satisfiesViewerWish || partnerWantsViewerGoods {
+        } else if satisfiesViewerWish || partnerDemand.partnerWantsViewerGoods {
             bucket = .possible
         } else {
             bucket = .none
