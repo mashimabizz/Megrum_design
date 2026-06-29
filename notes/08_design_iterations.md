@@ -4,6 +4,45 @@
 
 ---
 
+## イテレーション1226.192：ホーム候補交換Policy分離
+
+### 背景・問題意識
+
+`HomeCandidateComposerUtilities` には、候補集約の補助に加えて、交換方法の判定、地域正規化、候補日キー生成、近い日付表示などの交換条件ロジックが残っていた。ホーム候補の今後の変更を安全にするため、候補Composerの責務から交換条件のpure policyを切り離す必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeCandidateExchangePolicy.swift`
+- 郵送/手渡し可否、交換方法タイトル、地域正規化、地域一致、活動枠の日付キー生成、近い候補日表示、活動枠の重なり判定を扱うpure policyを追加した。
+
+#### `ios-native/Sources/MegrumApp/HomeCandidateComposerUtilities.swift`
+- 交換条件 helper の実装を削除し、候補のcondition signal生成では `HomeCandidateExchangePolicy` を呼ぶ形にした。
+- 候補並び替え、重複排除、ID/文字列のordered uniqueなど、Composer固有の集約補助だけを残した。
+
+#### `ios-native/Sources/MegrumApp/HomeCandidateCompositionContext.swift`
+#### `ios-native/Sources/MegrumApp/HomeCandidateViewerOfferSignalsBuilder.swift`
+- viewer/partnerの交換可否、地域/日付表示、地域一致判定を新しい policy 呼び出しへ差し替えた。
+
+### 影響範囲
+
+- ホーム候補の条件シグナル生成内部に影響する。
+- ユーザー表示文言、画面レイアウト、ナビゲーション、Supabase API、DB schema、通知、認証、課金、取引状態、保存順序は変更していない。
+- 状態遷移、用語、データモデルに変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` は更新不要と判断した。
+
+### 確認方法
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-exchange-policy --enable-xctest --disable-swift-testing -j 1 --filter HomeCandidateComposerTests`
+  - passed：22 tests, 0 failures
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-exchange-policy-wide --enable-xctest --disable-swift-testing -j 1 --filter 'HomeCandidateComposerTests|HomeDiscoveryMatchPolicyTests|HomeMutualMatchConditionPoliciesTests|HomeScreenFlowTests'`
+  - passed：160 tests, 0 failures
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild-refactor-home-exchange-policy CODE_SIGNING_ALLOWED=NO build`
+  - passed
+
+### セルフレビュー結果
+- ✅ 交換条件の細部を `HomeCandidateComposer` 名前空間から外し、再利用しやすいpure policyへ分離した。
+- ✅ 郵送/手渡し判定、地域正規化、日付キー生成、日付表示のロジックは移動のみで、条件シグナルの値は既存テストで維持確認した。
+- ✅ DB/API、保存処理、状態遷移、通知、認証、課金、取引状態、表示文言は変更していない。
+- ✅ 既存の未コミット変更は戻していない。
+
 ## イテレーション1226.191：ホーム候補Composer責務分離
 
 ### 背景・問題意識

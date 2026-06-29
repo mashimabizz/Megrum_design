@@ -32,10 +32,10 @@ struct HomeCandidateCompositionContext {
         partnerScope = HomeCandidatePartnerScope(composition: composition)
         availableViewerInventory = composition.viewerInventory.filter(HomeCandidateRowMapper.isMarketAvailable)
         viewerAllowsMail = availableViewerInventory.contains {
-            HomeCandidateComposer.exchangeAllowsMail($0.exchangeType)
+            HomeCandidateExchangePolicy.allowsMail($0.exchangeType)
         }
         viewerAllowsLocal = availableViewerInventory.contains {
-            HomeCandidateComposer.exchangeAllowsLocal($0.exchangeType)
+            HomeCandidateExchangePolicy.allowsLocal($0.exchangeType)
         }
     }
 

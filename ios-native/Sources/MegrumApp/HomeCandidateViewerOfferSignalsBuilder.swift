@@ -30,36 +30,36 @@ enum HomeCandidateViewerOfferSignalsBuilder {
             partnerMethodsList: orderedPartnerIDs.map { context.partnerScope.usersByID[$0]?.paymentMethods }
         )
         let partnerAllowsMail = matchingPartnerWishes.contains {
-            HomeCandidateComposer.exchangeAllowsMail($0.exchangeType)
+            HomeCandidateExchangePolicy.allowsMail($0.exchangeType)
         } || matchingPartnerListingOptions.contains {
-            HomeCandidateComposer.exchangeAllowsMail($0.exchangeType)
+            HomeCandidateExchangePolicy.allowsMail($0.exchangeType)
         }
         let partnerAllowsLocal = matchingPartnerWishes.contains {
-            HomeCandidateComposer.exchangeAllowsLocal($0.exchangeType)
+            HomeCandidateExchangePolicy.allowsLocal($0.exchangeType)
         } || matchingPartnerListingOptions.contains {
-            HomeCandidateComposer.exchangeAllowsLocal($0.exchangeType)
+            HomeCandidateExchangePolicy.allowsLocal($0.exchangeType)
         }
         let partnerLocalPrefectureNames = orderedPartnerIDs.compactMap { partnerID in
             context.partnerScope.usersByID[partnerID]?.primaryArea
         }
         let partnerLocalPrefectures = Set(
-            partnerLocalPrefectureNames.compactMap(HomeCandidateComposer.normalizedArea)
+            partnerLocalPrefectureNames.compactMap(HomeCandidateExchangePolicy.normalizedArea)
         )
-        let partnerLocalDateKeys = HomeCandidateComposer.localDateKeys(
+        let partnerLocalDateKeys = HomeCandidateExchangePolicy.localDateKeys(
             from: orderedPartnerIDs.flatMap { partnerID in
                 context.partnerScope.activityWindowsByUser[partnerID, default: []]
             }
         )
-        let partnerExchangeMethodTitle = HomeCandidateComposer.exchangeMethodTitle(
+        let partnerExchangeMethodTitle = HomeCandidateExchangePolicy.methodTitle(
             allowsLocal: partnerAllowsLocal,
             allowsMail: partnerAllowsMail
         )
-        let partnerLocalConditionText = HomeCandidateComposer.localConditionText(
+        let partnerLocalConditionText = HomeCandidateExchangePolicy.localConditionText(
             prefectures: partnerLocalPrefectureNames,
             dateKeys: partnerLocalDateKeys
         )
         let prefectureMatches = orderedPartnerIDs.contains { partnerID in
-            HomeCandidateComposer.prefecturesMatch(
+            HomeCandidateExchangePolicy.prefecturesMatch(
                 context.viewerUser?.primaryArea,
                 context.partnerScope.usersByID[partnerID]?.primaryArea
             )
@@ -79,8 +79,8 @@ enum HomeCandidateViewerOfferSignalsBuilder {
                 hasWishHit: !matchingPartnerWishes.isEmpty
             ),
             exchange: HomeExchangeConditionSignals(
-                postalAcceptedByBoth: HomeCandidateComposer.exchangeAllowsMail(viewerItem.exchangeType) && partnerAllowsMail,
-                localExchangeSelected: HomeCandidateComposer.exchangeAllowsLocal(viewerItem.exchangeType) && partnerAllowsLocal,
+                postalAcceptedByBoth: HomeCandidateExchangePolicy.allowsMail(viewerItem.exchangeType) && partnerAllowsMail,
+                localExchangeSelected: HomeCandidateExchangePolicy.allowsLocal(viewerItem.exchangeType) && partnerAllowsLocal,
                 prefectureMatches: prefectureMatches,
                 dateMatches: false,
                 partnerExchangeMethodTitle: partnerExchangeMethodTitle,

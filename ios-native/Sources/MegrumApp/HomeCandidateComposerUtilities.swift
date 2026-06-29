@@ -37,15 +37,15 @@ extension HomeCandidateComposer {
         wishMatchedPartnerUserIDs: [UUID],
         ownerHasMegrumPlus: Bool
     ) -> HomeCandidateConditionSignals {
-        let candidateAllowsMail = exchangeAllowsMail(candidate.exchangeType)
-        let candidateAllowsLocal = exchangeAllowsLocal(candidate.exchangeType)
-        let hasDateOverlap = activityWindowsOverlap(viewerActivityWindows, partnerActivityWindows)
-        let hasLocalPlaceHint = prefecturesMatch(viewerUser?.primaryArea, partnerUser?.primaryArea)
-        let partnerLocalPrefectures = Set([partnerUser?.primaryArea].compactMap(normalizedArea))
-        let partnerLocalDateKeys = localDateKeys(from: partnerActivityWindows)
-        let partnerExchangeMethodTitle = exchangeMethodTitle(from: candidate.exchangeType)
-            ?? exchangeMethodTitle(allowsLocal: candidateAllowsLocal, allowsMail: candidateAllowsMail)
-        let partnerLocalConditionText = localConditionText(
+        let candidateAllowsMail = HomeCandidateExchangePolicy.allowsMail(candidate.exchangeType)
+        let candidateAllowsLocal = HomeCandidateExchangePolicy.allowsLocal(candidate.exchangeType)
+        let hasDateOverlap = HomeCandidateExchangePolicy.activityWindowsOverlap(viewerActivityWindows, partnerActivityWindows)
+        let hasLocalPlaceHint = HomeCandidateExchangePolicy.prefecturesMatch(viewerUser?.primaryArea, partnerUser?.primaryArea)
+        let partnerLocalPrefectures = Set([partnerUser?.primaryArea].compactMap(HomeCandidateExchangePolicy.normalizedArea))
+        let partnerLocalDateKeys = HomeCandidateExchangePolicy.localDateKeys(from: partnerActivityWindows)
+        let partnerExchangeMethodTitle = HomeCandidateExchangePolicy.methodTitle(from: candidate.exchangeType)
+            ?? HomeCandidateExchangePolicy.methodTitle(allowsLocal: candidateAllowsLocal, allowsMail: candidateAllowsMail)
+        let partnerLocalConditionText = HomeCandidateExchangePolicy.localConditionText(
             prefectures: [partnerUser?.primaryArea].compactMap(\.self),
             dateKeys: partnerLocalDateKeys
         )
@@ -81,72 +81,6 @@ extension HomeCandidateComposer {
         )
     }
 
-    static func exchangeAllowsMail(_ value: String?) -> Bool {
-        guard let method = ExchangeMethod(exchangeTypeValue: value) else {
-            return false
-        }
-        return method == .mail || method == .both
-    }
-
-    static func exchangeAllowsLocal(_ value: String?) -> Bool {
-        guard let method = ExchangeMethod(exchangeTypeValue: value) else {
-            return true
-        }
-        return method == .hand || method == .both
-    }
-
-    static func exchangeMethodTitle(from exchangeType: String?) -> String? {
-        ExchangeMethod(exchangeTypeValue: exchangeType)?.displayName
-    }
-
-    static func exchangeMethodTitle(allowsLocal: Bool, allowsMail: Bool) -> String? {
-        switch (allowsLocal, allowsMail) {
-        case (true, true):
-            ExchangeMethod.both.displayName
-        case (true, false):
-            ExchangeMethod.hand.displayName
-        case (false, true):
-            ExchangeMethod.mail.displayName
-        case (false, false):
-            nil
-        }
-    }
-
-    static func localConditionText(prefectures: [String], dateKeys: Set<String>) -> String? {
-        let prefecture = orderedUnique(prefectures.compactMap(trimmed))
-            .first
-        let dateText = nearestLocalDateText(from: dateKeys)
-        let parts = [prefecture, dateText].compactMap(\.self)
-        return parts.isEmpty ? nil : parts.joined(separator: " / ")
-    }
-
-    static func nearestLocalDateText(from dateKeys: Set<String>) -> String? {
-        let usableKeys = orderedLocalDateKeys(from: dateKeys, onlyFuture: true)
-        let displayKeys = usableKeys.isEmpty ? orderedLocalDateKeys(from: dateKeys, onlyFuture: false) : usableKeys
-        guard let firstKey = displayKeys.first else {
-            return nil
-        }
-        let suffix = displayKeys.count > 1 ? "他" : ""
-        return "\(HomeExchangeDateKey.compactDisplayText(for: firstKey))\(suffix)"
-    }
-
-    static func activityWindowsOverlap(
-        _ viewerWindows: [SupabaseHomeActivityWindowRow],
-        _ partnerWindows: [SupabaseHomeActivityWindowRow]
-    ) -> Bool {
-        viewerWindows.contains { viewerWindow in
-            partnerWindows.contains { partnerWindow in
-                windowsOverlap(viewerWindow, partnerWindow)
-            }
-        }
-    }
-
-    static func localDateKeys(from windows: [SupabaseHomeActivityWindowRow]) -> Set<String> {
-        Set(windows.flatMap { window in
-            dateKeys(from: window.startAt, through: window.endAt)
-        })
-    }
-
     static func orderedUnique(_ ids: [UUID]) -> [UUID] {
         var seen: Set<UUID> = []
         var result: [UUID] = []
@@ -154,15 +88,6 @@ extension HomeCandidateComposer {
             result.append(id)
         }
         return result
-    }
-
-    static func prefecturesMatch(_ lhs: String?, _ rhs: String?) -> Bool {
-        guard let lhs = normalizedArea(lhs),
-              let rhs = normalizedArea(rhs)
-        else {
-            return false
-        }
-        return lhs == rhs
     }
 
     static func orderedUnique(_ values: [String]) -> [String] {
@@ -183,55 +108,4 @@ extension HomeCandidateComposer {
         return result
     }
 
-    private static func windowsOverlap(
-        _ lhs: SupabaseHomeActivityWindowRow,
-        _ rhs: SupabaseHomeActivityWindowRow
-    ) -> Bool {
-        lhs.startAt < rhs.endAt && rhs.startAt < lhs.endAt
-    }
-
-    private static func dateKeys(from startAt: Date, through endAt: Date, calendar: Calendar = .current) -> [String] {
-        let startDay = calendar.startOfDay(for: startAt)
-        let endDay = calendar.startOfDay(for: endAt)
-        guard startDay <= endDay else {
-            return [HomeExchangeDateKey.key(for: startAt, calendar: calendar)]
-        }
-
-        var keys: [String] = []
-        var cursor = startDay
-        while cursor <= endDay {
-            keys.append(HomeExchangeDateKey.key(for: cursor, calendar: calendar))
-            guard let nextDay = calendar.date(byAdding: .day, value: 1, to: cursor) else {
-                break
-            }
-            cursor = nextDay
-        }
-        return keys
-    }
-
-    static func normalizedArea(_ value: String?) -> String? {
-        guard let value else {
-            return nil
-        }
-        let normalized = value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        return normalized.isEmpty ? nil : normalized
-    }
-
-    private static func orderedLocalDateKeys(from dateKeys: Set<String>, onlyFuture: Bool) -> [String] {
-        dateKeys
-            .filter { !onlyFuture || HomeExchangeDateKey.isOnOrAfterToday($0) }
-            .compactMap { key -> (String, Date)? in
-                guard let date = HomeExchangeDateKey.date(from: key) else {
-                    return nil
-                }
-                return (key, date)
-            }
-            .sorted { $0.1 < $1.1 }
-            .map(\.0)
-    }
-
-    private static func trimmed(_ value: String) -> String? {
-        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? nil : trimmed
-    }
 }
