@@ -2,59 +2,57 @@ import Foundation
 import MegrumCore
 import MegrumData
 
-extension HomeCandidateComposer {
-    struct MutualListingSideEvaluation {
-        var isSatisfied: Bool
-        var matchedGoods: [SupabaseHomeGoodsRow]
-        var matchedCashOptions: [SupabaseHomeListingWishOptionRow]
-        var attentionKinds: [HomeMutualMatchAttentionKind]
+struct HomeMutualMatchListingSideEvaluation {
+    var isSatisfied: Bool
+    var matchedGoods: [SupabaseHomeGoodsRow]
+    var matchedCashOptions: [SupabaseHomeListingWishOptionRow]
+    var attentionKinds: [HomeMutualMatchAttentionKind]
 
-        static let unsatisfied = MutualListingSideEvaluation(
-            isSatisfied: false,
-            matchedGoods: [],
-            matchedCashOptions: [],
-            attentionKinds: []
-        )
+    static let unsatisfied = HomeMutualMatchListingSideEvaluation(
+        isSatisfied: false,
+        matchedGoods: [],
+        matchedCashOptions: [],
+        attentionKinds: []
+    )
 
-        var score: Int {
-            if attentionKinds.contains(.amountInsufficient) {
-                return 3
-            }
-            if attentionKinds.contains(.amountIncluded) {
-                return 2
-            }
-            if attentionKinds.contains(.tagMismatch) {
-                return 1
-            }
-            return 0
+    var score: Int {
+        if attentionKinds.contains(.amountInsufficient) {
+            return 3
         }
+        if attentionKinds.contains(.amountIncluded) {
+            return 2
+        }
+        if attentionKinds.contains(.tagMismatch) {
+            return 1
+        }
+        return 0
     }
+}
 
-    struct MutualListingOptionEvaluation {
-        var isSatisfied: Bool
-        var matchedGoods: [SupabaseHomeGoodsRow]
-        var matchedCashOptions: [SupabaseHomeListingWishOptionRow]
-        var attentionKinds: [HomeMutualMatchAttentionKind]
+struct HomeMutualMatchListingOptionEvaluation {
+    var isSatisfied: Bool
+    var matchedGoods: [SupabaseHomeGoodsRow]
+    var matchedCashOptions: [SupabaseHomeListingWishOptionRow]
+    var attentionKinds: [HomeMutualMatchAttentionKind]
 
-        static let unsatisfied = MutualListingOptionEvaluation(
-            isSatisfied: false,
-            matchedGoods: [],
-            matchedCashOptions: [],
-            attentionKinds: []
-        )
+    static let unsatisfied = HomeMutualMatchListingOptionEvaluation(
+        isSatisfied: false,
+        matchedGoods: [],
+        matchedCashOptions: [],
+        attentionKinds: []
+    )
 
-        var score: Int {
-            if attentionKinds.contains(.amountInsufficient) {
-                return 3
-            }
-            if attentionKinds.contains(.amountIncluded) {
-                return 2
-            }
-            if attentionKinds.contains(.tagMismatch) {
-                return 1
-            }
-            return 0
+    var score: Int {
+        if attentionKinds.contains(.amountInsufficient) {
+            return 3
         }
+        if attentionKinds.contains(.amountIncluded) {
+            return 2
+        }
+        if attentionKinds.contains(.tagMismatch) {
+            return 1
+        }
+        return 0
     }
 }
 
@@ -65,7 +63,7 @@ enum HomeMutualMatchListingEvaluator {
         counterpartCashOptions: [SupabaseHomeListingWishOptionRow],
         rowsByID: [UUID: SupabaseHomeGoodsRow],
         tagsByInventoryID: [UUID: [SupabaseHomeInventoryTagRow]]
-    ) -> HomeCandidateComposer.MutualListingSideEvaluation {
+    ) -> HomeMutualMatchListingSideEvaluation {
         guard !options.isEmpty else {
             return .unsatisfied
         }
@@ -90,7 +88,7 @@ enum HomeMutualMatchListingEvaluator {
             else {
                 return .unsatisfied
             }
-            return HomeCandidateComposer.MutualListingSideEvaluation(
+            return HomeMutualMatchListingSideEvaluation(
                 isSatisfied: true,
                 matchedGoods: best.matchedGoods,
                 matchedCashOptions: best.matchedCashOptions,
@@ -100,7 +98,7 @@ enum HomeMutualMatchListingEvaluator {
             guard optionResults.allSatisfy(\.isSatisfied) else {
                 return .unsatisfied
             }
-            return HomeCandidateComposer.MutualListingSideEvaluation(
+            return HomeMutualMatchListingSideEvaluation(
                 isSatisfied: true,
                 matchedGoods: deduplicatedRows(optionResults.flatMap(\.matchedGoods)),
                 matchedCashOptions: optionResults.flatMap(\.matchedCashOptions),
@@ -115,7 +113,7 @@ enum HomeMutualMatchListingEvaluator {
         counterpartCashOptions: [SupabaseHomeListingWishOptionRow],
         rowsByID: [UUID: SupabaseHomeGoodsRow],
         tagsByInventoryID: [UUID: [SupabaseHomeInventoryTagRow]]
-    ) -> HomeCandidateComposer.MutualListingOptionEvaluation {
+    ) -> HomeMutualMatchListingOptionEvaluation {
         if option.isCashOffer == true {
             return evaluateCashWantedOption(
                 option,
@@ -148,7 +146,7 @@ enum HomeMutualMatchListingEvaluator {
                 )
             }
 
-        return HomeCandidateComposer.MutualListingOptionEvaluation(
+        return HomeMutualMatchListingOptionEvaluation(
             isSatisfied: true,
             matchedGoods: matchedGoods,
             matchedCashOptions: [],
@@ -159,7 +157,7 @@ enum HomeMutualMatchListingEvaluator {
     private static func evaluateCashWantedOption(
         _ option: SupabaseHomeListingWishOptionRow,
         counterpartCashOptions: [SupabaseHomeListingWishOptionRow]
-    ) -> HomeCandidateComposer.MutualListingOptionEvaluation {
+    ) -> HomeMutualMatchListingOptionEvaluation {
         let compatibleKinds = counterpartCashOptions
             .filter { $0.isCashOffer == true }
             .map {
@@ -172,7 +170,7 @@ enum HomeMutualMatchListingEvaluator {
             return .unsatisfied
         }
 
-        return HomeCandidateComposer.MutualListingOptionEvaluation(
+        return HomeMutualMatchListingOptionEvaluation(
             isSatisfied: true,
             matchedGoods: [],
             matchedCashOptions: [option],

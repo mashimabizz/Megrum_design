@@ -41,8 +41,8 @@ enum HomeMutualMatchCandidateSignals {
     }
 
     static func attentionKinds(
-        receiveSide: HomeCandidateComposer.MutualListingSideEvaluation,
-        giveSide: HomeCandidateComposer.MutualListingSideEvaluation,
+        receiveSide: HomeMutualMatchListingSideEvaluation,
+        giveSide: HomeMutualMatchListingSideEvaluation,
         exchangeKinds: [HomeMutualMatchAttentionKind],
         paymentKinds: [HomeMutualMatchAttentionKind]
     ) -> [HomeMutualMatchAttentionKind] {

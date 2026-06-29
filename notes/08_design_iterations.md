@@ -4,6 +4,43 @@
 
 ---
 
+## イテレーション1226.205：MutualMatch評価型分離
+
+### 背景・問題意識
+
+`HomeMutualMatchListingEvaluation` の評価結果型が `HomeCandidateComposer` の nested type として定義されており、候補Composerの責務に評価Policyの型までぶら下がっていた。相互マッチのwanted side評価結果をComposerから独立した型として扱えるよう、評価型を専用の top-level 型へ分離する必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeMutualMatchListingEvaluation.swift`
+- `HomeCandidateComposer.MutualListingSideEvaluation` を `HomeMutualMatchListingSideEvaluation` へ移した。
+- `HomeCandidateComposer.MutualListingOptionEvaluation` を `HomeMutualMatchListingOptionEvaluation` へ移した。
+- evaluator 内の戻り値生成と `.unsatisfied` は同じ値を維持した。
+
+#### `ios-native/Sources/MegrumApp/HomeMutualMatchCandidateSignals.swift`
+- `attentionKinds` の引数型を新しい評価型へ更新した。
+- attention kind の結合順、重み、`.ready` fallback は変更していない。
+
+### 影響範囲
+
+- ホーム相互マッチ候補の内部評価型に影響する。
+- ユーザー表示文言、画面レイアウト、ナビゲーション、Supabase API、DB schema、通知、認証、課金、取引状態、保存順序は変更していない。
+- 状態遷移、用語、データモデルに変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` は更新不要と判断した。
+
+### 確認方法
+- `git diff --check -- ios-native/Sources/MegrumApp/HomeMutualMatchListingEvaluation.swift ios-native/Sources/MegrumApp/HomeMutualMatchCandidateSignals.swift notes/08_design_iterations.md`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-mutual-evaluation-types --enable-xctest --disable-swift-testing -j 1 --filter 'HomeCandidateComposerTests|HomeDiscoveryMatchPolicyTests|HomeMutualMatchConditionPoliciesTests|HomeScreenFlowTests'`
+  - passed
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild-refactor-home-mutual-evaluation-types CODE_SIGNING_ALLOWED=NO build`
+  - passed
+
+### セルフレビュー結果
+- ✅ 評価結果型だけをComposerから分離し、評価値・score・unsatisfied の意味は維持した。
+- ✅ attention kind の生成順、重み、候補生成、表示データ、ユーザー表示文言は変更していない。
+- ✅ DB/API、保存処理、状態遷移、通知、認証、課金、取引状態、ユーザー表示文言は変更していない。
+- ✅ 既存の未コミット変更は戻していない。
+
 ## イテレーション1226.204：MutualMatch表示Side分離
 
 ### 背景・問題意識
