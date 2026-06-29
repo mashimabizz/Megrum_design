@@ -107,22 +107,16 @@ extension HomeCandidateComposer {
                         tagsByInventoryID: tagsByInventoryID
                     )
                 )
-                let partnerGoodsItems = HomeMutualMatchCandidatePresentation.goodsItems(
+                let partnerSide = HomeMutualMatchCandidatePresentation.displaySide(
                     rows: partnerGoods,
                     tagsByInventoryID: tagsByInventoryID,
-                    ownerUser: partnerUser
-                )
-                let viewerGoodsItems = HomeMutualMatchCandidatePresentation.goodsItems(
-                    rows: viewerGoods,
-                    tagsByInventoryID: tagsByInventoryID,
-                    ownerUser: composition.viewerUser
-                )
-                let partnerDisplayItems = HomeMutualMatchCandidatePresentation.displayItems(
-                    goodsItems: partnerGoodsItems,
+                    ownerUser: partnerUser,
                     cashOptions: receiveSide.matchedCashOptions
                 )
-                let viewerDisplayItems = HomeMutualMatchCandidatePresentation.displayItems(
-                    goodsItems: viewerGoodsItems,
+                let viewerSide = HomeMutualMatchCandidatePresentation.displaySide(
+                    rows: viewerGoods,
+                    tagsByInventoryID: tagsByInventoryID,
+                    ownerUser: composition.viewerUser,
                     cashOptions: giveSide.matchedCashOptions
                 )
                 let candidateID = HomeMutualMatchCandidatePresentation.stableID(
@@ -155,13 +149,13 @@ extension HomeCandidateComposer {
                         partnerEvaluationSummaryText: HomeMutualMatchCandidatePresentation.evaluationSummaryText(
                             for: partnerUser
                         ),
-                        partnerGoodsItems: partnerGoodsItems,
-                        viewerGoodsItems: viewerGoodsItems,
-                        partnerDisplayItems: partnerDisplayItems,
-                        viewerDisplayItems: viewerDisplayItems,
+                        partnerGoodsItems: partnerSide.goodsItems,
+                        viewerGoodsItems: viewerSide.goodsItems,
+                        partnerDisplayItems: partnerSide.displayItems,
+                        viewerDisplayItems: viewerSide.displayItems,
                         signals: signals,
                         conditionSignalsByPartnerGoodsID: Dictionary(
-                            uniqueKeysWithValues: partnerGoodsItems.map { ($0.id, signals) }
+                            uniqueKeysWithValues: partnerSide.goodsItems.map { ($0.id, signals) }
                         ),
                         attentionKinds: attentionKinds
                     )

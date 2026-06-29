@@ -2,7 +2,32 @@ import Foundation
 import MegrumCore
 import MegrumData
 
+struct HomeMutualMatchCandidateDisplaySide {
+    var goodsItems: [GoodsItem]
+    var displayItems: [HomeMutualMatchDisplayItemData]
+}
+
 enum HomeMutualMatchCandidatePresentation {
+    static func displaySide(
+        rows: [SupabaseHomeGoodsRow],
+        tagsByInventoryID: [UUID: [SupabaseHomeInventoryTagRow]],
+        ownerUser: SupabaseHomeUserRow?,
+        cashOptions: [SupabaseHomeListingWishOptionRow]
+    ) -> HomeMutualMatchCandidateDisplaySide {
+        let goodsItems = goodsItems(
+            rows: rows,
+            tagsByInventoryID: tagsByInventoryID,
+            ownerUser: ownerUser
+        )
+        return HomeMutualMatchCandidateDisplaySide(
+            goodsItems: goodsItems,
+            displayItems: displayItems(
+                goodsItems: goodsItems,
+                cashOptions: cashOptions
+            )
+        )
+    }
+
     static func goodsItems(
         rows: [SupabaseHomeGoodsRow],
         tagsByInventoryID: [UUID: [SupabaseHomeInventoryTagRow]],

@@ -4,6 +4,42 @@
 
 ---
 
+## イテレーション1226.204：MutualMatch表示Side分離
+
+### 背景・問題意識
+
+`HomeMutualMatchCandidateComposer` は、相互マッチ候補ごとに相手側と自分側の `GoodsItem` と `HomeMutualMatchDisplayItemData` をそれぞれ個別に組み立てていた。cash option がある場合は表示アイテムを金額表示へ切り替える既存仕様を保ったまま、候補生成本体から表示Side組み立ての重複を分離する必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeMutualMatchCandidatePresentation.swift`
+- `HomeMutualMatchCandidateDisplaySide` を追加し、候補片側の `goodsItems` と `displayItems` をまとめて返せるようにした。
+- `displaySide` を追加し、既存の `goodsItems` と `displayItems` の組み合わせ処理を専用化した。
+
+#### `ios-native/Sources/MegrumApp/HomeMutualMatchCandidateComposer.swift`
+- 相手側/自分側の表示データ組み立てを `displaySide` へ委譲した。
+- candidate ID、signals、conditionSignals、attentionKinds、候補順位付けは変更していない。
+
+### 影響範囲
+
+- ホーム相互マッチ候補の内部表示データ組み立てに影響する。
+- ユーザー表示文言、画面レイアウト、ナビゲーション、Supabase API、DB schema、通知、認証、課金、取引状態、保存順序は変更していない。
+- 状態遷移、用語、データモデルに変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` は更新不要と判断した。
+
+### 確認方法
+- `git diff --check -- ios-native/Sources/MegrumApp/HomeMutualMatchCandidatePresentation.swift ios-native/Sources/MegrumApp/HomeMutualMatchCandidateComposer.swift notes/08_design_iterations.md`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-mutual-display-side --enable-xctest --disable-swift-testing -j 1 --filter 'HomeCandidateComposerTests|HomeDiscoveryMatchPolicyTests|HomeMutualMatchConditionPoliciesTests|HomeScreenFlowTests'`
+  - passed
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild-refactor-home-mutual-display-side CODE_SIGNING_ALLOWED=NO build`
+  - passed
+
+### セルフレビュー結果
+- ✅ 表示Sideの組み立てだけを値型と小さな関数へ切り出し、cash option 優先表示と goods fallback は維持した。
+- ✅ 相互マッチ候補生成、評価、signals、順位付け、ユーザー表示文言は変更していない。
+- ✅ DB/API、保存処理、状態遷移、通知、認証、課金、取引状態、ユーザー表示文言は変更していない。
+- ✅ 既存の未コミット変更は戻していない。
+
 ## イテレーション1226.203：MutualMatch候補Ordering分離
 
 ### 背景・問題意識
