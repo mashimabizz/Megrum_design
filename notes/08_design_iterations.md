@@ -4,6 +4,42 @@
 
 ---
 
+## イテレーション1226.193：ホーム候補SignalsBuilder分離
+
+### 背景・問題意識
+
+`HomeCandidateComposerUtilities` には候補集約補助だけでなく、`HomeCandidateConditionSignals` を組み立てる処理が残っていた。交換条件 policy 分離後も、goods/exchange/payment/link/めぐるむプレミアムの条件signalを1つのComposer extensionで生成していたため、候補評価から使う専用builderへ移し、Composer側を集約補助に絞る必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeCandidateConditionSignalsBuilder.swift`
+- `HomeCandidateConditionSignals` の組み立て処理を専用builderとして追加した。
+- 交換条件は `HomeCandidateExchangePolicy`、支払い条件は `HomeCandidatePaymentPolicy` を使い、既存のsignal値を維持した。
+
+#### `ios-native/Sources/MegrumApp/HomeCandidateComposerUtilities.swift`
+- `conditionSignals` 実装を削除し、候補並び替え、重複排除、ordered uniqueの集約補助だけを残した。
+
+#### `ios-native/Sources/MegrumApp/HomeCandidatePartnerOfferEvaluation.swift`
+- 相手候補評価時のcondition signal生成を `HomeCandidateConditionSignalsBuilder` 呼び出しへ差し替えた。
+
+### 影響範囲
+
+- ホーム候補の条件シグナル生成内部に影響する。
+- ユーザー表示文言、画面レイアウト、ナビゲーション、Supabase API、DB schema、通知、認証、課金、取引状態、保存順序は変更していない。
+- 状態遷移、用語、データモデルに変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` は更新不要と判断した。
+
+### 確認方法
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-condition-signals-builder --enable-xctest --disable-swift-testing -j 1 --filter 'HomeCandidateComposerTests|HomeDiscoveryMatchPolicyTests|HomeMutualMatchConditionPoliciesTests|HomeScreenFlowTests'`
+  - passed：160 tests, 0 failures
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild-refactor-home-condition-signals-builder CODE_SIGNING_ALLOWED=NO build`
+  - passed
+
+### セルフレビュー結果
+- ✅ condition signal生成をComposer extensionから外し、相手候補評価から使う専用builderへ分離した。
+- ✅ 交換条件、支払い条件、link counts、wish/member match、めぐるむプレミアムのsignal値は移動のみで、既存Homeテストで維持確認した。
+- ✅ DB/API、保存処理、状態遷移、通知、認証、課金、取引状態、表示文言は変更していない。
+- ✅ 既存の未コミット変更は戻していない。
+
 ## イテレーション1226.192：ホーム候補交換Policy分離
 
 ### 背景・問題意識

@@ -71,7 +71,7 @@ struct HomeCandidatePartnerOfferEvaluation {
             includesCash: true
         )
 
-        signals = HomeCandidateComposer.conditionSignals(
+        signals = HomeCandidateConditionSignalsBuilder.signals(
             candidate: candidate,
             partnerUser: context.partnerScope.usersByID[candidate.userId],
             partnerActivityWindows: context.partnerScope.activityWindowsByUser[candidate.userId, default: []],
