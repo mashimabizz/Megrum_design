@@ -4,6 +4,42 @@
 
 ---
 
+## イテレーション1226.201：ListingOfferedItems Builder分離
+
+### 背景・問題意識
+
+`HomeCandidateListingDetailContextFactory` は、detail contextの組み立てに加えて、個別募集の譲るもの一覧の行解決、条件指定時のfallback、数量補正、画像URL解決まで同じ場所で担っていた。detail context生成を薄く保ち、譲るもの一覧の解決だけを安全にテスト対象へ寄せられるよう、offered items生成を専用Builderへ分離する必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeCandidateListingOfferedItemsBuilder.swift`
+- 個別募集detailで表示する譲るもの一覧の生成を専用Builderとして追加した。
+- `haveIds` 指定、条件指定時のlisting inventory fallback、candidate fallback、`haveQtys` の数量補正、画像URL解決の既存順序を維持した。
+
+#### `ios-native/Sources/MegrumApp/HomeCandidateListingDetailContextFactory.swift`
+- offered items生成を `HomeCandidateListingOfferedItemsBuilder` へ委譲した。
+- wanted/offered logic、minimum count、wanted options、cash amount抽出は変更していない。
+
+### 影響範囲
+
+- ホーム候補の個別募集detailで使う譲るもの一覧生成内部に影響する。
+- ユーザー表示文言、画面レイアウト、ナビゲーション、Supabase API、DB schema、通知、認証、課金、取引状態、保存順序は変更していない。
+- 状態遷移、用語、データモデルに変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` は更新不要と判断した。
+
+### 確認方法
+- `git diff --check -- ios-native/Sources/MegrumApp/HomeCandidateListingOfferedItemsBuilder.swift ios-native/Sources/MegrumApp/HomeCandidateListingDetailContextFactory.swift notes/08_design_iterations.md`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-offered-items --enable-xctest --disable-swift-testing -j 1 --filter 'HomeCandidateComposerTests|HomeDiscoveryMatchPolicyTests|HomeMutualMatchConditionPoliciesTests|HomeScreenFlowTests'`
+  - passed
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild-refactor-home-offered-items CODE_SIGNING_ALLOWED=NO build`
+  - passed
+
+### セルフレビュー結果
+- ✅ 譲るもの一覧の行解決と数量補正だけをBuilderへ切り出し、detail contextの外部形は維持した。
+- ✅ `haveIds`、条件指定fallback、candidate fallback、数量fallback、画像URLの既存順序は維持した。
+- ✅ DB/API、保存処理、状態遷移、通知、認証、課金、取引状態、ユーザー表示文言は変更していない。
+- ✅ 既存の未コミット変更は戻していない。
+
 ## イテレーション1226.200：ListingOption並び順Policy分離
 
 ### 背景・問題意識
