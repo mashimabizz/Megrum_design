@@ -4,6 +4,42 @@
 
 ---
 
+## イテレーション1226.195：ホーム候補Viewer需要Summary分離
+
+### 背景・問題意識
+
+`HomeCandidateViewerOfferSignalsBuilder` は、自分の提示物に対して相手Wishや相手個別募集が当たるかの探索、相手側の交換可否、地域/日付表示、個別募集selection、tag match countまで1つのbuilder内で直接組み立てていた。condition signal生成の責務を薄く保つため、viewer提示物に対する相手需要の集約を小さなpure summaryへ分離する必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeCandidateViewerOfferDemandSummary.swift`
+- viewer提示物に当たる相手Wish、相手個別募集、相手側交換可否、地域/日付条件、個別募集selection context、tag match countをまとめるsummaryを追加した。
+- 既存の `HomeCandidateListingMatchPolicy`、`HomeCandidateExchangePolicy`、`HomeCandidateTagMatcher` を使い、判定順序と条件は維持した。
+
+#### `ios-native/Sources/MegrumApp/HomeCandidateViewerOfferSignalsBuilder.swift`
+- 相手需要/交換条件のローカル集約を `HomeCandidateViewerOfferDemandSummary` 生成へ差し替えた。
+- `HomeCandidateConditionSignals` 生成と支払い条件の組み立てをsummary入力から読む形にした。
+
+### 影響範囲
+
+- ホーム候補のviewer提示物側condition signal生成内部に影響する。
+- ユーザー表示文言、画面レイアウト、ナビゲーション、Supabase API、DB schema、通知、認証、課金、取引状態、保存順序は変更していない。
+- 状態遷移、用語、データモデルに変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` は更新不要と判断した。
+
+### 確認方法
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-viewer-demand --enable-xctest --disable-swift-testing -j 1 --filter HomeCandidateComposerTests`
+  - passed：22 tests, 0 failures
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-viewer-demand-wide --enable-xctest --disable-swift-testing -j 1 --filter 'HomeCandidateComposerTests|HomeDiscoveryMatchPolicyTests|HomeMutualMatchConditionPoliciesTests|HomeScreenFlowTests'`
+  - passed：160 tests, 0 failures
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild-refactor-home-viewer-demand CODE_SIGNING_ALLOWED=NO build`
+  - passed
+
+### セルフレビュー結果
+- ✅ viewer提示物側の相手需要探索と交換条件集約をsignal builderから分離し、builderを入力集約と `HomeCandidateConditionSignals` 生成に寄せた。
+- ✅ Wishヒット、個別募集ヒット、link counts、selection context、payment/交換条件、tag match countは既存Homeテストで維持確認した。
+- ✅ DB/API、保存処理、状態遷移、通知、認証、課金、取引状態、表示文言は変更していない。
+- ✅ 既存の未コミット変更は戻していない。
+
 ## イテレーション1226.194：ホーム候補相手需要Summary分離
 
 ### 背景・問題意識
