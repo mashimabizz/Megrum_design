@@ -4,6 +4,42 @@
 
 ---
 
+## イテレーション1226.203：MutualMatch候補Ordering分離
+
+### 背景・問題意識
+
+`HomeMutualMatchCandidateComposer` は、相互マッチ候補の評価・表示データ生成に加えて、最後のattention score順ソート、同点時ID順、12件上限の表示順決定も同じ場所で担っていた。候補生成と候補順位付けの責務を分け、今後スコアや上限を触る時に生成ロジックへ波及しないよう、候補Orderingを専用Policyへ分離する必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeMutualMatchCandidateOrdering.swift`
+- 相互マッチ候補の優先順決定を専用Policyとして追加した。
+- attention score昇順、同点時 `id.uuidString` 昇順、最大12件という既存条件を維持した。
+
+#### `ios-native/Sources/MegrumApp/HomeMutualMatchCandidateComposer.swift`
+- 末尾の候補sort/prefixを `HomeMutualMatchCandidateOrdering` へ委譲した。
+- candidate生成、重複排除、condition/payment評価、表示データ生成は変更していない。
+
+### 影響範囲
+
+- ホーム相互マッチ候補の内部順位付けに影響する。
+- ユーザー表示文言、画面レイアウト、ナビゲーション、Supabase API、DB schema、通知、認証、課金、取引状態、保存順序は変更していない。
+- 状態遷移、用語、データモデルに変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` は更新不要と判断した。
+
+### 確認方法
+- `git diff --check -- ios-native/Sources/MegrumApp/HomeMutualMatchCandidateOrdering.swift ios-native/Sources/MegrumApp/HomeMutualMatchCandidateComposer.swift notes/08_design_iterations.md`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-mutual-ordering --enable-xctest --disable-swift-testing -j 1 --filter 'HomeCandidateComposerTests|HomeDiscoveryMatchPolicyTests|HomeMutualMatchConditionPoliciesTests|HomeScreenFlowTests'`
+  - passed
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild-refactor-home-mutual-ordering CODE_SIGNING_ALLOWED=NO build`
+  - passed
+
+### セルフレビュー結果
+- ✅ 候補順位付けだけをPolicyへ切り出し、既存のscore/id/12件条件は維持した。
+- ✅ 相互マッチ候補生成、評価、表示データ、ユーザー表示文言は変更していない。
+- ✅ DB/API、保存処理、状態遷移、通知、認証、課金、取引状態、ユーザー表示文言は変更していない。
+- ✅ 既存の未コミット変更は戻していない。
+
 ## イテレーション1226.202：MutualMatch入力Resolver分離
 
 ### 背景・問題意識

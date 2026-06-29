@@ -169,17 +169,7 @@ extension HomeCandidateComposer {
             }
         }
 
-        return result
-            .sorted { lhs, rhs in
-                let lhsScore = HomeMutualMatchCandidateSignals.attentionScore(lhs.attentionKinds)
-                let rhsScore = HomeMutualMatchCandidateSignals.attentionScore(rhs.attentionKinds)
-                if lhsScore == rhsScore {
-                    return lhs.id.uuidString < rhs.id.uuidString
-                }
-                return lhsScore < rhsScore
-            }
-            .prefix(12)
-            .map { $0 }
+        return HomeMutualMatchCandidateOrdering.prioritized(result)
     }
 
 }
