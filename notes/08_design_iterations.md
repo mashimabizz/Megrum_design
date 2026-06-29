@@ -4,6 +4,42 @@
 
 ---
 
+## イテレーション1226.207：MutualMatch交換Review分離
+
+### 背景・問題意識
+
+`HomeMutualMatchConditionReviewPolicy` は、支払条件レビュー分離後も交換条件レビューの長い分岐を抱えていた。条件確認レビューの集約Policyを薄くし、交換条件と支払条件をそれぞれ独立して変更・検証できるよう、交換条件レビューだけを専用Policyへ分離する必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeMutualMatchExchangeReviewPolicy.swift`
+- 交換条件レビューの `items(for:)` を専用Policyとして追加した。
+- 交換手段不一致、郵送成立、送料要相談、現地交換の都道府県/日程確認などの既存 title/detail/status をそのまま移した。
+
+#### `ios-native/Sources/MegrumApp/HomeMutualMatchConditionReviewPolicy.swift`
+- 交換条件レビュー生成を `HomeMutualMatchExchangeReviewPolicy.items(for:)` へ委譲した。
+- `review(for:)` は交換条件と支払条件のレビューを集約するだけの薄いPolicyにした。
+
+### 影響範囲
+
+- ホーム相互マッチ候補の条件確認内部ロジックに影響する。
+- ユーザー表示文言、画面レイアウト、ナビゲーション、Supabase API、DB schema、通知、認証、課金、取引状態、保存順序は変更していない。
+- 状態遷移、用語、データモデルに変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` は更新不要と判断した。
+
+### 確認方法
+- `git diff --check -- ios-native/Sources/MegrumApp/HomeMutualMatchConditionReviewPolicy.swift ios-native/Sources/MegrumApp/HomeMutualMatchExchangeReviewPolicy.swift notes/08_design_iterations.md`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-mutual-exchange-review --enable-xctest --disable-swift-testing -j 1 --filter 'HomeCandidateComposerTests|HomeDiscoveryMatchPolicyTests|HomeMutualMatchConditionPoliciesTests|HomeScreenFlowTests'`
+  - passed
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild-refactor-home-mutual-exchange-review CODE_SIGNING_ALLOWED=NO build`
+  - passed
+
+### セルフレビュー結果
+- ✅ 交換条件レビューだけを専用Policyへ分離し、既存の title/detail/status と分岐条件は維持した。
+- ✅ 支払条件レビュー、条件確認の表示文言、画面レイアウト、ナビゲーションは変更していない。
+- ✅ DB/API、保存処理、状態遷移、通知、認証、課金、取引状態、ユーザー表示文言は変更していない。
+- ✅ 既存の未コミット変更は戻していない。
+
 ## イテレーション1226.206：MutualMatch支払Review分離
 
 ### 背景・問題意識
