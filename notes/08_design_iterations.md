@@ -4,6 +4,46 @@
 
 ---
 
+## イテレーション1226.200：ListingOption並び順Policy分離
+
+### 背景・問題意識
+
+個別募集のwish option並び順は、`position` 昇順、同値時は `id` 文字列昇順という同じ条件を、ホーム候補のselection生成と相互マッチ候補生成の2箇所がそれぞれ保持していた。今後option表示や候補生成の責務を触る時に並び順の揺れを起こさないよう、並び順だけを小さな専用Policyへ分離する必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeCandidateListingOptionOrdering.swift`
+- 個別募集wish optionの並び順を専用Policyとして追加した。
+- `position` 昇順、同値時は `id.uuidString` 昇順という既存条件を維持した。
+
+#### `ios-native/Sources/MegrumApp/HomeCandidateListingSelectionFactory.swift`
+- selection context生成時のoption sortを `HomeCandidateListingOptionOrdering` へ委譲した。
+- wanted option生成、detail option fallback、listing note、detail context生成は変更していない。
+
+#### `ios-native/Sources/MegrumApp/HomeMutualMatchCandidateComposer.swift`
+- viewer側/partner側のoption sortを `HomeCandidateListingOptionOrdering` へ委譲した。
+- 相互マッチの評価条件、候補生成、score並び順、件数上限は変更していない。
+
+### 影響範囲
+
+- ホーム候補と相互マッチ候補で使う個別募集wish optionの内部並び順決定に影響する。
+- ユーザー表示文言、画面レイアウト、ナビゲーション、Supabase API、DB schema、通知、認証、課金、取引状態、保存順序は変更していない。
+- 状態遷移、用語、データモデルに変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` は更新不要と判断した。
+
+### 確認方法
+- `git diff --check -- ios-native/Sources/MegrumApp/HomeCandidateListingOptionOrdering.swift ios-native/Sources/MegrumApp/HomeCandidateListingSelectionFactory.swift ios-native/Sources/MegrumApp/HomeMutualMatchCandidateComposer.swift notes/08_design_iterations.md`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-option-ordering --enable-xctest --disable-swift-testing -j 1 --filter 'HomeCandidateComposerTests|HomeDiscoveryMatchPolicyTests|HomeMutualMatchConditionPoliciesTests|HomeScreenFlowTests'`
+  - passed
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild-refactor-home-option-ordering CODE_SIGNING_ALLOWED=NO build`
+  - passed
+
+### セルフレビュー結果
+- ✅ 重複していたoption sortだけを切り出し、sort条件は維持した。
+- ✅ selection context生成、相互マッチ評価、候補score、表示文言は変更していない。
+- ✅ DB/API、保存処理、状態遷移、通知、認証、課金、取引状態、ユーザー表示文言は変更していない。
+- ✅ 既存の未コミット変更は戻していない。
+
 ## イテレーション1226.199：WantedOption文言Policy分離
 
 ### 背景・問題意識

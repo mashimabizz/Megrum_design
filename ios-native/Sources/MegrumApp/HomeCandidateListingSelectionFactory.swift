@@ -18,7 +18,7 @@ enum HomeCandidateListingSelectionFactory {
                 continue
             }
 
-            let sortedOptions = sortedOptions(
+            let sortedOptions = HomeCandidateListingOptionOrdering.sorted(
                 optionsByListingID[listing.id, default: []]
             )
             let wantedOptions = sortedOptions.compactMap { option in
@@ -98,14 +98,4 @@ enum HomeCandidateListingSelectionFactory {
         )
     }
 
-    private static func sortedOptions(
-        _ options: [SupabaseHomeListingWishOptionRow]
-    ) -> [SupabaseHomeListingWishOptionRow] {
-        options.sorted { lhs, rhs in
-            if lhs.position == rhs.position {
-                return lhs.id.uuidString < rhs.id.uuidString
-            }
-            return lhs.position < rhs.position
-        }
-    }
 }

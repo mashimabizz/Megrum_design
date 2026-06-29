@@ -32,8 +32,12 @@ extension HomeCandidateComposer {
                     continue
                 }
 
-                let viewerOptions = sortedOptions(listingOptionsByListingID[viewerListing.id, default: []])
-                let partnerOptions = sortedOptions(listingOptionsByListingID[partnerListing.id, default: []])
+                let viewerOptions = HomeCandidateListingOptionOrdering.sorted(
+                    listingOptionsByListingID[viewerListing.id, default: []]
+                )
+                let partnerOptions = HomeCandidateListingOptionOrdering.sorted(
+                    listingOptionsByListingID[partnerListing.id, default: []]
+                )
                 let receiveSide = HomeMutualMatchListingEvaluator.evaluateWantedSide(
                     options: viewerOptions,
                     counterpartOffers: partnerOffers,
@@ -193,17 +197,6 @@ extension HomeCandidateComposer {
         return inventory.filter { row in
             HomeCandidateGoodsMatchPolicy.fieldMatches(listing.haveGroupId, row.groupId)
                 && HomeCandidateGoodsMatchPolicy.fieldMatches(listing.haveGoodsTypeId, row.goodsTypeId)
-        }
-    }
-
-    private static func sortedOptions(
-        _ options: [SupabaseHomeListingWishOptionRow]
-    ) -> [SupabaseHomeListingWishOptionRow] {
-        options.sorted { lhs, rhs in
-            if lhs.position == rhs.position {
-                return lhs.id.uuidString < rhs.id.uuidString
-            }
-            return lhs.position < rhs.position
         }
     }
 
