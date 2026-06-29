@@ -4,6 +4,47 @@
 
 ---
 
+## イテレーション1226.191：ホーム候補Composer責務分離
+
+### 背景・問題意識
+
+`HomeCandidateComposer.sections` は、Supabase home composition からの文脈生成、相手候補のWish/個別募集ヒット評価、候補分類、自分提示物側の条件シグナル生成を1つの関数内で扱っていた。ホーム候補は今後も表示・条件・打診導線で触る頻度が高いため、挙動を変えずに責務を小さな純粋型へ分け、テストで守れる構造へ寄せる必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeCandidateComposer.swift`
+- `sections` を、文脈作成、相手候補評価結果の集約、自分提示物シグナルの埋め込み、返却に絞った。
+- matched / possible の分類、重複除去、fallback、mutual match 生成の呼び出し順は維持した。
+
+#### `ios-native/Sources/MegrumApp/HomeCandidateCompositionContext.swift`
+- `inventoryTags` / `listingWishOptions` の辞書化、viewer inventory / wishes / interests、partner scope、viewer側の交換手段可否をまとめる文脈型を追加した。
+
+#### `ios-native/Sources/MegrumApp/HomeCandidatePartnerOfferEvaluation.swift`
+- 相手の譲る候補1件について、GoodsItem化、viewer wish/推しとの一致、相手Wish/個別募集ヒット、条件シグナル、matched/possible分類を行う純粋評価型を追加した。
+
+#### `ios-native/Sources/MegrumApp/HomeCandidateViewerOfferSignalsBuilder.swift`
+- 自分の提示物が相手Wish/個別募集に該当する場合の条件シグナル生成を専用builderへ分離した。
+
+### 影響範囲
+
+- ホーム候補の内部構成ロジックに影響する。
+- ユーザー表示文言、画面レイアウト、ナビゲーション、Supabase API、DB schema、通知、認証、課金、取引状態、保存順序は変更していない。
+- 状態遷移、用語、データモデルに変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` は更新不要と判断した。
+
+### 確認方法
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-candidate-context --enable-xctest --disable-swift-testing -j 1 --filter HomeCandidateComposerTests`
+  - passed：22 tests, 0 failures
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home --enable-xctest --disable-swift-testing -j 1 --filter 'HomeCandidateComposerTests|HomeDiscoveryMatchPolicyTests|HomeMutualMatchConditionPoliciesTests|HomeScreenFlowTests'`
+  - passed：160 tests, 0 failures
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild-refactor-home-candidate CODE_SIGNING_ALLOWED=NO build`
+  - passed
+
+### セルフレビュー結果
+- ✅ `HomeCandidateComposer.sections` は長い候補生成ロジックを直接持たず、集約の流れとして読める形になった。
+- ✅ 相手候補評価と自分提示物シグナル生成を、それぞれテスト経由で守れる純粋型へ分離した。
+- ✅ DB/API、保存処理、状態遷移、通知、認証、課金、取引状態、表示文言は変更していない。
+- ✅ 既存の未コミット変更は戻していない。
+
 ## イテレーション1226.190：グルーム投稿ストーリー編集
 
 ### 背景・問題意識
