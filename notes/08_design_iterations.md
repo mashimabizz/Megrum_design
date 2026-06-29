@@ -4,6 +4,45 @@
 
 ---
 
+## イテレーション1226.199：WantedOption文言Policy分離
+
+### 背景・問題意識
+
+`HomeCandidateListingWantedOptionFactory` は、個別募集wanted optionのcash/goods/condition分類、preview生成、matching goods ID構築に加えて、タイトル/サブタイトル文言の決定も同じ場所で担っていた。今後の個別募集表示文言の調整時に、選択可否やpreview生成へ触れずに変更できるよう、文言決定だけを専用Policyへ分離する必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeCandidateListingWantedOptionTextPolicy.swift`
+- wanted optionのタイトル決定を専用Policyとして追加した。
+- preview title優先、exact wish ID一致、matching item fallback、`グッズ指定`/`条件指定` fallbackの既存順序を維持した。
+- サブタイトル決定を専用Policyとして追加し、複数wish、`atLeast` 最小数、group/goods type候補件数の既存文言を維持した。
+
+#### `ios-native/Sources/MegrumApp/HomeCandidateListingWantedOptionFactory.swift`
+- wanted optionのタイトル/サブタイトル生成を `HomeCandidateListingWantedOptionTextPolicy` へ委譲した。
+- cash/goods/condition分類、preview item、matching goods ID、選択可否判定は変更していない。
+
+### 影響範囲
+
+- ホーム候補の個別募集wanted option表示文言決定内部に影響する。
+- ユーザー表示文言そのもの、画面レイアウト、ナビゲーション、Supabase API、DB schema、通知、認証、課金、取引状態、保存順序は変更していない。
+- 状態遷移、用語、データモデルに変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` は更新不要と判断した。
+
+### 確認方法
+- `git diff --check -- ios-native/Sources/MegrumApp/HomeCandidateListingWantedOptionFactory.swift ios-native/Sources/MegrumApp/HomeCandidateListingWantedOptionTextPolicy.swift notes/08_design_iterations.md`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-wanted-text --enable-xctest --disable-swift-testing -j 1 --filter HomeCandidateComposerTests`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-wanted-text --enable-xctest --disable-swift-testing -j 1 --filter 'HomeCandidateComposerTests|HomeDiscoveryMatchPolicyTests|HomeMutualMatchConditionPoliciesTests|HomeScreenFlowTests'`
+  - passed
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild-refactor-home-wanted-text CODE_SIGNING_ALLOWED=NO build`
+  - passed
+
+### セルフレビュー結果
+- ✅ 文言決定だけをFactoryから切り出し、wanted optionの分類、選択可否、preview生成、matching goods IDは維持した。
+- ✅ 既存のfallback順とサブタイトル条件は移動のみで維持した。
+- ✅ DB/API、保存処理、状態遷移、通知、認証、課金、取引状態、ユーザー表示文言は変更していない。
+- ✅ 既存の未コミット変更は戻していない。
+
 ## イテレーション1226.198：個別募集WantedOption一致Policy分離
 
 ### 背景・問題意識

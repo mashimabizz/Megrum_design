@@ -112,8 +112,15 @@ enum HomeCandidateListingWantedOptionFactory {
             id: option.id,
             listingID: option.listingId,
             position: option.position,
-            title: wantedOptionTitle(option: option, matchingItems: matchingItems, previewItems: titlePreviewItems),
-            subtitle: wantedOptionSubtitle(option: option, matchingCount: subtitleMatchingCount ?? matchingItems.count),
+            title: HomeCandidateListingWantedOptionTextPolicy.title(
+                option: option,
+                matchingItems: matchingItems,
+                previewItems: titlePreviewItems
+            ),
+            subtitle: HomeCandidateListingWantedOptionTextPolicy.subtitle(
+                option: option,
+                matchingCount: subtitleMatchingCount ?? matchingItems.count
+            ),
             logic: logic,
             minimumCount: option.minCount ?? 1,
             kind: kind,
@@ -123,42 +130,6 @@ enum HomeCandidateListingWantedOptionFactory {
             groupID: option.wishGroupId,
             goodsTypeID: option.wishGoodsTypeId
         )
-    }
-
-    private static func wantedOptionTitle(
-        option: SupabaseHomeListingWishOptionRow,
-        matchingItems: [SupabaseHomeGoodsRow],
-        previewItems: [HomeIndividualListingWantedPreviewItem] = []
-    ) -> String {
-        if let previewTitle = previewItems.first?.title {
-            return previewTitle
-        }
-        if !option.wishIds.isEmpty {
-            if let exactItem = matchingItems.first(where: { option.wishIds.contains($0.id) }) {
-                return exactItem.title
-            }
-            return matchingItems.first?.title ?? "グッズ指定"
-        }
-        if let first = matchingItems.first {
-            return first.title
-        }
-        return "条件指定"
-    }
-
-    private static func wantedOptionSubtitle(
-        option: SupabaseHomeListingWishOptionRow,
-        matchingCount: Int
-    ) -> String? {
-        if option.wishIds.count > 1 {
-            if ListingLogic(rawValue: option.logic ?? "") == .atLeast {
-                return ListingLogic.minimumCountTitle(option.minCount ?? 1)
-            }
-            return "\(option.wishIds.count)点から選択"
-        }
-        if option.wishGroupId != nil || option.wishGoodsTypeId != nil {
-            return "\(matchingCount)件の候補"
-        }
-        return nil
     }
 
 }
