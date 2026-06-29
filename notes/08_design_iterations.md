@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション1226.197：個別募集WantedOptionPreview分離
+
+### 背景・問題意識
+
+`HomeCandidateListingWantedOptionFactory` は、wanted optionの表示可否、タイトル/サブタイトル、cash/goods/condition分類に加えて、プレビュー用の画像URLやタグ名の組み立てまで同じFactory内で担っていた。wanted option本体の判定を触らずに、プレビュー行生成だけを独立させ、今後の画像/タグ表示変更を安全にする必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeCandidateListingWantedOptionPreviewBuilder.swift`
+- 個別募集wanted optionのプレビュー行生成を専用Builderとして追加した。
+- wish ID順のpreview inventory lookup、matching itemsへのfallback、重複排除、画像URL解決、raw tag name抽出の既存順序を維持した。
+
+#### `ios-native/Sources/MegrumApp/HomeCandidateListingWantedOptionFactory.swift`
+- preview item生成を `HomeCandidateListingWantedOptionPreviewBuilder.previewItems` へ委譲した。
+- wanted optionのcash/goods/condition分類、表示可否、タイトル/サブタイトル、matching goods IDは変更していない。
+
+### 影響範囲
+
+- ホーム候補の個別募集wanted option preview生成内部に影響する。
+- ユーザー表示文言、画面レイアウト、ナビゲーション、Supabase API、DB schema、通知、認証、課金、取引状態、保存順序は変更していない。
+- 状態遷移、用語、データモデルに変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` は更新不要と判断した。
+
+### 確認方法
+- `git diff --check -- ios-native/Sources/MegrumApp/HomeCandidateListingWantedOptionFactory.swift ios-native/Sources/MegrumApp/HomeCandidateListingWantedOptionPreviewBuilder.swift`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-listing-selection-retry --enable-xctest --disable-swift-testing -j 1 --filter HomeCandidateComposerTests`
+  - passed：22 tests, 0 failures
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-listing-selection-retry --enable-xctest --disable-swift-testing -j 1 --filter 'HomeCandidateComposerTests|HomeDiscoveryMatchPolicyTests|HomeMutualMatchConditionPoliciesTests|HomeScreenFlowTests'`
+  - passed：160 tests, 0 failures
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild-refactor-home-listing-selection CODE_SIGNING_ALLOWED=NO build`
+  - passed
+
+### セルフレビュー結果
+- ✅ preview画像/タグ行生成だけを切り出し、wanted option本体の判定や表示値は維持した。
+- ✅ exact wish ID順、fallback、重複排除、画像URL、raw tag nameは既存Homeテストで維持確認した。
+- ✅ DB/API、保存処理、状態遷移、通知、認証、課金、取引状態、表示文言は変更していない。
+- ✅ 既存の未コミット変更は戻していない。
+
 ## イテレーション1226.196：個別募集SelectionFactory分離
 
 ### 背景・問題意識
