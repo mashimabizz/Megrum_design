@@ -93,6 +93,7 @@ alter table public.notifications
       'dispute_closed',
       'cancel_requested',
       'expires_soon',
+      'groom_liked',
       'groom_reply',
       'meguri_message',
       'meguri_board_reply',
