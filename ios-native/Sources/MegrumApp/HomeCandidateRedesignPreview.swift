@@ -38,18 +38,13 @@ struct HomeCandidateRedesignPreview: View {
         .background(MegrumTheme.canvas.ignoresSafeArea())
     }
 
-    /// 見出し＋「すべて見る」。ミラー時は左右が入れ替わる。
-    private func sectionHeader(_ title: String, mirrored: Bool) -> some View {
+    /// 見出し＋「すべて見る」。見出し行はミラーせず常に「タイトル左・
+    /// すべて見る右」で統一する（行のみミラー）。
+    private func sectionHeader(_ title: String, mirrored _: Bool) -> some View {
         HStack(alignment: .firstTextBaseline) {
-            if mirrored {
-                seeAllButton
-                Spacer()
-                headerTitle(title)
-            } else {
-                headerTitle(title)
-                Spacer()
-                seeAllButton
-            }
+            headerTitle(title)
+            Spacer()
+            seeAllButton
         }
     }
 
