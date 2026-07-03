@@ -22,7 +22,7 @@ final class SettingsScreenTests: XCTestCase {
         XCTAssertEqual(AppDrawerDestination.paymentSettings.title, "支払い方法の設定")
         XCTAssertEqual(AppDrawerDestination.exchangeSettings.title, "交換条件の設定")
         XCTAssertEqual(AppDrawerDestination.help.title, "ヘルプ")
-        XCTAssertEqual(AppDrawerDestination.megrumPlus.title, "Megrum プレミアム")
+        XCTAssertEqual(AppDrawerDestination.megrumPlus.title, "Megrumプレミアム")
         XCTAssertEqual(AppDrawerDestination.oshiSettings.systemImage, "sparkles")
         XCTAssertEqual(AppDrawerDestination.paymentSettings.systemImage, "yensign.circle")
         XCTAssertEqual(AppDrawerDestination.exchangeSettings.systemImage, "arrow.left.arrow.right.circle")
@@ -39,6 +39,7 @@ final class SettingsScreenTests: XCTestCase {
                 .address,
                 .premium,
                 .blockedUsers,
+                .meguriBlockedUsers,
                 .privacy,
                 .loginSecurity,
                 .help,
@@ -50,6 +51,49 @@ final class SettingsScreenTests: XCTestCase {
                 .logout
             ]
         )
+    }
+
+    func testSettingsPresentationStateTracksNavigationAndSignOutLifecycle() {
+        var state = SettingsPresentationState()
+
+        state.openRoute(.loginSecurity)
+        state.openRoute(.accountDeletion)
+
+        XCTAssertEqual(state.navigationPath, [.loginSecurity, .accountDeletion])
+        XCTAssertTrue(state.beginSignOutIfNeeded())
+        XCTAssertTrue(state.isSigningOut)
+        XCTAssertFalse(state.beginSignOutIfNeeded())
+
+        state.finishSignOut()
+
+        XCTAssertFalse(state.isSigningOut)
+        XCTAssertTrue(state.beginSignOutIfNeeded())
+    }
+
+    func testNativeLoadingFailurePresentationStateTracksRetryAndSignOutActions() {
+        var state = NativeLoadingFailurePresentationState()
+
+        XCTAssertEqual(state.retryTitle, "再読み込み")
+        XCTAssertEqual(state.signOutTitle, "ログアウトしてやり直す")
+        XCTAssertFalse(state.actionsDisabled)
+
+        state.beginRetry()
+
+        XCTAssertTrue(state.isRetrying)
+        XCTAssertEqual(state.retryTitle, "再読み込み中")
+        XCTAssertTrue(state.actionsDisabled)
+
+        state.finishRetry()
+        state.beginSignOut()
+
+        XCTAssertFalse(state.isRetrying)
+        XCTAssertTrue(state.isSigningOut)
+        XCTAssertEqual(state.signOutTitle, "ログアウト中")
+        XCTAssertTrue(state.actionsDisabled)
+
+        state.finishSignOut()
+
+        XCTAssertFalse(state.actionsDisabled)
     }
 
     func testSettingsStatusTextResolverFormatsNotificationStates() {
@@ -92,6 +136,75 @@ final class SettingsScreenTests: XCTestCase {
         XCTAssertEqual(SettingsStatusTextResolver.subscriptionStatusText(isActive: false), "未加入")
     }
 
+    func testSubscriptionSettingsPresentationStateTracksOfferAndPurchaseFeedback() {
+        let fallbackOffer = MegrumPlusPurchaseOffer(
+            productID: "fallback",
+            displayName: "Megrumプレミアム",
+            priceText: "月額500円"
+        )
+        let storeOffer = MegrumPlusPurchaseOffer(
+            productID: "store",
+            displayName: "Megrumプレミアム",
+            priceText: "¥500"
+        )
+        var state = SubscriptionSettingsPresentationState()
+
+        XCTAssertEqual(state.displayOffer(fallback: fallbackOffer), fallbackOffer)
+        XCTAssertTrue(state.beginLoadingOfferIfNeeded())
+        XCTAssertTrue(state.isLoadingOffer)
+        XCTAssertFalse(state.beginLoadingOfferIfNeeded())
+
+        state.finishLoadingOffer(storeOffer)
+
+        XCTAssertEqual(state.displayOffer(fallback: fallbackOffer), storeOffer)
+        XCTAssertFalse(state.isLoadingOffer)
+        XCTAssertFalse(state.beginLoadingOfferIfNeeded())
+
+        state.setPurchaseMessage("古い成功")
+        state.setPurchaseErrorMessage("古いエラー")
+
+        XCTAssertNil(state.purchaseMessage)
+        XCTAssertEqual(state.purchaseErrorMessage, "古いエラー")
+        XCTAssertTrue(state.beginPurchaseAction())
+        XCTAssertTrue(state.isPurchasing)
+        XCTAssertNil(state.purchaseMessage)
+        XCTAssertNil(state.purchaseErrorMessage)
+        XCTAssertFalse(state.beginPurchaseAction())
+
+        state.setPurchaseMessage("有効になりました")
+        XCTAssertEqual(state.purchaseMessage, "有効になりました")
+        XCTAssertNil(state.purchaseErrorMessage)
+
+        state.finishPurchaseAction()
+
+        XCTAssertFalse(state.isPurchasing)
+    }
+
+    func testMegrumPlusRuntimeConfigurationKeepsIAPDisabledByDefault() {
+        let configuration = MegrumPlusRuntimeConfiguration.current(environment: [:], infoDictionary: [:])
+
+        XCTAssertFalse(configuration.isIAPEnabled)
+    }
+
+    func testMegrumPlusRuntimeConfigurationReadsExplicitIAPEnablement() {
+        let environmentConfiguration = MegrumPlusRuntimeConfiguration.current(
+            environment: ["MEGRUM_PLUS_IAP_ENABLED": "YES"],
+            infoDictionary: ["MegrumPlusIAPEnabled": "NO"]
+        )
+        let infoConfiguration = MegrumPlusRuntimeConfiguration.current(
+            environment: [:],
+            infoDictionary: ["MegrumPlusIAPEnabled": "true"]
+        )
+        let unresolvedConfiguration = MegrumPlusRuntimeConfiguration.current(
+            environment: [:],
+            infoDictionary: ["MegrumPlusIAPEnabled": "$(MEGRUM_PLUS_IAP_ENABLED)"]
+        )
+
+        XCTAssertTrue(environmentConfiguration.isIAPEnabled)
+        XCTAssertTrue(infoConfiguration.isIAPEnabled)
+        XCTAssertFalse(unresolvedConfiguration.isIAPEnabled)
+    }
+
     func testSettingsStatusTextResolverFormatsPushNotificationRows() {
         XCTAssertEqual(SettingsStatusTextResolver.pushNotificationStatusText(isEnabled: true), "端末に通知を届ける")
         XCTAssertEqual(SettingsStatusTextResolver.pushNotificationStatusText(isEnabled: false), "端末通知はOFF")
@@ -120,6 +233,54 @@ final class SettingsScreenTests: XCTestCase {
 
         XCTAssertEqual(input.reasons, [.other, .notUsing])
         XCTAssertEqual(input.note, "ありがとうございました")
+    }
+
+    func testAccountDeletionDraftStateTracksReasonsNoteAndSubmissionInput() {
+        var state = AccountDeletionDraftState()
+        state.toggle(.notUsing)
+        state.toggle(.privacyConcern)
+        state.toggle(.notUsing)
+        state.setNote("  退会理由  ")
+
+        let input = state.submissionInput
+
+        XCTAssertEqual(state.selectedReasons, [.privacyConcern])
+        XCTAssertEqual(input.reasons, [.privacyConcern])
+        XCTAssertEqual(input.note, "退会理由")
+    }
+
+    func testAccountDeletionDraftStateValidatesAndMovesSteps() {
+        var state = AccountDeletionDraftState()
+
+        XCTAssertFalse(state.validateReasonsStep())
+        XCTAssertEqual(
+            state.validationMessage,
+            AccountDeletionDraftValidator.missingReasonMessage
+        )
+
+        state.clearValidationMessage()
+        XCTAssertNil(state.validationMessage)
+        state.setOngoingTradeValidationMessage()
+        XCTAssertEqual(state.validationMessage, "現在進行中の取引があるため退会できません")
+
+        state.moveToReasonsStep()
+        XCTAssertEqual(state.step, .reasons)
+        state.returnToWarningStep()
+        XCTAssertEqual(state.step, .warning)
+    }
+
+    func testAccountDeletionDraftStateLimitsNoteAndRequestsConfirmation() {
+        var state = AccountDeletionDraftState()
+        let tooLongNote = String(repeating: "あ", count: AccountDeletionDraftValidator.noteMaxLength + 20)
+
+        state.setNote(tooLongNote)
+        state.toggle(.other)
+        let isValid = state.validateReasonsStep()
+        state.requestFinalConfirmation()
+
+        XCTAssertEqual(state.note.count, AccountDeletionDraftValidator.noteMaxLength)
+        XCTAssertTrue(isValid)
+        XCTAssertTrue(state.showsFinalConfirmation)
     }
 
     func testAccountDeletionEligibilityBlocksOnlyOngoingParticipantTrades() {
@@ -233,6 +394,7 @@ final class SettingsScreenTests: XCTestCase {
         )
 
         XCTAssertNil(draft.validationMessage)
+        XCTAssertTrue(draft.requiresBankAccountDetails)
         XCTAssertEqual(PaymentSettingsDraft.limitedOtherNote("123456789"), "12345678")
         XCTAssertEqual(draft.normalized.otherNote, "楽天ペイ相談可能")
         XCTAssertEqual(draft.normalized.summaryText, "銀行振込 / PayPay / 現金交換 / 楽天ペイ相談可能")
@@ -242,6 +404,8 @@ final class SettingsScreenTests: XCTestCase {
         XCTAssertEqual(draft.validationMessage, "その他を選ぶ場合は自由入力を入力してください")
 
         draft.set(.other, isSelected: false)
+        draft.set(.bankTransfer, isSelected: false)
+        XCTAssertFalse(draft.requiresBankAccountDetails)
         XCTAssertNil(draft.settings(userID: UUID()).otherNote)
     }
 
@@ -285,6 +449,73 @@ final class SettingsScreenTests: XCTestCase {
 
         XCTAssertEqual(draft.methods, [.bankTransfer, .cashExchange])
         XCTAssertEqual(draft.otherNote, "プロフィール側")
+    }
+
+    func testPaymentSettingsEditingStateKeepsUserEditsDuringExternalRefresh() {
+        let userID = UUID(uuidString: "00000000-0000-0000-0000-000000000823")!
+        let viewer = UserProfile(id: userID, handle: "michi", displayName: "みち")
+        var state = PaymentSettingsEditingState()
+
+        state.applyCurrentValues(
+            settings: UserPaymentSettings(
+                userID: userID,
+                methods: [.paypay],
+                otherNote: nil
+            ),
+            viewer: viewer,
+            force: true
+        )
+        XCTAssertEqual(state.draft.methods, [.paypay])
+
+        state.updateText(\.bankName, value: "ユーザー入力銀行")
+        state.applyCurrentValues(
+            settings: UserPaymentSettings(
+                userID: userID,
+                methods: [.bankTransfer],
+                bankName: "外部更新銀行"
+            ),
+            viewer: viewer
+        )
+        XCTAssertEqual(state.draft.bankName, "ユーザー入力銀行")
+
+        state.applyCurrentValues(
+            settings: UserPaymentSettings(
+                userID: userID,
+                methods: [.bankTransfer],
+                bankName: "外部更新銀行"
+            ),
+            viewer: viewer,
+            force: true
+        )
+        XCTAssertEqual(state.draft.methods, [.bankTransfer])
+        XCTAssertEqual(state.draft.bankName, "外部更新銀行")
+    }
+
+    func testPaymentSettingsEditingStateValidatesBeforeSave() {
+        let userID = UUID(uuidString: "00000000-0000-0000-0000-000000000824")!
+        var state = PaymentSettingsEditingState()
+
+        state.toggleMethod(.other)
+        XCTAssertNil(state.settingsForSave(viewerID: userID))
+        XCTAssertEqual(state.validationMessage, "その他を選ぶ場合は自由入力を入力してください")
+
+        state.updateOtherNote("123456789")
+        let settings = state.settingsForSave(viewerID: userID)
+        XCTAssertEqual(settings?.methods, [.other])
+        XCTAssertEqual(settings?.otherNote, "12345678")
+        XCTAssertTrue(state.hasUserEditedDraft)
+
+        state.markSaveSucceeded()
+        XCTAssertFalse(state.hasUserEditedDraft)
+    }
+
+    func testPaymentSettingsEditingStateRequiresViewerBeforeSave() {
+        var state = PaymentSettingsEditingState()
+
+        state.toggleMethod(.paypay)
+
+        XCTAssertNil(state.settingsForSave(viewerID: nil))
+        XCTAssertEqual(state.validationMessage, "プロフィールを読み込めませんでした")
     }
 
     func testDefaultExchangeSettingsPreserveSelectedDateDetails() {
@@ -367,6 +598,29 @@ final class SettingsScreenTests: XCTestCase {
         XCTAssertEqual(summary.resetEmailPrefill, "")
     }
 
+    func testLoginSecurityPasswordResetStatePrefillsAndValidatesEmail() {
+        var state = LoginSecurityPasswordResetState()
+
+        state.prefillEmailIfNeeded(" michi@example.com ")
+        XCTAssertEqual(state.email, " michi@example.com ")
+        XCTAssertEqual(state.normalizedEmail, "michi@example.com")
+        XCTAssertNil(state.validationMessageForSubmission())
+
+        state.email = "manual@example.com"
+        state.prefillEmailIfNeeded("other@example.com")
+        XCTAssertEqual(state.email, "manual@example.com")
+
+        state.email = " "
+        XCTAssertEqual(
+            state.validationMessageForSubmission(),
+            MegrumAuthInputValidator.passwordResetValidationMessage(email: "")
+        )
+        XCTAssertNotNil(state.inputErrorMessage)
+
+        state.clearInputFeedback()
+        XCTAssertNil(state.inputErrorMessage)
+    }
+
     func testLegalDocumentKindsExposeMinimumEntrancesWithoutFullText() {
         XCTAssertEqual(LegalDocumentKind.terms.title, "利用規約")
         XCTAssertEqual(LegalDocumentKind.privacy.title, "プライバシーポリシー")
@@ -425,6 +679,76 @@ final class SettingsScreenTests: XCTestCase {
         )
 
         XCTAssertNil(MailingAddressDraftValidator.validationMessage(for: address))
+    }
+
+    func testAddressSettingsDraftStateBuildsTrimmedMailingAddress() {
+        let userID = UUID(uuidString: "20000000-0000-0000-0000-000000000007")!
+        var state = AddressSettingsDraftState()
+        state.recipientName = "  みち  "
+        state.postalCode = "〒150-0001"
+        state.prefecture = " 東京都 "
+        state.city = " 渋谷区 "
+        state.line1 = " 神宮前1-1-1 "
+        state.line2 = " "
+        state.phoneNumber = " 090-0000-0000 "
+
+        let address = state.mailingAddress(userID: userID)
+
+        XCTAssertEqual(address.userID, userID)
+        XCTAssertEqual(address.recipientName, "みち")
+        XCTAssertEqual(address.postalCode, "1500001")
+        XCTAssertEqual(address.prefecture, "東京都")
+        XCTAssertEqual(address.city, "渋谷区")
+        XCTAssertEqual(address.line1, "神宮前1-1-1")
+        XCTAssertNil(address.line2)
+        XCTAssertEqual(address.phoneNumber, "090-0000-0000")
+    }
+
+    func testAddressSettingsDraftStateAppliesAddressAndPostalCodeLookup() {
+        var state = AddressSettingsDraftState()
+        let savedAddress = MailingAddress(
+            userID: UUID(uuidString: "20000000-0000-0000-0000-000000000008")!,
+            recipientName: "みち",
+            postalCode: "1000001",
+            prefecture: "東京都",
+            city: "千代田区",
+            line1: "千代田1-1",
+            line2: "本館",
+            phoneNumber: "090"
+        )
+
+        state.apply(address: savedAddress)
+        XCTAssertEqual(state.recipientName, "みち")
+        XCTAssertEqual(state.lastAppliedPostalCode, "1000001")
+        XCTAssertFalse(state.shouldLookupPostalCode("1000001"))
+        XCTAssertTrue(state.shouldLookupPostalCode("1500001"))
+
+        state.apply(
+            postalCodeAddress: PostalCodeAddress(
+                postalCode: "1500001",
+                prefecture: "東京都",
+                city: "渋谷区",
+                town: "神宮前"
+            )
+        )
+
+        XCTAssertEqual(state.prefecture, "東京都")
+        XCTAssertEqual(state.city, "渋谷区")
+        XCTAssertEqual(state.line1, "神宮前")
+        XCTAssertEqual(state.lastAppliedPostalCode, "1500001")
+    }
+
+    func testAddressSettingsDraftStateNormalizesPostalCodeAndClearsInputError() {
+        var state = AddressSettingsDraftState()
+        state.postalCode = "150-0001"
+        state.setValidationMessage("入力してください")
+
+        let normalized = state.normalizePostalCodeInput("〒150-0001")
+        state.clearInputError()
+
+        XCTAssertEqual(normalized, "1500001")
+        XCTAssertEqual(state.postalCode, "1500001")
+        XCTAssertNil(state.inputErrorMessage)
     }
 
     private static func proposal(

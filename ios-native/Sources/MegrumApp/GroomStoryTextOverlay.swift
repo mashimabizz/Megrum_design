@@ -63,19 +63,22 @@ struct GroomStoryTextOverlay: Identifiable, Equatable {
     var normalizedPosition: CGPoint
     var color: GroomStoryTextColor
     var scale: CGFloat
+    var rotationDegrees: Double
 
     init(
         id: UUID = UUID(),
         text: String,
         normalizedPosition: CGPoint,
         color: GroomStoryTextColor = .white,
-        scale: CGFloat = 1
+        scale: CGFloat = 1,
+        rotationDegrees: Double = 0
     ) {
         self.id = id
         self.text = text
         self.normalizedPosition = normalizedPosition.groomStoryClamped
         self.color = color
         self.scale = min(max(scale, 0.55), 2.6)
+        self.rotationDegrees = rotationDegrees
     }
 }
 

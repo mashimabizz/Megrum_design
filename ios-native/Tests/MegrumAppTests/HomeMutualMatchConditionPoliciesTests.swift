@@ -3,6 +3,65 @@ import MegrumData
 import XCTest
 
 final class HomeMutualMatchConditionPoliciesTests: XCTestCase {
+    func testSelectedPreviewPresentationStateTracksConditionHelpPopover() {
+        var state = HomeMutualMatchSelectedPreviewPresentationState()
+
+        XCTAssertFalse(state.isShowingConditionHelp)
+
+        state.showConditionHelp()
+
+        XCTAssertTrue(state.isShowingConditionHelp)
+
+        state.dismissConditionHelp()
+
+        XCTAssertFalse(state.isShowingConditionHelp)
+    }
+
+    func testMutualMatchDetailPresentationStateTracksSelectionNestedAndExtras() {
+        let ownerID = UUID(uuidString: "00000000-0000-0000-0000-00000000C101")!
+        let receiverID = UUID(uuidString: "00000000-0000-0000-0000-00000000C102")!
+        let extraReceiverID = UUID(uuidString: "00000000-0000-0000-0000-00000000C103")!
+        let senderID = UUID(uuidString: "00000000-0000-0000-0000-00000000C104")!
+        let base = HomeDiscoveryProposalSelection(
+            receiverGoodsID: receiverID,
+            senderGoodsIDs: [senderID],
+            matchType: .perfect
+        )
+        let extra = HomeDiscoveryProposalSelection(
+            receiverGoodsID: extraReceiverID,
+            senderGoodsIDs: [],
+            matchType: .forward
+        )
+        var state = HomeMutualMatchDetailPresentationState()
+
+        state.seedInitialSelectionIfNeeded(hasSelectedPair: false, preferredPairID: "pair-a")
+
+        XCTAssertEqual(state.selectedPairID, "pair-a")
+
+        state.selectPair(id: "pair-b")
+        state.seedInitialSelectionIfNeeded(hasSelectedPair: true, preferredPairID: "pair-c")
+
+        XCTAssertEqual(state.selectedPairID, "pair-b")
+
+        state.showNestedProfile(PublicProfileRoute(userID: ownerID))
+
+        XCTAssertEqual(state.nestedPresentation?.id, "profile-\(ownerID.uuidString)")
+
+        state.addExtraProposalSelectionAndDismiss(extra)
+
+        XCTAssertNil(state.nestedPresentation)
+        XCTAssertEqual(state.addedExtraCandidateIDs, [extraReceiverID])
+        XCTAssertEqual(
+            state.proposalSelection(base).receiverGoodsIDs,
+            [receiverID, extraReceiverID]
+        )
+
+        state.showNestedProfile(PublicProfileRoute(userID: ownerID))
+        state.closeNestedPresentation()
+
+        XCTAssertNil(state.nestedPresentation)
+    }
+
     func testLocalExchangeKeepsCandidateButAddsDateDiscussionWhenEitherScheduleIsFlexible() throws {
         let evaluation = try exchangeEvaluation(
             viewer: summary(

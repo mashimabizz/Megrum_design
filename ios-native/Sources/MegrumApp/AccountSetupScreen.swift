@@ -11,8 +11,7 @@ public struct AccountSetupScreen: View {
     @State private var step: AccountSetupStep = .welcome
     @State private var oshiState = AccountSetupOshiState()
     @State private var profileState: AccountSetupProfileState
-    @State private var toastMessage: String?
-    @State private var toastID = UUID()
+    @State private var toastState = AccountSetupToastState()
     @FocusState private var focusedField: AccountSetupFocusedField?
 
     private var oshiPresentationState: AccountSetupOshiPresentationState {
@@ -111,13 +110,13 @@ public struct AccountSetupScreen: View {
         .megrumHiddenNavigationBar()
         .scrollDismissesKeyboard(.interactively)
         .overlay(alignment: .bottom) {
-            if let toastMessage {
+            if let toastMessage = toastState.message {
                 MeguriToastView(message: toastMessage)
                     .padding(.bottom, 104)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
-        .animation(.spring(response: 0.32, dampingFraction: 0.88), value: toastMessage)
+        .animation(.spring(response: 0.32, dampingFraction: 0.88), value: toastState.message)
     }
 
     @ViewBuilder
@@ -204,13 +203,8 @@ public struct AccountSetupScreen: View {
     }
 
     private func advanceFromValidatedStep(_ validatedStep: AccountSetupStep) {
-        let message = AccountSetupDraftValidator.validationMessage(
+        let message = profileState.draft.validationMessage(
             for: validatedStep,
-            displayName: profileState.displayName,
-            handle: profileState.handle,
-            prefecture: profileState.prefecture,
-            birthDate: profileState.birthDate,
-            gender: profileState.gender,
             oshiSelections: selectedOshiInputs
         )
         guard message == nil else {
@@ -260,25 +254,14 @@ public struct AccountSetupScreen: View {
 
     private func save() async {
         focusedField = nil
-        profileState.inputErrorMessage = AccountSetupDraftValidator.validationMessage(
-            displayName: profileState.displayName,
-            handle: profileState.handle,
-            prefecture: profileState.prefecture,
-            birthDate: profileState.birthDate,
-            gender: profileState.gender,
-            oshiSelections: selectedOshiInputs
-        )
+        let draft = profileState.draft
+        profileState.inputErrorMessage = draft.validationMessage(oshiSelections: selectedOshiInputs)
         guard profileState.inputErrorMessage == nil else {
             return
         }
 
         let completed = await appState.completeAccountSetup(
-            handle: profileState.handle,
-            displayName: profileState.displayName,
-            prefecture: profileState.prefecture,
-            birthDate: profileState.birthDate,
-            gender: profileState.gender,
-            oshiSelections: selectedOshiInputs
+            draft.accountSetupInput(oshiSelections: selectedOshiInputs)
         )
         if !completed {
             profileState.inputErrorMessage = appState.errorMessage
@@ -438,14 +421,10 @@ public struct AccountSetupScreen: View {
 
     private func showToast(_ message: String) {
         let nextToastID = UUID()
-        toastID = nextToastID
-        toastMessage = message
+        toastState.showToast(message, id: nextToastID)
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: 2_200_000_000)
-            guard toastID == nextToastID else {
-                return
-            }
-            toastMessage = nil
+            toastState.clearToast(ifMatching: nextToastID)
         }
     }
 

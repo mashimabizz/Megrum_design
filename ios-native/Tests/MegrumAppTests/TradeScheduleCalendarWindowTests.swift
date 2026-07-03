@@ -66,6 +66,85 @@ final class TradeScheduleCalendarWindowTests: XCTestCase {
         XCTAssertEqual(result, [overlap])
     }
 
+    func testPersonalSchedulePresentationStateMovesAnchorAndTracksEditor() {
+        var state = PersonalSchedulePresentationState(anchorDate: date(year: 2026, month: 6, day: 25, hour: 15))
+        let expectedWindow = TradeScheduleCalendarWindow(
+            mode: .fiveDays,
+            anchorDate: state.anchorDate,
+            calendar: calendar
+        )
+
+        XCTAssertEqual(state.reloadKey(calendar: calendar), expectedWindow.reloadKey)
+
+        state.showScheduleEditor()
+        XCTAssertTrue(state.isShowingScheduleEditor)
+
+        state.moveAnchor(by: 5, calendar: calendar)
+        XCTAssertEqual(state.anchorDate, date(year: 2026, month: 6, day: 30, hour: 15))
+
+        state.mode = .month
+        state.moveAnchor(by: 1, calendar: calendar)
+
+        XCTAssertEqual(state.anchorDate, date(year: 2026, month: 7, day: 30, hour: 15))
+        XCTAssertEqual(state.visibleInterval(calendar: calendar).start, date(year: 2026, month: 7, day: 1))
+    }
+
+    func testTradeSchedulePresentationStateMovesAnchorAndTracksEditor() {
+        var state = TradeSchedulePresentationState(anchorDate: date(year: 2026, month: 6, day: 25, hour: 15))
+        let expectedWindow = TradeScheduleCalendarWindow(
+            mode: .fiveDays,
+            anchorDate: state.anchorDate,
+            calendar: calendar
+        )
+
+        XCTAssertEqual(state.reloadKey(calendar: calendar), expectedWindow.reloadKey)
+
+        state.showScheduleEditor()
+        XCTAssertTrue(state.isShowingScheduleEditor)
+
+        state.moveAnchor(by: 5, calendar: calendar)
+        XCTAssertEqual(state.anchorDate, date(year: 2026, month: 6, day: 30, hour: 15))
+
+        state.mode = .month
+        state.moveAnchor(by: 1, calendar: calendar)
+
+        XCTAssertEqual(state.anchorDate, date(year: 2026, month: 7, day: 30, hour: 15))
+        XCTAssertEqual(state.visibleInterval(calendar: calendar).start, date(year: 2026, month: 7, day: 1))
+    }
+
+    func testProfileSchedulePresentationStateBuildsRangesAndPreservesDayOffsetMovement() {
+        let userID = UUID(uuidString: "00000000-0000-0000-0000-000000000990")!
+        var state = ProfileSchedulePresentationState(anchorDate: date(year: 2026, month: 6, day: 25, hour: 15))
+
+        XCTAssertEqual(state.visibleInterval(calendar: calendar).start, date(year: 2026, month: 6, day: 25))
+        XCTAssertEqual(state.visibleInterval(calendar: calendar).end, date(year: 2026, month: 6, day: 30))
+        XCTAssertEqual(state.fiveVisibleDays(calendar: calendar).count, 5)
+        XCTAssertTrue(state.reloadKey(userID: userID, calendar: calendar).contains(userID.uuidString))
+
+        state.mode = .month
+        XCTAssertEqual(state.visibleInterval(calendar: calendar).start, date(year: 2026, month: 6, day: 1))
+        XCTAssertEqual(state.monthDays(calendar: calendar).count, 30)
+
+        state.moveAnchor(by: 1, calendar: calendar)
+        XCTAssertEqual(state.anchorDate, date(year: 2026, month: 6, day: 26, hour: 15))
+
+        let overlap = makeSchedule(
+            idSuffix: "904",
+            startAt: date(year: 2026, month: 6, day: 26, hour: 23),
+            endAt: date(year: 2026, month: 6, day: 27, hour: 1)
+        )
+        let outside = makeSchedule(
+            idSuffix: "905",
+            startAt: date(year: 2026, month: 6, day: 27),
+            endAt: date(year: 2026, month: 6, day: 27, hour: 2)
+        )
+
+        XCTAssertEqual(
+            state.schedules(on: date(year: 2026, month: 6, day: 26), from: [overlap, outside], calendar: calendar),
+            [overlap]
+        )
+    }
+
     private func makeSchedule(idSuffix: String, startAt: Date, endAt: Date) -> PersonalSchedule {
         PersonalSchedule(
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000\(idSuffix)")!,

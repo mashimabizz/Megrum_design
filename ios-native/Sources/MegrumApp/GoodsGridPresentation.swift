@@ -31,7 +31,9 @@ enum GoodsTileCardPolicy {
 }
 
 enum GoodsSelectionFooterMetrics {
-    static let bottomPadding: CGFloat = 12
+    /// Measured from the screen bottom (the containers ignore the bottom safe
+    /// area): clears the floating tab bar (~83pt) so the footer sits above it.
+    static let bottomPadding: CGFloat = 106
     static let horizontalPadding: CGFloat = 18
     static let cornerRadius: CGFloat = 28
     static let actionHeight: CGFloat = 52

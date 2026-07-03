@@ -47,65 +47,49 @@ extension ProposalCreateFlow {
         guard meetupPrefecture.isBlank else {
             return
         }
-        if let summary = viewerListingExchangeSummary, summary.includesLocal {
-            meetupPrefecture = summary.localPrefecture
-            meetupPlaceMemo = summary.localPlaceMemo
-            if let date = Self.date(fromScheduleText: summary.localSchedule) {
-                meetupStartAt = date
-                meetupEndAt = date.addingTimeInterval(30 * 60)
-            }
-        } else if defaultExchangeSummary.includesLocal {
-            meetupPrefecture = defaultExchangeSummary.localPrefecture
-            meetupPlaceMemo = defaultExchangeSummary.localPlaceMemo
-            if let date = Self.date(fromScheduleText: defaultExchangeSummary.localSchedule) {
-                meetupStartAt = date
-                meetupEndAt = date.addingTimeInterval(30 * 60)
-            }
-        } else if let viewerPrefecture = appState.viewer?.prefecture.nilIfBlank {
-            meetupPrefecture = viewerPrefecture
-        } else if let ownerPrefecture = targetItem.ownerPrefecture.nilIfBlank {
-            meetupPrefecture = ownerPrefecture
+        guard let draft = ProposalMeetupConditionDraftResolver.resolvedDraft(
+            viewerListingSummary: viewerListingExchangeSummary,
+            defaultSummary: defaultExchangeSummary,
+            viewerPrefecture: appState.viewer?.prefecture,
+            ownerPrefecture: targetItem.ownerPrefecture
+        ) else {
+            return
+        }
+        meetupPrefecture = draft.prefecture
+        if let placeMemo = draft.placeMemo {
+            meetupPlaceMemo = placeMemo
+        }
+        if let startAt = draft.startAt, let endAt = draft.endAt {
+            meetupStartAt = startAt
+            meetupEndAt = endAt
         }
     }
 
     func seedDefaultShippingConditionsIfNeeded() {
-        if let summary = viewerListingExchangeSummary, summary.includesMail {
-            shippingFee = summary.shippingFee
-            shippingDays = summary.shippingDays
-            return
-        }
-        if let initialShippingFee {
-            shippingFee = initialShippingFee
-        }
-        if let initialShippingDays {
-            shippingDays = initialShippingDays
-        }
-        if initialShippingFee == nil, defaultExchangeSummary.includesMail {
-            shippingFee = defaultExchangeSummary.shippingFee
-        }
-        if initialShippingDays == nil, defaultExchangeSummary.includesMail {
-            shippingDays = defaultExchangeSummary.shippingDays
-        }
+        let draft = ProposalShippingConditionDraftResolver.resolvedDraft(
+            viewerListingSummary: viewerListingExchangeSummary,
+            initialFee: initialShippingFee,
+            initialDays: initialShippingDays,
+            defaultSummary: defaultExchangeSummary
+        )
+        shippingFee = draft.fee
+        shippingDays = draft.days
     }
 
     func handleExchangeMethodChange() {
-        if selectedStep == .meetup && !configuration.requiresMeetupBeforeSubmit {
-            selectedStep = configuration.requiresShippingBeforeSubmit ? .shipping : .confirm
-        }
-        if selectedStep == .shipping && !configuration.requiresShippingBeforeSubmit {
-            selectedStep = configuration.requiresMeetupBeforeSubmit ? .meetup : .confirm
-        }
-        if selectedStep == .payment && !configuration.requiresPaymentSelection {
-            selectedStep = .confirm
-        }
+        selectedStep = ProposalExchangeMethodStepResolver.resolvedStepAfterExchangeMethodChange(
+            currentStep: selectedStep,
+            requiresMeetupBeforeSubmit: configuration.requiresMeetupBeforeSubmit,
+            requiresShippingBeforeSubmit: configuration.requiresShippingBeforeSubmit,
+            requiresPaymentSelection: configuration.requiresPaymentSelection
+        )
         applyInitialStepIfNeeded()
     }
 
     func applyInitialExchangeMethodIfNeeded() {
-        guard !didApplyInitialExchangeMethod else {
+        guard initialStateFlags.claimExchangeMethodApplication() else {
             return
         }
-        didApplyInitialExchangeMethod = true
         guard let initialExchangeMethod else {
             return
         }
@@ -113,10 +97,9 @@ extension ProposalCreateFlow {
     }
 
     func applyVisualQAStateIfNeeded() {
-        guard !didApplyVisualQAState else {
+        guard initialStateFlags.claimVisualQAStateApplication() else {
             return
         }
-        didApplyVisualQAState = true
         guard visualQAInitialScreen == .proposalConfirm || visualQAInitialScreen == .proposalComplete else {
             return
         }
@@ -129,7 +112,7 @@ extension ProposalCreateFlow {
                 senderCount: max(senderSelectionCount, 1),
                 receiverCount: max(receiverSelectionCount, 1),
                 partnerHandle: displayPartnerHandle,
-                methodTitle: Self.methodTitle(exchangeMethod),
+                methodTitle: ProposalCreateDisplayTextFormatter.methodTitle(exchangeMethod),
                 meetupSummary: meetupSummary,
                 conditionTags: [],
                 exchangeMethod: exchangeMethod
@@ -157,19 +140,21 @@ extension ProposalCreateFlow {
     }
 
     func applyInitialStepIfNeeded() {
-        guard !didApplyInitialStep else {
+        guard initialStateFlags.canApplyInitialStep() else {
             return
         }
-        guard visibleSteps.contains(initialStep) else {
-            didApplyInitialStep = true
+        switch ProposalInitialStepResolver.resolution(
+            initialStep: initialStep,
+            visibleSteps: visibleSteps,
+            configuration: configuration
+        ) {
+        case .apply(let step):
+            selectedStep = step
+            initialStateFlags.markInitialStepApplied()
+        case .markApplied:
+            initialStateFlags.markInitialStepApplied()
+        case .wait:
             return
-        }
-        if visibleSteps
-            .prefix(while: { $0 != initialStep })
-            .allSatisfy({ configuration.canAdvance(from: $0) })
-        {
-            selectedStep = initialStep
-            didApplyInitialStep = true
         }
     }
 }

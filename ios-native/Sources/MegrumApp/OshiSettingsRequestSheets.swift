@@ -9,10 +9,7 @@ struct OshiRequestSheet: View {
     var onClose: () -> Void
     var onSubmit: (OshiRequestSheetPayload) -> Void
 
-    @State private var name: String
-    @State private var note = ""
-    @State private var kind: OshiRequestKind = .group
-    @State private var genreID: UUID?
+    @State private var draftState: OshiRequestDraftState
 
     init(
         state: OshiRequestSheetState,
@@ -24,25 +21,21 @@ struct OshiRequestSheet: View {
         self.genres = genres
         self.onClose = onClose
         self.onSubmit = onSubmit
-        _name = State(initialValue: state.initialName ?? "")
-    }
-
-    private var canSubmit: Bool {
-        !name.isBlank
+        _draftState = State(initialValue: OshiRequestDraftState(initialName: state.initialName))
     }
 
     var body: some View {
         OshiRequestSheetContent(
-            name: $name,
-            note: $note,
-            kind: $kind,
-            genreID: $genreID,
+            name: $draftState.name,
+            note: $draftState.note,
+            kind: $draftState.kind,
+            genreID: $draftState.genreID,
             genres: genres,
             onClose: onClose
         )
         .safeAreaInset(edge: .bottom) {
             OshiRequestSubmitFooter(
-                canSubmit: canSubmit,
+                canSubmit: draftState.canSubmit,
                 onSubmit: submitRequest
             )
         }
@@ -51,14 +44,7 @@ struct OshiRequestSheet: View {
     }
 
     private func submitRequest() {
-        onSubmit(
-            OshiRequestSheetPayload(
-                name: name.trimmingCharacters(in: .whitespacesAndNewlines),
-                note: note.nilIfBlank,
-                kind: kind,
-                genreID: genreID
-            )
-        )
+        onSubmit(draftState.payload)
     }
 }
 
@@ -67,8 +53,7 @@ struct OshiMemberRequestSheet: View {
     var onClose: () -> Void
     var onSubmit: (OshiMemberRequestSheetPayload) -> Void
 
-    @State private var name: String
-    @State private var note = ""
+    @State private var draftState: OshiMemberRequestDraftState
 
     init(
         context: OshiMemberRequestContext,
@@ -78,23 +63,19 @@ struct OshiMemberRequestSheet: View {
         self.context = context
         self.onClose = onClose
         self.onSubmit = onSubmit
-        _name = State(initialValue: context.initialName ?? "")
-    }
-
-    private var canSubmit: Bool {
-        !name.isBlank
+        _draftState = State(initialValue: OshiMemberRequestDraftState(initialName: context.initialName))
     }
 
     var body: some View {
         OshiMemberRequestSheetContent(
             context: context,
-            name: $name,
-            note: $note,
+            name: $draftState.name,
+            note: $draftState.note,
             onClose: onClose
         )
         .safeAreaInset(edge: .bottom) {
             OshiRequestSubmitFooter(
-                canSubmit: canSubmit,
+                canSubmit: draftState.canSubmit,
                 onSubmit: submitRequest
             )
         }
@@ -103,11 +84,6 @@ struct OshiMemberRequestSheet: View {
     }
 
     private func submitRequest() {
-        onSubmit(
-            OshiMemberRequestSheetPayload(
-                name: name.trimmingCharacters(in: .whitespacesAndNewlines),
-                note: note.nilIfBlank
-            )
-        )
+        onSubmit(draftState.payload)
     }
 }

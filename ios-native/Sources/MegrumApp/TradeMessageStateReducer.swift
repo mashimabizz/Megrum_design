@@ -12,6 +12,56 @@ public enum TradeMessageStateReducer {
         return next
     }
 
+    static func replacingMessagesPreservingViewerEvaluationNotices(
+        in messagesByProposalID: [UUID: [TradeMessage]],
+        proposalID: UUID,
+        messages: [TradeMessage],
+        viewerID: UUID?
+    ) -> [UUID: [TradeMessage]] {
+        replacingMessages(
+            in: messagesByProposalID,
+            proposalID: proposalID,
+            messages: messagesPreservingViewerEvaluationNotices(
+                remoteMessages: messages,
+                existingMessages: messagesByProposalID[proposalID] ?? [],
+                viewerID: viewerID
+            )
+        )
+    }
+
+    static func messagesPreservingViewerEvaluationNotices(
+        remoteMessages: [TradeMessage],
+        existingMessages: [TradeMessage],
+        viewerID: UUID?
+    ) -> [TradeMessage] {
+        guard let viewerID else {
+            return remoteMessages
+        }
+        let remoteHasViewerEvaluation = remoteMessages.contains { message in
+            message.senderID == viewerID && TradeEvaluationSystemMessage.isEvaluationNotice(message)
+        }
+        guard !remoteHasViewerEvaluation else {
+            return remoteMessages
+        }
+
+        let remoteIDs = Set(remoteMessages.map(\.id))
+        let localViewerEvaluationNotices = existingMessages.filter { message in
+            message.senderID == viewerID
+                && !remoteIDs.contains(message.id)
+                && TradeEvaluationSystemMessage.isEvaluationNotice(message)
+        }
+        guard !localViewerEvaluationNotices.isEmpty else {
+            return remoteMessages
+        }
+
+        return (remoteMessages + localViewerEvaluationNotices).sorted { lhs, rhs in
+            if lhs.createdAt != rhs.createdAt {
+                return lhs.createdAt < rhs.createdAt
+            }
+            return lhs.id.uuidString < rhs.id.uuidString
+        }
+    }
+
     public static func appendingMessage(
         _ message: TradeMessage,
         to messagesByProposalID: [UUID: [TradeMessage]],

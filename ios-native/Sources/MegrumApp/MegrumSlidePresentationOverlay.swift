@@ -2,25 +2,32 @@ import SwiftUI
 
 struct MegrumSlideBoolPresentationOverlay<PresentedContent: View>: View {
     @Binding var isPresented: Bool
+    var backSwipeInteractionScope: MegrumSlideBackSwipeInteractionScope
     var content: (_ dismiss: @escaping @MainActor @Sendable () -> Void) -> PresentedContent
 
-    @State private var dragOffset: CGFloat = 0
-    @State private var isTrackingDismissDrag = false
+    @State private var dragState = MegrumSlidePresentationDragState()
+
+    init(
+        isPresented: Binding<Bool>,
+        backSwipeInteractionScope: MegrumSlideBackSwipeInteractionScope = .leadingEdge,
+        @ViewBuilder content: @escaping (_ dismiss: @escaping @MainActor @Sendable () -> Void) -> PresentedContent
+    ) {
+        _isPresented = isPresented
+        self.backSwipeInteractionScope = backSwipeInteractionScope
+        self.content = content
+    }
 
     var body: some View {
         GeometryReader { proxy in
             if isPresented {
                 ZStack(alignment: .leading) {
-                    content(dismissPresentation)
-                        .megrumSlidePresentedContent(
-                            width: proxy.size.width,
-                            height: proxy.size.height,
-                            dragOffset: dragOffset,
-                            dismiss: dismissPresentation
-                        )
+                    presentedContent(screenWidth: proxy.size.width, screenHeight: proxy.size.height)
 
-                    leadingEdgeSwipeCaptureArea(screenWidth: proxy.size.width, screenHeight: proxy.size.height)
+                    if backSwipeInteractionScope == .leadingEdge {
+                        leadingEdgeSwipeCaptureArea(screenWidth: proxy.size.width, screenHeight: proxy.size.height)
+                    }
                 }
+                .transition(MegrumSlidePresentationMetrics.trailingTransition)
             }
         }
         .ignoresSafeArea()
@@ -33,25 +40,44 @@ struct MegrumSlideBoolPresentationOverlay<PresentedContent: View>: View {
         }
     }
 
+    @ViewBuilder
+    private func presentedContent(screenWidth: CGFloat, screenHeight: CGFloat) -> some View {
+        switch backSwipeInteractionScope {
+        case .leadingEdge:
+            content(dismissPresentation)
+                .megrumSlidePresentedContent(
+                    width: screenWidth,
+                    height: screenHeight,
+                    dragOffset: dragState.dragOffset,
+                    dismiss: dismissPresentation
+                )
+        case .fullScreen:
+            content(dismissPresentation)
+                .megrumSlidePresentedContent(
+                    width: screenWidth,
+                    height: screenHeight,
+                    dragOffset: dragState.dragOffset,
+                    dismiss: dismissPresentation
+                )
+                .simultaneousGesture(backSwipeGesture(screenWidth: screenWidth), including: .gesture)
+        }
+    }
+
     private func backSwipeGesture(screenWidth: CGFloat) -> some Gesture {
         DragGesture(minimumDistance: 8)
             .onChanged { value in
-                guard isTrackingDismissDrag
-                        || MegrumSlideBackSwipeResolver.interactiveOffset(
-                            translation: value.translation,
-                            screenWidth: screenWidth
-                        ) != nil
-                else {
+                guard dragState.beginTrackingIfNeeded(translation: value.translation, screenWidth: screenWidth) else {
                     return
                 }
-                isTrackingDismissDrag = true
-                updateDragOffset(max(0, min(value.translation.width, screenWidth)))
+                updateDragOffset(
+                    dragState.clampedDragOffset(translation: value.translation, screenWidth: screenWidth)
+                )
             }
             .onEnded { value in
-                guard isTrackingDismissDrag else {
+                guard dragState.isTrackingDismissDrag else {
                     return
                 }
-                if MegrumSlideBackSwipeResolver.shouldDismiss(
+                if dragState.shouldDismiss(
                     translation: value.translation,
                     predictedEndTranslationWidth: value.predictedEndTranslation.width,
                     screenWidth: screenWidth
@@ -80,18 +106,18 @@ struct MegrumSlideBoolPresentationOverlay<PresentedContent: View>: View {
         var transaction = Transaction()
         transaction.disablesAnimations = true
         withTransaction(transaction) {
-            dragOffset = offset
+            dragState.dragOffset = offset
         }
     }
 
     private func resetDismissDrag(animated: Bool = false) {
-        isTrackingDismissDrag = false
-        guard dragOffset != 0 else {
+        dragState.stopTracking()
+        guard dragState.dragOffset != 0 else {
             return
         }
         if animated {
             withAnimation(MegrumSlidePresentationMetrics.animation) {
-                dragOffset = 0
+                dragState.resetDragOffset()
             }
         } else {
             updateDragOffset(0)
@@ -101,25 +127,32 @@ struct MegrumSlideBoolPresentationOverlay<PresentedContent: View>: View {
 
 struct MegrumSlideItemPresentationOverlay<Item: Identifiable, PresentedContent: View>: View {
     @Binding var item: Item?
+    var backSwipeInteractionScope: MegrumSlideBackSwipeInteractionScope
     var content: (_ item: Item, _ dismiss: @escaping @MainActor @Sendable () -> Void) -> PresentedContent
 
-    @State private var dragOffset: CGFloat = 0
-    @State private var isTrackingDismissDrag = false
+    @State private var dragState = MegrumSlidePresentationDragState()
+
+    init(
+        item: Binding<Item?>,
+        backSwipeInteractionScope: MegrumSlideBackSwipeInteractionScope = .leadingEdge,
+        @ViewBuilder content: @escaping (_ item: Item, _ dismiss: @escaping @MainActor @Sendable () -> Void) -> PresentedContent
+    ) {
+        _item = item
+        self.backSwipeInteractionScope = backSwipeInteractionScope
+        self.content = content
+    }
 
     var body: some View {
         GeometryReader { proxy in
             if let item {
                 ZStack(alignment: .leading) {
-                    content(item, dismissPresentation)
-                        .megrumSlidePresentedContent(
-                            width: proxy.size.width,
-                            height: proxy.size.height,
-                            dragOffset: dragOffset,
-                            dismiss: dismissPresentation
-                        )
+                    presentedContent(item, screenWidth: proxy.size.width, screenHeight: proxy.size.height)
 
-                    leadingEdgeSwipeCaptureArea(screenWidth: proxy.size.width, screenHeight: proxy.size.height)
+                    if backSwipeInteractionScope == .leadingEdge {
+                        leadingEdgeSwipeCaptureArea(screenWidth: proxy.size.width, screenHeight: proxy.size.height)
+                    }
                 }
+                .transition(MegrumSlidePresentationMetrics.trailingTransition)
             }
         }
         .ignoresSafeArea()
@@ -132,25 +165,44 @@ struct MegrumSlideItemPresentationOverlay<Item: Identifiable, PresentedContent: 
         }
     }
 
+    @ViewBuilder
+    private func presentedContent(_ item: Item, screenWidth: CGFloat, screenHeight: CGFloat) -> some View {
+        switch backSwipeInteractionScope {
+        case .leadingEdge:
+            content(item, dismissPresentation)
+                .megrumSlidePresentedContent(
+                    width: screenWidth,
+                    height: screenHeight,
+                    dragOffset: dragState.dragOffset,
+                    dismiss: dismissPresentation
+                )
+        case .fullScreen:
+            content(item, dismissPresentation)
+                .megrumSlidePresentedContent(
+                    width: screenWidth,
+                    height: screenHeight,
+                    dragOffset: dragState.dragOffset,
+                    dismiss: dismissPresentation
+                )
+                .simultaneousGesture(backSwipeGesture(screenWidth: screenWidth), including: .gesture)
+        }
+    }
+
     private func backSwipeGesture(screenWidth: CGFloat) -> some Gesture {
         DragGesture(minimumDistance: 8)
             .onChanged { value in
-                guard isTrackingDismissDrag
-                        || MegrumSlideBackSwipeResolver.interactiveOffset(
-                            translation: value.translation,
-                            screenWidth: screenWidth
-                        ) != nil
-                else {
+                guard dragState.beginTrackingIfNeeded(translation: value.translation, screenWidth: screenWidth) else {
                     return
                 }
-                isTrackingDismissDrag = true
-                updateDragOffset(max(0, min(value.translation.width, screenWidth)))
+                updateDragOffset(
+                    dragState.clampedDragOffset(translation: value.translation, screenWidth: screenWidth)
+                )
             }
             .onEnded { value in
-                guard isTrackingDismissDrag else {
+                guard dragState.isTrackingDismissDrag else {
                     return
                 }
-                if MegrumSlideBackSwipeResolver.shouldDismiss(
+                if dragState.shouldDismiss(
                     translation: value.translation,
                     predictedEndTranslationWidth: value.predictedEndTranslation.width,
                     screenWidth: screenWidth
@@ -179,18 +231,18 @@ struct MegrumSlideItemPresentationOverlay<Item: Identifiable, PresentedContent: 
         var transaction = Transaction()
         transaction.disablesAnimations = true
         withTransaction(transaction) {
-            dragOffset = offset
+            dragState.dragOffset = offset
         }
     }
 
     private func resetDismissDrag(animated: Bool = false) {
-        isTrackingDismissDrag = false
-        guard dragOffset != 0 else {
+        dragState.stopTracking()
+        guard dragState.dragOffset != 0 else {
             return
         }
         if animated {
             withAnimation(MegrumSlidePresentationMetrics.animation) {
-                dragOffset = 0
+                dragState.resetDragOffset()
             }
         } else {
             updateDragOffset(0)
@@ -201,19 +253,29 @@ struct MegrumSlideItemPresentationOverlay<Item: Identifiable, PresentedContent: 
 extension View {
     func megrumSlidePresentation<PresentedContent: View>(
         isPresented: Binding<Bool>,
+        backSwipeInteractionScope: MegrumSlideBackSwipeInteractionScope = .leadingEdge,
         @ViewBuilder content: @escaping (_ dismiss: @escaping @MainActor @Sendable () -> Void) -> PresentedContent
     ) -> some View {
         overlay {
-            MegrumSlideBoolPresentationOverlay(isPresented: isPresented, content: content)
+            MegrumSlideBoolPresentationOverlay(
+                isPresented: isPresented,
+                backSwipeInteractionScope: backSwipeInteractionScope,
+                content: content
+            )
         }
     }
 
     func megrumSlideItemPresentation<Item: Identifiable, PresentedContent: View>(
         item: Binding<Item?>,
+        backSwipeInteractionScope: MegrumSlideBackSwipeInteractionScope = .leadingEdge,
         @ViewBuilder content: @escaping (_ item: Item, _ dismiss: @escaping @MainActor @Sendable () -> Void) -> PresentedContent
     ) -> some View {
         overlay {
-            MegrumSlideItemPresentationOverlay(item: item, content: content)
+            MegrumSlideItemPresentationOverlay(
+                item: item,
+                backSwipeInteractionScope: backSwipeInteractionScope,
+                content: content
+            )
         }
     }
 }

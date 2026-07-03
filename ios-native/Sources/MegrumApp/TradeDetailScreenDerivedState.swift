@@ -56,7 +56,7 @@ extension TradeDetailScreen {
             proposal: currentProposal,
             viewerID: viewerID,
             messages: messages,
-            localSubmission: didSubmitEvaluation
+            localSubmission: interactionState.didSubmitEvaluation
         )
     }
 

@@ -138,17 +138,17 @@ extension ProposalCreateFlow {
         .onChange(of: exchangeMethod) { _, _ in
             handleExchangeMethodChange()
         }
-        .onChange(of: senderSelectionMode) { _, newValue in
+        .onChange(of: valueSelectionState.senderSelectionMode) { _, newValue in
             handleSenderSelectionModeChange(newValue)
         }
-        .onChange(of: receiverSelectionMode) { _, newValue in
+        .onChange(of: valueSelectionState.receiverSelectionMode) { _, newValue in
             handleReceiverSelectionModeChange(newValue)
         }
-        .onChange(of: senderCashAmountText) { _, newValue in
+        .onChange(of: valueSelectionState.senderCashAmountText) { _, newValue in
             normalizeSenderCashAmountText(newValue)
             syncPaymentSelectionIfNeeded()
         }
-        .onChange(of: receiverCashAmountText) { _, newValue in
+        .onChange(of: valueSelectionState.receiverCashAmountText) { _, newValue in
             normalizeReceiverCashAmountText(newValue)
             syncPaymentSelectionIfNeeded()
         }

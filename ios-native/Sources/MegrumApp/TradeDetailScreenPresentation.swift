@@ -24,7 +24,7 @@ extension TradeDetailScreen {
             viewerPaymentMethods: viewerPaymentMethods,
             viewerPaymentNote: viewerPaymentNote,
             viewerHasCounterProposal: viewerHasCounterProposal,
-            isMessageComposerFocused: isMessageComposerFocused,
+            isMessageComposerFocused: interactionState.isMessageComposerFocused,
             evidencePhotos: evidencePhotos,
             selectedEvidencePhotoItem: evidencePhotoPickerSelection,
             partnerLastReadAt: appState.partnerLastReadAt(for: currentProposal.id),
@@ -46,17 +46,15 @@ extension TradeDetailScreen {
                 }
             },
             onReject: {
-                isShowingRejectConfirmation = true
+                routePresentationState.isShowingRejectConfirmation = true
             },
             onCounterProposal: {
-                isShowingCounterProposalPage = true
+                routePresentationState.isShowingCounterProposalPage = true
             },
-            onOpenEvidenceCamera: {
-                isShowingEvidenceCamera = true
-            },
+            onOpenEvidenceCamera: presentEvidenceCamera,
             onOpenEvidenceList: openEvidenceList,
             onOpenImage: { url in
-                selectedRemoteImage = RemoteImageSelection(url: url)
+                routePresentationState.selectRemoteImage(RemoteImageSelection(url: url))
             },
             onOpenEvidencePhoto: openEvidencePhoto,
             onApproveEvidence: { photo in
@@ -65,7 +63,7 @@ extension TradeDetailScreen {
                 }
             },
             onRate: {
-                isShowingEvaluationPage = true
+                routePresentationState.isShowingEvaluationPage = true
             },
             onApproveCancel: {
                 Task {
@@ -83,9 +81,7 @@ extension TradeDetailScreen {
                 ) {
                     TradeAgreementNextStepFooter(
                         isAddingEvidence: appState.addingEvidenceProposalID == currentProposal.id,
-                        action: {
-                            isShowingEvidenceSourceDialog = true
-                        }
+                        action: presentEvidenceSourceDialog
                     )
                     .padding(.horizontal, 16)
                     .padding(.top, 10)
@@ -95,12 +91,12 @@ extension TradeDetailScreen {
                     proposal: currentProposal,
                     viewerID: appState.viewer?.id,
                     messages: messages,
-                    localSubmission: didSubmitEvaluation
+                    localSubmission: interactionState.didSubmitEvaluation
                 ) {
                     TradeEvaluationNextStepFooter(
                         isSubmitting: appState.submittingEvaluationProposalID == currentProposal.id,
                         action: {
-                            isShowingEvaluationPage = true
+                            routePresentationState.isShowingEvaluationPage = true
                         }
                     )
                     .padding(.horizontal, 16)
@@ -110,13 +106,13 @@ extension TradeDetailScreen {
                 }
 
                 TradeDetailMessageInputBar(
-                    text: $draftMessage,
-                    selectedChatPhotoItem: $selectedChatPhotoItem,
-                    selectedOutfitPhotoItem: $selectedOutfitPhotoItem,
+                    text: $interactionState.draftMessage,
+                    selectedChatPhotoItem: $photoPresentationState.selectedChatPhotoItem,
+                    selectedOutfitPhotoItem: $photoPresentationState.selectedOutfitPhotoItem,
                     isVisible: isChatInputVisible,
                     context: messageInputContext,
                     onOpenSchedule: {
-                        isShowingSchedulePage = true
+                        routePresentationState.isShowingSchedulePage = true
                     },
                     onSendArrivalStatus: { action in
                         sendArrivalQuickAction(action)
@@ -125,33 +121,33 @@ extension TradeDetailScreen {
                         shareCurrentLocation()
                     },
                     onOpenChatCamera: {
-                        isShowingChatCamera = true
+                        photoPresentationState.isShowingChatCamera = true
                     },
                     onOpenChatLibrary: {
-                        isShowingChatPhotoLibraryPicker = true
+                        photoPresentationState.isShowingChatPhotoLibraryPicker = true
                     },
                     onOpenOutfitCamera: {
-                        isShowingOutfitCamera = true
+                        photoPresentationState.isShowingOutfitCamera = true
                     },
                     onOpenOutfitLibrary: {
-                        isShowingOutfitPhotoLibraryPicker = true
+                        photoPresentationState.isShowingOutfitPhotoLibraryPicker = true
                     },
                     onCounterProposal: {
-                        isShowingCounterProposalPage = true
+                        routePresentationState.isShowingCounterProposalPage = true
                     },
                     onRequestLate: {
-                        assistanceRequestKind = .late
+                        routePresentationState.assistanceRequestKind = .late
                     },
                     onRequestCancel: {
-                        assistanceRequestKind = .cancel
+                        routePresentationState.assistanceRequestKind = .cancel
                     },
                     onReport: {
-                        isShowingDisputePage = true
+                        routePresentationState.isShowingDisputePage = true
                     },
                     onSendMessage: sendDraftMessage,
                     onFocusChange: { focused in
                         withAnimation(.snappy(duration: 0.18)) {
-                            isMessageComposerFocused = focused
+                            interactionState.isMessageComposerFocused = focused
                         }
                     }
                 )
@@ -168,13 +164,13 @@ extension TradeDetailScreen {
                 await appState.loadPublicUserProfile(userID: partnerID, reportsFailure: false)
             }
         }
-        .onChange(of: selectedChatPhotoItem) { _, item in
+        .onChange(of: photoPresentationState.selectedChatPhotoItem) { _, item in
             handleSelectedChatPhoto(item)
         }
-        .onChange(of: selectedOutfitPhotoItem) { _, item in
+        .onChange(of: photoPresentationState.selectedOutfitPhotoItem) { _, item in
             handleSelectedOutfitPhoto(item)
         }
-        .navigationDestination(isPresented: $isShowingEvaluationPage) {
+        .navigationDestination(isPresented: $routePresentationState.isShowingEvaluationPage) {
             TradeEvaluationSheet(
                 isSubmitting: appState.submittingEvaluationProposalID == currentProposal.id
             ) { stars, comment in
@@ -184,14 +180,14 @@ extension TradeDetailScreen {
                     comment: comment
                 )
                 if sent {
-                    didSubmitEvaluation = true
+                    interactionState.markEvaluationSubmitted()
                     await appState.loadMessages(proposalID: currentProposal.id)
-                    isShowingEvaluationPage = false
+                    routePresentationState.isShowingEvaluationPage = false
                     showToast("評価を送信しました")
                 }
             }
         }
-        .navigationDestination(isPresented: $isShowingDisputePage) {
+        .navigationDestination(isPresented: $routePresentationState.isShowingDisputePage) {
             TradeDisputeSheet(
                 isSubmitting: appState.filingDisputeProposalID == currentProposal.id
             ) { category, factMemo in
@@ -201,11 +197,11 @@ extension TradeDetailScreen {
                     factMemo: factMemo
                 )
                 if sent {
-                    isShowingDisputePage = false
+                    routePresentationState.isShowingDisputePage = false
                 }
             }
         }
-        .navigationDestination(isPresented: $isShowingCounterProposalPage) {
+        .navigationDestination(isPresented: $routePresentationState.isShowingCounterProposalPage) {
             if let counterProposalTargetItem {
                 ProposalCreateFlow(
                     appState: appState,
@@ -232,13 +228,13 @@ extension TradeDetailScreen {
                 CounterProposalUnavailableView()
             }
         }
-        .navigationDestination(isPresented: $isShowingSchedulePage) {
+        .navigationDestination(isPresented: $routePresentationState.isShowingSchedulePage) {
             TradeScheduleSheet(appState: appState, proposal: currentProposal)
         }
-        .navigationDestination(item: $unavailableChatAction) { action in
+        .navigationDestination(item: $routePresentationState.unavailableChatAction) { action in
             TradeUnavailableChatActionSheet(action: action)
         }
-        .navigationDestination(item: $assistanceRequestKind) { kind in
+        .navigationDestination(item: $routePresentationState.assistanceRequestKind) { kind in
             TradeAssistanceRequestSheet(
                 kind: kind,
                 isSubmitting: appState.sendingMessageProposalID == currentProposal.id
@@ -260,14 +256,14 @@ extension TradeDetailScreen {
                     )
                 }
                 if sent {
-                    assistanceRequestKind = nil
+                    routePresentationState.assistanceRequestKind = nil
                 }
             }
         }
-        .navigationDestination(item: $disputeDetailRoute) { route in
+        .navigationDestination(item: $routePresentationState.disputeDetailRoute) { route in
             DisputeDetailScreen(model: route.model)
         }
-        .navigationDestination(item: $partnerProfileRoute) { route in
+        .navigationDestination(item: $routePresentationState.partnerProfileRoute) { route in
             PublicUserProfileScreen(
                 appState: appState,
                 userID: route.userID,

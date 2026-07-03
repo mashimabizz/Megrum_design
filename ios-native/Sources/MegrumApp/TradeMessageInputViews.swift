@@ -22,11 +22,11 @@ struct TradeMessageInput: View {
     var onSend: () -> Void
     var onFocusChange: (Bool) -> Void = { _ in }
 
-    @State private var isComposerFocused = false
+    @State private var presentationState = TradeMessageInputPresentationState()
 
     var body: some View {
         VStack(spacing: 8) {
-            if context.shouldShowQuickActions(isComposerFocused: isComposerFocused) {
+            if presentationState.shouldShowQuickActions(context: context) {
                 TradeMessageQuickActionStrip(
                     actions: context.quickActions,
                     isSending: context.isSending,
@@ -62,7 +62,7 @@ struct TradeMessageInput: View {
                 onReport: onReport,
                 onSend: onSend,
                 onFocusChange: { focused in
-                    isComposerFocused = focused
+                    presentationState.setComposerFocused(focused)
                     onFocusChange(focused)
                 }
             )

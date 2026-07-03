@@ -14,18 +14,119 @@ struct MegrumAuthenticatedTabsView: View {
     @Binding var publicProfileRoute: PublicProfileRoute?
     @Binding var homeSettingsRoute: HomeSettingsRoute?
     @Binding var requestedWishSection: WishCollectionSection?
-    @Binding var drawerDragTranslation: CGFloat
+    @Binding var pendingNotificationRouteIntent: NotificationRouteIntent?
     var adDisplayContext: AdDisplayContext
     var visualQAInitialScreen: VisualQAInitialScreen?
     var onSignOut: () async -> Void
     var onRequestInterstitial: (AdPlacement) -> Void
+    @State private var isGroomViewerPresented = false
+
+    var body: some View {
+        AppDrawerInteractiveHost(
+            appState: appState,
+            showsDrawer: $showsDrawer,
+            isHomeTabSelected: selectedTab == .home,
+            isSearchPresented: showsSearch,
+            onSelectDestination: { destination in
+                openDrawerDestination(destination)
+            },
+            onSignOut: signOutFromDrawer
+        ) {
+            tabContent
+        }
+        .background(SystemTabBarVisibilityHost(isHidden: isGroomViewerPresented))
+        #if os(iOS)
+        .toolbar(isGroomViewerPresented ? .hidden : .visible, for: .tabBar)
+        .statusBarHidden(isGroomViewerPresented)
+        #endif
+    }
+
+    private var tabContent: some View {
+        MegrumAuthenticatedTabContentView(
+            appState: appState,
+            selectedTab: $selectedTab,
+            showsSearch: $showsSearch,
+            requestedTradesStage: $requestedTradesStage,
+            publicProfileRoute: $publicProfileRoute,
+            homeSettingsRoute: $homeSettingsRoute,
+            requestedWishSection: $requestedWishSection,
+            pendingNotificationRouteIntent: $pendingNotificationRouteIntent,
+            isGroomViewerPresented: $isGroomViewerPresented,
+            adDisplayContext: adDisplayContext,
+            visualQAInitialScreen: visualQAInitialScreen,
+            onOpenDrawer: openDrawer,
+            onRequestInterstitial: onRequestInterstitial
+        )
+    }
+
+    private func openDrawer() {
+        withAnimation(AppDrawerInteractiveMetrics.animation) {
+            showsDrawer = true
+        }
+    }
+
+    private func signOutFromDrawer() async {
+        await onSignOut()
+        drawerDestination = nil
+        drawerPageDestination = nil
+        publicProfileRoute = nil
+        showsDrawer = false
+    }
+
+    private func openDrawerDestination(_ destination: AppDrawerDestination) {
+        drawerDestination = nil
+        drawerPageDestination = nil
+
+        let presentationDelay: TimeInterval = showsDrawer ? 0.18 : 0
+        DispatchQueue.main.asyncAfter(deadline: .now() + presentationDelay) {
+            drawerDestination = destination
+        }
+    }
+}
+
+enum AppDrawerInteractiveMetrics {
+    static let animation: Animation = .interactiveSpring(response: 0.30, dampingFraction: 0.88)
+}
+
+/// Owns the interactive drawer drag state so per-frame drag updates re-render
+/// only this host (drawer chrome, offsets), never the tab content passed in
+/// by the parent — dragging must not re-evaluate the tab screens.
+@MainActor
+struct AppDrawerInteractiveHost<Content: View>: View {
+    @ObservedObject var appState: MegrumAppState
+    @Binding var showsDrawer: Bool
+    var isHomeTabSelected: Bool
+    var isSearchPresented: Bool
+    var onSelectDestination: (AppDrawerDestination) -> Void
+    var onSignOut: () async -> Void
+
+    private let content: Content
+    @State private var dragTranslation: CGFloat = 0
+
+    init(
+        appState: MegrumAppState,
+        showsDrawer: Binding<Bool>,
+        isHomeTabSelected: Bool,
+        isSearchPresented: Bool,
+        onSelectDestination: @escaping (AppDrawerDestination) -> Void,
+        onSignOut: @escaping () async -> Void,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.appState = appState
+        _showsDrawer = showsDrawer
+        self.isHomeTabSelected = isHomeTabSelected
+        self.isSearchPresented = isSearchPresented
+        self.onSelectDestination = onSelectDestination
+        self.onSignOut = onSignOut
+        self.content = content()
+    }
 
     var body: some View {
         GeometryReader { proxy in
             let drawerPresentation = AppDrawerPresentationState(
                 containerWidth: proxy.size.width,
                 isPresented: showsDrawer,
-                dragTranslation: drawerDragTranslation
+                dragTranslation: dragTranslation
             )
 
             ZStack(alignment: .leading) {
@@ -34,16 +135,15 @@ struct MegrumAuthenticatedTabsView: View {
                     presentationProgress: drawerPresentation.progress,
                     drawerWidth: drawerPresentation.drawerWidth,
                     appState: appState,
-                    onSelectDestination: { destination in
-                        openDrawerDestination(destination)
-                    },
-                    onSignOut: signOutFromDrawer
+                    onSelectDestination: onSelectDestination,
+                    onSignOut: onSignOut
                 )
                 .allowsHitTesting(drawerPresentation.isInteractive)
                 .zIndex(AppDrawerVisualMetrics.drawerZIndex)
 
                 AppDrawerForegroundLayer(
                     presentation: drawerPresentation,
+                    safeAreaInsets: proxy.safeAreaInsets,
                     closeGesture: drawerPanGesture(drawerTravel: drawerPresentation.drawerOpenOffset),
                     homeGesture: homeDrawerPanGesture(
                         drawerTravel: drawerPresentation.drawerOpenOffset,
@@ -51,7 +151,7 @@ struct MegrumAuthenticatedTabsView: View {
                     ),
                     onCloseOverlayTap: closeDrawer
                 ) {
-                    tabContent
+                    content
                 }
             }
             .background(MegrumTheme.canvas.ignoresSafeArea())
@@ -64,34 +164,19 @@ struct MegrumAuthenticatedTabsView: View {
                 including: showsDrawer ? .all : .subviews
             )
         }
-    }
-
-    private var tabContent: some View {
-        MegrumAuthenticatedTabContentView(
-            appState: appState,
-            selectedTab: $selectedTab,
-            showsSearch: $showsSearch,
-            requestedTradesStage: $requestedTradesStage,
-            publicProfileRoute: $publicProfileRoute,
-            homeSettingsRoute: $homeSettingsRoute,
-            requestedWishSection: $requestedWishSection,
-            adDisplayContext: adDisplayContext,
-            visualQAInitialScreen: visualQAInitialScreen,
-            onOpenDrawer: openDrawer,
-            onRequestInterstitial: onRequestInterstitial
-        )
-    }
-
-    private var drawerAnimation: Animation {
-        .interactiveSpring(response: 0.30, dampingFraction: 0.88)
+        .onChange(of: showsDrawer) { _, _ in
+            if dragTranslation != 0 {
+                updateDragTranslation(0)
+            }
+        }
     }
 
     private func homeDrawerPanGesture(drawerTravel: CGFloat, containerSize: CGSize) -> some Gesture {
         drawerPanGesture(drawerTravel: drawerTravel) { startLocation in
             AppDrawerGestureResolver.isClosedHomeDrawerSwipeStartAllowed(
-                isHomeTabSelected: selectedTab == .home,
+                isHomeTabSelected: isHomeTabSelected,
                 isDrawerPresented: showsDrawer,
-                isSearchPresented: showsSearch,
+                isSearchPresented: isSearchPresented,
                 startLocation: startLocation,
                 screenSize: containerSize
             )
@@ -115,21 +200,21 @@ struct MegrumAuthenticatedTabsView: View {
         DragGesture(minimumDistance: 6)
             .onChanged { value in
                 guard allowsStart(value.startLocation) else {
-                    resetDrawerDragTranslation()
+                    resetDismissDrag()
                     return
                 }
                 if let translation = AppDrawerGestureResolver.activeTranslation(
                     isPresented: showsDrawer,
                     translation: value.translation
                 ) {
-                    updateDrawerDragTranslation(translation)
+                    updateDragTranslation(translation)
                 } else {
-                    resetDrawerDragTranslation()
+                    resetDismissDrag()
                 }
             }
             .onEnded { value in
                 guard allowsStart(value.startLocation) else {
-                    resetDrawerDragTranslation()
+                    resetDismissDrag()
                     return
                 }
                 guard let targetVisibility = AppDrawerGestureResolver.targetVisibility(
@@ -138,68 +223,42 @@ struct MegrumAuthenticatedTabsView: View {
                     predictedEndTranslationWidth: value.predictedEndTranslation.width,
                     drawerWidth: drawerTravel
                 ) else {
-                    resetDrawerDragTranslation(animated: true)
+                    resetDismissDrag(animated: true)
                     return
                 }
 
-                withAnimation(drawerAnimation) {
+                withAnimation(AppDrawerInteractiveMetrics.animation) {
                     showsDrawer = targetVisibility
-                    drawerDragTranslation = 0
+                    dragTranslation = 0
                 }
             }
     }
 
-    private func updateDrawerDragTranslation(_ translation: CGFloat) {
+    private func updateDragTranslation(_ translation: CGFloat) {
         var transaction = Transaction()
         transaction.disablesAnimations = true
         withTransaction(transaction) {
-            drawerDragTranslation = translation
+            dragTranslation = translation
         }
     }
 
-    private func resetDrawerDragTranslation(animated: Bool = false) {
-        guard drawerDragTranslation != 0 else {
+    private func resetDismissDrag(animated: Bool = false) {
+        guard dragTranslation != 0 else {
             return
         }
         if animated {
-            withAnimation(drawerAnimation) {
-                drawerDragTranslation = 0
+            withAnimation(AppDrawerInteractiveMetrics.animation) {
+                dragTranslation = 0
             }
         } else {
-            updateDrawerDragTranslation(0)
-        }
-    }
-
-    private func openDrawer() {
-        withAnimation(drawerAnimation) {
-            drawerDragTranslation = 0
-            showsDrawer = true
+            updateDragTranslation(0)
         }
     }
 
     private func closeDrawer() {
-        withAnimation(drawerAnimation) {
-            drawerDragTranslation = 0
+        withAnimation(AppDrawerInteractiveMetrics.animation) {
+            dragTranslation = 0
             showsDrawer = false
-        }
-    }
-
-    private func signOutFromDrawer() async {
-        await onSignOut()
-        drawerDestination = nil
-        drawerPageDestination = nil
-        publicProfileRoute = nil
-        drawerDragTranslation = 0
-        showsDrawer = false
-    }
-
-    private func openDrawerDestination(_ destination: AppDrawerDestination) {
-        drawerDestination = nil
-        drawerPageDestination = nil
-
-        let presentationDelay: TimeInterval = showsDrawer ? 0.18 : 0
-        DispatchQueue.main.asyncAfter(deadline: .now() + presentationDelay) {
-            drawerDestination = destination
         }
     }
 }

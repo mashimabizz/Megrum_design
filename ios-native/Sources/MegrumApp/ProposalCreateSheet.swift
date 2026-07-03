@@ -10,15 +10,7 @@ struct ProposalCreateSheet: View {
     var receiverGoodsIDs: [UUID]?
 
     @Environment(\.dismiss) var dismiss
-    @State var selectedSenderGoodsID: UUID?
-    @State var exchangeMethod: ExchangeMethod = .mail
-    @State var selectedConditionTags: Set<String> = []
-    @State var message = ""
-    @State var meetupStartAt = Date()
-    @State var meetupEndAt = Date().addingTimeInterval(30 * 60)
-    @State var meetupPlaceName = ""
-    @State var meetupLatitudeText = ""
-    @State var meetupLongitudeText = ""
+    @State var draftState = ProposalCreateSheetDraftState()
     @StateObject var locationState = MegrumLocationState()
 
     var body: some View {
@@ -33,21 +25,21 @@ struct ProposalCreateSheet: View {
 
                 ProposalCreateSenderGoodsSection(
                     inventory: appState.inventory,
-                    selectedGoodsID: $selectedSenderGoodsID
+                    selectedGoodsID: $draftState.selectedSenderGoodsID
                 )
 
                 ProposalCreateExchangeMethodSection(
-                    exchangeMethod: $exchangeMethod,
+                    exchangeMethod: $draftState.exchangeMethod,
                     configuration: configuration
                 )
 
                 if configuration.requiresMeetupBeforeSubmit {
                     ProposalMeetupForm(
-                        startAt: $meetupStartAt,
-                        endAt: $meetupEndAt,
-                        placeName: $meetupPlaceName,
-                        latitudeText: $meetupLatitudeText,
-                        longitudeText: $meetupLongitudeText,
+                        startAt: $draftState.meetupStartAt,
+                        endAt: $draftState.meetupEndAt,
+                        placeName: $draftState.meetupPlaceName,
+                        latitudeText: $draftState.meetupLatitudeText,
+                        longitudeText: $draftState.meetupLongitudeText,
                         isRequestingLocation: locationState.isRequestingLocation,
                         locationErrorMessage: locationState.locationErrorMessage
                     )
@@ -55,11 +47,11 @@ struct ProposalCreateSheet: View {
 
                 ProposalCreateConditionTagsSection(
                     tags: conditionTagOptions,
-                    selectedTags: selectedConditionTags,
+                    selectedTags: draftState.selectedConditionTags,
                     onToggle: toggleConditionTag
                 )
 
-                ProposalCreateMessageSection(message: $message)
+                ProposalCreateMessageSection(message: $draftState.message)
 
                 ProposalCreateSubmitButton(
                     title: configuration.submitTitle,
@@ -93,10 +85,10 @@ struct ProposalCreateSheet: View {
                 await appState.loadMailingAddress()
             }
         }
-        .onChange(of: exchangeMethod) { _, _ in
+        .onChange(of: draftState.exchangeMethod) { _, _ in
             handleExchangeMethodChange()
         }
-        .onChange(of: meetupStartAt) { _, newValue in
+        .onChange(of: draftState.meetupStartAt) { _, newValue in
             boundMeetupEnd(after: newValue)
         }
         .onChange(of: locationState.coordinate) { _, coordinate in

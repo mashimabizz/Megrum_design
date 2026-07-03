@@ -3,13 +3,19 @@
 > **目的**：Megrum の全エンティティのDBスキーマ設計と、状態・マッチング・取引のデータフロー定義。
 > 実装の正解集。`09_state_machines.md` と完全に整合させ、`10_glossary.md` の用語を使う。
 
-最終更新: 2026-06-29
-ステータス: Draft v2.57（iter1226.112 評価・通報・ブロック・モデレーションの法務前提を追加）
+最終更新: 2026-07-01
+ステータス: Draft v2.63（iter1226.258 めぐりプロフィール変更ロックを表示名に限定）
 
 ## 最新化履歴
 
 | Rev | 日付 | 変更 |
 |---|---|---|
+| **v2.63** | **2026-07-01** | **iter1226.258 反映（`meguri_profiles.last_changed_at` と保存RPCの1ヶ月ロック対象を表示名変更に限定し、アイコン変更・`uses_public_profile` 切り替えは保存できるようにした）** |
+| **v2.62** | **2026-06-30** | **iter1226.231 反映（`groom_posts` / `meguri_board_threads` に任意の `group_id` / `character_id` / `series_name` を追加し、めぐりホームで推し・シリーズによる表示フィルターに使えるようにした）** |
+| **v2.61** | **2026-06-29** | **iter1226.187 反映（`listings.have_is_cash_offer` / `have_cash_amount` を追加し、譲る側を定価/金額指定にした個別募集でも `have_ids=[]` / `have_qtys=[]` を正規に保存できるようにした）** |
+| **v2.60** | **2026-06-29** | **iter1226.183 反映（チャットルーム詳細を会話UIへ寄せ、`meguri_board_thread_reactions` / `meguri_board_reply_reactions` の表示用種別として `good` / `bad` を追加。旧 `useful` は `good` として互換集計）** |
+| **v2.59** | **2026-06-29** | **iter1226.179 反映（`meguri_profiles.uses_public_profile` を追加し、めぐり内表示をグッズ交換側の公開プロフィールへ連携できるようにした。匿名名の一意制約は匿名モードだけに適用）** |
+| **v2.58** | **2026-06-29** | **iter1226.177 反映（`meguri_messages` に `source_groom_post_id` / `source_groom_owner_id` / `source_groom_image_url` を追加し、グルームへの返信文脈をめぐりメッセージ本文の前に表示できるようにした）** |
 | **v2.57** | **2026-06-29** | **iter1226.112 反映（`user_evaluations` / `reports` / `goods_reports` / `groom_reports` / `meguri_board_reports` / `disputes` / `groom_user_blocks` は安全対応・表示制御・監査用データであり、本人確認・安全確認・信用保証・緊急通報・削除保証を意味しない法務前提を追記）** |
 | **v2.56** | **2026-06-29** | **iter1226.111 反映（`users.gender` / `users.primary_area` / 評価 / 支払い方法要約は公開プロフィール・候補表示の参考情報であり、本人確認・法的性別確認・安全確認・支払能力確認を意味しない法務前提を追記）** |
 | **v2.55** | **2026-06-29** | **iter1226.110 反映（`users.birth_date` / `users.age` は自己申告年齢として扱い、公的年齢確認・身分証確認・保護者同意確認を意味しない法務前提を追記）** |
@@ -476,6 +482,9 @@ iter162.49 で iOS めぐりホームに追加した、写真中心の24時間�
 | `place_hint` | text nullable | 「同じイベント圏内」など丸めた場所表示 |
 | `area_key` | text nullable | 厳密位置ではなく、閲覧判定用の粗いエリアキー |
 | `origin_lat` / `origin_lng` | double precision nullable | iter168.89 追加。投稿作成時の位置。画面には正確値を出さず、1km圏内フィード判定に使う |
+| `group_id` | uuid nullable | iter1226.231 追加。任意の推しL1（→ groups_master）。めぐりホームの表示フィルターに使う |
+| `character_id` | uuid nullable | iter1226.231 追加。任意の推しL2（→ characters_master）。めぐりホームの表示フィルターに使う |
+| `series_name` | text nullable | iter1226.231 追加。任意のシリーズ名。めぐりホームの表示フィルターに使う |
 | `image_transform` | jsonb | 編集画面での画像の `rotation` / `scale` / `x` / `y` |
 | `text_overlays` | jsonb | テキストオーバーレイ配列 |
 | `stickers` | jsonb | スタンプ等の拡張配列 |
@@ -576,12 +585,14 @@ iter1225 以降、いいね操作は `set_groom_like_for_viewer(p_post_id,p_is_l
 |---|---|---|
 | `user_id` | uuid | → users。PK |
 | `display_name` | text | めぐり内表示名。1〜24文字 |
-| `display_name_key` | text | 空白を除去して小文字化した一意判定キー |
+| `display_name_key` | text | 空白を除去して小文字化した匿名モード用の一意判定キー |
 | `avatar_id` | text | `avatar_1`〜`avatar_6` |
-| `last_changed_at` | timestamptz | 最後に名前またはアイコンを変更した時刻 |
+| `avatar_url` | text nullable | めぐり専用のカスタムアイコンURL。未設定時は `avatar_id` を使う |
+| `uses_public_profile` | boolean | true の時は、めぐり内の表示名・アイコンを `users` 側のグッズ交換プロフィールに連携して表示する |
+| `last_changed_at` | timestamptz | 最後にめぐり内表示名を変更した時刻。アイコン変更や `uses_public_profile` 切り替えでは更新しない |
 | `created_at` / `updated_at` | timestamptz | |
 
-`display_name_key` は全ユーザーで一意。保存は `set_meguri_profile_for_viewer(display_name, avatar_id)` RPC を使い、既存値から変更がある場合は `last_changed_at` から1ヶ月経過していないと拒否する。同じ値の再保存は許可する。
+`display_name_key` は `uses_public_profile=false` の匿名モードだけで一意。保存は `set_meguri_profile_for_viewer(display_name, avatar_id, avatar_url, uses_public_profile)` RPC を使う。匿名名を変更する場合は `last_changed_at` から1ヶ月経過していないと拒否する。既定アイコン・カスタムアイコンURL・`uses_public_profile` の切り替えは表示名ロックの対象外として保存できる。
 
 ### `meguri_messages`（めぐりあいメッセージ / iter165）
 
@@ -593,6 +604,9 @@ iter1225 以降、いいね操作は `set_groom_like_for_viewer(p_post_id,p_is_l
 | `sender_id` | uuid | → users |
 | `recipient_id` | uuid | → users |
 | `source_groom_reply_id` | uuid nullable | → groom_replies。グルーム返信から始まった会話の起点 |
+| `source_groom_post_id` | uuid nullable | → groom_posts。グルームへの返信文脈として引用する投稿 |
+| `source_groom_owner_id` | uuid nullable | → users。引用元グルームの投稿者 |
+| `source_groom_image_url` | text nullable | 返信文脈カードで表示するグルーム画像URL。投稿失効後も会話文脈を示すための表示用スナップショット |
 | `message_type` | text | `text` / `image` |
 | `body` | text nullable | 本文 |
 | `image_url` | text nullable | 互換用。private Storage では path 相当 |
@@ -602,6 +616,7 @@ iter1225 以降、いいね操作は `set_groom_like_for_viewer(p_post_id,p_is_l
 
 `notifications.kind='meguri_message'` と `notifications.meguri_message_id` を使い、受信者に通知を残す。iter1226.14以降、通常めぐりメッセージの通知行はDB triggerで作成し、タイトルは「表示名さんからメッセージが届きました！」形式、bodyにはメッセージプレビューを入れない。`source_groom_reply_id` がある行は `groom_reply` 通知と重複させない。
 iter168.43 以降、無料受信者に本文・画像パスを直接返さないため、通常表示は `list_meguri_messages_for_viewer()` RPC を使う。直接 `meguri_messages` をSELECTできるのは送信者本人、または `user_entitlements(feature_key in ('megrum_plus','meguri_plus','premium'), active=true)` を持つ受信者に限定する。iter1226.102 以降、Swift Nativeの導線は現行表記の「Megrum プレミアム」へつなぐため、現行 `megrum_plus` を優先し、旧 `meguri_plus` / `premium` は互換として残す。
+iter1226.177 以降、グルームへの返信から始まる/反応一覧から送るめぐりメッセージは、本文の前に「あなたのグルームに返信しました」カードと対象グルーム画像を表示できるよう、`source_groom_*` の3列を返す。既存の `source_groom_reply_id` だけがある行は `groom_replies.groom_snapshot` から画像・投稿者を補完する。
 
 ### `meguri_board_threads`（スポット掲示板スレッド / iter168.73）
 
@@ -624,8 +639,11 @@ iter168.43 以降、無料受信者に本文・画像パスを直接返さない
 | `spot_label` | text nullable | 画面表示用のスポット名 |
 | `prefecture` | text nullable | 閲覧判定・表示用の都道府県。`nearby_3km` / `same_prefecture` の時は必須 |
 | `origin_lat` / `origin_lng` | double precision nullable | iter168.89 追加。スレッド作成時の位置。`nearby_3km` では必須 |
+| `group_id` | uuid nullable | iter1226.231 追加。任意の推しL1（→ groups_master）。めぐりホームの表示フィルターに使う |
+| `character_id` | uuid nullable | iter1226.231 追加。任意の推しL2（→ characters_master）。めぐりホームの表示フィルターに使う |
+| `series_name` | text nullable | iter1226.231 追加。任意のシリーズ名。めぐりホームの表示フィルターに使う |
 | `reply_count` | integer | 返信数のサマリ |
-| `reaction_count` | integer | 「参考になった」の集計。iter171 追加 |
+| `reaction_count` | integer | 旧「参考になった」の互換集計。iter1226.183以降、画面表示はRPCが返す `good_reaction_count` / `bad_reaction_count` を優先 |
 | `bookmark_count` | integer | 保存数の集計。iter171 追加 |
 | `view_count` | integer | 詳細を開いた回数の集計。iter171 追加 |
 | `latest_reply_preview` | text nullable | 最新返信の先頭160字 |
@@ -658,7 +676,7 @@ iter168.43 以降、無料受信者に本文・画像パスを直接返さない
 | `quote_author_name` | text nullable | 引用元の表示名スナップショット。iter173 追加 |
 | `quote_body` | text nullable | 引用元本文の先頭160字スナップショット。iter173 追加 |
 | `status` | text | `visible` / `deleted`。iter172 追加 |
-| `reaction_count` | integer | 返信への「参考になった」の集計。iter171 追加 |
+| `reaction_count` | integer | 返信への旧「参考になった」の互換集計。iter1226.183以降、画面表示はRPCが返す `good_reaction_count` / `bad_reaction_count` を優先 |
 | `deleted_at` | timestamptz nullable | 削除済み表示に切り替えた時刻。iter172 追加 |
 | `created_at` / `updated_at` | timestamptz | |
 
@@ -680,10 +698,10 @@ iter168.43 以降、無料受信者に本文・画像パスを直接返さない
 |---|---|---|
 | `thread_id` / `reply_id` | uuid | 対象スレッドまたは返信 |
 | `user_id` | uuid | → users |
-| `reaction_type` | text | MVPでは `useful` のみ |
+| `reaction_type` | text | `good` / `bad`。旧データ互換として `useful` も許容し、一覧RPCでは `good` に含めて返す |
 | `created_at` | timestamptz | |
 
-スレッド/返信への「参考になった」。各対象・ユーザー・reaction_typeで一意。trigger で `reaction_count` を同期する。
+スレッド/返信へのグッド/バッド。iter1226.183以降、アプリは `set_meguri_board_thread_message_reaction()` / `set_meguri_board_reply_message_reaction()` でユーザーごとに1種だけ保存する。既存の `reaction_count` trigger は互換集計として残し、`list_meguri_board_threads_for_viewer()` / `list_meguri_board_replies_for_viewer()` は `good_reaction_count` / `bad_reaction_count` / `viewer_reaction_type` を返す。
 
 ### `meguri_board_thread_reads`（スポット掲示板既読 / iter171）
 
@@ -808,19 +826,22 @@ iter67.4 で求側を **「複数選択肢」モデル** に再設計。listings
 | `have_qtys` | int[] | 各譲の数量（各 1〜99） |
 | `have_logic` | text | `'and'`（全部セット）/ `'or'`（いずれか）/ `'at_least'`（何個以上）、default `'and'` |
 | `have_min_count` | int | `have_logic='at_least'` の最低成立数。通常は 1。`at_least` は have_ids 2件以上かつ 1〜have_ids件数 |
+| `have_is_cash_offer` | boolean | 譲る側を定価/金額指定で出す場合 true。true の時だけ `have_ids=[]` / `have_qtys=[]` を許可 |
+| `have_cash_amount` | int nullable | 譲る側の金額指定。定価扱いは null、指定金額は 1〜9,999,999 |
 | `have_group_id` | uuid | trigger で全 haves から自動算出（同一性検証） |
 | `have_goods_type_id` | uuid | 同上 |
 | `status` | text | `active` / `paused` / `matched` / `closed` |
 | `note` | text nullable | |
 | `created_at` / `updated_at` | timestamptz | |
 
-> iter774 暫定互換：譲る側を `定価で選ぶ` / `金額指定` にした個別募集では、DBカラム追加を避けるため `have_ids=[]` / `have_qtys=[]` とし、`note` 内に `譲る金額: 定価` または `譲る金額: ¥1500` のメタ行を保存する。将来、金額条件を相互マッチの主判定へより厳密に組み込む時は、`listings` 側に専用の譲側金額カラムを追加する。
+> iter1226.187：譲る側を `定価で選ぶ` / `金額指定` にした個別募集では、`have_is_cash_offer=true` とし、`have_ids=[]` / `have_qtys=[]` を許可する。指定金額は `have_cash_amount`、定価扱いは null。UI表示・共有文面の互換のため、`note` 内の `譲る金額: 定価` または `譲る金額: ¥1500` メタ行も維持する。
 
 制約：
-- have_ids 全件が **同 group + 同 goods_type**（trigger 検証）
-- have_qtys 各値 1〜99（trigger）
+- `have_is_cash_offer=false` の場合、have_ids 全件が **同 group + 同 goods_type**（trigger 検証）
+- `have_is_cash_offer=false` の場合、have_qtys 各値 1〜99（trigger）
+- `have_is_cash_offer=false` の場合、have_ids 全件が listing 所有者の `kind=for_trade` インベントリ
+- `have_is_cash_offer=true` の場合、have_ids / have_qtys は空、have_group_id / have_goods_type_id は null
 - have_logic='at_least' の時は have_ids 2件以上、have_min_count は 1〜have_ids件数。それ以外は have_min_count=1
-- have_ids 全件が listing 所有者の `kind=for_trade` インベントリ
 - iter153: 譲アイテムが削除または非 active 化された場合、開いている個別募集の `have_ids` / `have_qtys` からそのアイテムを除外する。残り譲が 0 件なら `status='closed'`。
 - iter153: マッチング市場では `have_qtys` が市場残数を超える個別募集条件は候補から外す（OR 条件は残数のある譲だけに縮退、AND 条件はいずれか不足したら非表示）。
 
@@ -1371,6 +1392,7 @@ iter45 で追加。`notes/16_monetization.md` の戦略に対応するテーブ�
 > iter731: Swift Native版も同じ方針に合わせ、アプリ内の広告非表示・有料導線は `user_entitlements(feature_key in ('premium','meguri_plus'))` の有効行を読む。Apple StoreKit、Stripe、管理者手動付与のどれで発生しても、最終的には `user_entitlements` へ集約する。
 > iter1223: 現行課金プランを **メグルムプラス** に統一し、`subscriptions.plan_type='megrum_plus_monthly'` / `user_entitlements.feature_key='megrum_plus'` を追加する。個別募集無料3件上限、ホーム/検索優先表示、グルームアーカイブ無料10件上限の判定はこの権限キーを見る。旧 `premium` / `meguri_plus` は互換用に残す。
 > iter1226.102: めぐりメッセージの本文・画像パス解除も、現行 `megrum_plus` を正とし、旧 `premium` / `meguri_plus` を互換として許可する。
+> iter1226.177: グルーム返信文脈付きのめぐりメッセージは `meguri_messages.source_groom_*` を使い、本文・画像ロックの有無とは別に引用元グルームの文脈カードを表示できる。
 
 #### StoreKit product id 候補（iter1223）
 

@@ -10,9 +10,11 @@ struct SubscriptionSettingsContent: View {
     var isPurchasing: Bool
     var purchaseMessage: String?
     var purchaseErrorMessage: String?
+    var isPurchaseEnabled: Bool
     var onPurchase: () -> Void
     var onRestore: () -> Void
     var onReload: () -> Void
+    var onToggleDebugPlan: (() -> Void)? = nil
 
     var body: some View {
         List {
@@ -24,6 +26,8 @@ struct SubscriptionSettingsContent: View {
                 )
             }
 
+            debugPlanSection
+
             Section {
                 ForEach(MegrumPlusBenefitItem.defaultItems) { item in
                     MegrumPlusBenefitRow(item: item)
@@ -31,7 +35,7 @@ struct SubscriptionSettingsContent: View {
             } header: {
                 Text("できること")
             } footer: {
-                Text("無料プランでは個別募集は3件まで、グルームアーカイブは10件まで保存表示できます。")
+                Text("無料プランでは個別募集は3件まで、グルームアーカイブは10件まで保存表示できます。めぐり内でのメッセージのやり取りと県外掲示板の閲覧には\(SubscriptionCatalog.currentPremiumDisplayName)が必要です。")
             }
 
             Section {
@@ -49,36 +53,79 @@ struct SubscriptionSettingsContent: View {
             }
 
             Section {
-                Button(action: onPurchase) {
-                    Label(primaryButtonTitle, systemImage: "sparkles")
-                        .frame(maxWidth: .infinity)
-                }
-                .disabled(state.isMegrumPlusActive || isPurchasing)
-                #if os(iOS)
-                .buttonStyle(.borderedProminent)
-                #endif
+                if isPurchaseEnabled {
+                    Button(action: onPurchase) {
+                        Label(primaryButtonTitle, systemImage: "sparkles")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .disabled(state.isMegrumPlusActive || isPurchasing)
+                    #if os(iOS)
+                    .buttonStyle(.borderedProminent)
+                    #endif
 
-                Button(action: onRestore) {
-                    Label("購入を復元", systemImage: "arrow.clockwise")
+                    Button(action: onRestore) {
+                        Label("購入を復元", systemImage: "arrow.clockwise")
+                    }
+                    .disabled(isPurchasing)
+                } else {
+                    Label("購入機能は公開準備中です", systemImage: "lock.fill")
+                        .foregroundStyle(MegrumTheme.muted)
                 }
-                .disabled(isPurchasing)
 
                 Button("状態を更新", action: onReload)
                     .disabled(isLoading || isPurchasing)
             } footer: {
-                Text("価格は月額500円です。App Storeのサブスクリプションとして更新・解約できます。")
+                Text(purchaseFooterText)
+            }
+
+        }
+    }
+
+    @ViewBuilder
+    private var debugPlanSection: some View {
+        #if DEBUG
+        if let onToggleDebugPlan {
+            Section {
+                DebugPlanToggleButton(
+                    title: debugPlanButtonTitle,
+                    isActive: state.isMegrumPlusActive,
+                    action: onToggleDebugPlan
+                )
+                .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
+                .listRowBackground(Color.clear)
+            } header: {
+                Text("開発用")
+            } footer: {
+                Text("DEBUGビルドだけに表示される確認用の切り替えです。")
             }
         }
+        #endif
     }
 
     private var primaryButtonTitle: String {
         if state.isMegrumPlusActive {
             return "利用中"
         }
+        if !isPurchaseEnabled {
+            return "準備中"
+        }
         if isPurchasing {
             return "確認中"
         }
         return "\(offer.priceText)で始める"
+    }
+
+    private var purchaseFooterText: String {
+        if isPurchaseEnabled {
+            return "価格は月額500円です。App Storeのサブスクリプションとして更新・解約できます。"
+        }
+        return "購入と復元は、公開準備が整うまで停止しています。"
+    }
+
+    private var debugPlanButtonTitle: String {
+        state.isMegrumPlusActive
+            ? "開発用: 無料プランに戻す"
+            : "開発用: プレミアムにする"
     }
 }
 
@@ -97,10 +144,10 @@ private struct MegrumPlusHeroRow: View {
                     .background(MegrumTheme.lavender.opacity(0.13), in: RoundedRectangle(cornerRadius: 16))
 
                 VStack(alignment: .leading, spacing: 5) {
-                    Text("メグルムプラス")
+                    Text(SubscriptionCatalog.currentPremiumDisplayName)
                         .font(.title3.bold())
                         .foregroundStyle(MegrumTheme.ink)
-                    Text("交換相手に見つけてもらいやすく、募集とめぐりの保存を広げます。")
+                    Text("交換相手に見つけてもらいやすく、めぐりの会話と保存を広げます。")
                         .font(.subheadline)
                         .foregroundStyle(MegrumTheme.muted)
                 }
@@ -148,6 +195,18 @@ private struct MegrumPlusBenefitItem: Identifiable, Equatable {
             title: "グルームアーカイブ無制限",
             subtitle: "無料プランの10件上限を外して、過去のグルームを残せます。",
             systemImage: "archivebox.fill"
+        ),
+        MegrumPlusBenefitItem(
+            id: .meguriMessageExpansion,
+            title: "めぐり内でメッセージのやり取りが可能",
+            subtitle: "届いた本文を読んで、そのまま相手とやり取りできます。",
+            systemImage: "message.fill"
+        ),
+        MegrumPlusBenefitItem(
+            id: .meguriBoardExtendedAccess,
+            title: "県外の掲示板も閲覧可能",
+            subtitle: "無料プランでは見られない県外のチャットルームも開けます。",
+            systemImage: "map.fill"
         )
     ]
 }
@@ -195,10 +254,41 @@ private struct SubscriptionStatusRow: View {
     }
 
     private var statusTitle: String {
-        state.isMegrumPlusActive ? "メグルムプラス" : "無料プラン"
+        state.isMegrumPlusActive ? SubscriptionCatalog.currentPremiumDisplayName : "無料プラン"
     }
 
     private var statusImage: String {
         state.isMegrumPlusActive ? "checkmark.seal.fill" : "person.crop.circle"
     }
 }
+
+#if DEBUG
+private struct DebugPlanToggleButton: View {
+    var title: String
+    var isActive: Bool
+    var action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                Image(systemName: isActive ? "person.crop.circle.badge.minus" : "switch.2")
+                    .font(.system(size: 19, weight: .bold))
+                Text(title)
+                    .font(.body.weight(.heavy))
+                Spacer(minLength: 0)
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 18)
+            .frame(maxWidth: .infinity, minHeight: 58, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(isActive ? MegrumTheme.ink : Color.blue)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(title)
+        .accessibilityIdentifier("subscription-debug-plan-toggle-button")
+    }
+}
+#endif

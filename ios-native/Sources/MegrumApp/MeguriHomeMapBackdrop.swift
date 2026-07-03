@@ -10,7 +10,8 @@ struct MeguriHomeMapBackdrop: View {
     var threads: [BoardThread]
     var currentCoordinate: MegrumLocationCoordinate?
     var viewerID: UUID?
-    var onSelectGroom: (GroomPost) -> Void
+    var subscriptionState: UserSubscriptionState
+    var onSelectGroom: (GroomPost, UnitPoint) -> Void
     var onSelectThread: (BoardThread) -> Void
     var onTapCoordinate: (MegrumLocationCoordinate) -> Void
     var pendingCreationCoordinate: MegrumLocationCoordinate?
@@ -40,7 +41,10 @@ struct MeguriHomeMapBackdrop: View {
                             ForEach(grooms) { groom in
                                 Annotation("", coordinate: groom.coordinate) {
                                     Button {
-                                        onSelectGroom(groom)
+                                        onSelectGroom(
+                                            groom,
+                                            sourceAnchor(for: groom, in: proxy, containerSize: geometry.size)
+                                        )
                                     } label: {
                                         GroomMapPin(
                                             groom: groom,
@@ -67,7 +71,8 @@ struct MeguriHomeMapBackdrop: View {
                                             isOutOfRange: !MeguriAccessPolicy.canOpenBoard(
                                                 annotation.thread,
                                                 currentCoordinate: currentCoordinate,
-                                                viewerID: viewerID
+                                                viewerID: viewerID,
+                                                subscriptionState: subscriptionState
                                             )
                                         )
                                     }
@@ -156,6 +161,19 @@ struct MeguriHomeMapBackdrop: View {
 }
 
 private extension MeguriHomeMapBackdrop {
+    func sourceAnchor(for groom: GroomPost, in proxy: MapProxy, containerSize: CGSize) -> UnitPoint {
+        guard containerSize.width > 0,
+              containerSize.height > 0,
+              let point = proxy.convert(groom.coordinate, to: .local)
+        else {
+            return .center
+        }
+        return UnitPoint(
+            x: min(max(point.x / containerSize.width, 0), 1),
+            y: min(max(point.y / containerSize.height, 0), 1)
+        )
+    }
+
     func isAnnotationTap(at location: CGPoint, in proxy: MapProxy) -> Bool {
         if selectedKind == .all || selectedKind == .grooms {
             for groom in grooms {

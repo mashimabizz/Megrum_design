@@ -7,8 +7,26 @@ extension NativePreviewData {
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000801")!,
             senderID: partnerID,
             recipientID: viewerID,
+            sourceGroomReplyID: UUID(uuidString: "00000000-0000-0000-0000-000000000704")!,
+            sourceGroomPostID: UUID(uuidString: "00000000-0000-0000-0000-000000000502")!,
+            sourceGroomOwnerID: viewerID,
+            sourceGroomImageURL: testGoodsImageURL("twice_momo_1"),
             messageType: .text,
             body: "グルーム見ました。会場付近ですか？",
+            senderDisplayName: "まさき",
+            senderHandle: "masaki"
+        ),
+        MeguriMessage(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000802")!,
+            senderID: partnerID,
+            recipientID: viewerID,
+            sourceGroomReplyID: UUID(uuidString: "00000000-0000-0000-0000-000000000705")!,
+            sourceGroomPostID: UUID(uuidString: "00000000-0000-0000-0000-000000000503")!,
+            sourceGroomOwnerID: viewerID,
+            sourceGroomImageURL: testGoodsImageURL("twice_dahyun_1"),
+            messageType: .text,
+            body: "次の現場でも見たいです",
+            createdAt: Date(timeIntervalSince1970: 1_779_912_180),
             senderDisplayName: "まさき",
             senderHandle: "masaki"
         )
@@ -18,25 +36,34 @@ extension NativePreviewData {
         GroomPost(
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000501")!,
             authorID: partnerID,
-            imageURL: URL(string: "https://example.com/groom-a.jpg")!,
+            imageURL: testGoodsImageURL("aespa_ningning")!,
             latitude: 35.681236,
             longitude: 139.767125,
+            groupID: groupID,
+            characterID: memberID,
+            seriesName: "2026 LIVE",
             createdAt: Date(timeIntervalSince1970: 1_780_169_880)
         ),
         GroomPost(
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000502")!,
             authorID: viewerID,
-            imageURL: URL(string: "https://example.com/groom-archive-viewer-a.jpg")!,
+            imageURL: testGoodsImageURL("twice_momo_1")!,
             latitude: 35.682236,
             longitude: 139.768425,
+            groupID: secondGroupID,
+            characterID: secondMemberID,
+            seriesName: "会場限定",
             createdAt: Date(timeIntervalSince1970: 1_780_090_000)
         ),
         GroomPost(
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000503")!,
             authorID: viewerID,
-            imageURL: URL(string: "https://example.com/groom-archive-viewer-b.jpg")!,
+            imageURL: testGoodsImageURL("twice_dahyun_1")!,
             latitude: 35.679936,
             longitude: 139.765825,
+            groupID: secondGroupID,
+            characterID: secondMemberID,
+            seriesName: "会場限定",
             createdAt: Date(timeIntervalSince1970: 1_779_910_000)
         )
     ]
@@ -66,7 +93,7 @@ extension NativePreviewData {
                 senderID: partnerID,
                 recipientID: viewerID,
                 body: "会場の雰囲気いいですね！",
-                groomImageURL: URL(string: "https://example.com/groom-archive-viewer-a.jpg"),
+                groomImageURL: testGoodsImageURL("twice_momo_1"),
                 createdAt: Date(timeIntervalSince1970: 1_780_091_260)
             )
         ],
@@ -77,7 +104,7 @@ extension NativePreviewData {
                 senderID: partnerID,
                 recipientID: viewerID,
                 body: "次の現場でも見たいです",
-                groomImageURL: URL(string: "https://example.com/groom-archive-viewer-b.jpg"),
+                groomImageURL: testGoodsImageURL("twice_dahyun_1"),
                 createdAt: Date(timeIntervalSince1970: 1_779_912_120)
             )
         ]
@@ -92,7 +119,10 @@ extension NativePreviewData {
             audience: .nearby3km,
             latitude: 35.681236,
             longitude: 139.767125,
-            prefecture: "東京都"
+            prefecture: "東京都",
+            groupID: groupID,
+            characterID: memberID,
+            seriesName: "2026 LIVE"
         ),
         BoardThread(
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000602")!,
@@ -100,7 +130,10 @@ extension NativePreviewData {
             title: "終演後の交換場所",
             body: "駅側より会場横の広場が落ち着いています。",
             audience: .samePrefecture,
-            prefecture: "東京都"
+            prefecture: "東京都",
+            groupID: secondGroupID,
+            characterID: secondMemberID,
+            seriesName: "会場限定"
         )
     ]
 

@@ -116,6 +116,41 @@ enum ProposalCreatePrimaryStepDestination {
     }
 }
 
+enum ProposalPreviousStepResolver {
+    static func destination(
+        from selectedStep: ProposalCreateStep,
+        visibleSteps: [ProposalCreateStep]
+    ) -> ProposalCreateStep? {
+        guard let index = visibleSteps.firstIndex(of: selectedStep), index > 0 else {
+            return nil
+        }
+        return visibleSteps[index - 1]
+    }
+}
+
+enum ProposalInitialStepResolution: Equatable {
+    case apply(ProposalCreateStep)
+    case markApplied
+    case wait
+}
+
+enum ProposalInitialStepResolver {
+    static func resolution(
+        initialStep: ProposalCreateStep,
+        visibleSteps: [ProposalCreateStep],
+        configuration: ProposalCreateConfiguration
+    ) -> ProposalInitialStepResolution {
+        guard visibleSteps.contains(initialStep) else {
+            return .markApplied
+        }
+        let priorSteps = visibleSteps.prefix(while: { $0 != initialStep })
+        guard priorSteps.allSatisfy({ configuration.canAdvance(from: $0) }) else {
+            return .wait
+        }
+        return .apply(initialStep)
+    }
+}
+
 enum ProposalFlowBottomBarPlacement {
     static func usesInlineScrollButton(for step: ProposalCreateStep) -> Bool {
         false

@@ -6,6 +6,7 @@ final class NotificationRouteTests: XCTestCase {
     private let tradeID = "11111111-1111-1111-1111-111111111111"
     private let disputeID = "22222222-2222-2222-2222-222222222222"
     private let userID = "33333333-3333-3333-3333-333333333333"
+    private let groomID = "44444444-4444-4444-4444-444444444444"
 
     func testTradeAndDisputeLinkPathsRouteToDetailIntents() {
         XCTAssertEqual(NotificationRouteIntent(linkPath: "/proposals/\(tradeID)"), .tradeDetail(id: tradeID))
@@ -44,6 +45,22 @@ final class NotificationRouteTests: XCTestCase {
             NotificationRouteIntent(linkPath: "/grooms/post-1?peerId=\(userID)", kind: .groomReply),
             .meguriMessages(peerID: userID, open: nil)
         )
+        XCTAssertEqual(
+            NotificationRouteIntent(linkPath: "/grooms/\(groomID)", kind: .groomLiked),
+            .ownGroom(postID: groomID)
+        )
+        XCTAssertEqual(
+            NotificationRouteIntent(linkPath: "/groom?postId=\(groomID)", kind: .groomLiked),
+            .ownGroom(postID: groomID)
+        )
+        XCTAssertEqual(
+            NotificationRouteIntent(linkPath: "/grooms/\(groomID)"),
+            .ownGroom(postID: groomID)
+        )
+        XCTAssertEqual(
+            NotificationRouteIntent(linkPath: "/grooms/\(groomID)?peerId=\(userID)"),
+            .meguriMessages(peerID: userID, open: nil)
+        )
     }
 
     func testProfileAndEvaluationLinkPathsRouteToProfileIntents() {
@@ -70,6 +87,7 @@ final class NotificationRouteTests: XCTestCase {
         XCTAssertEqual(try XCTUnwrap(NotificationRouteIntent(linkPath: "/transactions/\(tradeID)")).fallbackTab, .trades)
         XCTAssertEqual(try XCTUnwrap(NotificationRouteIntent(linkPath: "/disputes/\(disputeID)")).fallbackTab, .trades)
         XCTAssertEqual(try XCTUnwrap(NotificationRouteIntent(linkPath: "/meguri-board-thread?id=thread-1")).fallbackTab, .meguri)
+        XCTAssertEqual(try XCTUnwrap(NotificationRouteIntent(linkPath: "/grooms/\(groomID)", kind: .groomLiked)).fallbackTab, .meguri)
         XCTAssertEqual(try XCTUnwrap(NotificationRouteIntent(linkPath: "/users/\(userID)")).fallbackTab, .home)
     }
 

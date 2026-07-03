@@ -57,7 +57,7 @@ extension ProposalCreateFlow {
 
     var meetupSummary: String {
         if let meetupInput {
-            return "\(Self.dateText(meetupInput.startAt)) / \(meetupInput.normalizedPlaceName)"
+            return "\(ProposalCreateDisplayTextFormatter.dateText(meetupInput.startAt)) / \(meetupInput.normalizedPlaceName)"
         }
         return configuration.requiresMeetupBeforeSubmit ? "未設定" : "現地では会わない設定"
     }

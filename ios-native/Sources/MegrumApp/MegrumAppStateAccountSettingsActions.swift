@@ -39,17 +39,22 @@ extension MegrumAppState {
         }
     }
 
-    public func loadPaymentSettings() async {
+    public func loadPaymentSettings(reportsFailure: Bool = true) async {
         guard !isLoadingPaymentSettings else {
             return
         }
 
         isLoadingPaymentSettings = true
-        errorMessage = nil
+        if reportsFailure {
+            errorMessage = nil
+        }
         do {
             paymentSettings = try await repository.loadPaymentSettings()
+            hasLoadedPaymentSettings = true
         } catch {
-            errorMessage = "支払い方法を読み込めませんでした"
+            if reportsFailure {
+                errorMessage = "支払い方法を読み込めませんでした"
+            }
         }
         isLoadingPaymentSettings = false
     }
@@ -69,6 +74,7 @@ extension MegrumAppState {
             let saved = try await repository.savePaymentSettings(settings.normalized(for: viewer.id))
             self.viewer = saved.profile
             self.paymentSettings = saved.settings
+            hasLoadedPaymentSettings = true
             isSavingPaymentSettings = false
             return true
         } catch {

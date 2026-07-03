@@ -9,6 +9,7 @@ struct MegrumRootDrawerDestinationSheet: View {
     @Binding var selectedTab: MegrumTab
     @Binding var drawerDestination: AppDrawerDestination?
     @Binding var publicProfileRoute: PublicProfileRoute?
+    var onOpenRouteIntent: (NotificationRouteIntent) -> Void = { _ in }
     var onClose: () -> Void = {}
 
     var body: some View {
@@ -74,7 +75,7 @@ struct MegrumRootDrawerDestinationSheet: View {
         case .exchangeSettings:
             HomeExchangeSettingsScreen(appState: appState, individualListings: appState.listings, onClose: onClose)
         case .megrumPlus:
-            SubscriptionSettingsScreen(appState: appState)
+            SubscriptionSettingsScreen(appState: appState, onClose: onClose)
         case .settings, .help:
             EmptyView()
         }
@@ -82,6 +83,7 @@ struct MegrumRootDrawerDestinationSheet: View {
 
     @discardableResult
     private func openNotificationRouteIntent(_ intent: NotificationRouteIntent) -> Bool {
+        onOpenRouteIntent(intent)
         selectedTab = intent.fallbackTab
         drawerDestination = nil
 
@@ -95,7 +97,7 @@ struct MegrumRootDrawerDestinationSheet: View {
             }
         case .tab, .tradeDetail, .tradeEvidenceCapture, .tradeEvidenceApproval,
              .tradeEvaluation, .tradeAssistance, .disputeDetail,
-             .meguriBoardThread, .meguriMessages, .unknown:
+             .meguriBoardThread, .meguriMessages, .ownGroom, .unknown:
             break
         }
         return true

@@ -133,6 +133,33 @@ final class AccountSetupScreenTests: XCTestCase {
         XCTAssertNil(AccountSetupBirthDateCalendarLogic.addYears(1, to: futureMonth, maxDate: maxDate))
     }
 
+    func testBirthDateCalendarPresentationStateTracksVisibleMonthNavigationAndSelection() throws {
+        let selection = try XCTUnwrap(ProfileBirthDateCodec.date(from: "2000-02-14"))
+        let maxDate = try XCTUnwrap(ProfileBirthDateCodec.date(from: "2026-06-27"))
+        var state = AccountSetupBirthDateCalendarPresentationState(selection: selection)
+
+        XCTAssertEqual(state.monthTitle, "2000年2月")
+        XCTAssertTrue(state.canShowPreviousYear(maxDate: maxDate))
+        XCTAssertTrue(state.canShowNextMonth(maxDate: maxDate))
+
+        state.showPreviousMonth()
+        XCTAssertEqual(state.monthTitle, "2000年1月")
+
+        state.showNextYear(maxDate: maxDate)
+        XCTAssertEqual(state.monthTitle, "2001年1月")
+
+        state.syncSelection(try XCTUnwrap(ProfileBirthDateCodec.date(from: "1999-12-31")))
+        XCTAssertEqual(state.monthTitle, "1999年12月")
+
+        var maxMonthState = AccountSetupBirthDateCalendarPresentationState(
+            selection: try XCTUnwrap(ProfileBirthDateCodec.date(from: "2026-06-01"))
+        )
+        XCTAssertFalse(maxMonthState.canShowNextMonth(maxDate: maxDate))
+
+        maxMonthState.showNextMonth(maxDate: maxDate)
+        XCTAssertEqual(maxMonthState.monthTitle, "2026年6月")
+    }
+
     func testOshiPresentationStateFiltersGroupsByGenreAndAlias() {
         let idolGenreID = UUID(uuidString: "30000000-0000-0000-0000-000000000101")!
         let actorGenreID = UUID(uuidString: "30000000-0000-0000-0000-000000000102")!

@@ -7,8 +7,7 @@ struct GoodsReportSheet: View {
     var onSubmit: (GoodsReportReason, String) -> Void
 
     @Environment(\.dismiss) private var dismiss
-    @State private var reason: GoodsReportReason = .fakeItem
-    @State private var note = ""
+    @State private var draftState = GoodsReportDraftState()
 
     var body: some View {
         Form {
@@ -18,7 +17,7 @@ struct GoodsReportSheet: View {
             }
 
             Section("理由") {
-                Picker("理由", selection: $reason) {
+                Picker("理由", selection: $draftState.reason) {
                     ForEach(GoodsReportReason.allCases) { reason in
                         Text(reason.displayName).tag(reason)
                     }
@@ -26,7 +25,7 @@ struct GoodsReportSheet: View {
             }
 
             Section("補足") {
-                TextEditor(text: $note)
+                TextEditor(text: $draftState.note)
                     .frame(minHeight: 120)
             }
         }
@@ -40,7 +39,8 @@ struct GoodsReportSheet: View {
             }
             ToolbarItem(placement: .confirmationAction) {
                 Button("送信") {
-                    onSubmit(reason, note)
+                    let submission = draftState.submission
+                    onSubmit(submission.reason, submission.note)
                     dismiss()
                 }
             }
@@ -63,12 +63,13 @@ struct GoodsTagTextPill: View {
     var fontSize: CGFloat
     var horizontalPadding: CGFloat
     var verticalPadding: CGFloat = 7
+    var foregroundColor: Color = MegrumTheme.ink
 
     var body: some View {
         Text(text)
             .font(.system(size: fontSize, weight: .heavy, design: .rounded))
             .lineLimit(1)
-            .foregroundStyle(MegrumTheme.ink)
+            .foregroundStyle(foregroundColor)
             .padding(.horizontal, horizontalPadding)
             .padding(.vertical, verticalPadding)
             .background(.white.opacity(0.86), in: Capsule())

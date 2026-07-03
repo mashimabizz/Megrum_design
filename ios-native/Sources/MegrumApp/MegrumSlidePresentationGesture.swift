@@ -11,6 +11,17 @@ enum MegrumSlidePresentationMetrics {
         dampingFraction: 0.88,
         blendDuration: 0.04
     )
+    static var trailingTransition: AnyTransition {
+        .asymmetric(
+            insertion: .move(edge: .trailing),
+            removal: .move(edge: .trailing)
+        )
+    }
+}
+
+enum MegrumSlideBackSwipeInteractionScope: Equatable {
+    case leadingEdge
+    case fullScreen
 }
 
 enum MegrumSlideBackSwipeResolver {

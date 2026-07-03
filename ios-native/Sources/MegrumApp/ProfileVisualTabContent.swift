@@ -46,7 +46,7 @@ struct ProfileVisualListingsSection: View {
     var characters: [OshiCharacter]
     var goodsTypes: [GoodsType]
     var onSelectListing: ((UUID) -> Void)?
-    @State private var activeListingID: UUID?
+    @State private var selectionState = IndividualListingActiveSelectionState()
 
     var body: some View {
         if listings.isEmpty {
@@ -55,37 +55,30 @@ struct ProfileVisualListingsSection: View {
             VStack(spacing: 14) {
                 IndividualListingConditionStrip(
                     listings: listings,
-                    activeListingID: $activeListingID
+                    activeListingID: $selectionState.activeListingID
                 )
 
                 listingCard(activeListing)
             }
             .onChange(of: listings.map(\.id), initial: true) { _, ids in
-                if let activeListingID, ids.contains(activeListingID) {
-                    return
-                }
-                activeListingID = ids.first
+                selectionState.reconcile(with: ids)
             }
         }
     }
 
     private var activeListing: IndividualListing? {
-        if let activeListingID,
-           let listing = listings.first(where: { $0.id == activeListingID }) {
-            return listing
-        }
-        return listings.first
+        selectionState.activeListing(in: listings)
     }
 
-    private func activeListingIndex(for listing: IndividualListing) -> Int {
-        listings.firstIndex(where: { $0.id == listing.id }) ?? 0
+    private var activeListingIndex: Int {
+        selectionState.activeListingIndex(in: listings)
     }
 
     @ViewBuilder
     private func listingCard(_ listing: IndividualListing) -> some View {
         let card = IndividualListingDesignCard(
             listing: listing,
-            listingIndex: activeListingIndex(for: listing),
+            listingIndex: activeListingIndex,
             listingCount: listings.count,
             inventoryByID: inventoryByID,
             wishByID: wishByID,
@@ -96,6 +89,7 @@ struct ProfileVisualListingsSection: View {
             onEditOffer: {},
             onAddCondition: {},
             onEditExchangeCondition: {},
+            onShare: {},
             onDelete: {}
         )
 

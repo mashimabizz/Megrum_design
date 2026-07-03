@@ -14,6 +14,7 @@ struct GoodsCollectionFloatingControls: View {
     var onDismissQuickAction: () -> Void
     var onQuickAction: (GoodsQuickActionKind) -> Void
     var onBulkTag: () -> Void
+    var onBulkShare: () -> Void
     var onBulkDelete: () -> Void
     var onCancelSelection: () -> Void
 
@@ -21,7 +22,7 @@ struct GoodsCollectionFloatingControls: View {
         if showsAddButton && !isSelectionMode && quickActionItem == nil {
             AddGoodsButton(accessibilityLabel: addButtonLabel, accessibilityHint: addButtonHint, action: onAdd)
                 .padding(.leading, FloatingActionLayoutMetrics.leadingPadding)
-                .padding(.bottom, FloatingActionLayoutMetrics.bottomGapAboveFooter)
+                .padding(.bottom, FloatingActionLayoutMetrics.addButtonBottomPadding)
         }
 
         if let quickActionItem {
@@ -48,6 +49,7 @@ struct GoodsCollectionFloatingControls: View {
             GoodsSelectionFooter(
                 selectedCount: selectedCount,
                 onTag: onBulkTag,
+                onShare: onBulkShare,
                 onDelete: onBulkDelete,
                 onCancel: onCancelSelection
             )

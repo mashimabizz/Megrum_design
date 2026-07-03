@@ -12,9 +12,7 @@ struct SearchResultGrid: View {
     var onOpenOwnerProfile: (UUID) -> Void
     var onReportItem: (GoodsItem, GoodsReportReason, String) -> Void
 
-    @State private var selectedSheet: HomeDiscoverySheet?
-    @State private var pendingProfileUserID: UUID?
-    @State private var reportTargetItem: GoodsItem?
+    @State private var presentationState = SearchResultGridPresentationState()
 
     var body: some View {
         Grid(horizontalSpacing: SearchResultGridMetrics.columnSpacing, verticalSpacing: SearchResultGridMetrics.rowSpacing) {
@@ -28,7 +26,7 @@ struct SearchResultGrid: View {
             }
         }
         .sheet(
-            item: $selectedSheet,
+            item: $presentationState.selectedSheet,
             onDismiss: presentPendingProfileIfNeeded
         ) { sheet in
             HomeDiscoverySheetView(
@@ -41,11 +39,11 @@ struct SearchResultGrid: View {
             .presentationDetents([.large])
             .presentationDragIndicator(.visible)
         }
-        .sheet(item: $reportTargetItem) { item in
+        .sheet(item: $presentationState.reportTargetItem) { item in
             NavigationStack {
                 GoodsReportSheet(item: item) { reason, note in
                     onReportItem(item, reason, note)
-                    reportTargetItem = nil
+                    presentationState.clearReport()
                 }
             }
         }
@@ -99,7 +97,7 @@ struct SearchResultGrid: View {
     }
 
     private func requestProposalPresentation(_ selection: HomeDiscoveryProposalSelection) {
-        selectedSheet = nil
+        presentationState.requestProposalPresentation()
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: HomeDiscoveryDeferredPresentationPolicy.sheetDismissalDelayNanoseconds)
             if let item = proposalTargetItem(for: selection) {
@@ -109,15 +107,13 @@ struct SearchResultGrid: View {
     }
 
     private func requestProfilePresentation(_ userID: UUID) {
-        pendingProfileUserID = userID
-        selectedSheet = nil
+        presentationState.requestProfilePresentation(userID: userID)
     }
 
     private func presentPendingProfileIfNeeded() {
-        guard let pendingProfileUserID else {
+        guard let pendingProfileUserID = presentationState.consumePendingProfileUserID() else {
             return
         }
-        self.pendingProfileUserID = nil
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: HomeDiscoveryDeferredPresentationPolicy.sheetDismissalDelayNanoseconds)
             onOpenOwnerProfile(pendingProfileUserID)
@@ -143,15 +139,17 @@ struct SearchResultGrid: View {
                 conditionTags: conditionTags(for: result, index: index),
                 viewerID: viewerID,
                 onOpen: {
-                    selectedSheet = SearchResultHomePresentation.sheet(
-                        for: result,
-                        index: index,
-                        goodsTypes: appState?.goodsTypes ?? [],
-                        explicitSignals: appState?.homeCandidateConditionSignals ?? [:]
+                    presentationState.showSheet(
+                        SearchResultHomePresentation.sheet(
+                            for: result,
+                            index: index,
+                            goodsTypes: appState?.goodsTypes ?? [],
+                            explicitSignals: appState?.homeCandidateConditionSignals ?? [:]
+                        )
                     )
                 },
                 onReport: {
-                    reportTargetItem = result.item
+                    presentationState.showReport(item: result.item)
                 }
             )
         case .nativeAd:

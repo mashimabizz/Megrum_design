@@ -623,8 +623,8 @@ iter157 で体験プロトタイプを iOS 版に追加し、iter162.41 でレ�
 ```mermaid
 stateDiagram-v2
     [*] --> received_locked: メッセージ到着
-    received_locked --> opened: めぐりPlusで本文表示
-    opened --> replied: 返信送信
+    received_locked --> opened: Megrumプレミアムで本文表示
+    opened --> replied: テキスト / 画像返信送信
     received_locked --> hidden: 非表示 / ブロック
     opened --> hidden: 非表示 / ブロック
     replied --> archived: 会話終了 / 履歴化
@@ -642,10 +642,11 @@ stateDiagram-v2
 
 ### ビジネスルール
 
-- 単発の本文表示チケットは作らず、月額1000円のめぐりPlusのみで本文表示・返信を許可する。
-- 送信側は月2通まで無料。めぐりPlusでは新規メッセージを月20通まで送れる。
+- 単発の本文表示チケットは作らず、現行のMegrumプレミアムで本文表示・返信を許可する。旧めぐりPlus / 旧Premium は互換権限として同じ判定に含める。
+- 無料ユーザーは到着・未読数・モザイクプレビューまでは確認できるが、本文表示・テキスト返信・画像送信はできない。
 - 実装上の有料判定は `user_entitlements(feature_key in ('megrum_plus','meguri_plus','premium'), active=true)` を参照する。無料ユーザーには `meguri_messages` の本文・画像パスを直接返さず、専用RPCでロック済みメタ情報だけ返す。
-- Swift Nativeでは、ロック済み会話の一覧プレビューと各メッセージ本文をモザイク表示にし、メッセージ本文側のモザイクをタップすると「Megrum プレミアム」画面へ遷移する。
+- Swift Nativeでは、ロック済み会話の一覧プレビューと各メッセージ本文を実テキストへblurをかけたモザイク表示にし、メッセージ本文側のモザイク上のボタンから「Megrumプレミアム」画面へ遷移する。
+- Megrumプレミアムユーザーはテキスト返信に加えて画像メッセージを送信できる。画像は `meguri-message-media` private Storage pathとして保存し、`meguri_messages.message_type='image'` / `image_path` に紐づけ、閲覧可能な会話を取得した後だけ署名URLで表示する。
 - 場所と時刻は必ず丸め、正確な地点・時刻・職場や生活導線の特定につながる表示は避ける。
 - 交換・打診・取引とは独立し、`proposal` / `deal` 状態へ自動遷移しない。
 
@@ -897,7 +898,7 @@ stateDiagram-v2
 | エンティティ | 状態 | 説明 |
 |---|---|---|
 | `subscriptions` | `incomplete` / `incomplete_expired` / `trialing` / `active` / `past_due` / `cancelled` / `canceled` / `unpaid` / `expired` | Stripe等プロバイダー由来の契約状態 |
-| `user_entitlements` | `active=true/false` | アプリが参照する最終的な機能権限。`feature_key='megrum_plus'` が現行メグルムプラス判定、`premium` / `meguri_plus` は旧設計互換の判定 |
+| `user_entitlements` | `active=true/false` | アプリが参照する最終的な機能権限。`feature_key='megrum_plus'` が現行Megrumプレミアム判定、`premium` / `meguri_plus` は旧設計互換の判定 |
 | `stripe_webhook_events` | `processing` / `processed` / `failed` / `ignored` | webhook処理の冪等性・再処理判断 |
 
 ### ビジネスルール
@@ -909,6 +910,7 @@ stateDiagram-v2
 - StoreKitで検証済みの `megrum.plus.monthly` は `sync_megrum_plus_purchase_for_viewer()` で `subscriptions.plan_type='megrum_plus_monthly'` と `user_entitlements(feature_key='megrum_plus')` へ同期する。App Store Server APIでのサーバー側署名検証は本番前タスク。
 - 個別募集は無料プランでは `active` / `paused` / `matched` の合計3件まで。`megrum_plus` が有効ならDBトリガー・クライアントUIともに上限を外す。
 - グルームアーカイブは無料プランでは最新10件まで。`megrum_plus` が有効ならビジネス上の保存上限を外し、アプリはページサイズ単位で取得する。
+- めぐり掲示板は無料プランでは県内または現在地1km圏内の閲覧を基本にし、`megrum_plus` / 旧 `premium` / 旧 `meguri_plus` が有効なら県外掲示板も閲覧できる。
 - 手動上書きは `plan_overrides` に履歴を残し、同時に `user_entitlements` を更新する。
 
 ## 15. 付録：エンティティ間の関係

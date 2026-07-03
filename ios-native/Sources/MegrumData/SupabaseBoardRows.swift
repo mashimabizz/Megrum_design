@@ -58,6 +58,9 @@ struct BoardThreadRow: Decodable, Sendable {
     var originLng: Double?
     var prefecture: String?
     var imagePaths: [String]?
+    var groupId: UUID?
+    var characterId: UUID?
+    var seriesName: String?
     var status: String?
     var replyCount: Int?
     var latestActivityAt: Date?
@@ -65,6 +68,11 @@ struct BoardThreadRow: Decodable, Sendable {
     var createdAt: Date?
     var anonymousDisplayName: String?
     var anonymousAvatarID: String?
+    var reactionCount: Int?
+    var goodReactionCount: Int?
+    var badReactionCount: Int?
+    var viewerReacted: Bool?
+    var viewerReactionType: String?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -76,6 +84,9 @@ struct BoardThreadRow: Decodable, Sendable {
         case originLng
         case prefecture
         case imagePaths
+        case groupId
+        case characterId
+        case seriesName
         case status
         case replyCount
         case latestActivityAt
@@ -83,6 +94,11 @@ struct BoardThreadRow: Decodable, Sendable {
         case createdAt
         case anonymousDisplayName
         case anonymousAvatarID = "anonymousAvatarId"
+        case reactionCount
+        case goodReactionCount
+        case badReactionCount
+        case viewerReacted
+        case viewerReactionType
     }
 
     func thread(signedURLs: [String: URL]) -> BoardThread? {
@@ -100,13 +116,20 @@ struct BoardThreadRow: Decodable, Sendable {
             prefecture: prefecture,
             imageURLs: paths.compactMap { signedURLs[$0] ?? URL(string: $0) },
             imagePaths: paths,
+            groupID: groupId,
+            characterID: characterId,
+            seriesName: SupabaseTextNormalizer.optional(seriesName),
             createdAt: created,
             latestActivityAt: latestActivityAt ?? created,
             expiresAt: expiresAt,
             replyCount: max(0, replyCount ?? 0),
             status: status ?? "visible",
             anonymousDisplayName: SupabaseTextNormalizer.optional(anonymousDisplayName),
-            anonymousAvatarID: SupabaseTextNormalizer.optional(anonymousAvatarID)
+            anonymousAvatarID: SupabaseTextNormalizer.optional(anonymousAvatarID),
+            goodReactionCount: max(0, goodReactionCount ?? reactionCount ?? 0),
+            badReactionCount: max(0, badReactionCount ?? 0),
+            viewerReaction: BoardMessageReaction(rawValue: viewerReactionType ?? "")
+                ?? ((viewerReacted ?? false) ? .good : nil)
         )
     }
 
@@ -158,6 +181,9 @@ struct BoardThreadCreatePayload: Encodable, Sendable {
     var pImagePaths: [String]
     var pAnonymousDisplayName: String?
     var pAnonymousAvatarID: String?
+    var pGroupID: UUID?
+    var pCharacterID: UUID?
+    var pSeriesName: String?
 
     init(input: BoardThreadCreateInput, imagePaths: [String]) {
         self.pTitle = SupabaseTextNormalizer.trimmed(input.title)
@@ -169,6 +195,9 @@ struct BoardThreadCreatePayload: Encodable, Sendable {
         self.pImagePaths = imagePaths
         self.pAnonymousDisplayName = SupabaseTextNormalizer.optional(input.anonymousDisplayName)
         self.pAnonymousAvatarID = SupabaseTextNormalizer.optional(input.anonymousAvatarID)
+        self.pGroupID = input.groupID
+        self.pCharacterID = input.characterID
+        self.pSeriesName = SupabaseTextNormalizer.optional(input.seriesName)
     }
 
     enum CodingKeys: String, CodingKey {
@@ -181,6 +210,9 @@ struct BoardThreadCreatePayload: Encodable, Sendable {
         case pImagePaths
         case pAnonymousDisplayName
         case pAnonymousAvatarID
+        case pGroupID
+        case pCharacterID
+        case pSeriesName
     }
 
     func encode(to encoder: Encoder) throws {
@@ -213,6 +245,21 @@ struct BoardThreadCreatePayload: Encodable, Sendable {
             try container.encode(pAnonymousAvatarID, forKey: .pAnonymousAvatarID)
         } else {
             try container.encodeNil(forKey: .pAnonymousAvatarID)
+        }
+        if let pGroupID {
+            try container.encode(pGroupID, forKey: .pGroupID)
+        } else {
+            try container.encodeNil(forKey: .pGroupID)
+        }
+        if let pCharacterID {
+            try container.encode(pCharacterID, forKey: .pCharacterID)
+        } else {
+            try container.encodeNil(forKey: .pCharacterID)
+        }
+        if let pSeriesName {
+            try container.encode(pSeriesName, forKey: .pSeriesName)
+        } else {
+            try container.encodeNil(forKey: .pSeriesName)
         }
     }
 }

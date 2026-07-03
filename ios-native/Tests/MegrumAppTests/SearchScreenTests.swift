@@ -116,6 +116,57 @@ final class SearchScreenTests: XCTestCase {
         )
     }
 
+    func testSearchScreenPresentationStateManagesQueryAndInitialCriteria() {
+        let groupID = UUID(uuidString: "00000000-0000-0000-0000-000000000501")!
+        let memberID = UUID(uuidString: "00000000-0000-0000-0000-000000000502")!
+        let goodsTypeID = UUID(uuidString: "00000000-0000-0000-0000-000000000503")!
+        let now = Date(timeIntervalSinceReferenceDate: 2_000)
+        let criteria = SearchInitialCriteria(
+            query: "  トレカ  ",
+            groupID: groupID,
+            memberID: memberID,
+            goodsTypeID: goodsTypeID,
+            tagNames: ["会場限定", "会場限定", "2026 LIVE"]
+        )
+        var draft = SearchFilterDraft(selectedMeetupPrefecture: "大阪府")
+        var state = SearchScreenPresentationState()
+
+        XCTAssertFalse(state.hasSubmittedQuery)
+
+        state.queryDraft = "ラキドロ"
+        state.submitQuery()
+
+        XCTAssertEqual(state.query, "ラキドロ")
+        XCTAssertTrue(state.hasSubmittedQuery)
+
+        state.showFilters()
+        XCTAssertTrue(state.isShowingFilters)
+
+        state.beginSuggestionApplication()
+        XCTAssertTrue(state.isApplyingSuggestion)
+        state.finishSuggestionApplication()
+        XCTAssertFalse(state.isApplyingSuggestion)
+
+        state.markWishSuggestionHorizontalScroll(now: now)
+        XCTAssertTrue(state.isBackSwipeSuppressed(now: now.addingTimeInterval(0.4)))
+        XCTAssertFalse(state.isBackSwipeSuppressed(now: now.addingTimeInterval(1.2)))
+
+        XCTAssertTrue(state.applyInitialCriteriaIfNeeded(criteria, filterDraft: &draft))
+        XCTAssertEqual(state.query, "トレカ")
+        XCTAssertEqual(state.queryDraft, "トレカ")
+        XCTAssertEqual(draft.selectedGroupID, groupID)
+        XCTAssertEqual(draft.selectedMemberID, memberID)
+        XCTAssertEqual(draft.selectedGoodsTypeID, goodsTypeID)
+        XCTAssertEqual(draft.selectedGoodsTagNames, ["会場限定", "2026 LIVE"])
+        XCTAssertEqual(draft.selectedMeetupPrefecture, "大阪府")
+
+        state.clearQuery()
+        XCTAssertEqual(state.query, "")
+        XCTAssertEqual(state.queryDraft, "")
+        XCTAssertFalse(state.applyInitialCriteriaIfNeeded(criteria, filterDraft: &draft))
+        XCTAssertEqual(state.query, "")
+    }
+
     func testSearchQueryResolverUsesGoodsTypeOrTagInsteadOfTitleOnlyQuery() {
         let goodsTypeID = SearchQueryResolver.matchingGoodsTypeID(
             query: "トレカ",
@@ -197,6 +248,95 @@ final class SearchScreenTests: XCTestCase {
         XCTAssertEqual(reset.meetupDateDraft, meetupDate)
     }
 
+    func testSearchFilterSheetStateManagesPresentationAndDefaultConditions() {
+        let meetupDateDraft = Date(timeIntervalSinceReferenceDate: 42)
+        let selectedMemberID = UUID(uuidString: "30000000-0000-0000-0000-000000000011")!
+        let group = NativePreviewData.oshiGroups[0]
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "Asia/Tokyo")!
+        var state = SearchFilterSheetState(
+            draft: SearchFilterDraft(
+                selectedMemberID: selectedMemberID,
+                selectedGoodsTagNames: ["会場限定"],
+                meetupDateDraft: meetupDateDraft
+            )
+        )
+
+        XCTAssertFalse(state.hasSelectedGroup)
+        XCTAssertEqual(state.selectedTagSummary, "1件")
+
+        state.showTagPicker()
+        XCTAssertTrue(state.isShowingTagPicker)
+
+        state.selectGroup(group)
+        XCTAssertEqual(state.draft.selectedGroupID, group.id)
+        XCTAssertNil(state.draft.selectedMemberID)
+
+        let firstDate = calendar.date(from: DateComponents(year: 2026, month: 7, day: 3, hour: 18))!
+        let sameDate = calendar.date(from: DateComponents(year: 2026, month: 7, day: 3, hour: 21))!
+        let secondDate = calendar.date(from: DateComponents(year: 2026, month: 7, day: 2, hour: 12))!
+        state.addMeetupDate(firstDate, calendar: calendar)
+        state.addMeetupDate(sameDate, calendar: calendar)
+        state.addMeetupDate(secondDate, calendar: calendar)
+
+        XCTAssertEqual(
+            state.draft.selectedMeetupDates,
+            [
+                calendar.startOfDay(for: secondDate),
+                calendar.startOfDay(for: firstDate)
+            ]
+        )
+
+        state.removeMeetupDate(sameDate, calendar: calendar)
+        XCTAssertEqual(state.draft.selectedMeetupDates, [calendar.startOfDay(for: secondDate)])
+
+        state.applyDefaultConditions(
+            previous: SearchConditionMatchFilters(),
+            current: SearchConditionMatchFilters(
+                matchesExchangeCondition: true,
+                matchesPaymentCondition: true
+            ),
+            defaultExchangeSettings: HomeDefaultExchangeSettings(preference: .local, requiresSamePrefecture: true),
+            defaultPaymentMethods: [.paypay, .paypay, .bankTransfer],
+            viewer: UserProfile(
+                id: UUID(uuidString: "30000000-0000-0000-0000-000000000012")!,
+                handle: "michi",
+                displayName: "みち",
+                prefecture: "東京都"
+            )
+        )
+
+        XCTAssertEqual(state.draft.selectedExchangeMethod, .hand)
+        XCTAssertEqual(state.draft.selectedMeetupPrefecture, "東京都")
+        XCTAssertEqual(state.draft.selectedPaymentMethods, [.bankTransfer, .paypay])
+
+        state.resetDraft()
+        XCTAssertEqual(state.draft.meetupDateDraft, meetupDateDraft)
+        XCTAssertNil(state.draft.selectedGroupID)
+        XCTAssertTrue(state.draft.selectedGoodsTagNames.isEmpty)
+    }
+
+    func testSearchGoodsTagSelectionStateFiltersAndDetectsDuplicateSearchText() {
+        var state = SearchGoodsTagSelectionState(searchText: " ＃2026 ")
+
+        XCTAssertEqual(state.normalizedSearchText, "2026")
+        XCTAssertEqual(
+            state.filteredCandidateNames(from: ["2026 LIVE", "会場限定", "2025 LIVE"]),
+            ["2026 LIVE"]
+        )
+        XCTAssertTrue(state.canAddSearchText(selectedTags: ["会場限定"]))
+        XCTAssertFalse(state.canAddSearchText(selectedTags: ["2026"]))
+        XCTAssertTrue(state.containsTag("2026 live", in: ["2026 LIVE"]))
+
+        state.clearSearch()
+        XCTAssertTrue(state.searchText.isEmpty)
+        XCTAssertEqual(
+            state.filteredCandidateNames(from: ["2026 LIVE", "会場限定"]),
+            ["2026 LIVE", "会場限定"]
+        )
+        XCTAssertFalse(state.canAddSearchText(selectedTags: []))
+    }
+
     func testSearchFilterUsesCurrentShippingFeeChoices() {
         XCTAssertEqual(
             IndividualListingShippingFeeDraft.selectableCases.map(\.title),
@@ -273,6 +413,42 @@ final class SearchScreenTests: XCTestCase {
         default:
             XCTFail("個別募集でHitする検索結果はホームと同じgoodsHitシートへつなぐ")
         }
+    }
+
+    func testSearchResultGridPresentationStateTracksSheetsReportsAndDeferredProfile() {
+        let result = makeSearchResults(count: 1)[0]
+        let sheet = SearchResultHomePresentation.sheet(
+            for: result,
+            index: 0,
+            goodsTypes: [],
+            explicitSignals: [:]
+        )
+        let profileUserID = UUID(uuidString: "00000000-0000-0000-0000-00000000AA02")!
+        var state = SearchResultGridPresentationState()
+
+        state.showSheet(sheet)
+
+        XCTAssertNotNil(state.selectedSheet)
+
+        state.requestProfilePresentation(userID: profileUserID)
+
+        XCTAssertNil(state.selectedSheet)
+        XCTAssertEqual(state.pendingProfileUserID, profileUserID)
+        XCTAssertEqual(state.consumePendingProfileUserID(), profileUserID)
+        XCTAssertNil(state.consumePendingProfileUserID())
+
+        state.showSheet(sheet)
+        state.requestProposalPresentation()
+
+        XCTAssertNil(state.selectedSheet)
+
+        state.showReport(item: result.item)
+
+        XCTAssertEqual(state.reportTargetItem?.id, result.item.id)
+
+        state.clearReport()
+
+        XCTAssertNil(state.reportTargetItem)
     }
 
     func testSearchSuggestionBuilderUsesOshiWishAndTagSources() {

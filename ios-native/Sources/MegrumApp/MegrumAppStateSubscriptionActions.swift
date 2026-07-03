@@ -48,4 +48,36 @@ public extension MegrumAppState {
         )
         return next
     }
+
+#if DEBUG
+    func debugToggleMegrumPremiumEntitlement(now: Date = Date()) {
+        if subscriptionState.isMegrumPlusActive {
+            var next = subscriptionState
+            next.planType = nil
+            next.status = nil
+            next.currentPeriodEnd = nil
+            next.entitlements.removeAll { $0.key == .megrumPlus }
+            next.loadedAt = now
+            subscriptionState = next
+            return
+        }
+
+        var next = subscriptionState
+        next.planType = .megrumPlusMonthly
+        next.status = .active
+        next.currentPeriodEnd = nil
+        next.entitlements.removeAll { $0.key == .megrumPlus }
+        next.entitlements.append(
+            UserEntitlement(
+                key: .megrumPlus,
+                isActive: true,
+                source: .manualOverride,
+                grantedAt: now,
+                updatedAt: now
+            )
+        )
+        next.loadedAt = now
+        subscriptionState = next
+    }
+#endif
 }

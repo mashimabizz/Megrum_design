@@ -62,10 +62,6 @@ extension BoardThreadComposerSheet {
     }
 
     func handlePrimaryAction() {
-        if !isShowingLocationStep {
-            revealLocationStep()
-            return
-        }
         submitThread()
     }
 
@@ -85,6 +81,10 @@ extension BoardThreadComposerSheet {
 
     func submitThread() {
         guard canSubmit else {
+            if locationMessage != nil {
+                locationState.requestCurrentLocation()
+                seedSelectedCoordinateIfNeeded()
+            }
             if let missingContextMessage {
                 showToast(missingContextMessage)
             }
@@ -100,7 +100,10 @@ extension BoardThreadComposerSheet {
                 prefecture: submitPrefecture,
                 thumbnailUpload: thumbnailUpload,
                 anonymousDisplayName: anonymousDisplayName,
-                anonymousAvatarID: anonymousAvatarID
+                anonymousAvatarID: anonymousAvatarID,
+                groupID: metadataDraft.groupID,
+                characterID: metadataDraft.characterID,
+                seriesName: metadataDraft.normalizedSeriesName
             )
             if let created {
                 onCreated(created)

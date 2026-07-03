@@ -66,6 +66,13 @@ extension SupabaseGroomClient {
         ]
     }
 
+    func ownGroomPostQueryItems(userID: UUID, postID: UUID) -> [URLQueryItem] {
+        [
+            URLQueryItem(name: "id", value: "eq.\(postID.uuidString.lowercased())"),
+            URLQueryItem(name: "user_id", value: "eq.\(userID.uuidString.lowercased())")
+        ]
+    }
+
     func engagementQueryItems(postIDs: [UUID], order: String) -> [URLQueryItem] {
         let ids = postIDs
             .map { $0.uuidString.lowercased() }

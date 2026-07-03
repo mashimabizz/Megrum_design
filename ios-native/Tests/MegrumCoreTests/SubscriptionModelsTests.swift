@@ -8,6 +8,8 @@ final class SubscriptionModelsTests: XCTestCase {
         XCTAssertFalse(state.isPremiumActive)
         XCTAssertFalse(state.isMegrumPlusActive)
         XCTAssertFalse(state.hasMeguriPlus)
+        XCTAssertFalse(state.hasMeguriMessageAccess)
+        XCTAssertFalse(state.hasMeguriBoardExtendedAccess)
         XCTAssertFalse(state.suppressesAds)
         XCTAssertFalse(state.hasUnlimitedIndividualListings)
         XCTAssertFalse(state.prioritizesMatchDisplay)
@@ -40,6 +42,8 @@ final class SubscriptionModelsTests: XCTestCase {
 
         XCTAssertTrue(state.isPremiumActive)
         XCTAssertTrue(state.suppressesAds)
+        XCTAssertTrue(state.hasMeguriMessageAccess)
+        XCTAssertTrue(state.hasMeguriBoardExtendedAccess)
     }
 
     func testMegrumPlusEntitlementUnlocksCurrentPaidFeatures() {
@@ -50,6 +54,8 @@ final class SubscriptionModelsTests: XCTestCase {
         )
 
         XCTAssertTrue(state.isMegrumPlusActive)
+        XCTAssertTrue(state.hasMeguriMessageAccess)
+        XCTAssertTrue(state.hasMeguriBoardExtendedAccess)
         XCTAssertTrue(state.hasUnlimitedIndividualListings)
         XCTAssertTrue(state.prioritizesMatchDisplay)
         XCTAssertTrue(state.hasUnlimitedGroomArchive)
@@ -63,10 +69,25 @@ final class SubscriptionModelsTests: XCTestCase {
         XCTAssertEqual(plans.count, 1)
         XCTAssertEqual(plan?.planType, .megrumPlusMonthly)
         XCTAssertEqual(plan?.productID, SubscriptionCatalog.megrumPlusMonthlyProductID)
-        XCTAssertEqual(plan?.displayName, "メグルムプラス")
+        XCTAssertEqual(plan?.displayName, "Megrumプレミアム")
         XCTAssertEqual(plan?.priceLabel, "月 ¥500")
         XCTAssertEqual(plan?.entitlementKey, .megrumPlus)
         XCTAssertEqual(Set(plan?.featureIDs ?? []), Set(SubscriptionCatalog.megrumPlusFeatures))
         XCTAssertNotNil(SubscriptionCatalog.plan(for: SubscriptionCatalog.premiumMonthlyProductID))
+    }
+
+    func testLegacyMeguriPlusEntitlementUnlocksMeguriMessagesAndBoardAccessOnly() {
+        let state = UserSubscriptionState(
+            entitlements: [
+                UserEntitlement(key: .meguriPlus, isActive: true, source: .subscription)
+            ]
+        )
+
+        XCTAssertTrue(state.hasMeguriPlus)
+        XCTAssertTrue(state.hasMeguriMessageAccess)
+        XCTAssertTrue(state.hasMeguriBoardExtendedAccess)
+        XCTAssertFalse(state.isMegrumPlusActive)
+        XCTAssertFalse(state.hasUnlimitedIndividualListings)
+        XCTAssertFalse(state.hasUnlimitedGroomArchive)
     }
 }

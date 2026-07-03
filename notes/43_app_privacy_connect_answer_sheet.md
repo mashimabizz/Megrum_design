@@ -31,8 +31,8 @@
 | 会員間支払い | `user_payment_settings` へ銀行名、支店名、口座種別、口座番号、口座名義、支払い方法、その他メモを保存し、金額指定取引の合意後に `proposals.sender_payment_settings` / `receiver_payment_settings` の支払い情報スナップショットを当事者へ表示する経路あり。PayPayはリンク登録なしの対応可否表示 |
 | 退会申請 | 退会理由、任意メモ、申請日時、削除予定日、申請状態を `account_deletion_requests` へ保存する経路あり。30日後実削除、申請取消/復旧、Apple/Google連携解除、APNs token無効化完了は未確認 |
 | 通知 | APNs token、platform、push provider、app version、last seen、revoked状態を扱う経路あり。APNs payloadへ通知タイトル/本文/未読バッジ/通知ID/linkPath/soundを送る経路あり |
-| IAP | `megrum.plus.monthly` のメグルムプラス購入・復元・同期経路あり。購入ボタン、復元ボタン、StoreKit商品情報照会、価格取得、購入開始、承認待ち、キャンセル、商品未取得、購入失敗、復元失敗、サーバー同期失敗、販売地域、販売停止、ローカル有効表示とサーバー最終権限の差分を確認。管理画面の手動有料権限上書きは最終権限に影響し得るが購入証明ではない。導線が見えるならPurchases回答とOther Data候補を確認 |
-| 広告 | Google Mobile Ads SDK / AdMob / SKAdNetworkの構成あり。`MEGRUM_ADS_ENABLED=YES`、AdMob app id、test ads有効、検索native/やりとりbanner unit idあり。広告を有効にするならAdvertising Data等と不適切/年齢不相応広告の通報導線を回答/説明 |
+| IAP | `megrum.plus.monthly` のメグルムプラス購入・復元・同期経路あり。2026-07-03時点のチェックイン既定は `MEGRUM_PLUS_IAP_ENABLED=NO` で購入/復元ボタン、StoreKit商品情報照会、購入、復元actionを停止。導線を有効化する場合は、購入ボタン、復元ボタン、StoreKit商品情報照会、価格取得、購入開始、承認待ち、キャンセル、商品未取得、購入失敗、復元失敗、サーバー同期失敗、販売地域、販売停止、ローカル有効表示とサーバー最終権限の差分を確認。管理画面の手動有料権限上書きは最終権限に影響し得るが購入証明ではない。導線が見えるならPurchases回答とOther Data候補を確認 |
+| 広告 | Google Mobile Ads SDK / AdMob / SKAdNetworkの構成あり。2026-07-03時点のチェックイン既定は `MEGRUM_ADS_ENABLED=NO`、AdMob app id/unit id/test unit id空。広告を有効にするならAdvertising Data等と不適切/年齢不相応広告の通報導線を回答/説明 |
 | 広告同意/Tracking | `NSPrivacyTracking=false`、`NSUserTrackingUsageDescription`なし。現行検索ではATT要求、UMP同意管理、非パーソナライズ広告指定、Publisher First-Party ID制御、mediation制御は未確認 |
 | 外部AI | `suggest-goods-series` 経由で最大3件の画像又は画像URL、グループ名、メンバー名、グッズ種別、既存候補をOpenAI Responses APIへ送り、`web_search` を必須実行する経路あり。導線が見えるならUser Content / Photos or Videos / Other Data等に反映 |
 | 外部画像URL | 既存画像URL又はAI/検索候補画像を表示する場合、外部画像ホスト/CDNへIP、端末/アプリ通信情報、アクセス時刻等が送信される可能性あり |
@@ -75,7 +75,7 @@ Appleの説明では、アプリが継続的又は主要機能として収集す
 | Location | Coarse Location | Yes | 都道府県、活動エリア、丸めた位置又はスポット表示 |
 | Identifiers | User ID | Yes | Supabase user id、プロフィールID、ユーザー名、Keychain保存session、認証callback、deep link又は通知 `linkPath` に含まれるID |
 | Identifiers | Device ID | Conditional | APNs token、広告SDK由来の端末/広告ID等を保存又は送信する場合 |
-| Purchases | Purchase History | Conditional | IAP/有料機能、購入ボタン、復元ボタン、価格、購入/復元状態、メグルムプラス権限状態、手動有料権限上書きによる最終権限状態を出す場合 |
+| Purchases | Purchase History | Conditional | IAP/有料機能、購入ボタン、復元ボタン、価格、購入/復元状態、メグルムプラス権限状態、手動有料権限上書きによる最終権限状態を出す場合。チェックイン既定OFF提出でも購入/復元/商品照会なしを実ビルド確認 |
 | Search History | Search History | Conditional | 検索語、検索条件、検索結果件数、`normalized_term`、`result_count`、検索時刻又は人気検索集計をサーバー保存する場合。現行DB/RPC基盤はあるがSwift呼び出しは未確認 |
 | Usage Data | Product Interaction | Conditional | 画面操作/行動分析、安全操作ログ、評価投稿、通報/ブロック/非表示操作、検索候補、候補表示、条件一致ラベル、表示順、Plus優先表示、通知ログ又は広告SDKの表示/クリック等を保存・送信する場合 |
 | Usage Data | Advertising Data | Conditional | AdMob広告を有効にする場合。広告通報時の広告枠/表示日時/広告識別子も確認 |
@@ -348,7 +348,7 @@ AdMob等の第三者広告を有効にする場合。
 | Purposes | Third-Party Advertising, Analytics, Customer Support |
 | Examples | 表示された広告、広告リクエスト、広告クリック、広告反応、広告通報時の広告枠、表示日時、広告識別子 |
 
-広告SDKを最終ビルドに含めるだけでなく、SDK初期化又は広告リクエストが発生するかを実機で確認する。広告を無効化して提出する場合は、`MegrumAdsEnabled`、ad provider、ad unit id、SDK起動条件も確認する。現行チェックイン設定では `MEGRUM_ADS_ENABLED=YES` かつ `MEGRUM_ADMOB_TEST_ADS_ENABLED=YES` のため、検索native広告、やりとり一覧上部banner、preview viewer向けhome banner fallbackがGoogleデモunit idへ広告リクエストを送る可能性がある。広告を有効にする場合は、不適切又は年齢に合わない広告の通報導線、通報時に取得する広告枠/表示日時/スクリーンショット等の扱い、Google公式データ開示、テスト広告除去、ATT/Tracking回答を確認する。
+広告SDKを最終ビルドに含めるだけでなく、SDK初期化又は広告リクエストが発生するかを実機で確認する。広告を無効化して提出する場合は、`MegrumAdsEnabled`、ad provider、ad unit id、SDK起動条件も確認する。現行チェックイン設定は `MEGRUM_ADS_ENABLED=NO` かつAdMob app id/unit id/test unit id空のため、既定では検索native広告、やりとり一覧上部banner、preview viewer向けhome banner fallbackから広告リクエストを送らない方針になっている。広告を有効にする場合は、不適切又は年齢に合わない広告の通報導線、通報時に取得する広告枠/表示日時/スクリーンショット等の扱い、Google公式データ開示、テスト広告除去、ATT/Tracking回答を確認する。
 
 ### 4.18 Diagnostics / Crash Data
 

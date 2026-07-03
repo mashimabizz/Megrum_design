@@ -2,31 +2,32 @@ import MegrumCore
 import MegrumDesign
 import SwiftUI
 
+enum TradesFooterLayoutMetrics {
+    static let bottomPadding: CGFloat = 22
+}
+
 struct TradesScreen: View {
     @ObservedObject var appState: MegrumAppState
     @Binding var requestedStage: TradeStage?
     @Binding var detailRoute: TradeDetailRoute?
     var adDisplayContext: AdDisplayContext = AdDisplayContext()
 
-    @State private var selectedStage: TradeStage = .pending
-    @State private var selectedPendingProposalIDs: Set<UUID> = []
-    @State private var activeDetailListSnapshot: TradeListDisplaySnapshot?
-    @State private var settledDetailProposalID: UUID?
+    @State private var presentationState = TradesScreenPresentationState()
 
     private var proposals: [TradeProposal] {
-        activeDetailListSnapshot?.proposals ?? appState.proposals
+        presentationState.proposals(fallback: appState.proposals)
     }
 
     private var messagesByProposalID: [UUID: [TradeMessage]] {
-        activeDetailListSnapshot?.messagesByProposalID ?? appState.messagesByProposalID
+        presentationState.messagesByProposalID(fallback: appState.messagesByProposalID)
     }
 
     private var viewerReadAtByProposalID: [UUID: Date] {
-        activeDetailListSnapshot?.viewerReadAtByProposalID ?? appState.viewerReadAtByProposalID
+        presentationState.viewerReadAtByProposalID(fallback: appState.viewerReadAtByProposalID)
     }
 
     private var visibleProposals: [TradeProposal] {
-        visibleProposals(for: selectedStage)
+        visibleProposals(for: presentationState.selectedStage)
     }
 
     private func visibleProposals(for stage: TradeStage) -> [TradeProposal] {
@@ -49,7 +50,7 @@ struct TradesScreen: View {
     }
 
     private var isSelectingPendingProposals: Bool {
-        selectedStage == .pending && !selectedPendingProposalIDs.isEmpty
+        presentationState.isSelectingPendingProposals
     }
 
     private var attentionCounts: TradeStageAttentionCounts {
@@ -62,34 +63,42 @@ struct TradesScreen: View {
     }
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            TabView(selection: $selectedStage) {
-                ForEach(TradeStage.allCases) { stage in
-                    TradeStagePage(
-                        stage: stage,
-                        proposals: visibleProposals(for: stage),
-                        viewerID: appState.viewer?.id,
-                        profilesByUserID: appState.publicProfilesByUserID,
-                        goodsByID: goodsByID,
-                        messagesByProposalID: messagesByProposalID,
-                        viewerReadAtByProposalID: viewerReadAtByProposalID,
-                        isSelectingPendingProposals: isSelectingPendingProposals,
-                        selectedPendingProposalIDs: selectedPendingProposalIDs,
-                        adDisplayContext: adDisplayContext,
-                        canWithdraw: { canWithdrawPendingProposal($0, in: stage) },
-                        onStartSelection: startPendingProposalSelection,
-                        onToggleSelection: togglePendingProposalSelection,
-                        onOpen: openProposal
-                    )
-                        .tag(stage)
+        GeometryReader { proxy in
+            ZStack(alignment: .bottom) {
+                TabView(selection: $presentationState.selectedStage) {
+                    ForEach(TradeStage.allCases) { stage in
+                        TradeStagePage(
+                            stage: stage,
+                            proposals: visibleProposals(for: stage),
+                            viewerID: appState.viewer?.id,
+                            profilesByUserID: appState.publicProfilesByUserID,
+                            goodsByID: goodsByID,
+                            messagesByProposalID: messagesByProposalID,
+                            viewerReadAtByProposalID: viewerReadAtByProposalID,
+                            isSelectingPendingProposals: isSelectingPendingProposals,
+                            selectedPendingProposalIDs: presentationState.selectedPendingProposalIDs,
+                            adDisplayContext: adDisplayContext,
+                            topContentInset: proxy.safeAreaInsets.top,
+                            canWithdraw: { canWithdrawPendingProposal($0, in: stage) },
+                            onStartSelection: startPendingProposalSelection,
+                            onToggleSelection: togglePendingProposalSelection,
+                            onOpen: openProposal
+                        )
+                            .tag(stage)
+                    }
                 }
-            }
-            .megrumPageTabViewStyle()
-            .ignoresSafeArea(.keyboard, edges: .bottom)
+                .megrumPageTabViewStyle()
+                .megrumHiddenBottomScrollEdgeEffect()
+                .ignoresSafeArea(.keyboard, edges: .bottom)
+                .ignoresSafeArea(.container, edges: [.top, .bottom])
 
-            tradeFooter
-                .padding(.horizontal, 20)
-                .padding(.bottom, 10)
+                tradeFooter
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, TradesFooterLayoutMetrics.bottomPadding)
+            }
+            .overlay(alignment: .top) {
+                MegrumStatusBarProgressiveBlur(topSafeAreaInset: proxy.safeAreaInsets.top)
+            }
         }
         .background(Color.white.ignoresSafeArea())
         .megrumHiddenNavigationBar()
@@ -99,12 +108,12 @@ struct TradesScreen: View {
         .onChange(of: requestedStage) { _, _ in
             consumeRequestedStage()
         }
-        .onChange(of: selectedStage) { _, _ in
-            selectedPendingProposalIDs.removeAll()
+        .onChange(of: presentationState.selectedStage) { _, _ in
+            presentationState.clearPendingSelection()
         }
         .onChange(of: detailRoute) { _, newValue in
             if newValue == nil {
-                settledDetailProposalID = nil
+                presentationState.markDetailRouteDismissed()
                 synchronizeActiveDetailListSnapshot()
                 clearActiveDetailListSnapshotAfterDismiss()
             } else if let newValue {
@@ -130,9 +139,9 @@ struct TradesScreen: View {
     @ViewBuilder
     private var tradeFooter: some View {
         TradesFooter(
-            selectedStage: $selectedStage,
+            selectedStage: $presentationState.selectedStage,
             isSelectingPendingProposals: isSelectingPendingProposals,
-            selectedPendingCount: selectedPendingProposalIDs.count,
+            selectedPendingCount: presentationState.selectedPendingProposalIDs.count,
             isResponding: appState.respondingProposalID != nil,
             pendingBadgeCount: attentionCounts.pendingNeedsResponse,
             inProgressBadgeCount: attentionCounts.inProgressUnread,
@@ -156,27 +165,26 @@ struct TradesScreen: View {
         guard let requestedStage else {
             return
         }
-        selectedStage = TradeStageRouteRequestResolver.resolve(
-            current: selectedStage,
-            requested: requestedStage
-        )
-        self.requestedStage = nil
+        if presentationState.consumeRequestedStage(requestedStage) {
+            self.requestedStage = nil
+        }
     }
 
     private func canWithdrawPendingProposal(_ proposal: TradeProposal, in stage: TradeStage? = nil) -> Bool {
         TradePendingWithdrawalPolicy.canWithdraw(
             proposal,
-            stage: stage ?? selectedStage,
+            stage: stage ?? presentationState.selectedStage,
             viewerID: appState.viewer?.id
         )
     }
 
     private func openProposal(_ proposal: TradeProposal) {
-        settledDetailProposalID = nil
-        activeDetailListSnapshot = TradeListDisplaySnapshot.current(
-            proposals: appState.proposals,
-            messagesByProposalID: appState.messagesByProposalID,
-            viewerReadAtByProposalID: appState.viewerReadAtByProposalID
+        presentationState.prepareToOpenDetail(
+            snapshot: TradeListDisplaySnapshot.current(
+                proposals: appState.proposals,
+                messagesByProposalID: appState.messagesByProposalID,
+                viewerReadAtByProposalID: appState.viewerReadAtByProposalID
+            )
         )
         withAnimation(TradeDetailSlidePresentationMetrics.animation) {
             detailRoute = TradeDetailRoute(proposalID: proposal.id)
@@ -184,7 +192,7 @@ struct TradesScreen: View {
     }
 
     private func scheduleActiveDetailListSnapshotSynchronization(for proposalID: UUID) {
-        settledDetailProposalID = nil
+        presentationState.prepareDetailSettlement()
         Task { @MainActor in
             do {
                 try await Task.sleep(nanoseconds: TradeDetailSlidePresentationMetrics.presentationSettledDelayNanoseconds)
@@ -194,31 +202,24 @@ struct TradesScreen: View {
             guard detailRoute?.proposalID == proposalID else {
                 return
             }
-            settledDetailProposalID = proposalID
+            presentationState.markDetailSettled(proposalID: proposalID)
             synchronizeActiveDetailListSnapshot()
         }
     }
 
     private func synchronizeActiveDetailListSnapshot() {
-        guard activeDetailListSnapshot != nil, canSynchronizeActiveDetailListSnapshot else {
+        guard presentationState.shouldSynchronizeActiveDetailListSnapshot(detailRoute: detailRoute) else {
             return
         }
         var transaction = Transaction()
         transaction.animation = nil
         withTransaction(transaction) {
-            activeDetailListSnapshot = TradeListDisplaySnapshot.current(
+            presentationState.activeDetailListSnapshot = TradeListDisplaySnapshot.current(
                 proposals: appState.proposals,
                 messagesByProposalID: appState.messagesByProposalID,
                 viewerReadAtByProposalID: appState.viewerReadAtByProposalID
             )
         }
-    }
-
-    private var canSynchronizeActiveDetailListSnapshot: Bool {
-        guard let detailRoute else {
-            return true
-        }
-        return settledDetailProposalID == detailRoute.proposalID
     }
 
     private func clearActiveDetailListSnapshotAfterDismiss() {
@@ -230,7 +231,7 @@ struct TradesScreen: View {
             var transaction = Transaction()
             transaction.animation = nil
             withTransaction(transaction) {
-                activeDetailListSnapshot = nil
+                presentationState.clearActiveDetailListSnapshot()
             }
         }
     }
@@ -240,11 +241,7 @@ struct TradesScreen: View {
             return
         }
         withAnimation(.snappy(duration: 0.2)) {
-            if selectedPendingProposalIDs.contains(proposal.id) {
-                selectedPendingProposalIDs.remove(proposal.id)
-            } else {
-                selectedPendingProposalIDs.insert(proposal.id)
-            }
+            presentationState.togglePendingProposalSelection(proposalID: proposal.id)
         }
     }
 
@@ -253,12 +250,12 @@ struct TradesScreen: View {
             return
         }
         withAnimation(.snappy(duration: 0.22)) {
-            _ = selectedPendingProposalIDs.insert(proposal.id)
+            presentationState.startPendingProposalSelection(proposalID: proposal.id)
         }
     }
 
     private func withdrawSelectedPendingProposals() {
-        let proposalIDs = Array(selectedPendingProposalIDs)
+        let proposalIDs = Array(presentationState.selectedPendingProposalIDs)
         guard !proposalIDs.isEmpty else {
             return
         }
@@ -266,7 +263,7 @@ struct TradesScreen: View {
             for proposalID in proposalIDs {
                 _ = await appState.rejectProposal(proposalID: proposalID)
             }
-            selectedPendingProposalIDs.removeAll()
+            presentationState.clearPendingSelection()
         }
     }
 }

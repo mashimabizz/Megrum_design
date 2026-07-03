@@ -7,7 +7,7 @@ struct GoodsShareActivitySheet: UIViewControllerRepresentable {
 
     func makeUIViewController(context: Context) -> UIActivityViewController {
         let controller = UIActivityViewController(
-            activityItems: [payload.text, payload.image],
+            activityItems: payload.activityItems,
             applicationActivities: nil
         )
         if let rootView = UIApplication.shared.megrumShareRootView {

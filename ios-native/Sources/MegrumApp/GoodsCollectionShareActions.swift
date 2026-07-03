@@ -3,14 +3,62 @@ import SwiftUI
 
 extension GoodsCollectionScreen {
     func presentSharePrompt(_ createdItems: [GoodsItem]) {
-        guard entryKind == .inventory, !createdItems.isEmpty else {
+        guard !createdItems.isEmpty else {
             return
         }
         sharePostErrorMessage = nil
         isPreparingSharePost = false
         sharePromptContext = GoodsSharePostContext(
+            kind: entryKind == .wish ? .wish : .inventory,
             items: createdItems,
             displayName: viewerDisplayNameForSharePost()
+        )
+    }
+
+    func presentListingSharePrompt(_ listing: IndividualListing) {
+        guard let appState else {
+            return
+        }
+        Task { @MainActor in
+            if !appState.hasLoadedPaymentSettings {
+                await appState.loadPaymentSettings(reportsFailure: false)
+            }
+            let displayName = viewerDisplayNameForSharePost()
+            let snapshot = IndividualListingShareSnapshotFactory.make(
+                listing: listing,
+                displayName: displayName,
+                inventory: appState.inventory,
+                wishes: appState.wishes,
+                groups: appState.oshiGroups,
+                goodsTypes: appState.goodsTypes,
+                paymentMethodsText: paymentMethodsTextForSharePost()
+            )
+            sharePostErrorMessage = nil
+            isPreparingSharePost = false
+            sharePromptContext = GoodsSharePostContext(
+                kind: .individualListing,
+                items: [],
+                displayName: displayName,
+                listingSnapshot: snapshot
+            )
+        }
+    }
+
+    func presentSelectedSharePrompt() {
+        let targetItems = selectedItems.filter(isOwnedItem)
+        guard !targetItems.isEmpty else {
+            return
+        }
+        sharePostErrorMessage = nil
+        isPreparingSharePost = false
+        sharePromptContext = GoodsSharePostContext(
+            kind: entryKind == .wish ? .wish : .inventory,
+            items: targetItems,
+            displayName: viewerDisplayNameForSharePost(),
+            promptTitle: "Xで投稿",
+            promptDescription: selectedSharePromptDescription,
+            shareButtonTitle: "Xで投稿する",
+            postTextLeadingText: selectedShareLeadingText
         )
     }
 
@@ -59,5 +107,36 @@ extension GoodsCollectionScreen {
         value?
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .nilIfBlank
+    }
+
+    private func paymentMethodsTextForSharePost() -> String {
+        GoodsSharePostTextBuilder.paymentMethodsText(
+            methods: PaymentSettingsResolver.methods(
+                settings: appState?.paymentSettings,
+                viewer: appState?.viewer
+            ),
+            otherNote: PaymentSettingsResolver.otherNote(
+                settings: appState?.paymentSettings,
+                viewer: appState?.viewer
+            )
+        )
+    }
+
+    private var selectedSharePromptDescription: String {
+        switch entryKind {
+        case .inventory:
+            "選択したマイグッズを画像と文面にしてXで周知できます。"
+        case .wish:
+            "選択したウィッシュを画像と文面にしてXで周知できます。"
+        }
+    }
+
+    private var selectedShareLeadingText: String {
+        switch entryKind {
+        case .inventory:
+            "Megrumで譲れるグッズをまとめました！"
+        case .wish:
+            "Megrumで欲しいものをまとめました！"
+        }
     }
 }

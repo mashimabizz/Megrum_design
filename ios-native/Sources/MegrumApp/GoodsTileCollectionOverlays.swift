@@ -59,6 +59,7 @@ struct GoodsCollectionFallback: View {
 
 struct GoodsCollectionTagPlate: View {
     var text: String
+    var foregroundColor: Color = MegrumTheme.ink
 
     var body: some View {
         GeometryReader { proxy in
@@ -66,7 +67,8 @@ struct GoodsCollectionTagPlate: View {
                 text: text,
                 fontSize: GoodsTileCollectionCardMetrics.tagFontSize,
                 horizontalPadding: GoodsTileCollectionCardMetrics.tagHorizontalPadding,
-                verticalPadding: GoodsTileCollectionCardMetrics.tagVerticalPadding
+                verticalPadding: GoodsTileCollectionCardMetrics.tagVerticalPadding,
+                foregroundColor: foregroundColor
             )
             .frame(maxWidth: proxy.size.width * GoodsTileCollectionCardMetrics.tagMaxWidthRatio, alignment: .trailing)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)

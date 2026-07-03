@@ -15,11 +15,18 @@ struct IndividualListingsContent: View {
     var characters: [OshiCharacter]
     var goodsTypes: [GoodsType]
     var viewerID: UUID?
+    var isSelectionMode: Bool
+    var selectedListingIDs: Set<UUID>
     var onEditOffer: (IndividualListing) -> Void
     var onAddCondition: (IndividualListing) -> Void
     var onEditExchangeCondition: (IndividualListing) -> Void
+    var onShare: (IndividualListing) -> Void
     var onDelete: (IndividualListing) -> Void
-    @State private var activeListingID: UUID?
+    var onBeginSelection: (IndividualListing) -> Void
+    var onToggleSelection: (IndividualListing) -> Void
+    var onScrollContentTopChange: ((CGFloat) -> Void)? = nil
+    @State private var selectionState = IndividualListingActiveSelectionState()
+    @Environment(\.megrumPinnedTopChromeInset) private var pinnedTopChromeInset
 
     var body: some View {
         ScrollView {
@@ -32,15 +39,19 @@ struct IndividualListingsContent: View {
                     IndividualListingSkeletons()
                 } else if listings.isEmpty {
                     EmptyListingView()
-                } else if let activeListing = activeListing(in: listings) {
+                } else if let activeListing = selectionState.activeListing(in: listings) {
                     IndividualListingConditionStrip(
                         listings: listings,
-                        activeListingID: $activeListingID
+                        activeListingID: $selectionState.activeListingID,
+                        isSelectionMode: isSelectionMode,
+                        selectedListingIDs: selectedListingIDs,
+                        onBeginSelection: onBeginSelection,
+                        onToggleSelection: onToggleSelection
                     )
 
                     IndividualListingDesignCard(
                         listing: activeListing,
-                        listingIndex: activeListingIndex(in: listings),
+                        listingIndex: selectionState.activeListingIndex(in: listings),
                         listingCount: listings.count,
                         inventoryByID: inventoryByID,
                         wishByID: wishByID,
@@ -57,6 +68,9 @@ struct IndividualListingsContent: View {
                         onEditExchangeCondition: {
                             onEditExchangeCondition(activeListing)
                         },
+                        onShare: {
+                            onShare(activeListing)
+                        },
                         onDelete: {
                             onDelete(activeListing)
                         }
@@ -64,32 +78,22 @@ struct IndividualListingsContent: View {
                 }
             }
             .padding(.horizontal, 18)
-            .padding(.top, 16)
+            .padding(.top, pinnedTopChromeInset > 0 ? pinnedTopChromeInset : 16)
             .padding(.bottom, 118)
+            .megrumReportsScrollContentTop()
+            .megrumSuppressesEnclosingScrollEdgeEffects()
         }
-        .onChange(of: listings.map(\.id), initial: true) { _, ids in
-            if let activeListingID, ids.contains(activeListingID) {
-                return
+        .coordinateSpace(name: MegrumScrollContentTopSpace.name)
+        .onPreferenceChange(MegrumScrollContentTopPreferenceKey.self) { contentTop in
+            MainActor.assumeIsolated {
+                onScrollContentTopChange?(contentTop)
             }
-            activeListingID = ids.first
         }
-    }
-
-    private func activeListing(in listings: [IndividualListing]) -> IndividualListing? {
-        if let activeListingID,
-           let listing = listings.first(where: { $0.id == activeListingID }) {
-            return listing
+        .megrumHiddenBottomScrollEdgeEffect()
+        .ignoresSafeArea(.container, edges: .bottom)
+        .onChange(of: listings.map(\.id), initial: true) { _, ids in
+            selectionState.reconcile(with: ids)
         }
-        return listings.first
-    }
-
-    private func activeListingIndex(in listings: [IndividualListing]) -> Int {
-        guard let activeListingID,
-              let index = listings.firstIndex(where: { $0.id == activeListingID })
-        else {
-            return 0
-        }
-        return index
     }
 }
 
@@ -106,6 +110,7 @@ struct IndividualListingDesignCard: View {
     var onEditOffer: () -> Void
     var onAddCondition: () -> Void
     var onEditExchangeCondition: () -> Void
+    var onShare: () -> Void
     var onDelete: () -> Void
 
     private var haveItems: [GoodsItem] {
@@ -146,6 +151,7 @@ struct IndividualListingDesignCard: View {
                 listing: listing,
                 canEdit: canEdit,
                 onEdit: onEditExchangeCondition,
+                onShare: onShare,
                 onDelete: onDelete
             )
         }

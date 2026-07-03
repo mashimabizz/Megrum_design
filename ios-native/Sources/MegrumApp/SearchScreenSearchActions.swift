@@ -23,19 +23,14 @@ extension SearchScreen {
     }
 
     func applyInitialCriteriaIfNeeded() async {
-        guard let initialCriteria,
-              appliedInitialCriteriaID != initialCriteria.id
-        else {
+        let didApplyInitialCriteria = presentationState.applyInitialCriteriaIfNeeded(
+            initialCriteria,
+            filterDraft: &filterDraft
+        )
+        guard didApplyInitialCriteria else {
             return
         }
-        appliedInitialCriteriaID = initialCriteria.id
-        query = initialCriteria.query
-        queryDraft = initialCriteria.query
-        selectedGroupID = initialCriteria.groupID
-        selectedMemberID = initialCriteria.memberID
-        selectedGoodsTypeID = initialCriteria.goodsTypeID
-        selectedGoodsTagNames = Set(initialCriteria.tagNames)
-        if selectedGroupID != nil {
+        if filterDraft.selectedGroupID != nil {
             await appState.loadOshiCharacters(group: selectedGroup)
         }
     }
@@ -48,13 +43,13 @@ extension SearchScreen {
         let matchedTagName = queryMatchedTagName
         await appState.searchGoods(
             query: SearchQueryResolver.backendQuery(
-                query: query,
+                query: presentationState.query,
                 matchedGoodsTypeID: matchedGoodsTypeID,
                 matchedTagName: matchedTagName
             ),
-            groupID: selectedGroupID,
-            memberID: selectedMemberID,
-            goodsTypeID: selectedGoodsTypeID ?? matchedGoodsTypeID
+            groupID: filterDraft.selectedGroupID,
+            memberID: filterDraft.selectedMemberID,
+            goodsTypeID: filterDraft.selectedGoodsTypeID ?? matchedGoodsTypeID
         )
         await loadSearchResultOwnerExchangeContentIfNeeded()
     }
@@ -85,12 +80,12 @@ extension SearchScreen {
     }
 
     func submitSearch() {
-        query = queryDraft
+        presentationState.submitQuery()
         scheduleSearch(delayNanoseconds: 0)
     }
 
     func loadSearchResultOwnerExchangeContentIfNeeded() async {
-        guard conditionMatches.matchesIndividualListing else {
+        guard filterDraft.conditionMatches.matchesIndividualListing else {
             return
         }
         let viewerID = appState.viewer?.id

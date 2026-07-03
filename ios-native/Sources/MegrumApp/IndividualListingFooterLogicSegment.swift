@@ -9,7 +9,7 @@ struct IndividualListingFooterLogicSegment: View {
     var allowsMinimumLogic: Bool
     var showsSingleChoiceButton: Bool
     var allTitle: String
-    @State private var showsMinimumPicker = false
+    @State private var presentationState = IndividualListingFooterLogicPresentationState()
 
     var body: some View {
         HStack(spacing: 0) {
@@ -28,13 +28,13 @@ struct IndividualListingFooterLogicSegment: View {
                 ) {
                     selectLogic(.atLeast)
                 }
-                .popover(isPresented: $showsMinimumPicker, attachmentAnchor: .point(.bottom), arrowEdge: .bottom) {
+                .popover(isPresented: $presentationState.isShowingMinimumPicker, attachmentAnchor: .point(.bottom), arrowEdge: .bottom) {
                     IndividualListingMinimumCountPicker(
                         selection: $selection,
                         minimumCount: $minimumCount,
                         choices: minimumChoices
                     ) {
-                        showsMinimumPicker = false
+                        presentationState.dismissMinimumPicker()
                     }
                 }
             }
@@ -58,20 +58,12 @@ struct IndividualListingFooterLogicSegment: View {
     }
 
     private var minimumChoices: [Int] {
-        guard selectedCount >= 2 else {
-            return []
-        }
-        return Array(1...selectedCount)
+        presentationState.minimumChoices(selectedCount: selectedCount)
     }
 
     private func selectLogic(_ logic: ListingLogic) {
         withAnimation(.smooth(duration: 0.18)) {
-            if logic == .atLeast {
-                selection = .atLeast
-                showsMinimumPicker = true
-            } else {
-                selection = logic
-            }
+            selection = presentationState.selectLogic(logic)
         }
     }
 }

@@ -11,20 +11,14 @@ struct PublicUserProfileScreen: View {
 
     @Environment(\.dismiss) var dismiss
     @Environment(\.megrumSlidePresentationDismiss) var slidePresentationDismiss
-    @State var selectedVisualTab: ProfileVisualTab = .goods
-    @State var proposalTargetItem: GoodsItem?
-    @State var listingProposalTarget: ListingProposalTarget?
-    @State var isSchedulePresented = false
-    @State var isExchangeConditionsPresented = false
-    @State var reportTarget: PublicProfileModerationTarget?
-    @State var blockTarget: PublicProfileModerationTarget?
+    @State var presentationState = PublicUserProfilePresentationState()
 
     var body: some View {
         let profile = displayedPublicProfile
         ScrollView {
             PublicUserProfileContent(
                 publicProfile: profile,
-                selectedVisualTab: $selectedVisualTab,
+                selectedVisualTab: $presentationState.selectedVisualTab,
                 bio: profile.map(publicProfileBio) ?? "",
                 ratingText: profile.map(publicProfileRating) ?? "—",
                 chips: [],
@@ -43,7 +37,7 @@ struct PublicUserProfileScreen: View {
                 onPrimaryAction: startPrimaryProposal,
                 onOpenSchedule: openSchedule,
                 onOpenExchangeConditions: {
-                    isExchangeConditionsPresented = true
+                    presentationState.openExchangeConditions()
                 },
                 onSelectGridItem: selectProfileGridItem,
                 onSelectListing: selectProfileListing
@@ -64,13 +58,13 @@ struct PublicUserProfileScreen: View {
                 ToolbarItem(placement: .primaryAction) {
                     Menu {
                         Button {
-                            reportTarget = moderationTarget
+                            presentationState.reportTarget = moderationTarget
                         } label: {
                             Label("通報", systemImage: "exclamationmark.bubble")
                         }
 
                         Button(role: .destructive) {
-                            blockTarget = moderationTarget
+                            presentationState.blockTarget = moderationTarget
                         } label: {
                             Label("ブロック", systemImage: "hand.raised")
                         }
@@ -99,7 +93,7 @@ struct PublicUserProfileScreen: View {
                 await appState.loadGoodsTypes()
             }
         }
-        .sheet(isPresented: $isExchangeConditionsPresented) {
+        .sheet(isPresented: $presentationState.isExchangeConditionsPresented) {
             NavigationStack {
                 PublicExchangeConditionsScreen(
                     displayName: displayedPublicProfile?.profile.displayName ?? "相手",
@@ -109,12 +103,12 @@ struct PublicUserProfileScreen: View {
                 )
             }
         }
-        .megrumSlideItemPresentation(item: $proposalTargetItem) { item, _ in
+        .megrumSlideItemPresentation(item: $presentationState.proposalTargetItem) { item, _ in
             NavigationStack {
                 ProposalCreateFlow(appState: appState, targetItem: item)
             }
         }
-        .megrumSlideItemPresentation(item: $listingProposalTarget) { target, _ in
+        .megrumSlideItemPresentation(item: $presentationState.listingProposalTarget) { target, _ in
             NavigationStack {
                 ProposalCreateFlow(
                     appState: appState,
@@ -124,18 +118,18 @@ struct PublicUserProfileScreen: View {
                 )
             }
         }
-        .sheet(isPresented: $isSchedulePresented) {
+        .sheet(isPresented: $presentationState.isSchedulePresented) {
             NavigationStack {
                 ProfileScheduleScreen(
                     appState: appState,
                     userID: userID,
                     displayName: displayedPublicProfile?.profile.displayName ?? "相手"
                 ) {
-                    isSchedulePresented = false
+                    presentationState.closeSchedule()
                 }
             }
         }
-        .sheet(item: $reportTarget) { target in
+        .sheet(item: $presentationState.reportTarget) { target in
             NavigationStack {
                 UserReportSheet(
                     target: target,
@@ -154,16 +148,14 @@ struct PublicUserProfileScreen: View {
         .confirmationDialog(
             "このユーザーをブロックしますか？",
             isPresented: Binding(
-                get: { blockTarget != nil },
+                get: { presentationState.blockTarget != nil },
                 set: { isPresented in
-                    if !isPresented {
-                        blockTarget = nil
-                    }
+                    presentationState.updateBlockConfirmationPresentation(isPresented)
                 }
             ),
             titleVisibility: .visible
         ) {
-            if let blockTarget {
+            if let blockTarget = presentationState.blockTarget {
                 Button("ブロック", role: .destructive) {
                     Task {
                         if await appState.blockUser(blockTarget.userID) {

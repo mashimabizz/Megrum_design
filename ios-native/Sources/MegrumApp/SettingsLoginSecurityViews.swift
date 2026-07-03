@@ -9,8 +9,7 @@ struct LoginSecuritySettingsScreen: View {
     var onSignOut: () async -> Void
 
     @FocusState private var focusedField: Field?
-    @State private var resetEmail = ""
-    @State private var resetInputErrorMessage: String?
+    @State private var passwordResetState = LoginSecurityPasswordResetState()
 
     private var summary: LoginSecuritySummary {
         LoginSecuritySummary(
@@ -40,7 +39,7 @@ struct LoginSecuritySettingsScreen: View {
                 }
                 .disabled(authState.isLoading)
 
-                if let resetInputErrorMessage {
+                if let resetInputErrorMessage = passwordResetState.inputErrorMessage {
                     SecurityFeedbackRow(message: resetInputErrorMessage, style: .error)
                 } else if let errorMessage = authState.errorMessage {
                     SecurityFeedbackRow(message: errorMessage, style: .error)
@@ -77,8 +76,8 @@ struct LoginSecuritySettingsScreen: View {
         .onChange(of: authState.session?.user.email) { _, _ in
             prefillResetEmailIfNeeded()
         }
-        .onChange(of: resetEmail) { _, _ in
-            resetInputErrorMessage = nil
+        .onChange(of: passwordResetState.email) { _, _ in
+            passwordResetState.clearInputFeedback()
             authState.clearFeedback()
         }
     }
@@ -86,7 +85,7 @@ struct LoginSecuritySettingsScreen: View {
     @ViewBuilder
     private var resetEmailField: some View {
         #if os(iOS)
-        TextField("ログインメール", text: $resetEmail)
+        TextField("ログインメール", text: $passwordResetState.email)
             .focused($focusedField, equals: .resetEmail)
             .textInputAutocapitalization(.never)
             .autocorrectionDisabled()
@@ -97,7 +96,7 @@ struct LoginSecuritySettingsScreen: View {
                 Task { await sendPasswordReset() }
             }
         #else
-        TextField("ログインメール", text: $resetEmail)
+        TextField("ログインメール", text: $passwordResetState.email)
             .focused($focusedField, equals: .resetEmail)
             .textContentType(.emailAddress)
             .onSubmit {
@@ -108,15 +107,13 @@ struct LoginSecuritySettingsScreen: View {
 
     private func sendPasswordReset() async {
         focusedField = nil
-        resetInputErrorMessage = nil
-        let normalizedEmail = MegrumAuthInputValidator.normalizedEmail(resetEmail)
-        if let validationMessage = MegrumAuthInputValidator.passwordResetValidationMessage(email: normalizedEmail) {
+        passwordResetState.clearInputFeedback()
+        if passwordResetState.validationMessageForSubmission() != nil {
             authState.clearFeedback()
-            resetInputErrorMessage = validationMessage
             return
         }
 
-        _ = await authState.sendPasswordReset(email: normalizedEmail)
+        _ = await authState.sendPasswordReset(email: passwordResetState.normalizedEmail)
     }
 
     private func startSignOut() {
@@ -127,10 +124,7 @@ struct LoginSecuritySettingsScreen: View {
     }
 
     private func prefillResetEmailIfNeeded() {
-        guard resetEmail.isBlank else {
-            return
-        }
-        resetEmail = summary.resetEmailPrefill
+        passwordResetState.prefillEmailIfNeeded(summary.resetEmailPrefill)
     }
 
     private enum Field {

@@ -14,6 +14,29 @@ final class MeguriProfileValidationTests: XCTestCase {
         XCTAssertEqual(input.avatarID, "avatar_2")
     }
 
+    func testCarriesCustomAvatarURL() throws {
+        let avatarURL = URL(string: "https://example.com/meguri-avatar.jpg")
+        let input = try MeguriProfileValidation.validate(
+            displayName: "めぐり名",
+            avatarID: "avatar_2",
+            avatarURL: avatarURL,
+            existingProfile: nil
+        )
+
+        XCTAssertEqual(input.avatarURL, avatarURL)
+    }
+
+    func testCarriesPublicProfileIdentityMode() throws {
+        let input = try MeguriProfileValidation.validate(
+            displayName: "めぐり名",
+            avatarID: "avatar_2",
+            usesPublicProfile: true,
+            existingProfile: nil
+        )
+
+        XCTAssertTrue(input.usesPublicProfile)
+    }
+
     func testRejectsBlankAndLongDisplayName() {
         XCTAssertThrowsError(
             try MeguriProfileValidation.validate(
@@ -36,7 +59,7 @@ final class MeguriProfileValidationTests: XCTestCase {
         }
     }
 
-    func testLocksChangedProfileForOneMonth() {
+    func testLocksChangedDisplayNameForOneMonth() {
         let lastChangedAt = Date(timeIntervalSince1970: 2_000)
         let existing = MeguriProfile(
             userID: UUID(uuidString: "00000000-0000-0000-0000-000000000001")!,
@@ -49,6 +72,7 @@ final class MeguriProfileValidationTests: XCTestCase {
             try MeguriProfileValidation.validate(
                 displayName: "めぐり名",
                 avatarID: "avatar_1",
+                usesPublicProfile: true,
                 existingProfile: existing,
                 now: lastChangedAt.addingTimeInterval(60 * 60 * 24)
             )
@@ -66,5 +90,25 @@ final class MeguriProfileValidationTests: XCTestCase {
                 return XCTFail("Expected lockedUntil")
             }
         }
+    }
+
+    func testAllowsAvatarChangeDuringDisplayNameLock() {
+        let lastChangedAt = Date(timeIntervalSince1970: 2_000)
+        let existing = MeguriProfile(
+            userID: UUID(uuidString: "00000000-0000-0000-0000-000000000001")!,
+            displayName: "めぐり名",
+            avatarID: "avatar_1",
+            lastChangedAt: lastChangedAt
+        )
+
+        XCTAssertNoThrow(
+            try MeguriProfileValidation.validate(
+                displayName: "めぐり名",
+                avatarID: "avatar_1",
+                avatarURL: URL(string: "https://example.com/new-avatar.jpg"),
+                existingProfile: existing,
+                now: lastChangedAt.addingTimeInterval(60 * 60 * 24)
+            )
+        )
     }
 }

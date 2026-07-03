@@ -7,7 +7,7 @@ public enum SupabaseBoardClientError: Error, Equatable, Sendable {
 }
 
 public final class SupabaseBoardClient: @unchecked Sendable {
-    private static let threadSelect = "id,author_id,title,body,audience_scope,origin_lat,origin_lng,prefecture,image_paths,status,reply_count,latest_activity_at,expires_at,created_at,anonymous_display_name,anonymous_avatar_id"
+    private static let threadSelect = "id,author_id,title,body,audience_scope,origin_lat,origin_lng,prefecture,image_paths,group_id,character_id,series_name,status,reply_count,latest_activity_at,expires_at,created_at,anonymous_display_name,anonymous_avatar_id"
     private static let nearbyRadiusMeters = 3_000.0
     private static let boardMediaBucket = "meguri-board-media"
     private static let maxUploadBytes = Int(9.5 * 1_024 * 1_024)
@@ -81,6 +81,27 @@ public final class SupabaseBoardClient: @unchecked Sendable {
             throw SupabaseBoardClientError.malformedResponse
         }
         return reply
+    }
+
+    public func setThreadReaction(threadID: UUID, reaction: BoardMessageReaction?) async throws {
+        try await client.rpcVoid(
+            function: "set_meguri_board_thread_message_reaction",
+            payload: BoardThreadReactionPayload(threadID: threadID, reaction: reaction)
+        )
+    }
+
+    public func setReplyReaction(replyID: UUID, reaction: BoardMessageReaction?) async throws {
+        try await client.rpcVoid(
+            function: "set_meguri_board_reply_message_reaction",
+            payload: BoardReplyReactionPayload(replyID: replyID, reaction: reaction)
+        )
+    }
+
+    public func reportThread(threadID: UUID, reason: String) async throws {
+        try await client.rpcVoid(
+            function: "report_meguri_board_thread",
+            payload: BoardThreadReportPayload(threadID: threadID, reason: reason)
+        )
     }
 
     public func createThread(_ input: BoardThreadCreateInput) async throws -> BoardThread {

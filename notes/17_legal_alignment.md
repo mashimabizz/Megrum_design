@@ -3,8 +3,27 @@
 > **目的**：弁護士納品の規約原典（2024-07-18）と現行 Megrum 設計の関係を整理。
 > iter47 では「docx 改訂不要・現行規約をそのまま運用」方針だった。2026-05-31時点の初回提出は現地交換MVPへ再固定していたが、2026-06-28時点の現行Swift Native実装では郵送交換・住所開示経路が復活し、2026-06-29時点では会員間支払い情報・銀行口座情報、顔検出・顔候補付けデータ、APNs通知本文、カスタムURL scheme・認証リダイレクト・ディープリンク、Keychain session保存、退会申請・削除予定日、公開プロフィール・性別・活動エリア・年齢表示、評価・通報・ブロック・モデレーション、削除申出・送信防止措置、Storage公開範囲、署名URL、外部AI画像送信の保存/表示/運用経路も確認したため、本メモ上部の追記を優先する。
 
-最終更新: 2026-06-29（近距離公開・作成位置情報 / 会員間支払い・金融規制境界 / 成立後支払い情報スナップショット / 手動有料権限・権限上書き / 運営通知・通知本文統制 / StoreKit・IAP販売可否・復元失敗 / IAP App Privacy同期 / 公開法務ページ同期No-Go / 現行Swift NativeのStorage公開範囲・署名URL / 公開プロフィール・性別・活動エリア・未成年・生年月日・年齢表示・広告年齢制限 / 評価・通報・ブロック・モデレーション / UGC・App Review 1.2 / App Store評価・公開レビュー返信 / 漏えい等初動・事故疑い / 広告宣伝メール・販促通知 / 公式連絡・フィッシング / 削除申出・送信防止措置 / サポートSLA・専門助言非保証 / 退会申請・削除予定 / 郵送交換 / 会員間支払い情報 / 待ち合わせ候補・日程公開 / 緊急時・安全対応非代替 / 会場・施設ルール / 有料権限・ブースト非決済手段 / UserDefaults・端末内ローカル設定 / 国外移転・外国第三者提供・国外アクセス / 登録禁止グッズ・規制物品 / 第三者SDK・OSSライセンス / 顔候補付け / APNs主線・legacy Expo条件付き・Push通知4.5.4 / AdMob実設定・ATT・テスト広告・広告通報 / StoreKit / TestFlight・ベータ機能 / 責任上限・利用者補償・存続条項 / UGC削除後利用 / 会員間支払い税務責任 / 運営者情報開示 / 外部AI送信 / 外部画像URL / 写真メタデータ / カメラ・写真ライブラリ・共有シート / カスタムURL scheme・認証リダイレクト・ディープリンク / Keychain・session保存・refresh token / MapKit・CoreLocation・精密位置・逆ジオコーディング / 公式非提携・権利物 / 古物営業・チケット不正転売 / EU DSA・配信地域 / ホーム候補・検索・レコメンド・Product Personalization / Apple標準EULA方針を規約・プライバシーポリシーへ反映）
+最終更新: 2026-07-03（公開前チェック / Megrum Plus IAPチェックイン既定OFF / AdMobチェックイン既定OFF / 退会申請時通知device失効 / meguri-board-media Storage policy縮小 / 近距離公開・作成位置情報 / 会員間支払い・金融規制境界 / 成立後支払い情報スナップショット / 手動有料権限・権限上書き / 運営通知・通知本文統制 / StoreKit・IAP販売可否・復元失敗 / IAP App Privacy同期 / 公開法務ページ同期No-Go / 現行Swift NativeのStorage公開範囲・署名URL / 公開プロフィール・性別・活動エリア・未成年・生年月日・年齢表示・広告年齢制限 / 評価・通報・ブロック・モデレーション / UGC・App Review 1.2 / App Store評価・公開レビュー返信 / 漏えい等初動・事故疑い / 広告宣伝メール・販促通知 / 公式連絡・フィッシング / 削除申出・送信防止措置 / サポートSLA・専門助言非保証 / 退会申請・削除予定 / 郵送交換 / 会員間支払い情報 / 待ち合わせ候補・日程公開 / 緊急時・安全対応非代替 / 会場・施設ルール / 有料権限・ブースト非決済手段 / UserDefaults・端末内ローカル設定 / 国外移転・外国第三者提供・国外アクセス / 登録禁止グッズ・規制物品 / 第三者SDK・OSSライセンス / 顔候補付け / APNs主線・legacy Expo条件付き・Push通知4.5.4 / AdMob実設定・ATT・テスト広告・広告通報 / StoreKit / TestFlight・ベータ機能 / 責任上限・利用者補償・存続条項 / UGC削除後利用 / 会員間支払い税務責任 / 運営者情報開示 / 外部AI送信 / 外部画像URL / 写真メタデータ / カメラ・写真ライブラリ・共有シート / カスタムURL scheme・認証リダイレクト・ディープリンク / Keychain・session保存・refresh token / MapKit・CoreLocation・精密位置・逆ジオコーディング / 公式非提携・権利物 / 古物営業・チケット不正転売 / EU DSA・配信地域 / ホーム候補・検索・レコメンド・Product Personalization / Apple標準EULA方針を規約・プライバシーポリシーへ反映）
 ステータス: 弁護士納品原典を保持しつつ、現行仕様ベースの規約・プライバシーポリシードラフトを管理
+
+---
+
+## 2026-07-03 追記：Megrum Plus IAPチェックイン既定を提出安全側へ変更
+
+- `ios-native/Config/MegrumNative.xcconfig` に `MEGRUM_PLUS_IAP_ENABLED=NO` を追加し、Info.plistの `MegrumPlusIAPEnabled` へ渡すようにした。Release build settingsでも `MEGRUM_PLUS_IAP_ENABLED=NO` を確認した。
+- `MegrumPlusRuntimeConfiguration` は、環境変数又はInfo.plistに `1`、`true`、`yes`、`on` が明示される場合だけIAPを有効化する。未設定、空文字、`$(MEGRUM_PLUS_IAP_ENABLED)` のような未解決placeholderは無効として扱う。
+- `SubscriptionSettingsScreen` はIAP無効時にStoreKitの商品情報照会、購入、復元を早期停止し、`SubscriptionSettingsContent` は購入ボタンと復元ボタンを表示せず「購入機能は公開準備中です」と表示する。既存の状態更新、サーバー由来の有料権限表示、DEBUG用の権限切替は別扱いで残す。
+- 初回提出で有料機能を出す場合は、local/CI設定で `MEGRUM_PLUS_IAP_ENABLED=YES` を明示したうえで、App Store Connect商品、価格、IAP Availability、公開特商法、FAQ、Review Notes、Purchases回答、Server API検証、Server Notifications、返金/取消/期限切れ/請求失敗同期、手動有料権限上書きとの区別を再確認する。
+- 新規購入導線を既定停止しても、既存権限、手動上書き、退会申請時の購読案内、削除完了時の権限停止、将来IAP有効化時の返金/取消/期限切れ同期は未解決のままなので、公開前No-Goとして残す。
+
+---
+
+## 2026-07-03 追記：AdMobチェックイン既定を提出安全側へ変更
+
+- `ios-native/Config/MegrumNative.xcconfig` のチェックイン既定を、`MEGRUM_ADS_ENABLED=NO`、`MEGRUM_ADMOB_APP_ID` 空、production ad unit id空、test ad unit id空、`MEGRUM_ADMOB_TEST_ADS_ENABLED=NO` に変更した。
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -configuration Release -showBuildSettings` で、Releaseの `MEGRUM_ADS_ENABLED=NO` と `MEGRUM_ADMOB_TEST_ADS_ENABLED=NO` を確認した。Debugはtarget overrideで `MEGRUM_ADMOB_TEST_ADS_ENABLED=YES` が残るが、`MEGRUM_ADS_ENABLED=NO` のため既定では `MobileAds.shared.start()` の起動条件を満たさない。
+- `ios-native/Config/MegrumNative.local.xcconfig.example` に、広告検証時だけlocal configへ明示的に埋めるAdMob項目を追加した。広告を初回提出で出す場合は、local/CI設定で明示的に有効化し、Google公式データ開示、SDK Privacy Manifest、App Privacy回答、ATT/IDFA/Tracking回答、UMP同意管理要否、test ads除去、広告通報導線を実ビルドと一致させる。
+- Google Mobile Ads SDKのSwiftPM依存、Xcode link、Info.plistのAdMob/SKAdNetwork項目は残るため、広告を出さない提出でも、実機又は審査ビルドでSDK初期化と広告リクエストが発生しないこと、App Store Connect回答と公開Privacyが矛盾しないことは提出前確認に残す。
 
 ---
 
@@ -136,7 +155,7 @@
 ## 2026-06-29 追記：StoreKit・IAP販売可否・復元失敗境界を補強
 
 - AppleのIn-App Purchase及びApp Store ConnectのIAP関連ヘルプでは、アプリ内で利用するデジタル商品、サブスクリプション、IAP商品の情報、価格、Availability、審査用情報等をApp Store Connectで管理する前提が示されている。Megrumのメグルムプラスはアプリ内のデジタル機能であり、iOSではApp Storeのアプリ内課金を前提に整理するのが保守的である。
-- 現行Swift Nativeコードでは、`SubscriptionSettingsContent` にメグルムプラスの購入ボタン、復元ボタン、StoreKitから取得した `offer.priceText`、フッター固定文言「価格は月額500円です。App Storeのサブスクリプションとして更新・解約できます。」が存在する。`SubscriptionSettingsScreen` では購入成功後にサーバー同期を行い、同期失敗時は「購入は確認できました。サーバー同期は次回起動時に再確認してください。」と表示する経路がある。
+- 2026-06-29時点のSwift Nativeコードでは、`SubscriptionSettingsContent` にメグルムプラスの購入ボタン、復元ボタン、StoreKitから取得した `offer.priceText`、フッター固定文言「価格は月額500円です。App Storeのサブスクリプションとして更新・解約できます。」が存在した。2026-07-03時点では `MEGRUM_PLUS_IAP_ENABLED=NO` のチェックイン既定を追加し、IAP無効時は購入/復元ボタン、StoreKit商品情報照会、購入、復元actionを停止する。IAPを有効化した場合は、購入成功後にサーバー同期を行い、同期失敗時は「購入は確認できました。サーバー同期は次回起動時に再確認してください。」と表示する経路がある。
 - `SettingsLegalViews` の特定商取引法に基づく表記は、正式な法的本文ではなく公開前レビュー後の原文へ差し替えるための要約表示である。アプリ内要約又は設定内入口だけで、ログイン不要の正式な公開特商法ページを公開済みとして扱わない。
 - 利用規約第7条へ、有料サービス名、価格、購入ボタン、復元ボタン、特典説明、ステータス、特定商取引法に基づく表記への入口又はサポート案内が表示される場合でも、App Store Connectの商品状態、審査状態、販売地域、価格設定、販売停止、会員のアカウント地域、支払方法、通信環境、年齢又は保護者承認、サーバー検証、アカウント状態等により、購入、復元、利用又は権限反映ができない場合があることを追加した。
 - プライバシーポリシー第2.9条及び第10条へ、商品情報照会、価格取得、購入開始、承認待ち、未完了、キャンセル、商品未取得、購入失敗、復元失敗、サーバー同期失敗、販売地域、販売停止状態等の記録を扱うことを追加した。
@@ -712,6 +731,16 @@
 - `suggest-goods-series` Edge Functionは、認証済みユーザー確認後、最大3件の画像データ又は画像URL、グループ名、メンバー名、グッズ種別、既存候補をOpenAI Responses APIへ送信し、`web_search` を必須実行する。導線を出す場合、送信先、送信情報、web search利用、学習利用、保持、削除可否、同意又は任意性、第三者画像禁止をPrivacy/App Privacy/Review Notes/アプリ内説明へ同期する。
 - 公開前No-Goとして、参加者限定画像がpublic bucketにある、private mediaの長期signed URLを説明できない、`meguri-board-media` のauthenticated selectが表示範囲と矛盾する、OpenAIへ画像を送る導線があるのに送信・保持・学習利用・web search利用を説明していない、又は画像base64/API key/service role keyをログや公開証跡へ出している状態では提出しない。
 
+## 2026-07-03 追記：meguri-board-media の authenticated-wide select を縮小
+
+- `supabase/migrations/20260703120000_harden_meguri_board_media_storage_policy.sql` で、`meguri-board-media` の旧 `authenticated` 全体select policyを削除し、表示可能な掲示板thread/replyの `image_paths` に紐づくobjectだけをselect可能にするStorage policyへ変更した。
+- これにより、path推測だけで任意の掲示板画像を署名URL化できる範囲は縮小した。ただし、本番適用後の `pg_policies` 確認、近距離scopeとStorage policyの境界、削除/通報/保持時のobject cleanup、signed URL期間の説明は引き続き公開前確認に残る。
+
+## 2026-07-03 追記：退会申請時の通知device失効を追加
+
+- `supabase/migrations/20260703123000_revoke_notification_devices_on_account_deletion.sql` で、`request_account_deletion_for_viewer()` の退会申請成功時に、そのユーザーの未失効 `notification_devices` へ `revoked_at` を設定するようにした。
+- これにより、退会申請後に通常の通知配送対象へ残り続けるリスクは縮小した。ただし、30日後の削除完了ジョブ、Authユーザー削除又は無効化、Apple/Google連携解除、外部provider側の完全削除、削除完了通知又は問い合わせ回答運用は引き続き公開前確認に残る。
+
 ---
 
 ## 2026-06-29 追記：管理者権限・監査ログ・運営担当者アクセスを公開前No-Goへ追加
@@ -865,9 +894,9 @@
 
 ## 2026-06-29 追記：AdMob実設定・ATT・テスト広告を公開前No-Goへ追加
 
-- 現行コード上、`ios-native/Package.swift` は `GoogleMobileAds` 13.6.0以降に依存し、`MegrumNativeApp.init()` は `AdRuntimeConfiguration.current().shouldStartAdMobSDK` がtrueの場合に `MobileAds.shared.start()` を呼ぶ。
-- `ios-native/Config/MegrumNative.xcconfig` は、チェックイン既定値として `MEGRUM_ADS_ENABLED=YES`、`MEGRUM_AD_PROVIDER=admob`、実AdMob app id、`MEGRUM_ADMOB_TEST_ADS_ENABLED=YES`、Googleデモのbanner/native test unit id、`MEGRUM_ADMOB_SEARCH_NATIVE_UNIT_ID`、`MEGRUM_ADMOB_TRADES_BANNER_UNIT_ID` を持つ。`MEGRUM_AD_PLACEHOLDERS_ENABLED=NO` のため、最終ビルド設定がこのままならAdMob SDK起動条件を満たす。
-- `AdRuntimeConfiguration.unitID(for:)` は `usesGoogleTestAdUnits` がtrueで、formatがbanner又はnativeの場合、設定済みのproduction unit idではなくtest banner/native unit idへ差し替える。したがって現行設定では、検索結果native広告、やりとり一覧上部banner、preview viewer向けhome banner fallbackはGoogleデモ広告ユニットへリクエストされ得る。
+- 2026-06-29時点のコード確認では、`ios-native/Package.swift` は `GoogleMobileAds` 13.6.0以降に依存し、`MegrumNativeApp.init()` は `AdRuntimeConfiguration.current().shouldStartAdMobSDK` がtrueの場合に `MobileAds.shared.start()` を呼ぶ設計だった。
+- 2026-06-29時点の `ios-native/Config/MegrumNative.xcconfig` は、チェックイン既定値として `MEGRUM_ADS_ENABLED=YES`、`MEGRUM_AD_PROVIDER=admob`、実AdMob app id、`MEGRUM_ADMOB_TEST_ADS_ENABLED=YES`、Googleデモのbanner/native test unit id、`MEGRUM_ADMOB_SEARCH_NATIVE_UNIT_ID`、`MEGRUM_ADMOB_TRADES_BANNER_UNIT_ID` を持っていた。2026-07-03時点の現在値は上記「AdMobチェックイン既定を提出安全側へ変更」を正とする。
+- `AdRuntimeConfiguration.unitID(for:)` は `usesGoogleTestAdUnits` がtrueで、formatがbanner又はnativeの場合、設定済みのproduction unit idではなくtest banner/native unit idへ差し替える。したがって2026-06-29時点の設定では、検索結果native広告、やりとり一覧上部banner、preview viewer向けhome banner fallbackはGoogleデモ広告ユニットへリクエストされ得た。
 - `AdBannerSlot` と `AdMobNativeCardView` は `Request()` をそのまま使い、現行検索では `AppTrackingTransparency`、`ATTrackingManager.requestTrackingAuthorization`、`NSUserTrackingUsageDescription`、`UserMessagingPlatform` / UMP、非パーソナライズ広告指定、Publisher First-Party ID制御、mediation制御、child-directed treatment、test device id指定は未確認。
 - `AdInterstitialPresenterModifier` は現行コード上、placeholder表示以外でGoogle interstitial SDKロードへ接続していない。home/wish/meguri/searchのinterstitial request経路はあるが、production interstitial unit idも空であり、現時点の主な外部広告通信リスクはbanner/native表示面にある。
 - `ios-native/App/PrivacyInfo.xcprivacy` は `NSPrivacyTracking=false`、`ios-native/App/Info.plist` には `NSUserTrackingUsageDescription` がない。IDFA又はApple定義のTrackingに該当する広告設定、パーソナライズ広告、Publisher First-Party ID、広告メディエーション、第三者広告目的の横断利用を有効にする場合、このまま提出することはNo-Goとする。
@@ -884,9 +913,9 @@
 ## 2026-06-28 追記：AdMob / StoreKit / 外部AI送信を公開前ドラフトへ反映
 
 - 現行コード上、Swift Native iOSは `ios-native/Package.swift` で `GoogleMobileAds` に依存し、`ios-native/App/Info.plist` に AdMob app id / ad unit id / SKAdNetworkItems が入っている。
-- 現行コード上、メグルムプラス購入は `StoreKitMegrumPlusPurchaseClient` が `Product.products`、`Product.purchase()`、`Transaction.currentEntitlements`、`AppStore.sync()` を使い、購入後は `sync_megrum_plus_purchase_for_viewer` 系の境界へ同期する。購入直後のサーバー同期失敗時にはローカルで有効表示へ倒すフォールバックがあるため、公開文面ではローカル表示を永続的な権限付与として扱わない。
+- メグルムプラス購入経路は `StoreKitMegrumPlusPurchaseClient` が `Product.products`、`Product.purchase()`、`Transaction.currentEntitlements`、`AppStore.sync()` を使い、購入後は `sync_megrum_plus_purchase_for_viewer` 系の境界へ同期する。ただし2026-07-03時点のチェックイン既定では `MEGRUM_PLUS_IAP_ENABLED=NO` により購入/復元/商品照会を停止する。購入導線を有効化した場合、購入直後のサーバー同期失敗時にはローカルで有効表示へ倒すフォールバックがあるため、公開文面ではローカル表示を永続的な権限付与として扱わない。
 - `sync_megrum_plus_purchase_for_viewer` は `megrum.plus.monthly`、transaction id、original transaction id、expiration dateを保存して `user_entitlements` を更新するが、migrationコメント上、App Store Server APIによるサーバー検証は本番前追加。App Store Server Notificationsによる更新、返金、取消、期限切れ、請求失敗、猶予期間同期も現行検索では未確認。
-- `SubscriptionSettingsContent` はStoreKitの商品価格をボタンへ表示する一方、フッターに「価格は月額500円です」と固定表示する。App Store Connect価格、アプリ内固定文言、特商法、FAQ、Review Notesが一致しない状態で有料導線を出すことはNo-Goとする。
+- IAPを有効化した場合、`SubscriptionSettingsContent` はStoreKitの商品価格をボタンへ表示する一方、フッターに「価格は月額500円です」と固定表示する。App Store Connect価格、アプリ内固定文言、特商法、FAQ、Review Notesが一致しない状態で有料導線を出すことはNo-Goとする。
 - 現行コード上、`suggest-goods-series` Edge Function はログイン済みJWTを検証したうえで OpenAI Responses API へ最大3件の画像、画像URL、グループ名、メンバー名、グッズ種別、既存候補名を送る。Function側では `web_search` を必須実行する。
 - 現行コード上、マイグッズ作成後のX共有導線はOS共有画面へ投稿文と画像を渡す形で、アプリが外部SNSへ自動投稿するものではない。
 - 上記を踏まえ、`notes/legal/01_terms_of_service_draft.md` と `notes/legal/02_privacy_policy_draft.md` を、メグルムプラス、StoreKit自動更新/復元、権限反映遅延、一時表示、返金/取消/期限切れ/請求失敗時の権限停止、AdMob/SKAdNetwork/ATT、外部AI送信、外部SNS共有後の責任分界、ステマ表示、第三者権利侵害、消費者契約法上の免責制限に合わせて更新した。

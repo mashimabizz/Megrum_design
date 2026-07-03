@@ -9,7 +9,7 @@ struct TradeProposalResponsePanel: View {
     var onAgree: (ExchangeMethod?) -> Void
     var onReject: () -> Void
     var onCounterProposal: () -> Void
-    @State private var selectedExchangeMethod: ExchangeMethod = .hand
+    @State private var methodSelectionState = TradeAgreementMethodSelectionState()
 
     private var canAgree: Bool {
         guard let viewerID, proposal.isParticipant(viewerID) else {
@@ -95,7 +95,7 @@ struct TradeProposalResponsePanel: View {
                         Text("交換手段を選ぶ")
                             .font(.system(size: 13, weight: .heavy, design: .rounded))
                             .foregroundStyle(MegrumTheme.muted)
-                        Picker("交換手段", selection: $selectedExchangeMethod) {
+                        Picker("交換手段", selection: $methodSelectionState.selectedExchangeMethod) {
                             Text(ExchangeMethod.hand.displayName).tag(ExchangeMethod.hand)
                             Text(ExchangeMethod.mail.displayName).tag(ExchangeMethod.mail)
                         }
@@ -104,7 +104,7 @@ struct TradeProposalResponsePanel: View {
                 }
 
                 Button {
-                    onAgree(needsExchangeMethodChoice ? selectedExchangeMethod : nil)
+                    onAgree(methodSelectionState.agreementExchangeMethod(needsChoice: needsExchangeMethodChoice))
                 } label: {
                     Group {
                         if isResponding {

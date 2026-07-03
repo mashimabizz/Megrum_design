@@ -6,7 +6,7 @@ struct OwnProfileEditProfileFields: View {
     @Binding var draft: OwnProfileEditDraft
     var onSubmitSave: () -> Void
     @FocusState private var focusedField: Field?
-    @State private var isBirthDatePickerExpanded = false
+    @State private var presentationState = OwnProfileEditProfileFieldsPresentationState()
 
     var body: some View {
         Section {
@@ -14,7 +14,7 @@ struct OwnProfileEditProfileFields: View {
             handleField
             bioField
             birthDateRow
-            if isBirthDatePickerExpanded {
+            if presentationState.isBirthDatePickerExpanded {
                 birthDatePicker
             }
             genderPicker
@@ -136,7 +136,7 @@ struct OwnProfileEditProfileFields: View {
     private var birthDateRow: some View {
         Button {
             withAnimation(.snappy(duration: 0.18)) {
-                isBirthDatePickerExpanded.toggle()
+                presentationState.toggleBirthDatePicker()
             }
         } label: {
             HStack {
@@ -148,7 +148,7 @@ struct OwnProfileEditProfileFields: View {
                 Image(systemName: "chevron.right")
                     .font(.footnote.weight(.semibold))
                     .foregroundStyle(.tertiary)
-                    .rotationEffect(.degrees(isBirthDatePickerExpanded ? 90 : 0))
+                    .rotationEffect(.degrees(presentationState.birthDateChevronDegrees))
             }
         }
         .buttonStyle(.plain)
@@ -170,7 +170,7 @@ struct OwnProfileEditProfileFields: View {
     private var birthDateSelection: Binding<Date> {
         Binding(
             get: {
-                draft.birthDate ?? Self.defaultBirthDate
+                draft.birthDate ?? presentationState.birthDateSelectionFallback
             },
             set: { newValue in
                 draft.birthDate = newValue
@@ -179,25 +179,7 @@ struct OwnProfileEditProfileFields: View {
     }
 
     private var birthDateText: String {
-        guard let birthDate = draft.birthDate else {
-            return "未設定"
-        }
-        return Self.birthDateFormatter.string(from: birthDate)
-    }
-
-    private static let birthDateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.locale = Locale(identifier: "ja_JP")
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .none
-        return formatter
-    }()
-
-    private static var defaultBirthDate: Date {
-        Calendar(identifier: .gregorian)
-            .date(byAdding: .year, value: -20, to: .now)
-            ?? .now
+        presentationState.birthDateText(for: draft.birthDate)
     }
 
     private enum Field {

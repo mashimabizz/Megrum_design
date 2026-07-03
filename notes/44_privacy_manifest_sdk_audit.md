@@ -17,10 +17,10 @@
 | 対象 | 現状 |
 |---|---|
 | `ios-native/App/PrivacyInfo.xcprivacy` | `NSPrivacyTracking=false`、UserDefaults `CA92.1` |
-| `ios-native/App/Info.plist` | カメラ、位置情報、`ITSAppUsesNonExemptEncryption=false`、AdMob app id / ad unit id、SKAdNetworkItems |
+| `ios-native/App/Info.plist` | カメラ、位置情報、`ITSAppUsesNonExemptEncryption=false`、AdMob app id / ad unit id build setting、SKAdNetworkItems |
 | `ios-native/Package.swift` | `GoogleMobileAds` Swift Package依存あり |
 | `ios-native/MegrumNative.xcodeproj` | `GoogleMobileAds` product linkあり |
-| `ios-native/Config/MegrumNative.xcconfig` | `MEGRUM_ADS_ENABLED=YES`、AdMob app id実値、`MEGRUM_ADMOB_TEST_ADS_ENABLED=YES`、search native / trades banner unit idあり。test ads有効時はbanner/nativeがGoogleデモunit idへ差し替わる |
+| `ios-native/Config/MegrumNative.xcconfig` | 2026-07-03時点のチェックイン既定は `MEGRUM_ADS_ENABLED=NO`、AdMob app id/unit id/test unit id空、`MEGRUM_ADMOB_TEST_ADS_ENABLED=NO`、`MEGRUM_PLUS_IAP_ENABLED=NO`。Debug targetにはtest ads overrideが残るが、広告OFFのため既定ではSDK起動条件を満たさない |
 | 広告同意/Tracking | `NSPrivacyTracking=false`、`NSUserTrackingUsageDescription`なし。ATT要求、UMP同意管理、非パーソナライズ広告指定、Publisher First-Party ID制御、mediation制御は現行検索で未確認 |
 | Supabase設定 | Info.plist / 環境からURLとキーを読む |
 | 生年月日 / 年齢 | 初回設定で生年月日入力が必須。年齢を算出して保存・表示する経路あり。公的年齢確認、身分証確認、保護者同意確認は未確認 |
@@ -29,7 +29,7 @@
 | APNs | token更新通知とSupabase通知クライアントあり。通知payloadはtitle/body/linkPath/未読バッジを含み得る |
 | PhotosUI / Camera | GoodsEditor / Tradesで利用 |
 | CoreLocation / MapKit系 | 現地交換、検索、取引チャットの現在地共有で利用 |
-| StoreKit | メグルムプラス購入・復元・`currentEntitlements` 読み込み経路あり。商品情報照会、価格取得、購入ボタン表示、復元ボタン表示、購入開始、承認待ち、キャンセル、商品未取得、購入失敗、復元失敗、サーバー同期失敗、販売地域、販売停止、購入後のtransaction id / Original Transaction ID / 期限同期、Server API検証、Server Notifications同期をApp Privacyと照合 |
+| StoreKit | メグルムプラス購入・復元・`currentEntitlements` 読み込み経路あり。ただしチェックイン既定は `MEGRUM_PLUS_IAP_ENABLED=NO` で、購入/復元ボタン表示、商品情報照会、購入、復元actionは停止される。IAPを有効化する場合は、商品情報照会、価格取得、購入ボタン表示、復元ボタン表示、購入開始、承認待ち、キャンセル、商品未取得、購入失敗、復元失敗、サーバー同期失敗、販売地域、販売停止、購入後のtransaction id / Original Transaction ID / 期限同期、Server API検証、Server Notifications同期をApp Privacyと照合 |
 | 外部AI API | `suggest-goods-series` Edge Function経由でOpenAI Responses APIへ最大3件の画像又は画像URL、グループ名、メンバー名、グッズ種別、既存候補を送り、`web_search` を必須実行する経路あり。導線が見える場合、送信前説明とApp Privacy回答が必要 |
 | 顔候補付け | Apple Visionによる顔矩形検出、`member_face_profiles` / `face_uploaded_images` / `detected_faces` / `face_match_candidates` / `face_match_corrections` の保存境界あり。Face ID / 生体認証APIではない。`member_face_profiles` はembedding/source image URLをauthenticated readする設計、補正履歴の学習データ追加フラグは既定trueの経路あり |
 | 郵便番号検索 | `PostalCodeAddressClient` からZipCloudへ郵便番号を送信する経路あり |
@@ -75,7 +75,7 @@
 | Maps | MapKit又は地図表示 | あり得る | Location | TODO |
 | Postal lookup | ZipCloud API | あり | Physical Address / Contact Info | TODO |
 | Payment settings | Supabase REST / `user_payment_settings` | あり | Financial Info / Payment Info | TODO |
-| IAP | StoreKit | メグルムプラス経路あり。導線露出次第。商品情報照会、価格取得、購入開始、承認待ち、未完了、キャンセル、商品未取得、購入失敗、復元失敗、サーバー同期失敗、販売地域、販売停止、返金/取消/期限切れ/請求失敗/猶予期間、復元、サーバー同期状態も確認 | Purchases, 必要に応じてIdentifiers / Other Data | TODO |
+| IAP | StoreKit | メグルムプラス経路あり。チェックイン既定は `MEGRUM_PLUS_IAP_ENABLED=NO` で購入/復元/商品照会を停止。導線を有効化する場合は、商品情報照会、価格取得、購入開始、承認待ち、未完了、キャンセル、商品未取得、購入失敗、復元失敗、サーバー同期失敗、販売地域、販売停止、返金/取消/期限切れ/請求失敗/猶予期間、復元、サーバー同期状態も確認 | Purchases, 必要に応じてIdentifiers / Other Data | TODO |
 | Analytics | Analytics SDK | 未確認 | Usage Data | TODO |
 | Crash | Crash SDK | 未確認 | Diagnostics | TODO |
 | Face / Member suggestion | Apple Vision / 将来Core ML / Supabase face tables | 顔矩形検出、候補付け保存境界あり。`member_face_profiles` embedding/source image URLのauthenticated readと補正履歴/学習データ追加可否を確認 | Sensitive Info / Biometric Data, User Content | TODO |
@@ -96,7 +96,7 @@
 | Supabase `user_payment_settings` / proposals snapshots | 支払い設定、合意後支払い情報表示 | Payment Info | TODO |
 | Supabase face recognition tables | 顔候補付け、候補・補正履歴保存 | Sensitive Info / User Content | TODO |
 | Apple APNs | 通知 | Device ID, User Content, Usage Data | TODO |
-| Apple App Store / StoreKit | IAP、商品情報照会、価格取得、購入開始、承認待ち、キャンセル、商品未取得、購入失敗、復元失敗、サーバー同期失敗、販売地域、販売停止 | Purchases, 必要に応じてIdentifiers / Other Data | 有料機能を出す場合 |
+| Apple App Store / StoreKit | IAP、商品情報照会、価格取得、購入開始、承認待ち、キャンセル、商品未取得、購入失敗、復元失敗、サーバー同期失敗、販売地域、販売停止 | Purchases, 必要に応じてIdentifiers / Other Data | 有料機能を出す場合。既定OFF提出でも購入/復元/商品照会なしを実ビルド確認 |
 | MapKit / Apple Location関連 | 地図/場所 | Location | TODO |
 | ZipCloud | 郵便番号検索/住所補完 | Physical Address / Contact Info | TODO |
 | Google Mobile Ads / AdMob | 広告表示、広告測定、広告通報対応 | Device ID, Advertising Data, Product Interaction, Diagnostics, Tracking該当性 | TODO |
@@ -135,7 +135,7 @@ rg -n "Firebase|Analytics|Crash|StoreKit|Supabase|URLSession|AsyncImage|PhotosUI
 | 通信先確認 | 未 |  |
 | App Privacy回答との一致 | 未 |  |
 | Tracking Noの根拠確認 | 未 |  |
-| IAP有無確認 | 未 | 購入ボタン、復元ボタン、商品情報照会、価格取得、購入開始、承認待ち、キャンセル、商品未取得、購入失敗、復元失敗、サーバー同期失敗、販売地域、販売停止、Server API/Notifications |
+| IAP有無確認 | 未 | `MEGRUM_PLUS_IAP_ENABLED`、購入ボタン、復元ボタン、商品情報照会、価格取得、購入開始、承認待ち、キャンセル、商品未取得、購入失敗、復元失敗、サーバー同期失敗、販売地域、販売停止、Server API/Notifications |
 | AdMob / 広告SDK有無確認 | 未 |  |
 | 広告通報導線 / 取得情報確認 | 未 |  |
 | 外部AI有無確認 | 未 | OpenAI、web_search、画像又は画像URL送信、保持/学習利用、第三者/未成年/権利未処理画像禁止 |
@@ -153,7 +153,7 @@ rg -n "Firebase|Analytics|Crash|StoreKit|Supabase|URLSession|AsyncImage|PhotosUI
 
 - `NSPrivacyTracking=false` なのにAdMob/広告SDKのIDFA、パーソナライズ広告、Publisher First-Party ID、メディエーション、横断追跡該当性を確認していない。
 - `NSUserTrackingUsageDescription` なし又はATT要求未実装のまま、IDFA又はApple定義のTrackingに該当する広告設定を有効にしている。
-- `MEGRUM_ADMOB_TEST_ADS_ENABLED=YES`、Googleデモunit id又は審査用でないtest ads設定のまま一般公開しようとしている。
+- 広告を有効化したビルドで、`MEGRUM_ADMOB_TEST_ADS_ENABLED=YES`、Googleデモunit id又は審査用でないtest ads設定のまま一般公開しようとしている。
 - 広告が見える、又はAdMob SDKが初期化/広告リクエストするのに、不適切又は年齢に合わない広告の通報導線、通報時の取得情報、サポート説明、Google公式データ開示、ATT/Tracking回答、test ads除去、同意管理要否を確認していない。
 - Required Reason APIの利用があるのにPrivacy Manifestに理由がない。
 - 外部SDKのPrivacy Manifestが不足している。

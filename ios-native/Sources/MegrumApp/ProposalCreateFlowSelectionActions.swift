@@ -3,13 +3,19 @@ import SwiftUI
 
 extension ProposalCreateFlow {
     func reconcileSenderSelection(with ids: [UUID]) {
-        selectedSenderGoodsIDs = selectedSenderGoodsIDs.intersection(Set(ids))
-        seedDefaultSenderSelection()
+        selectedSenderGoodsIDs = ProposalCreateGoodsSelectionReducer.reconciled(
+            selectedIDs: selectedSenderGoodsIDs,
+            availableIDs: ids,
+            fallbackIDs: initialSenderGoodsIDs
+        )
     }
 
     func reconcileReceiverSelection(with ids: [UUID]) {
-        selectedReceiverGoodsIDs = selectedReceiverGoodsIDs.intersection(Set(ids))
-        seedDefaultReceiverSelection()
+        selectedReceiverGoodsIDs = ProposalCreateGoodsSelectionReducer.reconciled(
+            selectedIDs: selectedReceiverGoodsIDs,
+            availableIDs: ids,
+            fallbackIDs: receiverGoodsIDs ?? [targetItem.id]
+        )
     }
 
     func handleSenderSelectionModeChange(_ newValue: ProposalSideSelectionMode) {
@@ -21,76 +27,41 @@ extension ProposalCreateFlow {
     }
 
     func normalizeSenderCashAmountText(_ newValue: String) {
-        let normalized = TradeAmountFormatter.cashInputText(from: newValue)
-        if normalized != newValue {
-            senderCashAmountText = normalized
-        }
+        valueSelectionState.normalizeSenderCashAmountText(newValue)
     }
 
     func normalizeReceiverCashAmountText(_ newValue: String) {
-        let normalized = TradeAmountFormatter.cashInputText(from: newValue)
-        if normalized != newValue {
-            receiverCashAmountText = normalized
-        }
+        valueSelectionState.normalizeReceiverCashAmountText(newValue)
     }
 
     func syncPaymentSelectionIfNeeded() {
-        guard requiresPaymentStep else {
-            selectedPaymentOptionID = nil
-            return
-        }
-        let options = paymentOptionSections.flatMap(\.options)
-        guard !options.isEmpty else {
-            selectedPaymentOptionID = nil
-            return
-        }
-        if let selectedPaymentOptionID,
-           options.contains(where: { $0.id == selectedPaymentOptionID }) {
-            return
-        }
-        selectedPaymentOptionID = options.first?.id
+        valueSelectionState.syncPaymentSelectionIfNeeded(options: paymentOptionSections.flatMap(\.options))
     }
 
     func toggleSenderGoods(_ id: UUID) {
-        senderSelectionMode = .goods
-        if selectedSenderGoodsIDs.contains(id) {
-            selectedSenderGoodsIDs.remove(id)
-        } else {
-            selectedSenderGoodsIDs.insert(id)
-        }
+        valueSelectionState.selectSenderGoodsMode()
+        selectedSenderGoodsIDs = ProposalCreateGoodsSelectionReducer.toggled(selectedSenderGoodsIDs, id: id)
     }
 
     func toggleReceiverGoods(_ id: UUID) {
-        receiverSelectionMode = .goods
-        if selectedReceiverGoodsIDs.contains(id) {
-            selectedReceiverGoodsIDs.remove(id)
-        } else {
-            selectedReceiverGoodsIDs.insert(id)
-        }
+        valueSelectionState.selectReceiverGoodsMode()
+        selectedReceiverGoodsIDs = ProposalCreateGoodsSelectionReducer.toggled(selectedReceiverGoodsIDs, id: id)
     }
 
     func seedDefaultSenderSelection() {
-        guard selectedSenderGoodsIDs.isEmpty else {
-            return
-        }
-        let availableIDs = Set(selectableSenderGoods.map(\.id))
-        let seededIDs = initialSenderGoodsIDs.filter { availableIDs.contains($0) }
-        if !seededIDs.isEmpty {
-            selectedSenderGoodsIDs = Set(seededIDs)
-            return
-        }
+        selectedSenderGoodsIDs = ProposalCreateGoodsSelectionReducer.seeded(
+            selectedIDs: selectedSenderGoodsIDs,
+            availableIDs: selectableSenderGoods.map(\.id),
+            fallbackIDs: initialSenderGoodsIDs
+        )
     }
 
     func seedDefaultReceiverSelection() {
-        guard selectedReceiverGoodsIDs.isEmpty else {
-            return
-        }
-        let availableIDs = Set(receiverChoiceGoods.map(\.id))
-        let candidateIDs = (receiverGoodsIDs ?? [targetItem.id]).filter { availableIDs.contains($0) }
-        if !candidateIDs.isEmpty {
-            selectedReceiverGoodsIDs = Set(candidateIDs)
-            return
-        }
+        selectedReceiverGoodsIDs = ProposalCreateGoodsSelectionReducer.seeded(
+            selectedIDs: selectedReceiverGoodsIDs,
+            availableIDs: receiverChoiceGoods.map(\.id),
+            fallbackIDs: receiverGoodsIDs ?? [targetItem.id]
+        )
     }
 
     func applyInitialCashAmountIfNeeded() {
@@ -100,7 +71,6 @@ extension ProposalCreateFlow {
         else {
             return
         }
-        senderSelectionMode = .cash
-        senderCashAmountText = TradeAmountFormatter.cashInputText(from: String(initialCashAmount))
+        valueSelectionState.applyInitialSenderCashAmount(initialCashAmount)
     }
 }

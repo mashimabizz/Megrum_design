@@ -6,6 +6,8 @@ public struct MeguriProfile: Identifiable, Codable, Hashable, Sendable {
     public var userID: UUID
     public var displayName: String
     public var avatarID: String
+    public var avatarURL: URL?
+    public var usesPublicProfile: Bool
     public var lastChangedAt: Date?
     public var createdAt: Date
     public var updatedAt: Date
@@ -16,6 +18,8 @@ public struct MeguriProfile: Identifiable, Codable, Hashable, Sendable {
         userID: UUID,
         displayName: String,
         avatarID: String = "avatar_1",
+        avatarURL: URL? = nil,
+        usesPublicProfile: Bool = false,
         lastChangedAt: Date? = nil,
         createdAt: Date = .now,
         updatedAt: Date = .now
@@ -23,6 +27,8 @@ public struct MeguriProfile: Identifiable, Codable, Hashable, Sendable {
         self.userID = userID
         self.displayName = displayName
         self.avatarID = avatarID
+        self.avatarURL = avatarURL
+        self.usesPublicProfile = usesPublicProfile
         self.lastChangedAt = lastChangedAt
         self.createdAt = createdAt
         self.updatedAt = updatedAt
@@ -41,10 +47,25 @@ public struct MeguriProfile: Identifiable, Codable, Hashable, Sendable {
 public struct MeguriProfileUpdateInput: Equatable, Sendable {
     public var displayName: String
     public var avatarID: String
+    public var avatarURL: URL?
+    public var avatarUpload: GoodsPhotoUpload?
+    public var clearsAvatarURL: Bool
+    public var usesPublicProfile: Bool
 
-    public init(displayName: String, avatarID: String) {
+    public init(
+        displayName: String,
+        avatarID: String,
+        avatarURL: URL? = nil,
+        avatarUpload: GoodsPhotoUpload? = nil,
+        clearsAvatarURL: Bool = false,
+        usesPublicProfile: Bool = false
+    ) {
         self.displayName = displayName
         self.avatarID = avatarID
+        self.avatarURL = avatarURL
+        self.avatarUpload = avatarUpload
+        self.clearsAvatarURL = clearsAvatarURL
+        self.usesPublicProfile = usesPublicProfile
     }
 }
 
@@ -61,6 +82,10 @@ public enum MeguriProfileValidation {
     public static func validate(
         displayName: String,
         avatarID: String,
+        avatarURL: URL? = nil,
+        avatarUpload: GoodsPhotoUpload? = nil,
+        clearsAvatarURL: Bool = false,
+        usesPublicProfile: Bool = false,
         existingProfile: MeguriProfile?,
         now: Date = .now
     ) throws -> MeguriProfileUpdateInput {
@@ -74,10 +99,17 @@ public enum MeguriProfileValidation {
 
         if let existingProfile,
            let lockedUntil = existingProfile.lockedUntil(now: now),
-           (existingProfile.displayName != normalizedName || existingProfile.avatarID != avatarID) {
+           existingProfile.displayName != normalizedName {
             throw MeguriProfileValidationError.lockedUntil(lockedUntil)
         }
 
-        return MeguriProfileUpdateInput(displayName: normalizedName, avatarID: avatarID)
+        return MeguriProfileUpdateInput(
+            displayName: normalizedName,
+            avatarID: avatarID,
+            avatarURL: avatarURL,
+            avatarUpload: avatarUpload,
+            clearsAvatarURL: clearsAvatarURL,
+            usesPublicProfile: usesPublicProfile
+        )
     }
 }

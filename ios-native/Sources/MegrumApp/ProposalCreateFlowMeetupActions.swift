@@ -3,9 +3,10 @@ import MegrumCore
 
 extension ProposalCreateFlow {
     func normalizeMeetupEnd() {
-        if meetupEndAt <= meetupStartAt {
-            meetupEndAt = meetupStartAt.addingTimeInterval(30 * 60)
-        }
+        meetupEndAt = ProposalMeetupEndDateResolver.adjustedEnd(
+            startAt: meetupStartAt,
+            currentEndAt: meetupEndAt
+        )
     }
 
     func saveSelectedMeetupCandidate() {
@@ -51,18 +52,10 @@ extension ProposalCreateFlow {
     }
 
     func previousMeetupPlaceDraft(before index: Int) -> ProposalMeetupCandidateDraft? {
-        let drafts = displayMeetupCandidateDrafts
-        return drafts.indices
-            .filter { $0 != index }
-            .reversed()
-            .map { drafts[$0] }
-            .first { draft in
-                !draft.normalizedPlaceName.isEmpty
-                    || ProposalMeetupMapDraft.coordinate(
-                        latitudeText: draft.latitudeText,
-                        longitudeText: draft.longitudeText
-                    ) != nil
-            }
+        ProposalMeetupPlaceDraftResolver.previousReusableDraft(
+            before: index,
+            in: displayMeetupCandidateDrafts
+        )
     }
 
     func saveMeetupPlaceSheetDraft(_ draft: ProposalMeetupCandidateDraft, at index: Int) {
@@ -106,13 +99,12 @@ extension ProposalCreateFlow {
             meetupPlaceSheetRoute = nil
             return
         }
-        let nextIndex: Int
-        if index < selectedMeetupCandidateIndex {
-            nextIndex = max(0, selectedMeetupCandidateIndex - 1)
-        } else if index == selectedMeetupCandidateIndex {
-            nextIndex = min(index, meetupCandidateDrafts.count - 1)
-        } else {
-            nextIndex = selectedMeetupCandidateIndex
+        guard let nextIndex = ProposalMeetupCandidateSelectionReducer.selectedIndexAfterRemoving(
+            removedIndex: index,
+            selectedIndex: selectedMeetupCandidateIndex,
+            remainingCount: meetupCandidateDrafts.count
+        ) else {
+            return
         }
         applyMeetupCandidate(meetupCandidateDrafts[nextIndex], at: nextIndex)
     }

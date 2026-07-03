@@ -22,10 +22,56 @@ final class GoodsGridLayoutTests: XCTestCase {
         XCTAssertEqual(GoodsGridLayout(columns: 5).skeletonTileCount, 10)
     }
 
+    func testGridColumnPreferenceStorePersistsColumnsPerUserAndEntryKind() throws {
+        let suiteName = "megrum.grid-columns.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+        let viewerID = UUID()
+        let inventoryContext = GoodsGridColumnPreferenceContext(entryKind: .inventory, viewerID: viewerID)
+        let wishContext = GoodsGridColumnPreferenceContext(entryKind: .wish, viewerID: viewerID)
+
+        XCTAssertEqual(GoodsGridColumnPreferenceStore.load(context: inventoryContext, defaults: defaults), 3)
+
+        GoodsGridColumnPreferenceStore.save(columns: 5, context: inventoryContext, defaults: defaults)
+        GoodsGridColumnPreferenceStore.save(columns: 4, context: wishContext, defaults: defaults)
+
+        XCTAssertEqual(GoodsGridColumnPreferenceStore.load(context: inventoryContext, defaults: defaults), 5)
+        XCTAssertEqual(GoodsGridColumnPreferenceStore.load(context: wishContext, defaults: defaults), 4)
+    }
+
+    func testGridColumnPreferenceStoreClampsUnsupportedColumnsAndSeparatesUsers() throws {
+        let suiteName = "megrum.grid-columns.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+        let firstUserContext = GoodsGridColumnPreferenceContext(entryKind: .inventory, viewerID: UUID())
+        let secondUserContext = GoodsGridColumnPreferenceContext(entryKind: .inventory, viewerID: UUID())
+
+        GoodsGridColumnPreferenceStore.save(columns: 9, context: firstUserContext, defaults: defaults)
+
+        XCTAssertEqual(GoodsGridColumnPreferenceStore.load(context: firstUserContext, defaults: defaults), 5)
+        XCTAssertEqual(GoodsGridColumnPreferenceStore.load(context: secondUserContext, defaults: defaults), 3)
+    }
+
     func testRemoteGoodsImageLoadingRetriesBeforeFallback() {
         XCTAssertEqual(GoodsRemoteImageLoadingPolicy.maximumAttempts, 4)
         XCTAssertEqual(GoodsRemoteImageLoadingPolicy.retryDelaysNanoseconds.first, 0)
         XCTAssertGreaterThanOrEqual(GoodsRemoteImageLoadingPolicy.requestTimeout, 10)
+    }
+
+    func testGoodsImageSkeletonPresentationStateTracksPulsingOpacity() {
+        var state = GoodsImageSkeletonPresentationState()
+
+        XCTAssertFalse(state.isPulsing)
+        XCTAssertEqual(state.opacity, 1)
+
+        state.startPulsing()
+
+        XCTAssertTrue(state.isPulsing)
+        XCTAssertEqual(state.opacity, 0.72)
     }
 
     func testRemoteGoodsImageDataLoaderCachesFileData() async throws {
@@ -67,6 +113,146 @@ final class GoodsGridLayoutTests: XCTestCase {
         XCTAssertEqual(GoodsGridLayout.tileAspectRatio, 1 / 1.34, accuracy: 0.0001)
         XCTAssertEqual(GoodsTileCollectionCardMetrics.tagMaxWidthRatio, 0.78)
         XCTAssertEqual(GoodsTileCollectionCardMetrics.glyphFontSize, 32)
+    }
+
+    func testGoodsGridPresentationStateTracksDetailReportAndActionMessage() {
+        let item = GoodsItem(id: UUID(), ownerID: UUID(), title: "サナ トレカ")
+        var state = GoodsGridPresentationState()
+
+        state.showDetail(item)
+        state.showReport(item)
+        state.showActionMessage("未接続です")
+
+        XCTAssertEqual(state.detailItem?.id, item.id)
+        XCTAssertEqual(state.reportItem?.id, item.id)
+        XCTAssertEqual(state.actionMessage, "未接続です")
+        XCTAssertTrue(state.hasActionMessage)
+
+        state.clearReport()
+        state.clearActionMessage()
+
+        XCTAssertNil(state.reportItem)
+        XCTAssertNil(state.actionMessage)
+        XCTAssertFalse(state.hasActionMessage)
+    }
+
+    func testGoodsGridPrimaryTapPolicyKeepsExistingDestinationPriority() {
+        let viewerID = UUID()
+        let ownerID = UUID()
+
+        XCTAssertEqual(
+            GoodsGridPrimaryTapPolicy(
+                isSelectionMode: true,
+                canToggleSelection: true,
+                canOpenItem: true,
+                canOpenOwnerProfile: true,
+                viewerID: viewerID,
+                itemOwnerID: ownerID
+            ).destination,
+            .toggleSelection
+        )
+
+        XCTAssertEqual(
+            GoodsGridPrimaryTapPolicy(
+                isSelectionMode: true,
+                canToggleSelection: false,
+                canOpenItem: true,
+                canOpenOwnerProfile: true,
+                viewerID: viewerID,
+                itemOwnerID: ownerID
+            ).destination,
+            .openItem
+        )
+
+        XCTAssertEqual(
+            GoodsGridPrimaryTapPolicy(
+                isSelectionMode: false,
+                canToggleSelection: false,
+                canOpenItem: false,
+                canOpenOwnerProfile: true,
+                viewerID: viewerID,
+                itemOwnerID: ownerID
+            ).destination,
+            .openOwnerProfile(ownerID)
+        )
+
+        XCTAssertEqual(
+            GoodsGridPrimaryTapPolicy(
+                isSelectionMode: false,
+                canToggleSelection: false,
+                canOpenItem: false,
+                canOpenOwnerProfile: true,
+                viewerID: ownerID,
+                itemOwnerID: ownerID
+            ).destination,
+            .showDetail
+        )
+
+        XCTAssertEqual(
+            GoodsGridPrimaryTapPolicy(
+                isSelectionMode: false,
+                canToggleSelection: false,
+                canOpenItem: false,
+                canOpenOwnerProfile: true,
+                viewerID: nil,
+                itemOwnerID: ownerID
+            ).destination,
+            .openOwnerProfile(ownerID)
+        )
+    }
+
+    func testGoodsGridTileActionPolicyKeepsOwnerRemoteAndFallbackDestinations() {
+        let viewerID = UUID()
+        let ownerID = UUID()
+        let title = "サナ トレカ"
+        let ownerPolicy = GoodsGridTileActionPolicy(
+            viewerID: viewerID,
+            itemOwnerID: viewerID,
+            itemTitle: title,
+            canAddToExchangeList: false,
+            canCreateIndividualListing: true,
+            canEdit: true,
+            canHide: true,
+            canDelete: true,
+            canReport: true
+        )
+        let remotePolicy = GoodsGridTileActionPolicy(
+            viewerID: viewerID,
+            itemOwnerID: ownerID,
+            itemTitle: title,
+            canAddToExchangeList: true,
+            canCreateIndividualListing: false,
+            canEdit: true,
+            canHide: true,
+            canDelete: true,
+            canReport: true
+        )
+        let unavailablePolicy = GoodsGridTileActionPolicy(
+            viewerID: viewerID,
+            itemOwnerID: ownerID,
+            itemTitle: title,
+            canAddToExchangeList: false,
+            canCreateIndividualListing: false,
+            canEdit: false,
+            canHide: false,
+            canDelete: false,
+            canReport: false
+        )
+
+        XCTAssertEqual(ownerPolicy.destination(for: .detail), .showDetail)
+        XCTAssertEqual(ownerPolicy.destination(for: .edit), .edit)
+        XCTAssertEqual(ownerPolicy.destination(for: .createIndividualListing), .createIndividualListing)
+        XCTAssertEqual(ownerPolicy.destination(for: .delete), .delete)
+        XCTAssertEqual(remotePolicy.destination(for: .addToExchangeList), .addToExchangeList)
+        XCTAssertEqual(remotePolicy.destination(for: .report), .showReport)
+        XCTAssertEqual(
+            unavailablePolicy.destination(for: .edit),
+            .showActionMessage("「サナ トレカ」の編集は、自分のマイグッズ/Wishでのみ使えます。")
+        )
+        XCTAssertEqual(
+            unavailablePolicy.destination(for: .delete),
+            .showActionMessage("「サナ トレカ」を削除する処理は、自分のマイグッズ/Wishでのみ使えます。")
+        )
     }
 
     func testInventoryQuickActionsMatchOwnerMenuOrder() {
@@ -111,7 +297,7 @@ final class GoodsGridLayoutTests: XCTestCase {
     }
 
     func testSelectionFooterUsesFixedGlassActionMetrics() {
-        XCTAssertEqual(GoodsSelectionFooterMetrics.bottomPadding, 12)
+        XCTAssertEqual(GoodsSelectionFooterMetrics.bottomPadding, 24)
         XCTAssertEqual(GoodsSelectionFooterMetrics.horizontalPadding, 18)
         XCTAssertEqual(GoodsSelectionFooterMetrics.cornerRadius, 28)
         XCTAssertEqual(GoodsSelectionFooterMetrics.actionHeight, 52)
@@ -192,6 +378,18 @@ final class GoodsGridLayoutTests: XCTestCase {
     func testWishCollectionUsesSwipePagingWithSharedPinnedHeader() {
         XCTAssertFalse(WishCollectionPresentationPolicy.usesDirectSectionRendering)
         XCTAssertTrue(WishCollectionPresentationPolicy.usesSwipePaging)
+    }
+
+    func testWishCollectionPresentationStateConsumesRequestedSection() {
+        var state = WishCollectionPresentationState()
+
+        XCTAssertFalse(state.applyRequestedSection(nil))
+        XCTAssertEqual(state.selectedSection, .wishes)
+
+        XCTAssertTrue(state.applyRequestedSection(.listings))
+        XCTAssertEqual(state.selectedSection, .listings)
+        XCTAssertTrue(state.applyRequestedSection(.wishes))
+        XCTAssertEqual(state.selectedSection.navigationTitle, "ウィッシュ")
     }
 
     func testGridContextLabelsFollowEntryKind() {

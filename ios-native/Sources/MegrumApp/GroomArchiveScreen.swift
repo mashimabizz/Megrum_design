@@ -8,8 +8,7 @@ struct GroomArchiveScreen: View {
     var currentCoordinate: MegrumLocationCoordinate?
     @Environment(\.dismiss) private var dismiss
     @State private var cameraPosition: MapCameraPosition = .automatic
-    @State private var selectedGroom: GroomPost?
-    @State private var showsMegrumPlus = false
+    @State private var presentationState = GroomArchivePresentationState()
 
     private var archivedGrooms: [GroomPost] {
         GroomArchiveOrdering.sorted(appState.ownGroomArchive)
@@ -26,7 +25,7 @@ struct GroomArchiveScreen: View {
                 cameraPosition: $cameraPosition,
                 grooms: archivedGrooms,
                 currentCoordinate: currentCoordinate,
-                onSelect: { selectedGroom = $0 }
+                onSelect: { presentationState.select($0) }
             )
             .ignoresSafeArea()
 
@@ -48,18 +47,23 @@ struct GroomArchiveScreen: View {
                 Spacer()
                 if isArchiveLimited {
                     GroomArchiveLimitNotice {
-                        showsMegrumPlus = true
+                        presentationState.showMegrumPlus()
                     }
                     .padding(.horizontal, 18)
                     .padding(.bottom, 10)
                 }
-                GroomArchiveThumbnailOverview(
+            }
+
+            HStack {
+                Spacer()
+                GroomArchiveTimelineAxis(
                     grooms: archivedGrooms,
-                    selectedGroomID: selectedGroom?.id,
-                    onSelect: { selectedGroom = $0 }
+                    focusedGroomID: presentationState.focusedGroomID,
+                    onFocus: focusGroom
                 )
-                .padding(.horizontal, 18)
-                .padding(.bottom, 28)
+                .padding(.trailing, 6)
+                .padding(.top, 104)
+                .padding(.bottom, isArchiveLimited ? 104 : 54)
             }
         }
         .background(MegrumTheme.canvas)
@@ -71,16 +75,20 @@ struct GroomArchiveScreen: View {
         .onChange(of: archivedGrooms) { _, _ in
             updateCameraPosition()
         }
+        .onChange(of: presentationState.focusedGroomID) { _, _ in
+            updateCameraPositionForFocusedGroom()
+        }
         #if os(iOS)
-        .fullScreenCover(item: $selectedGroom) { groom in
+        .groomViewerImmersiveOverlay(item: $presentationState.selectedGroom) { groom, dismiss in
             GroomArchiveStoryScreen(
                 grooms: archivedGrooms,
                 initialGroom: groom,
-                appState: appState
+                appState: appState,
+                onDismiss: dismiss
             )
         }
         #else
-        .sheet(item: $selectedGroom) { groom in
+        .sheet(item: $presentationState.selectedGroom) { groom in
             GroomArchiveStoryScreen(
                 grooms: archivedGrooms,
                 initialGroom: groom,
@@ -88,7 +96,7 @@ struct GroomArchiveScreen: View {
             )
         }
         #endif
-        .sheet(isPresented: $showsMegrumPlus) {
+        .sheet(isPresented: $presentationState.showsMegrumPlus) {
             NavigationStack {
                 SubscriptionSettingsScreen(appState: appState)
             }
@@ -99,8 +107,21 @@ struct GroomArchiveScreen: View {
         cameraPosition = .region(
             GroomArchiveMapRegion.region(
                 for: archivedGrooms,
-                currentCoordinate: currentCoordinate
+                currentCoordinate: archivedGrooms.isEmpty ? currentCoordinate : nil
             )
         )
+    }
+
+    private func focusGroom(_ groom: GroomPost) {
+        presentationState.focus(groom)
+    }
+
+    private func updateCameraPositionForFocusedGroom() {
+        guard let groom = presentationState.focusedGroom(in: archivedGrooms) else {
+            return
+        }
+        withAnimation(.easeInOut(duration: 0.28)) {
+            cameraPosition = .region(GroomArchiveMapRegion.focusedRegion(for: groom))
+        }
     }
 }

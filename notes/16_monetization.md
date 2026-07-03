@@ -1,10 +1,10 @@
 # 16. マネタイズ戦略（Monetization）
 
-> **目的**：Megrum の収益化戦略。メグルムプラス・広告・ブースト・アフィリエイト・公式コラボの設計と Phase別ロードマップ。
+> **目的**：Megrum の収益化戦略。Megrumプレミアム・広告・ブースト・アフィリエイト・公式コラボの設計と Phase別ロードマップ。
 > ファン層に嫌われない健全なマネタイズを実現する。
 
-最終更新: 2026-06-29（iter1226.166）
-ステータス: Draft v1.3（メグルムプラス月額500円 / 手動有料権限・権限上書き境界を反映）
+最終更新: 2026-06-29（iter1226.170）
+ステータス: Draft v1.5（Megrumプレミアム月額500円 / めぐり内メッセージやり取りを反映）
 
 ---
 
@@ -29,7 +29,7 @@
 4. [Phase別ロードマップ](#4-phase別ロードマップ)
 5. [広告（Ad）](#5-広告ad)
 6. [ブースト機能（Boost）](#6-ブースト機能boost)
-7. [メグルムプラス / 旧Premium](#7-premium-会員)
+7. [Megrumプレミアム / 旧Premium](#7-premium-会員)
 8. [アフィリエイト](#8-アフィリエイト)
 9. [公式コラボ・スポンサー](#9-公式コラボスポンサー)
 10. [B2B SaaS（Post-MVP）](#10-b2b-saaspost-mvp)
@@ -99,7 +99,7 @@ Phase δ（公式コラボ・B2B拡大時）に **合同会社（LLC、設立費
 - 在庫登録・ウィッシュ登録（数量制限なし）
 - AW登録（実用的な数量）
 - 打診送信・受信・ネゴ・合意・取引・C-3 全プロセス
-- メッセージ送信・受信
+- 取引メッセージ送信・受信（めぐり内メッセージの本文表示・返信は 7-4a のMegrumプレミアム対象）
 - 通報・dispute申告
 - 評価表示
 
@@ -395,13 +395,13 @@ ad_overrides table:
 - 未使用月分の払い戻しは原則なし（年額契約）
 - 解約後も期間終了まで使える
 
-### 7-4a. メグルムプラス（iter1223）
+### 7-4a. Megrumプレミアム（iter1223 / iter1226.172）
 
-Swift Native iOSの現行サブスクは **メグルムプラス** に統一する。旧Premium/めぐりPlusの権限キーは互換用に残すが、新規導線・新規課金訴求はメグルムプラスを正とする。
+Swift Native iOSの現行サブスク表示名は **Megrumプレミアム** に統一する。旧Premium/めぐりPlus/旧メグルムプラスの権限キーは互換用に残すが、新規導線・新規課金訴求はMegrumプレミアムを正とする。
 
 | 項目 | 内容 |
 |---|---|
-| 表示名 | メグルムプラス |
+| 表示名 | Megrumプレミアム |
 | 価格 | 月額 ¥500（税込） |
 | StoreKit product id候補 | `megrum.plus.monthly` |
 | plan_type | `megrum_plus_monthly` |
@@ -409,8 +409,9 @@ Swift Native iOSの現行サブスクは **メグルムプラス** に統一す�
 | 対象機能1 | 個別募集の作成数無制限。無料プランは `active` / `paused` / `matched` 合計3件まで |
 | 対象機能2 | ホームのマッチ候補・検索結果で、自分のグッズが優先表示される |
 | 対象機能3 | グルームアーカイブ無制限。無料プランは最新10件まで |
+| 対象機能4 | めぐりメッセージの本文表示・返信。無料プランは到着・未読数・モザイクプレビューまで |
 
-表示導線は左ドロワーの「交換条件の設定」配下に余白を空けて「メグルムプラス」を置き、タップ後に3特典と月額価格を説明してStoreKit購入へ進める。アプリ側の判定は `UserSubscriptionState.isMegrumPlusActive` を通じて `user_entitlements` を見る。
+表示導線は左ドロワーの「交換条件の設定」配下に余白を空けて「Megrumプレミアム」を置き、タップ後に主要特典と月額価格を説明してStoreKit購入へ進める。アプリ側の判定は `UserSubscriptionState.isMegrumPlusActive` と、めぐりメッセージ用の互換判定 `hasMeguriMessageAccess` を通じて `user_entitlements` を見る。
 
 DB側では `list_megrum_plus_user_ids_for_viewer()` によりホーム/検索ランキング用のPlusユーザーIDを返し、`enforce_individual_listing_free_limit()` により無料ユーザーの個別募集3件上限をサーバー側でも守る。StoreKit購入後は `sync_megrum_plus_purchase_for_viewer()` で `subscriptions` と `user_entitlements` へ同期する。本番前には App Store Server API によるサーバー側署名検証を追加する。
 
@@ -418,7 +419,7 @@ DB側では `list_megrum_plus_user_ids_for_viewer()` によりホーム/検索�
 
 ### 7-4b. めぐりPlus（iter168.43）
 
-旧設計。Premium 会員とは別の、めぐり機能専用サブスク。iter1223以降の新規訴求はメグルムプラスを正とし、この節は互換・履歴として残す。
+旧設計。Premium 会員とは別の、めぐり機能専用サブスク。iter1223以降の新規訴求はMegrumプレミアムを正とし、この節は互換・履歴として残す。
 
 | 項目 | 内容 |
 |---|---|
@@ -427,7 +428,7 @@ DB側では `list_megrum_plus_user_ids_for_viewer()` によりホーム/検索�
 | 対象機能 | めぐりメッセージ本文表示、返信、新規メッセージ月20通 |
 | 非対象 | 交換・打診・取引のコア機能、広告非表示、ブースト配布 |
 
-無料ユーザーにも、めぐり到着、相性、ぼかした場所/時刻、伏せ字プレビュー、月2通までの送信枠は残す。めぐりPlusでは新規メッセージを月20通まで送れる。単発の本文表示チケットは作らない。
+無料ユーザーにも、めぐり到着、相性、ぼかした場所/時刻、モザイクプレビューは残す。現行Swift Nativeでは本文表示・返信をMegrumプレミアム対象に寄せ、旧めぐりPlusは `feature_key='meguri_plus'` の互換権限として同じ判定に含める。単発の本文表示チケットは作らない。
 
 ### 7-5. 関連データモデル
 
@@ -455,9 +456,9 @@ subscriptions table:
 - アプリの機能判定は、決済プロバイダーの生ステータスではなく `user_entitlements` を見る。
 - `subscriptions` は決済・更新・解約・返金などの原本、`user_entitlements` はアプリが見る利用権の集約結果とする。
 - `plan_overrides` と `manual_override` はサポート又は運営上の暫定・補正手段であり、購入証明、返金確定、補償又は無償提供継続として扱わない。
-- メグルムプラスの現行3特典は `user_entitlements.feature_key='megrum_plus'` が有効な時だけ発火する。
+- Megrumプレミアムの現行特典（個別募集無制限、優先表示、グルームアーカイブ無制限、めぐり内メッセージ本文表示・返信）は `user_entitlements.feature_key='megrum_plus'` が有効な時だけ発火する。
 - 旧Premium会員の広告非表示は `user_entitlements.feature_key='premium'` が有効な時だけ発火する。
-- 旧めぐりPlusは `premium` / `megrum_plus` に含めず、`feature_key='meguri_plus'` として分離する。
+- 旧めぐりPlusは `feature_key='meguri_plus'` として分離して残し、Swift側ではめぐりメッセージ本文表示・返信の互換権限として見る。
 - 打診、取引チャット、証跡、通報、評価、アカウント安全機能は有料権限にしない。
 
 #### Swift側の初期カタログ

@@ -14,9 +14,7 @@ struct HomeMutualMatchDetailSheet: View {
     var onOpenOwnerProfile: (UUID) -> Void
     var onStartProposal: (HomeDiscoveryProposalSelection) -> Void
 
-    @State private var selectedPairID: String?
-    @State private var nestedPresentation: HomeDiscoveryNestedPresentation?
-    @State private var addedExtraSelections: [HomeDiscoveryProposalSelection] = []
+    @State private var presentationState = HomeMutualMatchDetailPresentationState()
 
     var body: some View {
         HomeSheetScaffold(
@@ -36,14 +34,14 @@ struct HomeMutualMatchDetailSheet: View {
                 excludedGoodsIDs: excludedGoodsIDs,
                 listingHitPayloads: partnerScopedListingHitPayloads,
                 wishHitPayloads: partnerScopedWishHitPayloads,
-                onOpenNestedSheet: { nestedPresentation = .discoverySheet($0) },
+                onOpenNestedSheet: { presentationState.showNestedSheet($0) },
                 showsLeadingDivider: !otherMutualPairs.isEmpty
             ) {
                 if !otherMutualPairs.isEmpty {
                     HomeOtherMutualMatchPairsSection(
                         pairs: otherMutualPairs,
-                        selectedPairID: selectedPairID,
-                        onSelect: { selectedPairID = $0.id }
+                        selectedPairID: presentationState.selectedPairID,
+                        onSelect: { presentationState.selectPair(id: $0.id) }
                     )
                 }
             }
@@ -54,12 +52,11 @@ struct HomeMutualMatchDetailSheet: View {
         }
         .modifier(
             HomeMutualMatchNestedPresentationModifier(
-                nestedPresentation: $nestedPresentation,
+                nestedPresentation: $presentationState.nestedPresentation,
                 appState: appState,
                 viewerOfferGoods: viewerOfferGoods,
                 onAddExtraProposalSelection: { selection in
-                    addedExtraSelections.append(selection)
-                    nestedPresentation = nil
+                    presentationState.addExtraProposalSelectionAndDismiss(selection)
                 },
                 onOpenOwnerProfile: openOwnerProfile,
                 onStartProposal: startNestedProposal
@@ -89,7 +86,7 @@ struct HomeMutualMatchDetailSheet: View {
     }
 
     private var selectedPair: HomeMutualMatchProposalPair? {
-        if let selectedPairID,
+        if let selectedPairID = presentationState.selectedPairID,
            let pair = mutualPairs.first(where: { $0.id == selectedPairID }) {
             return pair
         }
@@ -101,7 +98,7 @@ struct HomeMutualMatchDetailSheet: View {
     }
 
     private var addedExtraCandidateIDs: Set<UUID> {
-        Set(addedExtraSelections.flatMap(\.receiverGoodsIDs))
+        presentationState.addedExtraCandidateIDs
     }
 
     private var selectedPartnerUserID: UUID? {
@@ -127,33 +124,31 @@ struct HomeMutualMatchDetailSheet: View {
     }
 
     private func seedInitialSelection() {
-        guard selectedPair == nil else {
-            return
-        }
-        selectedPairID = tappedCandidatePairs.first?.id ?? mutualPairs.first?.id
+        presentationState.seedInitialSelectionIfNeeded(
+            hasSelectedPair: selectedPair != nil,
+            preferredPairID: tappedCandidatePairs.first?.id ?? mutualPairs.first?.id
+        )
     }
 
     private func startProposal() {
         guard let selectedPair else {
             return
         }
-        onStartProposal(
-            HomeDiscoveryProposalSelection(
-                receiverGoodsID: selectedPair.receiverGoods.id,
-                receiverGoodsIDs: [selectedPair.receiverGoods.id],
-                senderGoodsIDs: selectedPair.senderDisplayItem.goods.map { [$0.id] } ?? [],
-                matchType: .perfect,
-                receiverGoods: selectedPair.receiverGoods,
-                senderGoods: selectedPair.senderDisplayItem.goods.map { [$0] } ?? [],
-                exchangeMethod: selectedPair.signals.preferredProposalExchangeMethod,
-                cashAmount: selectedPair.proposalCashAmount
-            )
-            .includingExtraSelections(addedExtraSelections)
+        let selection = HomeDiscoveryProposalSelection(
+            receiverGoodsID: selectedPair.receiverGoods.id,
+            receiverGoodsIDs: [selectedPair.receiverGoods.id],
+            senderGoodsIDs: selectedPair.senderDisplayItem.goods.map { [$0.id] } ?? [],
+            matchType: .perfect,
+            receiverGoods: selectedPair.receiverGoods,
+            senderGoods: selectedPair.senderDisplayItem.goods.map { [$0] } ?? [],
+            exchangeMethod: selectedPair.signals.preferredProposalExchangeMethod,
+            cashAmount: selectedPair.proposalCashAmount
         )
+        onStartProposal(presentationState.proposalSelection(selection))
     }
 
     private func startNestedProposal(_ selection: HomeDiscoveryProposalSelection) {
-        nestedPresentation = nil
+        presentationState.closeNestedPresentation()
         onStartProposal(selection)
     }
 
@@ -163,7 +158,7 @@ struct HomeMutualMatchDetailSheet: View {
             canPresentNestedProfile: appState != nil
         ) {
         case .nested(let route):
-            nestedPresentation = .publicProfile(route)
+            presentationState.showNestedProfile(route)
         case .parent(let userID):
             onOpenOwnerProfile(userID)
         }

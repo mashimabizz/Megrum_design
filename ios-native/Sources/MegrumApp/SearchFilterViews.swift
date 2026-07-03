@@ -10,9 +10,7 @@ struct SearchFilterSheet: View {
     var onApply: (SearchFilterDraft) -> Void
 
     @Environment(\.dismiss) private var dismiss
-    @State private var draft: SearchFilterDraft
-    @State private var isMeetupDatePickerExpanded = false
-    @State private var isShowingTagPicker = false
+    @State private var sheetState: SearchFilterSheetState
 
     init(
         appState: MegrumAppState,
@@ -25,15 +23,15 @@ struct SearchFilterSheet: View {
         self.defaultExchangeSettings = defaultExchangeSettings
         self.defaultPaymentMethods = defaultPaymentMethods
         self.onApply = onApply
-        _draft = State(initialValue: initialDraft)
+        _sheetState = State(initialValue: SearchFilterSheetState(draft: initialDraft))
     }
 
     private var hasSelectedGroup: Bool {
-        draft.selectedGroupID != nil
+        sheetState.hasSelectedGroup
     }
 
     private var selectedGroup: OshiGroup? {
-        guard let selectedGroupID = draft.selectedGroupID else {
+        guard let selectedGroupID = sheetState.draft.selectedGroupID else {
             return nil
         }
         return appState.oshiGroups.first { $0.id == selectedGroupID }
@@ -45,16 +43,13 @@ struct SearchFilterSheet: View {
             wishes: appState.wishes,
             inventory: appState.inventory,
             viewerID: appState.viewer?.id,
-            limitingToGroupID: draft.selectedGroupID,
+            limitingToGroupID: sheetState.draft.selectedGroupID,
             limit: 48
         )
     }
 
     private var selectedTagSummary: String {
-        if draft.selectedGoodsTagNames.isEmpty {
-            return "選択する"
-        }
-        return "\(draft.selectedGoodsTagNames.count)件"
+        sheetState.selectedTagSummary
     }
 
     var body: some View {
@@ -65,39 +60,39 @@ struct SearchFilterSheet: View {
                 characters: hasSelectedGroup ? appState.oshiCharacters : [],
                 goodsTypes: appState.goodsTypes,
                 selectedTagSummary: selectedTagSummary,
-                selectedGroupID: $draft.selectedGroupID,
-                selectedMemberID: $draft.selectedMemberID,
-                selectedGoodsTypeID: $draft.selectedGoodsTypeID,
+                selectedGroupID: $sheetState.draft.selectedGroupID,
+                selectedMemberID: $sheetState.draft.selectedMemberID,
+                selectedGoodsTypeID: $sheetState.draft.selectedGoodsTypeID,
                 isLoadingGroups: appState.isLoadingOshiGroups,
                 isLoadingMembers: appState.isLoadingOshiCharacters,
                 isLoadingGoodsTypes: appState.isLoadingGoodsTypes,
                 onSelectGroup: selectGroup,
                 onClearGroup: clearGroupSelection,
                 onOpenTagPicker: {
-                    isShowingTagPicker = true
+                    sheetState.showTagPicker()
                 }
             )
 
-            SearchConditionMatchFilterSection(filters: $draft.conditionMatches)
+            SearchConditionMatchFilterSection(filters: $sheetState.draft.conditionMatches)
 
             SearchExchangeConditionFilterSection(
-                selectedExchangeMethod: $draft.selectedExchangeMethod,
-                selectedPrefecture: $draft.selectedMeetupPrefecture,
-                placeMemo: $draft.meetupPlaceMemo,
-                selectedDates: $draft.selectedMeetupDates,
-                dateDraft: $draft.meetupDateDraft,
-                isDatePickerExpanded: $isMeetupDatePickerExpanded,
-                shippingFee: $draft.shippingFee,
-                shippingWindow: $draft.shippingWindow,
-                allowsOutOfConditionProposal: $draft.allowsOutOfConditionProposal,
-                isLocked: draft.conditionMatches.matchesExchangeCondition,
+                selectedExchangeMethod: $sheetState.draft.selectedExchangeMethod,
+                selectedPrefecture: $sheetState.draft.selectedMeetupPrefecture,
+                placeMemo: $sheetState.draft.meetupPlaceMemo,
+                selectedDates: $sheetState.draft.selectedMeetupDates,
+                dateDraft: $sheetState.draft.meetupDateDraft,
+                isDatePickerExpanded: $sheetState.isMeetupDatePickerExpanded,
+                shippingFee: $sheetState.draft.shippingFee,
+                shippingWindow: $sheetState.draft.shippingWindow,
+                allowsOutOfConditionProposal: $sheetState.draft.allowsOutOfConditionProposal,
+                isLocked: sheetState.draft.conditionMatches.matchesExchangeCondition,
                 onAddDate: addMeetupDate,
                 onRemoveDate: removeMeetupDate
             )
 
             SearchPaymentMethodFilterSection(
-                selectedMethods: $draft.selectedPaymentMethods,
-                isLocked: draft.conditionMatches.matchesPaymentCondition
+                selectedMethods: $sheetState.draft.selectedPaymentMethods,
+                isLocked: sheetState.draft.conditionMatches.matchesPaymentCondition
             )
 
             SearchFilterResetSection(onReset: resetDraft)
@@ -117,59 +112,51 @@ struct SearchFilterSheet: View {
         .safeAreaInset(edge: .bottom) {
             SearchFilterApplyFooter(action: applyAndDismiss)
         }
-        .sheet(isPresented: $isShowingTagPicker) {
+        .sheet(isPresented: $sheetState.isShowingTagPicker) {
             NavigationStack {
                 SearchGoodsTagSelectionSheet(
                     candidateNames: availableGoodsTagNames,
                     selectedGroupName: selectedGroup?.name,
-                    selectedTags: $draft.selectedGoodsTagNames
+                    selectedTags: $sheetState.draft.selectedGoodsTagNames
                 )
             }
         }
-        .onChange(of: draft.conditionMatches) { previous, current in
+        .onChange(of: sheetState.draft.conditionMatches) { previous, current in
             applyDefaultConditions(previous: previous, current: current)
         }
     }
 
     private func addMeetupDate(_ date: Date) {
-        let normalizedDate = Calendar.current.startOfDay(for: date)
-        guard !draft.selectedMeetupDates.contains(normalizedDate) else {
-            return
-        }
-        draft.selectedMeetupDates.append(normalizedDate)
-        draft.selectedMeetupDates.sort()
+        sheetState.addMeetupDate(date)
     }
 
     private func removeMeetupDate(_ date: Date) {
-        let normalizedDate = Calendar.current.startOfDay(for: date)
-        draft.selectedMeetupDates.removeAll { Calendar.current.isDate($0, inSameDayAs: normalizedDate) }
+        sheetState.removeMeetupDate(date)
     }
 
     private func selectGroup(_ group: OshiGroup) {
-        draft.selectedGroupID = group.id
-        draft.selectedMemberID = nil
+        sheetState.selectGroup(group)
         Task {
             await appState.loadOshiCharacters(group: group)
         }
     }
 
     private func clearGroupSelection() {
-        draft.selectedGroupID = nil
-        draft.selectedMemberID = nil
+        sheetState.clearGroupSelection()
         Task {
             await appState.loadOshiCharacters(group: nil)
         }
     }
 
     private func resetDraft() {
-        draft = draft.reset()
+        sheetState.resetDraft()
         Task {
             await appState.loadOshiCharacters(group: nil)
         }
     }
 
     private func applyAndDismiss() {
-        onApply(draft)
+        onApply(sheetState.draft)
         dismiss()
     }
 
@@ -177,15 +164,13 @@ struct SearchFilterSheet: View {
         previous: SearchConditionMatchFilters,
         current: SearchConditionMatchFilters
     ) {
-        if current.matchesExchangeCondition, !previous.matchesExchangeCondition {
-            draft.applyDefaultExchangeCondition(
-                settings: defaultExchangeSettings,
-                viewer: appState.viewer
-            )
-        }
-        if current.matchesPaymentCondition, !previous.matchesPaymentCondition {
-            draft.applyDefaultPaymentCondition(methods: defaultPaymentMethods)
-        }
+        sheetState.applyDefaultConditions(
+            previous: previous,
+            current: current,
+            defaultExchangeSettings: defaultExchangeSettings,
+            defaultPaymentMethods: defaultPaymentMethods,
+            viewer: appState.viewer
+        )
     }
 }
 

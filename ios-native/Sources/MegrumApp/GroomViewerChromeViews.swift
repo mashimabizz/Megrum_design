@@ -5,49 +5,88 @@ import SwiftUI
 struct GroomViewerPageIndicator: View {
     let totalCount: Int
     let currentIndex: Int
+    let currentProgress: Double
 
     var body: some View {
         HStack(spacing: 6) {
             ForEach(0..<totalCount, id: \.self) { index in
-                Capsule()
-                    .fill(index <= currentIndex ? .white : .white.opacity(0.28))
-                    .frame(height: 3)
+                GroomViewerPageIndicatorSegment(fillRatio: fillRatio(for: index))
             }
         }
         .padding(.horizontal, 14)
         .padding(.top, 14)
     }
+
+    private func fillRatio(for index: Int) -> Double {
+        if index < currentIndex {
+            return 1
+        }
+        if index == currentIndex {
+            return min(max(currentProgress, 0), 1)
+        }
+        return 0
+    }
+}
+
+private struct GroomViewerPageIndicatorSegment: View {
+    var fillRatio: Double
+
+    var body: some View {
+        GeometryReader { proxy in
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(.white.opacity(0.28))
+
+                Capsule()
+                    .fill(.white)
+                    .frame(width: proxy.size.width * CGFloat(fillRatio))
+            }
+        }
+        .frame(height: 3)
+    }
 }
 
 struct GroomViewerTopBar: View {
     var authorName: String
+    var postTimeText: String
     var authorAvatarID: String?
     var authorAvatarURL: URL?
     var canModerate: Bool
     var onReport: () -> Void
     var onBlock: () -> Void
+    var onOpenProfile: () -> Void
     let action: () -> Void
 
     var body: some View {
         HStack {
-            HStack(spacing: 8) {
-                MeguriProfileAvatarView(
-                    avatarID: authorAvatarID,
-                    avatarURL: authorAvatarURL,
-                    fallback: authorName,
-                    size: 34
-                )
+            Button(action: onOpenProfile) {
+                HStack(spacing: 8) {
+                    MeguriProfileAvatarView(
+                        avatarID: authorAvatarID,
+                        avatarURL: authorAvatarURL,
+                        fallback: authorName,
+                        size: 34
+                    )
 
-                Text(authorName)
-                    .font(.system(size: 13, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.78)
+                    HStack(spacing: 6) {
+                        Text(authorName)
+                            .font(.system(size: 13, weight: .black, design: .rounded))
+                            .foregroundStyle(.white)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.78)
+
+                        Text(postTimeText)
+                            .font(.system(size: 11, weight: .heavy, design: .rounded))
+                            .foregroundStyle(.white.opacity(0.78))
+                            .lineLimit(1)
+                    }
+                }
+                .padding(.horizontal, 10)
+                .frame(height: 44)
+                .frame(maxWidth: 214, alignment: .leading)
             }
-            .padding(.horizontal, 10)
-            .frame(height: 44)
-            .frame(maxWidth: 176, alignment: .leading)
-            .background(.black.opacity(0.28), in: Capsule())
+            .buttonStyle(.plain)
+            .accessibilityLabel("\(authorName)のプロフィールを開く")
 
             if canModerate {
                 Menu {
@@ -62,7 +101,6 @@ struct GroomViewerTopBar: View {
                         .font(.system(size: 18, weight: .heavy))
                         .foregroundStyle(.white)
                         .frame(width: 44, height: 44)
-                        .background(.black.opacity(0.28), in: Circle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("グルームのメニュー")
@@ -77,7 +115,6 @@ struct GroomViewerTopBar: View {
                     .font(.system(size: 16, weight: .heavy))
                     .foregroundStyle(.white)
                     .frame(width: 44, height: 44)
-                    .background(.black.opacity(0.28), in: Circle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel("閉じる")
@@ -87,15 +124,39 @@ struct GroomViewerTopBar: View {
     }
 }
 
+enum GroomPostRelativeTimeFormatter {
+    static func relativeText(from date: Date, now: Date = Date()) -> String {
+        let elapsedSeconds = max(0, Int(now.timeIntervalSince(date)))
+        if elapsedSeconds < 60 {
+            return "たった今"
+        }
+        let minutes = elapsedSeconds / 60
+        if minutes < 60 {
+            return "\(minutes)分前"
+        }
+        let hours = minutes / 60
+        if hours < 24 {
+            return "\(hours)時間前"
+        }
+        let days = hours / 24
+        if days < 7 {
+            return "\(days)日前"
+        }
+        return date.formatted(.dateTime.month().day())
+    }
+}
+
 struct GroomViewerBottomControls: View {
     let canReply: Bool
     let canLike: Bool
     let isSendingReply: Bool
     let isLiked: Bool
     let likeCount: Int
+    let commentCount: Int
     let onSubmitReply: () -> Void
     let onToggleLike: () -> Void
     @Binding var replyDraft: String
+    @FocusState private var isComposerFocused: Bool
 
     var body: some View {
         HStack(spacing: 10) {
@@ -103,28 +164,102 @@ struct GroomViewerBottomControls: View {
                 GroomViewerReplyComposer(
                     replyDraft: $replyDraft,
                     isSendingReply: isSendingReply,
+                    isFocused: $isComposerFocused,
                     onSubmitReply: onSubmitReply
                 )
             } else {
                 Spacer()
             }
 
-            if canLike {
-                GroomViewerLikeButton(
-                    isLiked: isLiked,
-                    likeCount: likeCount,
-                    action: onToggleLike
-                )
+            if canLike && !isComposerFocused {
+                VStack(spacing: 8) {
+                    GroomViewerEngagementColumn(
+                        likeCount: likeCount,
+                        commentCount: commentCount
+                    )
+
+                    GroomViewerLikeButton(
+                        isLiked: isLiked,
+                        action: onToggleLike
+                    )
+                }
+                .transition(.opacity.combined(with: .scale(scale: 0.9)))
             }
         }
         .padding(.horizontal, 18)
         .padding(.bottom, 24)
+        .animation(.snappy(duration: 0.22), value: isComposerFocused)
+    }
+}
+
+struct GroomViewerOwnerBottomControls: View {
+    let likeCount: Int
+    let commentCount: Int
+    let isDeleting: Bool
+    let onOpenInsights: () -> Void
+    let onDelete: () -> Void
+
+    var body: some View {
+        VStack(alignment: .trailing, spacing: 8) {
+            Button(action: onOpenInsights) {
+                GroomViewerEngagementColumn(
+                    likeCount: likeCount,
+                    commentCount: commentCount
+                )
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("いいねとコメントを見る")
+
+            Menu {
+                Button(role: .destructive, action: onDelete) {
+                    Label("削除する", systemImage: "trash")
+                }
+            } label: {
+                Group {
+                    if isDeleting {
+                        ProgressView()
+                            .controlSize(.small)
+                            .tint(.white)
+                    } else {
+                        Image(systemName: "ellipsis")
+                            .font(.system(size: 18, weight: .heavy))
+                    }
+                }
+                .foregroundStyle(.white)
+                .frame(width: 54, height: 54)
+                .background(.black.opacity(0.28), in: Circle())
+            }
+            .buttonStyle(.plain)
+            .disabled(isDeleting)
+            .accessibilityLabel("グルームの操作")
+        }
+    }
+}
+
+struct GroomViewerEngagementColumn: View {
+    let likeCount: Int
+    let commentCount: Int
+
+    var body: some View {
+        VStack(spacing: 6) {
+            Label("\(likeCount)", systemImage: "heart.fill")
+            Label("\(commentCount)", systemImage: "bubble.left.fill")
+        }
+        .font(.system(size: 11, weight: .black, design: .rounded))
+        .foregroundStyle(.white)
+        .labelStyle(.titleAndIcon)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(.black.opacity(0.30), in: Capsule())
+        .overlay(Capsule().stroke(.white.opacity(0.16), lineWidth: 1))
+        .accessibilityLabel("いいね\(likeCount)件、コメント\(commentCount)件")
     }
 }
 
 private struct GroomViewerReplyComposer: View {
     @Binding var replyDraft: String
     let isSendingReply: Bool
+    var isFocused: FocusState<Bool>.Binding
     let onSubmitReply: () -> Void
 
     var body: some View {
@@ -134,61 +269,55 @@ private struct GroomViewerReplyComposer: View {
                 .foregroundStyle(.white)
                 .tint(.white)
                 .submitLabel(.send)
+                .focused(isFocused)
                 .padding(.horizontal, 14)
                 .frame(height: 46)
                 .background(.white.opacity(0.16), in: Capsule())
                 .overlay(Capsule().stroke(.white.opacity(0.22), lineWidth: 1))
                 .onSubmit(onSubmitReply)
 
-            Button(action: onSubmitReply) {
-                Group {
-                    if isSendingReply {
-                        ProgressView()
-                            .controlSize(.small)
-                            .tint(.white)
-                    } else {
-                        Image(systemName: "arrow.up")
-                            .font(.system(size: 18, weight: .heavy))
+            if isFocused.wrappedValue {
+                Button(action: onSubmitReply) {
+                    Group {
+                        if isSendingReply {
+                            ProgressView()
+                                .controlSize(.small)
+                                .tint(.white)
+                        } else {
+                            Image(systemName: "arrow.up")
+                                .font(.system(size: 18, weight: .heavy))
+                        }
                     }
+                    .foregroundStyle(.white)
+                    .frame(width: 46, height: 46)
+                    .background(MegrumTheme.lavender, in: Circle())
                 }
-                .foregroundStyle(.white)
-                .frame(width: 46, height: 46)
-                .background(MegrumTheme.lavender, in: Circle())
+                .buttonStyle(.plain)
+                .disabled(replyDraft.isBlank || isSendingReply)
+                .opacity(replyDraft.isBlank ? 0.52 : 1)
+                .transition(.opacity.combined(with: .scale(scale: 0.85)))
             }
-            .buttonStyle(.plain)
-            .disabled(replyDraft.isBlank || isSendingReply)
-            .opacity(replyDraft.isBlank ? 0.52 : 1)
         }
     }
 }
 
 private struct GroomViewerLikeButton: View {
     let isLiked: Bool
-    let likeCount: Int
     let action: () -> Void
-    @State private var burstToken = UUID()
-    @State private var isBursting = false
+    @State private var presentationState = GroomViewerLikeButtonPresentationState()
 
     var body: some View {
         Button(action: action) {
             ZStack {
-                if isBursting {
-                    GroomLikeBurst(token: burstToken)
+                if presentationState.isBursting {
+                    GroomLikeBurst(token: presentationState.burstToken)
                         .allowsHitTesting(false)
                 }
 
-                VStack(spacing: 2) {
-                    Image(systemName: isLiked ? "heart.fill" : "heart")
-                        .font(.system(size: 24, weight: .heavy))
-                        .foregroundStyle(isLiked ? MegrumTheme.pink : .white)
-                        .scaleEffect(isBursting ? 1.16 : 1)
-
-                    if likeCount > 0 {
-                        Text("\(likeCount)")
-                            .font(.system(size: 10, weight: .black, design: .rounded))
-                            .foregroundStyle(isLiked ? MegrumTheme.pink : .white.opacity(0.86))
-                    }
-                }
+                Image(systemName: isLiked ? "heart.fill" : "heart")
+                    .font(.system(size: 24, weight: .heavy))
+                    .foregroundStyle(isLiked ? MegrumTheme.pink : .white)
+                    .scaleEffect(presentationState.likeIconScale)
                 .frame(width: 54, height: 54)
                 .background(.black.opacity(0.28), in: Circle())
             }
@@ -197,14 +326,13 @@ private struct GroomViewerLikeButton: View {
         .accessibilityLabel(isLiked ? "いいねを取り消す" : "いいね")
         .onChange(of: isLiked) { _, next in
             guard next else { return }
-            burstToken = UUID()
             withAnimation(.spring(response: 0.24, dampingFraction: 0.52)) {
-                isBursting = true
+                presentationState.startBurst()
             }
             Task { @MainActor in
                 try? await Task.sleep(for: .milliseconds(620))
                 withAnimation(.easeOut(duration: 0.16)) {
-                    isBursting = false
+                    presentationState.finishBurst()
                 }
             }
         }

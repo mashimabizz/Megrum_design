@@ -85,6 +85,7 @@ final class MegrumNativeAdUIKitView: NativeAdView {
     private let presentation: AdNativePresentation
     private let cardView = UIView()
     private let mediaAssetView = MediaView()
+    private let adChoicesContainerView = UIView()
     private let adChoicesAssetView = AdChoicesView()
     private let iconImageView = UIImageView()
     private let headlineLabel = UILabel()
@@ -161,7 +162,19 @@ final class MegrumNativeAdUIKitView: NativeAdView {
         mediaAssetView.layer.cornerCurve = .continuous
         mediaAssetView.clipsToBounds = true
 
+        adChoicesContainerView.translatesAutoresizingMaskIntoConstraints = false
+        adChoicesContainerView.backgroundColor = UIColor(white: 1, alpha: 0.96)
+        adChoicesContainerView.layer.cornerRadius = 10
+        adChoicesContainerView.layer.cornerCurve = .continuous
+        adChoicesContainerView.layer.borderWidth = 1
+        adChoicesContainerView.layer.borderColor = UIColor(red: 0.65, green: 0.58, blue: 0.85, alpha: 0.22).cgColor
+        adChoicesContainerView.layer.shadowColor = UIColor.black.withAlphaComponent(0.08).cgColor
+        adChoicesContainerView.layer.shadowOpacity = 1
+        adChoicesContainerView.layer.shadowRadius = 2
+        adChoicesContainerView.layer.shadowOffset = CGSize(width: 0, height: 1)
+
         adChoicesAssetView.translatesAutoresizingMaskIntoConstraints = false
+        adChoicesAssetView.backgroundColor = .clear
 
         iconImageView.translatesAutoresizingMaskIntoConstraints = false
         iconImageView.layer.cornerRadius = 10
@@ -185,14 +198,15 @@ final class MegrumNativeAdUIKitView: NativeAdView {
         advertiserLabel.numberOfLines = 1
 
         attributionLabel.translatesAutoresizingMaskIntoConstraints = false
-        attributionLabel.text = "広告"
-        attributionLabel.font = .systemFont(ofSize: 11, weight: .black)
+        attributionLabel.text = "Ad"
+        attributionLabel.font = .systemFont(ofSize: 10, weight: .black)
         attributionLabel.textColor = .white
         attributionLabel.textAlignment = .center
         attributionLabel.backgroundColor = UIColor(red: 0.65, green: 0.58, blue: 0.85, alpha: 1)
         attributionLabel.layer.cornerRadius = 11
         attributionLabel.layer.cornerCurve = .continuous
         attributionLabel.clipsToBounds = true
+        attributionLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
 
         callToActionButton.translatesAutoresizingMaskIntoConstraints = false
         callToActionButton.titleLabel?.font = .systemFont(ofSize: 13, weight: .heavy)
@@ -213,9 +227,10 @@ final class MegrumNativeAdUIKitView: NativeAdView {
         headerStack.alignment = .center
         headerStack.spacing = 10
 
-        [mediaAssetView, adChoicesAssetView, headerStack, attributionLabel, callToActionButton].forEach {
+        [mediaAssetView, adChoicesContainerView, headerStack, attributionLabel, callToActionButton].forEach {
             cardView.addSubview($0)
         }
+        adChoicesContainerView.addSubview(adChoicesAssetView)
 
         NSLayoutConstraint.activate([
             cardView.topAnchor.constraint(equalTo: topAnchor),
@@ -228,10 +243,15 @@ final class MegrumNativeAdUIKitView: NativeAdView {
             mediaAssetView.trailingAnchor.constraint(equalTo: cardView.trailingAnchor, constant: -12),
             mediaAssetView.heightAnchor.constraint(equalToConstant: presentation.mediaHeight),
 
-            adChoicesAssetView.topAnchor.constraint(equalTo: cardView.topAnchor, constant: 10),
-            adChoicesAssetView.trailingAnchor.constraint(equalTo: cardView.trailingAnchor, constant: -10),
-            adChoicesAssetView.widthAnchor.constraint(greaterThanOrEqualToConstant: 18),
-            adChoicesAssetView.heightAnchor.constraint(greaterThanOrEqualToConstant: 18),
+            adChoicesContainerView.topAnchor.constraint(equalTo: cardView.topAnchor, constant: 10),
+            adChoicesContainerView.trailingAnchor.constraint(equalTo: cardView.trailingAnchor, constant: -10),
+            adChoicesContainerView.widthAnchor.constraint(equalToConstant: 28),
+            adChoicesContainerView.heightAnchor.constraint(equalToConstant: 28),
+
+            adChoicesAssetView.centerXAnchor.constraint(equalTo: adChoicesContainerView.centerXAnchor),
+            adChoicesAssetView.centerYAnchor.constraint(equalTo: adChoicesContainerView.centerYAnchor),
+            adChoicesAssetView.widthAnchor.constraint(equalToConstant: 18),
+            adChoicesAssetView.heightAnchor.constraint(equalToConstant: 18),
 
             headerStack.topAnchor.constraint(equalTo: mediaAssetView.bottomAnchor, constant: presentation.isCompactSearchGrid ? 8 : 12),
             headerStack.leadingAnchor.constraint(equalTo: cardView.leadingAnchor, constant: 14),
@@ -240,9 +260,9 @@ final class MegrumNativeAdUIKitView: NativeAdView {
             iconImageView.widthAnchor.constraint(equalToConstant: presentation.isCompactSearchGrid ? 30 : 42),
             iconImageView.heightAnchor.constraint(equalToConstant: presentation.isCompactSearchGrid ? 30 : 42),
 
-            attributionLabel.leadingAnchor.constraint(equalTo: mediaAssetView.leadingAnchor, constant: 8),
-            attributionLabel.topAnchor.constraint(equalTo: mediaAssetView.topAnchor, constant: 8),
-            attributionLabel.widthAnchor.constraint(equalToConstant: 42),
+            attributionLabel.leadingAnchor.constraint(equalTo: cardView.leadingAnchor, constant: 12),
+            attributionLabel.topAnchor.constraint(equalTo: cardView.topAnchor, constant: 12),
+            attributionLabel.widthAnchor.constraint(equalToConstant: 28),
             attributionLabel.heightAnchor.constraint(equalToConstant: 22),
 
             callToActionButton.trailingAnchor.constraint(equalTo: cardView.trailingAnchor, constant: -14),

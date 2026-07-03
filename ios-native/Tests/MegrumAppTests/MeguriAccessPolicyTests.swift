@@ -1,4 +1,5 @@
 @testable import MegrumApp
+@testable import MegrumData
 import CoreGraphics
 import CoreLocation
 import Foundation
@@ -7,6 +8,245 @@ import XCTest
 
 @MainActor
 final class MeguriAccessPolicyTests: XCTestCase {
+    func testMeguriHomeUtilityLayoutKeepsControlsAboveTabBar() {
+        XCTAssertEqual(MeguriHomeUtilityLayout.bottomPadding(safeAreaBottom: 0), 116)
+        XCTAssertEqual(MeguriHomeUtilityLayout.bottomPadding(safeAreaBottom: 34), 150)
+    }
+
+    func testMeguriHomeTopControlsLayoutKeepsFilterBelowTopObstruction() {
+        XCTAssertEqual(MeguriHomeTopControlsLayout.topPadding(safeAreaTop: 0), 58)
+        XCTAssertEqual(MeguriHomeTopControlsLayout.topPadding(safeAreaTop: 47), 58)
+        XCTAssertEqual(MeguriHomeTopControlsLayout.topPadding(safeAreaTop: 64), 74)
+    }
+
+    func testMeguriContentFilterMatchesOshiAndSeriesMetadata() {
+        let groupID = UUID(uuidString: "00000000-0000-0000-0000-000000000011")!
+        let characterID = UUID(uuidString: "00000000-0000-0000-0000-000000000012")!
+        let otherGroupID = UUID(uuidString: "00000000-0000-0000-0000-000000000013")!
+        var filter = MeguriContentFilterState(
+            draft: MeguriContentMetadataDraft(
+                groupID: groupID,
+                characterID: characterID,
+                seriesName: "live"
+            )
+        )
+        let matchingGroom = GroomPost(
+            id: UUID(),
+            authorID: UUID(),
+            imageURL: URL(string: "https://example.com/match.jpg")!,
+            latitude: 35.681236,
+            longitude: 139.767125,
+            groupID: groupID,
+            characterID: characterID,
+            seriesName: "2026 LIVE"
+        )
+        let otherThread = BoardThread(
+            id: UUID(),
+            authorID: UUID(),
+            title: "別の話題",
+            body: "別グループ",
+            audience: .nearby3km,
+            groupID: otherGroupID,
+            characterID: characterID,
+            seriesName: "2026 LIVE"
+        )
+
+        XCTAssertTrue(filter.matches(groom: matchingGroom))
+        XCTAssertFalse(filter.matches(thread: otherThread))
+
+        filter.reset()
+
+        XCTAssertTrue(filter.matches(thread: otherThread))
+    }
+
+    func testMeguriContentMetadataSuggestionsFiltersTopicGroupsBySearchText() {
+        let twice = OshiGroup(id: UUID(), name: "TWICE")
+        let ive = OshiGroup(id: UUID(), name: "IVE")
+        let aespa = OshiGroup(id: UUID(), name: "aespa")
+
+        XCTAssertEqual(
+            MeguriContentMetadataSuggestions.filteredGroups([twice, ive, aespa], query: "  iv ").map(\.name),
+            ["IVE"]
+        )
+        XCTAssertEqual(
+            MeguriContentMetadataSuggestions.filteredGroups([twice, ive, aespa], query: "").map(\.name),
+            ["TWICE", "IVE", "aespa"]
+        )
+    }
+
+    func testMapCreationPromptPresentationStateResolvesDropPinAndCalloutVisibility() {
+        var state = MeguriMapCreationPromptPresentationState()
+
+        XCTAssertFalse(state.isVisible)
+        XCTAssertEqual(state.dropPinYOffset, -78)
+        XCTAssertEqual(state.dropPinOpacity, 0.18)
+        XCTAssertEqual(state.dropPinScale, 0.88)
+        XCTAssertEqual(state.calloutOpacity, 0)
+        XCTAssertEqual(state.calloutScale, 0.96)
+
+        state.show()
+
+        XCTAssertTrue(state.isVisible)
+        XCTAssertEqual(state.dropPinYOffset, 0)
+        XCTAssertEqual(state.dropPinOpacity, 1)
+        XCTAssertEqual(state.dropPinScale, 1)
+        XCTAssertEqual(state.calloutOpacity, 1)
+        XCTAssertEqual(state.calloutScale, 1)
+
+        state.prepare()
+
+        XCTAssertFalse(state.isVisible)
+    }
+
+    func testGroomStoryComposerPresentationStateTracksCaptionAndToastLifecycle() {
+        let firstToastID = UUID(uuidString: "00000000-0000-0000-0000-00000000BB01")!
+        let secondToastID = UUID(uuidString: "00000000-0000-0000-0000-00000000BB02")!
+        var state = GroomStoryComposerPresentationState()
+
+        XCTAssertNil(state.captionForPublish)
+
+        state.captionText = "会場入口の一枚"
+
+        XCTAssertEqual(state.captionForPublish, "会場入口の一枚")
+
+        state.clearCaptionAfterPhotoReset()
+
+        XCTAssertEqual(state.captionText, "")
+        XCTAssertNil(state.captionForPublish)
+
+        state.showToast("最後に地図上でピンを立ててください", toastID: firstToastID)
+        state.showToast("投稿する写真を選択してください", toastID: secondToastID)
+        state.clearToast(ifMatching: firstToastID)
+
+        XCTAssertEqual(state.toastMessage, "投稿する写真を選択してください")
+
+        state.clearToast(ifMatching: secondToastID)
+
+        XCTAssertNil(state.toastMessage)
+    }
+
+    func testGroomStoryExportJPEGBudgetStaysBelowUploadLimit() {
+        XCTAssertLessThanOrEqual(GroomStoryExportRenderer.maxJPEGBytes, SupabaseGroomClient.maxUploadBytes)
+    }
+
+    func testMeguriProfileSettingsDraftHydratesFromProfileAndKeepsSaveEligibility() {
+        let profile = MeguriProfile(
+            userID: UUID(),
+            displayName: "まくはり民",
+            avatarID: "avatar_4",
+            avatarURL: URL(string: "https://example.com/avatar.jpg")
+        )
+        var state = MeguriProfileSettingsDraftState()
+
+        state.hydrate(profile: profile, viewerDisplayName: "ビューアー", viewerAvatarURL: nil)
+
+        XCTAssertEqual(state.displayName, "まくはり民")
+        XCTAssertEqual(state.selectedAvatarID, "avatar_4")
+        XCTAssertEqual(state.visibleAvatarURL?.absoluteString, "https://example.com/avatar.jpg")
+        XCTAssertTrue(state.hasCustomAvatar)
+        XCTAssertEqual(state.avatarFallback, "まくはり民")
+        XCTAssertTrue(state.canSave(isSaving: false))
+        XCTAssertFalse(state.canSave(isSaving: true))
+
+        state.selectPresetAvatar("avatar_2")
+
+        XCTAssertEqual(state.selectedAvatarID, "avatar_2")
+        XCTAssertNil(state.visibleAvatarURL)
+        XCTAssertTrue(state.clearsAvatarURL)
+    }
+
+    func testMeguriProfileSettingsDraftHydratesOnlyWhenBlankAndTracksAlert() {
+        var state = MeguriProfileSettingsDraftState()
+
+        state.displayName = "  "
+        state.hydrateIfNeeded(profile: nil, viewerDisplayName: "表示名", viewerAvatarURL: nil)
+
+        XCTAssertEqual(state.displayName, "表示名")
+
+        state.displayName = "編集中"
+        state.hydrateIfNeeded(
+            profile: MeguriProfile(userID: UUID(), displayName: "保存済み"),
+            viewerDisplayName: nil,
+            viewerAvatarURL: nil
+        )
+
+        XCTAssertEqual(state.displayName, "編集中")
+
+        state.setFailureMessage(nil)
+        XCTAssertTrue(state.hasAlert)
+        XCTAssertEqual(state.localAlertMessage, "めぐりプロフィールを保存できませんでした")
+
+        state.clearAlert()
+        XCTAssertFalse(state.hasAlert)
+    }
+
+    func testMeguriProfileSettingsDraftHydratesPublicProfileIdentity() {
+        let profile = MeguriProfile(
+            userID: UUID(),
+            displayName: "匿名めぐり名",
+            avatarID: "avatar_4",
+            avatarURL: URL(string: "https://example.com/meguri.jpg"),
+            usesPublicProfile: true
+        )
+        var state = MeguriProfileSettingsDraftState()
+
+        state.hydrate(
+            profile: profile,
+            viewerDisplayName: "グッズ交換名",
+            viewerAvatarURL: URL(string: "https://example.com/public.jpg")
+        )
+
+        XCTAssertTrue(state.usesPublicProfile)
+        XCTAssertEqual(state.displayName, "グッズ交換名")
+        XCTAssertEqual(state.visibleAvatarURL?.absoluteString, "https://example.com/public.jpg")
+        XCTAssertTrue(state.hasCustomAvatar)
+
+        state.syncPublicProfile(
+            displayName: "変更後のグッズ交換名",
+            avatarURL: URL(string: "https://example.com/public-new.jpg")
+        )
+
+        XCTAssertEqual(state.displayName, "変更後のグッズ交換名")
+        XCTAssertEqual(state.visibleAvatarURL?.absoluteString, "https://example.com/public-new.jpg")
+        XCTAssertNil(state.avatarUpload)
+        XCTAssertFalse(state.clearsAvatarURL)
+    }
+
+    func testMeguriProfileSettingsDraftKeepsStoredMeguriIdentityWhenSavingPublicProfileMode() {
+        let profile = MeguriProfile(
+            userID: UUID(),
+            displayName: "匿名めぐり名",
+            avatarID: "avatar_4",
+            avatarURL: URL(string: "https://example.com/meguri.jpg"),
+            usesPublicProfile: false,
+            lastChangedAt: Date(timeIntervalSince1970: 2_000)
+        )
+        var state = MeguriProfileSettingsDraftState()
+
+        state.hydrate(
+            profile: profile,
+            viewerDisplayName: "グッズ交換名",
+            viewerAvatarURL: URL(string: "https://example.com/public.jpg")
+        )
+        state.usesPublicProfile = true
+        state.syncPublicProfile(
+            displayName: "グッズ交換名",
+            avatarURL: URL(string: "https://example.com/public.jpg")
+        )
+
+        XCTAssertEqual(
+            state.displayNameForSave(currentProfile: profile, syncedPublicDisplayName: "グッズ交換名"),
+            "匿名めぐり名"
+        )
+        XCTAssertEqual(state.avatarIDForSave(currentProfile: profile), "avatar_4")
+        XCTAssertEqual(
+            state.avatarURLForSave(currentProfile: profile)?.absoluteString,
+            "https://example.com/meguri.jpg"
+        )
+        XCTAssertNil(state.avatarUploadForSave())
+        XCTAssertFalse(state.clearsAvatarURLForSave())
+    }
+
     func testGroomAccessAllowsNearbyAndBlocksOutsideOneKilometer() {
         let viewerID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
         let otherID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
@@ -73,6 +313,29 @@ final class MeguriAccessPolicyTests: XCTestCase {
         XCTAssertFalse(MeguriAccessPolicy.canOpenBoard(far, currentCoordinate: current, viewerID: viewerID))
         XCTAssertTrue(MeguriAccessPolicy.canOpenBoard(mine, currentCoordinate: nil, viewerID: viewerID))
         XCTAssertTrue(MeguriAccessPolicy.boardAccessMessage(far, currentCoordinate: current, viewerID: viewerID).contains("1km圏外"))
+
+        let premiumState = UserSubscriptionState(
+            entitlements: [
+                UserEntitlement(key: .megrumPlus, isActive: true, source: .subscription)
+            ]
+        )
+        XCTAssertTrue(
+            MeguriAccessPolicy.canOpenBoard(
+                far,
+                currentCoordinate: current,
+                viewerID: viewerID,
+                subscriptionState: premiumState
+            )
+        )
+        XCTAssertEqual(
+            MeguriAccessPolicy.boardAccessMessage(
+                far,
+                currentCoordinate: current,
+                viewerID: viewerID,
+                subscriptionState: premiumState
+            ),
+            ""
+        )
     }
 
     func testCreationLocationPolicyAllowsInsideOneKilometerAndBlocksOutside() {
@@ -209,6 +472,80 @@ final class MeguriAccessPolicyTests: XCTestCase {
         XCTAssertEqual(plusMetrics.columns.count, 6)
         XCTAssertEqual(GroomArchiveOverviewGridMetrics.containerHeight(itemCount: 18), 190)
         XCTAssertLessThanOrEqual(plusMetrics.thumbnailSize, freeMetrics.thumbnailSize)
+    }
+
+    func testGroomArchiveStoryPresentationStateTracksInsightsSheet() {
+        var state = GroomArchiveStoryPresentationState()
+
+        XCTAssertFalse(state.showsInsights)
+
+        state.showInsights()
+
+        XCTAssertTrue(state.showsInsights)
+
+        state.dismissInsights()
+
+        XCTAssertFalse(state.showsInsights)
+    }
+
+    func testGroomArchiveStoryPresentationStateMovesWithinBoundsAndDismissesAfterLast() {
+        var state = GroomArchiveStoryPresentationState(initialIndex: 1)
+
+        XCTAssertEqual(state.currentIndex, 1)
+        XCTAssertEqual(state.move(by: -1, itemCount: 3), .moved)
+        XCTAssertEqual(state.currentIndex, 0)
+        XCTAssertEqual(state.move(by: -1, itemCount: 3), .unchanged)
+        XCTAssertEqual(state.currentIndex, 0)
+
+        XCTAssertEqual(state.move(by: 1, itemCount: 3), .moved)
+        XCTAssertEqual(state.move(by: 1, itemCount: 3), .moved)
+        XCTAssertEqual(state.currentIndex, 2)
+        XCTAssertEqual(state.move(by: 1, itemCount: 3), .dismiss)
+        XCTAssertEqual(state.currentIndex, 2)
+    }
+
+    func testGroomArchiveStoryPresentationStateTracksDragDisplayAndOutcomes() {
+        var state = GroomArchiveStoryPresentationState()
+
+        state.updateDrag(CGSize(width: 12, height: 180))
+
+        XCTAssertEqual(state.dragOffset, CGSize(width: 12, height: 180))
+        XCTAssertEqual(state.imageYOffset, 36, accuracy: 0.001)
+        XCTAssertEqual(state.imageScale, 0.92, accuracy: 0.001)
+        XCTAssertEqual(state.dragOutcome(for: CGSize(width: 0, height: -90)), .showInsights)
+        XCTAssertEqual(state.dragOutcome(for: CGSize(width: 0, height: 124)), .dismiss)
+        XCTAssertEqual(state.dragOutcome(for: CGSize(width: 0, height: 20)), .none)
+
+        state.resetDrag()
+
+        XCTAssertEqual(state.dragOffset, .zero)
+    }
+
+    func testGroomArchivePresentationStateTracksSelectedGroomAndPlusSheet() {
+        let groom = GroomPost(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000701")!,
+            authorID: UUID(uuidString: "00000000-0000-0000-0000-000000000702")!,
+            imageURL: URL(string: "https://example.com/groom.jpg")!,
+            latitude: 35.6812,
+            longitude: 139.7671,
+            createdAt: Date(timeIntervalSince1970: 1_700_000_000)
+        )
+        var state = GroomArchivePresentationState()
+
+        XCTAssertNil(state.selectedGroom)
+        XCTAssertNil(state.selectedGroomID)
+        XCTAssertFalse(state.showsMegrumPlus)
+
+        state.select(groom)
+        state.showMegrumPlus()
+
+        XCTAssertEqual(state.selectedGroomID, groom.id)
+        XCTAssertEqual(state.selectedGroom, groom)
+        XCTAssertTrue(state.showsMegrumPlus)
+
+        state.dismissMegrumPlus()
+
+        XCTAssertFalse(state.showsMegrumPlus)
     }
 
     func testGroomMapClustersNearbyPostsAndKeepsNewestFirst() {

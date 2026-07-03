@@ -18,6 +18,8 @@ struct MegrumNativeApp: App {
     @State private var didRequestNativePushAuthorization = false
     @State private var pendingNativePushToken: String?
     @State private var notificationDestinationTab: MegrumTab?
+    @State private var notificationRouteLinkPath: String?
+    @State private var notificationRouteKindRawValue: String?
     #endif
 
     init() {
@@ -30,12 +32,22 @@ struct MegrumNativeApp: App {
             MegrumRootView(
                 appState: appState,
                 authState: authState,
-                notificationDestinationTab: $notificationDestinationTab
+                notificationDestinationTab: $notificationDestinationTab,
+                notificationRouteLinkPath: $notificationRouteLinkPath,
+                notificationRouteKindRawValue: $notificationRouteKindRawValue
             )
             #if os(iOS)
             .task {
                 await requestNativePushAuthorizationIfReady()
             }
+            #if DEBUG
+            .task {
+                await Self.dumpViewHierarchyForDebuggingIfRequested()
+            }
+            .task {
+                await Self.performDebugAutoSignInIfRequested(authState: authState)
+            }
+            #endif
             .onChange(of: authState.session?.accessToken) { _, _ in
                 Task {
                     await requestNativePushAuthorizationIfReady()
@@ -45,6 +57,20 @@ struct MegrumNativeApp: App {
             .onChange(of: appState.viewer?.id) { _, _ in
                 Task {
                     await registerPendingNativePushToken()
+                }
+            }
+            .onChange(of: appState.appIconBadgeCount, initial: true) { _, unreadCount in
+                Task {
+                    do {
+                        try await UNUserNotificationCenter.current().setBadgeCount(unreadCount)
+                        #if DEBUG
+                        print("MEGRUM_DEBUG_BADGE set to \(unreadCount)")
+                        #endif
+                    } catch {
+                        #if DEBUG
+                        print("MEGRUM_DEBUG_BADGE error: \(error) (count=\(unreadCount))")
+                        #endif
+                    }
                 }
             }
             .onReceive(NotificationCenter.default.publisher(for: .megrumNativeAPNsTokenDidUpdate)) { notification in
@@ -58,7 +84,12 @@ struct MegrumNativeApp: App {
             }
             .onReceive(NotificationCenter.default.publisher(for: .megrumNativeNotificationResponseDidReceive)) { notification in
                 let linkPath = notification.userInfo?[NativePushAppDelegate.linkPathUserInfoKey] as? String
-                notificationDestinationTab = MegrumTab(notificationLinkPath: linkPath) ?? .home
+                if let linkPath {
+                    notificationRouteKindRawValue = notification.userInfo?[NativePushAppDelegate.notificationKindUserInfoKey] as? String
+                    notificationRouteLinkPath = linkPath
+                } else {
+                    notificationDestinationTab = .home
+                }
 
                 guard
                     let notificationIDString = notification.userInfo?[NativePushAppDelegate.notificationIDUserInfoKey] as? String,
@@ -87,6 +118,92 @@ struct MegrumNativeApp: App {
         MobileAds.shared.start()
         #endif
     }
+
+    #if DEBUG
+    /// Debug-only: launch with `MEGRUM_DEBUG_AUTO_SIGNIN_EMAIL` /
+    /// `MEGRUM_DEBUG_AUTO_SIGNIN_PASSWORD` to sign in automatically so live
+    /// screens can be exercised from automated simulator runs.
+    @MainActor
+    private static func performDebugAutoSignInIfRequested(authState: MegrumAuthState) async {
+        let environment = ProcessInfo.processInfo.environment
+        guard
+            let email = environment["MEGRUM_DEBUG_AUTO_SIGNIN_EMAIL"],
+            let password = environment["MEGRUM_DEBUG_AUTO_SIGNIN_PASSWORD"],
+            !email.isEmpty,
+            !password.isEmpty,
+            !authState.isAuthenticated
+        else {
+            return
+        }
+        await authState.signIn(email: email, password: password)
+    }
+
+    /// Debug-only diagnostics: launch with
+    /// `MEGRUM_DEBUG_DUMP_HIERARCHY=1` to print the UIKit view hierarchy to
+    /// stdout so on-device rendering issues can be inspected via
+    /// `devicectl device process launch --console`. Add
+    /// `MEGRUM_DEBUG_TRIGGER_REFRESH=1` to also fire the pull-to-refresh
+    /// controls and dump again afterwards.
+    @MainActor
+    private static func dumpViewHierarchyForDebuggingIfRequested() async {
+        guard ProcessInfo.processInfo.environment["MEGRUM_DEBUG_DUMP_HIERARCHY"] == "1" else {
+            return
+        }
+        try? await Task.sleep(nanoseconds: 8_000_000_000)
+        print("MEGRUM_DEBUG_OS: \(UIDevice.current.systemVersion)")
+        dumpAllWindows(marker: "INITIAL")
+
+        guard ProcessInfo.processInfo.environment["MEGRUM_DEBUG_TRIGGER_REFRESH"] == "1" else {
+            return
+        }
+        let refreshControls = allViews(ofType: UIRefreshControl.self)
+        print("MEGRUM_DEBUG_REFRESH_CONTROLS: \(refreshControls.count)")
+        for control in refreshControls {
+            control.sendActions(for: .valueChanged)
+        }
+        try? await Task.sleep(nanoseconds: 10_000_000_000)
+        dumpAllWindows(marker: "AFTER_REFRESH")
+    }
+
+    @MainActor
+    private static func dumpAllWindows(marker: String) {
+        for scene in UIApplication.shared.connectedScenes {
+            guard let windowScene = scene as? UIWindowScene else {
+                continue
+            }
+            for window in windowScene.windows {
+                print("MEGRUM_DEBUG_WINDOW[\(marker)]: \(window.frame) safeArea=\(window.safeAreaInsets)")
+                if let description = window.perform(Selector(("recursiveDescription")))?.takeUnretainedValue() as? String {
+                    print("MEGRUM_DEBUG_HIERARCHY_BEGIN[\(marker)]")
+                    print(description)
+                    print("MEGRUM_DEBUG_HIERARCHY_END[\(marker)]")
+                }
+            }
+        }
+    }
+
+    @MainActor
+    private static func allViews<T: UIView>(ofType type: T.Type) -> [T] {
+        var results: [T] = []
+        func walk(_ view: UIView) {
+            if let match = view as? T {
+                results.append(match)
+            }
+            for subview in view.subviews {
+                walk(subview)
+            }
+        }
+        for scene in UIApplication.shared.connectedScenes {
+            guard let windowScene = scene as? UIWindowScene else {
+                continue
+            }
+            for window in windowScene.windows {
+                walk(window)
+            }
+        }
+        return results
+    }
+    #endif
 
     @MainActor
     private func requestNativePushAuthorizationIfReady() async {
@@ -145,6 +262,7 @@ private final class NativePushAppDelegate: NSObject, UIApplicationDelegate, UNUs
     nonisolated static let deviceTokenUserInfoKey = "deviceToken"
     nonisolated static let linkPathUserInfoKey = "linkPath"
     nonisolated static let notificationIDUserInfoKey = "notificationID"
+    nonisolated static let notificationKindUserInfoKey = "notificationKind"
     private static let logger = Logger(subsystem: "tokyo.megrum.native", category: "NativePush")
 
     func application(
@@ -196,6 +314,11 @@ private final class NativePushAppDelegate: NSObject, UIApplicationDelegate, UNUs
         }
         if let notificationID = userInfo["notificationId"] as? String ?? userInfo["notification_id"] as? String {
             routedUserInfo[Self.notificationIDUserInfoKey] = notificationID
+        }
+        if let kind = userInfo["kind"] as? String
+            ?? userInfo["notificationKind"] as? String
+            ?? userInfo["notification_kind"] as? String {
+            routedUserInfo[Self.notificationKindUserInfoKey] = kind
         }
 
         NotificationCenter.default.post(

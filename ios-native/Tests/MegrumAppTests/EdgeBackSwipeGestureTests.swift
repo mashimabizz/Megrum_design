@@ -101,7 +101,84 @@ final class EdgeBackSwipeGestureTests: XCTestCase {
         )
     }
 
+    func testInteractiveBackSwipePresentationStateTracksWidthOffsetAndTrigger() {
+        var state = InteractiveBackSwipePresentationState()
+
+        state.updateContainerWidth(420)
+
+        XCTAssertEqual(state.containerWidth, 420)
+        XCTAssertFalse(
+            state.beginTrackingIfNeeded(
+                translation: CGSize(width: 24, height: 72)
+            )
+        )
+
+        XCTAssertTrue(
+            state.beginTrackingIfNeeded(
+                translation: CGSize(width: 96, height: 8)
+            )
+        )
+
+        state.dragOffset = state.trackedOffset(translation: CGSize(width: 96, height: 8))
+
+        XCTAssertTrue(state.isTrackingBackSwipe)
+        XCTAssertEqual(state.dragOffset, 96)
+        XCTAssertTrue(
+            state.shouldTrigger(
+                translation: CGSize(width: 86, height: 8),
+                predictedEndTranslationWidth: 88
+            )
+        )
+
+        state.stopTracking()
+
+        XCTAssertFalse(
+            state.shouldTrigger(
+                translation: CGSize(width: 86, height: 8),
+                predictedEndTranslationWidth: 140
+            )
+        )
+
+        state.resetDragOffset()
+
+        XCTAssertEqual(state.dragOffset, 0)
+    }
+
+    func testMeguriMessageBackSwipeTriggersFromAnywhere() {
+        XCTAssertTrue(
+            MeguriMessageNavigationBackSwipeResolver.shouldTrigger(
+                translation: CGSize(width: 92, height: 8),
+                predictedEndTranslationWidth: 94,
+                screenWidth: 390
+            )
+        )
+        XCTAssertTrue(
+            MeguriMessageNavigationBackSwipeResolver.shouldTrigger(
+                translation: CGSize(width: 34, height: 3),
+                predictedEndTranslationWidth: 132,
+                screenWidth: 390
+            )
+        )
+        XCTAssertFalse(
+            MeguriMessageNavigationBackSwipeResolver.shouldTrigger(
+                translation: CGSize(width: -92, height: 8),
+                predictedEndTranslationWidth: -120,
+                screenWidth: 390
+            )
+        )
+        XCTAssertFalse(
+            MeguriMessageNavigationBackSwipeResolver.shouldTrigger(
+                translation: CGSize(width: 92, height: 140),
+                predictedEndTranslationWidth: 132,
+                screenWidth: 390
+            )
+        )
+    }
+
     func testSlideBackSwipeTracksRightDragAndDismissesByFraction() {
+        XCTAssertEqual(MegrumSlideBackSwipeInteractionScope.leadingEdge, .leadingEdge)
+        XCTAssertEqual(MegrumSlideBackSwipeInteractionScope.fullScreen, .fullScreen)
+
         XCTAssertEqual(
             MegrumSlideBackSwipeResolver.interactiveOffset(
                 translation: CGSize(width: 118, height: 12),
@@ -138,5 +215,52 @@ final class EdgeBackSwipeGestureTests: XCTestCase {
                 screenWidth: 390
             )
         )
+    }
+
+    func testSlidePresentationDragStateTracksOffsetAndDismissDecision() {
+        var state = MegrumSlidePresentationDragState()
+
+        XCTAssertFalse(
+            state.beginTrackingIfNeeded(
+                translation: CGSize(width: 24, height: 90),
+                screenWidth: 390
+            )
+        )
+        XCTAssertFalse(state.isTrackingDismissDrag)
+
+        XCTAssertTrue(
+            state.beginTrackingIfNeeded(
+                translation: CGSize(width: 120, height: 12),
+                screenWidth: 390
+            )
+        )
+        state.dragOffset = state.clampedDragOffset(
+            translation: CGSize(width: 420, height: 12),
+            screenWidth: 390
+        )
+
+        XCTAssertTrue(state.isTrackingDismissDrag)
+        XCTAssertEqual(state.dragOffset, 390)
+        XCTAssertTrue(
+            state.shouldDismiss(
+                translation: CGSize(width: 120, height: 12),
+                predictedEndTranslationWidth: 120,
+                screenWidth: 390
+            )
+        )
+
+        state.stopTracking()
+
+        XCTAssertFalse(
+            state.shouldDismiss(
+                translation: CGSize(width: 120, height: 12),
+                predictedEndTranslationWidth: 160,
+                screenWidth: 390
+            )
+        )
+
+        state.resetDragOffset()
+
+        XCTAssertEqual(state.dragOffset, 0)
     }
 }

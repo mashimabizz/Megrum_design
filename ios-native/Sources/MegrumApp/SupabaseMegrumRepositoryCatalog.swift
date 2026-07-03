@@ -52,6 +52,18 @@ public extension SupabaseMegrumRepository {
         try await goodsSeriesSuggestionClient.suggestSeriesNames(input: input)
     }
 
+    func uploadGoodsGoogleLensSearchPhoto(_ upload: GoodsPhotoUpload) async throws -> URL {
+        let rawURL = try await goodsInventoryClient.uploadGoodsPhoto(
+            userID: viewerID,
+            imageData: upload.data,
+            contentType: upload.contentType
+        )
+        guard let url = URL(string: rawURL) else {
+            throw URLError(.badURL)
+        }
+        return url
+    }
+
     func searchGoods(_ input: GoodsSearchInput) async throws -> [GoodsItem] {
         try await goodsInventoryClient.searchGoods(viewerID: viewerID, input: input)
     }

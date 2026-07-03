@@ -8,7 +8,7 @@ extension AuthScreen {
         #if canImport(AuthenticationServices) && canImport(UIKit)
         startGoogleSignIn()
         #else
-        identityProviderError = "Googleログインを開始できませんでした。もう一度お試しください"
+        inputState.identityProviderError = "Googleログインを開始できませんでした。もう一度お試しください"
         #endif
     }
 
@@ -18,7 +18,7 @@ extension AuthScreen {
         clearFeedback()
 
         guard let callbackScheme = authState.oauthCallbackScheme else {
-            identityProviderError = "Googleログインを開始できませんでした。もう一度お試しください"
+            inputState.identityProviderError = "Googleログインを開始できませんでした。もう一度お試しください"
             return
         }
 
@@ -35,12 +35,12 @@ extension AuthScreen {
                         return
                     }
                     guard let callbackURL else {
-                        identityProviderError = "Googleでのログインに失敗しました。もう一度お試しください"
+                        inputState.identityProviderError = "Googleでのログインに失敗しました。もう一度お試しください"
                         return
                     }
                     let handled = await authState.handleOpenURL(callbackURL)
                     if !handled, authState.errorMessage == nil {
-                        identityProviderError = "Googleログイン情報を取得できませんでした。もう一度お試しください"
+                        inputState.identityProviderError = "Googleログイン情報を取得できませんでした。もう一度お試しください"
                     }
                 }
             }
@@ -49,10 +49,10 @@ extension AuthScreen {
             googleOAuthSession = session
             if !session.start() {
                 googleOAuthSession = nil
-                identityProviderError = "Googleログインを開始できませんでした。もう一度お試しください"
+                inputState.identityProviderError = "Googleログインを開始できませんでした。もう一度お試しください"
             }
         } catch {
-            identityProviderError = "Googleログインを開始できませんでした。もう一度お試しください"
+            inputState.identityProviderError = "Googleログインを開始できませんでした。もう一度お試しください"
         }
     }
     #endif
@@ -63,7 +63,7 @@ extension AuthScreen {
     func prepareAppleSignIn(_ request: ASAuthorizationAppleIDRequest) {
         let nonce = AppleSignInNonce.make()
         appleSignInNonce = nonce
-        identityProviderError = nil
+        inputState.identityProviderError = nil
         request.requestedScopes = [.fullName, .email]
         request.nonce = AppleSignInNonce.sha256(nonce)
     }
@@ -77,7 +77,7 @@ extension AuthScreen {
                 let tokenData = credential.identityToken,
                 let idToken = String(data: tokenData, encoding: .utf8)
             else {
-                identityProviderError = "Appleログイン情報を取得できませんでした。もう一度お試しください"
+                inputState.identityProviderError = "Appleログイン情報を取得できませんでした。もう一度お試しください"
                 appleSignInNonce = nil
                 return
             }
@@ -92,7 +92,7 @@ extension AuthScreen {
             if let authorizationError = error as? ASAuthorizationError, authorizationError.code == .canceled {
                 return
             }
-            identityProviderError = "Appleでのログインに失敗しました。もう一度お試しください"
+            inputState.identityProviderError = "Appleでのログインに失敗しました。もう一度お試しください"
         }
     }
 }

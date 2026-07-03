@@ -83,6 +83,10 @@ struct PaymentSettingsDraft: Equatable, Sendable {
         return "口座: \(normalized.bankName) \(normalized.bankBranchName) \(normalized.bankAccountType) \(maskedAccountNumber(normalized.bankAccountNumber))"
     }
 
+    var requiresBankAccountDetails: Bool {
+        contains(.bankTransfer)
+    }
+
     var validationMessage: String? {
         let normalized = normalized
         if normalized.methods.contains(.bankTransfer) {

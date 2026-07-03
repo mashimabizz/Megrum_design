@@ -37,6 +37,20 @@ final class GroomPostLocalMutationTests: XCTestCase {
         XCTAssertEqual(filtered, [otherPost])
     }
 
+    func testRemovingPostIDFiltersOnlyTargetPost() {
+        let authorID = UUID(uuidString: "00000000-0000-0000-0000-000000000803")!
+        let target = makePost(idSuffix: "703", authorID: authorID)
+        let sameAuthorOtherPost = makePost(idSuffix: "704", authorID: authorID)
+        let otherAuthorPost = makePost(idSuffix: "705", authorSuffix: "805")
+
+        let filtered = GroomPostLocalMutation.removing(
+            postID: target.id,
+            from: [target, sameAuthorOtherPost, otherAuthorPost]
+        )
+
+        XCTAssertEqual(filtered, [sameAuthorOtherPost, otherAuthorPost])
+    }
+
     func testFirstPostSearchesCollectionsInOrder() {
         let first = makePost(idSuffix: "705", authorSuffix: "805")
         let second = makePost(idSuffix: "706", authorSuffix: "806")

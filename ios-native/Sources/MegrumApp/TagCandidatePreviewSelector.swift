@@ -17,7 +17,7 @@ struct TagCandidatePreviewSelector: View {
     var emptyMessage = "シリーズ候補はまだありません"
     var onToggle: (String) -> Void
 
-    @State private var previewedName: String?
+    @State private var previewState = TagCandidatePreviewSelectionState()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -67,7 +67,8 @@ struct TagCandidatePreviewSelector: View {
 
     private func tagButton(_ name: String) -> some View {
         let selected = isSelected(name)
-        let previewing = previewedName == name
+        let previewing = previewState.isPreviewing(name)
+        let disabled = previewState.isDisabled(name, selectedNames: selectedNames, maxSelection: maxSelection)
         return VStack(alignment: .leading, spacing: 0) {
             Button {
                 if selected || previewing {
@@ -77,7 +78,7 @@ struct TagCandidatePreviewSelector: View {
                 } else {
                     MegrumHaptics.buttonTap()
                     withAnimation(.smooth(duration: 0.18)) {
-                        previewedName = name
+                        previewState.preview(name)
                     }
                 }
             } label: {
@@ -106,8 +107,8 @@ struct TagCandidatePreviewSelector: View {
             .buttonStyle(.plain)
             .accessibilityLabel("シリーズ候補 #\(name)")
             .accessibilityHint(previewing ? "もう一度タップするとこのシリーズを選択します" : "タップすると紐づく画像の吹き出しを表示します")
-            .disabled(!selected && selectedNames.count >= maxSelection)
-            .opacity(!selected && selectedNames.count >= maxSelection ? 0.45 : 1)
+            .disabled(disabled)
+            .opacity(disabled ? 0.45 : 1)
 
             if previewing && !selected {
                 TagCandidatePreviewPopover(
@@ -124,14 +125,12 @@ struct TagCandidatePreviewSelector: View {
     private func toggle(_ name: String) {
         withAnimation(.smooth(duration: 0.18)) {
             onToggle(name)
-            if previewedName == name {
-                previewedName = nil
-            }
+            previewState.clearPreview(ifMatches: name)
         }
     }
 
     private func isSelected(_ name: String) -> Bool {
-        selectedNames.contains { $0.caseInsensitiveCompare(name) == .orderedSame }
+        previewState.isSelected(name, selectedNames: selectedNames)
     }
 }
 

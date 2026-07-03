@@ -3,19 +3,14 @@ import MegrumDesign
 import SwiftUI
 
 struct TradeDisputeSheet: View {
-    @State private var category: TradeDisputeCategory = .wrong
-    @State private var factMemo = ""
+    @State private var draftState = TradeDisputeDraftState()
     var isSubmitting: Bool
     var onSubmit: (TradeDisputeCategory, String) async -> Void
-
-    private var trimmedFactMemo: String {
-        factMemo.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
 
     var body: some View {
         Form {
             Section {
-                Picker("理由", selection: $category) {
+                Picker("理由", selection: $draftState.category) {
                     ForEach(TradeDisputeCategory.allCases) { category in
                         Text(category.displayName).tag(category)
                     }
@@ -25,10 +20,10 @@ struct TradeDisputeSheet: View {
             }
 
             Section {
-                TextEditor(text: $factMemo)
+                TextEditor(text: $draftState.factMemo)
                     .frame(minHeight: 140)
                     .overlay(alignment: .topLeading) {
-                        if factMemo.isEmpty {
+                        if draftState.factMemo.isEmpty {
                             Text("何が起きたかを具体的に入力してください")
                                 .foregroundStyle(MegrumTheme.muted)
                                 .padding(.top, 8)
@@ -48,7 +43,7 @@ struct TradeDisputeSheet: View {
             ToolbarItem(placement: .confirmationAction) {
                 Button {
                     Task {
-                        await onSubmit(category, trimmedFactMemo)
+                        await onSubmit(draftState.category, draftState.trimmedFactMemo)
                     }
                 } label: {
                     if isSubmitting {
@@ -57,7 +52,7 @@ struct TradeDisputeSheet: View {
                         Text("送信")
                     }
                 }
-                .disabled(isSubmitting || trimmedFactMemo.isEmpty)
+                .disabled(isSubmitting || !draftState.canSubmit)
             }
         }
     }

@@ -3,19 +3,7 @@ import MegrumCore
 
 extension SearchScreen {
     func resetFilters() {
-        selectedGroupID = nil
-        selectedMemberID = nil
-        selectedGoodsTypeID = nil
-        selectedGoodsTagNames = []
-        selectedPaymentMethods = []
-        selectedExchangeMethod = nil
-        selectedMeetupDates = []
-        selectedMeetupPrefecture = ""
-        meetupPlaceMemo = ""
-        shippingFee = ""
-        shippingWindow = ""
-        allowsOutOfConditionProposal = false
-        conditionMatches = SearchConditionMatchFilters()
+        filterDraft = filterDraft.reset()
         Task {
             await appState.loadOshiCharacters(group: nil)
         }
@@ -25,63 +13,49 @@ extension SearchScreen {
     func removeActiveCriteria(_ removal: SearchActiveCriteriaRemoval) {
         switch removal {
         case .query:
-            query = ""
-            queryDraft = ""
+            presentationState.clearQuery()
         case .group:
-            selectedGroupID = nil
-            selectedMemberID = nil
+            filterDraft.selectedGroupID = nil
+            filterDraft.selectedMemberID = nil
         case .member:
-            selectedMemberID = nil
+            filterDraft.selectedMemberID = nil
         case .goodsType:
-            selectedGoodsTypeID = nil
+            filterDraft.selectedGoodsTypeID = nil
         case .goodsTag(let tagName):
-            selectedGoodsTagNames.remove(tagName)
+            filterDraft.selectedGoodsTagNames.remove(tagName)
         case .paymentMethod(let method):
-            selectedPaymentMethods.remove(method)
+            filterDraft.selectedPaymentMethods.remove(method)
         case .exchangeMethod:
-            selectedExchangeMethod = nil
+            filterDraft.selectedExchangeMethod = nil
         case .meetupDates:
-            selectedMeetupDates = []
+            filterDraft.selectedMeetupDates = []
         case .meetupPrefecture:
-            selectedMeetupPrefecture = ""
+            filterDraft.selectedMeetupPrefecture = ""
         case .meetupPlaceMemo:
-            meetupPlaceMemo = ""
+            filterDraft.meetupPlaceMemo = ""
         case .shippingFee:
-            shippingFee = ""
+            filterDraft.shippingFee = ""
         case .shippingWindow:
-            shippingWindow = ""
+            filterDraft.shippingWindow = ""
         case .allowsOutOfConditionProposal:
-            allowsOutOfConditionProposal = false
+            filterDraft.allowsOutOfConditionProposal = false
         case .conditionMatch(let kind):
             switch kind {
             case .wish:
-                conditionMatches.matchesWish = false
+                filterDraft.conditionMatches.matchesWish = false
             case .individualListing:
-                conditionMatches.matchesIndividualListing = false
+                filterDraft.conditionMatches.matchesIndividualListing = false
             case .exchangeCondition:
-                conditionMatches.matchesExchangeCondition = false
+                filterDraft.conditionMatches.matchesExchangeCondition = false
             case .paymentCondition:
-                conditionMatches.matchesPaymentCondition = false
+                filterDraft.conditionMatches.matchesPaymentCondition = false
             }
         }
         scheduleSearch(delayNanoseconds: 0)
     }
 
     func applyFilterDraft(_ draft: SearchFilterDraft) {
-        selectedGroupID = draft.selectedGroupID
-        selectedMemberID = draft.selectedMemberID
-        selectedGoodsTypeID = draft.selectedGoodsTypeID
-        selectedGoodsTagNames = draft.selectedGoodsTagNames
-        selectedPaymentMethods = draft.selectedPaymentMethods
-        selectedExchangeMethod = draft.selectedExchangeMethod
-        selectedMeetupDates = draft.selectedMeetupDates
-        meetupDateDraft = draft.meetupDateDraft
-        selectedMeetupPrefecture = draft.selectedMeetupPrefecture
-        meetupPlaceMemo = draft.meetupPlaceMemo
-        shippingFee = draft.shippingFee
-        shippingWindow = draft.shippingWindow
-        allowsOutOfConditionProposal = draft.allowsOutOfConditionProposal
-        conditionMatches = draft.conditionMatches
+        filterDraft = draft
         Task {
             await appState.loadOshiCharacters(group: selectedGroup)
         }
@@ -111,35 +85,35 @@ extension SearchScreen {
         )
         switch settings.preference {
         case .local:
-            selectedExchangeMethod = .hand
+            filterDraft.selectedExchangeMethod = .hand
         case .mail:
-            selectedExchangeMethod = .mail
+            filterDraft.selectedExchangeMethod = .mail
         case .both:
-            selectedExchangeMethod = .both
+            filterDraft.selectedExchangeMethod = .both
         }
 
         if settings.requiresSamePrefecture {
             let prefecture = settings.localPrefecture.nilIfBlank ?? appState.viewer?.prefecture
             if let prefecture, !prefecture.isBlank {
-                selectedMeetupPrefecture = prefecture
+                filterDraft.selectedMeetupPrefecture = prefecture
             }
         }
 
         let dates = settings.usableLocalDateKeys.compactMap { HomeExchangeDateKey.date(from: $0) }
         if !dates.isEmpty {
-            selectedMeetupDates = dates
+            filterDraft.selectedMeetupDates = dates
         }
 
         if settings.preference.acceptsMail {
-            shippingFee = settings.mailShippingFee.title
-            shippingWindow = settings.mailShippingDays.title
+            filterDraft.shippingFee = settings.mailShippingFee.title
+            filterDraft.shippingWindow = settings.mailShippingDays.title
         }
     }
 
     func applyDefaultPaymentCondition() {
         let methods = PaymentSettingsResolver.methods(settings: appState.paymentSettings, viewer: appState.viewer)
         if !methods.isEmpty {
-            selectedPaymentMethods = Set(methods)
+            filterDraft.selectedPaymentMethods = Set(methods)
         }
     }
 }

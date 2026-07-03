@@ -9,7 +9,9 @@ struct MeguriProfileAvatarView: View {
     var size: CGFloat
 
     var body: some View {
-        if let avatarID, !avatarID.isBlank {
+        if avatarURL != nil {
+            ProfileVisualAvatar(url: avatarURL, fallback: fallback, size: size)
+        } else if let avatarID, !avatarID.isBlank {
             BoardAnonymousAvatar(
                 option: BoardAnonymousAvatarOption.option(id: avatarID),
                 size: size

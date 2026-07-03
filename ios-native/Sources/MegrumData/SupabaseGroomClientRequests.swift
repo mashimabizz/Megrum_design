@@ -70,6 +70,17 @@ extension SupabaseGroomClient {
         )
     }
 
+    public func makeDeletePostRequest(userID: UUID, postID: UUID) throws -> URLRequest {
+        try client.makeMutationRequest(
+            path: "/rest/v1/groom_posts",
+            queryItems: [URLQueryItem(name: "select", value: "id")]
+                + ownGroomPostQueryItems(userID: userID, postID: postID),
+            method: "PATCH",
+            body: client.encoder.encode(GroomPostDeletePayload()),
+            prefer: "return=representation"
+        )
+    }
+
     public func makeMarkViewedRequest(userID: UUID, postID: UUID) throws -> URLRequest {
         try client.makeUpsertRequest(
             into: "groom_views",

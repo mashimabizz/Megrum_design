@@ -11,28 +11,11 @@ struct AddressSettingsScreen: View {
     @Environment(\.dismiss) private var dismiss
     @FocusState private var focusedField: AddressSettingsField?
 
-    @State private var recipientName = ""
-    @State private var postalCode = ""
-    @State private var prefecture = ""
-    @State private var city = ""
-    @State private var line1 = ""
-    @State private var line2 = ""
-    @State private var phoneNumber = ""
+    @State private var draftState = AddressSettingsDraftState()
     @State private var postalCodeLookupTask: Task<Void, Never>?
-    @State private var lastAppliedPostalCode = ""
-    @State private var inputErrorMessage: String?
 
     private var draftAddress: MailingAddress {
-        MailingAddress(
-            userID: appState.viewer?.id ?? NativePreviewData.viewerID,
-            recipientName: recipientName.trimmingCharacters(in: .whitespacesAndNewlines),
-            postalCode: MegrumAppStateInputNormalizer.postalCode(postalCode),
-            prefecture: prefecture.trimmingCharacters(in: .whitespacesAndNewlines),
-            city: city.trimmingCharacters(in: .whitespacesAndNewlines),
-            line1: line1.trimmingCharacters(in: .whitespacesAndNewlines),
-            line2: line2.nilIfBlank,
-            phoneNumber: phoneNumber.nilIfBlank
-        )
+        draftState.mailingAddress(userID: appState.viewer?.id ?? NativePreviewData.viewerID)
     }
 
     var body: some View {
@@ -40,16 +23,16 @@ struct AddressSettingsScreen: View {
             VStack(alignment: .leading, spacing: 18) {
                 AddressSettingsHeader()
                 AddressSettingsForm(
-                    recipientName: $recipientName,
-                    postalCode: $postalCode,
-                    prefecture: $prefecture,
-                    city: $city,
-                    line1: $line1,
-                    line2: $line2,
-                    phoneNumber: $phoneNumber,
+                    recipientName: $draftState.recipientName,
+                    postalCode: $draftState.postalCode,
+                    prefecture: $draftState.prefecture,
+                    city: $draftState.city,
+                    line1: $draftState.line1,
+                    line2: $draftState.line2,
+                    phoneNumber: $draftState.phoneNumber,
                     focusedField: $focusedField,
                     isLookingUpPostalCode: appState.isLookingUpPostalCode,
-                    inputErrorMessage: inputErrorMessage,
+                    inputErrorMessage: draftState.inputErrorMessage,
                     appErrorMessage: appState.errorMessage,
                     onPostalCodeChange: handlePostalCodeChange
                 )
@@ -86,10 +69,10 @@ struct AddressSettingsScreen: View {
             postalCodeLookupTask?.cancel()
         }
         .onChange(of: appState.mailingAddress) { _, address in
-            apply(address: address)
+            draftState.apply(address: address)
         }
         .onChange(of: draftAddress) { _, _ in
-            inputErrorMessage = nil
+            draftState.clearInputError()
         }
     }
 
@@ -99,43 +82,30 @@ struct AddressSettingsScreen: View {
 
     private func save() async {
         focusedField = nil
-        inputErrorMessage = MailingAddressDraftValidator.validationMessage(for: draftAddress)
-        guard inputErrorMessage == nil else {
+        draftState.setValidationMessage(MailingAddressDraftValidator.validationMessage(for: draftAddress))
+        guard draftState.inputErrorMessage == nil else {
             return
         }
 
         if await appState.saveMailingAddress(draftAddress) {
-            inputErrorMessage = nil
+            draftState.clearInputError()
             onSaveCompleted?()
             dismiss()
         }
     }
 
     private func apply(address: MailingAddress?) {
-        guard let address else {
-            return
-        }
-        recipientName = address.recipientName
-        postalCode = address.postalCode
-        prefecture = address.prefecture
-        city = address.city
-        line1 = address.line1
-        line2 = address.line2 ?? ""
-        phoneNumber = address.phoneNumber ?? ""
-        lastAppliedPostalCode = address.postalCode
+        draftState.apply(address: address)
     }
 
     private func handlePostalCodeChange(_ value: String) {
-        let normalized = MegrumAppStateInputNormalizer.postalCode(value)
-        if normalized != value {
-            postalCode = normalized
-        }
+        let normalized = draftState.normalizePostalCodeInput(value)
         schedulePostalCodeLookup(normalized)
     }
 
     private func schedulePostalCodeLookup(_ value: String) {
         postalCodeLookupTask?.cancel()
-        guard value.count == 7, value != lastAppliedPostalCode else {
+        guard draftState.shouldLookupPostalCode(value) else {
             return
         }
 
@@ -150,10 +120,7 @@ struct AddressSettingsScreen: View {
             guard !Task.isCancelled else {
                 return
             }
-            prefecture = address.prefecture
-            city = address.city
-            line1 = address.line1Suggestion
-            lastAppliedPostalCode = address.postalCode
+            draftState.apply(postalCodeAddress: address)
         }
     }
 }

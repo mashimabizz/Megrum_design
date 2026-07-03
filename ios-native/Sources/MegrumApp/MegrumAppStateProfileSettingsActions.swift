@@ -10,30 +10,43 @@ extension MegrumAppState {
         gender: UserGender?,
         oshiSelections: [AccountSetupOshiInput] = []
     ) async -> Bool {
+        await completeAccountSetup(
+            AccountSetupInput(
+                handle: handle,
+                displayName: displayName,
+                gender: gender,
+                prefecture: prefecture,
+                birthDate: birthDate,
+                oshiSelections: oshiSelections
+            )
+        )
+    }
+
+    public func completeAccountSetup(_ input: AccountSetupInput) async -> Bool {
         guard !isSavingAccountSetup else {
             return false
         }
         guard let normalizedHandle = MegrumAppStateInputNormalizer.accountSetupHandle(
-            handle,
+            input.handle,
             userID: viewer?.id
         ) else {
             errorMessage = "プロフィールを読み込めませんでした"
             return false
         }
         let trimmedDisplayName = MegrumAppStateInputNormalizer.accountSetupDisplayName(
-            displayName,
+            input.displayName,
             fallbackHandle: normalizedHandle
         )
-        if let birthDate,
+        if let birthDate = input.birthDate,
            birthDate > Date() {
             errorMessage = "生年月日は今日以前の日付を選択してください"
             return false
         }
-        guard AccountSetupGenderOptions.contains(gender) else {
+        guard AccountSetupGenderOptions.contains(input.gender) else {
             errorMessage = "性別を選択してください"
             return false
         }
-        guard !oshiSelections.isEmpty else {
+        guard !input.oshiSelections.isEmpty else {
             errorMessage = "推しを選択してください"
             return false
         }
@@ -46,15 +59,15 @@ extension MegrumAppState {
                 AccountSetupInput(
                     handle: normalizedHandle,
                     displayName: trimmedDisplayName,
-                    gender: gender,
-                    prefecture: MegrumAppStateInputNormalizer.prefecture(prefecture),
-                    birthDate: birthDate,
-                    oshiSelections: oshiSelections
+                    gender: input.gender,
+                    prefecture: MegrumAppStateInputNormalizer.prefecture(input.prefecture),
+                    birthDate: input.birthDate,
+                    oshiSelections: input.oshiSelections
                 )
             )
             viewer = savedViewer
             userOshiSelections = UserOshiSelectionPersistenceMapper.selections(
-                from: oshiSelections,
+                from: input.oshiSelections,
                 userID: savedViewer.id
             )
             isSavingAccountSetup = false

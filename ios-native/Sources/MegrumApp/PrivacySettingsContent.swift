@@ -19,12 +19,22 @@ private struct PrivacySafetyManagementSection: View {
     var body: some View {
         Section {
             NavigationLink {
-                BlockedUsersScreen(appState: appState)
+                BlockedUsersScreen(appState: appState, context: .exchange)
             } label: {
                 HelpRouteRow(
                     iconName: "person.crop.circle.badge.xmark",
-                    title: "ブロックした人",
+                    title: "グッズ交換でブロックした人",
                     message: "ブロック中の相手を確認し、必要に応じて解除できます。"
+                )
+            }
+
+            NavigationLink {
+                BlockedUsersScreen(appState: appState, context: .meguri)
+            } label: {
+                HelpRouteRow(
+                    iconName: "message.badge.circle",
+                    title: "めぐりでブロックした人",
+                    message: "めぐりメッセージでブロック中の相手を確認し、必要に応じて解除できます。"
                 )
             }
 

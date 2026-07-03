@@ -50,7 +50,7 @@ enum AppDrawerDestination: String, Identifiable {
         case .exchangeSettings:
             "交換条件の設定"
         case .megrumPlus:
-            "Megrum プレミアム"
+            SubscriptionCatalog.currentPremiumDisplayName
         case .settings:
             "設定とプライバシー"
         case .help:
@@ -97,8 +97,15 @@ enum AppDrawerSettingsBadgePolicy {
             : nil
     }
 
-    static func paymentBadgeText(methods: [UserPaymentMethod], hasAnyStoredData: Bool = false) -> String? {
-        hasAnyStoredData || !UserPaymentMethod.normalized(methods).isEmpty ? nil : needsConfigurationBadge
+    static func paymentBadgeText(
+        methods: [UserPaymentMethod],
+        hasAnyStoredData: Bool = false,
+        hasLoadedSettings: Bool = true
+    ) -> String? {
+        guard hasLoadedSettings || hasAnyStoredData || !UserPaymentMethod.normalized(methods).isEmpty else {
+            return nil
+        }
+        return hasAnyStoredData || !UserPaymentMethod.normalized(methods).isEmpty ? nil : needsConfigurationBadge
     }
 }
 

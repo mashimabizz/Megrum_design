@@ -6,18 +6,14 @@ struct AccountDeletionScreen: View {
     @ObservedObject var appState: MegrumAppState
     var onCompleted: () -> Void
     @FocusState private var isNoteFocused: Bool
-    @State private var step: AccountDeletionStep = .warning
-    @State private var selectedReasons: Set<AccountDeletionReason> = []
-    @State private var note = ""
-    @State private var validationMessage: String?
-    @State private var showsFinalConfirmation = false
+    @State private var draftState = AccountDeletionDraftState()
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 header
 
-                switch step {
+                switch draftState.step {
                 case .warning:
                     AccountDeletionWarningContent(ongoingTradeCount: ongoingTradeCount)
                 case .reasons:
@@ -50,7 +46,7 @@ struct AccountDeletionScreen: View {
         }
         .confirmationDialog(
             "退会しますか？",
-            isPresented: $showsFinalConfirmation,
+            isPresented: $draftState.showsFinalConfirmation,
             titleVisibility: .visible
         ) {
             Button("退会する", role: .destructive) {
@@ -60,16 +56,16 @@ struct AccountDeletionScreen: View {
         } message: {
             Text("退会申請後はアカウントが削除申請中になり、Megrumの通常利用ができなくなります。")
         }
-        .onChange(of: selectedReasons) {
-            validationMessage = nil
+        .onChange(of: draftState.selectedReasons) {
+            draftState.clearValidationMessage()
         }
-        .onChange(of: note) {
-            validationMessage = nil
+        .onChange(of: draftState.note) {
+            draftState.clearValidationMessage()
         }
     }
 
     private var header: some View {
-        AccountDeletionStepHeader(step: step)
+        AccountDeletionStepHeader(step: draftState.step)
     }
 
     private var reasonForm: some View {
@@ -78,7 +74,7 @@ struct AccountDeletionScreen: View {
                 ForEach(AccountDeletionReason.allCases) { reason in
                     AccountDeletionReasonRow(
                         reason: reason,
-                        isSelected: selectedReasons.contains(reason)
+                        isSelected: draftState.selectedReasons.contains(reason)
                     ) {
                         toggle(reason)
                     }
@@ -106,7 +102,7 @@ struct AccountDeletionScreen: View {
                         .scrollContentBackground(.hidden)
                         .background(MegrumTheme.canvas, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
 
-                    if note.isEmpty {
+                    if draftState.note.isEmpty {
                         Text("任意で詳しく教えてください")
                             .font(.system(size: 16, weight: .semibold, design: .rounded))
                             .foregroundStyle(MegrumTheme.muted.opacity(0.62))
@@ -123,7 +119,7 @@ struct AccountDeletionScreen: View {
                 HStack {
                     Text("個人情報や取引相手を特定できる内容は書かないでください。")
                     Spacer()
-                    Text("\(note.count)/\(AccountDeletionDraftValidator.noteMaxLength)")
+                    Text("\(draftState.note.count)/\(AccountDeletionDraftValidator.noteMaxLength)")
                 }
                 .font(.system(size: 12, weight: .bold, design: .rounded))
                 .foregroundStyle(MegrumTheme.muted)
@@ -134,7 +130,7 @@ struct AccountDeletionScreen: View {
 
     @ViewBuilder
     private var validationErrorView: some View {
-        if let validationMessage {
+        if let validationMessage = draftState.validationMessage {
             AccountDeletionAlertLabel(message: validationMessage)
         } else if let errorMessage = appState.errorMessage {
             AccountDeletionAlertLabel(message: errorMessage)
@@ -143,7 +139,7 @@ struct AccountDeletionScreen: View {
 
     private var bottomBar: some View {
         AccountDeletionBottomBar(
-            step: step,
+            step: draftState.step,
             isRequesting: appState.isRequestingAccountDeletion,
             ongoingTradeCount: ongoingTradeCount,
             onBack: returnToWarningStep,
@@ -159,45 +155,38 @@ struct AccountDeletionScreen: View {
 
     private var noteBinding: Binding<String> {
         Binding(
-            get: { note },
-            set: { note = String($0.prefix(AccountDeletionDraftValidator.noteMaxLength)) }
+            get: { draftState.note },
+            set: { draftState.setNote($0) }
         )
     }
 
     private func primaryAction() {
-        switch step {
+        switch draftState.step {
         case .warning:
             guard ongoingTradeCount == 0 else {
-                validationMessage = "現在進行中の取引があるため退会できません"
+                draftState.setOngoingTradeValidationMessage()
                 return
             }
             withAnimation(.easeInOut(duration: 0.18)) {
-                step = .reasons
+                draftState.moveToReasonsStep()
             }
         case .reasons:
-            if let message = AccountDeletionDraftValidator.validationMessage(
-                reasons: Array(selectedReasons),
-                note: note
-            ) {
-                validationMessage = message
+            guard draftState.validateReasonsStep() else {
                 return
             }
             isNoteFocused = false
-            showsFinalConfirmation = true
+            draftState.requestFinalConfirmation()
         }
     }
 
     private func returnToWarningStep() {
         withAnimation(.easeInOut(duration: 0.18)) {
-            step = .warning
+            draftState.returnToWarningStep()
         }
     }
 
     private func submit() {
-        let input = AccountDeletionRequestInput(
-            reasons: Array(selectedReasons),
-            note: note
-        ).normalized
+        let input = draftState.submissionInput
 
         Task {
             if await appState.requestAccountDeletion(input) {
@@ -207,11 +196,7 @@ struct AccountDeletionScreen: View {
     }
 
     private func toggle(_ reason: AccountDeletionReason) {
-        if selectedReasons.contains(reason) {
-            selectedReasons.remove(reason)
-        } else {
-            selectedReasons.insert(reason)
-        }
+        draftState.toggle(reason)
         MegrumHaptics.selectionChanged()
     }
 }

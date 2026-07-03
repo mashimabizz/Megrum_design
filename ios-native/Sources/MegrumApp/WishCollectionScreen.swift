@@ -23,7 +23,11 @@ struct WishCollectionScreen: View {
     var appState: MegrumAppState?
     var adDisplayContext: AdDisplayContext
     @Binding private var requestedSection: WishCollectionSection?
-    @State private var selectedSection: WishCollectionSection = .wishes
+    @State private var presentationState = WishCollectionPresentationState()
+    @State private var wishColumns = GoodsGridLayout.minimumColumns
+    @State private var topChromeHeight: CGFloat = CollectionScreenLayoutMetrics.estimatedPinnedChromeBottomEdge
+    @State private var isTopChromeCollapsed = false
+    @State private var topChromeCollapseTracker = MegrumTopChromeCollapseTracker()
 
     init(
         items: [WishItem],
@@ -56,30 +60,51 @@ struct WishCollectionScreen: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: CollectionScreenLayoutMetrics.mainStackSpacing) {
-            WishCollectionTopChrome(
-                title: selectedSection.navigationTitle,
-                accessory: sectionPicker
-            )
-            .padding(.horizontal, CollectionScreenLayoutMetrics.horizontalPadding)
-            .padding(.top, CollectionScreenLayoutMetrics.topPadding)
-
+        Group {
             if WishCollectionPresentationPolicy.usesSwipePaging {
-                TabView(selection: $selectedSection) {
+                TabView(selection: $presentationState.selectedSection) {
                     ForEach(WishCollectionSection.allCases) { section in
                         wishSectionPage(section)
                             .tag(section)
                     }
                 }
                 .megrumPageTabViewStyle()
+                .megrumHiddenBottomScrollEdgeEffect()
+                .ignoresSafeArea(.container, edges: .bottom)
             } else {
-                wishSectionPage(selectedSection)
+                wishSectionPage(presentationState.selectedSection)
             }
         }
+        .environment(
+            \.megrumPinnedTopChromeInset,
+            topChromeHeight + CollectionScreenLayoutMetrics.mainStackSpacing
+        )
+        .megrumPinnedTranslucentTopChrome(bottomEdge: expandedTopChromeBottomEdge) {
+            WishCollectionTopChrome(
+                title: presentationState.selectedSection.navigationTitle,
+                accessory: sectionPicker,
+                columns: $wishColumns,
+                showsColumnToggle: presentationState.selectedSection == .wishes,
+                hidesTitle: isTopChromeCollapsed
+            )
+            .padding(.horizontal, CollectionScreenLayoutMetrics.horizontalPadding)
+            .padding(.top, CollectionScreenLayoutMetrics.topPadding)
+            .padding(.bottom, 6)
+        }
+        .onChange(of: presentationState.selectedSection) { _, _ in
+            resetTopChromeCollapse()
+        }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .ignoresSafeArea(.container, edges: .bottom)
         .background(MegrumTheme.canvas.ignoresSafeArea())
         .onChange(of: requestedSection, initial: true) { _, requestedSection in
             applyRequestedSection(requestedSection)
+        }
+        .onChange(of: wishColumnPreferenceContext, initial: true) { _, _ in
+            loadStoredWishColumns()
+        }
+        .onChange(of: wishColumns) { _, newValue in
+            saveWishColumns(newValue)
         }
     }
 
@@ -97,8 +122,12 @@ struct WishCollectionScreen: View {
                 headerAccessory: nil,
                 showsHeader: false,
                 showsColumnToggle: false,
+                displayColumnsOverride: wishColumns,
                 adPlacement: .wishListBanner,
-                adDisplayContext: adDisplayContext
+                adDisplayContext: adDisplayContext,
+                onScrollContentTopChange: { contentTop in
+                    handleSectionScrollContentTop(contentTop, section: .wishes)
+                }
             )
         case .listings:
             if let appState {
@@ -106,7 +135,10 @@ struct WishCollectionScreen: View {
                     appState: appState,
                     headerTitle: section.navigationTitle,
                     headerAccessory: nil,
-                    showsHeader: false
+                    showsHeader: false,
+                    onScrollContentTopChange: { contentTop in
+                        handleSectionScrollContentTop(contentTop, section: .listings)
+                    }
                 )
             } else {
                 GoodsCollectionScreen(
@@ -122,9 +154,48 @@ struct WishCollectionScreen: View {
         }
     }
 
+    /// While the chrome is collapsed, keep reporting the expanded height so
+    /// scroll content does not jump when the title row hides.
+    private var expandedTopChromeBottomEdge: Binding<CGFloat> {
+        Binding(
+            get: { topChromeHeight },
+            set: { newValue in
+                if !isTopChromeCollapsed {
+                    topChromeHeight = newValue
+                }
+            }
+        )
+    }
+
+    private func handleSectionScrollContentTop(_ contentTop: CGFloat, section: WishCollectionSection) {
+        guard section == presentationState.selectedSection else {
+            return
+        }
+        let newValue = topChromeCollapseTracker.updatedCollapsedState(
+            contentTop: contentTop,
+            isCollapsed: isTopChromeCollapsed
+        )
+        guard newValue != isTopChromeCollapsed else {
+            return
+        }
+        withAnimation(MegrumTopChromeCollapseAnimation.animation) {
+            isTopChromeCollapsed = newValue
+        }
+    }
+
+    private func resetTopChromeCollapse() {
+        topChromeCollapseTracker.reset()
+        guard isTopChromeCollapsed else {
+            return
+        }
+        withAnimation(MegrumTopChromeCollapseAnimation.animation) {
+            isTopChromeCollapsed = false
+        }
+    }
+
     private var sectionPicker: AnyView {
         AnyView(
-            Picker("表示", selection: $selectedSection) {
+            Picker("表示", selection: $presentationState.selectedSection) {
                 ForEach(WishCollectionSection.allCases) { section in
                     Text(section.rawValue).tag(section)
                 }
@@ -136,10 +207,32 @@ struct WishCollectionScreen: View {
     }
 
     private func applyRequestedSection(_ section: WishCollectionSection?) {
-        guard let section else {
+        if presentationState.applyRequestedSection(section) {
+            requestedSection = nil
+        }
+    }
+
+    private var wishColumnPreferenceContext: GoodsGridColumnPreferenceContext {
+        GoodsGridColumnPreferenceContext(
+            entryKind: .wish,
+            viewerID: appState?.viewer?.id
+        )
+    }
+
+    private func loadStoredWishColumns() {
+        wishColumns = GoodsGridColumnPreferenceStore.load(context: wishColumnPreferenceContext)
+    }
+
+    private func saveWishColumns(_ newColumns: Int) {
+        let normalizedColumns = GoodsGridLayout(columns: newColumns).columns
+        if wishColumns != normalizedColumns {
+            wishColumns = normalizedColumns
             return
         }
-        selectedSection = section
-        requestedSection = nil
+
+        GoodsGridColumnPreferenceStore.save(
+            columns: normalizedColumns,
+            context: wishColumnPreferenceContext
+        )
     }
 }

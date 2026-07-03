@@ -6,7 +6,7 @@ struct AccountSetupBirthDateCalendar: View {
     @Binding private var selection: Date
     private let maxDate: Date
     private let onSelectionChange: () -> Void
-    @State private var visibleMonth: Date
+    @State private var presentationState: AccountSetupBirthDateCalendarPresentationState
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 4), count: 7)
 
@@ -18,7 +18,9 @@ struct AccountSetupBirthDateCalendar: View {
         _selection = selection
         self.maxDate = maxDate
         self.onSelectionChange = onSelectionChange
-        _visibleMonth = State(initialValue: AccountSetupBirthDateCalendarLogic.startOfMonth(selection.wrappedValue))
+        _presentationState = State(
+            initialValue: AccountSetupBirthDateCalendarPresentationState(selection: selection.wrappedValue)
+        )
     }
 
     var body: some View {
@@ -34,16 +36,13 @@ struct AccountSetupBirthDateCalendar: View {
                 .strokeBorder(MegrumTheme.lavender.opacity(0.18), lineWidth: 1)
         }
         .onChange(of: selection) { _, newValue in
-            let selectedMonth = AccountSetupBirthDateCalendarLogic.startOfMonth(newValue)
-            if selectedMonth != visibleMonth {
-                visibleMonth = selectedMonth
-            }
+            presentationState.syncSelection(newValue)
         }
     }
 
     private var header: some View {
         HStack(spacing: 8) {
-            Text(AccountSetupBirthDateCalendarLogic.monthTitle(for: visibleMonth))
+            Text(presentationState.monthTitle)
                 .font(.system(size: 16, weight: .black, design: .rounded))
                 .foregroundStyle(MegrumTheme.ink)
                 .lineLimit(1)
@@ -68,14 +67,14 @@ struct AccountSetupBirthDateCalendar: View {
                 calendarNavigationButton(
                     title: "翌月",
                     systemImage: "chevron.right",
-                    isEnabled: canShowNextMonth,
+                    isEnabled: presentationState.canShowNextMonth(maxDate: maxDate),
                     action: showNextMonth
                 )
 
                 calendarNavigationButton(
                     title: "翌年",
                     systemImage: "chevron.right.2",
-                    isEnabled: canShowNextYear,
+                    isEnabled: presentationState.canShowNextYear(maxDate: maxDate),
                     action: showNextYear
                 )
             }
@@ -96,7 +95,7 @@ struct AccountSetupBirthDateCalendar: View {
 
     private var dayGrid: some View {
         LazyVGrid(columns: columns, spacing: 8) {
-            ForEach(AccountSetupBirthDateCalendarLogic.days(for: visibleMonth)) { day in
+            ForEach(AccountSetupBirthDateCalendarLogic.days(for: presentationState.visibleMonth)) { day in
                 if let date = day.date {
                     let isSelected = AccountSetupBirthDateCalendarLogic.isSameDay(date, selection)
                     let isDisabled = AccountSetupBirthDateCalendarLogic.isAfter(date, maxDate)
@@ -128,19 +127,8 @@ struct AccountSetupBirthDateCalendar: View {
         }
     }
 
-    private var canShowNextMonth: Bool {
-        guard let nextMonth = AccountSetupBirthDateCalendarLogic.addMonths(1, to: visibleMonth) else {
-            return false
-        }
-        return !AccountSetupBirthDateCalendarLogic.isAfterMonth(nextMonth, maxDate)
-    }
-
     private var canShowPreviousYear: Bool {
-        AccountSetupBirthDateCalendarLogic.addYears(-1, to: visibleMonth, maxDate: maxDate) != nil
-    }
-
-    private var canShowNextYear: Bool {
-        AccountSetupBirthDateCalendarLogic.addYears(1, to: visibleMonth, maxDate: maxDate) != nil
+        presentationState.canShowPreviousYear(maxDate: maxDate)
     }
 
     private func calendarNavigationButton(
@@ -159,33 +147,19 @@ struct AccountSetupBirthDateCalendar: View {
     }
 
     private func showPreviousMonth() {
-        guard let previousMonth = AccountSetupBirthDateCalendarLogic.addMonths(-1, to: visibleMonth) else {
-            return
-        }
-        visibleMonth = previousMonth
+        presentationState.showPreviousMonth()
     }
 
     private func showNextMonth() {
-        guard canShowNextMonth,
-              let nextMonth = AccountSetupBirthDateCalendarLogic.addMonths(1, to: visibleMonth)
-        else {
-            return
-        }
-        visibleMonth = nextMonth
+        presentationState.showNextMonth(maxDate: maxDate)
     }
 
     private func showPreviousYear() {
-        guard let previousYear = AccountSetupBirthDateCalendarLogic.addYears(-1, to: visibleMonth, maxDate: maxDate) else {
-            return
-        }
-        visibleMonth = previousYear
+        presentationState.showPreviousYear(maxDate: maxDate)
     }
 
     private func showNextYear() {
-        guard let nextYear = AccountSetupBirthDateCalendarLogic.addYears(1, to: visibleMonth, maxDate: maxDate) else {
-            return
-        }
-        visibleMonth = nextYear
+        presentationState.showNextYear(maxDate: maxDate)
     }
 
     private func dayTextColor(isSelected: Bool, isDisabled: Bool) -> Color {

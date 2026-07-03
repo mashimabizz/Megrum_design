@@ -1,8 +1,32 @@
-import MegrumApp
+@testable import MegrumApp
 import MegrumCore
 import XCTest
 
 final class NotificationReadStateReducerTests: XCTestCase {
+    func testNotificationCenterPresentationStateFiltersUnreadAndTradeNotifications() {
+        let unreadTradeID = UUID(uuidString: "00000000-0000-0000-0000-000000000111")!
+        let readTradeID = UUID(uuidString: "00000000-0000-0000-0000-000000000112")!
+        let communityID = UUID(uuidString: "00000000-0000-0000-0000-000000000113")!
+        let readAt = Date(timeIntervalSince1970: 700)
+        let notifications = [
+            makeNotification(id: unreadTradeID, kind: .proposalReceived),
+            makeNotification(id: readTradeID, kind: .messageReceived, readAt: readAt),
+            makeNotification(id: communityID, kind: .groomLiked),
+        ]
+        var state = NotificationCenterPresentationState()
+
+        XCTAssertEqual(state.visibleNotifications(in: notifications).map(\.id), [unreadTradeID, readTradeID, communityID])
+        XCTAssertEqual(state.emptyTitle, "まだ通知はありません")
+
+        state.filter = .unread
+        XCTAssertEqual(state.visibleNotifications(in: notifications).map(\.id), [unreadTradeID, communityID])
+        XCTAssertEqual(state.emptyTitle, "未読の通知はありません")
+
+        state.filter = .trades
+        XCTAssertEqual(state.visibleNotifications(in: notifications).map(\.id), [unreadTradeID, readTradeID])
+        XCTAssertEqual(state.emptyTitle, "取引の通知はありません")
+    }
+
     func testMarkReadOnlyUpdatesUnreadMatchingNotification() {
         let targetID = UUID(uuidString: "00000000-0000-0000-0000-000000000101")!
         let otherID = UUID(uuidString: "00000000-0000-0000-0000-000000000102")!
@@ -82,12 +106,13 @@ final class NotificationReadStateReducerTests: XCTestCase {
 
     private func makeNotification(
         id: UUID,
+        kind: MegrumNotificationKind = .proposalReceived,
         title: String = "通知",
         readAt: Date? = nil
     ) -> MegrumNotification {
         MegrumNotification(
             id: id,
-            kind: .proposalReceived,
+            kind: kind,
             title: title,
             body: "本文",
             linkPath: "/proposals/\(id.uuidString)",

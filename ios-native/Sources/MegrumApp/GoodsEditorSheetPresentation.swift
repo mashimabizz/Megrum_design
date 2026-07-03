@@ -47,6 +47,11 @@ extension GoodsEditorSheet {
         selectedGroupSupportsMemberSelection && !scopedOshiCharacters.isEmpty
     }
 
+    var inventoryCreateRequiresMemberAssignment: Bool {
+        GoodsEditorMemberLinkingPolicy.requiresMemberAssignmentDuringCreate
+            && inventoryCreateAllowsMemberAssignment
+    }
+
     var scopedOshiCharacters: [OshiCharacter] {
         GoodsEditorMemberScope.members(for: selectedGroup, from: appState.oshiCharacters)
     }

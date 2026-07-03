@@ -10,7 +10,7 @@ struct TradeAgreementCompactBar: View {
     var onAgree: (ExchangeMethod?) -> Void
     var onReject: () -> Void
     var onCounterProposal: () -> Void
-    @State private var selectedExchangeMethod: ExchangeMethod = .hand
+    @State private var methodSelectionState = TradeAgreementMethodSelectionState()
 
     private var isInitialSenderWaiting: Bool {
         guard let viewerID else {
@@ -79,7 +79,7 @@ struct TradeAgreementCompactBar: View {
             }
 
             if needsExchangeMethodChoice {
-                Picker("交換手段", selection: $selectedExchangeMethod) {
+                Picker("交換手段", selection: $methodSelectionState.selectedExchangeMethod) {
                     Text(ExchangeMethod.hand.displayName).tag(ExchangeMethod.hand)
                     Text(ExchangeMethod.mail.displayName).tag(ExchangeMethod.mail)
                 }
@@ -109,7 +109,7 @@ struct TradeAgreementCompactBar: View {
                 .disabled(isResponding || myAgreed)
 
                 Button {
-                    onAgree(needsExchangeMethodChoice ? selectedExchangeMethod : nil)
+                    onAgree(methodSelectionState.agreementExchangeMethod(needsChoice: needsExchangeMethodChoice))
                 } label: {
                     HStack(spacing: 5) {
                         if isResponding {

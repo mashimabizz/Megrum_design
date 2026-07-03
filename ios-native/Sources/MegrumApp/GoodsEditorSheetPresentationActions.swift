@@ -53,7 +53,7 @@ extension GoodsEditorSheet {
     func startSaveInventoryCreateFlow() {
         guard !GoodsInventoryCreateValidation.hasMissingMemberAssignments(
             metas: createMetas,
-            requiresMemberAssignment: inventoryCreateAllowsMemberAssignment
+            requiresMemberAssignment: inventoryCreateRequiresMemberAssignment
         ) else {
             createError = "メンバーがある推しは、すべての画像にメンバーを登録してください"
             return

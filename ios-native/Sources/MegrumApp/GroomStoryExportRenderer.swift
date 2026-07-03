@@ -10,6 +10,16 @@ enum GroomStoryExportRenderer {
     }
 
     static let canvasSize = CGSize(width: 1080, height: 1920)
+    static let maxJPEGBytes = 8_800_000
+
+    private static let jpegCompressionQualities: [CGFloat] = [
+        0.82,
+        0.74,
+        0.66,
+        0.58,
+        0.50,
+        0.42,
+    ]
 
     @MainActor
     static func renderedJPEGData(
@@ -30,7 +40,7 @@ enum GroomStoryExportRenderer {
         guard let image = renderer.uiImage else {
             throw RenderError.imageUnavailable
         }
-        guard let jpegData = image.jpegData(compressionQuality: 0.88) else {
+        guard let jpegData = jpegData(from: image) else {
             throw RenderError.jpegUnavailable
         }
         return jpegData
@@ -38,6 +48,22 @@ enum GroomStoryExportRenderer {
         return photoData
         #endif
     }
+
+    #if canImport(UIKit)
+    private static func jpegData(from image: UIImage) -> Data? {
+        var fallbackData: Data?
+        for quality in jpegCompressionQualities {
+            guard let data = image.jpegData(compressionQuality: quality) else {
+                continue
+            }
+            fallbackData = data
+            if data.count <= maxJPEGBytes {
+                return data
+            }
+        }
+        return fallbackData
+    }
+    #endif
 }
 
 private struct GroomStoryExportView: View {

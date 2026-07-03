@@ -7,41 +7,31 @@ struct SearchGoodsTagSelectionSheet: View {
     @Binding var selectedTags: Set<String>
 
     @Environment(\.dismiss) private var dismiss
-    @State private var searchText = ""
-
-    private var normalizedSearchText: String {
-        searchText
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .trimmingCharacters(in: CharacterSet(charactersIn: "#＃"))
-    }
+    @State private var selectionState = SearchGoodsTagSelectionState()
 
     private var filteredCandidateNames: [String] {
-        let normalized = normalizedSearchText
-        guard !normalized.isEmpty else {
-            return candidateNames
-        }
-        return candidateNames.filter { $0.localizedCaseInsensitiveContains(normalized) }
+        selectionState.filteredCandidateNames(from: candidateNames)
     }
 
     private var canAddSearchText: Bool {
-        let normalized = normalizedSearchText
-        guard !normalized.isEmpty else {
-            return false
-        }
-        return !containsTag(normalized)
+        selectionState.canAddSearchText(selectedTags: selectedTags)
+    }
+
+    private var normalizedSearchText: String {
+        selectionState.normalizedSearchText
     }
 
     var body: some View {
         Form {
             Section {
-                TextField("シリーズを検索・追加", text: $searchText)
+                TextField("シリーズを検索・追加", text: $selectionState.searchText)
                     .disableAutocorrection(true)
 
                 if canAddSearchText {
                     Button {
                         MegrumHaptics.performSelectionChanged {
                             addTag(normalizedSearchText)
-                            searchText = ""
+                            selectionState.clearSearch()
                         }
                     } label: {
                         Label("「\(normalizedSearchText)」を追加", systemImage: "plus.circle.fill")
@@ -122,7 +112,7 @@ struct SearchGoodsTagSelectionSheet: View {
     }
 
     private func containsTag(_ tagName: String) -> Bool {
-        selectedTags.contains { $0.localizedCaseInsensitiveCompare(tagName) == .orderedSame }
+        selectionState.containsTag(tagName, in: selectedTags)
     }
 }
 

@@ -9,9 +9,9 @@ import UIKit
 extension TradeDetailScreen {
     var evidencePhotoPickerSelection: Binding<PhotosPickerItem?> {
         Binding(
-            get: { selectedEvidencePhotoItem },
+            get: { photoPresentationState.selectedEvidencePhotoItem },
             set: { item in
-                selectedEvidencePhotoItem = item
+                photoPresentationState.selectedEvidencePhotoItem = item
                 handleSelectedEvidencePhoto(item)
             }
         )
@@ -38,7 +38,7 @@ extension TradeDetailScreen {
     }
 
     func openDisputeDetail(_ summary: TradeDisputeSummary) {
-        disputeDetailRoute = TradeDisputeDetailRoute(
+        routePresentationState.disputeDetailRoute = TradeDisputeDetailRoute(
             summary: summary,
             model: summary.detailModel(proposal: currentProposal, viewerID: viewerID)
         )
@@ -48,7 +48,25 @@ extension TradeDetailScreen {
         guard let partnerID else {
             return
         }
-        partnerProfileRoute = TradePartnerProfileRoute(userID: partnerID)
+        routePresentationState.partnerProfileRoute = TradePartnerProfileRoute(userID: partnerID)
+    }
+
+    func rejectCurrentProposal() {
+        Task {
+            await appState.rejectProposal(proposalID: currentProposal.id)
+        }
+    }
+
+    func presentEvidenceSourceDialog() {
+        photoPresentationState.showEvidenceSourceDialog()
+    }
+
+    func presentEvidenceCamera() {
+        photoPresentationState.showEvidenceCamera()
+    }
+
+    func presentEvidencePhotoLibrary() {
+        photoPresentationState.showEvidencePhotoLibraryPicker()
     }
 
     func handleSelectedEvidencePhoto(_ item: PhotosPickerItem?) {
@@ -105,17 +123,19 @@ extension TradeDetailScreen {
     }
 
     func openEvidenceList() {
-        isShowingEvidenceList = true
+        routePresentationState.showEvidenceList()
         Task {
             await appState.loadTradeEvidencePhotos(proposal: currentProposal, reportsFailure: false)
         }
     }
 
     func openEvidencePhoto(_ photo: TradeEvidencePhoto) {
-        selectedRemoteImage = RemoteImageSelection(
-            url: photo.photoURL,
-            evidencePhotoID: photo.id,
-            canDeleteEvidencePhoto: currentProposal.status == .agreed && photo.isUploadedBy(viewerID)
+        routePresentationState.selectRemoteImage(
+            RemoteImageSelection(
+                url: photo.photoURL,
+                evidencePhotoID: photo.id,
+                canDeleteEvidencePhoto: currentProposal.status == .agreed && photo.isUploadedBy(viewerID)
+            )
         )
     }
 
@@ -126,7 +146,7 @@ extension TradeDetailScreen {
             return nil
         }
         return {
-            selectedRemoteImage = nil
+            routePresentationState.clearSelectedRemoteImage()
             Task {
                 await appState.deleteTradeEvidencePhoto(
                     proposalID: currentProposal.id,
@@ -138,32 +158,28 @@ extension TradeDetailScreen {
 
     func sendDraftMessage() {
         Task {
-            let sent = await appState.sendMessage(proposalID: proposal.id, body: draftMessage)
-            if sent {
-                draftMessage = ""
-            }
+            let sent = await appState.sendMessage(proposalID: proposal.id, body: interactionState.draftMessage)
+            interactionState.clearDraftAfterSend(succeeded: sent)
         }
     }
 
     func handleLocationCoordinateChange(_ coordinate: MegrumLocationCoordinate?) {
-        guard isWaitingToShareLocation, let coordinate else {
+        guard let coordinate = interactionState.consumeLocationCoordinate(coordinate) else {
             return
         }
-        isWaitingToShareLocation = false
         sendLocationMessage(coordinate)
     }
 
     func handleLocationErrorChange(_ errorMessage: String?) {
-        guard isWaitingToShareLocation, errorMessage != nil else {
+        guard interactionState.consumeLocationError(errorMessage) else {
             return
         }
-        isWaitingToShareLocation = false
-        unavailableChatAction = .location
+        routePresentationState.unavailableChatAction = .location
     }
 
     func addEvidence(from item: PhotosPickerItem) async {
         defer {
-            selectedEvidencePhotoItem = nil
+            photoPresentationState.clearEvidencePhotoItem()
         }
         guard let data = try? await item.loadTransferable(type: Data.self) else {
             return
@@ -179,23 +195,16 @@ extension TradeDetailScreen {
             imageContentType: imageContentType
         )
         if added {
-            isShowingEvidenceList = true
+            routePresentationState.showEvidenceList()
         }
     }
 
     func addChatPhoto(from item: PhotosPickerItem, messageType: TradeMessageType) async {
         defer {
-            switch messageType {
-            case .outfitPhoto:
-                selectedOutfitPhotoItem = nil
-            case .photo:
-                selectedChatPhotoItem = nil
-            case .text, .location, .arrivalStatus, .system:
-                break
-            }
+            photoPresentationState.clearPhotoItem(for: messageType)
         }
         guard let data = try? await item.loadTransferable(type: Data.self) else {
-            unavailableChatAction = TradeUnavailableChatAction.messageFailureAction(for: messageType)
+            routePresentationState.unavailableChatAction = TradeUnavailableChatAction.messageFailureAction(for: messageType)
             return
         }
         let upload = normalizedChatPhotoUpload(from: data)
@@ -218,7 +227,7 @@ extension TradeDetailScreen {
             body: messageType == .outfitPhoto ? intent.body : nil
         )
         if !sent {
-            unavailableChatAction = TradeUnavailableChatAction.messageFailureAction(for: messageType)
+            routePresentationState.unavailableChatAction = TradeUnavailableChatAction.messageFailureAction(for: messageType)
         }
     }
 
@@ -234,14 +243,14 @@ extension TradeDetailScreen {
     }
 
     func shareCurrentLocation() {
-        isWaitingToShareLocation = true
+        interactionState.startWaitingForLocation()
         locationState.requestCurrentLocation(clearsPreviousCoordinate: true)
     }
 
     func sendLocationMessage(_ coordinate: MegrumLocationCoordinate) {
         let intent = TradeLocationShareIntent(coordinate: coordinate)
         guard intent.isSubmittable else {
-            unavailableChatAction = .location
+            routePresentationState.unavailableChatAction = .location
             return
         }
         Task {
@@ -256,13 +265,14 @@ extension TradeDetailScreen {
     }
 
     func showToast(_ message: String) {
-        toastMessage = message
+        interactionState.showToast(message)
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: 1_800_000_000)
-            if toastMessage == message {
-                withAnimation(.snappy(duration: 0.18)) {
-                    toastMessage = nil
-                }
+            guard interactionState.toastMessage == message else {
+                return
+            }
+            withAnimation(.snappy(duration: 0.18)) {
+                interactionState.clearToast(ifMatching: message)
             }
         }
     }

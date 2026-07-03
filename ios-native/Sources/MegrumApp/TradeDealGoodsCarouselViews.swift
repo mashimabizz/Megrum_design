@@ -13,8 +13,7 @@ struct TradeGoodsCarouselColumn: View {
     var onStageTap: (() -> Void)?
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var selectedIndex = 0
-    @State private var dragProgress: Double = 0
+    @State private var presentationState = TradeGoodsCarouselPresentationState()
 
     var body: some View {
         VStack(spacing: 5) {
@@ -49,19 +48,11 @@ struct TradeGoodsCarouselColumn: View {
         guard !displayItems.isEmpty else {
             return "0/0"
         }
-        return "\(selectedIndex + 1)/\(displayItems.count)"
+        return presentationState.countText(itemCount: displayItems.count)
     }
 
     private var displayItems: [TradeDealDisplayItem] {
         items.map(TradeDealDisplayItem.goods) + (cashOffer ? [.cash(amount: cashAmount)] : [])
-    }
-
-    private var tableStep: Double {
-        360.0 / Double(max(displayItems.count, 3))
-    }
-
-    private var displayedDragProgress: Double {
-        reduceMotion ? 0 : dragProgress
     }
 
     private var carousel: some View {
@@ -69,9 +60,12 @@ struct TradeGoodsCarouselColumn: View {
             TradeGoodsCarouselStage(
                 items: items,
                 displayItems: displayItems,
-                selectedIndex: selectedIndex,
-                dragProgress: displayedDragProgress,
-                tableRotation: (Double(selectedIndex) + displayedDragProgress) * tableStep,
+                selectedIndex: presentationState.selectedIndex,
+                dragProgress: presentationState.displayedDragProgress(reduceMotion: reduceMotion),
+                tableRotation: presentationState.tableRotation(
+                    itemCount: displayItems.count,
+                    reduceMotion: reduceMotion
+                ),
                 accentColor: accentColor,
                 badgeTitle: badgeTitle
             )
@@ -110,8 +104,7 @@ struct TradeGoodsCarouselColumn: View {
             }
         }
         .onChange(of: displayItems.map(\.id)) { _, _ in
-            selectedIndex = min(selectedIndex, max(0, displayItems.count - 1))
-            dragProgress = 0
+            presentationState.clampSelection(itemCount: displayItems.count)
         }
     }
 
@@ -133,16 +126,19 @@ struct TradeGoodsCarouselColumn: View {
         guard displayItems.count > 1, !reduceMotion else {
             return
         }
-        guard let progress = carouselDragProgress(translation: translation, width: width) else {
+        guard let progress = TradeGoodsCarouselPresentationState.dragProgress(
+            translation: translation,
+            width: width
+        ) else {
             if abs(translation.height) > abs(translation.width) {
-                dragProgress = 0
+                presentationState.resetDragProgress()
             }
             return
         }
         var transaction = Transaction()
         transaction.disablesAnimations = true
         withTransaction(transaction) {
-            dragProgress = progress
+            presentationState.updateDragProgress(progress)
         }
     }
 
@@ -152,56 +148,29 @@ struct TradeGoodsCarouselColumn: View {
         width: CGFloat
     ) {
         guard displayItems.count > 1 else {
-            dragProgress = 0
+            presentationState.resetDragProgress()
             return
         }
-        guard isHorizontalCarouselDrag(translation) else {
-            dragProgress = 0
+        guard let indexDelta = TradeGoodsCarouselPresentationState.resolvedIndexDelta(
+            translation: translation,
+            projectedTranslationWidth: projectedTranslationWidth,
+            width: width
+        ) else {
+            presentationState.resetDragProgress()
             return
-        }
-        let denominator = max(width * 0.58, 72)
-        let projectedProgress = -Double(projectedTranslationWidth / denominator)
-        let actualProgress = -Double(translation.width / denominator)
-        let resolvedProgress = abs(projectedProgress) > abs(actualProgress) ? projectedProgress : actualProgress
-        let indexDelta: Int
-        if resolvedProgress > 0.34 {
-            indexDelta = 1
-        } else if resolvedProgress < -0.34 {
-            indexDelta = -1
-        } else {
-            indexDelta = 0
         }
         settleCarousel(indexDelta: indexDelta)
     }
 
-    private func carouselDragProgress(translation: CGSize, width: CGFloat) -> Double? {
-        guard isHorizontalCarouselDrag(translation) else {
-            return nil
-        }
-        let denominator = max(width * 0.58, 72)
-        return max(-1.15, min(1.15, -Double(translation.width / denominator)))
-    }
-
-    private func isHorizontalCarouselDrag(_ translation: CGSize) -> Bool {
-        HorizontalSwipeIntentResolver.isHorizontalSwipe(translation)
-    }
-
     private func settleCarousel(indexDelta: Int) {
         let updates = {
-            if indexDelta != 0 {
-                selectedIndex = wrappedIndex(selectedIndex + indexDelta)
-            }
-            dragProgress = 0
+            presentationState.settle(indexDelta: indexDelta, itemCount: displayItems.count)
         }
         guard !reduceMotion else {
             updates()
             return
         }
         withAnimation(.interactiveSpring(response: 0.46, dampingFraction: 0.82, blendDuration: 0.12), updates)
-    }
-
-    private func wrappedIndex(_ index: Int) -> Int {
-        (index % displayItems.count + displayItems.count) % displayItems.count
     }
 }
 

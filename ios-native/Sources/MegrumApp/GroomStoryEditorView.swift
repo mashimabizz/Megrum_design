@@ -15,7 +15,10 @@ struct GroomStoryEditorView: View {
     @State private var isTextInputPresented = false
     @State private var draftText = ""
     @State private var draftTextPosition = CGPoint(x: 0.50, y: 0.45)
+    @State private var draftTextScale: CGFloat = 1
+    @State private var draftRotationDegrees: Double = 0
     @State private var selectedTextColor: GroomStoryTextColor = .white
+    @State private var editingOverlayID: UUID?
     @State private var draggingOverlayID: UUID?
     @State private var isHoveringDeleteTarget = false
 
@@ -32,26 +35,25 @@ struct GroomStoryEditorView: View {
                 GroomStoryEditableCanvas(
                     photoData: photoData,
                     textOverlays: $textOverlays,
+                    editingOverlayID: editingOverlayID,
                     draggingOverlayID: $draggingOverlayID,
                     isHoveringDeleteTarget: $isHoveringDeleteTarget,
                     onDelete: deleteOverlay,
+                    onEdit: beginEditingTextOverlay,
                     onTapCanvas: { location, size in
                         beginTextInput(at: location, in: size)
                     }
                 )
                 .frame(width: canvasFrame.width, height: canvasFrame.height)
-                .clipShape(RoundedRectangle(cornerRadius: 34, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 34, style: .continuous)
-                        .stroke(.white.opacity(0.08), lineWidth: 1)
-                }
                 .position(x: canvasFrame.midX, y: canvasFrame.midY)
 
                 if isTextInputPresented {
                     GroomStoryTextInputLayer(
                         canvasFrame: canvasFrame,
+                        safeAreaInsets: proxy.safeAreaInsets,
                         text: $draftText,
                         selectedColor: selectedTextColor,
+                        textScale: $draftTextScale,
                         position: draftTextPosition,
                         isFocused: $isTextFieldFocused,
                         onCommit: commitDraftText
@@ -63,21 +65,15 @@ struct GroomStoryEditorView: View {
                     GroomStoryDeleteTarget(isActive: isHoveringDeleteTarget)
                         .position(
                             x: canvasFrame.midX,
-                            y: canvasFrame.maxY - 78
+                            y: proxy.size.height - proxy.safeAreaInsets.bottom - 32
                         )
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
 
                 if !isTextInputPresented {
                     GroomStoryEditorTopChrome(
-                        canvasFrame: canvasFrame,
-                        onClose: onClose,
-                        onAddText: {
-                            beginTextInput(
-                                at: CGPoint(x: canvasFrame.width * 0.50, y: canvasFrame.height * 0.42),
-                                in: canvasFrame.size
-                            )
-                        }
+                        safeAreaInsets: proxy.safeAreaInsets,
+                        onClose: onClose
                     )
                     .transition(.opacity)
 
@@ -86,8 +82,8 @@ struct GroomStoryEditorView: View {
                         onPublish: onPublish
                     )
                     .position(
-                        x: proxy.size.width - 52,
-                        y: proxy.size.height - proxy.safeAreaInsets.bottom - 40
+                        x: proxy.size.width - proxy.safeAreaInsets.trailing - 38,
+                        y: proxy.size.height - proxy.safeAreaInsets.bottom - 46
                     )
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
@@ -97,11 +93,9 @@ struct GroomStoryEditorView: View {
         }
         .safeAreaInset(edge: .bottom) {
             if isTextInputPresented {
-                GroomStoryTextColorToolbar(
-                    selectedColor: $selectedTextColor
-                )
-                .padding(.horizontal, 24)
-                .padding(.bottom, 10)
+                GroomStoryTextColorToolbar(selectedColor: $selectedTextColor)
+                .padding(.horizontal, 22)
+                .padding(.bottom, 8)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
@@ -113,9 +107,31 @@ struct GroomStoryEditorView: View {
         }
         draftText = ""
         draftTextPosition = CGPoint(
-            x: min(max(location.x / max(canvasSize.width, 1), 0.12), 0.88),
+            x: 0.50,
             y: min(max(location.y / max(canvasSize.height, 1), 0.12), 0.84)
         )
+        draftTextScale = 1
+        draftRotationDegrees = 0
+        editingOverlayID = nil
+        withAnimation(.smooth(duration: 0.16)) {
+            isTextInputPresented = true
+        }
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(120))
+            isTextFieldFocused = true
+        }
+    }
+
+    private func beginEditingTextOverlay(_ overlay: GroomStoryTextOverlay) {
+        guard !isCreating else {
+            return
+        }
+        draftText = overlay.text
+        draftTextPosition = overlay.normalizedPosition
+        draftTextScale = overlay.scale
+        draftRotationDegrees = overlay.rotationDegrees
+        selectedTextColor = overlay.color
+        editingOverlayID = overlay.id
         withAnimation(.smooth(duration: 0.16)) {
             isTextInputPresented = true
         }
@@ -127,18 +143,31 @@ struct GroomStoryEditorView: View {
 
     private func commitDraftText() {
         let trimmedText = draftText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let editedOverlayID = editingOverlayID
         withAnimation(.smooth(duration: 0.16)) {
             isTextFieldFocused = false
             isTextInputPresented = false
+            editingOverlayID = nil
         }
         guard !trimmedText.isEmpty else {
+            return
+        }
+        if let editedOverlayID,
+           let index = textOverlays.firstIndex(where: { $0.id == editedOverlayID }) {
+            textOverlays[index].text = trimmedText
+            textOverlays[index].normalizedPosition = draftTextPosition.groomStoryClamped
+            textOverlays[index].color = selectedTextColor
+            textOverlays[index].scale = min(max(draftTextScale, 0.55), 2.6)
+            textOverlays[index].rotationDegrees = draftRotationDegrees
             return
         }
         textOverlays.append(
             GroomStoryTextOverlay(
                 text: trimmedText,
                 normalizedPosition: draftTextPosition,
-                color: selectedTextColor
+                color: selectedTextColor,
+                scale: draftTextScale,
+                rotationDegrees: draftRotationDegrees
             )
         )
     }
@@ -146,25 +175,27 @@ struct GroomStoryEditorView: View {
     private func deleteOverlay(_ id: UUID) {
         withAnimation(.smooth(duration: 0.18)) {
             textOverlays.removeAll { $0.id == id }
+            if editingOverlayID == id {
+                editingOverlayID = nil
+            }
         }
     }
 }
 
 private enum GroomStoryEditorLayout {
     static func canvasFrame(in size: CGSize, safeAreaInsets: EdgeInsets) -> CGRect {
-        let top = safeAreaInsets.top + 52
-        let bottom = safeAreaInsets.bottom + 96
-        let height = max(420, size.height - top - bottom)
-        return CGRect(x: 0, y: top, width: size.width, height: height)
+        CGRect(origin: .zero, size: size)
     }
 }
 
 private struct GroomStoryEditableCanvas: View {
     var photoData: Data
     @Binding var textOverlays: [GroomStoryTextOverlay]
+    var editingOverlayID: UUID?
     @Binding var draggingOverlayID: UUID?
     @Binding var isHoveringDeleteTarget: Bool
     var onDelete: (UUID) -> Void
+    var onEdit: (GroomStoryTextOverlay) -> Void
     var onTapCanvas: (CGPoint, CGSize) -> Void
 
     var body: some View {
@@ -173,13 +204,16 @@ private struct GroomStoryEditableCanvas: View {
                 GroomStoryPhotoCanvas(photoData: photoData)
 
                 ForEach($textOverlays) { $overlay in
-                    GroomStoryEditableTextOverlay(
-                        overlay: $overlay,
-                        canvasSize: proxy.size,
-                        draggingOverlayID: $draggingOverlayID,
-                        isHoveringDeleteTarget: $isHoveringDeleteTarget,
-                        onDelete: onDelete
-                    )
+                    if overlay.id != editingOverlayID {
+                        GroomStoryEditableTextOverlay(
+                            overlay: $overlay,
+                            canvasSize: proxy.size,
+                            draggingOverlayID: $draggingOverlayID,
+                            isHoveringDeleteTarget: $isHoveringDeleteTarget,
+                            onDelete: onDelete,
+                            onEdit: onEdit
+                        )
+                    }
                 }
             }
             .coordinateSpace(name: GroomStoryCanvasCoordinateSpace.name)
@@ -200,9 +234,14 @@ private struct GroomStoryEditableTextOverlay: View {
     @Binding var draggingOverlayID: UUID?
     @Binding var isHoveringDeleteTarget: Bool
     var onDelete: (UUID) -> Void
+    var onEdit: (GroomStoryTextOverlay) -> Void
 
     @State private var dragStartPosition: CGPoint?
     @State private var scaleStart: CGFloat = 1
+    @State private var rotationStartDegrees: Double = 0
+    @State private var isMagnifying = false
+    @State private var isRotating = false
+    @State private var hasExceededDragThreshold = false
 
     var body: some View {
         GroomStoryOverlayText(
@@ -216,6 +255,7 @@ private struct GroomStoryEditableTextOverlay: View {
         .scaleEffect(draggingOverlayID == overlay.id ? 1.04 : 1)
         .gesture(dragGesture)
         .simultaneousGesture(magnificationGesture)
+        .simultaneousGesture(rotationGesture)
     }
 
     private var dragGesture: some Gesture {
@@ -223,23 +263,33 @@ private struct GroomStoryEditableTextOverlay: View {
             .onChanged { value in
                 if dragStartPosition == nil {
                     dragStartPosition = overlay.normalizedPosition
-                    draggingOverlayID = overlay.id
+                    hasExceededDragThreshold = false
                 }
+                let distance = hypot(value.translation.width, value.translation.height)
+                guard distance > 6 || hasExceededDragThreshold else {
+                    return
+                }
+                hasExceededDragThreshold = true
+                draggingOverlayID = overlay.id
                 let basePosition = dragStartPosition ?? overlay.normalizedPosition
                 overlay.normalizedPosition = CGPoint(
                     x: basePosition.x + value.translation.width / max(canvasSize.width, 1),
                     y: basePosition.y + value.translation.height / max(canvasSize.height, 1)
                 )
                 .groomStoryClamped
-                isHoveringDeleteTarget = overlay.normalizedPosition.y > 0.78
+                isHoveringDeleteTarget = overlay.normalizedPosition.y > 0.84
             }
             .onEnded { _ in
-                let shouldDelete = overlay.normalizedPosition.y > 0.78
+                let shouldEdit = !hasExceededDragThreshold
+                let shouldDelete = overlay.normalizedPosition.y > 0.84
                 dragStartPosition = nil
                 draggingOverlayID = nil
                 isHoveringDeleteTarget = false
+                hasExceededDragThreshold = false
                 if shouldDelete {
                     onDelete(overlay.id)
+                } else if shouldEdit {
+                    onEdit(overlay)
                 }
             }
     }
@@ -247,18 +297,40 @@ private struct GroomStoryEditableTextOverlay: View {
     private var magnificationGesture: some Gesture {
         MagnificationGesture()
             .onChanged { value in
+                if !isMagnifying {
+                    scaleStart = overlay.scale
+                    isMagnifying = true
+                }
                 overlay.scale = min(max(scaleStart * value, 0.55), 2.6)
             }
             .onEnded { _ in
                 scaleStart = overlay.scale
+                isMagnifying = false
+            }
+    }
+
+    private var rotationGesture: some Gesture {
+        RotationGesture()
+            .onChanged { value in
+                if !isRotating {
+                    rotationStartDegrees = overlay.rotationDegrees
+                    isRotating = true
+                }
+                overlay.rotationDegrees = rotationStartDegrees + value.degrees
+            }
+            .onEnded { _ in
+                rotationStartDegrees = overlay.rotationDegrees
+                isRotating = false
             }
     }
 }
 
 private struct GroomStoryTextInputLayer: View {
     var canvasFrame: CGRect
+    var safeAreaInsets: EdgeInsets
     @Binding var text: String
     var selectedColor: GroomStoryTextColor
+    @Binding var textScale: CGFloat
     var position: CGPoint
     var isFocused: FocusState<Bool>.Binding
     var onCommit: () -> Void
@@ -270,44 +342,57 @@ private struct GroomStoryTextInputLayer: View {
 
             inputField
 
+            GroomStoryVerticalTextSizeControl(textScale: $textScale)
+                .frame(width: 46, height: 196)
+                .position(
+                    x: canvasFrame.minX + safeAreaInsets.leading + 34,
+                    y: canvasFrame.midY
+                )
+
             Button("完了", action: onCommit)
                 .font(.system(size: 18, weight: .heavy, design: .rounded))
                 .foregroundStyle(.white)
                 .padding(.horizontal, 22)
                 .padding(.vertical, 12)
                 .contentShape(Capsule())
-                .padding(.top, canvasFrame.minY + 20)
+                .padding(.top, safeAreaInsets.top + 12)
                 .padding(.trailing, 22)
         }
     }
 
     private var inputField: some View {
-        TextField("", text: $text)
-            .font(.system(size: 46, weight: .regular, design: .rounded))
+        TextField("", text: $text, axis: .vertical)
+            .font(.system(size: inputFontSize, weight: .regular, design: .rounded))
             .foregroundStyle(selectedColor.color)
             .shadow(color: selectedColor.shadowColor, radius: 4, x: 0, y: 2)
+            .multilineTextAlignment(.center)
+            .lineLimit(1...7)
             .focused(isFocused)
             .onSubmit(onCommit)
-            .frame(width: inputFieldWidth, alignment: .leading)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(width: inputFieldWidth, alignment: .center)
             .position(inputFieldPosition)
     }
 
     private var inputFieldWidth: CGFloat {
-        min(340, max(180, canvasFrame.width - 48))
+        min(360, max(190, canvasFrame.width - 58))
     }
 
     private var inputFieldPosition: CGPoint {
         CGPoint(
-            x: canvasFrame.minX + position.x * canvasFrame.width,
+            x: canvasFrame.midX,
             y: canvasFrame.minY + position.y * canvasFrame.height
         )
+    }
+
+    private var inputFontSize: CGFloat {
+        min(max(46 * textScale, 30), 104)
     }
 }
 
 private struct GroomStoryEditorTopChrome: View {
-    var canvasFrame: CGRect
+    var safeAreaInsets: EdgeInsets
     var onClose: () -> Void
-    var onAddText: () -> Void
 
     var body: some View {
         ZStack {
@@ -316,19 +401,12 @@ private struct GroomStoryEditorTopChrome: View {
                 accessibilityLabel: "閉じる",
                 action: onClose
             )
-            .position(x: canvasFrame.minX + 46, y: canvasFrame.minY + 50)
-
-            Button(action: onAddText) {
-                Text("Aa")
-                    .font(.system(size: 25, weight: .heavy, design: .rounded))
-                    .foregroundStyle(.white)
-                    .frame(width: 58, height: 58)
-                    .background(.black.opacity(0.44), in: Circle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("テキストを追加")
-            .position(x: canvasFrame.maxX - 46, y: canvasFrame.minY + 50)
+            .position(x: safeAreaInsets.leading + 32, y: topButtonY)
         }
+    }
+
+    private var topButtonY: CGFloat {
+        safeAreaInsets.top + 30
     }
 }
 
@@ -406,8 +484,70 @@ private struct GroomStoryTextColorToolbar: View {
             }
         }
         .frame(maxWidth: .infinity)
-        .frame(height: 54)
-        .background(.black.opacity(0.70), in: Capsule())
+        .padding(.horizontal, 16)
+        .padding(.vertical, 11)
+        .background(.black.opacity(0.72), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+    }
+}
+
+private struct GroomStoryVerticalTextSizeControl: View {
+    @Binding var textScale: CGFloat
+
+    var body: some View {
+        GeometryReader { proxy in
+            let height = max(proxy.size.height, 1)
+            let normalized = normalizedTextScale
+            let knobY = height * (1 - normalized)
+
+            ZStack {
+                GroomStoryTextSizeTrackShape()
+                    .fill(.white.opacity(0.34))
+                    .overlay {
+                        GroomStoryTextSizeTrackShape()
+                            .stroke(.white.opacity(0.58), lineWidth: 1)
+                    }
+
+                Circle()
+                    .fill(.white)
+                    .frame(width: 18, height: 18)
+                    .shadow(color: .black.opacity(0.28), radius: 8, x: 0, y: 3)
+                    .position(x: proxy.size.width / 2, y: min(max(knobY, 9), height - 9))
+            }
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { value in
+                        updateScale(from: value.location.y, height: height)
+                    }
+            )
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("文字サイズ")
+        .accessibilityValue("\(Int(textScale * 100))パーセント")
+    }
+
+    private var normalizedTextScale: CGFloat {
+        (min(max(textScale, 0.65), 2.20) - 0.65) / (2.20 - 0.65)
+    }
+
+    private func updateScale(from y: CGFloat, height: CGFloat) {
+        let clampedY = min(max(y, 0), height)
+        let normalized = 1 - clampedY / max(height, 1)
+        textScale = 0.65 + normalized * (2.20 - 0.65)
+    }
+}
+
+private struct GroomStoryTextSizeTrackShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: rect.midX, y: rect.maxY))
+        path.addLine(to: CGPoint(x: rect.maxX - 4, y: rect.minY + 2))
+        path.addQuadCurve(
+            to: CGPoint(x: rect.minX + 4, y: rect.minY + 2),
+            control: CGPoint(x: rect.midX, y: rect.minY - 4)
+        )
+        path.closeSubpath()
+        return path
     }
 }
 
@@ -415,21 +555,15 @@ private struct GroomStoryDeleteTarget: View {
     var isActive: Bool
 
     var body: some View {
-        VStack(spacing: 12) {
-            Text("ドラッグして削除")
-                .font(.system(size: 19, weight: .heavy, design: .rounded))
-                .foregroundStyle(.white)
-
-            Image(systemName: "trash")
-                .font(.system(size: 30, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(width: 70, height: 70)
-                .background(isActive ? MegrumTheme.conditionExact : .black.opacity(0.22), in: Circle())
-                .overlay {
-                    Circle()
-                        .stroke(.white, lineWidth: 2)
-                }
-        }
+        Image(systemName: "trash")
+            .font(.system(size: 18, weight: .semibold))
+            .foregroundStyle(.white)
+            .frame(width: 42, height: 42)
+            .background(isActive ? MegrumTheme.conditionExact : .black.opacity(0.28), in: Circle())
+            .overlay {
+                Circle()
+                    .stroke(.white, lineWidth: 1.6)
+            }
     }
 }
 

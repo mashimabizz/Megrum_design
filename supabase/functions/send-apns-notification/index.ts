@@ -8,6 +8,7 @@ declare const Deno: {
 type NotificationRow = {
   id: string;
   user_id: string;
+  kind: string;
   title: string;
   body: string | null;
   link_path: string | null;
@@ -58,7 +59,8 @@ Deno.serve(async (request) => {
   try {
     config = readConfig();
   } catch (error) {
-    return jsonResponse({ error: "missing_configuration", detail: messageOf(error) }, 500);
+    console.error("send-apns-notification configuration error", publicErrorCode(error));
+    return jsonResponse({ error: "missing_configuration" }, 500);
   }
 
   if (!isAuthorized(request, config)) {
@@ -70,14 +72,15 @@ Deno.serve(async (request) => {
     const payload = await request.json();
     notificationID = requireString(payload?.notification_id ?? payload?.notificationId, "notification_id");
   } catch (error) {
-    return jsonResponse({ error: "invalid_payload", detail: messageOf(error) }, 400);
+    return jsonResponse({ error: "invalid_payload", detail: publicErrorCode(error) }, 400);
   }
 
   try {
     const result = await dispatchNotification(notificationID, config);
     return jsonResponse(result, 200);
   } catch (error) {
-    return jsonResponse({ error: "dispatch_failed", detail: messageOf(error) }, 500);
+    console.error("send-apns-notification dispatch failed", publicErrorCode(error));
+    return jsonResponse({ error: "dispatch_failed", detail: publicErrorCode(error) }, 500);
   }
 });
 
@@ -112,7 +115,7 @@ async function dispatchNotification(notificationID: string, config: RuntimeConfi
 
 async function loadNotification(notificationID: string, config: RuntimeConfig): Promise<NotificationRow> {
   const rows = await supabaseFetch<NotificationRow[]>(
-    `/rest/v1/notifications?select=id,user_id,title,body,link_path&id=eq.${encodeURIComponent(notificationID)}&limit=1`,
+    `/rest/v1/notifications?select=id,user_id,kind,title,body,link_path&id=eq.${encodeURIComponent(notificationID)}&limit=1`,
     config,
   );
   const notification = rows[0];
@@ -144,7 +147,7 @@ async function loadUnreadCount(userID: string, config: RuntimeConfig): Promise<n
     },
   });
   if (!response.ok) {
-    throw new Error(`unread_count_failed:${response.status}:${await response.text()}`);
+    throw new Error(`unread_count_failed:${response.status}`);
   }
   const contentRange = response.headers.get("content-range");
   if (contentRange?.includes("/")) {
@@ -175,6 +178,7 @@ async function sendAPNsNotification(
       sound: "default",
     },
     notificationId: notification.id,
+    kind: notification.kind,
     linkPath: notification.link_path ?? "/notifications",
   };
 
@@ -214,7 +218,7 @@ async function revokeDevice(deviceID: string, config: RuntimeConfig): Promise<vo
     },
   );
   if (!response.ok) {
-    throw new Error(`device_revoke_failed:${response.status}:${await response.text()}`);
+    throw new Error(`device_revoke_failed:${response.status}`);
   }
 }
 
@@ -223,7 +227,7 @@ async function supabaseFetch<T>(path: string, config: RuntimeConfig): Promise<T>
     headers: supabaseHeaders(config),
   });
   if (!response.ok) {
-    throw new Error(`supabase_fetch_failed:${response.status}:${await response.text()}`);
+    throw new Error(`supabase_fetch_failed:${response.status}`);
   }
   return await response.json() as T;
 }
@@ -352,4 +356,27 @@ function jsonResponse(body: unknown, status: number): Response {
 
 function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function publicErrorCode(error: unknown): string {
+  const message = messageOf(error);
+  if (message === "notification_not_found") {
+    return message;
+  }
+  for (const prefix of [
+    "unread_count_failed",
+    "device_revoke_failed",
+    "supabase_fetch_failed",
+  ]) {
+    if (message.startsWith(`${prefix}:`)) {
+      return prefix;
+    }
+  }
+  if (message.endsWith(" is required")) {
+    return "required_value_missing";
+  }
+  if (message.startsWith("MEGRUM_APNS_ENVIRONMENT")) {
+    return "configuration_invalid";
+  }
+  return "dispatch_error";
 }

@@ -30,10 +30,12 @@ extension IndividualListingEditorSheet {
     }
 
     func save() async {
-        saveErrorMessage = nil
+        presentationState.clearSaveError()
         guard let input = draft.createInput(inventory: appState.inventory, wishes: appState.wishes) else {
-            saveErrorMessage = stepValidationMessage
+            presentationState.setSaveError(
+                stepValidationMessage
                 ?? IndividualListingEditorSaveFailurePresentation.fallbackMessage
+            )
             return
         }
         if case .edit(let listing) = draft.mode {
@@ -47,17 +49,21 @@ extension IndividualListingEditorSheet {
                 onLocalEditSaved?(updated)
                 finishSuccessfulSave()
             } else {
-                saveErrorMessage = appState.errorMessage
+                presentationState.setSaveError(
+                    appState.errorMessage
                     ?? IndividualListingEditorSaveFailurePresentation.fallbackMessage
+                )
             }
             return
         }
-        let saved = await appState.createIndividualListing(input)
-        if saved {
+        if let created = await appState.createIndividualListingRecord(input) {
+            onCreatedListing?(created)
             finishSuccessfulSave()
         } else {
-            saveErrorMessage = appState.errorMessage
+            presentationState.setSaveError(
+                appState.errorMessage
                 ?? IndividualListingEditorSaveFailurePresentation.fallbackMessage
+            )
         }
     }
 
@@ -72,7 +78,7 @@ extension IndividualListingEditorSheet {
 
     func selectStep(_ targetStep: IndividualListingEditorStep) {
         withAnimation(.smooth(duration: 0.2)) {
-            step = targetStep
+            presentationState.selectStep(targetStep)
         }
     }
 
@@ -80,14 +86,14 @@ extension IndividualListingEditorSheet {
         guard stepValidationMessage == nil else {
             return
         }
-        switch step {
+        switch presentationState.step {
         case .haves:
             withAnimation(.smooth(duration: 0.2)) {
-                step = .options
+                presentationState.selectStep(.options)
             }
         case .options:
             withAnimation(.smooth(duration: 0.2)) {
-                step = .exchange
+                presentationState.selectStep(.exchange)
             }
         case .exchange:
             draft.includesExchangeConditionSummary = true
@@ -98,13 +104,13 @@ extension IndividualListingEditorSheet {
     }
 
     func addCurrentOption() {
-        guard step == .options, stepValidationMessage == nil else {
+        guard presentationState.step == .options, stepValidationMessage == nil else {
             return
         }
-        guard let item = makeCurrentOptionReviewItem(title: "選択肢\(stagedOptionSummaries.count + 1)") else {
+        guard let item = makeCurrentOptionReviewItem(title: presentationState.nextOptionTitle) else {
             return
         }
-        stagedOptionSummaries.append(item)
+        presentationState.appendStagedOption(item)
         draft.resetCurrentOptionSelection()
         showOptionAddedToast(for: item)
     }
@@ -112,10 +118,7 @@ extension IndividualListingEditorSheet {
     func deleteOptionReviewItem(_ item: IndividualListingOptionReviewItem) {
         switch item.source {
         case .staged:
-            stagedOptionSummaries = IndividualListingOptionReviewReducer.deleting(
-                itemID: item.id,
-                from: stagedOptionSummaries
-            )
+            presentationState.deleteStagedOption(id: item.id)
         case .current:
             clearCurrentOption()
         }
@@ -127,28 +130,27 @@ extension IndividualListingEditorSheet {
 
     func showOptionAddedToast(for item: IndividualListingOptionReviewItem) {
         let toastID = UUID()
-        optionToastID = toastID
         withAnimation(.snappy(duration: 0.18)) {
-            optionToastMessage = item.addedToastMessage
+            presentationState.showOptionAddedToast(for: item, toastID: toastID)
         }
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: 2_200_000_000)
-            guard optionToastID == toastID else {
+            guard presentationState.optionToastID == toastID else {
                 return
             }
             withAnimation(.snappy(duration: 0.18)) {
-                optionToastMessage = nil
+                presentationState.clearOptionToast(ifMatching: toastID)
             }
         }
     }
 
     func seedDraftDefaultsIfNeeded() {
-        if step != .haves,
+        if presentationState.step != .haves,
            draft.selectedHaveIDs.isEmpty,
            let firstHave = appState.inventory.first(where: { draft.maxHaveQuantity(for: $0) > 0 }) {
             draft.toggleHave(firstHave.id, maxQuantity: draft.maxHaveQuantity(for: firstHave))
         }
-        if step == .exchange, draft.optionKind == .wish, draft.selectedWishIDs.isEmpty, let firstWish = appState.wishes.first {
+        if presentationState.step == .exchange, draft.optionKind == .wish, draft.selectedWishIDs.isEmpty, let firstWish = appState.wishes.first {
             draft.toggleWish(firstWish.id)
         }
     }

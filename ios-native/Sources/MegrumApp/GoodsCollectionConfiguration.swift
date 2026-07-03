@@ -65,6 +65,11 @@ struct GoodsCollectionFilterChoices {
 
 enum CollectionScreenLayoutMetrics {
     static let mainStackSpacing: CGFloat = 12
+    /// Initial estimate of the pinned chrome's bottom edge (status bar +
+    /// title + tabs) so the first layout pass starts content at roughly the
+    /// right offset instead of visibly dropping down once the real
+    /// measurement arrives.
+    static let estimatedPinnedChromeBottomEdge: CGFloat = 186
     static let horizontalPadding: CGFloat = 20
     static let topPadding: CGFloat = 14
     static let headerAccessoryVerticalPadding: CGFloat = 2

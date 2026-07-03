@@ -3,14 +3,10 @@ import Foundation
 enum GoodsInventoryCreateMetaTilePresentation {
     static func missingSetupCount(
         for meta: GoodsCreateMetaDraft,
-        allowsMemberSelection: Bool,
-        memberName: String?
+        allowsMemberSelection _: Bool,
+        memberName _: String?
     ) -> Int {
-        var count = meta.tagNames.isEmpty ? 1 : 0
-        if allowsMemberSelection, memberName == nil {
-            count += 1
-        }
-        return count
+        meta.tagNames.isEmpty ? 1 : 0
     }
 
     static func tagLine(for tagNames: [String]) -> String? {

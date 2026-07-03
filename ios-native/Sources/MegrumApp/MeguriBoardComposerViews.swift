@@ -23,6 +23,7 @@ struct BoardThreadComposerSheet: View {
     @State var bodyText = ""
     @State var anonymousDisplayName = BoardThreadComposerSheet.defaultAnonymousDisplayName
     @State var anonymousAvatarID = BoardThreadComposerSheet.defaultAnonymousAvatarID
+    @State var metadataDraft = MeguriContentMetadataDraft()
     @State var thumbnailItem: PhotosPickerItem?
     @State var thumbnailUpload: GoodsPhotoUpload?
     @State var thumbnailErrorMessage: String?
@@ -86,14 +87,16 @@ struct BoardThreadComposerSheet: View {
             }
             .task {
                 await hydrateMeguriProfileDefaults()
+                if appState.oshiGroups.isEmpty {
+                    await appState.loadOshiGroups()
+                }
+                seedSelectedCoordinateIfNeeded()
                 if baseCoordinate == nil {
                     locationState.requestCurrentLocation()
                 }
             }
             .onChange(of: locationState.coordinate) { _, _ in
-                if isShowingLocationStep {
-                    seedSelectedCoordinateIfNeeded()
-                }
+                seedSelectedCoordinateIfNeeded()
             }
     }
 
@@ -104,6 +107,7 @@ struct BoardThreadComposerSheet: View {
             bodyText: $bodyText,
             anonymousDisplayName: $anonymousDisplayName,
             anonymousAvatarID: $anonymousAvatarID,
+            metadataDraft: $metadataDraft,
             thumbnailItem: $thumbnailItem,
             missingContextMessage: missingContextMessage,
             isShowingLocationStep: isShowingLocationStep,
@@ -113,7 +117,23 @@ struct BoardThreadComposerSheet: View {
             isRequestingLocation: locationState.isRequestingLocation,
             selectedCoordinate: $selectedCoordinate,
             thumbnailPreviewImage: thumbnailPreviewImage,
+            groups: appState.oshiGroups,
+            characters: appState.oshiCharacters,
+            userOshiSelections: appState.userOshiSelections,
+            inventory: appState.inventory,
+            wishes: appState.wishes,
+            isLoadingGroups: appState.isLoadingOshiGroups,
+            isLoadingCharacters: appState.isLoadingOshiCharacters,
             onRemoveThumbnail: clearThumbnail,
+            onLoadGroups: {
+                await appState.loadOshiGroups()
+            },
+            onLoadCharacters: { group in
+                await appState.loadOshiCharacters(group: group)
+            },
+            onLoadUserOshiSelections: {
+                await appState.loadUserOshiSelections()
+            },
             onRequestLocation: {
                 locationState.requestCurrentLocation()
             },
@@ -126,6 +146,7 @@ struct BoardThreadComposerSheet: View {
             bodyText: $bodyText,
             anonymousDisplayName: $anonymousDisplayName,
             anonymousAvatarID: $anonymousAvatarID,
+            metadataDraft: $metadataDraft,
             thumbnailItem: $thumbnailItem,
             missingContextMessage: missingContextMessage,
             isShowingLocationStep: isShowingLocationStep,
@@ -134,7 +155,23 @@ struct BoardThreadComposerSheet: View {
             currentCoordinate: baseCoordinate,
             isRequestingLocation: locationState.isRequestingLocation,
             selectedCoordinate: $selectedCoordinate,
+            groups: appState.oshiGroups,
+            characters: appState.oshiCharacters,
+            userOshiSelections: appState.userOshiSelections,
+            inventory: appState.inventory,
+            wishes: appState.wishes,
+            isLoadingGroups: appState.isLoadingOshiGroups,
+            isLoadingCharacters: appState.isLoadingOshiCharacters,
             onRemoveThumbnail: clearThumbnail,
+            onLoadGroups: {
+                await appState.loadOshiGroups()
+            },
+            onLoadCharacters: { group in
+                await appState.loadOshiCharacters(group: group)
+            },
+            onLoadUserOshiSelections: {
+                await appState.loadUserOshiSelections()
+            },
             onRequestLocation: {
                 locationState.requestCurrentLocation()
             },

@@ -11,6 +11,8 @@ struct MegrumAuthenticatedTabContentView: View {
     @Binding var publicProfileRoute: PublicProfileRoute?
     @Binding var homeSettingsRoute: HomeSettingsRoute?
     @Binding var requestedWishSection: WishCollectionSection?
+    @Binding var pendingNotificationRouteIntent: NotificationRouteIntent?
+    @Binding var isGroomViewerPresented: Bool
     var adDisplayContext: AdDisplayContext
     var visualQAInitialScreen: VisualQAInitialScreen?
     var onOpenDrawer: () -> Void
@@ -19,6 +21,14 @@ struct MegrumAuthenticatedTabContentView: View {
     @State private var homeRelationRoute: HomeRelationRoute?
     @State private var homeProposalRoute: HomeProposalRoute?
     @State private var tradeDetailRoute: TradeDetailRoute?
+    @State private var meguriHomeResetToken = UUID()
+    @State private var isShowingMeguriMessageInbox = false
+    @State private var meguriMessageDetailRoute: MeguriMessagePeerRoute?
+    @State private var meguriBoardThreadRoute: MeguriBoardThreadRoute?
+    @State private var meguriUserProfileRoute: MeguriUserProfileRoute?
+    @State private var didOpenVisualQAMeguriMessages = false
+    @State private var meguriGroomViewerPost: GroomPost?
+    @State private var meguriGroomViewerSourceAnchor: UnitPoint = .center
 
     var body: some View {
         ZStack {
@@ -86,11 +96,116 @@ struct MegrumAuthenticatedTabContentView: View {
                 proposals: appState.proposals
             )
             .zIndex(100)
+
+            MegrumSlideItemPresentationOverlay(
+                item: $meguriBoardThreadRoute,
+                backSwipeInteractionScope: .fullScreen
+            ) { route, dismiss in
+                NavigationStack {
+                    BoardThreadDetailScreen(
+                        appState: appState,
+                        thread: route.thread,
+                        selectedPrefecture: route.selectedPrefecture,
+                        coordinate: route.coordinate,
+                        onClose: dismiss
+                    )
+                }
+            }
+            .zIndex(109)
+
+            MegrumSlideBoolPresentationOverlay(
+                isPresented: $isShowingMeguriMessageInbox,
+                backSwipeInteractionScope: .fullScreen
+            ) { dismiss in
+                MeguriMessageInboxScreen(
+                    appState: appState,
+                    visualQAInitialScreen: visualQAInitialScreen,
+                    onClose: dismiss,
+                    onOpenThread: openMeguriMessageThread
+                )
+            }
+            .zIndex(110)
+
+            MegrumSlideItemPresentationOverlay(
+                item: $meguriMessageDetailRoute,
+                backSwipeInteractionScope: .fullScreen
+            ) { route, dismiss in
+                NavigationStack {
+                    MeguriMessagesScreen(
+                        appState: appState,
+                        route: route,
+                        onClose: dismiss,
+                        onOpenUserProfile: openMeguriUserProfile
+                    )
+                }
+            }
+            .zIndex(111)
+
+            MegrumSlideItemPresentationOverlay(
+                item: $meguriUserProfileRoute,
+                backSwipeInteractionScope: .fullScreen
+            ) { route, dismiss in
+                NavigationStack {
+                    MeguriUserProfileRouteScreen(
+                        appState: appState,
+                        userID: route.userID,
+                        adDisplayContext: adDisplayContext,
+                        onClose: dismiss,
+                        onOpenMessage: { userID in
+                            dismiss()
+                            openMeguriMessageThread(peerID: userID)
+                        }
+                    )
+                }
+            }
+            .zIndex(112)
         }
+        .onAppear {
+            openVisualQAMeguriMessagesIfNeeded()
+            handlePendingNotificationRouteIntent(pendingNotificationRouteIntent)
+        }
+        .onChange(of: pendingNotificationRouteIntent) { _, intent in
+            handlePendingNotificationRouteIntent(intent)
+        }
+        .onChange(of: isShowingMeguriMessageInbox) { _, newValue in
+            if !newValue {
+                meguriMessageDetailRoute = nil
+            }
+        }
+        .onChange(of: meguriGroomViewerPost?.id) { _, groomID in
+            isGroomViewerPresented = groomID != nil
+        }
+        .onDisappear {
+            isGroomViewerPresented = false
+        }
+        .groomViewerImmersiveOverlay(
+            item: $meguriGroomViewerPost,
+            sourceAnchor: meguriGroomViewerSourceAnchor,
+            onDismiss: dismissMeguriGroomViewer
+        ) { groom, dismiss in
+            GroomViewerScreen(
+                grooms: appState.grooms,
+                initialGroom: groom,
+                appState: appState,
+                onDismiss: dismiss,
+                onOpenMeguriUserProfile: openMeguriUserProfileFromGroomViewer
+            )
+        }
+        .background(SystemTabBarVisibilityHost(isHidden: meguriGroomViewerPost != nil))
+        .background {
+            if meguriGroomViewerPost != nil {
+                Color.black.ignoresSafeArea(.all)
+            }
+        }
+        .ignoresSafeArea(.container, edges: meguriGroomViewerPost == nil ? [] : .all)
+        #if os(iOS)
+        .toolbar(meguriGroomViewerPost == nil ? .visible : .hidden, for: .tabBar)
+        .statusBarHidden(meguriGroomViewerPost != nil)
+        #endif
     }
 
     private var tabs: some View {
-        TabView(selection: $selectedTab) {
+        TabView(selection: tabSelection) {
             homeTab
             tradesTab
             meguriTab
@@ -101,7 +216,24 @@ struct MegrumAuthenticatedTabContentView: View {
         .onChange(of: selectedTab) { _, selectedTab in
             requestInterstitialIfPrepared(for: selectedTab)
         }
+        #if os(iOS)
+        .toolbar(meguriGroomViewerPost == nil ? .visible : .hidden, for: .tabBar)
+        .toolbarBackground(tabBarBackgroundVisibility, for: .tabBar)
+        .ignoresSafeArea(.container, edges: selectedTab == .meguri ? .bottom : [])
+        #endif
     }
+
+    #if os(iOS)
+    private var tabBarBackgroundVisibility: Visibility {
+        if meguriGroomViewerPost != nil || selectedTab == .meguri {
+            return .hidden
+        }
+        if #available(iOS 26.0, *) {
+            return .hidden
+        }
+        return .automatic
+    }
+    #endif
 
     private var homeTab: some View {
         NavigationStack {
@@ -211,9 +343,24 @@ struct MegrumAuthenticatedTabContentView: View {
 
     private var meguriTab: some View {
         NavigationStack {
-            MeguriScreen(appState: appState)
+            MegrumDeferredContent {
+                MeguriScreen(
+                    appState: appState,
+                    homeResetToken: meguriHomeResetToken,
+                    visualQAInitialScreen: visualQAInitialScreen,
+                    pendingNotificationRouteIntent: $pendingNotificationRouteIntent,
+                    onOpenMessages: openMeguriMessageInbox,
+                    onOpenBoardThread: openMeguriBoardThread,
+                    onOpenMeguriUserProfile: openMeguriUserProfile,
+                    onOpenGroomViewer: openMeguriGroomViewer
+                )
+            }
         }
         .tag(MegrumTab.meguri)
+        .ignoresSafeArea(.container, edges: .bottom)
+        #if os(iOS)
+        .toolbar(meguriGroomViewerPost == nil ? .visible : .hidden, for: .tabBar)
+        #endif
         .tabItem {
             Label {
                 Text(MegrumTab.meguri.title)
@@ -234,6 +381,122 @@ struct MegrumAuthenticatedTabContentView: View {
     private func openTradesFromHomePresentation() {
         requestedTradesStage = nil
         selectedTab = .trades
+    }
+
+    private var tabSelection: Binding<MegrumTab> {
+        Binding(
+            get: { selectedTab },
+            set: { newValue in
+                if newValue == selectedTab {
+                    handleTabReselection(newValue)
+                } else {
+                    selectedTab = newValue
+                }
+            }
+        )
+    }
+
+    private func handleTabReselection(_ tab: MegrumTab) {
+        if tab == .meguri {
+            meguriGroomViewerPost = nil
+            isGroomViewerPresented = false
+            isShowingMeguriMessageInbox = false
+            meguriMessageDetailRoute = nil
+            meguriBoardThreadRoute = nil
+            meguriHomeResetToken = UUID()
+        }
+    }
+
+    private func openMeguriGroomViewer(_ groom: GroomPost, sourceAnchor: UnitPoint) {
+        meguriGroomViewerSourceAnchor = sourceAnchor
+        isGroomViewerPresented = true
+        meguriGroomViewerPost = groom
+    }
+
+    private func dismissMeguriGroomViewer() {
+        meguriGroomViewerPost = nil
+        isGroomViewerPresented = false
+    }
+
+    private func openMeguriUserProfileFromGroomViewer(_ userID: UUID) {
+        dismissMeguriGroomViewer()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+            openMeguriUserProfile(userID)
+        }
+    }
+
+    private func openMeguriMessageInbox() {
+        withAnimation(MegrumSlidePresentationMetrics.animation) {
+            meguriMessageDetailRoute = nil
+            isShowingMeguriMessageInbox = true
+        }
+    }
+
+    private func openMeguriMessageThread(_ thread: MeguriMessageThread) {
+        withAnimation(MegrumSlidePresentationMetrics.animation) {
+            isShowingMeguriMessageInbox = true
+            meguriMessageDetailRoute = MeguriMessagePeerRoute(
+                peerID: thread.peerID,
+                scope: .conversation(sourceGroomPostID: thread.sourceGroomPostID)
+            )
+        }
+    }
+
+    private func openMeguriMessageThread(peerID: UUID) {
+        withAnimation(MegrumSlidePresentationMetrics.animation) {
+            isShowingMeguriMessageInbox = true
+            meguriMessageDetailRoute = MeguriMessagePeerRoute(peerID: peerID)
+        }
+    }
+
+    private func openMeguriBoardThread(_ route: MeguriBoardThreadRoute) {
+        withAnimation(MegrumSlidePresentationMetrics.animation) {
+            meguriBoardThreadRoute = route
+        }
+    }
+
+    private func openMeguriUserProfile(_ userID: UUID) {
+        withAnimation(MegrumSlidePresentationMetrics.animation) {
+            meguriUserProfileRoute = MeguriUserProfileRoute(userID: userID)
+        }
+    }
+
+    private func handlePendingNotificationRouteIntent(_ intent: NotificationRouteIntent?) {
+        guard let intent else {
+            return
+        }
+
+        switch intent {
+        case .meguriMessages(let peerID, _):
+            requestedTradesStage = nil
+            selectedTab = .meguri
+            withAnimation(MegrumSlidePresentationMetrics.animation) {
+                isShowingMeguriMessageInbox = true
+                if let peerID, let uuid = UUID(uuidString: peerID) {
+                    meguriMessageDetailRoute = MeguriMessagePeerRoute(peerID: uuid)
+                } else {
+                    meguriMessageDetailRoute = nil
+                }
+            }
+            pendingNotificationRouteIntent = nil
+        case .ownGroom:
+            requestedTradesStage = nil
+            selectedTab = .meguri
+        case .tab, .tradeDetail, .tradeEvidenceCapture, .tradeEvidenceApproval,
+             .tradeEvaluation, .tradeAssistance, .disputeDetail,
+             .meguriBoardThread, .userProfile, .userEvaluations, .unknown:
+            pendingNotificationRouteIntent = nil
+        }
+    }
+
+    private func openVisualQAMeguriMessagesIfNeeded() {
+        guard visualQAInitialScreen == .meguriMessages || visualQAInitialScreen == .meguriMessageThread,
+              !didOpenVisualQAMeguriMessages
+        else {
+            return
+        }
+        didOpenVisualQAMeguriMessages = true
+        openMeguriMessageInbox()
     }
 
     private var tradeAttentionCounts: TradeStageAttentionCounts {

@@ -5,9 +5,7 @@ import SwiftUI
 
 struct TradeEvidenceListSheet: View {
     @Environment(\.dismiss) private var dismiss
-    @State private var pendingDeletePhoto: TradeEvidencePhoto?
-    @State private var presentedPhoto: TradeEvidencePhoto?
-    @State private var locallyDeletedPhotoIDs: Set<UUID> = []
+    @State private var presentationState = TradeEvidenceListPresentationState()
 
     var proposal: TradeProposal
     var viewerID: UUID?
@@ -42,11 +40,11 @@ struct TradeEvidenceListSheet: View {
                             isApproving: isApproving,
                             deletingPhotoID: deletingPhotoID,
                             onOpenImage: { photo in
-                                presentedPhoto = photo
+                                presentationState.openPhoto(photo)
                             },
                             onApprove: onApprove,
                             onDelete: { photo in
-                                pendingDeletePhoto = photo
+                                presentationState.requestDelete(photo)
                             }
                         )
                     }
@@ -100,39 +98,39 @@ struct TradeEvidenceListSheet: View {
                 }
             }
 #if os(iOS)
-            .toolbar(presentedPhoto == nil ? .visible : .hidden, for: .navigationBar)
+            .toolbar(presentationState.presentedPhoto == nil ? .visible : .hidden, for: .navigationBar)
 #endif
             .confirmationDialog(
                 "この証跡写真を削除しますか？",
                 isPresented: Binding(
-                    get: { pendingDeletePhoto != nil },
+                    get: { presentationState.isDeleteConfirmationPresented },
                     set: { isPresented in
                         if !isPresented {
-                            pendingDeletePhoto = nil
+                            presentationState.clearPendingDelete()
                         }
                     }
                 ),
                 titleVisibility: .visible
             ) {
                 Button("削除", role: .destructive) {
-                    if let pendingDeletePhoto {
+                    if let pendingDeletePhoto = presentationState.pendingDeletePhoto {
                         deletePhoto(pendingDeletePhoto)
                     }
-                    pendingDeletePhoto = nil
+                    presentationState.clearPendingDelete()
                 }
                 Button("キャンセル", role: .cancel) {
-                    pendingDeletePhoto = nil
+                    presentationState.clearPendingDelete()
                 }
             } message: {
                 Text("削除すると、取引証跡の一覧から外れます。")
             }
         }
         .overlay {
-            if let presentedPhoto {
+            if let presentedPhoto = presentationState.presentedPhoto {
                 FullScreenRemoteImageView(
                     url: presentedPhoto.photoURL,
                     onDismiss: {
-                        self.presentedPhoto = nil
+                        presentationState.clearPresentedPhoto()
                     },
                     onDelete: deleteAction(for: presentedPhoto)
                 )
@@ -145,14 +143,11 @@ struct TradeEvidenceListSheet: View {
     }
 
     private var displayedEvidencePhotos: [TradeEvidencePhoto] {
-        evidencePhotos.filter { !locallyDeletedPhotoIDs.contains($0.id) }
+        presentationState.displayedPhotos(from: evidencePhotos)
     }
 
     private func deletePhoto(_ photo: TradeEvidencePhoto) {
-        locallyDeletedPhotoIDs.insert(photo.id)
-        if presentedPhoto?.id == photo.id {
-            presentedPhoto = nil
-        }
+        presentationState.markDeleted(photo)
         Task {
             _ = await onDelete(photo)
         }

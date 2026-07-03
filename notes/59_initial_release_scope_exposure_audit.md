@@ -38,8 +38,8 @@ App Store初回提出ビルドで「出す機能」と「隠す機能」が、�
 | グルーム | 出すならUGC対応必須 | 投稿、通報、ブロック、モデレーション、作成時の緯度経度、公開範囲、距離判定、生活圏推測リスクの説明 | 未完成投稿導線を隠す | UGCが見えるのに通報不可。近距離表示が匿名化/安全確認に見える |
 | スポット掲示板 | 未完成なら隠す | 投稿、返信、通報、ブロック、削除/非表示。近くの掲示板や返信範囲判定で精密座標、作成座標、閲覧者座標、1km/3km判定を使う場合はPrecise Location説明 | タブ、説明、FAQ、スクショから外す | 未完成投稿画面が見える。精密座標を使うのにCoarse Locationだけで説明している。1km/3kmを匿名/安全保証として説明している |
 | めぐり | 3Dなしで出す候補 | 3Dなしでも主要体験が破綻しない。近くのグルーム、掲示板、地図表示、逆ジオコーディングで精密座標、作成位置、閲覧者位置を使う場合はPrivacy/App Privacy/FAQを揃える | 未完成3D導線を外す | 未完成3Dが表示される。精密位置、作成位置、閲覧者位置、地図サービス説明が不足 |
-| 有料機能 | IAP未完なら隠す | IAP商品、価格、復元、解約、特商法、Purchases回答 | Premium、めぐりPlus、ブースト導線を外す | 有料導線が見えるのにIAP未設定 |
-| 広告 / AdMob | 初回で出すなら実広告・通報・App Privacyを揃える | Google Mobile Ads SDK初期化、広告リクエスト画面、App Privacy、Privacy Manifest、ATT/Tracking、SKAdNetworkItems、test ads除去、広告通報 | 広告設定、広告unit id、FAQ、スクショ、Review Notesから外す。SDK初期化/広告リクエストが発生しないことを確認 | `MEGRUM_ADS_ENABLED=YES` のままSDKが起動するのにApp Privacy/ATT/Google開示が未整備。Googleデモunit idやtest adsを一般公開する |
+| 有料機能 | IAP未完なら隠す。チェックイン既定は `MEGRUM_PLUS_IAP_ENABLED=NO` で購入/復元/商品照会を停止 | IAP商品、価格、復元、解約、特商法、Purchases回答 | Premium、めぐりPlus、ブースト導線を外し、購入/復元ボタンと価格が出ないことを確認 | 有料導線が見えるのにIAP未設定 |
+| 広告 / AdMob | 初回で出すなら実広告・通報・App Privacyを揃える | Google Mobile Ads SDK初期化、広告リクエスト画面、App Privacy、Privacy Manifest、ATT/Tracking、SKAdNetworkItems、test ads除去、広告通報 | 現チェックイン既定は広告OFF。広告を出さないなら広告unit id、FAQ、スクショ、Review Notesから外し、SDK初期化/広告リクエストが発生しないことを確認 | 広告を有効化したままApp Privacy/ATT/Google開示が未整備。Googleデモunit idやtest adsを一般公開する |
 | 外部AI | 初回は隠す又はオンデバイス限定推奨 | 送信情報、送信先、OpenAI等外部AI名、画像又は画像URL、web search利用、保持、学習利用、削除可否、同意又は任意性、Privacy、App Privacy | AI送信ボタン、説明、FAQ露出を外す | 外部送信が見えるのに説明/同意なし。「画像からシリーズ名称の候補を出す」ボタンが見えるのにOpenAI/web_search/保持/学習利用/第三者画像禁止を説明していない |
 | 外部画像URL | 初回はSupabase保存画像中心推奨 | 外部ホスト通信、第三者ポリシー、Content Rights、権利確認責任、Privacy回答 | 外部URL入力、AI/検索候補画像、外部画像プレビューを外す | 外部画像URLが見えるのにPrivacy/Content Rights説明が不足 |
 | カメラ / 写真ライブラリ / 共有シート | 出すならApp Privacyと権限説明を揃える | Info.plist権限文言、画像メタデータ、Photos or Videos / Location / Device Info回答、共有用画像/テキスト、外部共有後の非管理説明 | 写真アップロード、共有シート、外部SNS共有を隠すなら画面/FAQ/Review Notesから外す | 権限文言が実用途より狭い。写真メタデータ又は外部共有後の保存/公開/再共有/削除非管理を説明していない |
@@ -71,7 +71,7 @@ App Store初回提出ビルドで「出す機能」と「隠す機能」が、�
 | Report / Block | UGCから通報/ブロックできる。直接ボタンがない対象はsupport@フォールバックが説明できる。通報者秘匿の限界、過去記録保持、緊急時外部連絡が説明できる | TODO |
 | Account Deletion | アプリ内削除入口がある | TODO |
 | Settings / Legal | Terms、Privacy、Support、FAQへ辿れる。アプリ内法務要約を正式本文として扱わず、公開本文リンク又は同等導線が最新本文へ到達する | TODO |
-| Paid surfaces | 初回で隠すなら導線なし。出すならIAP文書と一致 | TODO |
+| Paid surfaces | 初回で隠すなら購入/復元導線なし、`MEGRUM_PLUS_IAP_ENABLED=NO`、StoreKit商品照会なし。出すならIAP文書と一致 | TODO |
 | AI surfaces | 初回で隠すなら導線なし。出すならOpenAI/外部AI、画像又は画像URL、web search、保持/学習利用、第三者/未成年/権利未処理画像禁止の送信前説明あり | TODO |
 | Meguri / 3D | 未完成3Dが露出しない。近くのグルーム/掲示板、地図表示、逆ジオコーディングが見える場合はPrecise Location回答と精密座標、作成位置、閲覧者位置、1km/3km非保証、地図サービス説明がある | TODO |
 

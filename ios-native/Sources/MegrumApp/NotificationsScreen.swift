@@ -7,7 +7,7 @@ struct NotificationCenterScreen: View {
     @ObservedObject var appState: MegrumAppState
     var onOpenDestination: (MegrumTab) -> Void
     var onOpenRouteIntent: (NotificationRouteIntent) -> Bool = { _ in false }
-    @State private var filter: NotificationCenterFilter = .all
+    @State private var presentationState = NotificationCenterPresentationState()
 
     init(
         appState: MegrumAppState,
@@ -21,7 +21,7 @@ struct NotificationCenterScreen: View {
 
     var body: some View {
         NotificationCenterContent(
-            filter: $filter,
+            presentationState: $presentationState,
             isLoading: appState.isLoadingNotifications,
             notifications: appState.notifications,
             onSelectNotification: openNotification

@@ -2,8 +2,7 @@ import MegrumDesign
 import SwiftUI
 
 struct TradeEvaluationSheet: View {
-    @State private var stars = 5
-    @State private var comment = ""
+    @State private var draftState = TradeEvaluationDraftState()
     var isSubmitting: Bool
     var onSubmit: (Int, String?) async -> Void
 
@@ -20,9 +19,9 @@ struct TradeEvaluationSheet: View {
             HStack(spacing: 10) {
                 ForEach(1...5, id: \.self) { value in
                     Button {
-                        stars = value
+                        draftState.stars = value
                     } label: {
-                        Image(systemName: value <= stars ? "star.fill" : "star")
+                        Image(systemName: value <= draftState.stars ? "star.fill" : "star")
                             .font(.system(size: 30, weight: .bold))
                             .foregroundStyle(MegrumTheme.lavender)
                     }
@@ -31,7 +30,7 @@ struct TradeEvaluationSheet: View {
             }
             .frame(maxWidth: .infinity)
 
-            TextField("コメント（任意）", text: $comment, axis: .vertical)
+            TextField("コメント（任意）", text: $draftState.comment, axis: .vertical)
                 .font(.system(size: 16, weight: .bold, design: .rounded))
                 .lineLimit(3...5)
                 .padding(14)
@@ -39,7 +38,7 @@ struct TradeEvaluationSheet: View {
 
             Button {
                 Task {
-                    await onSubmit(stars, comment.nilIfBlank)
+                    await onSubmit(draftState.stars, draftState.submittedComment)
                 }
             } label: {
                 Group {

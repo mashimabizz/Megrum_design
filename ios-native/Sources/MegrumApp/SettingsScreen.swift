@@ -12,8 +12,7 @@ struct SettingsScreen: View {
     var onSignOut: () async -> Void = {}
     @Environment(\.dismiss) private var dismiss
     @StateObject private var securityAuthState: MegrumAuthState
-    @State private var isSigningOut = false
-    @State private var navigationPath: [SettingsEssentialRoute] = []
+    @State private var presentationState = SettingsPresentationState()
 
     init(
         appState: MegrumAppState,
@@ -34,7 +33,7 @@ struct SettingsScreen: View {
     }
 
     var body: some View {
-        NavigationStack(path: $navigationPath) {
+        NavigationStack(path: $presentationState.navigationPath) {
             List {
                 SettingsPrimarySection(
                     appState: appState,
@@ -52,14 +51,14 @@ struct SettingsScreen: View {
                 )
 
                 SettingsSupportAccountSection(
-                    isSigningOut: isSigningOut,
+                    isSigningOut: presentationState.isSigningOut,
                     accountSummary: accountSummary,
                     loginSecuritySummary: loginSecuritySummary,
                     onOpenRoute: openRoute
                 )
 
                 SettingsDangerSection(
-                    isSigningOut: isSigningOut,
+                    isSigningOut: presentationState.isSigningOut,
                     onSignOut: startSignOut,
                     onRequestAccountDeletion: {
                         openRoute(.accountDeletion)
@@ -161,7 +160,7 @@ struct SettingsScreen: View {
     }
 
     private func openRoute(_ route: SettingsEssentialRoute) {
-        navigationPath.append(route)
+        presentationState.openRoute(route)
     }
 
     @ViewBuilder
@@ -189,13 +188,15 @@ struct SettingsScreen: View {
         case .premium:
             SubscriptionSettingsScreen(appState: appState)
         case .blockedUsers:
-            BlockedUsersScreen(appState: appState)
+            BlockedUsersScreen(appState: appState, context: .exchange)
+        case .meguriBlockedUsers:
+            BlockedUsersScreen(appState: appState, context: .meguri)
         case .privacy:
             PrivacySettingsScreen(appState: appState)
         case .loginSecurity:
             LoginSecuritySettingsScreen(
                 authState: securityAuthState,
-                isSigningOut: isSigningOut,
+                isSigningOut: presentationState.isSigningOut,
                 accountSummary: accountSummary,
                 onSignOut: {
                     await performSignOut(dismissSettings: true)
@@ -233,13 +234,12 @@ struct SettingsScreen: View {
     }
 
     private func performSignOut(dismissSettings: Bool) async {
-        guard !isSigningOut else {
+        guard presentationState.beginSignOutIfNeeded() else {
             return
         }
 
-        isSigningOut = true
         await onSignOut()
-        isSigningOut = false
+        presentationState.finishSignOut()
 
         if dismissSettings {
             closeSettings()

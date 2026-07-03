@@ -45,6 +45,7 @@ public final class MegrumAppState: ObservableObject {
     @Published public internal(set) var userEvaluationsByUserID: [UUID: [UserEvaluation]] = [:]
     @Published public internal(set) var mailingAddress: MailingAddress?
     @Published public internal(set) var paymentSettings: UserPaymentSettings?
+    @Published public internal(set) var hasLoadedPaymentSettings = false
     @Published public internal(set) var exchangeSettings: HomeDefaultExchangeSettings?
     @Published public internal(set) var subscriptionState: UserSubscriptionState = .free
     @Published public internal(set) var blockedUsers: [BlockedUser] = []
@@ -96,7 +97,9 @@ public final class MegrumAppState: ObservableObject {
     @Published public internal(set) var filingDisputeProposalID: UUID?
     @Published public internal(set) var isCreatingGroomPost = false
     @Published public internal(set) var isCreatingBoardThread = false
+    @Published public internal(set) var deletingGroomPostID: UUID?
     @Published public internal(set) var reportingGroomPostID: UUID?
+    @Published public internal(set) var reportingBoardThreadID: UUID?
     @Published public internal(set) var blockingGroomUserID: UUID?
     @Published public internal(set) var reportingUserID: UUID?
     @Published public internal(set) var blockingUserID: UUID?
@@ -145,18 +148,36 @@ public final class MegrumAppState: ObservableObject {
         NotificationReadStateReducer.unreadCount(in: notifications)
     }
 
+    /// アプリアイコンのバッジに出す合計：未読通知＋やりとりの要対応＋めぐりの要返信。
+    /// アプリ内のタブバッジやドロワーのバッジで見える数の合算に相当する。
+    public var appIconBadgeCount: Int {
+        let tradeAttention = TradeStageAttentionCounts(
+            proposals: proposals,
+            messagesByProposalID: messagesByProposalID,
+            viewerReadAtByProposalID: viewerReadAtByProposalID,
+            viewerID: viewer?.id
+        )
+        return unreadNotificationCount + tradeAttention.total + meguriPendingReplyCount
+    }
+
     public var meguriUnreadMessageCount: Int {
         guard let viewer else {
             return 0
         }
-        return MeguriMessageReadStateReducer.unreadIncomingCount(meguriMessages, viewerID: viewer.id)
+        return MeguriMessageReadStateReducer.unreadIncomingCount(
+            visibleMeguriMessages(for: viewer.id),
+            viewerID: viewer.id
+        )
     }
 
     public var meguriPendingReplyCount: Int {
         guard let viewer else {
             return 0
         }
-        return MeguriMessageReadStateReducer.pendingReplyThreadCount(meguriMessages, viewerID: viewer.id)
+        return MeguriMessageReadStateReducer.pendingReplyThreadCount(
+            visibleMeguriMessages(for: viewer.id),
+            viewerID: viewer.id
+        )
     }
 
     public var meguriMessageThreads: [MeguriMessageThread] {
@@ -164,11 +185,28 @@ public final class MegrumAppState: ObservableObject {
             return []
         }
         return MeguriMessageReadStateReducer.conversationThreads(
-            from: meguriMessages,
+            from: visibleMeguriMessages(for: viewer.id),
             viewerID: viewer.id,
             publicProfilesByUserID: publicProfilesByUserID,
             meguriProfilesByUserID: meguriProfilesByUserID
         )
+        .filter { thread in
+            !MeguriHiddenThreadStore.isHidden(
+                lastMessageAt: thread.lastMessage.createdAt,
+                hiddenAt: hiddenMeguriThreadEntries[thread.id]
+            )
+        }
+    }
+
+    /// めぐりメッセージ一覧でローカル非表示（削除）にしたスレッド。
+    @Published public private(set) var hiddenMeguriThreadEntries: [String: Date] = [:]
+
+    public func hideMeguriMessageThread(_ thread: MeguriMessageThread) {
+        guard let viewer else {
+            return
+        }
+        hiddenMeguriThreadEntries[thread.id] = Date()
+        MeguriHiddenThreadStore.save(hiddenMeguriThreadEntries, viewerID: viewer.id)
     }
 
     public func meguriProfile(for userID: UUID) -> MeguriProfile? {
@@ -219,9 +257,36 @@ public final class MegrumAppState: ObservableObject {
     }
 
     public func meguriMessages(with peerID: UUID) -> [MeguriMessage] {
-        meguriMessages.filter { message in
-            message.senderID == peerID || message.recipientID == peerID
+        meguriMessages(
+            in: MeguriMessageConversationKey(peerID: peerID),
+            showsAllPeerMessages: true
+        )
+    }
+
+    public func meguriMessages(
+        in conversationKey: MeguriMessageConversationKey,
+        showsAllPeerMessages: Bool = false
+    ) -> [MeguriMessage] {
+        guard !blockedContentUserIDs.contains(conversationKey.peerID) else {
+            return []
         }
+        return meguriMessages.filter { message in
+            guard message.senderID == conversationKey.peerID || message.recipientID == conversationKey.peerID else {
+                return false
+            }
+            if showsAllPeerMessages && conversationKey.sourceGroomPostID == nil {
+                return true
+            }
+            return message.sourceGroomPostID == conversationKey.sourceGroomPostID
+        }
+    }
+
+    private func visibleMeguriMessages(for viewerID: UUID) -> [MeguriMessage] {
+        MeguriMessageReadStateReducer.visibleMessages(
+            meguriMessages,
+            viewerID: viewerID,
+            blockedUserIDs: blockedContentUserIDs
+        )
     }
 
     public func isGroomLiked(_ postID: UUID) -> Bool {
@@ -230,6 +295,20 @@ public final class MegrumAppState: ObservableObject {
 
     public func groomLikeCount(_ postID: UUID, fallback: Int = 0) -> Int {
         groomPost(postID)?.likeCount ?? fallback
+    }
+
+    public func ownVisibleGroom(postID: UUID? = nil) -> GroomPost? {
+        guard let viewerID = viewer?.id else {
+            return nil
+        }
+        let candidates = grooms + groomMapPosts
+        if let postID,
+           let groom = candidates.first(where: { $0.id == postID && $0.authorID == viewerID }) {
+            return groom
+        }
+        return candidates
+            .filter { $0.authorID == viewerID }
+            .max { $0.createdAt < $1.createdAt }
     }
 
     private func groomPost(_ postID: UUID) -> GroomPost? {
@@ -297,13 +376,12 @@ public final class MegrumAppState: ObservableObject {
             let sections = try await repository.loadHomeCandidateSections()
             applyHomeCandidateSections(sections, fallbackInventory: fallbackInventory)
         } catch {
-            applyHomeCandidateSections(
-                HomeCandidateSections(
-                    matchedItems: fallbackInventory,
-                    possibleItems: Array(fallbackInventory.reversed())
-                ),
-                fallbackInventory: fallbackInventory
-            )
+            #if DEBUG
+            print("MEGRUM_DEBUG_HOME_CANDIDATES error: \(error)")
+            #endif
+            // 以前は取得失敗時に自分の在庫を候補のように表示していたが、
+            // 「更新すると候補が消える」ように見える混乱の元だったため、
+            // 失敗時は表示を変えない（実データのみ表示する）。
         }
     }
 
@@ -318,6 +396,7 @@ public final class MegrumAppState: ObservableObject {
             previousViewedGroomIDs: viewedGroomIDs
         )
         viewer = state.viewer
+        hiddenMeguriThreadEntries = MeguriHiddenThreadStore.load(viewerID: state.viewer.id)
         inventory = state.inventory
         wishes = state.wishes
         listings = state.listings

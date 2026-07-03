@@ -8,8 +8,7 @@ struct DisputeDetailScreen: View {
     var onSubmitTradeRequest: (TradeRequestDraft) async -> Bool
 
     @Environment(\.dismiss) private var dismiss
-    @State private var presentedRequestKind: TradeRequestKind?
-    @State private var isShowingWithdrawConfirmation = false
+    @State private var presentationState = DisputeDetailPresentationState()
 
     init(
         model: DisputeDetailModel,
@@ -130,11 +129,11 @@ struct DisputeDetailScreen: View {
             )
         }
         .disputeDetailTradeRequestSheet(
-            presentedRequestKind: $presentedRequestKind,
+            presentedRequestKind: $presentationState.presentedRequestKind,
             onSubmitTradeRequest: onSubmitTradeRequest
         )
         .disputeDetailWithdrawConfirmation(
-            isPresented: $isShowingWithdrawConfirmation,
+            isPresented: $presentationState.isShowingWithdrawConfirmation,
             onWithdraw: withdrawDispute
         )
         .disputeDetailActionErrorAlert(
@@ -167,7 +166,7 @@ struct DisputeDetailScreen: View {
     }
 
     private func requestWithdrawConfirmation() {
-        isShowingWithdrawConfirmation = true
+        presentationState.requestWithdrawConfirmation()
     }
 
     private func withdrawDispute() {
@@ -177,10 +176,10 @@ struct DisputeDetailScreen: View {
     }
 
     private func openLateRequest() {
-        presentedRequestKind = .late
+        presentationState.openLateRequest()
     }
 
     private func openCancellationRequest() {
-        presentedRequestKind = .cancellation
+        presentationState.openCancellationRequest()
     }
 }

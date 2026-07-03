@@ -107,6 +107,10 @@ public extension PreviewMegrumRepository {
         return Array((contextual + ["初回限定", "特典", "ラキドロ"]).prefix(6))
     }
 
+    func uploadGoodsGoogleLensSearchPhoto(_ upload: GoodsPhotoUpload) async throws -> URL {
+        URL(string: "https://preview.megrum.jp/goods-lens-search.jpg")!
+    }
+
     func searchGoods(_ input: GoodsSearchInput) async throws -> [GoodsItem] {
         let query = input.query.trimmingCharacters(in: .whitespacesAndNewlines)
         return NativePreviewData.inventory.filter { item in

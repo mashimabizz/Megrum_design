@@ -11,6 +11,40 @@ struct BoardReplyDisplay: Identifiable {
     var initial: String
     var isMine: Bool
     var relativeTime: String
+    var goodReactionCount: Int
+    var badReactionCount: Int
+    var viewerReaction: BoardMessageReaction?
+}
+
+enum BoardThreadChatMessageTarget: Hashable {
+    case thread(UUID)
+    case reply(UUID)
+}
+
+struct BoardThreadChatMessageDisplay: Identifiable {
+    var target: BoardThreadChatMessageTarget
+    var authorID: UUID
+    var displayName: String
+    var avatarID: String?
+    var avatarURL: URL?
+    var initial: String
+    var isMine: Bool
+    var body: String
+    var imageURLs: [URL] = []
+    var isDeleted: Bool
+    var relativeTime: String
+    var goodReactionCount: Int
+    var badReactionCount: Int
+    var viewerReaction: BoardMessageReaction?
+
+    var id: String {
+        switch target {
+        case .thread(let id):
+            "thread-\(id.uuidString)"
+        case .reply(let id):
+            "reply-\(id.uuidString)"
+        }
+    }
 }
 
 struct BoardParticipantAvatar: Identifiable {
@@ -21,7 +55,9 @@ struct BoardParticipantAvatar: Identifiable {
 }
 
 struct BoardThreadDetailHeader: View {
+    var title: String
     var onClose: () -> Void
+    var onReport: () -> Void
 
     var body: some View {
         HStack {
@@ -35,16 +71,22 @@ struct BoardThreadDetailHeader: View {
 
             Spacer()
 
-            Text("話題")
+            Text(title)
                 .font(.system(size: 23, weight: .black, design: .rounded))
                 .foregroundStyle(MegrumTheme.ink)
+                .lineLimit(1)
+                .minimumScaleFactor(0.76)
 
             Spacer()
 
-            Image(systemName: "ellipsis")
-                .font(.system(size: 20, weight: .black, design: .rounded))
-                .foregroundStyle(MegrumTheme.lavender)
-                .frame(width: 44, height: 44, alignment: .trailing)
+            Button(action: onReport) {
+                Image(systemName: "exclamationmark.bubble.fill")
+                    .font(.system(size: 18, weight: .black, design: .rounded))
+                    .foregroundStyle(MegrumTheme.lavender)
+                    .frame(width: 44, height: 44, alignment: .trailing)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("チャットルームを通報")
         }
     }
 }

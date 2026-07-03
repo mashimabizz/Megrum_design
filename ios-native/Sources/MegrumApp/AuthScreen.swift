@@ -8,15 +8,8 @@ import SwiftUI
 public struct AuthScreen: View {
     @ObservedObject var authState: MegrumAuthState
     @State var route: AuthFlowRoute
-    @State var email = ""
-    @State var password = ""
-    @State var handle = ""
-    @State var passwordResetEmail = ""
-    @State var hasSubmittedPasswordReset = false
-    @State var passwordResetInputErrorMessage: String?
+    @State var inputState = AuthScreenInputState()
     @State var appleSignInNonce: String?
-    @State var identityProviderError: String?
-    @State var inputErrorMessage: String?
     #if canImport(AuthenticationServices) && canImport(UIKit)
     @State var googleOAuthSession: ASWebAuthenticationSession?
     #endif
@@ -59,8 +52,8 @@ public struct AuthScreen: View {
                 case .signInEmail:
                     AuthEmailScreen(
                         mode: .signIn,
-                        email: $email,
-                        password: $password,
+                        email: $inputState.email,
+                        password: $inputState.password,
                         isLoading: authState.isLoading,
                         feedback: feedbackMessage,
                         onSubmit: submitFromButton,
@@ -71,8 +64,8 @@ public struct AuthScreen: View {
                 case .signUpEmail:
                     AuthEmailScreen(
                         mode: .signUp,
-                        email: $email,
-                        password: $password,
+                        email: $inputState.email,
+                        password: $inputState.password,
                         isLoading: authState.isLoading,
                         feedback: feedbackMessage,
                         onSubmit: submitFromButton,
@@ -82,7 +75,7 @@ public struct AuthScreen: View {
                     )
                 case .passwordReset:
                     AuthPasswordResetScreen(
-                        email: $passwordResetEmail,
+                        email: $inputState.passwordResetEmail,
                         isSending: authState.isLoading,
                         feedback: passwordResetFeedbackMessage,
                         onEmailChanged: handlePasswordResetEmailChanged,
@@ -112,13 +105,13 @@ public struct AuthScreen: View {
             }
             #endif
         }
-        .onChange(of: email) { _, _ in
+        .onChange(of: inputState.email) { _, _ in
             clearFeedback()
         }
-        .onChange(of: password) { _, _ in
+        .onChange(of: inputState.password) { _, _ in
             clearFeedback()
         }
-        .onChange(of: handle) { _, _ in
+        .onChange(of: inputState.handle) { _, _ in
             clearFeedback()
         }
     }

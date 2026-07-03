@@ -1,5 +1,12 @@
 import Foundation
 
+public enum BoardMessageReaction: String, Codable, Hashable, Sendable, CaseIterable, Identifiable {
+    case good
+    case bad
+
+    public var id: String { rawValue }
+}
+
 public struct BoardThread: Identifiable, Codable, Hashable, Sendable {
     public enum Audience: String, Codable, Sendable, CaseIterable, Identifiable {
         case nearby3km = "nearby_3km"
@@ -20,6 +27,9 @@ public struct BoardThread: Identifiable, Codable, Hashable, Sendable {
     public var prefecture: String?
     public var imageURLs: [URL]?
     public var imagePaths: [String]?
+    public var groupID: UUID?
+    public var characterID: UUID?
+    public var seriesName: String?
     public var createdAt: Date
     public var latestActivityAt: Date
     public var expiresAt: Date?
@@ -27,6 +37,9 @@ public struct BoardThread: Identifiable, Codable, Hashable, Sendable {
     public var status: String
     public var anonymousDisplayName: String?
     public var anonymousAvatarID: String?
+    public var goodReactionCount: Int?
+    public var badReactionCount: Int?
+    public var viewerReaction: BoardMessageReaction?
 
     public var thumbnailURL: URL? {
         imageURLs?.first
@@ -47,13 +60,19 @@ public struct BoardThread: Identifiable, Codable, Hashable, Sendable {
         prefecture: String? = nil,
         imageURLs: [URL] = [],
         imagePaths: [String] = [],
+        groupID: UUID? = nil,
+        characterID: UUID? = nil,
+        seriesName: String? = nil,
         createdAt: Date = .now,
         latestActivityAt: Date? = nil,
         expiresAt: Date? = nil,
         replyCount: Int = 0,
         status: String = "visible",
         anonymousDisplayName: String? = nil,
-        anonymousAvatarID: String? = nil
+        anonymousAvatarID: String? = nil,
+        goodReactionCount: Int? = nil,
+        badReactionCount: Int? = nil,
+        viewerReaction: BoardMessageReaction? = nil
     ) {
         self.id = id
         self.authorID = authorID
@@ -65,6 +84,9 @@ public struct BoardThread: Identifiable, Codable, Hashable, Sendable {
         self.prefecture = prefecture
         self.imageURLs = imageURLs.isEmpty ? nil : imageURLs
         self.imagePaths = imagePaths.isEmpty ? nil : imagePaths
+        self.groupID = groupID
+        self.characterID = characterID
+        self.seriesName = seriesName
         self.createdAt = createdAt
         self.latestActivityAt = latestActivityAt ?? createdAt
         self.expiresAt = expiresAt
@@ -72,6 +94,9 @@ public struct BoardThread: Identifiable, Codable, Hashable, Sendable {
         self.status = status
         self.anonymousDisplayName = anonymousDisplayName
         self.anonymousAvatarID = anonymousAvatarID
+        self.goodReactionCount = goodReactionCount
+        self.badReactionCount = badReactionCount
+        self.viewerReaction = viewerReaction
     }
 }
 
@@ -87,6 +112,9 @@ public struct BoardThreadCreateInput: Equatable, Sendable {
     public var thumbnailUpload: GoodsPhotoUpload?
     public var anonymousDisplayName: String?
     public var anonymousAvatarID: String?
+    public var groupID: UUID?
+    public var characterID: UUID?
+    public var seriesName: String?
 
     public init(
         authorID: UUID,
@@ -99,7 +127,10 @@ public struct BoardThreadCreateInput: Equatable, Sendable {
         imagePaths: [String] = [],
         thumbnailUpload: GoodsPhotoUpload? = nil,
         anonymousDisplayName: String? = nil,
-        anonymousAvatarID: String? = nil
+        anonymousAvatarID: String? = nil,
+        groupID: UUID? = nil,
+        characterID: UUID? = nil,
+        seriesName: String? = nil
     ) {
         self.authorID = authorID
         self.title = title
@@ -112,6 +143,9 @@ public struct BoardThreadCreateInput: Equatable, Sendable {
         self.thumbnailUpload = thumbnailUpload
         self.anonymousDisplayName = anonymousDisplayName
         self.anonymousAvatarID = anonymousAvatarID
+        self.groupID = groupID
+        self.characterID = characterID
+        self.seriesName = seriesName
     }
 }
 
@@ -129,6 +163,9 @@ public struct BoardReply: Identifiable, Codable, Hashable, Sendable {
     public var body: String
     public var status: Status
     public var createdAt: Date
+    public var goodReactionCount: Int?
+    public var badReactionCount: Int?
+    public var viewerReaction: BoardMessageReaction?
 
     public init(
         id: UUID,
@@ -136,7 +173,10 @@ public struct BoardReply: Identifiable, Codable, Hashable, Sendable {
         authorID: UUID,
         body: String,
         status: Status = .visible,
-        createdAt: Date = .now
+        createdAt: Date = .now,
+        goodReactionCount: Int? = nil,
+        badReactionCount: Int? = nil,
+        viewerReaction: BoardMessageReaction? = nil
     ) {
         self.id = id
         self.threadID = threadID
@@ -144,6 +184,9 @@ public struct BoardReply: Identifiable, Codable, Hashable, Sendable {
         self.body = body
         self.status = status
         self.createdAt = createdAt
+        self.goodReactionCount = goodReactionCount
+        self.badReactionCount = badReactionCount
+        self.viewerReaction = viewerReaction
     }
 }
 

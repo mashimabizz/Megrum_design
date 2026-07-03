@@ -149,7 +149,9 @@ extension GoodsCollectionScreen {
     }
 
     var deleteConfirmationBottomPadding: CGFloat {
-        isConfirmingBulkDelete ? 132 : FloatingActionLayoutMetrics.contentBottomPadding
+        isConfirmingBulkDelete
+            ? GoodsSelectionFooterMetrics.bottomPadding + 108
+            : FloatingActionLayoutMetrics.contentBottomPadding
     }
 
     var deleteConfirmationPopover: some View {

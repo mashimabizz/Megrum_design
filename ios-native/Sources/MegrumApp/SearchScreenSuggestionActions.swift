@@ -2,38 +2,37 @@ import Foundation
 
 extension SearchScreen {
     func applySuggestion(_ action: SearchSuggestionAction) {
-        isApplyingSuggestion = true
+        presentationState.beginSuggestionApplication()
         switch action {
         case .group(let groupID):
-            selectedGroupID = groupID
-            selectedMemberID = nil
+            filterDraft.selectedGroupID = groupID
+            filterDraft.selectedMemberID = nil
         case .member(let groupID, let memberID):
-            selectedGroupID = groupID
-            selectedMemberID = memberID
+            filterDraft.selectedGroupID = groupID
+            filterDraft.selectedMemberID = memberID
         case .wish(let groupID, let memberID, let goodsTypeID, let tagNames):
-            selectedGroupID = groupID
-            selectedMemberID = memberID
-            selectedGoodsTypeID = goodsTypeID
+            filterDraft.selectedGroupID = groupID
+            filterDraft.selectedMemberID = memberID
+            filterDraft.selectedGoodsTypeID = goodsTypeID
             if groupID == nil, memberID == nil, goodsTypeID == nil {
-                selectedGoodsTagNames.formUnion(
+                filterDraft.selectedGoodsTagNames.formUnion(
                     SearchSuggestionTagPolicy.allowedRequestedTagNames(
                         tagNames,
                         candidateTagNames: availableGoodsTagNames
                     )
                 )
             }
-            conditionMatches.matchesWish = true
+            filterDraft.conditionMatches.matchesWish = true
         case .goodsType(let goodsTypeID):
-            selectedGoodsTypeID = goodsTypeID
+            filterDraft.selectedGoodsTypeID = goodsTypeID
         case .tag(let tagName):
-            selectedGoodsTagNames.insert(tagName)
+            filterDraft.selectedGoodsTagNames.insert(tagName)
         case .payment(let method):
-            selectedPaymentMethods.insert(method)
+            filterDraft.selectedPaymentMethods.insert(method)
         case .meetupPrefecture(let prefecture):
-            selectedMeetupPrefecture = prefecture
+            filterDraft.selectedMeetupPrefecture = prefecture
         case .query(let text):
-            query = text
-            queryDraft = text
+            presentationState.setQuery(text)
         }
         scheduleSearch(delayNanoseconds: 0)
         finishSuggestionApplication()
@@ -42,7 +41,7 @@ extension SearchScreen {
     func finishSuggestionApplication() {
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: 30_000_000)
-            isApplyingSuggestion = false
+            presentationState.finishSuggestionApplication()
         }
     }
 }

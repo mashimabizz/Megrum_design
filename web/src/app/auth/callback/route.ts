@@ -12,12 +12,14 @@ export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
   const error = searchParams.get("error");
-  // Webは管理者コンソール専用。認証後はadminへ戻す。
-  const next = searchParams.get("next") ?? "/admin";
+  const nextParam = searchParams.get("next");
 
-  if (next === "mobile") {
+  if (nextParam === "mobile") {
     return handleMobileAuthCallback(searchParams);
   }
+
+  // Webは管理者コンソール専用。認証後の戻り先は同一originのpathだけを許可する。
+  const next = normalizedWebNextPath(nextParam);
 
   if (code) {
     const supabase = await createClient();
@@ -162,4 +164,18 @@ function buildMobileFragmentBridgeResponse(searchParams: URLSearchParams) {
 
 function getMobileScheme(value: string | null) {
   return value === "megrum-preview" ? value : "megrum";
+}
+
+function normalizedWebNextPath(value: string | null) {
+  const fallback = "/admin";
+  if (!value) return fallback;
+  if (!value.startsWith("/") || value.startsWith("//")) return fallback;
+
+  try {
+    const url = new URL(value, "https://megrum.local");
+    if (url.origin !== "https://megrum.local") return fallback;
+    return `${url.pathname}${url.search}${url.hash}`;
+  } catch {
+    return fallback;
+  }
 }

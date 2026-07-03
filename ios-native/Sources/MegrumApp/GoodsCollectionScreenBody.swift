@@ -22,8 +22,10 @@ extension GoodsCollectionScreen {
                 },
                 onQuickAction: performQuickAction,
                 onBulkTag: {
+                    bulkTagGoogleLensErrorMessage = nil
                     bulkTagRoute = GoodsBulkTagRoute(itemIDs: selectedItemIDs)
                 },
+                onBulkShare: presentSelectedSharePrompt,
                 onBulkDelete: requestBulkDelete,
                 onCancelSelection: {
                     selectedItemIDs = []
@@ -53,6 +55,7 @@ extension GoodsCollectionScreen {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+        .ignoresSafeArea(.container, edges: .bottom)
         .animation(
             .spring(
                 response: GoodsQuickActionPresentationMetrics.panelAnimationResponse,
@@ -77,7 +80,8 @@ extension GoodsCollectionScreen {
                 NavigationStack {
                     IndividualListingEditorSheet(
                         appState: appState,
-                        preselectedWishID: item.id
+                        preselectedWishID: item.id,
+                        onCreatedListing: presentListingSharePrompt
                     )
                 }
             }
@@ -86,10 +90,21 @@ extension GoodsCollectionScreen {
             GoodsBulkTagSheet(
                 selectedCount: route.itemIDs.count,
                 candidateNames: bulkTagCandidateNames(for: route.itemIDs),
-                previewItemsByTag: bulkTagPreviewItemsByTag(for: route.itemIDs)
+                previewItemsByTag: bulkTagPreviewItemsByTag(for: route.itemIDs),
+                googleLensItems: bulkTagGoogleLensItems(for: route.itemIDs),
+                googleLensErrorMessage: bulkTagGoogleLensErrorMessage,
+                onOpenGoogleLens: { itemID in
+                    openBulkTagGoogleLensSearch(itemID: itemID, for: route.itemIDs)
+                }
             ) { tagName in
                 applyBulkTag(tagName, to: route.itemIDs)
             }
+            #if os(iOS)
+            .sheet(item: $bulkTagLensBrowserRoute) { browserRoute in
+                MegrumInAppSafariView(url: browserRoute.url)
+                    .ignoresSafeArea()
+            }
+            #endif
         }
         .alert("追加できません", isPresented: $isShowingUnavailableAlert) {
             Button("OK", role: .cancel) {}
@@ -103,6 +118,12 @@ extension GoodsCollectionScreen {
         .animation(.spring(response: 0.30, dampingFraction: 0.86), value: sharePromptContext?.id)
         .task {
             await loadFilterChoicesIfNeeded()
+        }
+        .onChange(of: columnPreferenceContext, initial: true) { _, _ in
+            loadStoredColumnsIfNeeded()
+        }
+        .onChange(of: columns) { _, newValue in
+            saveColumnsIfNeeded(newValue)
         }
         .onChange(of: collectionMemberLookupGroupIDs) { _, _ in
             Task {

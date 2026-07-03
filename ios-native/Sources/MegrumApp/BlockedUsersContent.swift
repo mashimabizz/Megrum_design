@@ -2,7 +2,40 @@ import MegrumCore
 import MegrumDesign
 import SwiftUI
 
+enum BlockedUsersContext: Equatable {
+    case exchange
+    case meguri
+
+    var navigationTitle: String {
+        switch self {
+        case .exchange:
+            "グッズ交換でブロックした人"
+        case .meguri:
+            "めぐりでブロックした人"
+        }
+    }
+
+    var emptyMessage: String {
+        switch self {
+        case .exchange:
+            "必要になった時は、プロフィールのメニューから追加できます。"
+        case .meguri:
+            "必要になった時は、めぐりメッセージのメニューから追加できます。"
+        }
+    }
+
+    func unblockConfirmationMessage(for displayName: String) -> String {
+        switch self {
+        case .exchange:
+            "\(displayName)さんをグッズ交換でブロックした人から外します。"
+        case .meguri:
+            "\(displayName)さんをめぐりでブロックした人から外します。"
+        }
+    }
+}
+
 struct BlockedUsersContent: View {
+    var context: BlockedUsersContext = .exchange
     var users: [BlockedUser]
     var isLoading: Bool
     var unblockingUserID: UUID?
@@ -14,7 +47,7 @@ struct BlockedUsersContent: View {
                 if isLoading {
                     BlockedUsersLoadingRow()
                 } else if users.isEmpty {
-                    BlockedUsersEmptyRow()
+                    BlockedUsersEmptyRow(context: context)
                 } else {
                     ForEach(users) { user in
                         BlockedUserRow(
@@ -46,11 +79,13 @@ private struct BlockedUsersLoadingRow: View {
 }
 
 private struct BlockedUsersEmptyRow: View {
+    var context: BlockedUsersContext
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("ブロック中のユーザーはいません")
                 .font(.headline.weight(.bold))
-            Text("必要になった時は、プロフィールやチャットルームのメニューから追加できます。")
+            Text(context.emptyMessage)
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(MegrumTheme.muted)
         }

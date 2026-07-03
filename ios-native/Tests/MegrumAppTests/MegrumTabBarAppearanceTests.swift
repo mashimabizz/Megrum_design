@@ -4,7 +4,8 @@ import XCTest
 
 final class MegrumTabBarAppearanceTests: XCTestCase {
     func testTabBarKeepsLabelsRaisedAboveBottomGlass() {
-        XCTAssertEqual(MegrumTabBarLayoutMetrics.titleVerticalAdjustment, -4)
+        XCTAssertEqual(MegrumTabBarLayoutMetrics.titleVerticalAdjustment, -8)
+        XCTAssertEqual(MegrumTabBarLayoutMetrics.imageVerticalInset, 3)
     }
 
     func testTabBarHidesSystemBackgroundPlate() {

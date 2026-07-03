@@ -1,8 +1,47 @@
-import MegrumApp
+@testable import MegrumApp
 import MegrumCore
 import XCTest
 
 final class ScheduleStateReducerTests: XCTestCase {
+    func testScheduleEditorDraftStateValidatesDatesAndBuildsInput() {
+        let start = Date(timeIntervalSince1970: 1_780_160_000)
+        var state = ScheduleEditorDraftState(defaultDate: start)
+
+        state.title = " \n "
+        XCTAssertFalse(state.canSave(isCreatingSchedule: false))
+
+        state.title = " 物販列 "
+        state.placeName = " 北口 "
+        state.note = " 早めに並ぶ "
+        XCTAssertTrue(state.canSave(isCreatingSchedule: false))
+        XCTAssertFalse(state.canSave(isCreatingSchedule: true))
+
+        state.startAt = state.endAt
+        state.adjustEndAfterStartChange()
+        XCTAssertEqual(state.endAt, state.startAt.addingTimeInterval(3_600))
+
+        let input = state.makeInput()
+        XCTAssertEqual(input.title, " 物販列 ")
+        XCTAssertEqual(input.placeName, " 北口 ")
+        XCTAssertEqual(input.note, " 早めに並ぶ ")
+        XCTAssertFalse(input.allDay)
+    }
+
+    func testScheduleEditorDraftStateAllDaySnapsToDateRange() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let start = calendar.date(from: DateComponents(year: 2026, month: 7, day: 4, hour: 18, minute: 30))!
+        var state = ScheduleEditorDraftState(defaultDate: start)
+
+        state.startAt = start
+        state.setAllDay(true, calendar: calendar)
+
+        let expectedStart = calendar.startOfDay(for: start)
+        XCTAssertTrue(state.allDay)
+        XCTAssertEqual(state.startAt, expectedStart)
+        XCTAssertEqual(state.endAt, calendar.date(byAdding: .day, value: 1, to: expectedStart))
+    }
+
     func testReplacingProposalSchedulesKeepsOtherProposalBuckets() {
         let targetProposalID = UUID(uuidString: "00000000-0000-0000-0000-000000000701")!
         let otherProposalID = UUID(uuidString: "00000000-0000-0000-0000-000000000702")!

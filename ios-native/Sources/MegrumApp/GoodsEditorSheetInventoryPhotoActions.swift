@@ -133,6 +133,9 @@ extension GoodsEditorSheet {
     }
 
     func analyzeFaceTagsIfNeeded(upload: GoodsPhotoUpload, target: FaceTaggingReviewTarget) {
+        guard GoodsEditorMemberLinkingPolicy.presentsAutomaticFaceTaggingReview else {
+            return
+        }
         let imageData = upload.data
         guard let group = selectedGroup, group.supportsMemberSelection else {
             return

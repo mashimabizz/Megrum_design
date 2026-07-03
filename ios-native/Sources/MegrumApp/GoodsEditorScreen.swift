@@ -23,6 +23,7 @@ struct GoodsEditorSheet: View {
     }
 
     @Environment(\.dismiss) var dismiss
+    @Environment(\.openURL) var openURL
     @State var draft: GoodsEditorDraft
     @State var tagDraft = ""
     @State var photoError: String?
@@ -52,7 +53,8 @@ struct GoodsEditorSheet: View {
     @State var isShowingTagSelectionSheet = false
     @State var isShowingCreateBulkTagSelectionSheet = false
     @State var isConfirmingInventoryCreateWithoutTags = false
-    @State var imageSeriesSuggestionState = GoodsEditorImageSeriesSuggestionState()
+    @State var isOpeningGoogleLensSearch = false
+    @State var googleLensSearchErrorMessage: String?
     @FocusState var isTagFieldFocused: Bool
     #if canImport(PhotosUI)
     @State var selectedPhotoItem: PhotosPickerItem?
@@ -230,11 +232,10 @@ struct GoodsEditorSheet: View {
                     textFieldPlaceholder: "例：会場限定",
                     footerText: "このWishにシリーズを追加します。",
                     confirmationTitle: "追加",
-                    imageSuggestionNames: imageSeriesSuggestionState.names,
-                    isSuggestingFromImage: imageSeriesSuggestionState.isLoading,
-                    imageSuggestionError: imageSeriesSuggestionState.errorMessage,
-                    canSuggestFromImage: draftSeriesSuggestionInput != nil,
-                    onSuggestFromImage: requestDraftImageSeriesSuggestions,
+                    googleLensItems: draftGoogleLensItems,
+                    isOpeningGoogleLens: isOpeningGoogleLensSearch,
+                    googleLensErrorMessage: googleLensSearchErrorMessage,
+                    onOpenGoogleLens: openDraftGoogleLensSearch,
                     onApply: addTagFromSelectionSheet
                 )
                 .presentationDetents([.large])
@@ -249,11 +250,10 @@ struct GoodsEditorSheet: View {
                     textFieldPlaceholder: "例：会場限定",
                     footerText: "\(selectedCreateMetaIDs.count)件の画像に同じシリーズを追加します。",
                     confirmationTitle: "登録",
-                    imageSuggestionNames: imageSeriesSuggestionState.names,
-                    isSuggestingFromImage: imageSeriesSuggestionState.isLoading,
-                    imageSuggestionError: imageSeriesSuggestionState.errorMessage,
-                    canSuggestFromImage: selectedCreateMetaSeriesSuggestionInput != nil,
-                    onSuggestFromImage: requestSelectedCreateMetaImageSeriesSuggestions,
+                    googleLensItems: selectedCreateMetaGoogleLensItems,
+                    isOpeningGoogleLens: isOpeningGoogleLensSearch,
+                    googleLensErrorMessage: googleLensSearchErrorMessage,
+                    onOpenGoogleLens: openSelectedCreateMetaGoogleLensSearch,
                     onApply: applyCreateBulkTag
                 )
                 .presentationDetents([.large])

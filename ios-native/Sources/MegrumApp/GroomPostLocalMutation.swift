@@ -25,6 +25,10 @@ enum GroomPostLocalMutation {
         posts.filter { $0.authorID != authorID }
     }
 
+    static func removing(postID: UUID, from posts: [GroomPost]) -> [GroomPost] {
+        posts.filter { $0.id != postID }
+    }
+
     static func firstPost(id: UUID, in collections: [GroomPost]...) -> GroomPost? {
         for collection in collections {
             if let post = collection.first(where: { $0.id == id }) {

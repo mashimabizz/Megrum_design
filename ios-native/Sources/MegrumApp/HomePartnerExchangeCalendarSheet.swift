@@ -98,13 +98,11 @@ struct HomePartnerExchangeCalendarContext: Identifiable, Equatable, Sendable {
 struct HomePartnerExchangeCalendarSheet: View {
     var context: HomePartnerExchangeCalendarContext
 
-    @State private var visibleMonth: Date
-    @State private var selectedDateKey: String?
+    @State private var presentationState: HomePartnerExchangeCalendarPresentationState
 
     init(context: HomePartnerExchangeCalendarContext) {
         self.context = context
-        _visibleMonth = State(initialValue: context.initialVisibleMonth)
-        _selectedDateKey = State(initialValue: context.initialDateKey)
+        _presentationState = State(initialValue: HomePartnerExchangeCalendarPresentationState(context: context))
     }
 
     var body: some View {
@@ -123,13 +121,13 @@ struct HomePartnerExchangeCalendarSheet: View {
                 .padding(.trailing, 58)
 
                 HomePartnerExchangeCalendarCard(
-                    visibleMonth: $visibleMonth,
-                    selectedDateKey: $selectedDateKey,
+                    visibleMonth: $presentationState.visibleMonth,
+                    selectedDateKey: $presentationState.selectedDateKey,
                     context: context
                 )
 
                 HomePartnerExchangeDateMemoCard(
-                    dateKey: selectedDateKey,
+                    dateKey: presentationState.selectedDateKey,
                     detail: selectedDetail,
                     fallbackPrefecture: context.fallbackPrefecture,
                     fallbackMemo: context.fallbackMemo
@@ -146,6 +144,6 @@ struct HomePartnerExchangeCalendarSheet: View {
     }
 
     private var selectedDetail: HomeExchangeLocalDateDetail? {
-        selectedDateKey.flatMap { context.dateDetails[$0] }
+        presentationState.selectedDetail(in: context)
     }
 }

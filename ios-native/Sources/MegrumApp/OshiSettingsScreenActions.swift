@@ -12,7 +12,7 @@ extension OshiSettingsScreen {
     }
 
     func showMasterSheet() {
-        showsMasterSheet = true
+        presentationState.showsMasterSheet = true
     }
 
     func toggleExpandedGroup(_ group: OshiSettingsGroupDraft) {
@@ -20,7 +20,7 @@ extension OshiSettingsScreen {
             return
         }
         withAnimation(.snappy(duration: 0.2)) {
-            expandedGroupKey = expandedGroupKey == group.key ? nil : group.key
+            presentationState.toggleExpandedGroup(group)
         }
     }
 
@@ -48,7 +48,7 @@ extension OshiSettingsScreen {
         guard group.supportsMemberSelection else {
             return
         }
-        requestSheet = .member(OshiMemberRequestContext(group: group))
+        presentationState.requestSheet = .member(OshiMemberRequestContext(group: group))
     }
 
     func submitOshiRequestTapped(_ payload: OshiRequestSheetPayload) {
@@ -60,8 +60,8 @@ extension OshiSettingsScreen {
     }
 
     func prepare() async {
-        isLoading = true
-        errorMessage = nil
+        presentationState.isLoading = true
+        presentationState.errorMessage = nil
         if appState.oshiGroups.isEmpty || appState.oshiGenres.isEmpty {
             await appState.loadOshiGroups()
         }
@@ -71,45 +71,45 @@ extension OshiSettingsScreen {
         for groupID in selectedGroupIDs {
             await loadCharactersIfNeeded(groupID: groupID)
         }
-        groups = OshiSettingsGroupDraft.build(
+        presentationState.applyPreparedGroups(
             selections: appState.userOshiSelections,
             masterGroups: appState.oshiGroups
         )
-        isLoading = false
+        presentationState.isLoading = false
     }
 
     func loadCharactersIfNeeded(groupID: UUID) async {
-        guard charactersByGroupID[groupID] == nil,
+        guard presentationState.charactersByGroupID[groupID] == nil,
               let group = appState.oshiGroups.first(where: { $0.id == groupID })
         else {
             return
         }
         guard group.supportsMemberSelection else {
-            charactersByGroupID[groupID] = []
+            presentationState.setCharacters([], for: groupID)
             return
         }
         await appState.loadOshiCharacters(group: group)
-        charactersByGroupID[groupID] = appState.oshiCharacters
+        presentationState.setCharacters(appState.oshiCharacters, for: groupID)
     }
 
     func addMasterGroup(_ group: OshiGroup) async {
-        showsMasterSheet = false
-        guard groups.contains(where: { $0.groupID == group.id }) == false else {
-            noticeMessage = "すでに追加済みです。"
+        presentationState.showsMasterSheet = false
+        guard presentationState.groups.contains(where: { $0.groupID == group.id }) == false else {
+            presentationState.noticeMessage = "すでに追加済みです。"
             return
         }
         await loadCharactersIfNeeded(groupID: group.id)
-        var next = groups
+        var next = presentationState.groups
         next.append(OshiSettingsGroupDraft(masterGroup: group, priority: next.count + 1))
         await persist(next, success: "推しを追加しました。")
     }
 
     func addMasterGroups(_ selectedGroups: [OshiGroup]) async {
-        showsMasterSheet = false
-        let existingIDs = Set(groups.compactMap(\.groupID))
+        presentationState.showsMasterSheet = false
+        let existingIDs = Set(presentationState.groups.compactMap(\.groupID))
         let groupsToAdd = selectedGroups.filter { !existingIDs.contains($0.id) }
         guard !groupsToAdd.isEmpty else {
-            noticeMessage = "すでに追加済みです。"
+            presentationState.noticeMessage = "すでに追加済みです。"
             return
         }
 
@@ -117,7 +117,7 @@ extension OshiSettingsScreen {
             await loadCharactersIfNeeded(groupID: group.id)
         }
 
-        var next = groups
+        var next = presentationState.groups
         for group in groupsToAdd {
             next.append(OshiSettingsGroupDraft(masterGroup: group, priority: next.count + 1))
         }
@@ -128,13 +128,13 @@ extension OshiSettingsScreen {
 
     func removeGroup(_ group: OshiSettingsGroupDraft) async {
         await persist(
-            groups.filter { $0.key != group.key },
+            presentationState.groups.filter { $0.key != group.key },
             success: "推し設定から削除しました。"
         )
     }
 
     func removeMember(_ member: OshiSettingsMemberDraft, from group: OshiSettingsGroupDraft) async {
-        var next = groups
+        var next = presentationState.groups
         guard let index = next.firstIndex(where: { $0.key == group.key }) else {
             return
         }
@@ -143,7 +143,7 @@ extension OshiSettingsScreen {
     }
 
     func addMember(_ character: OshiCharacter, to group: OshiSettingsGroupDraft) async {
-        var next = groups
+        var next = presentationState.groups
         guard let index = next.firstIndex(where: { $0.key == group.key }) else {
             return
         }
@@ -155,7 +155,7 @@ extension OshiSettingsScreen {
     }
 
     func submitOshiRequest(_ payload: OshiRequestSheetPayload) async {
-        requestSheet = nil
+        presentationState.requestSheet = nil
         guard let requestID = await appState.createOshiRequest(
             OshiRequestCreateInput(
                 requestedName: payload.name,
@@ -164,10 +164,10 @@ extension OshiSettingsScreen {
                 note: payload.note
             )
         ) else {
-            errorMessage = appState.errorMessage
+            presentationState.errorMessage = appState.errorMessage
             return
         }
-        var next = groups
+        var next = presentationState.groups
         next.append(
             OshiSettingsGroupDraft(
                 requestID: requestID,
@@ -183,23 +183,23 @@ extension OshiSettingsScreen {
         _ payload: OshiMemberRequestSheetPayload,
         context: OshiMemberRequestContext
     ) async {
-        requestSheet = nil
+        presentationState.requestSheet = nil
         let requestedName = payload.name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !requestedName.isEmpty else {
             return
         }
         guard context.canCreateCharacterRequest else {
-            errorMessage = "対象の推しを確認できませんでした"
+            presentationState.errorMessage = "対象の推しを確認できませんでした"
             return
         }
-        guard let groupIndex = groups.firstIndex(where: { $0.key == context.groupKey }) else {
-            errorMessage = "対象の推しを確認できませんでした"
+        guard let groupIndex = presentationState.groups.firstIndex(where: { $0.key == context.groupKey }) else {
+            presentationState.errorMessage = "対象の推しを確認できませんでした"
             return
         }
-        guard groups[groupIndex].members.contains(where: { member in
+        guard presentationState.groups[groupIndex].members.contains(where: { member in
             member.name.compare(requestedName, options: [.caseInsensitive, .widthInsensitive, .diacriticInsensitive]) == .orderedSame
         }) == false else {
-            noticeMessage = "すでに追加済みです。"
+            presentationState.noticeMessage = "すでに追加済みです。"
             return
         }
         guard let requestID = await appState.createCharacterRequest(
@@ -210,11 +210,11 @@ extension OshiSettingsScreen {
                 note: payload.note
             )
         ) else {
-            errorMessage = appState.errorMessage
+            presentationState.errorMessage = appState.errorMessage
             return
         }
 
-        var next = groups
+        var next = presentationState.groups
         next[groupIndex].members.append(
             OshiSettingsMemberDraft(
                 characterRequestID: requestID,
@@ -226,19 +226,18 @@ extension OshiSettingsScreen {
     }
 
     func persist(_ nextGroups: [OshiSettingsGroupDraft], success: String) async {
-        isSaving = true
-        errorMessage = nil
+        presentationState.isSaving = true
+        presentationState.errorMessage = nil
         let inputs = OshiSettingsGroupDraft.accountSetupInputs(from: nextGroups)
         let saved = await appState.saveOshiSelections(inputs)
         if saved {
             withAnimation(.snappy(duration: 0.2)) {
-                groups = nextGroups.reprioritized()
+                presentationState.setPersistedGroups(nextGroups, success: success)
             }
-            noticeMessage = success
         } else {
-            errorMessage = appState.errorMessage
+            presentationState.errorMessage = appState.errorMessage
         }
-        isSaving = false
+        presentationState.isSaving = false
     }
 }
 

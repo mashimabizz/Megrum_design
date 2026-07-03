@@ -2,25 +2,19 @@ import MegrumDesign
 import SwiftUI
 
 extension HomeDiscoveryExperience {
-    var pinnedHeader: some View {
+    func pinnedHeader(isCollapsed: Bool) -> some View {
         VStack(spacing: 0) {
-            header
-                .padding(.horizontal, 20)
-                .padding(.bottom, 8)
-            HomeDiscoveryTabSwitcher(
-                selection: $selectedPrimaryTab,
-                swipeProgress: primaryTabSwipeProgress
-            )
+            if !isCollapsed {
+                header
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 8)
+                    .transition(MegrumTopChromeCollapseAnimation.titleTransition)
+            }
         }
             .padding(.top, 10)
             .padding(.bottom, 0)
             .frame(maxWidth: .infinity)
-            .background {
-                Rectangle()
-                    .fill(.ultraThinMaterial)
-                    .overlay(MegrumTheme.canvas.opacity(0.34))
-                    .ignoresSafeArea(edges: .top)
-            }
+            .megrumTranslucentTopChromeBackground()
             .overlay(alignment: .bottom) {
                 Rectangle()
                     .fill(.white.opacity(0.42))
@@ -81,7 +75,7 @@ extension HomeDiscoveryExperience {
 }
 
 enum HomeDiscoveryHeaderMetrics {
-    static let contentTopPadding: CGFloat = 122
+    static let contentTopPadding: CGFloat = 82
     static let contentBottomPadding: CGFloat = FloatingActionLayoutMetrics.contentBottomPadding + 120
-    static let pullRefreshIndicatorTopPadding: CGFloat = 114
+    static let pullRefreshIndicatorTopPadding: CGFloat = 74
 }

@@ -6,26 +6,17 @@ struct OshiSettingsScreen: View {
     @ObservedObject var appState: MegrumAppState
     var onClose: (() -> Void)?
     @Environment(\.dismiss) var dismiss
-    @State var groups: [OshiSettingsGroupDraft] = []
-    @State var charactersByGroupID: [UUID: [OshiCharacter]] = [:]
-    @State var expandedGroupKey: String?
-    @State var activeRemoveConfirmationGroupKey: String?
-    @State var isSaving = false
-    @State var isLoading = false
-    @State var noticeMessage: String?
-    @State var errorMessage: String?
-    @State var showsMasterSheet = false
-    @State var requestSheet: OshiRequestSheetState?
+    @State var presentationState = OshiSettingsPresentationState()
 
     var body: some View {
         OshiSettingsMainContent(
-            groups: groups,
-            isLoading: isLoading || appState.isLoadingUserOshiSelections || appState.isLoadingOshiGroups,
-            isSaving: isSaving,
-            errorMessage: errorMessage,
-            noticeMessage: noticeMessage,
-            expandedGroupKey: expandedGroupKey,
-            activeRemoveConfirmationGroupKey: $activeRemoveConfirmationGroupKey,
+            groups: presentationState.groups,
+            isLoading: presentationState.isLoading || appState.isLoadingUserOshiSelections || appState.isLoadingOshiGroups,
+            isSaving: presentationState.isSaving,
+            errorMessage: presentationState.errorMessage,
+            noticeMessage: presentationState.noticeMessage,
+            expandedGroupKey: presentationState.expandedGroupKey,
+            activeRemoveConfirmationGroupKey: $presentationState.activeRemoveConfirmationGroupKey,
             availableCharacters: availableCharacters(for:),
             onBack: closeScreen,
             onShowMasterSheet: showMasterSheet,
@@ -37,17 +28,17 @@ struct OshiSettingsScreen: View {
         )
         .background(MegrumTheme.canvas.ignoresSafeArea())
         .megrumHiddenNavigationBar()
-        .sheet(isPresented: $showsMasterSheet) {
+        .sheet(isPresented: $presentationState.showsMasterSheet) {
             OshiMasterSelectSheet(
                 genres: appState.oshiGenres,
                 groups: appState.oshiGroups,
-                selectedGroupIDs: Set(groups.compactMap(\.groupID)),
-                charactersByGroupID: charactersByGroupID,
+                selectedGroupIDs: Set(presentationState.groups.compactMap(\.groupID)),
+                charactersByGroupID: presentationState.charactersByGroupID,
                 allowsMultipleSelection: true,
-                onClose: { showsMasterSheet = false },
+                onClose: { presentationState.showsMasterSheet = false },
                 onRequest: { query in
-                    showsMasterSheet = false
-                    requestSheet = .oshi(initialName: query)
+                    presentationState.showsMasterSheet = false
+                    presentationState.requestSheet = .oshi(initialName: query)
                 },
                 onSelect: addMasterGroupTapped,
                 onRegisterSelected: addMasterGroupsTapped
@@ -55,13 +46,13 @@ struct OshiSettingsScreen: View {
             .presentationDetents([.large])
             .presentationDragIndicator(.hidden)
         }
-        .sheet(item: $requestSheet) { state in
+        .sheet(item: $presentationState.requestSheet) { state in
             switch state {
             case .oshi:
                 OshiRequestSheet(
                     state: state,
                     genres: appState.oshiGenres,
-                    onClose: { requestSheet = nil },
+                    onClose: { presentationState.requestSheet = nil },
                     onSubmit: submitOshiRequestTapped
                 )
                 .presentationDetents([.large])
@@ -69,7 +60,7 @@ struct OshiSettingsScreen: View {
             case .member(let context):
                 OshiMemberRequestSheet(
                     context: context,
-                    onClose: { requestSheet = nil },
+                    onClose: { presentationState.requestSheet = nil },
                     onSubmit: { submitMemberRequestTapped($0, context: context) }
                 )
                 .presentationDetents([.medium])

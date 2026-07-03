@@ -43,6 +43,8 @@
 	<string>$(MEGRUM_AUTH_EMAIL_REDIRECT_URL)</string>
 	<key>MegrumAuthOAuthAuthorizeURL</key>
 	<string>$(MEGRUM_AUTH_OAUTH_AUTHORIZE_URL)</string>
+	<key>MegrumPlusIAPEnabled</key>
+	<string>$(MEGRUM_PLUS_IAP_ENABLED)</string>
 	<key>MegrumAdMobAppID</key>
 	<string>$(MEGRUM_ADMOB_APP_ID)</string>
 	<key>GADApplicationIdentifier</key>

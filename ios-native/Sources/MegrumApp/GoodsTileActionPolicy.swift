@@ -50,6 +50,95 @@ enum GoodsTileContextMenuPolicy {
     }
 }
 
+struct GoodsGridPrimaryTapPolicy: Equatable {
+    var isSelectionMode: Bool
+    var canToggleSelection: Bool
+    var canOpenItem: Bool
+    var canOpenOwnerProfile: Bool
+    var viewerID: UUID?
+    var itemOwnerID: UUID
+
+    var destination: GoodsGridPrimaryTapDestination {
+        if isSelectionMode, canToggleSelection {
+            return .toggleSelection
+        }
+        if canOpenItem {
+            return .openItem
+        }
+        if canOpenOwnerProfile, Optional(itemOwnerID) != viewerID {
+            return .openOwnerProfile(itemOwnerID)
+        }
+        return .showDetail
+    }
+}
+
+enum GoodsGridPrimaryTapDestination: Equatable {
+    case toggleSelection
+    case openItem
+    case openOwnerProfile(UUID)
+    case showDetail
+}
+
+struct GoodsGridTileActionPolicy: Equatable {
+    var viewerID: UUID?
+    var itemOwnerID: UUID
+    var itemTitle: String
+    var canAddToExchangeList: Bool
+    var canCreateIndividualListing: Bool
+    var canEdit: Bool
+    var canHide: Bool
+    var canDelete: Bool
+    var canReport: Bool
+
+    func destination(for action: GoodsTileAction) -> GoodsGridTileActionDestination {
+        switch action {
+        case .detail:
+            return .showDetail
+        case .addToExchangeList:
+            if canAddToExchangeList {
+                return .addToExchangeList
+            }
+            return .showActionMessage("「\(itemTitle)」を交換リストに追加する処理は、打診フローのSwift化で接続します。")
+        case .createIndividualListing:
+            if canCreateIndividualListing {
+                return .createIndividualListing
+            }
+            return .showActionMessage("「\(itemTitle)」から個別募集を作成する処理は、Wish画面で使えます。")
+        case .edit:
+            if itemOwnerID == viewerID, canEdit {
+                return .edit
+            }
+            return .showActionMessage("「\(itemTitle)」の編集は、自分のマイグッズ/Wishでのみ使えます。")
+        case .hide:
+            if itemOwnerID == viewerID, canHide {
+                return .hide
+            }
+            return .showActionMessage("「\(itemTitle)」を非表示にする処理は、自分のマイグッズ/Wishでのみ使えます。")
+        case .report:
+            if Optional(itemOwnerID) != viewerID, canReport {
+                return .showReport
+            }
+            return .showActionMessage("「\(itemTitle)」の通報導線は、他のユーザーのグッズでのみ使えます。")
+        case .delete:
+            if itemOwnerID == viewerID, canDelete {
+                return .delete
+            }
+            return .showActionMessage("「\(itemTitle)」を削除する処理は、自分のマイグッズ/Wishでのみ使えます。")
+        }
+    }
+}
+
+enum GoodsGridTileActionDestination: Equatable {
+    case showDetail
+    case addToExchangeList
+    case createIndividualListing
+    case edit
+    case hide
+    case showReport
+    case delete
+    case showActionMessage(String)
+}
+
 enum GoodsTileAction: CaseIterable, Identifiable, Equatable {
     case detail
     case addToExchangeList

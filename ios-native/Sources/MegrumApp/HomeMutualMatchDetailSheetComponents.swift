@@ -6,7 +6,7 @@ struct HomeMutualMatchSelectedPreviewCard: View {
     var pair: HomeMutualMatchProposalPair
     var review: HomeMutualMatchConditionReview
 
-    @State private var isShowingConditionHelp = false
+    @State private var presentationState = HomeMutualMatchSelectedPreviewPresentationState()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -47,7 +47,7 @@ struct HomeMutualMatchSelectedPreviewCard: View {
                         .foregroundStyle(MegrumTheme.muted)
 
                     Button {
-                        isShowingConditionHelp = true
+                        presentationState.showConditionHelp()
                     } label: {
                         Image(systemName: "questionmark.circle.fill")
                             .font(.system(size: 15, weight: .black))
@@ -57,7 +57,7 @@ struct HomeMutualMatchSelectedPreviewCard: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("確認ポイントの説明を開く")
-                    .popover(isPresented: $isShowingConditionHelp) {
+                    .popover(isPresented: $presentationState.isShowingConditionHelp) {
                         HomeMutualMatchConditionHelpPopover()
                             .presentationCompactAdaptation(.popover)
                     }

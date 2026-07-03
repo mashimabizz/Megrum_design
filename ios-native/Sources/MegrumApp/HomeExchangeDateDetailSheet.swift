@@ -10,9 +10,7 @@ struct HomeExchangeLocalDateDetailSheet: View {
     var onCancel: ([String]) -> Void
 
     @Environment(\.dismiss) private var dismiss
-    @State private var prefecture: String
-    @State private var memo: String
-    @State private var didFinish = false
+    @State private var editorState: HomeExchangeLocalDateDetailEditorState
 
     init(
         dateKeys: [String],
@@ -28,8 +26,7 @@ struct HomeExchangeLocalDateDetailSheet: View {
         self.onSave = onSave
         self.onRemove = onRemove
         self.onCancel = onCancel
-        _prefecture = State(initialValue: initialDetail.prefecture)
-        _memo = State(initialValue: initialDetail.memo)
+        _editorState = State(initialValue: HomeExchangeLocalDateDetailEditorState(detail: initialDetail))
     }
 
     var body: some View {
@@ -49,10 +46,10 @@ struct HomeExchangeLocalDateDetailSheet: View {
 
                 Section("都道府県") {
                     if isReadOnly {
-                        Text(prefecture.nilIfBlank ?? "未設定")
+                        Text(editorState.prefecture.nilIfBlank ?? "未設定")
                             .foregroundStyle(MegrumTheme.ink)
                     } else {
-                        Picker("都道府県", selection: $prefecture) {
+                        Picker("都道府県", selection: $editorState.prefecture) {
                             Text("未設定").tag("")
                             ForEach(JapanesePrefectureCatalog.all, id: \.self) { prefecture in
                                 Text(prefecture).tag(prefecture)
@@ -66,10 +63,10 @@ struct HomeExchangeLocalDateDetailSheet: View {
 
                 Section("メモ") {
                     if isReadOnly {
-                        Text(memo.nilIfBlank ?? "未設定")
+                        Text(editorState.memo.nilIfBlank ?? "未設定")
                             .foregroundStyle(MegrumTheme.ink)
                     } else {
-                        TextField("例：東京駅付近で相談", text: $memo, axis: .vertical)
+                        TextField("例：東京駅付近で相談", text: $editorState.memo, axis: .vertical)
                             .lineLimit(3...)
                     }
                 }
@@ -77,7 +74,7 @@ struct HomeExchangeLocalDateDetailSheet: View {
                 if !isReadOnly {
                     Section {
                         Button(role: .destructive) {
-                            didFinish = true
+                            editorState.markFinished()
                             onRemove(dateKeys)
                             dismiss()
                         } label: {
@@ -120,21 +117,15 @@ struct HomeExchangeLocalDateDetailSheet: View {
     }
 
     private func cancelIfNeeded() {
-        guard !isReadOnly, !didFinish else {
+        guard editorState.shouldCancelOnDisappear(isReadOnly: isReadOnly) else {
             return
         }
         onCancel(dateKeys)
     }
 
     private func save() {
-        didFinish = true
-        onSave(
-            dateKeys,
-            HomeExchangeLocalDateDetail(
-                prefecture: prefecture.trimmingCharacters(in: .whitespacesAndNewlines),
-                memo: memo.trimmingCharacters(in: .whitespacesAndNewlines)
-            )
-        )
+        editorState.markFinished()
+        onSave(dateKeys, editorState.detailForSave)
         dismiss()
     }
 }

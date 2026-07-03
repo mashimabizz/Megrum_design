@@ -1,8 +1,35 @@
-import MegrumApp
+@testable import MegrumApp
 import MegrumCore
 import XCTest
 
 final class MeguriMessageReadStateReducerTests: XCTestCase {
+    func testMeguriMessagesPresentationStateClearsDraftOnlyAfterSuccessfulSendAndShowsPlus() {
+        var state = MeguriMessagesPresentationState()
+
+        state.draft = "こんにちは"
+        state.clearDraftAfterSend(false)
+
+        XCTAssertEqual(state.draft, "こんにちは")
+
+        state.showMegrumPlus()
+        XCTAssertTrue(state.isShowingMegrumPlus)
+
+        state.showInitialMegrumPlusPrompt()
+        XCTAssertTrue(state.isShowingMegrumPlusPrompt)
+        XCTAssertTrue(state.didShowInitialMegrumPlusPrompt)
+
+        state.isShowingMegrumPlusPrompt = false
+        state.showInitialMegrumPlusPrompt()
+        XCTAssertFalse(state.isShowingMegrumPlusPrompt)
+
+        state.showMegrumPlusPrompt()
+        XCTAssertTrue(state.isShowingMegrumPlusPrompt)
+
+        state.clearDraftAfterSend(true)
+
+        XCTAssertEqual(state.draft, "")
+    }
+
     func testConversationThreadsGroupByPeerAndSortUnreadFirstThenLatest() {
         let viewerID = UUID(uuidString: "00000000-0000-0000-0000-000000000220")!
         let unreadPeerID = UUID(uuidString: "00000000-0000-0000-0000-000000000221")!
@@ -44,6 +71,68 @@ final class MeguriMessageReadStateReducerTests: XCTestCase {
         XCTAssertEqual(threads.first?.lastMessagePreview, "未読")
     }
 
+    func testConversationThreadsSplitSamePeerBySourceGroomPost() {
+        let viewerID = UUID(uuidString: "00000000-0000-0000-0000-000000000280")!
+        let peerID = UUID(uuidString: "00000000-0000-0000-0000-000000000281")!
+        let firstGroomPostID = UUID(uuidString: "00000000-0000-0000-0000-000000000501")!
+        let secondGroomPostID = UUID(uuidString: "00000000-0000-0000-0000-000000000502")!
+        let messages = [
+            makeMessage(
+                senderID: peerID,
+                recipientID: viewerID,
+                body: "1つ目",
+                sourceGroomPostID: firstGroomPostID,
+                createdAt: Date(timeIntervalSince1970: 100)
+            ),
+            makeMessage(
+                senderID: peerID,
+                recipientID: viewerID,
+                body: "2つ目",
+                sourceGroomPostID: secondGroomPostID,
+                createdAt: Date(timeIntervalSince1970: 200)
+            ),
+        ]
+
+        let threads = MeguriMessageReadStateReducer.conversationThreads(
+            from: messages,
+            viewerID: viewerID
+        )
+
+        XCTAssertEqual(threads.count, 2)
+        XCTAssertEqual(
+            threads.map { $0.sourceGroomPostID },
+            [secondGroomPostID, firstGroomPostID]
+        )
+    }
+
+    func testVisibleMessagesExcludeBlockedPeersWithoutDroppingOtherThreads() {
+        let viewerID = UUID(uuidString: "00000000-0000-0000-0000-000000000260")!
+        let blockedPeerID = UUID(uuidString: "00000000-0000-0000-0000-000000000261")!
+        let visiblePeerID = UUID(uuidString: "00000000-0000-0000-0000-000000000262")!
+        let messages = [
+            makeMessage(senderID: blockedPeerID, recipientID: viewerID, body: "非表示"),
+            makeMessage(senderID: viewerID, recipientID: visiblePeerID, body: "表示"),
+        ]
+
+        let visibleMessages = MeguriMessageReadStateReducer.visibleMessages(
+            messages,
+            viewerID: viewerID,
+            blockedUserIDs: [blockedPeerID]
+        )
+
+        XCTAssertEqual(visibleMessages.compactMap(\.body), ["表示"])
+    }
+
+    func testLockedMessagePresentationExpandsShortTextForThreeLineBlur() {
+        let expanded = MeguriLockedMessageTextPresentation.expandedText(
+            "短い",
+            minimumCharacterCount: 18
+        )
+
+        XCTAssertGreaterThanOrEqual(expanded.count, 18)
+        XCTAssertTrue(expanded.contains("短い"))
+    }
+
     func testUnreadIncomingCountCountsOnlyUnreadMessagesToViewer() {
         let viewerID = UUID(uuidString: "00000000-0000-0000-0000-000000000224")!
         let peerID = UUID(uuidString: "00000000-0000-0000-0000-000000000225")!
@@ -76,8 +165,78 @@ final class MeguriMessageReadStateReducerTests: XCTestCase {
             viewerID: viewerID
         )
 
-        XCTAssertEqual(threads.first?.lastMessagePreview, "Megrum プレミアムで表示できます")
+        XCTAssertEqual(threads.first?.lastMessagePreview, "Megrumプレミアムで表示できます")
         XCTAssertTrue(threads.first?.lastMessage.locked == true)
+    }
+
+    func testConversationThreadUsesPublicProfileWhenMeguriProfileIsLinked() throws {
+        let viewerID = UUID(uuidString: "00000000-0000-0000-0000-000000000271")!
+        let peerID = UUID(uuidString: "00000000-0000-0000-0000-000000000272")!
+        let messages = [
+            makeMessage(senderID: peerID, recipientID: viewerID, senderDisplayName: "匿名名", senderHandle: "anon")
+        ]
+        let publicProfile = PublicUserProfile(
+            profile: UserProfile(
+                id: peerID,
+                handle: "goods",
+                displayName: "グッズ名",
+                avatarURL: URL(string: "https://example.com/goods-avatar.jpg")
+            )
+        )
+        let meguriProfile = MeguriProfile(
+            userID: peerID,
+            displayName: "匿名名",
+            avatarID: "avatar_4",
+            usesPublicProfile: true
+        )
+
+        let thread = try XCTUnwrap(MeguriMessageReadStateReducer.conversationThreads(
+            from: messages,
+            viewerID: viewerID,
+            publicProfilesByUserID: [peerID: publicProfile],
+            meguriProfilesByUserID: [peerID: meguriProfile]
+        ).first)
+
+        XCTAssertEqual(thread.displayName, "グッズ名")
+        XCTAssertEqual(thread.handle, "goods")
+        XCTAssertEqual(thread.avatarURL, URL(string: "https://example.com/goods-avatar.jpg"))
+        XCTAssertNil(thread.avatarID)
+        XCTAssertTrue(thread.usesPublicProfile)
+    }
+
+    func testConversationThreadHidesHandleWhenMeguriProfileIsAnonymous() throws {
+        let viewerID = UUID(uuidString: "00000000-0000-0000-0000-000000000273")!
+        let peerID = UUID(uuidString: "00000000-0000-0000-0000-000000000274")!
+        let messages = [
+            makeMessage(senderID: peerID, recipientID: viewerID, senderDisplayName: "公開名", senderHandle: "public")
+        ]
+        let publicProfile = PublicUserProfile(
+            profile: UserProfile(
+                id: peerID,
+                handle: "public",
+                displayName: "公開名",
+                avatarURL: URL(string: "https://example.com/public-avatar.jpg")
+            )
+        )
+        let meguriProfile = MeguriProfile(
+            userID: peerID,
+            displayName: "匿名名",
+            avatarID: "avatar_5",
+            usesPublicProfile: false
+        )
+
+        let thread = try XCTUnwrap(MeguriMessageReadStateReducer.conversationThreads(
+            from: messages,
+            viewerID: viewerID,
+            publicProfilesByUserID: [peerID: publicProfile],
+            meguriProfilesByUserID: [peerID: meguriProfile]
+        ).first)
+
+        XCTAssertEqual(thread.displayName, "匿名名")
+        XCTAssertNil(thread.handle)
+        XCTAssertEqual(thread.avatarID, "avatar_5")
+        XCTAssertNil(thread.avatarURL)
+        XCTAssertFalse(thread.usesPublicProfile)
     }
 
     func testPendingReplyThreadCountCountsThreadsWhereLatestMessageIsIncoming() {
@@ -132,6 +291,32 @@ final class MeguriMessageReadStateReducerTests: XCTestCase {
         )
     }
 
+    func testPendingReplyThreadCountCountsMultipleSourceThreadsFromSamePeerSeparately() {
+        let viewerID = UUID(uuidString: "00000000-0000-0000-0000-000000000282")!
+        let peerID = UUID(uuidString: "00000000-0000-0000-0000-000000000283")!
+        let messages = [
+            makeMessage(
+                senderID: peerID,
+                recipientID: viewerID,
+                body: "1つ目",
+                sourceGroomPostID: UUID(uuidString: "00000000-0000-0000-0000-000000000503")!,
+                createdAt: Date(timeIntervalSince1970: 100)
+            ),
+            makeMessage(
+                senderID: peerID,
+                recipientID: viewerID,
+                body: "2つ目",
+                sourceGroomPostID: UUID(uuidString: "00000000-0000-0000-0000-000000000504")!,
+                createdAt: Date(timeIntervalSince1970: 200)
+            ),
+        ]
+
+        XCTAssertEqual(
+            MeguriMessageReadStateReducer.pendingReplyThreadCount(messages, viewerID: viewerID),
+            2
+        )
+    }
+
     func testAppendingSentMessageKeepsExistingOrderAndAddsMessageAtEnd() {
         let viewerID = UUID(uuidString: "00000000-0000-0000-0000-000000000210")!
         let peerID = UUID(uuidString: "00000000-0000-0000-0000-000000000211")!
@@ -172,14 +357,14 @@ final class MeguriMessageReadStateReducerTests: XCTestCase {
         XCTAssertTrue(
             MeguriMessageReadStateReducer.hasUnreadIncomingMessages(
                 messages,
-                peerID: peerID,
+                conversationKey: MeguriMessageConversationKey(peerID: peerID),
                 viewerID: viewerID
             )
         )
 
         let updated = MeguriMessageReadStateReducer.markIncomingMessagesRead(
             messages,
-            peerID: peerID,
+            conversationKey: MeguriMessageConversationKey(peerID: peerID),
             viewerID: viewerID,
             readAt: readAt
         )
@@ -202,10 +387,43 @@ final class MeguriMessageReadStateReducerTests: XCTestCase {
         XCTAssertFalse(
             MeguriMessageReadStateReducer.hasUnreadIncomingMessages(
                 messages,
-                peerID: peerID,
+                conversationKey: MeguriMessageConversationKey(peerID: peerID),
                 viewerID: viewerID
             )
         )
+    }
+
+    func testMarkIncomingMessagesReadOnlyUpdatesMatchingSourceThread() {
+        let viewerID = UUID(uuidString: "00000000-0000-0000-0000-000000000284")!
+        let peerID = UUID(uuidString: "00000000-0000-0000-0000-000000000285")!
+        let targetSourceID = UUID(uuidString: "00000000-0000-0000-0000-000000000505")!
+        let otherSourceID = UUID(uuidString: "00000000-0000-0000-0000-000000000506")!
+        let readAt = Date(timeIntervalSince1970: 500)
+        let messages = [
+            makeMessage(
+                senderID: peerID,
+                recipientID: viewerID,
+                sourceGroomPostID: targetSourceID
+            ),
+            makeMessage(
+                senderID: peerID,
+                recipientID: viewerID,
+                sourceGroomPostID: otherSourceID
+            ),
+        ]
+
+        let updated = MeguriMessageReadStateReducer.markIncomingMessagesRead(
+            messages,
+            conversationKey: MeguriMessageConversationKey(
+                peerID: peerID,
+                sourceGroomPostID: targetSourceID
+            ),
+            viewerID: viewerID,
+            readAt: readAt
+        )
+
+        XCTAssertEqual(updated[0].readAt, readAt)
+        XCTAssertNil(updated[1].readAt)
     }
 
     func testMergingUpdatedReplacesOnlyReturnedMessages() {
@@ -241,6 +459,7 @@ final class MeguriMessageReadStateReducerTests: XCTestCase {
         senderID: UUID,
         recipientID: UUID,
         body: String? = "こんにちは",
+        sourceGroomPostID: UUID? = nil,
         readAt: Date? = nil,
         createdAt: Date = Date(timeIntervalSince1970: 0),
         locked: Bool = false,
@@ -251,6 +470,7 @@ final class MeguriMessageReadStateReducerTests: XCTestCase {
             id: id,
             senderID: senderID,
             recipientID: recipientID,
+            sourceGroomPostID: sourceGroomPostID,
             messageType: .text,
             body: body,
             readAt: readAt,

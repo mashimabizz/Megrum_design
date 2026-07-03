@@ -20,9 +20,9 @@ struct GoodsGrid: View {
     var selectedItemIDs: Set<UUID> = []
     var onBeginSelection: ((GoodsItem) -> Void)?
     var onToggleSelection: ((GoodsItem) -> Void)?
-    @State private var detailItem: GoodsItem?
-    @State private var actionMessage: String?
-    @State private var reportItem: GoodsItem?
+    var animatesEntrance = false
+    @State private var presentationState = GoodsGridPresentationState()
+    @State private var entranceStartedAt = Date()
 
     private var gridItems: [GridItem] {
         Array(repeating: GridItem(.flexible(), spacing: GoodsGridLayout.columnSpacing), count: layout.columns)
@@ -34,25 +34,13 @@ struct GoodsGrid: View {
 
     var body: some View {
         LazyVGrid(columns: gridItems, spacing: GoodsGridLayout.rowSpacing) {
-            ForEach(items) { item in
+            ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
                 let tileActions = actions(for: item)
                 GoodsTile(
                     item: item,
                     context: context,
                     actions: tileActions,
-                    onOpenDetail: {
-                        if isSelectionMode, let onToggleSelection {
-                            onToggleSelection(item)
-                            return
-                        }
-                        if let onOpenItem {
-                            onOpenItem(item)
-                        } else if let onOpenOwnerProfile, item.ownerID != viewerID {
-                            onOpenOwnerProfile(item.ownerID)
-                        } else {
-                            detailItem = item
-                        }
-                    },
+                    onOpenDetail: { handlePrimaryTap(item) },
                     onAction: { action in
                         handle(action, item: item)
                     },
@@ -67,73 +55,76 @@ struct GoodsGrid: View {
                         { beginSelection(item) }
                     }
                 )
+                .modifier(
+                    GoodsGridEntranceEffect(
+                        isEnabled: animatesEntrance,
+                        row: index / layout.columns,
+                        startedAt: entranceStartedAt
+                    )
+                )
             }
         }
-        .sheet(item: $detailItem) { item in
-            NavigationStack {
-                GoodsDetailSheet(item: item, context: context)
-            }
-        }
-        .sheet(item: $reportItem) { item in
-            NavigationStack {
-                GoodsReportSheet(item: item) { reason, note in
-                    onReportItem?(item, reason, note)
-                    reportItem = nil
-                }
-            }
-        }
-        .alert("まだ接続していません", isPresented: Binding(
-            get: { actionMessage != nil },
-            set: { if !$0 { actionMessage = nil } }
-        )) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            if let actionMessage {
-                Text(actionMessage)
-            }
+        .modifier(
+            GoodsGridPresentationModifier(
+                presentationState: $presentationState,
+                context: context,
+                onReportItem: onReportItem
+            )
+        )
+    }
+
+    private func handlePrimaryTap(_ item: GoodsItem) {
+        let policy = GoodsGridPrimaryTapPolicy(
+            isSelectionMode: isSelectionMode,
+            canToggleSelection: onToggleSelection != nil,
+            canOpenItem: onOpenItem != nil,
+            canOpenOwnerProfile: onOpenOwnerProfile != nil,
+            viewerID: viewerID,
+            itemOwnerID: item.ownerID
+        )
+
+        switch policy.destination {
+        case .toggleSelection:
+            onToggleSelection?(item)
+        case .openItem:
+            onOpenItem?(item)
+        case .openOwnerProfile(let ownerID):
+            onOpenOwnerProfile?(ownerID)
+        case .showDetail:
+            presentationState.showDetail(item)
         }
     }
 
     private func handle(_ action: GoodsTileAction, item: GoodsItem) {
-        switch action {
-        case .detail:
-            detailItem = item
+        let policy = GoodsGridTileActionPolicy(
+            viewerID: viewerID,
+            itemOwnerID: item.ownerID,
+            itemTitle: item.title,
+            canAddToExchangeList: onAddToExchangeList != nil,
+            canCreateIndividualListing: onCreateIndividualListing != nil,
+            canEdit: onEditItem != nil,
+            canHide: onHideItem != nil,
+            canDelete: onDeleteItem != nil,
+            canReport: onReportItem != nil
+        )
+
+        switch policy.destination(for: action) {
+        case .showDetail:
+            presentationState.showDetail(item)
         case .addToExchangeList:
-            if let onAddToExchangeList {
-                onAddToExchangeList(item)
-            } else {
-                actionMessage = "「\(item.title)」を交換リストに追加する処理は、打診フローのSwift化で接続します。"
-            }
+            onAddToExchangeList?(item)
         case .createIndividualListing:
-            if let onCreateIndividualListing {
-                onCreateIndividualListing(item)
-            } else {
-                actionMessage = "「\(item.title)」から個別募集を作成する処理は、Wish画面で使えます。"
-            }
+            onCreateIndividualListing?(item)
         case .edit:
-            if item.ownerID == viewerID, let onEditItem {
-                onEditItem(item)
-            } else {
-                actionMessage = "「\(item.title)」の編集は、自分のマイグッズ/Wishでのみ使えます。"
-            }
+            onEditItem?(item)
         case .hide:
-            if item.ownerID == viewerID, let onHideItem {
-                onHideItem(item)
-            } else {
-                actionMessage = "「\(item.title)」を非表示にする処理は、自分のマイグッズ/Wishでのみ使えます。"
-            }
-        case .report:
-            if item.ownerID != viewerID, onReportItem != nil {
-                reportItem = item
-            } else {
-                actionMessage = "「\(item.title)」の通報導線は、他のユーザーのグッズでのみ使えます。"
-            }
+            onHideItem?(item)
+        case .showReport:
+            presentationState.showReport(item)
         case .delete:
-            if item.ownerID == viewerID, onDeleteItem != nil {
-                onDeleteItem?(item)
-            } else {
-                actionMessage = "「\(item.title)」を削除する処理は、自分のマイグッズ/Wishでのみ使えます。"
-            }
+            onDeleteItem?(item)
+        case .showActionMessage(let message):
+            presentationState.showActionMessage(message)
         }
     }
 
@@ -149,5 +140,43 @@ struct GoodsGrid: View {
             canReport: onReportItem != nil
         )
         .actions
+    }
+}
+
+/// Staggered row-by-row entrance for grid tiles: tiles drop in from above,
+/// one row after another, when the grid first appears. Tiles appearing later
+/// (scrolling) show instantly.
+private struct GoodsGridEntranceEffect: ViewModifier {
+    let isEnabled: Bool
+    let row: Int
+    let startedAt: Date
+
+    @State private var isShown = false
+
+    private static let entranceWindow: TimeInterval = 0.9
+    private static let rowDelay: TimeInterval = 0.07
+    private static let maxDelayedRows = 8
+
+    func body(content: Content) -> some View {
+        content
+            .opacity(showsInPlace ? 1 : (isShown ? 1 : 0))
+            .offset(y: showsInPlace ? 0 : (isShown ? 0 : -16))
+            .onAppear {
+                guard isEnabled, !isShown else {
+                    return
+                }
+                if Date().timeIntervalSince(startedAt) > Self.entranceWindow {
+                    isShown = true
+                    return
+                }
+                let delay = Double(min(row, Self.maxDelayedRows)) * Self.rowDelay
+                withAnimation(.spring(response: 0.36, dampingFraction: 0.86).delay(delay)) {
+                    isShown = true
+                }
+            }
+    }
+
+    private var showsInPlace: Bool {
+        !isEnabled
     }
 }

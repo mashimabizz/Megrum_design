@@ -5,10 +5,419 @@ import MegrumCore
 import XCTest
 
 final class ProposalCreateFlowTests: XCTestCase {
+    func testProposalCompletionAnimationPresentationStateResolvesMotionValues() {
+        var state = ProposalCompletionAnimationPresentationState()
+
+        XCTAssertEqual(state.haloScale(reduceMotion: false), 0.82)
+        XCTAssertEqual(state.haloScale(reduceMotion: true), 0.82)
+        XCTAssertEqual(state.haloOpacity, 0.4)
+        XCTAssertEqual(state.badgeScale(reduceMotion: false), 0.72)
+        XCTAssertEqual(state.badgeScale(reduceMotion: true), 1)
+        XCTAssertEqual(state.sparkleOffsetValue(100, reduceMotion: false), 52)
+        XCTAssertEqual(state.sparkleScale(reduceMotion: false), 0.36)
+        XCTAssertEqual(state.sparkleOpacity, 0)
+
+        state.show()
+
+        XCTAssertEqual(state.haloScale(reduceMotion: false), 1.16)
+        XCTAssertEqual(state.haloScale(reduceMotion: true), 0.82)
+        XCTAssertEqual(state.haloOpacity, 1)
+        XCTAssertEqual(state.badgeScale(reduceMotion: false), 1)
+        XCTAssertEqual(state.sparkleOffsetValue(100, reduceMotion: false), 100)
+        XCTAssertEqual(state.sparkleScale(reduceMotion: false), 1)
+        XCTAssertEqual(state.sparkleOpacity, 1)
+    }
+
     func testProposalCreateStepsStayInVisibleParityOrder() {
         XCTAssertEqual(
             ProposalCreateStep.allCases.map(\.title),
             ["出すもの", "受け取る", "待ち合わせ", "送料", "支払方法", "確認"]
+        )
+    }
+
+    func testProposalHeaderLeadingActionResolverKeepsBackOrDismissBehavior() {
+        XCTAssertEqual(ProposalHeaderLeadingActionResolver.action(for: .give), .dismiss)
+        XCTAssertEqual(ProposalHeaderLeadingActionResolver.action(for: .receive), .dismiss)
+        XCTAssertEqual(ProposalHeaderLeadingActionResolver.action(for: .meetup), .dismiss)
+        XCTAssertEqual(ProposalHeaderLeadingActionResolver.action(for: .shipping), .dismiss)
+        XCTAssertEqual(ProposalHeaderLeadingActionResolver.action(for: .payment), .previousStep)
+        XCTAssertEqual(ProposalHeaderLeadingActionResolver.action(for: .confirm), .previousStep)
+    }
+
+    func testProposalPreviousStepResolverUsesVisibleOrderOnlyWhenPossible() {
+        let visibleSteps: [ProposalCreateStep] = [.give, .receive, .meetup, .confirm]
+
+        XCTAssertNil(
+            ProposalPreviousStepResolver.destination(
+                from: .give,
+                visibleSteps: visibleSteps
+            )
+        )
+        XCTAssertEqual(
+            ProposalPreviousStepResolver.destination(
+                from: .meetup,
+                visibleSteps: visibleSteps
+            ),
+            .receive
+        )
+        XCTAssertEqual(
+            ProposalPreviousStepResolver.destination(
+                from: .confirm,
+                visibleSteps: visibleSteps
+            ),
+            .meetup
+        )
+        XCTAssertNil(
+            ProposalPreviousStepResolver.destination(
+                from: .payment,
+                visibleSteps: visibleSteps
+            )
+        )
+    }
+
+    func testProposalExchangeMethodStepResolverMovesAwayFromUnavailableSteps() {
+        XCTAssertEqual(
+            ProposalExchangeMethodStepResolver.resolvedStepAfterExchangeMethodChange(
+                currentStep: .meetup,
+                requiresMeetupBeforeSubmit: false,
+                requiresShippingBeforeSubmit: true,
+                requiresPaymentSelection: false
+            ),
+            .shipping
+        )
+        XCTAssertEqual(
+            ProposalExchangeMethodStepResolver.resolvedStepAfterExchangeMethodChange(
+                currentStep: .meetup,
+                requiresMeetupBeforeSubmit: false,
+                requiresShippingBeforeSubmit: false,
+                requiresPaymentSelection: false
+            ),
+            .confirm
+        )
+        XCTAssertEqual(
+            ProposalExchangeMethodStepResolver.resolvedStepAfterExchangeMethodChange(
+                currentStep: .shipping,
+                requiresMeetupBeforeSubmit: true,
+                requiresShippingBeforeSubmit: false,
+                requiresPaymentSelection: false
+            ),
+            .meetup
+        )
+        XCTAssertEqual(
+            ProposalExchangeMethodStepResolver.resolvedStepAfterExchangeMethodChange(
+                currentStep: .shipping,
+                requiresMeetupBeforeSubmit: false,
+                requiresShippingBeforeSubmit: false,
+                requiresPaymentSelection: false
+            ),
+            .confirm
+        )
+        XCTAssertEqual(
+            ProposalExchangeMethodStepResolver.resolvedStepAfterExchangeMethodChange(
+                currentStep: .payment,
+                requiresMeetupBeforeSubmit: true,
+                requiresShippingBeforeSubmit: true,
+                requiresPaymentSelection: false
+            ),
+            .confirm
+        )
+        XCTAssertEqual(
+            ProposalExchangeMethodStepResolver.resolvedStepAfterExchangeMethodChange(
+                currentStep: .payment,
+                requiresMeetupBeforeSubmit: true,
+                requiresShippingBeforeSubmit: true,
+                requiresPaymentSelection: true
+            ),
+            .payment
+        )
+        XCTAssertEqual(
+            ProposalExchangeMethodStepResolver.resolvedStepAfterExchangeMethodChange(
+                currentStep: .give,
+                requiresMeetupBeforeSubmit: false,
+                requiresShippingBeforeSubmit: false,
+                requiresPaymentSelection: false
+            ),
+            .give
+        )
+    }
+
+    func testProposalCreateDisplayTextFormatterKeepsMethodAndDateText() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "Asia/Tokyo")!
+        let date = calendar.date(from: DateComponents(year: 2026, month: 6, day: 7, hour: 12))!
+
+        XCTAssertEqual(ProposalCreateDisplayTextFormatter.methodTitle(.hand), "現地交換")
+        XCTAssertEqual(ProposalCreateDisplayTextFormatter.methodTitle(.mail), "郵送交換")
+        XCTAssertEqual(ProposalCreateDisplayTextFormatter.methodTitle(.both), "現地 / 郵送")
+        XCTAssertEqual(ProposalCreateDisplayTextFormatter.dateText(date), "6月7日")
+    }
+
+    func testProposalCreateInitialStateFlagsAreOneShot() {
+        var flags = ProposalCreateInitialStateFlags()
+
+        XCTAssertTrue(flags.claimExchangeMethodApplication())
+        XCTAssertFalse(flags.claimExchangeMethodApplication())
+        XCTAssertTrue(flags.hasAppliedExchangeMethod)
+
+        XCTAssertTrue(flags.claimVisualQAStateApplication())
+        XCTAssertFalse(flags.claimVisualQAStateApplication())
+        XCTAssertTrue(flags.hasAppliedVisualQAState)
+
+        XCTAssertTrue(flags.canApplyInitialStep())
+        flags.markInitialStepApplied()
+        XCTAssertFalse(flags.canApplyInitialStep())
+        XCTAssertTrue(flags.hasAppliedInitialStep)
+    }
+
+    func testProposalCreateFilterStateFiltersEachSideIndependently() {
+        let groupA = UUID(uuidString: "00000000-0000-0000-0000-000000000901")!
+        let groupB = UUID(uuidString: "00000000-0000-0000-0000-000000000902")!
+        let typeA = UUID(uuidString: "00000000-0000-0000-0000-000000000903")!
+        let typeB = UUID(uuidString: "00000000-0000-0000-0000-000000000904")!
+        let first = GoodsItem(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000905")!,
+            ownerID: UUID(),
+            groupID: groupA,
+            goodsTypeID: typeA,
+            title: "first"
+        )
+        let second = GoodsItem(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000906")!,
+            ownerID: UUID(),
+            groupID: groupB,
+            goodsTypeID: typeB,
+            title: "second"
+        )
+        let goods = [first, second]
+        let filterState = ProposalCreateFilterState(
+            senderGroupID: groupA,
+            senderGoodsTypeID: typeA,
+            receiverGroupID: groupB,
+            receiverGoodsTypeID: typeB
+        )
+
+        XCTAssertEqual(filterState.filteredSenderGoods(from: goods).map(\.id), [first.id])
+        XCTAssertEqual(filterState.filteredReceiverGoods(from: goods).map(\.id), [second.id])
+    }
+
+    func testProposalCreateGoodsSelectionReducerTogglesAndSeedsFromAvailableFallbacks() {
+        let first = UUID(uuidString: "00000000-0000-0000-0000-000000000921")!
+        let second = UUID(uuidString: "00000000-0000-0000-0000-000000000922")!
+        let missing = UUID(uuidString: "00000000-0000-0000-0000-000000000923")!
+
+        XCTAssertEqual(ProposalCreateGoodsSelectionReducer.toggled([], id: first), [first])
+        XCTAssertEqual(ProposalCreateGoodsSelectionReducer.toggled([first], id: first), [])
+        XCTAssertEqual(
+            ProposalCreateGoodsSelectionReducer.seeded(
+                selectedIDs: [],
+                availableIDs: [first, second],
+                fallbackIDs: [missing, second]
+            ),
+            [second]
+        )
+        XCTAssertEqual(
+            ProposalCreateGoodsSelectionReducer.seeded(
+                selectedIDs: [first],
+                availableIDs: [second],
+                fallbackIDs: [second]
+            ),
+            [first]
+        )
+    }
+
+    func testProposalCreateGoodsSelectionReducerReconcilesBeforeApplyingFallbacks() {
+        let first = UUID(uuidString: "00000000-0000-0000-0000-000000000931")!
+        let second = UUID(uuidString: "00000000-0000-0000-0000-000000000932")!
+        let third = UUID(uuidString: "00000000-0000-0000-0000-000000000933")!
+
+        XCTAssertEqual(
+            ProposalCreateGoodsSelectionReducer.reconciled(
+                selectedIDs: [first, second],
+                availableIDs: [second, third],
+                fallbackIDs: [third]
+            ),
+            [second]
+        )
+        XCTAssertEqual(
+            ProposalCreateGoodsSelectionReducer.reconciled(
+                selectedIDs: [first],
+                availableIDs: [second, third],
+                fallbackIDs: [third]
+            ),
+            [third]
+        )
+    }
+
+    func testProposalCreateValueSelectionStateNormalizesCashAndSyncsPaymentOption() {
+        let first = ProposalPaymentOption(
+            id: "first",
+            title: "PayPay",
+            subtitle: nil,
+            section: .mutuallyAccepted,
+            kind: .method(.paypay)
+        )
+        let second = ProposalPaymentOption(
+            id: "second",
+            title: "銀行振込",
+            subtitle: nil,
+            section: .needsDiscussion,
+            kind: .method(.bankTransfer)
+        )
+        var state = ProposalCreateValueSelectionState()
+
+        state.senderCashAmountText = "1,234円"
+        state.normalizeSenderCashAmountText(state.senderCashAmountText)
+        XCTAssertEqual(state.senderCashAmountText, "1,234")
+        XCTAssertEqual(state.senderCashAmount, 1234)
+        XCTAssertTrue(state.requiresPaymentStep)
+
+        state.syncPaymentSelectionIfNeeded(options: [first, second])
+        XCTAssertEqual(state.selectedPaymentOptionID, "first")
+
+        state.selectedPaymentOptionID = "second"
+        state.syncPaymentSelectionIfNeeded(options: [first, second])
+        XCTAssertEqual(state.selectedPaymentOptionID, "second")
+
+        state.senderCashAmountText = ""
+        state.syncPaymentSelectionIfNeeded(options: [first, second])
+        XCTAssertNil(state.selectedPaymentOptionID)
+    }
+
+    func testProposalPaymentOptionSelectionResolverKeepsOrResetsSelection() {
+        let first = ProposalPaymentOption(
+            id: "first",
+            title: "PayPay",
+            subtitle: nil,
+            section: .mutuallyAccepted,
+            kind: .method(.paypay)
+        )
+        let second = ProposalPaymentOption(
+            id: "second",
+            title: "銀行振込",
+            subtitle: nil,
+            section: .needsDiscussion,
+            kind: .method(.bankTransfer)
+        )
+
+        XCTAssertNil(
+            ProposalPaymentOptionSelectionResolver.resolvedSelectionID(
+                currentID: "first",
+                requiresPaymentStep: false,
+                options: [first, second]
+            )
+        )
+        XCTAssertNil(
+            ProposalPaymentOptionSelectionResolver.resolvedSelectionID(
+                currentID: "first",
+                requiresPaymentStep: true,
+                options: []
+            )
+        )
+        XCTAssertEqual(
+            ProposalPaymentOptionSelectionResolver.resolvedSelectionID(
+                currentID: "second",
+                requiresPaymentStep: true,
+                options: [first, second]
+            ),
+            "second"
+        )
+        XCTAssertEqual(
+            ProposalPaymentOptionSelectionResolver.resolvedSelectionID(
+                currentID: "missing",
+                requiresPaymentStep: true,
+                options: [first, second]
+            ),
+            "first"
+        )
+    }
+
+    func testProposalShippingConditionDraftResolverKeepsExistingPriority() {
+        let viewerSummary = IndividualListingExchangeSummary(
+            handoffMethod: .mail,
+            shippingFee: .owner,
+            shippingDays: .oneDay
+        )
+        let defaultSummary = IndividualListingExchangeSummary(
+            handoffMethod: .mail,
+            shippingFee: .partner,
+            shippingDays: .afterFiveDays
+        )
+
+        XCTAssertEqual(
+            ProposalShippingConditionDraftResolver.resolvedDraft(
+                viewerListingSummary: viewerSummary,
+                initialFee: .negotiate,
+                initialDays: .twoToFourDays,
+                defaultSummary: defaultSummary
+            ),
+            ProposalShippingConditionDraft(fee: .owner, days: .oneDay)
+        )
+        XCTAssertEqual(
+            ProposalShippingConditionDraftResolver.resolvedDraft(
+                viewerListingSummary: nil,
+                initialFee: .negotiate,
+                initialDays: nil,
+                defaultSummary: defaultSummary
+            ),
+            ProposalShippingConditionDraft(fee: .negotiate, days: .afterFiveDays)
+        )
+        XCTAssertEqual(
+            ProposalShippingConditionDraftResolver.resolvedDraft(
+                viewerListingSummary: nil,
+                initialFee: nil,
+                initialDays: nil,
+                defaultSummary: IndividualListingExchangeSummary(handoffMethod: .local)
+            ),
+            ProposalShippingConditionDraft(fee: .negotiate, days: .twoToFourDays)
+        )
+    }
+
+    func testProposalMeetupConditionDraftResolverKeepsExistingPriority() throws {
+        let viewerSummary = IndividualListingExchangeSummary(
+            handoffMethod: .local,
+            localPrefecture: "大阪府",
+            localPlaceMemo: "京セラドーム前",
+            localSchedule: "6月7日"
+        )
+        let defaultSummary = IndividualListingExchangeSummary(
+            handoffMethod: .local,
+            localPrefecture: "東京都",
+            localPlaceMemo: "東京ドーム",
+            localSchedule: "6月8日"
+        )
+
+        let viewerDraft = try XCTUnwrap(
+            ProposalMeetupConditionDraftResolver.resolvedDraft(
+                viewerListingSummary: viewerSummary,
+                defaultSummary: defaultSummary,
+                viewerPrefecture: "福岡県",
+                ownerPrefecture: "北海道"
+            )
+        )
+        let viewerStartAt = try XCTUnwrap(viewerDraft.startAt)
+
+        XCTAssertEqual(viewerDraft.prefecture, "大阪府")
+        XCTAssertEqual(viewerDraft.placeMemo, "京セラドーム前")
+        XCTAssertEqual(viewerStartAt, ProposalScheduleTextDateParser.date(from: "6月7日"))
+        XCTAssertEqual(viewerDraft.endAt, viewerStartAt.addingTimeInterval(30 * 60))
+
+        XCTAssertEqual(
+            ProposalMeetupConditionDraftResolver.resolvedDraft(
+                viewerListingSummary: nil,
+                defaultSummary: IndividualListingExchangeSummary(handoffMethod: .mail),
+                viewerPrefecture: " 福岡県 ",
+                ownerPrefecture: "北海道"
+            ),
+            ProposalMeetupConditionDraft(prefecture: "福岡県")
+        )
+        XCTAssertEqual(
+            ProposalMeetupConditionDraftResolver.resolvedDraft(
+                viewerListingSummary: nil,
+                defaultSummary: IndividualListingExchangeSummary(handoffMethod: .mail),
+                viewerPrefecture: " ",
+                ownerPrefecture: "北海道"
+            ),
+            ProposalMeetupConditionDraft(prefecture: "北海道")
         )
     }
 
@@ -82,6 +491,39 @@ final class ProposalCreateFlowTests: XCTestCase {
 
         XCTAssertTrue(configuration.canAdvance(from: .receive))
         XCTAssertTrue(configuration.canSubmit)
+    }
+
+    func testProposalSubmissionTargetStatusResolverRequiresSubmitAndHonorsOverride() {
+        XCTAssertEqual(
+            ProposalSubmissionTargetStatusResolver.status(
+                canSubmit: true,
+                defaultTargetStatus: .sent,
+                override: nil
+            ),
+            .sent
+        )
+        XCTAssertEqual(
+            ProposalSubmissionTargetStatusResolver.status(
+                canSubmit: true,
+                defaultTargetStatus: .sent,
+                override: .negotiating
+            ),
+            .negotiating
+        )
+        XCTAssertNil(
+            ProposalSubmissionTargetStatusResolver.status(
+                canSubmit: false,
+                defaultTargetStatus: .sent,
+                override: .negotiating
+            )
+        )
+        XCTAssertNil(
+            ProposalSubmissionTargetStatusResolver.status(
+                canSubmit: true,
+                defaultTargetStatus: nil,
+                override: .negotiating
+            )
+        )
     }
 
     func testProposalFlowRequiresPaymentSelectionWhenCashIsIncluded() {
@@ -224,6 +666,26 @@ final class ProposalCreateFlowTests: XCTestCase {
         XCTAssertEqual(configuration.targetSupplement, "ほか1件も受け取る条件です")
     }
 
+    func testProposalMeetupEndDateResolverKeepsOrPushesEndAfterStart() {
+        let start = Date(timeIntervalSince1970: 1_000)
+        let earlierEnd = Date(timeIntervalSince1970: 900)
+        let sameEnd = start
+        let laterEnd = Date(timeIntervalSince1970: 2_000)
+
+        XCTAssertEqual(
+            ProposalMeetupEndDateResolver.adjustedEnd(startAt: start, currentEndAt: earlierEnd),
+            Date(timeIntervalSince1970: 2_800)
+        )
+        XCTAssertEqual(
+            ProposalMeetupEndDateResolver.adjustedEnd(startAt: start, currentEndAt: sameEnd),
+            Date(timeIntervalSince1970: 2_800)
+        )
+        XCTAssertEqual(
+            ProposalMeetupEndDateResolver.adjustedEnd(startAt: start, currentEndAt: laterEnd),
+            laterEnd
+        )
+    }
+
     func testProposalMeetupMapRegionBuilderKeepsExistingSpans() throws {
         XCTAssertNil(ProposalMeetupMapRegionBuilder.region(for: []))
 
@@ -254,6 +716,37 @@ final class ProposalCreateFlowTests: XCTestCase {
         XCTAssertEqual(multiple.center.longitude, (139.7519 + 139.7548) / 2, accuracy: 0.000_001)
         XCTAssertEqual(multiple.span.latitudeDelta, 0.01, accuracy: 0.000_001)
         XCTAssertEqual(multiple.span.longitudeDelta, 0.01, accuracy: 0.000_001)
+    }
+
+    func testProposalMeetupSubmissionCandidatesResolverKeepsRequiredMeetupRule() {
+        let input = ProposalMeetupInput(
+            startAt: Date(timeIntervalSince1970: 1_000),
+            endAt: Date(timeIntervalSince1970: 2_800),
+            placeName: "東京ドーム 22ゲート前",
+            latitude: 35.7056,
+            longitude: 139.7519
+        )
+
+        XCTAssertEqual(
+            ProposalMeetupSubmissionCandidatesResolver.candidates(
+                requiresMeetupBeforeSubmit: false,
+                meetupInputs: [input]
+            ),
+            []
+        )
+        XCTAssertNil(
+            ProposalMeetupSubmissionCandidatesResolver.candidates(
+                requiresMeetupBeforeSubmit: true,
+                meetupInputs: []
+            )
+        )
+        XCTAssertEqual(
+            ProposalMeetupSubmissionCandidatesResolver.candidates(
+                requiresMeetupBeforeSubmit: true,
+                meetupInputs: [input]
+            ),
+            [input]
+        )
     }
 
     func testProposalSubmittedSummaryOmitsTagsWhenEmpty() {
@@ -364,6 +857,18 @@ final class ProposalCreateFlowTests: XCTestCase {
         XCTAssertEqual(draft.input.cashAmountSide, .sender)
         XCTAssertEqual(draft.summary.completionMessage, "@michilion に打診を送りました。返事が届いたら通知と打診一覧で確認できます。")
         XCTAssertEqual(draft.summary.detailText, "1件を提示 / 1件を受け取り候補・終演後OK / 短時間OK")
+    }
+
+    func testProposalMessageDraftLimiterKeepsLimitAndCharacterBoundaries() {
+        XCTAssertEqual(ProposalMessageDraftLimiter.limited("abc", limit: 3), "abc")
+        XCTAssertEqual(ProposalMessageDraftLimiter.limited("abcd", limit: 3), "abc")
+        XCTAssertEqual(ProposalMessageDraftLimiter.limited("abc", limit: 0), "")
+
+        let emojiMessage = String(repeating: "🎫", count: 3) + "a"
+        XCTAssertEqual(
+            ProposalMessageDraftLimiter.limited(emojiMessage, limit: 3),
+            String(repeating: "🎫", count: 3)
+        )
     }
 
     func testProposalStepSwipeNavigatorMovesBetweenVisibleSteps() {
@@ -655,6 +1160,64 @@ final class ProposalCreateFlowTests: XCTestCase {
                 visibleSteps: [.give, .receive, .shipping, .payment, .confirm]
             ),
             .confirm
+        )
+    }
+
+    func testProposalInitialStepResolverWaitsUntilPriorStepsCanAdvance() {
+        let readyHand = ProposalCreateConfiguration(
+            exchangeMethod: .hand,
+            hasSelectedSenderGoods: true,
+            isCreatingProposal: false,
+            hasReadyMailingAddress: true,
+            isLoadingMailingAddress: false,
+            hasValidMeetup: false,
+            receiverGoodsCount: 1,
+            isListingSource: false
+        )
+        let missingReceiver = ProposalCreateConfiguration(
+            exchangeMethod: .hand,
+            hasSelectedSenderGoods: true,
+            isCreatingProposal: false,
+            hasReadyMailingAddress: true,
+            isLoadingMailingAddress: false,
+            hasValidMeetup: false,
+            receiverGoodsCount: 0,
+            isListingSource: false
+        )
+        let mailOnly = ProposalCreateConfiguration(
+            exchangeMethod: .mail,
+            hasSelectedSenderGoods: true,
+            isCreatingProposal: false,
+            hasReadyMailingAddress: true,
+            isLoadingMailingAddress: false,
+            hasValidMeetup: false,
+            receiverGoodsCount: 1,
+            isListingSource: false
+        )
+
+        XCTAssertEqual(
+            ProposalInitialStepResolver.resolution(
+                initialStep: .meetup,
+                visibleSteps: [.give, .receive, .meetup, .confirm],
+                configuration: readyHand
+            ),
+            .apply(.meetup)
+        )
+        XCTAssertEqual(
+            ProposalInitialStepResolver.resolution(
+                initialStep: .meetup,
+                visibleSteps: [.give, .receive, .meetup, .confirm],
+                configuration: missingReceiver
+            ),
+            .wait
+        )
+        XCTAssertEqual(
+            ProposalInitialStepResolver.resolution(
+                initialStep: .meetup,
+                visibleSteps: [.give, .receive, .shipping, .confirm],
+                configuration: mailOnly
+            ),
+            .markApplied
         )
     }
 

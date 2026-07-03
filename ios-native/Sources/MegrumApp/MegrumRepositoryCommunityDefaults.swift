@@ -34,6 +34,10 @@ public extension MegrumRepository {
         throw MegrumRepositoryError.unsupportedMutation
     }
 
+    func deleteGroomPost(postID: UUID) async throws {
+        throw MegrumRepositoryError.unsupportedMutation
+    }
+
     func markGroomViewed(postID: UUID) async throws {}
 
     func setGroomLiked(postID: UUID, isLiked: Bool) async throws {}
@@ -61,7 +65,11 @@ public extension MegrumRepository {
         throw MegrumRepositoryError.unsupportedMutation
     }
 
-    func markMeguriMessagesRead(peerID: UUID, readAt: Date) async throws -> [MeguriMessage] {
+    func sendMeguriPhotoMessage(_ input: MeguriPhotoMessageCreateInput) async throws -> MeguriMessage {
+        throw MegrumRepositoryError.unsupportedMutation
+    }
+
+    func markMeguriMessagesRead(peerID: UUID, sourceGroomPostID: UUID?, includesAllSources: Bool, readAt: Date) async throws -> [MeguriMessage] {
         []
     }
 
@@ -74,6 +82,18 @@ public extension MegrumRepository {
     }
 
     func sendBoardReply(_ input: BoardReplyCreateInput) async throws -> BoardReply {
+        throw MegrumRepositoryError.unsupportedMutation
+    }
+
+    func setBoardThreadReaction(threadID: UUID, reaction: BoardMessageReaction?) async throws {
+        throw MegrumRepositoryError.unsupportedMutation
+    }
+
+    func setBoardReplyReaction(replyID: UUID, reaction: BoardMessageReaction?) async throws {
+        throw MegrumRepositoryError.unsupportedMutation
+    }
+
+    func reportBoardThread(threadID: UUID, reason: String) async throws {
         throw MegrumRepositoryError.unsupportedMutation
     }
 

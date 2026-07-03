@@ -31,10 +31,10 @@ extension ProposalCreateFlow {
             goodsTypeChoices: senderGoodsTypeFilterChoices,
             selectedGoodsIDs: selectedSenderGoodsIDs,
             cashReferenceRows: listingCashReferenceRows,
-            selectionMode: $senderSelectionMode,
-            cashAmountText: $senderCashAmountText,
-            selectedGroupID: $senderGroupFilterID,
-            selectedGoodsTypeID: $senderGoodsTypeFilterID,
+            selectionMode: $valueSelectionState.senderSelectionMode,
+            cashAmountText: $valueSelectionState.senderCashAmountText,
+            selectedGroupID: $filterState.senderGroupID,
+            selectedGoodsTypeID: $filterState.senderGoodsTypeID,
             onToggleGoods: toggleSenderGoods
         )
     }
@@ -46,10 +46,10 @@ extension ProposalCreateFlow {
             goodsTypeChoices: receiverGoodsTypeFilterChoices,
             selectedGoodsIDs: selectedReceiverGoodsIDs,
             cashReferenceRows: listingCashReferenceRows,
-            selectionMode: $receiverSelectionMode,
-            cashAmountText: $receiverCashAmountText,
-            selectedGroupID: $receiverGroupFilterID,
-            selectedGoodsTypeID: $receiverGoodsTypeFilterID,
+            selectionMode: $valueSelectionState.receiverSelectionMode,
+            cashAmountText: $valueSelectionState.receiverCashAmountText,
+            selectedGroupID: $filterState.receiverGroupID,
+            selectedGoodsTypeID: $filterState.receiverGoodsTypeID,
             onToggleGoods: toggleReceiverGoods
         )
     }
@@ -76,7 +76,7 @@ extension ProposalCreateFlow {
     var paymentStep: some View {
         ProposalPaymentMethodStepView(
             sections: paymentOptionSections,
-            selectedOptionID: $selectedPaymentOptionID
+            selectedOptionID: $valueSelectionState.selectedPaymentOptionID
         )
         .onAppear {
             syncPaymentSelectionIfNeeded()
@@ -109,10 +109,7 @@ extension ProposalCreateFlow {
     }
 
     private var filteredSenderGoods: [GoodsItem] {
-        selectableSenderGoods.filter { item in
-            (senderGroupFilterID == nil || item.groupID == senderGroupFilterID)
-                && (senderGoodsTypeFilterID == nil || item.goodsTypeID == senderGoodsTypeFilterID)
-        }
+        filterState.filteredSenderGoods(from: selectableSenderGoods)
     }
 
     private var senderGroupFilterChoices: [ProposalFilterChoice] {
@@ -124,10 +121,7 @@ extension ProposalCreateFlow {
     }
 
     private var filteredReceiverGoods: [GoodsItem] {
-        receiverChoiceGoods.filter { item in
-            (receiverGroupFilterID == nil || item.groupID == receiverGroupFilterID)
-                && (receiverGoodsTypeFilterID == nil || item.goodsTypeID == receiverGoodsTypeFilterID)
-        }
+        filterState.filteredReceiverGoods(from: receiverChoiceGoods)
     }
 
     private var receiverGroupFilterChoices: [ProposalFilterChoice] {

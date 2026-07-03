@@ -11,8 +11,8 @@ extension IndividualListingEditorSheet {
     }
 
     func selectAllVisibleItems() {
-        switch step {
-        case .haves where havesTab == .goods:
+        switch presentationState.step {
+        case .haves where presentationState.havesTab == .goods:
             if allVisibleHavesAreSelected {
                 draft.deselectHaves(visibleHaveSelectionItems)
             } else {
@@ -30,17 +30,17 @@ extension IndividualListingEditorSheet {
     }
 
     var visibleHaveSelectionItems: [GoodsItem] {
-        appState.inventory.filter(haveSelectionFilter.matches)
+        appState.inventory.filter(presentationState.haveSelectionFilter.matches)
     }
 
     var visibleWishSelectionItems: [WishItem] {
-        appState.wishes.filter(wishSelectionFilter.matches)
+        appState.wishes.filter(presentationState.wishSelectionFilter.matches)
     }
 
     var showsSelectAllVisibleButton: Bool {
-        switch step {
+        switch presentationState.step {
         case .haves:
-            return havesTab == .goods
+            return presentationState.havesTab == .goods
         case .options:
             return draft.optionKind == .wish
         case .exchange:
@@ -49,8 +49,8 @@ extension IndividualListingEditorSheet {
     }
 
     var canSelectAllVisible: Bool {
-        switch step {
-        case .haves where havesTab == .goods:
+        switch presentationState.step {
+        case .haves where presentationState.havesTab == .goods:
             return !visibleHaveSelectionItems.isEmpty
         case .options where draft.optionKind == .wish:
             return !visibleWishSelectionItems.isEmpty
@@ -60,8 +60,8 @@ extension IndividualListingEditorSheet {
     }
 
     var selectAllVisibleButtonTitle: String {
-        switch step {
-        case .haves where havesTab == .goods:
+        switch presentationState.step {
+        case .haves where presentationState.havesTab == .goods:
             return allVisibleHavesAreSelected
                 ? IndividualListingEditorBottomBarPresentation.deselectAllVisibleTitle
                 : IndividualListingEditorBottomBarPresentation.selectAllVisibleTitle

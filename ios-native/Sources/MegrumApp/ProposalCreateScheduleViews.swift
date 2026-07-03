@@ -6,14 +6,14 @@ import SwiftUI
 struct ProposalScheduleBackgroundSection: View {
     var context: ProposalScheduleContext
     var selectedStartAt: Date
-    @State private var mode: ProposalScheduleCalendarMode = .fiveDays
+    @State private var presentationState = ProposalScheduleBackgroundPresentationState()
 
     private let calendar = Calendar.current
 
     var body: some View {
         ProposalCardSection(title: "スケジュール背景") {
             VStack(alignment: .leading, spacing: 12) {
-                Picker("表示", selection: $mode) {
+                Picker("表示", selection: $presentationState.mode) {
                     ForEach(ProposalScheduleCalendarMode.allCases) { mode in
                         Text(mode.title).tag(mode)
                     }
@@ -36,10 +36,17 @@ struct ProposalScheduleBackgroundSection: View {
                         ProposalSelectedScheduleOverlapBanner(context: context)
                     }
 
-                    switch mode {
+                    switch presentationState.mode {
                     case .fiveDays:
                         VStack(spacing: 8) {
-                            ForEach(context.visibleDays(anchorDate: selectedStartAt, mode: .fiveDays, calendar: calendar), id: \.self) { day in
+                            ForEach(
+                                presentationState.visibleDays(
+                                    context: context,
+                                    anchorDate: selectedStartAt,
+                                    calendar: calendar
+                                ),
+                                id: \.self
+                            ) { day in
                                 ProposalScheduleDayStrip(
                                     day: day,
                                     schedules: context.schedules(on: day, calendar: calendar),

@@ -42,7 +42,7 @@ export async function login(formData: FormData): Promise<AuthResult> {
     if (error.message.includes("Email not confirmed")) {
       return { error: "メール認証が完了していません。受信メールを確認してください" };
     }
-    return { error: error.message };
+    return { error: "ログインできませんでした。入力内容を確認してください" };
   }
 
   revalidatePath("/", "layout");
@@ -77,7 +77,7 @@ export async function signInWithGoogle(): Promise<AuthResult> {
   });
 
   if (error) {
-    return { error: error.message };
+    return { error: "Googleログインを開始できませんでした。時間をおいて再度試してください" };
   }
 
   // signInWithOAuth は url を返す → そこに redirect
@@ -111,7 +111,9 @@ export async function passwordReset(formData: FormData): Promise<AuthResult> {
         error: "送信間隔が短すぎます。しばらく待ってから再度試してください",
       };
     }
-    return { error: error.message };
+    return {
+      error: "パスワード再設定メールを送信できませんでした。時間をおいて再度試してください",
+    };
   }
 
   redirect("/login?password_reset=sent");
@@ -140,7 +142,7 @@ export async function setNewPassword(
         },
       };
     }
-    return { error: error.message };
+    return { error: "パスワードを更新できませんでした。時間をおいて再度試してください" };
   }
 
   return {};

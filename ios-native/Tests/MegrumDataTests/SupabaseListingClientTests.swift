@@ -77,6 +77,31 @@ final class SupabaseListingClientTests: XCTestCase {
         XCTAssertEqual(json.first?["note"] as? String, "会場で交換したい")
     }
 
+    func testBuildsCreateListingRequestForCashHaveOffer() throws {
+        let client = SupabaseListingClient(configuration: configuration)
+        let userID = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
+        let input = IndividualListingCreateInput(
+            haveItems: [],
+            haveLogic: .all,
+            haveIsCashOffer: true,
+            haveCashAmount: 2_000,
+            wishItems: [
+                ListingItemQuantity(itemID: UUID(uuidString: "33333333-3333-3333-3333-333333333333")!, quantity: 1)
+            ],
+            note: "譲る金額: ¥2000"
+        )
+
+        let request = try client.makeCreateListingRequest(userID: userID, input: input)
+        let body = try XCTUnwrap(request.httpBody)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [[String: Any]])
+
+        XCTAssertEqual(json.first?["have_ids"] as? [String], [])
+        XCTAssertEqual(json.first?["have_qtys"] as? [Int], [])
+        XCTAssertEqual(json.first?["have_is_cash_offer"] as? Bool, true)
+        XCTAssertEqual(json.first?["have_cash_amount"] as? Int, 2_000)
+        XCTAssertEqual(json.first?["note"] as? String, "譲る金額: ¥2000")
+    }
+
     func testBuildsCreateListingWishOptionRequest() throws {
         let client = SupabaseListingClient(configuration: configuration)
         let listingID = UUID(uuidString: "44444444-4444-4444-4444-444444444444")!
@@ -137,6 +162,56 @@ final class SupabaseListingClientTests: XCTestCase {
         XCTAssertEqual(json["have_logic"] as? String, "or")
         XCTAssertEqual(json["status"] as? String, "paused")
         XCTAssertEqual(json["note"] as? String, "条件変更")
+    }
+
+    func testBuildsUpdateListingRequestForCashHaveOffer() throws {
+        let client = SupabaseListingClient(configuration: configuration)
+        let userID = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
+        let listingID = UUID(uuidString: "44444444-4444-4444-4444-444444444444")!
+        let input = SupabaseListingUpdateInput(
+            haveItems: [],
+            haveLogic: .all,
+            haveMinimumCount: 1,
+            haveIsCashOffer: true,
+            haveCashAmount: 2_000,
+            status: .active,
+            note: "譲る金額: ¥2000"
+        )
+
+        let request = try client.makeUpdateListingRequest(userID: userID, listingID: listingID, input: input)
+        let body = try XCTUnwrap(request.httpBody)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+
+        XCTAssertEqual(json["have_ids"] as? [String], [])
+        XCTAssertEqual(json["have_qtys"] as? [Int], [])
+        XCTAssertEqual(json["have_is_cash_offer"] as? Bool, true)
+        XCTAssertEqual(json["have_cash_amount"] as? Int, 2_000)
+        XCTAssertEqual(json["note"] as? String, "譲る金額: ¥2000")
+    }
+
+    func testBuildsUpdateListingRequestClearingCashHaveOffer() throws {
+        let client = SupabaseListingClient(configuration: configuration)
+        let userID = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
+        let listingID = UUID(uuidString: "44444444-4444-4444-4444-444444444444")!
+        let input = SupabaseListingUpdateInput(
+            haveItems: [
+                ListingItemQuantity(itemID: UUID(uuidString: "22222222-2222-2222-2222-222222222222")!, quantity: 1)
+            ],
+            haveLogic: .all,
+            haveMinimumCount: 1,
+            haveIsCashOffer: false,
+            clearsHaveCashAmount: true,
+            status: .active,
+            note: "グッズに戻す"
+        )
+
+        let request = try client.makeUpdateListingRequest(userID: userID, listingID: listingID, input: input)
+        let body = try XCTUnwrap(request.httpBody)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+
+        XCTAssertEqual(json["have_ids"] as? [String], ["22222222-2222-2222-2222-222222222222"])
+        XCTAssertEqual(json["have_is_cash_offer"] as? Bool, false)
+        XCTAssertTrue(json["have_cash_amount"] is NSNull)
     }
 
     func testUpdateListingRequestCanClearNote() throws {

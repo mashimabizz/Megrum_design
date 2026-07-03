@@ -227,6 +227,8 @@ final class SupabaseBoardClientTests: XCTestCase {
     func testBuildsBoardThreadCreateRequest() throws {
         let client = SupabaseBoardClient(configuration: configuration)
         let authorID = UUID(uuidString: "22222222-2222-2222-2222-222222222222")!
+        let groupID = UUID(uuidString: "00000000-0000-0000-0000-000000000011")!
+        let characterID = UUID(uuidString: "00000000-0000-0000-0000-000000000012")!
 
         let request = try client.makeCreateThreadRequest(
             BoardThreadCreateInput(
@@ -237,7 +239,10 @@ final class SupabaseBoardClientTests: XCTestCase {
                 latitude: 35.681236,
                 longitude: 139.767125,
                 prefecture: " 東京都 ",
-                imagePaths: ["board_threads/22222222-2222-2222-2222-222222222222/thumb.jpg"]
+                imagePaths: ["board_threads/22222222-2222-2222-2222-222222222222/thumb.jpg"],
+                groupID: groupID,
+                characterID: characterID,
+                seriesName: " 2026 LIVE "
             )
         )
         let body = try XCTUnwrap(request.httpBody)
@@ -255,6 +260,9 @@ final class SupabaseBoardClientTests: XCTestCase {
         XCTAssertEqual(json["p_origin_lat"] as? Double, 35.681236)
         XCTAssertEqual(json["p_origin_lng"] as? Double, 139.767125)
         XCTAssertEqual(json["p_prefecture"] as? String, "東京都")
+        XCTAssertEqual(json["p_group_id"] as? String, groupID.uuidString.lowercased())
+        XCTAssertEqual(json["p_character_id"] as? String, characterID.uuidString.lowercased())
+        XCTAssertEqual(json["p_series_name"] as? String, "2026 LIVE")
     }
 
     func testBuildsBoardThreadCreateRequestWithAnonymousProfile() throws {

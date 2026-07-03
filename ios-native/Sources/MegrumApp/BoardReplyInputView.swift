@@ -12,19 +12,14 @@ struct BoardReplyInput: View {
     }
 
     var body: some View {
-        HStack(spacing: 14) {
-            Image(systemName: "photo")
-                .font(.system(size: 22, weight: .semibold, design: .rounded))
-            Image(systemName: "camera")
-                .font(.system(size: 22, weight: .semibold, design: .rounded))
-
-            TextField("この話題に返信する", text: $text, axis: .vertical)
+        HStack(spacing: 10) {
+            TextField("メッセージ", text: $text, axis: .vertical)
                 .font(.system(size: 14, weight: .heavy, design: .rounded))
                 .lineLimit(1...3)
                 .submitLabel(.send)
-                .padding(.horizontal, 18)
+                .padding(.horizontal, 16)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .frame(height: 40)
+                .frame(minHeight: 40)
                 .background(.white.opacity(0.94), in: Capsule())
                 .overlay(Capsule().strokeBorder(MegrumTheme.ink.opacity(0.09), lineWidth: 1))
                 .onSubmit {
@@ -46,7 +41,7 @@ struct BoardReplyInput: View {
                     }
                 }
                 .foregroundStyle(.white)
-                .frame(width: 46, height: 46)
+                .frame(width: 42, height: 42)
                 .background(MegrumTheme.lavender, in: Circle())
                 .shadow(color: MegrumTheme.lavender.opacity(0.34), radius: 12, y: 6)
             }
@@ -55,12 +50,10 @@ struct BoardReplyInput: View {
             .opacity(canSend ? 1 : 0.45)
         }
         .foregroundStyle(MegrumTheme.lavender)
-        .padding(.horizontal, 20)
-        .frame(height: 68)
-        .background(.white.opacity(0.96), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .padding(.horizontal, 10)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(.regularMaterial)
         .padding(.bottom, 8)
-        .shadow(color: MegrumTheme.ink.opacity(0.10), radius: 18, y: -5)
         .opacity(isDisabled ? 0.62 : 1)
     }
 }

@@ -148,6 +148,56 @@ extension MegrumAppState {
         }
     }
 
+    public func setBoardThreadReaction(threadID: UUID, reaction: BoardMessageReaction?) async {
+        let previousThreads = threads
+        threads = ReplyThreadStateReducer.settingBoardThreadReaction(
+            reaction,
+            threadID: threadID,
+            in: threads
+        )
+        errorMessage = nil
+        do {
+            try await repository.setBoardThreadReaction(threadID: threadID, reaction: reaction)
+        } catch {
+            threads = previousThreads
+            errorMessage = "リアクションを更新できませんでした"
+        }
+    }
+
+    public func setBoardReplyReaction(replyID: UUID, reaction: BoardMessageReaction?) async {
+        let previousReplies = boardRepliesByThreadID
+        boardRepliesByThreadID = ReplyThreadStateReducer.settingBoardReplyReaction(
+            reaction,
+            replyID: replyID,
+            in: boardRepliesByThreadID
+        )
+        errorMessage = nil
+        do {
+            try await repository.setBoardReplyReaction(replyID: replyID, reaction: reaction)
+        } catch {
+            boardRepliesByThreadID = previousReplies
+            errorMessage = "リアクションを更新できませんでした"
+        }
+    }
+
+    public func reportBoardThread(_ threadID: UUID, reason: String = "user_report") async -> Bool {
+        guard reportingBoardThreadID != threadID else {
+            return false
+        }
+        reportingBoardThreadID = threadID
+        errorMessage = nil
+        defer {
+            reportingBoardThreadID = nil
+        }
+        do {
+            try await repository.reportBoardThread(threadID: threadID, reason: reason)
+            return true
+        } catch {
+            errorMessage = "チャットルームを通報できませんでした"
+            return false
+        }
+    }
+
     public func createBoardThread(
         title: String,
         body: String,
@@ -157,7 +207,10 @@ extension MegrumAppState {
         prefecture: String? = nil,
         thumbnailUpload: GoodsPhotoUpload? = nil,
         anonymousDisplayName: String? = nil,
-        anonymousAvatarID: String? = nil
+        anonymousAvatarID: String? = nil,
+        groupID: UUID? = nil,
+        characterID: UUID? = nil,
+        seriesName: String? = nil
     ) async -> Bool {
         await createBoardThreadRecord(
             title: title,
@@ -168,7 +221,10 @@ extension MegrumAppState {
             prefecture: prefecture,
             thumbnailUpload: thumbnailUpload,
             anonymousDisplayName: anonymousDisplayName,
-            anonymousAvatarID: anonymousAvatarID
+            anonymousAvatarID: anonymousAvatarID,
+            groupID: groupID,
+            characterID: characterID,
+            seriesName: seriesName
         ) != nil
     }
 
@@ -181,7 +237,10 @@ extension MegrumAppState {
         prefecture: String? = nil,
         thumbnailUpload: GoodsPhotoUpload? = nil,
         anonymousDisplayName: String? = nil,
-        anonymousAvatarID: String? = nil
+        anonymousAvatarID: String? = nil,
+        groupID: UUID? = nil,
+        characterID: UUID? = nil,
+        seriesName: String? = nil
     ) async -> BoardThread? {
         guard !isCreatingBoardThread else {
             return nil
@@ -234,7 +293,10 @@ extension MegrumAppState {
                     prefecture: creationPrefecture,
                     thumbnailUpload: thumbnailUpload,
                     anonymousDisplayName: MegrumAppStateInputNormalizer.optionalText(anonymousDisplayName),
-                    anonymousAvatarID: MegrumAppStateInputNormalizer.optionalText(anonymousAvatarID)
+                    anonymousAvatarID: MegrumAppStateInputNormalizer.optionalText(anonymousAvatarID),
+                    groupID: groupID,
+                    characterID: characterID,
+                    seriesName: MegrumAppStateInputNormalizer.optionalText(seriesName)
                 )
             )
             threads = MeguriFeedStateReducer.upsertingBoardThread(created, into: threads)

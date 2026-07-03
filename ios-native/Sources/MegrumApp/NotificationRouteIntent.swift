@@ -16,6 +16,7 @@ enum NotificationRouteIntent: Equatable, Sendable {
     case disputeDetail(id: String)
     case meguriBoardThread(id: String, viewMode: String?)
     case meguriMessages(peerID: String?, open: String?)
+    case ownGroom(postID: String?)
     case userProfile(id: String)
     case userEvaluations(userID: String)
     case unknown(rawPath: String, fallbackTab: MegrumTab)
@@ -38,7 +39,7 @@ enum NotificationRouteIntent: Equatable, Sendable {
         case .tradeDetail, .tradeEvidenceCapture, .tradeEvidenceApproval,
              .tradeEvaluation, .tradeAssistance, .disputeDetail:
             .trades
-        case .meguriBoardThread, .meguriMessages:
+        case .meguriBoardThread, .meguriMessages, .ownGroom:
             .meguri
         case .userProfile, .userEvaluations:
             .home
@@ -49,6 +50,10 @@ enum NotificationRouteIntent: Equatable, Sendable {
         from link: NotificationLinkComponents,
         kind: MegrumNotificationKind?
     ) -> NotificationRouteIntent {
+        if kind == .groomLiked {
+            return ownGroomIntent(from: link)
+        }
+
         if (kind == .groomReply || kind == .meguriMessage),
            let intent = meguriMessageIntent(from: link) {
             return intent
@@ -135,7 +140,12 @@ enum NotificationRouteIntent: Equatable, Sendable {
             return .tab(.inventory)
         case "wish", "wishes":
             return .tab(.wish)
-        case "meguri", "grooms", "groom":
+        case "grooms", "groom":
+            if let intent = meguriMessageIntent(from: link) {
+                return intent
+            }
+            return ownGroomIntent(from: link)
+        case "meguri":
             return .tab(.meguri)
         default:
             return .unknown(rawPath: link.rawPath, fallbackTab: link.fallbackTab)
@@ -162,13 +172,21 @@ enum NotificationRouteIntent: Equatable, Sendable {
     }
 
     private static func meguriMessageIntent(from link: NotificationLinkComponents) -> NotificationRouteIntent? {
+        let messagePathUsesPeerSegment = link.lowercaseSegments.first == "meguri-letters"
+            || link.lowercaseSegments.first == "meguri-messages"
         let peerID = link.queryValue("userid", "user_id", "peerid", "peer_id").nilIfBlank
-            ?? link.firstUUIDLikeSegment
+            ?? (messagePathUsesPeerSegment ? link.firstUUIDLikeSegment : nil)
         if peerID == nil,
            link.lowercaseSegments.first != "meguri-letters",
            link.lowercaseSegments.first != "meguri-messages" {
             return nil
         }
         return .meguriMessages(peerID: peerID, open: link.queryValue("open"))
+    }
+
+    private static func ownGroomIntent(from link: NotificationLinkComponents) -> NotificationRouteIntent {
+        let postID = link.queryValue("groompostid", "groom_post_id", "postid", "post_id", "id").nilIfBlank
+            ?? link.firstUUIDLikeSegment
+        return .ownGroom(postID: postID)
     }
 }

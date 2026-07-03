@@ -6,7 +6,7 @@ enum HomeMutualMatchExchangeReviewPolicy {
     ) -> [HomeMutualMatchConditionReviewItem] {
         guard signals.localExchangeSelected || signals.postalAcceptedByBoth else {
             return [
-                item(
+                HomeMutualMatchConditionReviewItemFactory.make(
                     category: "交換条件",
                     title: "交換手段が不一致",
                     detail: "現地交換か郵送交換のどちらで進めるか確認が必要です",
@@ -18,7 +18,7 @@ enum HomeMutualMatchExchangeReviewPolicy {
         if signals.postalAcceptedByBoth && !signals.localExchangeSelected {
             if signals.shippingFeeNeedsDiscussion {
                 return [
-                    item(
+                    HomeMutualMatchConditionReviewItemFactory.make(
                         category: "交換条件",
                         title: "送料要相談",
                         detail: "郵送交換はできますが、送料負担を決める必要があります",
@@ -28,7 +28,7 @@ enum HomeMutualMatchExchangeReviewPolicy {
             }
 
             return [
-                item(
+                HomeMutualMatchConditionReviewItemFactory.make(
                     category: "交換条件",
                     title: "全一致",
                     detail: "郵送交換で進められます",
@@ -43,7 +43,7 @@ enum HomeMutualMatchExchangeReviewPolicy {
                 && signals.dateMatches
                 && !signals.dateNeedsDiscussion {
                 return [
-                    item(
+                    HomeMutualMatchConditionReviewItemFactory.make(
                         category: "交換条件",
                         title: "全一致",
                         detail: "現地交換も郵送交換も候補にできます",
@@ -53,7 +53,7 @@ enum HomeMutualMatchExchangeReviewPolicy {
             }
 
             var items = [
-                item(
+                HomeMutualMatchConditionReviewItemFactory.make(
                     category: "交換条件",
                     title: signals.localExchangeSelected ? "郵送交換で成立可能" : "全一致",
                     detail: signals.localExchangeSelected ? "現地交換は必要に応じて調整できます" : "郵送交換で進められます",
@@ -63,7 +63,7 @@ enum HomeMutualMatchExchangeReviewPolicy {
 
             if signals.localExchangeSelected && !signals.prefectureMatches {
                 items.append(
-                    item(
+                    HomeMutualMatchConditionReviewItemFactory.make(
                         category: "交換条件",
                         title: "都道府県の確認が必要",
                         detail: "現地交換にする場合は場所をすり合わせます",
@@ -74,7 +74,7 @@ enum HomeMutualMatchExchangeReviewPolicy {
 
             if signals.localExchangeSelected && (!signals.dateMatches || signals.dateNeedsDiscussion) {
                 items.append(
-                    item(
+                    HomeMutualMatchConditionReviewItemFactory.make(
                         category: "交換条件",
                         title: "日程調整が必要",
                         detail: "現地交換にする場合は会える日程を決めます",
@@ -93,7 +93,7 @@ enum HomeMutualMatchExchangeReviewPolicy {
             && !signals.prefectureUnset
             && !signals.dateNeedsDiscussion {
             items.append(
-                item(
+                HomeMutualMatchConditionReviewItemFactory.make(
                     category: "交換条件",
                     title: "全一致",
                     detail: "現地交換で進められます",
@@ -103,7 +103,7 @@ enum HomeMutualMatchExchangeReviewPolicy {
         } else {
             if signals.prefectureUnset {
                 items.append(
-                    item(
+                    HomeMutualMatchConditionReviewItemFactory.make(
                         category: "交換条件",
                         title: "都道府県未設定",
                         detail: "現地交換にする場合は都道府県を確認します",
@@ -114,7 +114,7 @@ enum HomeMutualMatchExchangeReviewPolicy {
 
             if !signals.prefectureMatches {
                 items.append(
-                    item(
+                    HomeMutualMatchConditionReviewItemFactory.make(
                         category: "交換条件",
                         title: "都道府県の確認が必要",
                         detail: "現地交換の場所をすり合わせます",
@@ -125,7 +125,7 @@ enum HomeMutualMatchExchangeReviewPolicy {
 
             if !signals.dateMatches || signals.dateNeedsDiscussion {
                 items.append(
-                    item(
+                    HomeMutualMatchConditionReviewItemFactory.make(
                         category: "交換条件",
                         title: "日程調整が必要",
                         detail: "会える日程を決めます",
@@ -138,17 +138,4 @@ enum HomeMutualMatchExchangeReviewPolicy {
         return items
     }
 
-    private static func item(
-        category: String,
-        title: String,
-        detail: String,
-        status: HomeMutualMatchConditionReviewStatus
-    ) -> HomeMutualMatchConditionReviewItem {
-        HomeMutualMatchConditionReviewItem(
-            category: category,
-            title: title,
-            detail: detail,
-            status: status
-        )
-    }
 }

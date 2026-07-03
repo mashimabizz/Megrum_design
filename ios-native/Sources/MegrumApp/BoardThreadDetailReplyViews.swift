@@ -2,6 +2,274 @@ import MegrumCore
 import MegrumDesign
 import SwiftUI
 
+struct BoardThreadChatTimeline: View {
+    var messages: [BoardThreadChatMessageDisplay]
+    var isLoadingReplies: Bool
+    var missingReplyContextMessage: String?
+    var onReact: (BoardThreadChatMessageTarget, BoardMessageReaction?) -> Void
+
+    var body: some View {
+        LazyVStack(spacing: 12) {
+            if let missingReplyContextMessage {
+                MeguriNoticeBanner(message: missingReplyContextMessage)
+                    .padding(.horizontal, 16)
+            }
+
+            ForEach(messages) { message in
+                BoardThreadChatMessageRow(
+                    message: message,
+                    onReact: { reaction in
+                        onReact(message.target, reaction)
+                    }
+                )
+                .id(message.id)
+            }
+
+            if isLoadingReplies {
+                BoardThreadDetailRepliesLoadingRow()
+                    .padding(.top, 4)
+            }
+        }
+    }
+}
+
+struct BoardThreadChatMessageRow: View {
+    var message: BoardThreadChatMessageDisplay
+    var onReact: (BoardMessageReaction?) -> Void
+
+    var body: some View {
+        HStack(alignment: .bottom, spacing: 8) {
+            if !message.isMine {
+                BoardThreadDetailAvatar(
+                    avatarID: message.avatarID,
+                    imageURL: message.avatarURL,
+                    initial: message.initial,
+                    size: 30
+                )
+            }
+
+            if message.isMine {
+                Spacer(minLength: 0)
+            }
+
+            VStack(alignment: message.isMine ? .trailing : .leading, spacing: 4) {
+                messageRow
+                BoardMessageReactionBar(
+                    goodCount: message.goodReactionCount,
+                    badCount: message.badReactionCount,
+                    selectedReaction: message.viewerReaction,
+                    alignsTrailing: message.isMine,
+                    onSelect: onReact
+                )
+            }
+
+            if !message.isMine {
+                Spacer(minLength: 0)
+            }
+        }
+        .padding(.horizontal, 16)
+    }
+
+    private var messageRow: some View {
+        HStack(alignment: .bottom, spacing: 6) {
+            if message.isMine {
+                messageTime
+            }
+
+            messageBubble
+
+            if !message.isMine {
+                messageTime
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var messageBubble: some View {
+        if !message.imageURLs.isEmpty {
+            richMessageBubble
+        } else {
+            textOnlyMessageBubble
+        }
+    }
+
+    private var textOnlyMessageBubble: some View {
+        ViewThatFits(in: .horizontal) {
+            compactTextBubble
+            wrappedTextBubble
+        }
+    }
+
+    private var compactTextBubble: some View {
+        Text(messageText)
+            .font(.system(size: 15, weight: .bold, design: .rounded))
+            .foregroundStyle(message.isMine ? .white : MegrumTheme.ink)
+            .multilineTextAlignment(message.isMine ? .trailing : .leading)
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(
+                message.isMine ? AnyShapeStyle(MegrumTheme.lavender) : AnyShapeStyle(.white.opacity(0.9)),
+                in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+            )
+    }
+
+    private var wrappedTextBubble: some View {
+        Text(messageText)
+            .font(.system(size: 15, weight: .bold, design: .rounded))
+            .foregroundStyle(message.isMine ? .white : MegrumTheme.ink)
+            .multilineTextAlignment(message.isMine ? .trailing : .leading)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(
+                maxWidth: BoardThreadChatBubbleMetrics.maxWidth,
+                alignment: message.isMine ? .trailing : .leading
+            )
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(
+                message.isMine ? AnyShapeStyle(MegrumTheme.lavender) : AnyShapeStyle(.white.opacity(0.9)),
+                in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+            )
+    }
+
+    private var richMessageBubble: some View {
+        VStack(alignment: message.isMine ? .trailing : .leading, spacing: 8) {
+            Text(messageText)
+                .font(.system(size: 15, weight: .bold, design: .rounded))
+                .foregroundStyle(message.isMine ? .white : MegrumTheme.ink)
+                .multilineTextAlignment(message.isMine ? .trailing : .leading)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if !message.isDeleted, !message.imageURLs.isEmpty {
+                BoardThreadChatImageGrid(imageURLs: message.imageURLs)
+            }
+        }
+        .frame(maxWidth: BoardThreadChatBubbleMetrics.maxWidth, alignment: message.isMine ? .trailing : .leading)
+        .fixedSize(horizontal: false, vertical: true)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(
+            message.isMine ? AnyShapeStyle(MegrumTheme.lavender) : AnyShapeStyle(.white.opacity(0.9)),
+            in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+        )
+    }
+
+    private var messageText: String {
+        message.isDeleted ? "削除済みです" : message.body
+    }
+
+    private var messageTime: some View {
+        Text(message.relativeTime)
+            .font(.system(size: 10.5, weight: .bold, design: .rounded))
+            .foregroundStyle(MegrumTheme.muted.opacity(0.82))
+            .padding(.bottom, 3)
+            .frame(minWidth: 28, alignment: message.isMine ? .trailing : .leading)
+    }
+}
+
+private enum BoardThreadChatBubbleMetrics {
+    static let maxWidth: CGFloat = 270
+}
+
+private struct BoardThreadChatImageGrid: View {
+    var imageURLs: [URL]
+
+    private var columns: [GridItem] {
+        [
+            GridItem(.flexible(minimum: 82), spacing: 6),
+            GridItem(.flexible(minimum: 82), spacing: 6),
+        ]
+    }
+
+    var body: some View {
+        LazyVGrid(columns: columns, spacing: 6) {
+            ForEach(Array(imageURLs.prefix(4).enumerated()), id: \.offset) { _, url in
+                AsyncImage(url: url, transaction: Transaction(animation: .smooth(duration: 0.18))) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .scaledToFill()
+                    default:
+                        ZStack {
+                            MegrumTheme.lavender.opacity(0.12)
+                            Image(systemName: "photo")
+                                .font(.system(size: 18, weight: .bold, design: .rounded))
+                                .foregroundStyle(MegrumTheme.lavender.opacity(0.72))
+                        }
+                    }
+                }
+                .frame(width: imageURLs.count == 1 ? 180 : 86, height: imageURLs.count == 1 ? 180 : 86)
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            }
+        }
+        .frame(maxWidth: imageURLs.count == 1 ? 180 : 180, alignment: .leading)
+    }
+}
+
+struct BoardMessageReactionBar: View {
+    var goodCount: Int
+    var badCount: Int
+    var selectedReaction: BoardMessageReaction?
+    var alignsTrailing: Bool
+    var onSelect: (BoardMessageReaction?) -> Void
+
+    var body: some View {
+        HStack(spacing: 6) {
+            reactionButton(
+                reaction: .good,
+                systemImage: "hand.thumbsup",
+                selectedSystemImage: "hand.thumbsup.fill",
+                count: goodCount
+            )
+            reactionButton(
+                reaction: .bad,
+                systemImage: "hand.thumbsdown",
+                selectedSystemImage: "hand.thumbsdown.fill",
+                count: badCount
+            )
+        }
+        .frame(maxWidth: BoardThreadChatBubbleMetrics.maxWidth, alignment: alignsTrailing ? .trailing : .leading)
+    }
+
+    private func reactionButton(
+        reaction: BoardMessageReaction,
+        systemImage: String,
+        selectedSystemImage: String,
+        count: Int
+    ) -> some View {
+        let isSelected = selectedReaction == reaction
+        return Button {
+            onSelect(isSelected ? nil : reaction)
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: isSelected ? selectedSystemImage : systemImage)
+                    .font(.system(size: 12.5, weight: .black, design: .rounded))
+                Text("\(max(0, count))")
+                    .font(.system(size: 11.5, weight: .black, design: .rounded))
+            }
+            .foregroundStyle(isSelected ? .white : MegrumTheme.muted)
+            .padding(.horizontal, 8)
+            .frame(minWidth: 44, minHeight: 30)
+            .background(
+                isSelected ? AnyShapeStyle(MegrumTheme.lavender) : AnyShapeStyle(.white.opacity(0.82)),
+                in: Capsule()
+            )
+            .overlay {
+                Capsule()
+                    .strokeBorder(
+                        isSelected ? .white.opacity(0.26) : MegrumTheme.ink.opacity(0.07),
+                        lineWidth: 1
+                    )
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(reaction == .good ? "グッド" : "バッド")
+        .accessibilityValue("\(max(0, count))件")
+    }
+}
+
 struct BoardThreadReplyRow: View {
     var display: BoardReplyDisplay
 

@@ -4,9 +4,15 @@ import type { ReactNode } from "react";
 
 export const SITE_URL = "https://megrum.jp";
 export const CONTACT_EMAIL = "support@megrum.jp";
+export const OFFICE_ADDRESS_LINES = [
+  "〒530-0001",
+  "大阪府大阪市北区梅田1丁目2番2号",
+  "大阪駅前第2ビル12-12",
+];
 
 const navItems = [
   { href: "/", label: "Megrum" },
+  { href: "/operator", label: "運営者情報" },
   { href: "/privacy", label: "プライバシー" },
   { href: "/support", label: "サポート" },
   { href: "/terms", label: "利用規約" },

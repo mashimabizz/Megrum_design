@@ -117,7 +117,8 @@ struct GoodsCollectionResultsArea: View {
                 isSelectionMode: isSelectionMode,
                 selectedItemIDs: selectedItemIDs,
                 onBeginSelection: onBeginSelection,
-                onToggleSelection: onToggleSelection
+                onToggleSelection: onToggleSelection,
+                animatesEntrance: true
             )
             if let adPlacement {
                 AdBannerSlot(

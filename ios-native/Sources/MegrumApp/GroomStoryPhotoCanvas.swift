@@ -7,28 +7,34 @@ struct GroomStoryPhotoCanvas: View {
     var photoData: Data
 
     var body: some View {
-        ZStack {
-            #if canImport(UIKit)
-            if let image = UIImage(data: photoData) {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-                    .blur(radius: 34)
-                    .saturation(0.92)
-                    .scaleEffect(1.10)
-                    .overlay(.black.opacity(0.20))
+        GeometryReader { proxy in
+            ZStack {
+                #if canImport(UIKit)
+                if let image = UIImage(data: photoData) {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                        .blur(radius: 34)
+                        .saturation(0.92)
+                        .scaleEffect(1.10)
+                        .overlay(.black.opacity(0.20))
+                        .frame(width: proxy.size.width, height: proxy.size.height)
+                        .clipped()
 
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFit()
-            } else {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: proxy.size.width, height: proxy.size.height)
+                } else {
+                    GroomStoryPhotoFallback()
+                }
+                #else
                 GroomStoryPhotoFallback()
+                #endif
             }
-            #else
-            GroomStoryPhotoFallback()
-            #endif
+            .frame(width: proxy.size.width, height: proxy.size.height)
+            .clipped()
         }
-        .clipped()
     }
 }
 
@@ -47,10 +53,11 @@ struct GroomStoryOverlayText: View {
             )
             .foregroundStyle(overlay.color.color)
             .shadow(color: overlay.color.shadowColor, radius: 4, x: 0, y: 2)
-            .multilineTextAlignment(.leading)
-            .lineLimit(5)
+            .multilineTextAlignment(.center)
+            .lineLimit(8)
             .fixedSize(horizontal: false, vertical: true)
-            .frame(width: min(canvasSize.width * 0.84, canvasSize.width - 38), alignment: .leading)
+            .frame(width: max(120, min(canvasSize.width * 0.82, canvasSize.width - 42)), alignment: .center)
+            .rotationEffect(.degrees(overlay.rotationDegrees))
     }
 
     private var baseFontSize: CGFloat {

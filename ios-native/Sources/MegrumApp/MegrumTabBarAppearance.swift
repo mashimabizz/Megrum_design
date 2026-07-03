@@ -12,20 +12,28 @@ enum MegrumTabBarLayoutMetrics {
 enum MegrumTabBarAppearance {
     static func configure() {
         #if os(iOS)
-        let appearance = UITabBarAppearance()
-        if MegrumTabBarLayoutMetrics.hidesSystemBackground {
-            appearance.configureWithTransparentBackground()
-            appearance.backgroundEffect = nil
-            appearance.backgroundColor = .clear
-            appearance.shadowColor = .clear
-        }
-
         let tabBarAppearance = UITabBar.appearance()
-        tabBarAppearance.standardAppearance = appearance
-        tabBarAppearance.scrollEdgeAppearance = appearance
         tabBarAppearance.isTranslucent = true
-        tabBarAppearance.backgroundImage = UIImage()
-        tabBarAppearance.shadowImage = UIImage()
+
+        if #unavailable(iOS 26) {
+            let appearance = UITabBarAppearance()
+            if MegrumTabBarLayoutMetrics.hidesSystemBackground {
+                appearance.configureWithTransparentBackground()
+                appearance.backgroundEffect = nil
+                appearance.backgroundColor = .clear
+                appearance.shadowColor = .clear
+            }
+
+            tabBarAppearance.standardAppearance = appearance
+            tabBarAppearance.scrollEdgeAppearance = appearance
+            tabBarAppearance.backgroundImage = UIImage()
+            tabBarAppearance.shadowImage = UIImage()
+        } else {
+            // Keep the system Liquid Glass tab bar on iOS 26 instead of forcing
+            // the older transparent appearance proxy configuration.
+            tabBarAppearance.backgroundImage = nil
+            tabBarAppearance.shadowImage = nil
+        }
 
         UITabBarItem.appearance().titlePositionAdjustment = UIOffset(
             horizontal: 0,

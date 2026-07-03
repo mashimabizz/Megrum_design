@@ -64,7 +64,7 @@ extension GoodsEditorSheet {
             return
         }
         createError = nil
-        resetImageSeriesSuggestions()
+        googleLensSearchErrorMessage = nil
         isShowingCreateBulkTagSelectionSheet = true
     }
 
@@ -114,7 +114,7 @@ extension GoodsEditorSheet {
         }
         guard !GoodsInventoryCreateValidation.hasMissingMemberAssignments(
             metas: createMetas,
-            requiresMemberAssignment: inventoryCreateAllowsMemberAssignment
+            requiresMemberAssignment: inventoryCreateRequiresMemberAssignment
         ) else {
             createError = "メンバーがある推しは、すべての画像にメンバーを登録してください"
             return
@@ -134,9 +134,7 @@ extension GoodsEditorSheet {
                 createError = savedCount > 0 ? "\(savedCount)件は登録済みです。\(base)" : base
                 return
             }
-            if input.kind == .inventory {
-                createdItems.append(created)
-            }
+            createdItems.append(created)
             savedCount += 1
         }
         if !createdItems.isEmpty {

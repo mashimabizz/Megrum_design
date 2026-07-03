@@ -160,6 +160,24 @@ struct MeguriMapScreen: View {
                 }
             }
         }
+        #if os(iOS)
+        .groomViewerImmersiveOverlay(item: $selectedGroom) { groom, dismiss in
+            GroomViewerScreen(
+                grooms: mapGrooms,
+                initialGroom: groom,
+                appState: appState,
+                onDismiss: dismiss
+            )
+        }
+        .groomViewerImmersiveOverlay(item: $selectedGroomGroup) { selection, dismiss in
+            GroomViewerScreen(
+                grooms: selection.grooms,
+                initialGroom: selection.initialGroom,
+                appState: appState,
+                onDismiss: dismiss
+            )
+        }
+        #else
         .sheet(item: $selectedGroom) { groom in
             GroomMapDetailSheet(groom: groom)
                 .presentationDetents([.height(280)])
@@ -168,13 +186,18 @@ struct MeguriMapScreen: View {
         .sheet(item: $selectedGroomGroup) { selection in
             GroomViewerScreen(grooms: selection.grooms, initialGroom: selection.initialGroom, appState: appState)
         }
-        .sheet(item: $selectedThread) { thread in
+        #endif
+        .megrumSlideItemPresentation(
+            item: $selectedThread,
+            backSwipeInteractionScope: .fullScreen
+        ) { thread, dismiss in
             NavigationStack {
                 BoardThreadDetailScreen(
                     appState: appState,
                     thread: thread,
                     selectedPrefecture: selectedPrefecture,
-                    coordinate: locationState.coordinate
+                    coordinate: locationState.coordinate,
+                    onClose: dismiss
                 )
             }
         }

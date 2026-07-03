@@ -84,12 +84,41 @@ extension MegrumAppState {
         isLoadingGroomArchive = false
     }
 
+    public func loadGroomEngagement(postIDs: [UUID], reportsFailure: Bool = false) async {
+        let postIDs = Array(Set(postIDs))
+        guard !postIDs.isEmpty else {
+            return
+        }
+        do {
+            async let reactions = repository.loadGroomReactions(postIDs: postIDs)
+            async let replies = repository.loadGroomReplies(postIDs: postIDs)
+            let loadedReactions = try await reactions
+            let loadedReplies = try await replies
+            for postID in postIDs {
+                groomReactionsByPostID[postID] = loadedReactions.filter { $0.groomPostID == postID }
+                groomRepliesByPostID[postID] = []
+            }
+            groomRepliesByPostID = ReplyThreadStateReducer.mergingGroomReplies(
+                loadedReplies,
+                into: groomRepliesByPostID
+            )
+            await loadPublicProfilesForGroomArchive()
+        } catch {
+            if reportsFailure {
+                errorMessage = "グルームの反応を読み込めませんでした"
+            }
+        }
+    }
+
     public func createGroomPost(
         imageData: Data,
         imageContentType: String,
         caption: String? = nil,
         latitude: Double? = nil,
-        longitude: Double? = nil
+        longitude: Double? = nil,
+        groupID: UUID? = nil,
+        characterID: UUID? = nil,
+        seriesName: String? = nil
     ) async -> Bool {
         guard !isCreatingGroomPost else {
             return false
@@ -117,7 +146,10 @@ extension MegrumAppState {
                     imageContentType: imageContentType,
                     caption: caption,
                     latitude: latitude,
-                    longitude: longitude
+                    longitude: longitude,
+                    groupID: groupID,
+                    characterID: characterID,
+                    seriesName: seriesName
                 )
             )
             grooms = MeguriFeedStateReducer.upsertingGroomPost(post, into: grooms)
@@ -189,6 +221,55 @@ extension MegrumAppState {
             groomMapPosts = previousMapPosts
             ownGroomArchive = previousArchive
             errorMessage = "グルームのいいねを更新できませんでした"
+        }
+    }
+
+    public func deleteOwnGroom(_ groom: GroomPost) async -> Bool {
+        guard let viewerID = viewer?.id else {
+            errorMessage = "ログイン状態を確認できません"
+            return false
+        }
+        guard groom.authorID == viewerID else {
+            errorMessage = "自分のグルームだけ削除できます"
+            return false
+        }
+        guard deletingGroomPostID != groom.id else {
+            return false
+        }
+
+        let previousGrooms = grooms
+        let previousMapPosts = groomMapPosts
+        let previousArchive = ownGroomArchive
+        let previousReactions = groomReactionsByPostID
+        let previousReplies = groomRepliesByPostID
+        let previousViewedIDs = viewedGroomIDs
+        let previousLikedIDs = likedGroomIDs
+
+        deletingGroomPostID = groom.id
+        errorMessage = nil
+        grooms = GroomPostLocalMutation.removing(postID: groom.id, from: grooms)
+        groomMapPosts = GroomPostLocalMutation.removing(postID: groom.id, from: groomMapPosts)
+        ownGroomArchive = GroomPostLocalMutation.removing(postID: groom.id, from: ownGroomArchive)
+        groomReactionsByPostID[groom.id] = nil
+        groomRepliesByPostID[groom.id] = nil
+        viewedGroomIDs.remove(groom.id)
+        likedGroomIDs.remove(groom.id)
+
+        do {
+            try await repository.deleteGroomPost(postID: groom.id)
+            deletingGroomPostID = nil
+            return true
+        } catch {
+            grooms = previousGrooms
+            groomMapPosts = previousMapPosts
+            ownGroomArchive = previousArchive
+            groomReactionsByPostID = previousReactions
+            groomRepliesByPostID = previousReplies
+            viewedGroomIDs = previousViewedIDs
+            likedGroomIDs = previousLikedIDs
+            deletingGroomPostID = nil
+            errorMessage = "グルームを削除できませんでした"
+            return false
         }
     }
 
@@ -319,6 +400,7 @@ extension MegrumAppState {
                 replies.map(\.senderID)
             }
         )
+        await loadMeguriProfiles(userIDs: userIDs, reportsFailure: false)
         for userID in userIDs where userID != viewer?.id && publicProfilesByUserID[userID] == nil {
             await loadPublicUserProfile(userID: userID, reportsFailure: false)
         }

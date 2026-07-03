@@ -13,8 +13,7 @@ struct GoodsCropFrameCanvas: View {
     @Binding var frames: [TradingCardCropFrame]
     @Binding var selectedFrameID: UUID?
 
-    @State private var dragStart: CGPoint?
-    @State private var draftRect: CGRect?
+    @State private var dragState = GoodsPhotoCropCanvasDragState()
 
     private var imageSize: CGSize? {
         GoodsPhotoCropGeometry.platformImageSize(from: imageData)
@@ -46,7 +45,7 @@ struct GoodsCropFrameCanvas: View {
                         }
                 }
 
-                if let draftRect {
+                if let draftRect = dragState.draftRect {
                     RoundedRectangle(cornerRadius: 4, style: .continuous)
                         .stroke(Color.yellow.opacity(0.86), style: StrokeStyle(lineWidth: 2, dash: [7, 5]))
                         .frame(width: draftRect.width, height: draftRect.height)
@@ -69,26 +68,12 @@ struct GoodsCropFrameCanvas: View {
     private func dragGesture(in displayRect: CGRect) -> some Gesture {
         DragGesture(minimumDistance: 8)
             .onChanged { value in
-                let start = dragStart ?? GoodsPhotoCropGeometry.clamped(value.startLocation, to: displayRect)
-                dragStart = start
-                let current = GoodsPhotoCropGeometry.clamped(value.location, to: displayRect)
-                draftRect = GoodsPhotoCropGeometry.rect(from: start, to: current)
+                dragState.update(startLocation: value.startLocation, location: value.location, in: displayRect)
             }
             .onEnded { value in
-                defer {
-                    dragStart = nil
-                    draftRect = nil
-                }
-                guard let start = dragStart else {
+                guard let frame = dragState.finish(location: value.location, in: displayRect) else {
                     return
                 }
-                let current = GoodsPhotoCropGeometry.clamped(value.location, to: displayRect)
-                let screen = GoodsPhotoCropGeometry.rect(from: start, to: current)
-                guard screen.width >= 28, screen.height >= 28 else {
-                    return
-                }
-                let normalized = GoodsPhotoCropGeometry.normalizedRect(screen, in: displayRect)
-                let frame = TradingCardCropFrame(rect: normalized)
                 frames.append(frame)
                 selectedFrameID = frame.id
             }

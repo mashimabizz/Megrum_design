@@ -88,6 +88,122 @@ final class GoodsEditorDraftTests: XCTestCase {
         XCTAssertEqual(suggestions, ["未開封", "トレカ", "ラキドロ"])
     }
 
+    func testGoodsBulkTagSheetStateTrimsDraftAndTracksApplyAvailability() {
+        var state = GoodsBulkTagSheetState()
+
+        XCTAssertFalse(state.canApply)
+
+        state.tagDraft = "  会場限定  \n"
+
+        XCTAssertEqual(state.trimmedTag, "会場限定")
+        XCTAssertTrue(state.canApply)
+    }
+
+    func testGoodsBulkTagSheetStateTogglesCandidateIntoDraft() {
+        var state = GoodsBulkTagSheetState()
+
+        state.toggleCandidateTag("ラキドロ")
+
+        XCTAssertEqual(state.selectedCandidateNames, ["ラキドロ"])
+        XCTAssertEqual(state.tagDraft, "ラキドロ")
+
+        state.toggleCandidateTag("ラキドロ")
+
+        XCTAssertTrue(state.selectedCandidateNames.isEmpty)
+        XCTAssertEqual(state.tagDraft, "")
+    }
+
+    func testGoodsBulkTagSheetStateKeepsEditedDraftWhenCandidateIsCleared() {
+        var state = GoodsBulkTagSheetState()
+
+        state.toggleCandidateTag("会場限定")
+        state.tagDraft = "会場限定 A賞"
+        state.toggleCandidateTag("会場限定")
+
+        XCTAssertTrue(state.selectedCandidateNames.isEmpty)
+        XCTAssertEqual(state.tagDraft, "会場限定 A賞")
+    }
+
+    func testGoogleLensSearchURLBuilderEncodesImageURL() throws {
+        let imageURL = try XCTUnwrap(URL(string: "https://storage.example.com/goods photos/a+b.jpg?token=abc 123"))
+
+        let url = try XCTUnwrap(GoogleLensSearchURLBuilder.url(forImageURL: imageURL))
+
+        XCTAssertEqual(url.scheme, "https")
+        XCTAssertEqual(url.host, "lens.google.com")
+        XCTAssertEqual(url.path, "/uploadbyurl")
+        let components = try XCTUnwrap(URLComponents(url: url, resolvingAgainstBaseURL: false))
+        XCTAssertEqual(components.queryItems?.first(where: { $0.name == "url" })?.value, imageURL.absoluteString)
+    }
+
+    func testGoogleLensSearchDisclosureMentionsExternalImageHandling() {
+        XCTAssertEqual(GoodsGoogleLensSearchDisclosure.title, "Google Lensで画像検索しますか？")
+        XCTAssertEqual(GoodsGoogleLensSearchDisclosure.confirmButtonTitle, "Google Lensで開く")
+        XCTAssertTrue(GoodsGoogleLensSearchDisclosure.message.contains("Google Lens"))
+        XCTAssertTrue(GoodsGoogleLensSearchDisclosure.message.contains("画像または画像URL"))
+        XCTAssertTrue(GoodsGoogleLensSearchDisclosure.message.contains("プライバシーポリシー"))
+        XCTAssertTrue(GoodsGoogleLensSearchDisclosure.message.contains("MegrumのURL"))
+    }
+
+    func testGoodsGoogleLensSearchItemFactoryBuildsItemsFromSelectedPhotos() {
+        let groupID = UUID()
+        let memberID = UUID()
+        let photoID = UUID()
+        let upload = GoodsPhotoUpload(data: Data([0xFF, 0xD8, 0xFF]), contentType: "image/jpeg")
+        let metas = [
+            GoodsCreateMetaDraft(
+                id: UUID(),
+                photoID: photoID,
+                memberID: memberID,
+                title: "",
+                tagNames: ["会場限定"]
+            ),
+            GoodsCreateMetaDraft(id: UUID(), photoID: nil, title: "画像なし")
+        ]
+        let items = GoodsGoogleLensSearchItemFactory.items(
+            metas: metas,
+            photos: [GoodsCreatePhotoDraft(id: photoID, upload: upload)],
+            groupName: "TWICE",
+            members: [OshiCharacter(id: memberID, groupID: groupID, name: "SANA")],
+            goodsTypeName: "トレカ"
+        )
+
+        XCTAssertEqual(items.count, 1)
+        XCTAssertEqual(items[0].title, "SANA TWICE トレカ")
+        XCTAssertEqual(items[0].detailText, "SANA ・ トレカ ・ 会場限定")
+        XCTAssertEqual(items[0].source, .upload(upload))
+    }
+
+    func testTagCandidatePreviewSelectionStateTracksPreviewAndSelectionLimit() {
+        var state = TagCandidatePreviewSelectionState()
+
+        XCTAssertFalse(state.isPreviewing("会場限定"))
+        XCTAssertTrue(state.isSelected("live", selectedNames: ["LIVE"]))
+        XCTAssertTrue(state.isDisabled("未選択", selectedNames: ["会場限定"], maxSelection: 1))
+        XCTAssertFalse(state.isDisabled("会場限定", selectedNames: ["会場限定"], maxSelection: 1))
+
+        state.preview("会場限定")
+        XCTAssertTrue(state.isPreviewing("会場限定"))
+
+        state.clearPreview(ifMatches: "別シリーズ")
+        XCTAssertTrue(state.isPreviewing("会場限定"))
+
+        state.clearPreview(ifMatches: "会場限定")
+        XCTAssertFalse(state.isPreviewing("会場限定"))
+    }
+
+    func testGoodsReportDraftStateKeepsReasonAndRawNoteForSubmission() {
+        var state = GoodsReportDraftState()
+
+        XCTAssertEqual(state.reason, .fakeItem)
+
+        state.reason = .privacy
+        state.note = "  写り込みがあります  "
+
+        XCTAssertEqual(state.submission.reason, .privacy)
+        XCTAssertEqual(state.submission.note, "  写り込みがあります  ")
+    }
+
     func testGoodsEditorMemberScopeKeepsMembersInsideSelectedGroupOrWork() {
         let selectedGroupID = UUID()
         let otherGroupID = UUID()
@@ -536,6 +652,68 @@ final class GoodsEditorDraftTests: XCTestCase {
         XCTAssertEqual(results.first?.source, .detected)
         XCTAssertEqual(results.first?.contentType, "image/jpeg")
         XCTAssertFalse(results.first?.data.isEmpty ?? true)
+    }
+
+    func testGoodsPhotoCropSheetPresentationStateTracksFramesSelectionAndMessages() {
+        let first = TradingCardCropFrame(id: UUID(), rect: CGRect(x: 0.1, y: 0.1, width: 0.3, height: 0.3))
+        let second = TradingCardCropFrame(id: UUID(), rect: CGRect(x: 0.5, y: 0.5, width: 0.2, height: 0.2))
+        var state = GoodsPhotoCropSheetPresentationState(initialFrames: [first, second])
+
+        XCTAssertTrue(state.canApply)
+        XCTAssertEqual(state.selectedFrameID, first.id)
+
+        state.selectedFrameID = second.id
+        state.deleteFrame(second.id)
+
+        XCTAssertEqual(state.frames.map(\.id), [first.id])
+        XCTAssertEqual(state.selectedFrameID, first.id)
+
+        state.showEmptyFrameMessage()
+        XCTAssertEqual(state.message, "切り取り枠を追加してください。")
+
+        state.showFailureMessage("画像を読み込めませんでした。")
+        XCTAssertEqual(state.message, "画像を読み込めませんでした。")
+
+        state.clearFrames()
+        XCTAssertFalse(state.canApply)
+        XCTAssertNil(state.selectedFrameID)
+    }
+
+    func testGoodsPhotoCropCanvasDragStateBuildsFrameAndResetsDraft() {
+        let displayRect = CGRect(x: 10, y: 20, width: 100, height: 200)
+        var state = GoodsPhotoCropCanvasDragState()
+
+        state.update(
+            startLocation: CGPoint(x: -5, y: 10),
+            location: CGPoint(x: 60, y: 120),
+            in: displayRect
+        )
+
+        XCTAssertEqual(state.draftRect, CGRect(x: 10, y: 20, width: 50, height: 100))
+
+        let frame = state.finish(location: CGPoint(x: 60, y: 120), in: displayRect)
+
+        XCTAssertEqual(frame?.rect.minX ?? -1, 0, accuracy: 0.001)
+        XCTAssertEqual(frame?.rect.minY ?? -1, 0, accuracy: 0.001)
+        XCTAssertEqual(frame?.rect.width ?? -1, 0.5, accuracy: 0.001)
+        XCTAssertEqual(frame?.rect.height ?? -1, 0.5, accuracy: 0.001)
+        XCTAssertNil(state.dragStart)
+        XCTAssertNil(state.draftRect)
+    }
+
+    func testGoodsPhotoCropCanvasDragStateRejectsSmallDrag() {
+        let displayRect = CGRect(x: 0, y: 0, width: 100, height: 100)
+        var state = GoodsPhotoCropCanvasDragState()
+
+        state.update(
+            startLocation: CGPoint(x: 10, y: 10),
+            location: CGPoint(x: 24, y: 24),
+            in: displayRect
+        )
+
+        XCTAssertNil(state.finish(location: CGPoint(x: 24, y: 24), in: displayRect))
+        XCTAssertNil(state.dragStart)
+        XCTAssertNil(state.draftRect)
     }
 
     func testTradingCardBulkRecognizerRejectsInvalidImageData() async {

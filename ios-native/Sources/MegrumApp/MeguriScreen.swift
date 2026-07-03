@@ -6,12 +6,19 @@ import SwiftUI
 
 struct MeguriScreen: View {
     @ObservedObject var appState: MegrumAppState
+    var homeResetToken: UUID?
+    var visualQAInitialScreen: VisualQAInitialScreen? = nil
+    @Binding var pendingNotificationRouteIntent: NotificationRouteIntent?
+    var onOpenMessages: () -> Void = {}
+    var onOpenBoardThread: (MeguriBoardThreadRoute) -> Void = { _ in }
+    var onOpenMeguriUserProfile: (UUID) -> Void = { _ in }
+    var onOpenGroomViewer: ((GroomPost, UnitPoint) -> Void)?
     @StateObject var locationState = MegrumLocationState()
     @AppStorage("megrum.meguri.board.prefecture") var storedBoardPrefecture = ""
     @AppStorage("megrum.meguri.board.scope") var storedBoardScopeRaw = BoardThread.Audience.nearby3km.rawValue
-    @State var selectedThread: BoardThread?
     @State var pendingCreatedThread: BoardThread?
     @State var selectedGroom: GroomPost?
+    @State var selectedGroomSourceAnchor: UnitPoint = .center
     @State var selectedGroomPhotoItem: PhotosPickerItem?
     @State var groomDraftPhotoData: Data?
     @State var groomDraftPhotoContentType = "image/jpeg"
@@ -21,8 +28,9 @@ struct MeguriScreen: View {
     @State var isShowingGroomComposer = false
     @State var isShowingGroomCamera = false
     @State var isShowingGroomArchive = false
-    @State var isShowingMeguriMessages = false
     @State var isShowingMeguriProfileSettings = false
+    @State var didOpenVisualQAMeguriProfileSettings = false
+    @State var didOpenVisualQAGroomArchive = false
     @State var activeMap: MeguriMapKind?
     @State var homeMapKind: MeguriMapKind = .all
     @State var isShowingThreadComposer = false
@@ -33,6 +41,8 @@ struct MeguriScreen: View {
     @State var toastMessage: String?
     @State var toastPlacement: MeguriToastPlacement = .bottom
     @State var toastID = UUID()
+    @State var contentFilter = MeguriContentFilterState()
+    @State var isShowingContentFilter = false
     @State var outOfRangeAlertMessage = ""
     @State var isShowingOutOfRangeAlert = false
     @State var boardSheetDetent: MeguriBoardSheetDetent = .compact
@@ -56,23 +66,37 @@ struct MeguriScreen: View {
         return (appState.viewer?.prefecture).nilIfBlank
     }
 
+    var visibleGrooms: [GroomPost] {
+        appState.grooms.filter { contentFilter.matches(groom: $0) }
+    }
+
+    var visibleMapGrooms: [GroomPost] {
+        (appState.groomMapPosts.isEmpty ? appState.grooms : appState.groomMapPosts)
+            .filter { contentFilter.matches(groom: $0) }
+    }
+
+    var visibleThreads: [BoardThread] {
+        appState.threads.filter { contentFilter.matches(thread: $0) }
+    }
+
     var body: some View {
         MeguriHomeContent(
             cameraPosition: $homeCameraPosition,
             viewer: appState.viewer,
             meguriProfile: appState.meguriProfile,
-            grooms: appState.grooms,
-            mapGrooms: appState.groomMapPosts.isEmpty ? appState.grooms : appState.groomMapPosts,
-            threads: appState.threads,
+            grooms: visibleGrooms,
+            mapGrooms: visibleMapGrooms,
+            threads: visibleThreads,
             currentCoordinate: locationState.coordinate,
+            subscriptionState: appState.subscriptionState,
             notice: notice,
             isRequestingLocation: locationState.isRequestingLocation,
             unreadMessageCount: appState.meguriUnreadMessageCount,
+            isContentFilterActive: contentFilter.hasActiveFilters,
             selectedMapKind: $homeMapKind,
+            onOpenContentFilter: { isShowingContentFilter = true },
             onRecenterMap: centerHomeMapOnCurrentLocation,
-            onOpenMessages: {
-                isShowingMeguriMessages = true
-            },
+            onOpenMessages: onOpenMessages,
             onSelectGroom: openGroomFromStrip,
             onSelectThread: openThreadFromHome,
             onTapMapCoordinate: handleHomeMapTap,
@@ -85,6 +109,7 @@ struct MeguriScreen: View {
             onOpenMeguriProfile: { isShowingMeguriProfileSettings = true }
         )
         .allowsHitTesting(!isShowingGroomArchive)
+        .ignoresSafeArea(.container, edges: .bottom)
         .background(MegrumTheme.canvas.ignoresSafeArea())
         .megrumHiddenNavigationBar()
         .task {
@@ -99,6 +124,10 @@ struct MeguriScreen: View {
         .task {
             await appState.loadMeguriProfile(reportsFailure: false)
         }
+        .onAppear {
+            openVisualQASheetsIfNeeded()
+            handlePendingNotificationRouteIntent(pendingNotificationRouteIntent)
+        }
         .task(id: appState.grooms.map(\.authorID)) {
             await preloadGroomAuthorProfiles()
         }
@@ -107,6 +136,12 @@ struct MeguriScreen: View {
         }
         .onChange(of: selectedGroomPhotoItem) { _, item in
             handleSelectedGroomPhotoItem(item)
+        }
+        .onChange(of: homeResetToken) { _, _ in
+            resetToHome()
+        }
+        .onChange(of: pendingNotificationRouteIntent) { _, intent in
+            handlePendingNotificationRouteIntent(intent)
         }
         .alert(MeguriAccessPolicy.outOfRangeTitle, isPresented: $isShowingOutOfRangeAlert) {
             Button("OK", role: .cancel) {}
@@ -121,16 +156,34 @@ struct MeguriScreen: View {
                     .transition(toastPlacement.transition)
             }
         }
-        .sheet(isPresented: $isShowingMeguriMessages) {
-            NavigationStack {
-                MeguriMessageInboxScreen(appState: appState)
-            }
-            .presentationDetents([.large])
-            .presentationDragIndicator(.visible)
-        }
         .sheet(isPresented: $isShowingMeguriProfileSettings) {
             NavigationStack {
                 MeguriProfileSettingsSheet(appState: appState)
+            }
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $isShowingContentFilter) {
+            NavigationStack {
+                MeguriContentFilterSheet(
+                    filter: $contentFilter,
+                    groups: appState.oshiGroups,
+                    characters: appState.oshiCharacters,
+                    userOshiSelections: appState.userOshiSelections,
+                    inventory: appState.inventory,
+                    wishes: appState.wishes,
+                    isLoadingGroups: appState.isLoadingOshiGroups,
+                    isLoadingCharacters: appState.isLoadingOshiCharacters,
+                    onLoadGroups: {
+                        await appState.loadOshiGroups()
+                    },
+                    onLoadCharacters: { group in
+                        await appState.loadOshiCharacters(group: group)
+                    },
+                    onLoadUserOshiSelections: {
+                        await appState.loadUserOshiSelections()
+                    }
+                )
             }
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
@@ -139,7 +192,6 @@ struct MeguriScreen: View {
             MeguriScreenPresentationModifier(
                 appState: appState,
                 locationState: locationState,
-                selectedThread: $selectedThread,
                 isShowingThreadComposer: $isShowingThreadComposer,
                 threadCreationCoordinate: $threadCreationCoordinate,
                 isShowingPrefecturePicker: $isShowingPrefecturePicker,
@@ -153,6 +205,7 @@ struct MeguriScreen: View {
                 isShowingGroomCamera: $isShowingGroomCamera,
                 isShowingGroomArchive: $isShowingGroomArchive,
                 selectedGroom: $selectedGroom,
+                selectedGroomSourceAnchor: $selectedGroomSourceAnchor,
                 activeMap: $activeMap,
                 selectedPrefecture: selectedBoardPrefecture,
                 boardScope: selectedBoardScope,
@@ -183,8 +236,67 @@ struct MeguriScreen: View {
                     showToast(message)
                 },
                 onPublishGroomPhoto: publishGroomPhoto,
-                onResetGroomDraft: resetGroomDraft
+                onResetGroomDraft: resetGroomDraft,
+                onOpenMeguriUserProfile: onOpenMeguriUserProfile
             )
         )
+    }
+
+    private func openVisualQASheetsIfNeeded() {
+        if visualQAInitialScreen == .meguriProfileSettings, !didOpenVisualQAMeguriProfileSettings {
+            didOpenVisualQAMeguriProfileSettings = true
+            isShowingMeguriProfileSettings = true
+        }
+        if visualQAInitialScreen == .groomArchive, !didOpenVisualQAGroomArchive {
+            didOpenVisualQAGroomArchive = true
+            isShowingGroomArchive = true
+        }
+    }
+
+    private func handlePendingNotificationRouteIntent(_ intent: NotificationRouteIntent?) {
+        guard case .ownGroom(let postIDString) = intent else {
+            return
+        }
+        openOwnGroomFromNotification(postIDString: postIDString)
+    }
+
+    private func openOwnGroomFromNotification(postIDString: String?) {
+        let postID = postIDString.flatMap(UUID.init(uuidString:))
+        if openOwnGroomIfAvailable(postID: postID) {
+            pendingNotificationRouteIntent = nil
+            return
+        }
+
+        Task {
+            await appState.loadMeguriFeed(
+                latitude: locationState.coordinate?.latitude,
+                longitude: locationState.coordinate?.longitude,
+                prefecture: selectedBoardPrefecture,
+                scope: selectedBoardScope,
+                force: true
+            )
+            if !openOwnGroomIfAvailable(postID: postID), postID != nil {
+                await appState.loadGroomArchive()
+                _ = openOwnGroomIfAvailable(postID: postID)
+            }
+            pendingNotificationRouteIntent = nil
+        }
+    }
+
+    @discardableResult
+    private func openOwnGroomIfAvailable(postID: UUID?) -> Bool {
+        let groom = appState.ownVisibleGroom(postID: postID)
+            ?? postID.flatMap { postID in
+                appState.ownGroomArchive.first { $0.id == postID }
+            }
+        guard let groom else {
+            return false
+        }
+        selectedGroomSourceAnchor = .center
+        presentGroomViewer(groom, sourceAnchor: .center)
+        Task {
+            await appState.loadGroomEngagement(postIDs: [groom.id], reportsFailure: false)
+        }
+        return true
     }
 }

@@ -4,6 +4,19 @@ import MegrumCore
 import XCTest
 
 final class PublicUserProfileScreenTests: XCTestCase {
+    func testUserReportDraftStateKeepsReasonAndRawNoteForSubmission() {
+        var state = UserReportDraftState()
+
+        XCTAssertEqual(state.reason, .harassment)
+        XCTAssertEqual(state.submission.note, "")
+
+        state.reason = .privacy
+        state.note = "  個人情報が書かれています  "
+
+        XCTAssertEqual(state.submission.reason, .privacy)
+        XCTAssertEqual(state.submission.note, "  個人情報が書かれています  ")
+    }
+
     func testPublicProfileUsesOwnProfileCompactHeaderMetrics() {
         XCTAssertEqual(PublicProfileLayoutMetrics.contentSpacing, OwnProfileLayoutMetrics.contentSpacing)
         XCTAssertEqual(PublicProfileLayoutMetrics.horizontalPadding, OwnProfileLayoutMetrics.horizontalPadding)
@@ -82,6 +95,71 @@ final class PublicUserProfileScreenTests: XCTestCase {
         XCTAssertTrue(presentation.listingConditions.isEmpty)
         XCTAssertEqual(presentation.paymentSummaryText, "未設定")
         XCTAssertTrue(presentation.isEmpty)
+    }
+
+    func testPublicProfilePresentationStateStartsGoodsProposalBeforeListing() throws {
+        let ownerID = UUID(uuidString: "10000000-0000-0000-0000-000000000921")!
+        let goodsID = UUID(uuidString: "10000000-0000-0000-0000-000000000922")!
+        let listingID = UUID(uuidString: "10000000-0000-0000-0000-000000000923")!
+        let goods = GoodsItem(id: goodsID, ownerID: ownerID, title: "譲るトレカ")
+        let listing = IndividualListing(
+            id: listingID,
+            ownerID: ownerID,
+            haves: [ListingItemQuantity(itemID: goodsID)]
+        )
+        var state = PublicUserProfilePresentationState()
+
+        state.startPrimaryProposal(
+            allowsProposalActions: true,
+            tradeGoods: [goods],
+            listings: [listing],
+            goodsByID: [goodsID: goods]
+        )
+
+        XCTAssertEqual(state.proposalTargetItem?.id, goodsID)
+        XCTAssertNil(state.listingProposalTarget)
+    }
+
+    func testPublicProfilePresentationStateSelectsListingOnlyWhenAllowed() {
+        let ownerID = UUID(uuidString: "10000000-0000-0000-0000-000000000931")!
+        let goodsID = UUID(uuidString: "10000000-0000-0000-0000-000000000932")!
+        let listingID = UUID(uuidString: "10000000-0000-0000-0000-000000000933")!
+        let goods = GoodsItem(id: goodsID, ownerID: ownerID, title: "譲るアクスタ")
+        let listing = IndividualListing(
+            id: listingID,
+            ownerID: ownerID,
+            haves: [ListingItemQuantity(itemID: goodsID)]
+        )
+        var state = PublicUserProfilePresentationState()
+
+        state.selectListing(
+            listingID,
+            allowsProposalActions: false,
+            listings: [listing],
+            goodsByID: [goodsID: goods]
+        )
+        XCTAssertNil(state.listingProposalTarget)
+
+        state.selectListing(
+            listingID,
+            allowsProposalActions: true,
+            listings: [listing],
+            goodsByID: [goodsID: goods]
+        )
+        XCTAssertEqual(state.listingProposalTarget?.id, listingID)
+        XCTAssertEqual(state.listingProposalTarget?.targetItem.id, goodsID)
+    }
+
+    func testPublicProfilePresentationStateClearsBlockTargetWhenDialogDismisses() {
+        let userID = UUID(uuidString: "10000000-0000-0000-0000-000000000941")!
+        var state = PublicUserProfilePresentationState()
+        state.blockTarget = PublicProfileModerationTarget(userID: userID, displayName: "みち")
+
+        state.updateBlockConfirmationPresentation(true)
+        XCTAssertEqual(state.blockTarget?.userID, userID)
+
+        state.updateBlockConfirmationPresentation(false)
+        XCTAssertNil(state.blockTarget)
     }
 
     func testPublicOshiTagsKeepGroupAndMemberInSameColorGroup() {

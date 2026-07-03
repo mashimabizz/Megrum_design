@@ -145,7 +145,8 @@ extension MeguriMapScreen {
                 MeguriAccessPolicy.boardAccessMessage(
                     thread,
                     currentCoordinate: locationState.coordinate,
-                    viewerID: appState.viewer?.id
+                    viewerID: appState.viewer?.id,
+                    subscriptionState: appState.subscriptionState
                 )
             )
             return
@@ -165,7 +166,8 @@ extension MeguriMapScreen {
         !MeguriAccessPolicy.canOpenBoard(
             thread,
             currentCoordinate: locationState.coordinate,
-            viewerID: appState.viewer?.id
+            viewerID: appState.viewer?.id,
+            subscriptionState: appState.subscriptionState
         )
     }
 
@@ -181,7 +183,8 @@ extension MeguriMapScreen {
         MeguriAccessPolicy.canOpenBoard(
             thread,
             currentCoordinate: locationState.coordinate,
-            viewerID: appState.viewer?.id
+            viewerID: appState.viewer?.id,
+            subscriptionState: appState.subscriptionState
         )
     }
 
@@ -197,7 +200,8 @@ extension MeguriMapScreen {
         MeguriAccessPolicy.boardAccessMessage(
             thread,
             currentCoordinate: locationState.coordinate,
-            viewerID: appState.viewer?.id
+            viewerID: appState.viewer?.id,
+            subscriptionState: appState.subscriptionState
         )
     }
 

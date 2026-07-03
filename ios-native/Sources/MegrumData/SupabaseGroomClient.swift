@@ -131,6 +131,15 @@ public final class SupabaseGroomClient: @unchecked Sendable {
         return post
     }
 
+    public func deletePost(userID: UUID, postID: UUID) async throws {
+        let _: [GroomPostDeleteRow] = try await client.updateRows(
+            in: "groom_posts",
+            values: GroomPostDeletePayload(),
+            select: "id",
+            queryItems: ownGroomPostQueryItems(userID: userID, postID: postID)
+        )
+    }
+
     public func markViewed(userID: UUID, postID: UUID) async throws {
         let _: [GroomViewRow] = try await client.upsertRows(
             into: "groom_views",

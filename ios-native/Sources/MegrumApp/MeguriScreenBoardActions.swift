@@ -98,7 +98,8 @@ extension MeguriScreen {
         guard MeguriAccessPolicy.canOpenBoard(
             thread,
             currentCoordinate: locationState.coordinate,
-            viewerID: appState.viewer?.id
+            viewerID: appState.viewer?.id,
+            subscriptionState: appState.subscriptionState
         ) else {
             if locationState.coordinate == nil {
                 locationState.startUpdatingCurrentLocation()
@@ -107,12 +108,19 @@ extension MeguriScreen {
                 MeguriAccessPolicy.boardAccessMessage(
                     thread,
                     currentCoordinate: locationState.coordinate,
-                    viewerID: appState.viewer?.id
+                    viewerID: appState.viewer?.id,
+                    subscriptionState: appState.subscriptionState
                 )
             )
             return
         }
-        selectedThread = thread
+        onOpenBoardThread(
+            MeguriBoardThreadRoute(
+                thread: thread,
+                selectedPrefecture: selectedBoardPrefecture,
+                coordinate: locationState.coordinate
+            )
+        )
     }
 
     func centerHomeMapOnCurrentLocation() {
@@ -130,7 +138,13 @@ extension MeguriScreen {
             return
         }
         pendingCreatedThread = nil
-        selectedThread = thread
+        onOpenBoardThread(
+            MeguriBoardThreadRoute(
+                thread: thread,
+                selectedPrefecture: selectedBoardPrefecture,
+                coordinate: locationState.coordinate
+            )
+        )
     }
 
     func centerHomeMap(on coordinate: MegrumLocationCoordinate, animated: Bool) {

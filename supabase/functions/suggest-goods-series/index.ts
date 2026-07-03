@@ -68,27 +68,30 @@ Deno.serve(async (request) => {
   try {
     config = readConfig();
   } catch (error) {
-    return jsonResponse({ error: "missing_configuration", detail: messageOf(error) }, 500);
+    console.error("suggest-goods-series configuration error", publicErrorCode(error));
+    return jsonResponse({ error: "missing_configuration" }, 500);
   }
 
   try {
     await requireAuthenticatedUser(request, config);
   } catch (error) {
-    return jsonResponse({ error: "unauthorized", detail: messageOf(error) }, 401);
+    console.error("suggest-goods-series authorization error", publicErrorCode(error));
+    return jsonResponse({ error: "unauthorized" }, 401);
   }
 
   let payload: NormalizedPayload;
   try {
     payload = normalizePayload(await request.json() as SuggestionPayload);
   } catch (error) {
-    return jsonResponse({ error: "invalid_payload", detail: messageOf(error) }, 400);
+    return jsonResponse({ error: "invalid_payload", detail: publicErrorCode(error) }, 400);
   }
 
   try {
     const suggestions = await suggestSeriesNames(payload, config);
     return jsonResponse({ suggestions }, 200);
   } catch (error) {
-    return jsonResponse({ error: "suggestion_failed", detail: messageOf(error) }, 502);
+    console.error("suggest-goods-series failed", publicErrorCode(error));
+    return jsonResponse({ error: "suggestion_failed", detail: publicErrorCode(error) }, 502);
   }
 });
 
@@ -146,7 +149,7 @@ async function suggestSeriesNames(payload: NormalizedPayload, config: RuntimeCon
   });
 
   if (!response.ok) {
-    throw new Error(`openai_failed:${response.status}:${await response.text()}`);
+    throw new Error(`openai_failed:${response.status}`);
   }
 
   const body = await response.json();
@@ -337,4 +340,24 @@ function jsonResponse(body: unknown, status: number): Response {
 
 function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function publicErrorCode(error: unknown): string {
+  const message = messageOf(error);
+  if (message.startsWith("auth_user_failed")) {
+    return "auth_user_failed";
+  }
+  if (message.startsWith("openai_failed")) {
+    return "openai_failed";
+  }
+  if (message === "web_search_not_performed") {
+    return message;
+  }
+  if (message === "at least one image is required") {
+    return "image_required";
+  }
+  if (message.endsWith(" is required")) {
+    return "required_value_missing";
+  }
+  return "request_failed";
 }

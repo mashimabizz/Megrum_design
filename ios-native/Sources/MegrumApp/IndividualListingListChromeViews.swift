@@ -101,6 +101,10 @@ struct IndividualListingSkeletons: View {
 struct IndividualListingConditionStrip: View {
     var listings: [IndividualListing]
     @Binding var activeListingID: UUID?
+    var isSelectionMode: Bool = false
+    var selectedListingIDs: Set<UUID> = []
+    var onBeginSelection: (IndividualListing) -> Void = { _ in }
+    var onToggleSelection: (IndividualListing) -> Void = { _ in }
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
@@ -109,11 +113,19 @@ struct IndividualListingConditionStrip: View {
                     IndividualListingConditionStripCard(
                         index: index,
                         totalCount: listings.count,
-                        isSelected: activeListingID == listing.id
+                        isActive: activeListingID == listing.id,
+                        isSelectionMode: isSelectionMode,
+                        isMultiSelected: selectedListingIDs.contains(listing.id)
                     ) {
-                        withAnimation(.smooth(duration: 0.22)) {
-                            activeListingID = listing.id
+                        if isSelectionMode {
+                            onToggleSelection(listing)
+                        } else {
+                            withAnimation(.smooth(duration: 0.22)) {
+                                activeListingID = listing.id
+                            }
                         }
+                    } longPressAction: {
+                        onBeginSelection(listing)
                     }
                     .id(listing.id)
                 }
@@ -130,32 +142,69 @@ struct IndividualListingConditionStrip: View {
 private struct IndividualListingConditionStripCard: View {
     var index: Int
     var totalCount: Int
-    var isSelected: Bool
+    var isActive: Bool
+    var isSelectionMode: Bool
+    var isMultiSelected: Bool
     var action: () -> Void
+    var longPressAction: () -> Void
+    @State private var didTriggerLongPress = false
+
+    private var isHighlighted: Bool {
+        isSelectionMode ? isMultiSelected : isActive
+    }
 
     var body: some View {
-        Button(action: action) {
-            Text(IndividualListingListPresentation.conditionStripTitle(index: index, totalCount: totalCount))
-                .font(.system(size: 15, weight: .black, design: .rounded))
-                .foregroundStyle(isSelected ? .white : MegrumTheme.ink)
-                .lineLimit(1)
-                .minimumScaleFactor(0.78)
-                .monospacedDigit()
-                .padding(.horizontal, 16)
-                .frame(height: 46)
+        Button(action: performTap) {
+            HStack(spacing: 7) {
+                if isSelectionMode {
+                    Image(systemName: isMultiSelected ? "checkmark.circle.fill" : "circle")
+                        .font(.system(size: 14, weight: .black, design: .rounded))
+                }
+
+                Text(IndividualListingListPresentation.conditionStripTitle(index: index, totalCount: totalCount))
+                    .font(.system(size: 15, weight: .black, design: .rounded))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.78)
+                    .monospacedDigit()
+            }
+            .foregroundStyle(isHighlighted ? .white : MegrumTheme.ink)
+            .padding(.horizontal, isSelectionMode ? 13 : 16)
+            .frame(height: 46)
             .background(
-                isSelected ? MegrumTheme.lavender : Color.white.opacity(0.88),
+                isHighlighted ? MegrumTheme.lavender : Color.white.opacity(0.88),
                 in: Capsule()
             )
             .overlay {
                 Capsule()
-                    .strokeBorder(isSelected ? MegrumTheme.lavender.opacity(0.35) : MegrumTheme.ink.opacity(0.08), lineWidth: 1)
+                    .strokeBorder(isHighlighted ? MegrumTheme.lavender.opacity(0.35) : MegrumTheme.ink.opacity(0.08), lineWidth: 1)
             }
-            .shadow(color: isSelected ? MegrumTheme.lavender.opacity(0.20) : .clear, radius: 12, y: 6)
+            .shadow(color: isHighlighted ? MegrumTheme.lavender.opacity(0.20) : .clear, radius: 12, y: 6)
         }
         .buttonStyle(.plain)
+        .onLongPressGesture(minimumDuration: 0.36) {
+            didTriggerLongPress = true
+            longPressAction()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.30) {
+                didTriggerLongPress = false
+            }
+        }
         .accessibilityLabel(IndividualListingListPresentation.conditionStripTitle(index: index, totalCount: totalCount))
-        .accessibilityValue(isSelected ? "選択中" : "\(totalCount)件中\(index + 1)件目")
+        .accessibilityValue(accessibilityValue)
+    }
+
+    private var accessibilityValue: String {
+        if isSelectionMode {
+            return isMultiSelected ? "一括削除の選択中" : "未選択"
+        }
+        return isActive ? "選択中" : "\(totalCount)件中\(index + 1)件目"
+    }
+
+    private func performTap() {
+        guard !didTriggerLongPress else {
+            didTriggerLongPress = false
+            return
+        }
+        action()
     }
 }
 

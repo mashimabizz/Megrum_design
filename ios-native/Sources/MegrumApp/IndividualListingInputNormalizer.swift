@@ -7,6 +7,8 @@ enum IndividualListingInputNormalizer {
             haveItems: input.haveItems.map(normalizedQuantity),
             haveLogic: input.haveLogic,
             haveMinimumCount: input.haveMinimumCount,
+            haveIsCashOffer: input.haveIsCashOffer,
+            haveCashAmount: input.haveCashAmount,
             wishItems: input.wishItems.map(normalizedQuantity),
             wishLogic: input.wishLogic,
             wishMinimumCount: input.wishMinimumCount,
@@ -26,7 +28,7 @@ enum IndividualListingInputNormalizer {
 
 extension IndividualListingCreateInput {
     var hasOfferCondition: Bool {
-        !haveItems.isEmpty || IndividualListingHaveCashSummary.extract(from: note).summary != nil
+        !haveItems.isEmpty || haveIsCashOffer
     }
 
     var hasReceivableCondition: Bool {

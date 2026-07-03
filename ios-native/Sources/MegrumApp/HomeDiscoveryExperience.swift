@@ -40,81 +40,83 @@ struct HomeDiscoveryExperience: View {
     @State var didOpenInitialSheet = false
     @State var selectedPrimaryTab: HomeDiscoveryPrimaryTab = .candidates
     @State var showsIndividualListingCreation = false
+    @State var sharePromptContext: GoodsSharePostContext?
+    @State var isPreparingSharePost = false
+    @State var sharePostErrorMessage: String?
+    #if os(iOS)
+    @State var shareActivityPayload: GoodsSharePostPayload?
+    #endif
 
     var body: some View {
-        ZStack(alignment: .top) {
-            TabView(selection: $selectedPrimaryTab) {
-                HomePullRefreshScrollView(
-                    coordinateSpaceName: "home-discovery-candidates-refresh",
-                    indicatorTopPadding: HomeDiscoveryHeaderMetrics.pullRefreshIndicatorTopPadding,
-                    onRefresh: onRefresh
-                ) {
-                    VStack(alignment: .leading, spacing: 14) {
-                        HomeDiscoverySection(
-                            title: "メンバー×シリーズでマッチ",
-                            candidates: userTagCandidates,
-                            layout: .grid,
-                            cardTitleStyle: .memberTag,
-                            onSelect: { selectedSheet = $0 },
-                            onSearchCandidate: { candidate, selectedGoods in
-                                openSearch(for: candidate, selectedGoods: selectedGoods, source: .userTag)
-                            }
-                        )
-
-                        HomeDiscoverySection(
-                            title: "メンバーでマッチ",
-                            candidates: userCandidates,
-                            layout: .grid,
-                            cardTitleStyle: .member,
-                            onSelect: { selectedSheet = $0 },
-                            onSearchCandidate: { candidate, selectedGoods in
-                                openSearch(for: candidate, selectedGoods: selectedGoods, source: .user)
-                            }
-                        )
-
-                        if !havesCandidates.isEmpty {
-                            HomeDiscoverySection(
-                                title: "求められているグッズ",
-                                candidates: havesCandidates,
-                                layout: .rail,
-                                onSelect: { selectedSheet = $0 }
-                            )
+        MegrumCollapsingTopChromeContainer {
+            HomePullRefreshScrollView(
+                coordinateSpaceName: "home-discovery-candidates-refresh",
+                indicatorTopPadding: HomeDiscoveryHeaderMetrics.pullRefreshIndicatorTopPadding,
+                onRefresh: onRefresh
+            ) {
+                VStack(alignment: .leading, spacing: 14) {
+                    HomeDiscoverySection(
+                        title: "メンバー×シリーズでマッチ",
+                        candidates: userTagCandidates,
+                        layout: .grid,
+                        cardTitleStyle: .memberTag,
+                        onSelect: { selectedSheet = $0 },
+                        onSearchCandidate: { candidate, selectedGoods in
+                            openSearch(for: candidate, selectedGoods: selectedGoods, source: .userTag)
                         }
+                    )
 
-                        AdBannerSlot(
-                            placement: .homeFeedBanner,
-                            displayContext: adDisplayContext
+                    HomeDiscoverySection(
+                        title: "メンバーでマッチ",
+                        candidates: userCandidates,
+                        layout: .grid,
+                        cardTitleStyle: .member,
+                        onSelect: { selectedSheet = $0 },
+                        onSearchCandidate: { candidate, selectedGoods in
+                            openSearch(for: candidate, selectedGoods: selectedGoods, source: .user)
+                        }
+                    )
+
+                    if !havesCandidates.isEmpty {
+                        HomeDiscoverySection(
+                            title: "求められているグッズ",
+                            candidates: havesCandidates,
+                            layout: .rail,
+                            onSelect: { selectedSheet = $0 }
                         )
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.top, HomeDiscoveryHeaderMetrics.contentTopPadding)
-                    .padding(.bottom, HomeDiscoveryHeaderMetrics.contentBottomPadding)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .tag(HomeDiscoveryPrimaryTab.candidates)
-
-                HomeMutualMatchPage(
-                    candidates: mutualMatchCandidates,
-                    listingCount: viewerIndividualListingCount,
-                    contentTopPadding: HomeDiscoveryHeaderMetrics.contentTopPadding,
-                    refreshIndicatorTopPadding: HomeDiscoveryHeaderMetrics.pullRefreshIndicatorTopPadding,
-                    onRefresh: onRefresh,
-                    onSelect: { selectedMutualMatchCandidate = $0 },
-                    onCreateListing: openIndividualListingCreation
-                )
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .tag(HomeDiscoveryPrimaryTab.mutual)
+                .padding(.horizontal, 20)
+                .padding(.top, HomeDiscoveryHeaderMetrics.contentTopPadding)
+                .padding(.bottom, HomeDiscoveryHeaderMetrics.contentBottomPadding)
+                .megrumReportsScrollContentTop(in: "home-discovery-candidates-refresh")
+                .megrumSuppressesEnclosingScrollEdgeEffects()
             }
-            .megrumPageTabViewStyle()
-
-            pinnedHeader
+            .megrumHiddenBottomScrollEdgeEffect()
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } chrome: { isCollapsed in
+            pinnedHeader(isCollapsed: isCollapsed)
         }
         .overlay {
-            if isLoading {
-                ProgressView()
-                    .tint(MegrumTheme.lavender)
-                    .padding(18)
-                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            ZStack {
+                if isLoading {
+                    ProgressView()
+                        .tint(MegrumTheme.lavender)
+                        .padding(18)
+                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                }
+
+                if let sharePromptContext {
+                    GoodsSharePromptOverlay(
+                        context: sharePromptContext,
+                        isPreparing: isPreparingSharePost,
+                        errorMessage: sharePostErrorMessage,
+                        onDismiss: dismissSharePrompt,
+                        onShare: startGoodsSharePost
+                    )
+                    .transition(.opacity.combined(with: .scale(scale: 0.97)))
+                    .zIndex(20)
+                }
             }
         }
         .sheet(
@@ -152,7 +154,8 @@ struct HomeDiscoveryExperience: View {
                 NavigationStack {
                     IndividualListingEditorSheet(
                         appState: appState,
-                        initialStep: .haves
+                        initialStep: .haves,
+                        onCreatedListing: handleCreatedListingShare
                     )
                 }
             }
@@ -183,6 +186,10 @@ struct HomeDiscoveryExperience: View {
         .task {
             openInitialSheetIfNeeded()
         }
+        #if os(iOS)
+        .sheet(item: $shareActivityPayload, content: GoodsShareActivitySheet.init)
+        #endif
+        .animation(.spring(response: 0.30, dampingFraction: 0.86), value: sharePromptContext?.id)
     }
 
 }

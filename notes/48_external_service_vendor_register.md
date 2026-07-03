@@ -15,14 +15,14 @@ Megrumの初回App Store提出前に、外部サービス、SDK、API、ホス�
 | 領域 | 読み取り結果 |
 |---|---|
 | Swift Native | `ios-native/Package.swift` 上は `GoogleMobileAds` 依存あり。Xcode projectでも `GoogleMobileAds` をlink |
-| Swift Native | `Info.plist` にカメラ、位置情報、`ITSAppUsesNonExemptEncryption=false`、AdMob app id / ad unit id、SKAdNetworkItems |
-| Swift Native / Ads | `MegrumNative.xcconfig` のチェックイン既定値は `MEGRUM_ADS_ENABLED=YES`、`MEGRUM_AD_PROVIDER=admob`、実AdMob app id、`MEGRUM_ADMOB_TEST_ADS_ENABLED=YES`、Googleデモbanner/native unit id、search native / trades banner unit idあり。`MobileAds.shared.start()` とbanner/native `Request()` が発生し得る |
+| Swift Native | `Info.plist` にカメラ、位置情報、`ITSAppUsesNonExemptEncryption=false`、AdMob app id / ad unit id build setting、SKAdNetworkItems |
+| Swift Native / Ads | `MegrumNative.xcconfig` のチェックイン既定値は `MEGRUM_ADS_ENABLED=NO`、`MEGRUM_AD_PROVIDER=admob`、AdMob app id/unit id/test unit id空、`MEGRUM_ADMOB_TEST_ADS_ENABLED=NO`。Google Mobile Ads SDK linkとSKAdNetworkItemsは残るが、既定では `MobileAds.shared.start()` とbanner/native `Request()` の起動条件を満たさない |
 | Swift Native / Ads | `NSUserTrackingUsageDescription`、ATT要求、UMP同意管理、非パーソナライズ広告指定、Publisher First-Party ID制御、mediation制御、child-directed treatment、test device id指定は現行検索で未確認 |
 | Swift Native | Supabase REST/Storage/Auth相当の独自クライアント、APNs端末登録、Google OAuth URL構築、Apple Sign-In処理が存在 |
 | Swift Native / Auth Links | `CFBundleURLSchemes=$(MEGRUM_URL_SCHEME)`、`MegrumAuthEmailRedirectURL`、`MegrumAuthOAuthAuthorizeURL`、`ASWebAuthenticationSession`、`MegrumRootView.onOpenURL`、`SupabaseAuthRedirectParser` が存在。認証callback fragmentはaccess token / refresh token等を含み得る |
 | Swift Native | MapKit、CoreLocation、CLGeocoder、PhotosUI、カメラ利用箇所が存在。位置情報はnearest ten meters相当の精度設定、逆ジオコーディング、近くのグルーム/掲示板、現在地共有、掲示板作成/返信範囲判定へ使われ得る |
 | Swift Native / Camera Photos Share | `PhotosPickerItem.loadTransferable(type: Data.self)` で読み込んだ写真を、対応形式・サイズ上限内で元データのまま保存し得る。`NativeCameraCaptureView` はカメラ撮影画像をJPEG再生成する経路あり。`GoodsShareActivitySheet` は `UIActivityViewController` で共有用テキスト/生成画像を外部アプリへ渡す |
-| Swift Native | StoreKitでメグルムプラス購入・復元・`currentEntitlements`を扱う経路が存在。購入後はproduct id、transaction id、Original Transaction ID、期限をサーバーRPCへ同期するが、Server API検証とServer Notifications同期は未確認 |
+| Swift Native | StoreKitでメグルムプラス購入・復元・`currentEntitlements`を扱う経路が存在。ただしチェックイン既定は `MEGRUM_PLUS_IAP_ENABLED=NO` で、購入/復元ボタン、StoreKit商品情報照会、購入、復元actionを停止する。IAP有効化時はproduct id、transaction id、Original Transaction ID、期限をサーバーRPCへ同期するが、Server API検証とServer Notifications同期は未確認 |
 | Swift Native / Home/Search | ホーム候補、検索結果、検索候補、マッチ/条件一致ラベル、表示順、レコメンドは、在庫、wish、個別募集、タグ、推し、交換方法、活動エリア、位置又は日程設定、支払い方法要約、評価、完了取引数、ブロック関係、通知状態、メグルムプラス有効状態等を使う経路あり。Plus優先表示と広告挿入は表示順/organic-ad区別へ影響する |
 | Swift Native | Apple Visionによる顔矩形検出、顔特徴量モデル境界、`member_face_profiles` / `face_uploaded_images` / `detected_faces` / `face_match_candidates` / `face_match_corrections` の保存境界が存在。Face ID / 生体認証APIではない。現行GoodsEditorでは候補補正をdraft/memberIDへ反映する経路はあるが、補正履歴DB保存呼び出しは未確認 |
 | Swift Native | `member_face_profiles` のselectには `embedding`、`embedding_model`、`source_image_url`、`consent_recorded_at` が含まれ、RLSはactive profileをauthenticated userに読ませる設計。実在人物データを格納する場合はSensitive Info / biometric data相当として公開前No-Go候補 |
@@ -52,7 +52,7 @@ Megrumの初回App Store提出前に、外部サービス、SDK、API、ホス�
 | 正とするバイナリ | Swift Native初回提出を正とする |
 | Legacy Expo | 削除済み旧実装。Expo系の過去ビルド、別環境又は再導入版で提出する場合のみ別監査 |
 | Web | 管理/運用/公開ページとして別扱い。ただしプライバシーポリシー、委託先台帳、セキュリティ監査には載せる。管理画面のservice role、MFA、権限、監査ログは提出前No-Go |
-| IAP | 現行コードにメグルムプラス購入経路あり。導線が見えるならApple IAP / App Privacy / 特商法 / サポート / Server API検証 / Server Notifications / 価格固定文言 / 手動有料権限上書きとの区別をP0で整合 |
+| IAP | 現行コードにメグルムプラス購入経路あり。チェックイン既定はIAP OFF。導線を有効化して見せるならApple IAP / App Privacy / 特商法 / サポート / Server API検証 / Server Notifications / 価格固定文言 / 手動有料権限上書きとの区別をP0で整合 |
 | 広告 | 現行コードにGoogle Mobile Ads SDK / AdMob / SKAdNetwork構成あり。広告が有効ならApp Privacy、ATT、Google公式開示、SDK Privacy Manifest、不適切/年齢不相応広告の通報導線をP0で整合 |
 | ホーム候補/検索/レコメンド | 候補表示、検索結果、検索候補、人気検索、表示順、Plus優先表示、広告挿入、Product Personalizationを出す場合、Search History / Usage Data / Product Personalization、非保証説明、検索ログ保存有無、organic/ad区別をP0で整合 |
 | 評価/通報/ブロック/モデレーション | 現行コードに `user_evaluations`、`reports`、`goods_reports`、`groom_reports`、`meguri_board_reports`、`disputes`、`groom_user_blocks` 経路あり。Supabase、サポートツール、必要な外部機関対応の範囲と保持をP0で整合 |
@@ -88,7 +88,7 @@ Megrumの初回App Store提出前に、外部サービス、SDK、API、ホス�
 | ASWebAuthenticationSession / Custom URL Scheme | Google OAuth、メールcallback、native session復元、deep link | `megrum://auth/callback`、`megrum-preview://auth/callback`、access token、refresh token、path/query/fragment、error/provider、リンク開封結果 | Contact Info, Identifiers, Usage Data / Other Dataの可能性 | 使用候補 | callback scheme、URL scheme衝突リスク、Universal Linksではない説明、リンク/認証コード共有禁止、ログ最小化 |
 | iOS Keychain / Security framework | ログイン状態維持、保存済みsession復元、refresh後session再保存、ログアウト時clear | AuthSession JSON、access token、refresh token、expires、token type、user id、email、保存/削除結果 | Contact Info, Identifiers, Usage Data / Other Dataの可能性 | 使用候補 | `kSecAttrAccessible` / ThisDeviceOnly方針、バックアップ/復元/アンインストール/端末紛失時説明、tokenログ混入防止 |
 | Apple APNs | 端末通知 | APNs device token、通知タイトル/本文、リンク先、未読バッジ、通知ID、sound | Identifiers, User Content, Usage Dataの一部 | 使用候補 | token失効、通知本文の個人情報、ロック画面/通知センター/連携端末表示。Push通知を利用必須にしない |
-| Apple StoreKit / IAP | メグルムプラス | purchase state、transaction id、original transaction id、expires_at、復元、返金/取消/期限切れ/請求失敗/猶予期間、サーバー同期状態、最終権限状態 | Purchases | 経路あり | App Store Connect商品、価格表示一致、復元、解約説明、Server API検証、Server Notifications、返金/取消/期限切れ同期、manual overrideとの区別 |
+| Apple StoreKit / IAP | メグルムプラス | purchase state、transaction id、original transaction id、expires_at、復元、返金/取消/期限切れ/請求失敗/猶予期間、サーバー同期状態、最終権限状態 | Purchases | 経路あり。チェックイン既定は `MEGRUM_PLUS_IAP_ENABLED=NO` で購入/復元/商品照会停止 | App Store Connect商品、価格表示一致、復元、解約説明、Server API検証、Server Notifications、返金/取消/期限切れ同期、manual overrideとの区別。OFF提出時はStoreKit通信なしを確認 |
 | Apple Vision / Core ML候補 | グッズ画像の顔検出、将来の顔特徴量又は画像特徴量生成 | 顔検出矩形、信頼度、特徴量、候補スコア、補正履歴、学習データ追加可否、`member_face_profiles` のembedding/source image URL | Sensitive Info / Biometric Data, User Content | 経路あり | Face IDではない説明、オンデバイス/サーバー処理、外部送信有無、削除、同意記録、authenticated readの最小化 |
 | Google Mobile Ads / AdMob | 広告表示、広告測定、広告通報対応 | IP、端末/広告ID、広告表示/クリック、広告通報時の広告枠/表示日時/広告識別子、診断、パフォーマンス、test ads / production unit id、広告リクエスト等 | Device ID, Advertising Data, Product Interaction, Diagnostics等 | SDK/構成あり。現行既定では広告ON/test ads ON | ATT、IDFA、Publisher First-Party ID、パーソナライズ広告、メディエーション、UMP同意管理、Google公式開示、test ads除去、不適切/年齢不相応広告の報告手順 |
 | Apple SKAdNetwork | 広告測定 | SKAdNetwork conversion info | Advertising / Measurement | Info.plist構成あり | SKAdNetworkItems更新、広告ネットワーク追加時確認 |
@@ -130,7 +130,7 @@ Megrumの初回App Store提出前に、外部サービス、SDK、API、ホス�
 | Keychain保存sessionの `kSecAttrAccessible` 方針、ThisDeviceOnly要否、logout時clear、refresh token更新、端末バックアップ/復元/紛失時案内、tokenログ混入防止の確認 | 未 |
 | 退会申請後のSupabase Auth削除/無効化、Storage削除、Apple/Google連携解除、APNs token無効化、完了通知又は手動処理記録の運用確認。過去又は別環境でExpo Pushを使う場合はExpo token無効化も別途確認 | 未（一部APNs token revoke経路は確認済み。退会申請/削除完了への連動は未確認） |
 | Google AdMobのデータ処理、パーソナライズ広告、Publisher First-Party ID、メディエーション、UMP同意管理、ATT要否、`NSUserTrackingUsageDescription`要否確認 | 未 |
-| `MEGRUM_ADMOB_TEST_ADS_ENABLED=YES` / Googleデモunit idを一般公開ビルドから外す確認 | 未 |
+| 広告を有効化する場合の `MEGRUM_ADMOB_TEST_ADS_ENABLED=YES` / Googleデモunit idを一般公開ビルドから外す確認 | 未（チェックイン既定は広告OFF） |
 | 不適切又は年齢に合わない広告の通報導線、広告配信事業者への報告手順、サポート説明確認 | 未 |
 | 評価コメント、通報補足、異議申し立て本文、ブロック関係、モデレーションstatusの保持、削除、App Privacy分類確認 | 未 |
 | Google Mobile Ads SDKのPrivacy Manifest / App Privacy Data Disclosure確認 | 未 |

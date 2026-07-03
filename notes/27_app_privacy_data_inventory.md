@@ -34,8 +34,8 @@ App Store Connectへ転記する回答は `notes/43_app_privacy_connect_answer_s
 - `ios-native/MegrumNative.xcodeproj`
   - `GoogleMobileAds` product linkあり
 - `ios-native/Config/MegrumNative.xcconfig` / 広告実行条件
-  - チェックイン既定値は `MEGRUM_ADS_ENABLED=YES`、`MEGRUM_AD_PROVIDER=admob`、`MEGRUM_ADMOB_APP_ID` 実値、`MEGRUM_ADMOB_TEST_ADS_ENABLED=YES`
-  - `MEGRUM_ADMOB_SEARCH_NATIVE_UNIT_ID` と `MEGRUM_ADMOB_TRADES_BANNER_UNIT_ID` に本番unit idが入る一方、test ads有効時はbanner/nativeがGoogleデモunit idへ差し替わる
+  - 2026-07-03時点のチェックイン既定値は `MEGRUM_ADS_ENABLED=NO`、`MEGRUM_AD_PROVIDER=admob`、`MEGRUM_ADMOB_APP_ID` 空、production ad unit id空、test ad unit id空、`MEGRUM_ADMOB_TEST_ADS_ENABLED=NO`
+  - Debug targetには `MEGRUM_ADMOB_TEST_ADS_ENABLED=YES` overrideが残るが、`MEGRUM_ADS_ENABLED=NO` のため既定では広告SDK起動条件を満たさない。広告検証は `MegrumNative.local.xcconfig` 又はCI設定で明示的に有効化する
   - `MegrumNativeApp` は広告有効、placeholder無効、AdMob provider、app idありなら `MobileAds.shared.start()` を実行する
   - `AdBannerSlot` / `AdMobNativeCardView` はGoogle Mobile Ads SDKの `Request()` で広告リクエストを送る。現行検索では `NSUserTrackingUsageDescription`、ATT要求、UMP同意管理、非パーソナライズ広告指定、Publisher First-Party ID制御、mediation制御、child-directed treatment、test device id指定は未確認
   - 現行設定上、検索結果native広告、やりとり一覧上部banner、preview viewer向けhome banner fallbackが主な広告リクエスト候補。インタースティシャルはplaceholder以外のGoogle SDKロード未接続かつunit id空
@@ -80,8 +80,9 @@ App Store Connectへ転記する回答は `notes/43_app_privacy_connect_answer_s
   - 問い合わせ又は通報経由で、権利侵害、名誉毀損、プライバシー侵害その他違法又は不適切情報に関する削除申出、送信防止措置の申出、発信者確認又は通知の対応履歴を保存し得る
   - 評価、通報、ブロック、モデレーション状態は安全対応と表示制御の参考情報であり、本人確認、安全確認、信用保証、支払能力確認、真実性確認、法的判断又は緊急通報の代替ではない
 - StoreKit / IAP
-  - `megrum.plus.monthly` を現行のメグルムプラス商品ID候補として、StoreKitの商品情報照会、価格取得、購入ボタン表示、復元ボタン表示、購入開始、承認待ち、キャンセル、購入失敗、復元失敗、`Transaction.currentEntitlements` 読み込みの経路あり
-  - `SubscriptionSettingsContent` はStoreKitの `offer.priceText` と固定フッター文言「価格は月額500円です。App Storeのサブスクリプションとして更新・解約できます。」を同時に表示し得るため、App Store Connect価格、販売地域、販売停止状態、公開特商法、FAQ、Review Notes、App Privacyを照合する
+  - 2026-07-03時点のチェックイン既定は `MEGRUM_PLUS_IAP_ENABLED=NO`。IAP無効時は購入ボタン/復元ボタンを表示せず、StoreKitの商品情報照会、購入、復元actionを早期停止する
+  - `megrum.plus.monthly` を現行のメグルムプラス商品ID候補として、IAPを明示的に有効化した場合はStoreKitの商品情報照会、価格取得、購入ボタン表示、復元ボタン表示、購入開始、承認待ち、キャンセル、購入失敗、復元失敗、`Transaction.currentEntitlements` 読み込みの経路あり
+  - IAPを有効化する場合、`SubscriptionSettingsContent` はStoreKitの `offer.priceText` と固定フッター文言「価格は月額500円です。App Storeのサブスクリプションとして更新・解約できます。」を同時に表示し得るため、App Store Connect価格、販売地域、販売停止状態、公開特商法、FAQ、Review Notes、App Privacyを照合する
   - 購入成功時に `sync_megrum_plus_purchase_for_viewer` へproduct id、transaction id、Original Transaction ID、期限を同期する経路あり。商品未取得、未完了、キャンセル、購入失敗、復元失敗、サーバー同期失敗、販売地域、販売停止、App Store Server APIによるサーバー検証、Server Notificationsによる更新/返金/取消/期限切れ/請求失敗/猶予期間同期は未確認
   - 購入直後のサーバー同期失敗時にローカルでメグルムプラス有効表示へ倒すフォールバックがあるため、App Privacy/法務/サポートではローカル表示とサーバー上の最終権限を分けて説明する
   - Web管理画面には `entitlements.manage` 権限で `plan_overrides` と `user_entitlements.source='manual_override'` を使う有料権限手動上書き経路があり、対象ユーザー、feature key、active/inactive、期限、理由、変更前後、作成者、override id、監査ログを扱う。これはIAP購入証明ではないが、最終的な有料機能表示に影響し得るため、Privacy本文とApp PrivacyのPurchases / Identifiers / Other Data候補で確認する
@@ -236,7 +237,7 @@ legacy `mobile/ios/MegrumPreview/PrivacyInfo.xcprivacy` は削除済み旧実装
 | Web Auth Cookie / Supabase SSR session | Supabase Auth Cookie、session refresh結果、Cookie設定/更新/削除、Web callback、password reset、Google OAuth callback、IP/User-Agent | Contact Info, Identifiers, Usage Data / Other Dataの可能性 | 公開Web/管理画面を使う場合はCookie説明、ログアウト、Cookie無効時の制限、token/Cookie値の証跡混入防止を確認 |
 | Custom URL Scheme / ASWebAuthenticationSession / Deep Links | `megrum://auth/callback`、`megrum-preview://auth/callback`、認証callback fragment、通知 `linkPath`、画面遷移path/query、エラー情報 | Contact Info, Identifiers, Usage Data, Other Dataの可能性 | `MEGRUM_URL_SCHEME`、Supabase Redirect URLs、Google OAuth設定、Review Notes、FAQの整合確認 |
 | iOS Keychain / AuthSessionStore | 端末内に保存されるaccess token、refresh token、expires、token type、user id、email、保存/削除結果 | Contact Info, Identifiers, Usage Data / Other Dataの可能性 | `kSecAttrAccessible`方針、ThisDeviceOnly要否、バックアップ/復元/端末紛失時説明、logout時clear、tokenログ混入防止を確認 |
-| App Store IAP / StoreKit | 商品情報照会、価格取得、購入ボタン表示、復元ボタン表示、購入開始、承認待ち、未完了、キャンセル、商品未取得、購入失敗、復元失敗、購入状態、サブスク状態、transaction id、original transaction id、期限、復元、返金/取消/期限切れ/請求失敗/猶予期間、サーバー同期状態、サーバー同期失敗、販売地域、販売停止、最終権限状態 | Purchases | メグルムプラス導線露出、固定価格/StoreKit価格一致、App Store Connect価格、IAP Availability、公開特商法、Server API/Notifications、手動上書きとの区別確認 |
+| App Store IAP / StoreKit | IAPを有効化する場合の商品情報照会、価格取得、購入ボタン表示、復元ボタン表示、購入開始、承認待ち、未完了、キャンセル、商品未取得、購入失敗、復元失敗、購入状態、サブスク状態、transaction id、original transaction id、期限、復元、返金/取消/期限切れ/請求失敗/猶予期間、サーバー同期状態、サーバー同期失敗、販売地域、販売停止、最終権限状態。チェックイン既定は `MEGRUM_PLUS_IAP_ENABLED=NO` で購入/復元/商品照会を停止 | Purchases | メグルムプラス導線露出、固定価格/StoreKit価格一致、App Store Connect価格、IAP Availability、公開特商法、Server API/Notifications、手動上書きとの区別確認。IAPを出さない提出でも実ビルドで購入/復元/商品照会が発生しないことを確認 |
 | Stripe | Web又は外部決済 | Purchases, Contact Info | iOSアプリ内課金との棲み分け確認 |
 | MapKit / CoreLocation / CLGeocoder | 精密な緯度経度、精度、時刻、場所名、逆ジオコーディング | Precise Location / Coarse Location | 現行実装は精密座標を扱い得る。権限文言、OS/地図サービス処理、サーバー送信、作成位置、閲覧者位置、保持/削除、場所名/距離の非保証、1km/3kmが匿名化又は安全保証ではない説明を確認 |
 | ZipCloud / 郵便番号検索 | 郵便番号、住所候補 | Physical Address / Contact Info | 郵送交換を出すなら確認 |
@@ -281,7 +282,7 @@ legacy `mobile/ios/MegrumPreview/PrivacyInfo.xcprivacy` は削除済み旧実装
 - [ ] 初回提出バイナリはSwift Nativeのみか、legacy Expo要素を含むか
 - [ ] Apple Sign in / Google Sign in を初回提出で出すか
 - [ ] メール認証、パスワードリセット、Google OAuth、native callback、Web中継Route、Supabase Redirect URLs、Google OAuth設定、App Store Review Notesのscheme/URLが一致しているか
-- [ ] メグルムプラス、IAP、Stripe関連導線を初回提出で出すか。出す場合、購入ボタン、復元ボタン、価格固定文言、StoreKit価格、商品情報照会、価格取得、購入開始、承認待ち、未完了、キャンセル、商品未取得、購入失敗、復元失敗、サーバー同期失敗、販売地域、販売停止、App Store Connect価格、IAP Availability、Server API/Notifications、返金/取消/期限切れ/請求失敗同期を確認する
+- [ ] メグルムプラス、IAP、Stripe関連導線を初回提出で出すか。チェックイン既定は `MEGRUM_PLUS_IAP_ENABLED=NO` のため、出す場合はlocal/CI設定で明示的に有効化し、購入ボタン、復元ボタン、価格固定文言、StoreKit価格、商品情報照会、価格取得、購入開始、承認待ち、未完了、キャンセル、商品未取得、購入失敗、復元失敗、サーバー同期失敗、販売地域、販売停止、App Store Connect価格、IAP Availability、Server API/Notifications、返金/取消/期限切れ/請求失敗同期を確認する
 - [ ] Analytics / Crash SDK を入れるか
 - [ ] カメラ/写真ライブラリ/共有シートを出す場合、Info.plist権限文言、画像メタデータ、共有用画像/テキストのApp Privacy影響を確認する
 - [ ] AdMob広告を初回提出で有効にするか。無効ならSDK初期化/広告リクエストが発生しないか
@@ -301,7 +302,7 @@ legacy `mobile/ios/MegrumPreview/PrivacyInfo.xcprivacy` は削除済み旧実装
 
 ## 9. 提出前の推奨回答メモ
 
-- 初回提出でAdMob、メグルムプラス、外部AIを見せる場合は、App Privacyと公開ポリシーに必ず反映する。隠す場合でも、SDK初期化、広告リクエスト、購入導線、AI送信が発生しないことを実機で確認する。
+- 初回提出でAdMob、メグルムプラス、外部AIを見せる場合は、App Privacyと公開ポリシーに必ず反映する。隠す場合でも、SDK初期化、広告リクエスト、購入導線、StoreKit商品照会、AI送信が発生しないことを実機で確認する。
 - 郵送交換を出す場合、Physical Address / Phone Numberを回答する。隠す場合でも住所設定、郵便番号検索、郵送先表示へ到達できないことを実機で確認する。
 - 支払い設定、銀行振込、口座番号、金額指定取引、成立後支払い情報スナップショットを出す場合、Financial Info / Payment Infoを回答する。隠す場合でも支払い設定、口座入力、合意後の支払い情報表示へ到達できないことを実機で確認する。
 - 銀行振込、PayPay、現金交換その他外部サービスへの対応可否を出す場合、Megrumが決済代行、資金移動、収納代行、返金、エスクロー、本人確認、口座名義確認、支払能力確認、外部アカウント/リンク/QRコード/外部ID/残高/送金可否/受領可否の確認を行うようにApp Privacy、FAQ、Review Notesで説明しない。
@@ -316,7 +317,7 @@ legacy `mobile/ios/MegrumPreview/PrivacyInfo.xcprivacy` は削除済み旧実装
 - AdMobを有効にする場合、Google Mobile Ads SDKの公式データ開示に沿ってAdvertising Data、Device ID、Product Interaction、Diagnostics、Performance Data等の要否を回答する。現行設定のようにSDK初期化と広告リクエストが発生し得る場合、「広告を出していない」前提の回答にしない。
 - 広告を有効にする場合、不適切又は年齢に合わない広告の通報導線を用意し、広告通報時の画面、日時、スクリーンショット、広告識別子等をCustomer Support / Advertising Dataのどちらで説明するかをApp Privacyとプライバシーポリシーで揃える。
 - `NSPrivacyTracking=false` かつ `NSUserTrackingUsageDescription` 未設定のまま、IDFA、Apple定義のTracking、Publisher First-Party ID、パーソナライズ広告、広告メディエーション又は第三者広告目的の横断利用を有効にしない。これらを使うならATT、Tracking回答、App Privacy、同意管理を先に揃える。
-- `MEGRUM_ADMOB_TEST_ADS_ENABLED=YES` 又はGoogleデモunit idを、一般公開ビルドの実広告として残さない。公開ビルドではproduction unit id、審査用test設定、App Store Review Notesのどれを使うかを明示して証跡化する。
+- 現チェックイン既定は広告OFFかつAdMob ID空だが、広告を有効化する場合は `MEGRUM_ADMOB_TEST_ADS_ENABLED=YES` 又はGoogleデモunit idを、一般公開ビルドの実広告として残さない。公開ビルドではproduction unit id、審査用test設定、App Store Review Notesのどれを使うかを明示して証跡化する。
 - 外部AIを出す場合、画像/画像URL/グッズ関連情報の外部送信と、汎用モデル学習利用の有無をアプリ内表示又はプライバシーポリシーで説明する。
 - 顔候補付けを出す場合、単なる写真アップロードとして片付けず、顔特徴量又は画像特徴量の生成・保存・照合があるかを確認する。到達可能ならSensitive Info / Biometric Dataを回答候補に上げ、Face ID認証や本人確認ではないことをReview Notesとプライバシーポリシーで説明する。
 

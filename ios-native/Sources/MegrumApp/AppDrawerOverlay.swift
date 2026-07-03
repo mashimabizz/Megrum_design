@@ -20,8 +20,7 @@ struct AppDrawerOverlay: View {
     @AppStorage(HomeExchangeSettingsStorageKeys.mailShippingFee) private var exchangeMailShippingFeeRawValue = HomeDefaultExchangeSettings.standard.mailShippingFee.rawValue
     @AppStorage(HomeExchangeSettingsStorageKeys.mailShippingDays) private var exchangeMailShippingDaysRawValue = HomeDefaultExchangeSettings.standard.mailShippingDays.rawValue
     @AppStorage(HomeExchangeSettingsStorageKeys.configuredAt) private var exchangeConfiguredAt = 0.0
-    @State private var isClosing = false
-    @State private var isSuppressingDrawerItemTap = false
+    @State private var presentationState = AppDrawerOverlayPresentationState()
 
     var body: some View {
         panel
@@ -32,14 +31,10 @@ struct AppDrawerOverlay: View {
             .offset(x: drawerOffset)
         .allowsHitTesting(presentationProgress > 0.001)
         .onChange(of: isPresented) { _, newValue in
-            if newValue {
-                isClosing = false
-            }
+            presentationState.handlePresentationChange(isPresented: newValue)
         }
         .task {
-            if appState.notifications.isEmpty {
-                await appState.loadNotifications()
-            }
+            await loadDrawerDataIfNeeded()
         }
     }
 
@@ -91,10 +86,9 @@ struct AppDrawerOverlay: View {
             .padding(.bottom, 8)
 
             Button(role: .destructive) {
-                guard !isClosing else {
+                guard presentationState.beginClosing() else {
                     return
                 }
-                isClosing = true
                 Task {
                     await onSignOut()
                     close()
@@ -106,7 +100,7 @@ struct AppDrawerOverlay: View {
                     .padding(.horizontal, 22)
                     .padding(.vertical, 10)
             }
-            .disabled(isClosing)
+            .disabled(presentationState.isClosing)
             .padding(.bottom, 22)
         }
         .padding(.top, 28)
@@ -181,7 +175,7 @@ struct AppDrawerOverlay: View {
         }
         .buttonStyle(.plain)
         .simultaneousGesture(drawerItemDragSuppressionGesture)
-        .disabled(isClosing)
+        .disabled(presentationState.isClosing)
         .accessibilityLabel(title)
         .accessibilityIdentifier("app-drawer-\(destination.rawValue)")
     }
@@ -223,7 +217,8 @@ struct AppDrawerOverlay: View {
         case .paymentSettings:
             return AppDrawerSettingsBadgePolicy.paymentBadgeText(
                 methods: PaymentSettingsResolver.methods(settings: appState.paymentSettings, viewer: appState.viewer),
-                hasAnyStoredData: PaymentSettingsResolver.hasAnyData(settings: appState.paymentSettings, viewer: appState.viewer)
+                hasAnyStoredData: PaymentSettingsResolver.hasAnyData(settings: appState.paymentSettings, viewer: appState.viewer),
+                hasLoadedSettings: appState.hasLoadedPaymentSettings || appState.paymentSettings != nil
             )
         case .exchangeSettings:
             return exchangeSettingsBadgeText
@@ -233,7 +228,7 @@ struct AppDrawerOverlay: View {
     }
 
     private func drawerBadgeTint(for value: String) -> Color {
-        value.allSatisfy(\.isNumber) ? MegrumTheme.pink : MegrumTheme.conditionWarning
+        MegrumTheme.conditionExact
     }
 
     private var exchangeSettingsBadgeText: String? {
@@ -254,7 +249,7 @@ struct AppDrawerOverlay: View {
     }
 
     private func select(_ destination: AppDrawerDestination) {
-        guard !isClosing, !isSuppressingDrawerItemTap else {
+        guard presentationState.canSelectDestination else {
             return
         }
         close {
@@ -262,36 +257,40 @@ struct AppDrawerOverlay: View {
         }
     }
 
+    private func loadDrawerDataIfNeeded() async {
+        if appState.notifications.isEmpty {
+            await appState.loadNotifications()
+        }
+        if !appState.hasLoadedPaymentSettings, appState.paymentSettings == nil {
+            await appState.loadPaymentSettings(reportsFailure: false)
+        }
+    }
+
     private var drawerItemDragSuppressionGesture: some Gesture {
         DragGesture(minimumDistance: AppDrawerGestureResolver.drawerItemTapSuppressionDistance)
             .onChanged { value in
-                guard AppDrawerGestureResolver.shouldSuppressDrawerItemTap(translation: value.translation) else {
-                    return
-                }
-                isSuppressingDrawerItemTap = true
+                presentationState.updateDrawerItemTapSuppression(translation: value.translation)
             }
             .onEnded { value in
-                guard AppDrawerGestureResolver.shouldSuppressDrawerItemTap(translation: value.translation) else {
-                    isSuppressingDrawerItemTap = false
+                guard presentationState.finishDrawerItemTapSuppression(translation: value.translation) else {
                     return
                 }
-                isSuppressingDrawerItemTap = true
                 DispatchQueue.main.asyncAfter(
                     deadline: .now() + AppDrawerGestureResolver.drawerItemTapSuppressionDuration
                 ) {
-                    isSuppressingDrawerItemTap = false
+                    presentationState.clearDrawerItemTapSuppression()
                 }
             }
     }
 
     private func close(completion: (() -> Void)? = nil) {
-        isClosing = true
+        _ = presentationState.beginClosing()
         withAnimation(drawerAnimation) {
             isPresented = false
         }
         let delay = reduceMotion ? 0.08 : 0.18
         DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-            isClosing = false
+            presentationState.finishClosing()
             completion?()
         }
     }

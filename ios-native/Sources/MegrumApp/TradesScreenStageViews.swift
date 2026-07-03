@@ -14,6 +14,7 @@ struct TradeStagePage: View {
     var isSelectingPendingProposals: Bool
     var selectedPendingProposalIDs: Set<UUID>
     var adDisplayContext: AdDisplayContext
+    var topContentInset: CGFloat = 0
     var canWithdraw: (TradeProposal) -> Bool
     var onStartSelection: (TradeProposal) -> Void
     var onToggleSelection: (TradeProposal) -> Void
@@ -36,9 +37,12 @@ struct TradeStagePage: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.top, 8)
+            .padding(.top, topContentInset + 8)
             .padding(.bottom, 132)
+            .megrumSuppressesEnclosingScrollEdgeEffects()
         }
+        .megrumHiddenBottomScrollEdgeEffect()
+        .ignoresSafeArea(.container, edges: .bottom)
         .background(Color.white)
     }
 

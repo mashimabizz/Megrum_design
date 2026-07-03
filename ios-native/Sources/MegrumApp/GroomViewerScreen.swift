@@ -4,18 +4,34 @@ import SwiftUI
 
 struct GroomViewerPresentationModifier: ViewModifier {
     @Binding var selectedGroom: GroomPost?
+    var sourceAnchor: UnitPoint = .center
     var grooms: [GroomPost]
     @ObservedObject var appState: MegrumAppState
+    var onOpenMeguriUserProfile: (UUID) -> Void = { _ in }
 
     func body(content: Content) -> some View {
         #if os(iOS)
-        content.fullScreenCover(item: $selectedGroom) { groom in
-            GroomViewerScreen(grooms: grooms, initialGroom: groom, appState: appState)
-        }
+        content
+            .groomViewerImmersiveOverlay(item: $selectedGroom, sourceAnchor: sourceAnchor) { groom, dismiss in
+                GroomViewerScreen(
+                    grooms: grooms,
+                    initialGroom: groom,
+                    appState: appState,
+                    onDismiss: dismiss,
+                    onOpenMeguriUserProfile: onOpenMeguriUserProfile
+                )
+            }
         #else
-        content.sheet(item: $selectedGroom) { groom in
-            GroomViewerScreen(grooms: grooms, initialGroom: groom, appState: appState)
-        }
+        content
+            .sheet(item: $selectedGroom) { groom in
+                GroomViewerScreen(
+                    grooms: grooms,
+                    initialGroom: groom,
+                    appState: appState,
+                    onOpenMeguriUserProfile: onOpenMeguriUserProfile
+                )
+                .background(Color.black.ignoresSafeArea())
+            }
         #endif
     }
 }
@@ -24,18 +40,32 @@ struct GroomViewerScreen: View {
     var grooms: [GroomPost]
     var initialGroom: GroomPost
     @ObservedObject var appState: MegrumAppState
+    var onDismiss: (() -> Void)?
+    var onOpenMeguriUserProfile: (UUID) -> Void = { _ in }
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var currentIndex: Int
-    @State private var dragOffset: CGSize = .zero
-    @State private var replyDraft = ""
-    @State private var isShowingReportConfirmation = false
-    @State private var isShowingBlockConfirmation = false
+    @State private var dragState = GroomViewerDragPresentationState()
+    @State private var interactionState = GroomViewerInteractionState()
+    @State private var isShowingOwnInsights = false
+    @State private var isShowingDeleteConfirmation = false
+    @State private var storyProgress = 0.0
 
-    init(grooms: [GroomPost], initialGroom: GroomPost, appState: MegrumAppState) {
-        let fallbackGrooms = grooms.isEmpty ? [initialGroom] : grooms
+    init(
+        grooms: [GroomPost],
+        initialGroom: GroomPost,
+        appState: MegrumAppState,
+        onDismiss: (() -> Void)? = nil,
+        onOpenMeguriUserProfile: @escaping (UUID) -> Void = { _ in }
+    ) {
+        let fallbackGrooms = grooms.contains(where: { $0.id == initialGroom.id })
+            ? grooms
+            : [initialGroom] + grooms
         self.grooms = fallbackGrooms
         self.initialGroom = initialGroom
         self.appState = appState
+        self.onDismiss = onDismiss
+        self.onOpenMeguriUserProfile = onOpenMeguriUserProfile
         _currentIndex = State(initialValue: fallbackGrooms.firstIndex(where: { $0.id == initialGroom.id }) ?? 0)
     }
 
@@ -54,112 +84,77 @@ struct GroomViewerScreen: View {
         return viewerID != currentGroom.authorID
     }
 
+    private var isCurrentGroomMine: Bool {
+        currentGroom.authorID == appState.viewer?.id
+    }
+
     private var isSendingReply: Bool {
         appState.sendingGroomReplyPostID == currentGroom.id
     }
 
-    private var authorMeguriProfile: MeguriProfile? {
-        appState.meguriProfile(for: currentGroom.authorID)
+    private var currentGroomLikeCount: Int {
+        if isCurrentGroomMine {
+            return appState.groomReactions(for: currentGroom.id).count
+        }
+        return appState.groomLikeCount(currentGroom.id, fallback: currentGroom.likeCount)
     }
 
-    private var authorPublicProfile: UserProfile? {
-        appState.publicProfilesByUserID[currentGroom.authorID]?.profile
+    private var currentGroomCommentCount: Int {
+        appState.groomReplies(for: currentGroom.id).count
+    }
+
+    private var viewerVerticalOffset: CGFloat {
+        dragState.verticalOffset
+    }
+
+    private var viewerScale: CGFloat {
+        dragState.scale
+    }
+
+    private var viewerCornerRadius: CGFloat {
+        dragState.cornerRadius
     }
 
     private var authorName: String {
-        authorMeguriProfile?.displayName.nilIfBlank
-            ?? authorPublicProfile?.displayName.nilIfBlank
-            ?? (currentGroom.authorID == appState.viewer?.id ? appState.viewer?.displayName : nil)
-            ?? "めぐりユーザー"
+        authorIdentity.displayName
+    }
+
+    private var authorIdentity: MeguriProfileIdentity {
+        appState.meguriIdentity(
+            for: currentGroom.authorID,
+            fallbackName: currentGroom.authorID == appState.viewer?.id ? appState.viewer?.displayName : nil,
+            fallbackHandle: currentGroom.authorID == appState.viewer?.id ? appState.viewer?.handle : nil,
+            fallbackAvatarURL: currentGroom.authorID == appState.viewer?.id ? appState.viewer?.avatarURL : nil
+        )
     }
 
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            Color.black
+                .ignoresSafeArea()
 
-            AsyncImage(url: currentGroom.imageURL) { phase in
-                switch phase {
-                case .success(let image):
-                    image
-                        .resizable()
-                        .scaledToFit()
-                        .id(currentGroom.id)
-                case .failure:
-                    GroomImageFailureView(message: "画像を読み込めませんでした", foregroundColor: .white)
-                default:
-                    ProgressView()
-                        .tint(.white)
-                        .controlSize(.large)
-                }
-            }
-            .padding(.horizontal, 8)
-            .offset(y: dragOffset.height * 0.28)
-            .scaleEffect(max(0.92, 1 - abs(dragOffset.height) / 900))
-
-            HStack(spacing: 0) {
-                Color.clear
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        move(by: -1)
-                    }
-
-                Color.clear
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        move(by: 1)
-                    }
-            }
-
-            VStack(spacing: 0) {
-                GroomViewerPageIndicator(
-                    totalCount: grooms.count,
-                    currentIndex: currentIndex
-                )
-
-                GroomViewerTopBar(
-                    authorName: authorName,
-                    authorAvatarID: authorMeguriProfile?.avatarID,
-                    authorAvatarURL: authorMeguriProfile == nil ? authorPublicProfile?.avatarURL : nil,
-                    canModerate: canReplyToCurrentGroom,
-                    onReport: { isShowingReportConfirmation = true },
-                    onBlock: { isShowingBlockConfirmation = true }
-                ) {
-                    dismiss()
-                }
-
-                Spacer()
-
-                if let remainingTimeText = currentGroom.remainingTimeText {
-                    Text(remainingTimeText)
-                        .font(.system(size: 12, weight: .black, design: .rounded))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 12)
-                        .frame(height: 28)
-                        .background(.black.opacity(0.28), in: Capsule())
-                        .padding(.bottom, 10)
-                }
-
-                GroomViewerBottomControls(
-                    canReply: canReplyToCurrentGroom,
-                    canLike: canReplyToCurrentGroom,
-                    isSendingReply: isSendingReply,
-                    isLiked: isCurrentGroomLiked,
-                    likeCount: appState.groomLikeCount(currentGroom.id, fallback: currentGroom.likeCount),
-                    onSubmitReply: submitGroomReply,
-                    onToggleLike: toggleCurrentGroomLike,
-                    replyDraft: $replyDraft
-                )
-            }
+            viewerSurface
+                .offset(y: viewerVerticalOffset)
+                .scaleEffect(viewerScale)
+                .clipShape(RoundedRectangle(cornerRadius: viewerCornerRadius, style: .continuous))
+                .ignoresSafeArea()
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.black.ignoresSafeArea())
+        .ignoresSafeArea()
         .task(id: currentGroom.id) {
             await appState.markGroomViewed(currentGroom.id)
+            await appState.loadGroomEngagement(postIDs: [currentGroom.id], reportsFailure: false)
             await appState.loadMeguriProfiles(userIDs: [currentGroom.authorID], reportsFailure: false)
             if currentGroom.authorID != appState.viewer?.id,
                appState.publicProfilesByUserID[currentGroom.authorID] == nil {
                 await appState.loadPublicUserProfile(userID: currentGroom.authorID, reportsFailure: false)
             }
         }
-        .confirmationDialog("このグルームを通報しますか？", isPresented: $isShowingReportConfirmation, titleVisibility: .visible) {
+        .task(id: currentGroom.id) {
+            await runStoryProgress(for: currentGroom.id)
+        }
+        .confirmationDialog("このグルームを通報しますか？", isPresented: $interactionState.isShowingReportConfirmation, titleVisibility: .visible) {
             Button("通報する", role: .destructive) {
                 Task {
                     _ = await appState.reportGroom(currentGroom)
@@ -169,12 +164,12 @@ struct GroomViewerScreen: View {
         } message: {
             Text("運営が内容を確認します。")
         }
-        .confirmationDialog("この投稿者をブロックしますか？", isPresented: $isShowingBlockConfirmation, titleVisibility: .visible) {
+        .confirmationDialog("この投稿者をブロックしますか？", isPresented: $interactionState.isShowingBlockConfirmation, titleVisibility: .visible) {
             Button("ブロックする", role: .destructive) {
                 Task {
                     let blocked = await appState.blockGroomAuthor(currentGroom)
                     if blocked {
-                        dismiss()
+                        dismissViewer()
                     }
                 }
             }
@@ -182,30 +177,141 @@ struct GroomViewerScreen: View {
         } message: {
             Text("グルームとチャットルームで相手の投稿が表示されにくくなります。グッズ交換のブロックとは別です。")
         }
+        .confirmationDialog("このグルームを削除しますか？", isPresented: $isShowingDeleteConfirmation, titleVisibility: .visible) {
+            Button("削除する", role: .destructive) {
+                deleteCurrentGroom()
+            }
+            Button("キャンセル", role: .cancel) {}
+        } message: {
+            Text("削除すると、めぐりホームとグルームアーカイブから表示されなくなります。")
+        }
+        .sheet(isPresented: $isShowingOwnInsights) {
+            GroomArchiveInsightsSheet(groom: currentGroom, appState: appState)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+        }
         .gesture(
             DragGesture(minimumDistance: 12)
                 .onChanged { value in
-                    if value.translation.height > 0 {
-                        dragOffset = value.translation
-                    }
+                    dragState.update(with: value.translation)
                 }
                 .onEnded { value in
-                    if value.translation.height > 100 {
-                        dismiss()
+                    if dragState.shouldDismiss(for: value.translation) {
+                        dismissViewer()
                     } else {
                         withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
-                            dragOffset = .zero
+                            dragState.reset()
                         }
                     }
                 }
         )
+        #if os(iOS)
+        .statusBarHidden(true)
+        #endif
+    }
+
+    private var viewerSurface: some View {
+        GeometryReader { proxy in
+            ZStack {
+                Color.black.ignoresSafeArea()
+
+                AsyncImage(url: currentGroom.imageURL) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .scaledToFit()
+                            .id(currentGroom.id)
+                    case .failure:
+                        GroomImageFailureView(message: "画像を読み込めませんでした", foregroundColor: .white)
+                    default:
+                        ProgressView()
+                            .tint(.white)
+                            .controlSize(.large)
+                    }
+                }
+                .padding(.horizontal, 8)
+
+                HStack(spacing: 0) {
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            move(by: -1)
+                        }
+
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            move(by: 1)
+                        }
+                }
+
+                Color.black
+                    .frame(height: GroomViewerChromeLayout.topObstructionHeight(safeAreaTop: proxy.safeAreaInsets.top))
+                    .frame(maxHeight: .infinity, alignment: .top)
+                    .allowsHitTesting(false)
+
+                VStack(spacing: 0) {
+                    GroomViewerPageIndicator(
+                        totalCount: grooms.count,
+                        currentIndex: currentIndex,
+                        currentProgress: storyProgress
+                    )
+
+                    GroomViewerTopBar(
+                        authorName: authorName,
+                        postTimeText: GroomPostRelativeTimeFormatter.relativeText(from: currentGroom.createdAt),
+                        authorAvatarID: authorIdentity.avatarID,
+                        authorAvatarURL: authorIdentity.avatarURL,
+                        canModerate: canReplyToCurrentGroom,
+                        onReport: { interactionState.showReportConfirmation() },
+                        onBlock: { interactionState.showBlockConfirmation() },
+                        onOpenProfile: { onOpenMeguriUserProfile(currentGroom.authorID) }
+                    ) {
+                        dismissViewer()
+                    }
+
+                    Spacer()
+
+                    if isCurrentGroomMine {
+                        HStack {
+                            Spacer()
+                            GroomViewerOwnerBottomControls(
+                                likeCount: currentGroomLikeCount,
+                                commentCount: currentGroomCommentCount,
+                                isDeleting: appState.deletingGroomPostID == currentGroom.id,
+                                onOpenInsights: { isShowingOwnInsights = true },
+                                onDelete: { isShowingDeleteConfirmation = true }
+                            )
+                        }
+                        .padding(.horizontal, 18)
+                        .padding(.bottom, 24)
+                    } else {
+                        GroomViewerBottomControls(
+                            canReply: canReplyToCurrentGroom,
+                            canLike: canReplyToCurrentGroom,
+                            isSendingReply: isSendingReply,
+                            isLiked: isCurrentGroomLiked,
+                            likeCount: currentGroomLikeCount,
+                            commentCount: currentGroomCommentCount,
+                            onSubmitReply: submitGroomReply,
+                            onToggleLike: toggleCurrentGroomLike,
+                            replyDraft: $interactionState.replyDraft
+                        )
+                    }
+                }
+                .padding(.top, GroomViewerChromeLayout.topPadding(safeAreaTop: proxy.safeAreaInsets.top))
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.black.ignoresSafeArea())
     }
 
     private func move(by delta: Int) {
         let nextIndex = currentIndex + delta
         guard grooms.indices.contains(nextIndex) else {
             if delta > 0 {
-                dismiss()
+                dismissViewer()
             }
             return
         }
@@ -216,6 +322,39 @@ struct GroomViewerScreen: View {
         }
     }
 
+    @MainActor
+    private func runStoryProgress(for groomID: UUID) async {
+        storyProgress = 0
+        let steps = 200
+        for step in 1...steps {
+            if Task.isCancelled || currentGroom.id != groomID {
+                return
+            }
+            try? await Task.sleep(nanoseconds: 100_000_000)
+            if Task.isCancelled || currentGroom.id != groomID {
+                return
+            }
+            let nextProgress = Double(step) / Double(steps)
+            if reduceMotion {
+                storyProgress = step == steps ? 1 : 0
+            } else {
+                storyProgress = nextProgress
+            }
+        }
+        guard currentGroom.id == groomID else {
+            return
+        }
+        move(by: 1)
+    }
+
+    private func dismissViewer() {
+        if let onDismiss {
+            onDismiss()
+        } else {
+            dismiss()
+        }
+    }
+
     private func toggleCurrentGroomLike() {
         Task {
             await appState.setGroomLiked(currentGroom.id, isLiked: !isCurrentGroomLiked)
@@ -223,8 +362,7 @@ struct GroomViewerScreen: View {
     }
 
     private func submitGroomReply() {
-        let body = replyDraft.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !body.isEmpty, !isSendingReply else {
+        guard let body = interactionState.replyBodyForSubmission(isSending: isSendingReply) else {
             return
         }
         Task {
@@ -235,24 +373,31 @@ struct GroomViewerScreen: View {
                 groomImageURL: currentGroom.imageURL
             )
             if sent {
-                replyDraft = ""
+                interactionState.clearReplyAfterSend(succeeded: sent)
+            }
+        }
+    }
+
+    private func deleteCurrentGroom() {
+        let target = currentGroom
+        Task {
+            let deleted = await appState.deleteOwnGroom(target)
+            if deleted {
+                dismissViewer()
             }
         }
     }
 }
 
-private extension GroomPost {
-    var remainingTimeText: String? {
-        guard let expiresAt else {
-            return nil
-        }
-        let remaining = expiresAt.timeIntervalSince(Date())
-        guard remaining > 0 else {
-            return "終了"
-        }
-        if remaining < 3_600 {
-            return "残り\(max(1, Int(ceil(remaining / 60))))分"
-        }
-        return "残り\(max(1, Int(ceil(remaining / 3_600))))時間"
+enum GroomViewerChromeLayout {
+    static let minimumTopObstructionHeight: CGFloat = 76
+    static let chromeGapBelowObstruction: CGFloat = 10
+
+    static func topPadding(safeAreaTop: CGFloat) -> CGFloat {
+        topObstructionHeight(safeAreaTop: safeAreaTop) + chromeGapBelowObstruction
+    }
+
+    static func topObstructionHeight(safeAreaTop: CGFloat) -> CGFloat {
+        max(minimumTopObstructionHeight, safeAreaTop)
     }
 }

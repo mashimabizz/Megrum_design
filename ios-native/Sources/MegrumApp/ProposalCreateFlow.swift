@@ -36,15 +36,8 @@ struct ProposalCreateFlow: View {
     @State var selectedStep: ProposalCreateStep = .give
     @State var selectedSenderGoodsIDs: Set<UUID> = []
     @State var selectedReceiverGoodsIDs: Set<UUID> = []
-    @State var senderSelectionMode: ProposalSideSelectionMode = .goods
-    @State var receiverSelectionMode: ProposalSideSelectionMode = .goods
-    @State var senderCashAmountText = ""
-    @State var receiverCashAmountText = ""
-    @State var selectedPaymentOptionID: String?
-    @State var senderGroupFilterID: UUID?
-    @State var senderGoodsTypeFilterID: UUID?
-    @State var receiverGroupFilterID: UUID?
-    @State var receiverGoodsTypeFilterID: UUID?
+    @State var valueSelectionState = ProposalCreateValueSelectionState()
+    @State var filterState = ProposalCreateFilterState()
     @State var exchangeMethod: ExchangeMethod = .hand
     @State var shareSchedule = true
     @State var message = ""
@@ -60,9 +53,7 @@ struct ProposalCreateFlow: View {
     @State var meetupCalendarAnchorDate = Date()
     @State var meetupPlaceSheetRoute: ProposalMeetupPlaceSheetRoute?
     @State var submittedSummary: ProposalSubmittedSummary?
-    @State var didApplyInitialExchangeMethod = false
-    @State var didApplyInitialStep = false
-    @State var didApplyVisualQAState = false
+    @State var initialStateFlags = ProposalCreateInitialStateFlags()
     @State var showsAddressSettings = false
     @State var shippingFee: IndividualListingShippingFeeDraft = .negotiate
     @State var shippingDays: IndividualListingShippingDaysDraft = .twoToFourDays

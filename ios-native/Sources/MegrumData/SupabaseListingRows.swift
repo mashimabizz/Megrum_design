@@ -78,6 +78,8 @@ struct ListingPayload: Encodable, Sendable {
     var haveQtys: [Int]
     var haveLogic: String
     var haveMinCount: Int
+    var haveIsCashOffer: Bool
+    var haveCashAmount: Int?
     var status: String
     var note: String?
 
@@ -87,6 +89,8 @@ struct ListingPayload: Encodable, Sendable {
         self.haveQtys = input.haveItems.map { max(1, min($0.quantity, 99)) }
         self.haveLogic = input.haveLogic.rawValue
         self.haveMinCount = input.haveMinimumCount
+        self.haveIsCashOffer = input.haveIsCashOffer
+        self.haveCashAmount = input.haveCashAmount
         self.status = IndividualListingStatus.active.rawValue
         self.note = input.note
     }
@@ -101,6 +105,8 @@ struct ListingUpdatePayload: Encodable, Sendable {
     private var haveQtys: [Int]?
     private var haveLogic: String?
     private var haveMinCount: Int?
+    private var haveIsCashOffer: Bool?
+    private var haveCashAmount: Int??
     private var status: String?
     private var note: String??
 
@@ -111,6 +117,12 @@ struct ListingUpdatePayload: Encodable, Sendable {
         }
         self.haveLogic = input.haveLogic?.rawValue
         self.haveMinCount = input.haveMinimumCount.map { max(1, $0) }
+        self.haveIsCashOffer = input.haveIsCashOffer
+        if let haveCashAmount = input.haveCashAmount {
+            self.haveCashAmount = .some(max(0, haveCashAmount))
+        } else if input.clearsHaveCashAmount {
+            self.haveCashAmount = .some(nil)
+        }
         self.status = input.status?.rawValue
         if let note = input.note {
             self.note = .some(SupabaseTextNormalizer.optional(note))
@@ -118,7 +130,7 @@ struct ListingUpdatePayload: Encodable, Sendable {
             self.note = .some(nil)
         }
 
-        guard haveIds != nil || haveLogic != nil || haveMinCount != nil || status != nil || note != nil else {
+        guard haveIds != nil || haveLogic != nil || haveMinCount != nil || haveIsCashOffer != nil || haveCashAmount != nil || status != nil || note != nil else {
             throw SupabaseListingClientError.emptyUpdate
         }
     }
@@ -128,6 +140,8 @@ struct ListingUpdatePayload: Encodable, Sendable {
         case haveQtys
         case haveLogic
         case haveMinCount
+        case haveIsCashOffer
+        case haveCashAmount
         case status
         case note
     }
@@ -138,6 +152,15 @@ struct ListingUpdatePayload: Encodable, Sendable {
         try container.encodeIfPresent(haveQtys, forKey: .haveQtys)
         try container.encodeIfPresent(haveLogic, forKey: .haveLogic)
         try container.encodeIfPresent(haveMinCount, forKey: .haveMinCount)
+        try container.encodeIfPresent(haveIsCashOffer, forKey: .haveIsCashOffer)
+        if let haveCashAmount {
+            switch haveCashAmount {
+            case let .some(value):
+                try container.encode(value, forKey: .haveCashAmount)
+            case .none:
+                try container.encodeNil(forKey: .haveCashAmount)
+            }
+        }
         try container.encodeIfPresent(status, forKey: .status)
         if let note {
             switch note {

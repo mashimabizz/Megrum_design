@@ -35,6 +35,10 @@ public extension SupabaseMegrumRepository {
         try await groomClient.createPost(input)
     }
 
+    func deleteGroomPost(postID: UUID) async throws {
+        try await groomClient.deletePost(userID: viewerID, postID: postID)
+    }
+
     func markGroomViewed(postID: UUID) async throws {
         try await groomClient.markViewed(userID: viewerID, postID: postID)
     }
@@ -64,7 +68,16 @@ public extension SupabaseMegrumRepository {
     }
 
     func saveMeguriProfile(_ input: MeguriProfileUpdateInput) async throws -> MeguriProfile {
-        try await meguriProfileClient.saveProfile(input, userID: viewerID)
+        let uploadedAvatarURL = try await profilePhotoStorage.uploadIfNeeded(input.avatarUpload, userID: viewerID)
+        let resolvedInput = MeguriProfileUpdateInput(
+            displayName: input.displayName,
+            avatarID: input.avatarID,
+            avatarURL: uploadedAvatarURL ?? input.avatarURL,
+            avatarUpload: nil,
+            clearsAvatarURL: input.clearsAvatarURL && uploadedAvatarURL == nil,
+            usesPublicProfile: input.usesPublicProfile
+        )
+        return try await meguriProfileClient.saveProfile(resolvedInput, userID: viewerID)
     }
 
     func loadMeguriMessages() async throws -> [MeguriMessage] {
@@ -75,8 +88,28 @@ public extension SupabaseMegrumRepository {
         try await meguriMessageClient.sendTextMessage(input)
     }
 
-    func markMeguriMessagesRead(peerID: UUID, readAt: Date) async throws -> [MeguriMessage] {
-        try await meguriMessageClient.markConversationRead(viewerID: viewerID, peerID: peerID, readAt: readAt)
+    func sendMeguriPhotoMessage(_ input: MeguriPhotoMessageCreateInput) async throws -> MeguriMessage {
+        let upload = try await meguriMessageMediaStorage.uploadPhoto(input)
+        return try await meguriMessageClient.sendImageMessage(
+            senderID: input.senderID,
+            recipientID: input.recipientID,
+            sourceGroomReplyID: input.sourceGroomReplyID,
+            sourceGroomPostID: input.sourceGroomPostID,
+            sourceGroomOwnerID: input.sourceGroomOwnerID,
+            sourceGroomImageURL: input.sourceGroomImageURL,
+            imagePath: upload.path,
+            body: input.body
+        )
+    }
+
+    func markMeguriMessagesRead(peerID: UUID, sourceGroomPostID: UUID?, includesAllSources: Bool, readAt: Date) async throws -> [MeguriMessage] {
+        try await meguriMessageClient.markConversationRead(
+            viewerID: viewerID,
+            peerID: peerID,
+            sourceGroomPostID: sourceGroomPostID,
+            includesAllSources: includesAllSources,
+            readAt: readAt
+        )
     }
 
     func loadBoardThreads(
@@ -111,6 +144,18 @@ public extension SupabaseMegrumRepository {
 
     func sendBoardReply(_ input: BoardReplyCreateInput) async throws -> BoardReply {
         try await boardClient.appendReply(input)
+    }
+
+    func setBoardThreadReaction(threadID: UUID, reaction: BoardMessageReaction?) async throws {
+        try await boardClient.setThreadReaction(threadID: threadID, reaction: reaction)
+    }
+
+    func setBoardReplyReaction(replyID: UUID, reaction: BoardMessageReaction?) async throws {
+        try await boardClient.setReplyReaction(replyID: replyID, reaction: reaction)
+    }
+
+    func reportBoardThread(threadID: UUID, reason: String) async throws {
+        try await boardClient.reportThread(threadID: threadID, reason: reason)
     }
 
     func createBoardThread(_ input: BoardThreadCreateInput) async throws -> BoardThread {

@@ -54,21 +54,21 @@ extension MeguriScreen {
         data: Data,
         imageContentType: String,
         caption: String?,
-        coordinate: MegrumLocationCoordinate
+        coordinate: MegrumLocationCoordinate,
+        metadata: MeguriContentMetadataDraft
     ) async -> Bool {
-        guard locationState.coordinate != nil else {
+        let currentCoordinate = locationState.coordinate ?? (isGroomCreationLocationLocked ? coordinate : nil)
+        if currentCoordinate == nil {
             locationState.startUpdatingCurrentLocation()
-            showToast("現在地を確認してから投稿してください")
-            return false
         }
         guard MeguriAccessPolicy.canCreateAt(
             coordinate,
-            currentCoordinate: locationState.coordinate
+            currentCoordinate: currentCoordinate
         ) else {
             showToast(
                 MeguriAccessPolicy.creationLocationMessage(
                     selectedCoordinate: coordinate,
-                    currentCoordinate: locationState.coordinate
+                    currentCoordinate: currentCoordinate
                 )
             )
             return false
@@ -79,7 +79,10 @@ extension MeguriScreen {
             imageContentType: imageContentType,
             caption: caption,
             latitude: coordinate.latitude,
-            longitude: coordinate.longitude
+            longitude: coordinate.longitude,
+            groupID: metadata.groupID,
+            characterID: metadata.characterID,
+            seriesName: metadata.normalizedSeriesName
         )
         if created {
             localNoticeMessage = nil
@@ -125,7 +128,7 @@ extension MeguriScreen {
         isPreparingGroomPhoto = false
     }
 
-    func openGroomFromStrip(_ groom: GroomPost) {
+    func openGroomFromStrip(_ groom: GroomPost, sourceAnchor: UnitPoint = .center) {
         guard MeguriAccessPolicy.canOpenGroom(
             groom,
             currentCoordinate: locationState.coordinate,
@@ -144,6 +147,15 @@ extension MeguriScreen {
             return
         }
         localNoticeMessage = nil
-        selectedGroom = groom
+        presentGroomViewer(groom, sourceAnchor: sourceAnchor)
+    }
+
+    func presentGroomViewer(_ groom: GroomPost, sourceAnchor: UnitPoint) {
+        selectedGroomSourceAnchor = sourceAnchor
+        if let onOpenGroomViewer {
+            onOpenGroomViewer(groom, sourceAnchor)
+        } else {
+            selectedGroom = groom
+        }
     }
 }

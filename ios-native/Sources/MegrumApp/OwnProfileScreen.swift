@@ -6,12 +6,7 @@ import SwiftUI
 struct OwnProfileScreen: View {
     @ObservedObject var appState: MegrumAppState
     var onClose: (() -> Void)?
-    @State private var localDraft: OwnProfileEditDraft?
-    @State private var editDraft = OwnProfileEditDraft.empty
-    @State private var isProfileEditorPresented = false
-    @State private var isSchedulePresented = false
-    @State private var showsProfileCompletion = false
-    @State private var selectedProfileTab: ProfileVisualTab = .goods
+    @State private var presentationState = OwnProfilePresentationState()
     @Environment(\.dismiss) private var dismiss
     @Environment(\.megrumSlidePresentationDismiss) private var slidePresentationDismiss
 
@@ -22,7 +17,7 @@ struct OwnProfileScreen: View {
             wishCount: appState.wishes.count,
             listingCount: appState.listings.count,
             proposals: appState.proposals,
-            localDraft: localDraft
+            localDraft: presentationState.localDraft
         )
     }
 
@@ -30,7 +25,7 @@ struct OwnProfileScreen: View {
         ScrollView {
             OwnProfileContent(
                 summary: summary,
-                selectedProfileTab: $selectedProfileTab,
+                selectedProfileTab: $presentationState.selectedProfileTab,
                 profileBio: summary.map(profileBio) ?? "",
                 profileTagItems: profileTagItems,
                 goodsItems: ownGoodsGridItems,
@@ -49,29 +44,29 @@ struct OwnProfileScreen: View {
         .background(MegrumTheme.canvas.ignoresSafeArea())
         .megrumHiddenNavigationBar()
         .megrumInteractiveBackSwipe(action: closePage)
-        .sheet(isPresented: $isProfileEditorPresented) {
+        .sheet(isPresented: $presentationState.isProfileEditorPresented) {
             NavigationStack {
                 OwnProfileEditForm(
-                    draft: $editDraft,
+                    draft: $presentationState.editDraft,
                     isSaving: appState.isSavingOwnProfile,
                     onSave: saveProfileDraft
                 )
             }
         }
-        .sheet(isPresented: $isSchedulePresented) {
+        .sheet(isPresented: $presentationState.isSchedulePresented) {
             NavigationStack {
                 PersonalScheduleScreen(appState: appState) {
-                    isSchedulePresented = false
+                    presentationState.closeSchedule()
                 }
             }
         }
-        .alert("プロフィールを更新しました", isPresented: $showsProfileCompletion) {
+        .alert("プロフィールを更新しました", isPresented: $presentationState.showsProfileCompletion) {
             Button("OK", role: .cancel) {}
         } message: {
             Text("変更内容をこの画面に反映しました。")
         }
         .onChange(of: appState.viewer) {
-            localDraft = nil
+            presentationState.clearLocalDraft()
         }
         .task {
             await loadSupplementalProfileDataIfNeeded()
@@ -120,12 +115,11 @@ struct OwnProfileScreen: View {
     }
 
     private func openSchedule() {
-        isSchedulePresented = true
+        presentationState.openSchedule()
     }
 
     private func openProfileEditor(summary: OwnProfileSummary) {
-        editDraft = OwnProfileEditDraft(summary: summary)
-        isProfileEditorPresented = true
+        presentationState.openProfileEditor(summary: summary)
     }
 
     private func loadSupplementalProfileDataIfNeeded() async {
@@ -155,8 +149,7 @@ struct OwnProfileScreen: View {
         )
 
         if saved {
-            localDraft = nil
-            showsProfileCompletion = true
+            presentationState.markProfileSaved()
         }
         return saved
     }

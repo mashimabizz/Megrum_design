@@ -6,63 +6,32 @@ import SwiftUI
 struct TradeDetailScreen: View {
     @ObservedObject var appState: MegrumAppState
     var proposal: TradeProposal
-    @State var draftMessage = ""
-    @State var selectedEvidencePhotoItem: PhotosPickerItem?
-    @State var selectedChatPhotoItem: PhotosPickerItem?
-    @State var selectedOutfitPhotoItem: PhotosPickerItem?
-    @State var isShowingEvidenceSourceDialog = false
-    @State var isShowingEvidencePhotoLibraryPicker = false
-    @State var isShowingChatPhotoLibraryPicker = false
-    @State var isShowingOutfitPhotoLibraryPicker = false
-    @State var isShowingEvidenceCamera = false
-    @State var isShowingChatCamera = false
-    @State var isShowingOutfitCamera = false
-    @State var isShowingEvidenceList = false
-    @State var isShowingEvaluationPage = false
-    @State var isShowingDisputePage = false
-    @State var isShowingRejectConfirmation = false
-    @State var isShowingCounterProposalPage = false
-    @State var isShowingSchedulePage = false
-    @State var unavailableChatAction: TradeUnavailableChatAction?
-    @State var assistanceRequestKind: TradeAssistanceRequestKind?
-    @State var selectedRemoteImage: RemoteImageSelection?
-    @State var isWaitingToShareLocation = false
-    @State var disputeDetailRoute: TradeDisputeDetailRoute?
-    @State var partnerProfileRoute: TradePartnerProfileRoute?
-    @State var didSubmitEvaluation = false
-    @State var toastMessage: String?
-    @State var isMessageComposerFocused = false
+    @State var interactionState = TradeDetailInteractionState()
+    @State var photoPresentationState = TradeDetailPhotoPresentationState()
+    @State var routePresentationState = TradeDetailRoutePresentationState()
     @StateObject var locationState = MegrumLocationState()
 
     var body: some View {
         bodyBeforeDialogs
         .confirmationDialog(
             "この打診を断りますか？",
-            isPresented: $isShowingRejectConfirmation,
+            isPresented: $routePresentationState.isShowingRejectConfirmation,
             titleVisibility: .visible
         ) {
-            Button("断る", role: .destructive) {
-                Task {
-                    await appState.rejectProposal(proposalID: currentProposal.id)
-                }
-            }
+            Button("断る", role: .destructive, action: rejectCurrentProposal)
             Button("キャンセル", role: .cancel) {}
         } message: {
             Text("断った後は、この打診では取引を進められません。")
         }
         .confirmationDialog(
             "証跡写真を追加",
-            isPresented: $isShowingEvidenceSourceDialog,
+            isPresented: $photoPresentationState.isShowingEvidenceSourceDialog,
             titleVisibility: .visible
         ) {
-            Button("写真を撮る") {
-                isShowingEvidenceCamera = true
-            }
+            Button("写真を撮る", action: presentEvidenceCamera)
             .disabled(appState.addingEvidenceProposalID == currentProposal.id || !canUseCamera)
 
-            Button("アルバムから選ぶ") {
-                isShowingEvidencePhotoLibraryPicker = true
-            }
+            Button("アルバムから選ぶ", action: presentEvidencePhotoLibrary)
             .disabled(appState.addingEvidenceProposalID == currentProposal.id)
 
             Button("キャンセル", role: .cancel) {}
@@ -70,21 +39,21 @@ struct TradeDetailScreen: View {
             Text("交換したグッズがわかる写真を追加します。")
         }
         .photosPicker(
-            isPresented: $isShowingEvidencePhotoLibraryPicker,
+            isPresented: $photoPresentationState.isShowingEvidencePhotoLibraryPicker,
             selection: evidencePhotoPickerSelection,
             matching: .images
         )
         .photosPicker(
-            isPresented: $isShowingChatPhotoLibraryPicker,
-            selection: $selectedChatPhotoItem,
+            isPresented: $photoPresentationState.isShowingChatPhotoLibraryPicker,
+            selection: $photoPresentationState.selectedChatPhotoItem,
             matching: .images
         )
         .photosPicker(
-            isPresented: $isShowingOutfitPhotoLibraryPicker,
-            selection: $selectedOutfitPhotoItem,
+            isPresented: $photoPresentationState.isShowingOutfitPhotoLibraryPicker,
+            selection: $photoPresentationState.selectedOutfitPhotoItem,
             matching: .images
         )
-        .sheet(isPresented: $isShowingEvidenceList) {
+        .sheet(isPresented: $routePresentationState.isShowingEvidenceList) {
             TradeEvidenceListSheet(
                 proposal: currentProposal,
                 viewerID: viewerID,
@@ -93,12 +62,8 @@ struct TradeDetailScreen: View {
                 isApproving: appState.approvingEvidenceProposalID == currentProposal.id,
                 deletingPhotoID: appState.deletingEvidencePhotoID,
                 canUseCamera: canUseCamera,
-                onOpenCamera: {
-                    isShowingEvidenceCamera = true
-                },
-                onOpenPhotoLibrary: {
-                    isShowingEvidencePhotoLibraryPicker = true
-                },
+                onOpenCamera: presentEvidenceCamera,
+                onOpenPhotoLibrary: presentEvidencePhotoLibrary,
                 onDelete: { photo in
                     await appState.deleteTradeEvidencePhoto(
                         proposalID: currentProposal.id,
@@ -113,19 +78,19 @@ struct TradeDetailScreen: View {
             )
         }
 #if os(iOS)
-        .sheet(isPresented: $isShowingEvidenceCamera) {
+        .sheet(isPresented: $photoPresentationState.isShowingEvidenceCamera) {
             NativeCameraCaptureView { imageData in
                 handleCapturedEvidenceImage(imageData)
             }
             .ignoresSafeArea()
         }
-        .sheet(isPresented: $isShowingOutfitCamera) {
+        .sheet(isPresented: $photoPresentationState.isShowingOutfitCamera) {
             NativeCameraCaptureView { imageData in
                 handleCapturedOutfitImage(imageData)
             }
             .ignoresSafeArea()
         }
-        .sheet(isPresented: $isShowingChatCamera) {
+        .sheet(isPresented: $photoPresentationState.isShowingChatCamera) {
             NativeCameraCaptureView { imageData in
                 handleCapturedChatImage(imageData)
             }
@@ -142,7 +107,7 @@ struct TradeDetailScreen: View {
                     }
                 } else {
                     Button {
-                        isShowingDisputePage = true
+                        routePresentationState.isShowingDisputePage = true
                     } label: {
                         Label("通報", systemImage: "exclamationmark.bubble")
                     }
@@ -151,11 +116,11 @@ struct TradeDetailScreen: View {
             }
         }
         .overlay {
-            if let selectedRemoteImage {
+            if let selectedRemoteImage = routePresentationState.selectedRemoteImage {
                 FullScreenRemoteImageView(
                     url: selectedRemoteImage.url,
                     onDismiss: {
-                        self.selectedRemoteImage = nil
+                        routePresentationState.clearSelectedRemoteImage()
                     },
                     onDelete: selectedRemoteImageDeleteAction(for: selectedRemoteImage)
                 )
@@ -164,7 +129,7 @@ struct TradeDetailScreen: View {
             }
         }
         .overlay(alignment: .bottom) {
-            if let toastMessage {
+            if let toastMessage = interactionState.toastMessage {
                 MeguriToastView(message: toastMessage)
                     .padding(.horizontal, 24)
                     .padding(.bottom, 28)
@@ -172,9 +137,9 @@ struct TradeDetailScreen: View {
                     .zIndex(9)
             }
         }
-        .animation(.spring(response: 0.32, dampingFraction: 0.88), value: toastMessage)
+        .animation(.spring(response: 0.32, dampingFraction: 0.88), value: interactionState.toastMessage)
 #if os(iOS)
-        .toolbar(selectedRemoteImage == nil ? .visible : .hidden, for: .navigationBar)
+        .toolbar(routePresentationState.selectedRemoteImage == nil ? .visible : .hidden, for: .navigationBar)
 #endif
     }
 }

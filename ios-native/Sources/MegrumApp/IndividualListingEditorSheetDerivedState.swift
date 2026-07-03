@@ -3,7 +3,7 @@ import SwiftUI
 extension IndividualListingEditorSheet {
     var stepValidationMessage: String? {
         IndividualListingEditorStepValidationPolicy.message(
-            for: step,
+            for: presentationState.step,
             draft: draft,
             inventory: appState.inventory,
             wishes: appState.wishes
@@ -21,13 +21,13 @@ extension IndividualListingEditorSheet {
 
     var saveErrorBinding: Binding<Bool> {
         Binding(
-            get: { saveErrorMessage != nil },
-            set: { if !$0 { saveErrorMessage = nil } }
+            get: { presentationState.saveErrorMessage != nil },
+            set: { if !$0 { presentationState.clearSaveError() } }
         )
     }
 
     var optionReviewItems: [IndividualListingOptionReviewItem] {
-        var items = stagedOptionSummaries
+        var items = presentationState.stagedOptionSummaries
         if let current = makeCurrentOptionReviewItem(
             title: items.isEmpty ? "編集中の選択肢" : "編集中",
             source: .current

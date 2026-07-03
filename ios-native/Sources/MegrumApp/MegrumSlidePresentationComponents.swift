@@ -18,10 +18,7 @@ struct MegrumSlidePresentedContentModifier: ViewModifier {
             .background(MegrumTheme.canvas.ignoresSafeArea())
             .offset(x: dragOffset)
             .shadow(color: MegrumTheme.ink.opacity(0.16), radius: 24, x: -8, y: 0)
-            .transition(.asymmetric(
-                insertion: .move(edge: .trailing),
-                removal: .move(edge: .trailing)
-            ))
+            .transition(MegrumSlidePresentationMetrics.trailingTransition)
             .zIndex(1)
     }
 }

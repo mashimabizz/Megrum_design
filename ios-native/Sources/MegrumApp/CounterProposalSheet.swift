@@ -7,18 +7,14 @@ struct CounterProposalSheet: View {
     @ObservedObject var appState: MegrumAppState
     var proposal: TradeProposal
     @Environment(\.dismiss) private var dismiss
-    @State private var exchangeMethod: ExchangeMethod
-    @State private var selectedConditionTags: Set<String>
-    @State private var message: String
+    @State private var draftState: CounterProposalDraftState
 
     private let conditionTagOptions = ["即日発送", "同日発送", "終演後OK", "グッズ販売中OK"]
 
     init(appState: MegrumAppState, proposal: TradeProposal) {
         self.appState = appState
         self.proposal = proposal
-        _exchangeMethod = State(initialValue: proposal.exchangeMethod)
-        _selectedConditionTags = State(initialValue: Set(proposal.conditionTags))
-        _message = State(initialValue: "")
+        _draftState = State(initialValue: CounterProposalDraftState(proposal: proposal))
     }
 
     private var viewerID: UUID? {
@@ -44,14 +40,14 @@ struct CounterProposalSheet: View {
     }
 
     private var availableConditionTags: [String] {
-        var seen = Set<String>()
-        return (conditionTagOptions + proposal.conditionTags).filter { tag in
-            seen.insert(tag).inserted
-        }
+        CounterProposalDraftState.availableConditionTags(
+            defaultOptions: conditionTagOptions,
+            proposalTags: proposal.conditionTags
+        )
     }
 
     private var orderedConditionTags: [String] {
-        availableConditionTags.filter { selectedConditionTags.contains($0) }
+        draftState.orderedConditionTags(in: availableConditionTags)
     }
 
     private var canSubmit: Bool {
@@ -60,9 +56,9 @@ struct CounterProposalSheet: View {
         }
         return proposal.counterProposalInput(
             from: viewerID,
-            exchangeMethod: exchangeMethod,
+            exchangeMethod: draftState.exchangeMethod,
             conditionTags: orderedConditionTags,
-            message: message
+            message: draftState.message
         ) != nil
     }
 
@@ -78,7 +74,7 @@ struct CounterProposalSheet: View {
             }
 
             Section("交換手段") {
-                Picker("交換手段", selection: $exchangeMethod) {
+                Picker("交換手段", selection: $draftState.exchangeMethod) {
                     ForEach(ExchangeMethod.allCases) { method in
                         Text(method.displayName).tag(method)
                     }
@@ -94,16 +90,16 @@ struct CounterProposalSheet: View {
                         } label: {
                             HStack(spacing: 6) {
                                 Text(tag)
-                                if selectedConditionTags.contains(tag) {
+                                if draftState.selectedConditionTags.contains(tag) {
                                     Image(systemName: "checkmark")
                                 }
                             }
                             .font(.system(size: 14, weight: .heavy, design: .rounded))
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 9)
-                            .foregroundStyle(selectedConditionTags.contains(tag) ? .white : MegrumTheme.ink)
+                            .foregroundStyle(draftState.selectedConditionTags.contains(tag) ? .white : MegrumTheme.ink)
                             .background(
-                                selectedConditionTags.contains(tag) ? MegrumTheme.lavender : .white.opacity(0.72),
+                                draftState.selectedConditionTags.contains(tag) ? MegrumTheme.lavender : .white.opacity(0.72),
                                 in: Capsule()
                             )
                         }
@@ -114,10 +110,10 @@ struct CounterProposalSheet: View {
             }
 
             Section("メッセージ") {
-                TextEditor(text: $message)
+                TextEditor(text: $draftState.message)
                     .frame(minHeight: 96)
                     .overlay(alignment: .topLeading) {
-                        if message.isEmpty {
+                        if draftState.message.isEmpty {
                             Text("変更したい条件を相手に伝える")
                                 .font(.system(size: 15, weight: .semibold, design: .rounded))
                                 .foregroundStyle(MegrumTheme.muted.opacity(0.68))
@@ -155,23 +151,18 @@ struct CounterProposalSheet: View {
     }
 
     private func toggleConditionTag(_ tag: String) {
-        if selectedConditionTags.contains(tag) {
-            selectedConditionTags.remove(tag)
-        } else {
-            selectedConditionTags.insert(tag)
-        }
+        draftState.toggleConditionTag(tag)
     }
 
     private func createCounterProposal() async {
         guard let viewerID else {
             return
         }
-        let trimmedMessage = message.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let input = proposal.counterProposalInput(
             from: viewerID,
-            exchangeMethod: exchangeMethod,
+            exchangeMethod: draftState.exchangeMethod,
             conditionTags: orderedConditionTags,
-            message: trimmedMessage.isEmpty ? nil : trimmedMessage
+            message: draftState.submittedMessage
         ) else {
             return
         }

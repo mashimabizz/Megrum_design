@@ -7,25 +7,16 @@ struct ProfileScheduleScreen: View {
     var userID: UUID
     var displayName: String
     var onClose: (() -> Void)?
-    @State private var mode: TradeScheduleCalendarMode = .fiveDays
-    @State private var anchorDate = Date()
+    @State private var presentationState = ProfileSchedulePresentationState()
 
     private let calendar = Calendar.current
 
     private var visibleInterval: DateInterval {
-        switch mode {
-        case .fiveDays:
-            let start = calendar.startOfDay(for: anchorDate)
-            let end = calendar.date(byAdding: .day, value: 5, to: start) ?? start.addingTimeInterval(86_400 * 5)
-            return DateInterval(start: start, end: end)
-        case .month:
-            return calendar.dateInterval(of: .month, for: anchorDate)
-                ?? DateInterval(start: calendar.startOfDay(for: anchorDate), duration: 86_400 * 31)
-        }
+        presentationState.visibleInterval(calendar: calendar)
     }
 
     private var reloadKey: String {
-        "\(userID.uuidString)-\(mode.rawValue)-\(Int(visibleInterval.start.timeIntervalSince1970))"
+        presentationState.reloadKey(userID: userID, calendar: calendar)
     }
 
     private var schedules: [PersonalSchedule] {
@@ -37,7 +28,7 @@ struct ProfileScheduleScreen: View {
             VStack(alignment: .leading, spacing: 18) {
                 ProfileScheduleHeader(displayName: displayName)
 
-                Picker("表示", selection: $mode) {
+                Picker("表示", selection: $presentationState.mode) {
                     ForEach(TradeScheduleCalendarMode.allCases) { mode in
                         Text(mode.title).tag(mode)
                     }
@@ -64,7 +55,7 @@ struct ProfileScheduleScreen: View {
                     .frame(maxWidth: .infinity)
                     .padding(.top, 36)
                 } else {
-                    switch mode {
+                    switch presentationState.mode {
                     case .fiveDays:
                         fiveDayView
                     case .month:
@@ -95,20 +86,20 @@ struct ProfileScheduleScreen: View {
 
             ToolbarItem(placement: .primaryAction) {
                 Button {
-                    moveAnchor(by: mode == .month ? 1 : 5)
+                    moveAnchor(by: presentationState.mode == .month ? 1 : 5)
                 } label: {
                     Image(systemName: "chevron.right")
                 }
-                .accessibilityLabel(mode == .month ? "次の月" : "次の週")
+                .accessibilityLabel(presentationState.mode == .month ? "次の月" : "次の週")
             }
 
             ToolbarItem(placement: .primaryAction) {
                 Button {
-                    moveAnchor(by: mode == .month ? -1 : -5)
+                    moveAnchor(by: presentationState.mode == .month ? -1 : -5)
                 } label: {
                     Image(systemName: "chevron.left")
                 }
-                .accessibilityLabel(mode == .month ? "前の月" : "前の週")
+                .accessibilityLabel(presentationState.mode == .month ? "前の月" : "前の週")
             }
         }
     }
@@ -138,30 +129,18 @@ struct ProfileScheduleScreen: View {
     }
 
     private var fiveVisibleDays: [Date] {
-        (0..<5).compactMap { offset in
-            calendar.date(byAdding: .day, value: offset, to: visibleInterval.start)
-        }
+        presentationState.fiveVisibleDays(calendar: calendar)
     }
 
     private var monthDays: [Date] {
-        guard let monthInterval = calendar.dateInterval(of: .month, for: anchorDate) else {
-            return []
-        }
-        let days = calendar.dateComponents([.day], from: monthInterval.start, to: monthInterval.end).day ?? 0
-        return (0..<days).compactMap { offset in
-            calendar.date(byAdding: .day, value: offset, to: monthInterval.start)
-        }
+        presentationState.monthDays(calendar: calendar)
     }
 
     private func schedules(on day: Date) -> [PersonalSchedule] {
-        let start = calendar.startOfDay(for: day)
-        let end = calendar.date(byAdding: .day, value: 1, to: start) ?? start.addingTimeInterval(86_400)
-        return schedules.filter { $0.overlaps(start: start, end: end) }
+        presentationState.schedules(on: day, from: schedules, calendar: calendar)
     }
 
     private func moveAnchor(by value: Int) {
-        if let next = calendar.date(byAdding: .day, value: value, to: anchorDate) {
-            anchorDate = next
-        }
+        presentationState.moveAnchor(by: value, calendar: calendar)
     }
 }

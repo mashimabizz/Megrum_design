@@ -23,7 +23,7 @@ struct MeguriGroomComposerPresentationModifier: ViewModifier {
     var onOpenCamera: () -> Void
     var onCapturePhoto: (Data) -> Void
     var onCameraFailure: (String) -> Void
-    var onPublish: (Data, String, String?, MegrumLocationCoordinate) async -> Bool
+    var onPublish: (Data, String, String?, MegrumLocationCoordinate, MeguriContentMetadataDraft) async -> Bool
     var onDiscard: () -> Void
 
     func body(content: Content) -> some View {
@@ -40,8 +40,24 @@ struct MeguriGroomComposerPresentationModifier: ViewModifier {
                 locksCreationCoordinate: locksCreationCoordinate,
                 currentCoordinate: currentCoordinate,
                 isRequestingLocation: isRequestingLocation,
+                groups: appState.oshiGroups,
+                characters: appState.oshiCharacters,
+                userOshiSelections: appState.userOshiSelections,
+                inventory: appState.inventory,
+                wishes: appState.wishes,
+                isLoadingGroups: appState.isLoadingOshiGroups,
+                isLoadingCharacters: appState.isLoadingOshiCharacters,
                 onRequestLocation: onRequestLocation,
                 onOpenCamera: onOpenCamera,
+                onLoadGroups: {
+                    await appState.loadOshiGroups()
+                },
+                onLoadCharacters: { group in
+                    await appState.loadOshiCharacters(group: group)
+                },
+                onLoadUserOshiSelections: {
+                    await appState.loadUserOshiSelections()
+                },
                 onPublish: onPublish,
                 onDiscard: onDiscard
             )
@@ -72,9 +88,19 @@ private extension View {
         locksCreationCoordinate: Bool,
         currentCoordinate: MegrumLocationCoordinate?,
         isRequestingLocation: Bool,
+        groups: [OshiGroup],
+        characters: [OshiCharacter],
+        userOshiSelections: [UserOshiSelection],
+        inventory: [GoodsItem],
+        wishes: [WishItem],
+        isLoadingGroups: Bool,
+        isLoadingCharacters: Bool,
         onRequestLocation: @escaping () -> Void,
         onOpenCamera: @escaping () -> Void,
-        onPublish: @escaping (Data, String, String?, MegrumLocationCoordinate) async -> Bool,
+        onLoadGroups: @escaping () async -> Void,
+        onLoadCharacters: @escaping (OshiGroup?) async -> Void,
+        onLoadUserOshiSelections: @escaping () async -> Void,
+        onPublish: @escaping (Data, String, String?, MegrumLocationCoordinate, MeguriContentMetadataDraft) async -> Bool,
         onDiscard: @escaping () -> Void
     ) -> some View {
         #if os(iOS)
@@ -90,8 +116,18 @@ private extension View {
                 locksCreationCoordinate: locksCreationCoordinate,
                 currentCoordinate: currentCoordinate,
                 isRequestingLocation: isRequestingLocation,
+                groups: groups,
+                characters: characters,
+                userOshiSelections: userOshiSelections,
+                inventory: inventory,
+                wishes: wishes,
+                isLoadingGroups: isLoadingGroups,
+                isLoadingCharacters: isLoadingCharacters,
                 onRequestLocation: onRequestLocation,
                 onOpenCamera: onOpenCamera,
+                onLoadGroups: onLoadGroups,
+                onLoadCharacters: onLoadCharacters,
+                onLoadUserOshiSelections: onLoadUserOshiSelections,
                 onPublish: onPublish,
                 onDiscard: onDiscard
             )
@@ -109,8 +145,18 @@ private extension View {
                 locksCreationCoordinate: locksCreationCoordinate,
                 currentCoordinate: currentCoordinate,
                 isRequestingLocation: isRequestingLocation,
+                groups: groups,
+                characters: characters,
+                userOshiSelections: userOshiSelections,
+                inventory: inventory,
+                wishes: wishes,
+                isLoadingGroups: isLoadingGroups,
+                isLoadingCharacters: isLoadingCharacters,
                 onRequestLocation: onRequestLocation,
                 onOpenCamera: onOpenCamera,
+                onLoadGroups: onLoadGroups,
+                onLoadCharacters: onLoadCharacters,
+                onLoadUserOshiSelections: onLoadUserOshiSelections,
                 onPublish: onPublish,
                 onDiscard: onDiscard
             )

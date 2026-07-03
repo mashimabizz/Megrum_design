@@ -77,6 +77,10 @@ public extension MegrumRepository {
         []
     }
 
+    func uploadGoodsGoogleLensSearchPhoto(_ upload: GoodsPhotoUpload) async throws -> URL {
+        throw MegrumRepositoryError.unsupportedMutation
+    }
+
     func searchGoods(_ input: GoodsSearchInput) async throws -> [GoodsItem] {
         []
     }

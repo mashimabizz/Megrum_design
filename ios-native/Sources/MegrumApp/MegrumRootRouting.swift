@@ -125,10 +125,14 @@ enum VisualQATargetItemResolver {
 enum VisualQATabRouteResolver {
     static func initialTab(for screen: VisualQAInitialScreen?) -> MegrumTab {
         switch screen {
-        case .meguri:
+        case .meguri, .groomArchive, .meguriProfileSettings, .meguriMessages, .meguriMessageThread:
             .meguri
         case .proposalPending:
             .trades
+        case .inventory:
+            .inventory
+        case .wish:
+            .wish
         default:
             .home
         }

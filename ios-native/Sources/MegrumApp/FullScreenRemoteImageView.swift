@@ -19,12 +19,7 @@ struct FullScreenRemoteImageView: View {
     var onDismiss: (() -> Void)?
     var onDelete: (() -> Void)?
     @Environment(\.dismiss) private var dismiss
-    @State private var isVisible = false
-    @State private var scale: CGFloat = 1
-    @State private var lastScale: CGFloat = 1
-    @State private var offset: CGSize = .zero
-    @State private var lastOffset: CGSize = .zero
-    @State private var dismissDragOffset: CGFloat = 0
+    @State private var presentationState = FullScreenRemoteImagePresentationState()
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -61,24 +56,20 @@ struct FullScreenRemoteImageView: View {
                 }
             }
             .padding(.horizontal, 16)
-            .scaleEffect(isVisible ? 1 : 0.9)
-            .opacity(isVisible ? 1 : 0)
+            .scaleEffect(presentationState.imagePresentationScale)
+            .opacity(presentationState.contentOpacity)
 
             topControls
         }
         .onAppear {
             withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
-                isVisible = true
+                presentationState.show()
             }
         }
     }
 
     private var backgroundOpacity: Double {
-        guard isVisible else {
-            return 0
-        }
-        let dragProgress = Double(min(dismissDragOffset, 220) / 320)
-        return max(0.22, 0.58 - dragProgress * 0.28)
+        presentationState.backgroundOpacity
     }
 
     private var topControls: some View {
@@ -121,7 +112,7 @@ struct FullScreenRemoteImageView: View {
 
             Spacer(minLength: 0)
         }
-        .opacity(isVisible ? 1 : 0)
+        .opacity(presentationState.contentOpacity)
     }
 
     private var failureContent: some View {
@@ -137,65 +128,45 @@ struct FullScreenRemoteImageView: View {
     private func interactiveImage<Content: View>(@ViewBuilder content: () -> Content) -> some View {
         content()
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .scaleEffect(scale)
-            .offset(x: offset.width, y: offset.height + dismissDragOffset)
+            .scaleEffect(presentationState.scale)
+            .offset(x: presentationState.imageOffset.width, y: presentationState.imageOffset.height)
             .gesture(zoomGesture.simultaneously(with: imageDragGesture))
             .onTapGesture(count: 2) {
-                resetZoom()
+                presentationState.resetZoom()
             }
     }
 
     private var zoomGesture: some Gesture {
         MagnificationGesture()
             .onChanged { value in
-                scale = min(max(lastScale * value, 1), 4)
+                presentationState.updateMagnification(value)
             }
             .onEnded { _ in
-                lastScale = scale
-                if scale <= 1.02 {
-                    resetZoom()
-                }
+                presentationState.endMagnification()
             }
     }
 
     private var imageDragGesture: some Gesture {
         DragGesture()
             .onChanged { value in
-                if scale > 1 {
-                    offset = CGSize(
-                        width: lastOffset.width + value.translation.width,
-                        height: lastOffset.height + value.translation.height
-                    )
-                } else if value.translation.height > 0,
-                          abs(value.translation.height) > abs(value.translation.width) {
-                    dismissDragOffset = value.translation.height
-                }
+                presentationState.updateDrag(translation: value.translation)
             }
             .onEnded { value in
-                if scale > 1 {
-                    lastOffset = offset
-                } else if dismissDragOffset > 96 || value.predictedEndTranslation.height > 160 {
+                if presentationState.isZoomed {
+                    presentationState.finishZoomedDrag()
+                } else if presentationState.shouldDismissAfterDrag(predictedEndTranslation: value.predictedEndTranslation) {
                     dismissImage()
                 } else {
                     withAnimation(.snappy(duration: 0.22)) {
-                        dismissDragOffset = 0
+                        presentationState.resetDismissDragOffset()
                     }
                 }
             }
     }
 
-    private func resetZoom() {
-        scale = 1
-        lastScale = 1
-        offset = .zero
-        lastOffset = .zero
-        dismissDragOffset = 0
-    }
-
     private func dismissImage() {
         withAnimation(.easeOut(duration: 0.16)) {
-            isVisible = false
-            dismissDragOffset = 0
+            presentationState.prepareDismissal()
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.16) {
             if let onDismiss {

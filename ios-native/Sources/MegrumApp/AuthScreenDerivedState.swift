@@ -7,13 +7,13 @@ extension AuthScreen {
         if !authState.isConfigured {
             return nil
         }
-        if let inputErrorMessage {
+        if let inputErrorMessage = inputState.inputErrorMessage {
             return AuthVisualFeedback(message: inputErrorMessage, style: .error)
         }
         if let errorMessage = authState.errorMessage {
             return AuthVisualFeedback(message: errorMessage, style: .error)
         }
-        if let identityProviderError {
+        if let identityProviderError = inputState.identityProviderError {
             return AuthVisualFeedback(message: identityProviderError, style: .error)
         }
         if let successMessage = authState.successMessage {
@@ -26,10 +26,10 @@ extension AuthScreen {
     }
 
     var passwordResetFeedbackMessage: AuthVisualFeedback? {
-        guard hasSubmittedPasswordReset else {
+        guard inputState.hasSubmittedPasswordReset else {
             return nil
         }
-        if let passwordResetInputErrorMessage {
+        if let passwordResetInputErrorMessage = inputState.passwordResetInputErrorMessage {
             return AuthVisualFeedback(message: passwordResetInputErrorMessage, style: .error)
         }
         if let errorMessage = authState.errorMessage {
@@ -42,11 +42,6 @@ extension AuthScreen {
     }
 
     var validationMessage: String? {
-        switch mode {
-        case .signIn:
-            MegrumAuthInputValidator.signInValidationMessage(email: email, password: password)
-        case .signUp:
-            MegrumAuthInputValidator.signUpValidationMessage(email: email, password: password, handle: handle)
-        }
+        inputState.validationMessage(mode: mode)
     }
 }

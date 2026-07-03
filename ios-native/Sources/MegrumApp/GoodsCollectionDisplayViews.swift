@@ -40,7 +40,7 @@ struct CollectionHeader: View {
     }
 }
 
-private struct ColumnToggleButton: View {
+struct ColumnToggleButton: View {
     @Binding var columns: Int
 
     private var layout: GoodsGridLayout {

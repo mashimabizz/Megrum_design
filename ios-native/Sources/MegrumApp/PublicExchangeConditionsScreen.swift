@@ -120,6 +120,7 @@ struct PublicExchangeConditionsScreen: View {
                         listing: listing,
                         canEdit: false,
                         onEdit: {},
+                        onShare: {},
                         onDelete: {}
                     )
                 }

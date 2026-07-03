@@ -22,7 +22,7 @@ public enum MegrumAppStateFactory {
         infoDictionary: [String: Any]? = Bundle.main.infoDictionary
     ) -> any MegrumRepository {
         if VisualQAPreviewMode.isEnabled(environment: environment) {
-            return PreviewMegrumRepository()
+            return PreviewMegrumRepository(subscriptionState: previewSubscriptionState(environment: environment))
         }
 
         if let authSession {
@@ -50,6 +50,32 @@ public enum MegrumAppStateFactory {
         }
 
         return PreviewMegrumRepository()
+    }
+
+    private static func previewSubscriptionState(environment: [String: String]) -> UserSubscriptionState {
+        let rawValue = environment[VisualQAPreviewMode.subscriptionEnvironmentKey]?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        switch rawValue {
+        case "megrum_plus", "megrum-plus", "premium", "plus", "1", "true", "yes", "on":
+            let now = Date()
+            return UserSubscriptionState(
+                planType: .megrumPlusMonthly,
+                status: .active,
+                entitlements: [
+                    UserEntitlement(
+                        key: .megrumPlus,
+                        isActive: true,
+                        source: .system,
+                        grantedAt: now,
+                        updatedAt: now
+                    )
+                ],
+                loadedAt: now
+            )
+        default:
+            return .free
+        }
     }
 
     private static func viewerID(from environment: [String: String]) -> UUID? {

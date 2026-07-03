@@ -18,8 +18,9 @@ struct IndividualListingConditionTab: View {
     var onShowOshiPicker: () -> Void
     var onToggleMember: (UUID) -> Void
 
-    @State private var showsMemberPicker = false
-    @State private var showsTagSheet = false
+    @State private var presentationState = IndividualListingConditionPresentationState()
+    @State private var googleLensErrorMessage: String?
+    @Environment(\.openURL) private var openURL
 
     private var selectedGroup: OshiGroup? {
         groups.first { $0.id == selectedGroupID } ?? groups.first
@@ -57,7 +58,7 @@ struct IndividualListingConditionTab: View {
                 IndividualListingActionRow(
                     title: "メンバー / キャラ",
                     value: memberSummary,
-                    action: { showsMemberPicker = true }
+                    action: { presentationState.showMemberPicker() }
                 )
                 Divider()
                 IndividualListingGoodsTypeRow(
@@ -67,7 +68,8 @@ struct IndividualListingConditionTab: View {
                 )
                 Divider()
                 IndividualListingTagRow(tagSummary: tagSummary) {
-                    showsTagSheet = true
+                    googleLensErrorMessage = nil
+                    presentationState.showTagSheet()
                 }
                 Divider()
                 if usesLogicChoice {
@@ -82,17 +84,17 @@ struct IndividualListingConditionTab: View {
                     .strokeBorder(MegrumTheme.ink.opacity(0.07), lineWidth: 1)
             }
         }
-        .sheet(isPresented: $showsMemberPicker) {
+        .sheet(isPresented: $presentationState.isShowingMemberPicker) {
             IndividualListingMemberPickerSheet(
                 groupName: selectedGroup?.name ?? "メンバー",
                 characters: characters.filter { selectedGroupID == nil || $0.groupID == selectedGroupID },
                 selectedIDs: selectedMemberIDs,
                 excludesSelectedMembers: $excludesSelectedMembers,
                 onToggle: onToggleMember,
-                onClose: { showsMemberPicker = false }
+                onClose: { presentationState.dismissMemberPicker() }
             )
         }
-        .sheet(isPresented: $showsTagSheet) {
+        .sheet(isPresented: $presentationState.isShowingTagSheet) {
             GoodsBulkTagSheet(
                 selectedCount: max(1, selectedTagNames.count),
                 candidateNames: tagCandidateNames,
@@ -100,7 +102,10 @@ struct IndividualListingConditionTab: View {
                 navigationTitle: "シリーズを登録",
                 textFieldPlaceholder: "例：会場限定",
                 footerText: "この条件にシリーズを追加します。",
-                confirmationTitle: "追加"
+                confirmationTitle: "追加",
+                googleLensItems: googleLensItems,
+                googleLensErrorMessage: googleLensErrorMessage,
+                onOpenGoogleLens: openGoogleLensSearch
             ) { tagName in
                 addConditionTag(tagName)
             }
@@ -132,6 +137,14 @@ struct IndividualListingConditionTab: View {
         tagBuilder.previewItemsByTag()
     }
 
+    private var googleLensItems: [GoodsGoogleLensSearchItem] {
+        GoodsGoogleLensSearchItemFactory.items(
+            from: inventory,
+            wishes: wishes,
+            selectedGroupID: selectedGroupID
+        )
+    }
+
     private func addConditionTag(_ name: String) {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty,
@@ -141,5 +154,17 @@ struct IndividualListingConditionTab: View {
             return
         }
         selectedTagNames.append(trimmed)
+    }
+
+    private func openGoogleLensSearch(_ itemID: GoodsGoogleLensSearchItem.ID) {
+        guard let item = googleLensItems.first(where: { $0.id == itemID }),
+              case let .imageURL(imageURL) = item.source,
+              let lensURL = GoogleLensSearchURLBuilder.url(forImageURL: imageURL)
+        else {
+            googleLensErrorMessage = "Google Lensを開けませんでした。画像を選び直してください。"
+            return
+        }
+        googleLensErrorMessage = nil
+        openURL(lensURL)
     }
 }

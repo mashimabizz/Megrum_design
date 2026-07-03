@@ -1,3 +1,4 @@
+import MegrumCore
 import SwiftUI
 
 @MainActor
@@ -71,7 +72,7 @@ struct SettingsPrimarySection: View {
             }
 
             SettingsNavigationButtonRow(
-                title: "メグルムプラス",
+                title: SubscriptionCatalog.currentPremiumDisplayName,
                 subtitle: subscriptionStatusText,
                 systemImage: "sparkles.rectangle.stack"
             ) {
@@ -79,11 +80,19 @@ struct SettingsPrimarySection: View {
             }
 
             SettingsNavigationButtonRow(
-                title: "ブロックした人",
+                title: "グッズ交換でブロックした人",
                 subtitle: "一覧と解除",
                 systemImage: "person.crop.circle.badge.xmark"
             ) {
                 onOpenRoute(.blockedUsers)
+            }
+
+            SettingsNavigationButtonRow(
+                title: "めぐりでブロックした人",
+                subtitle: "一覧と解除",
+                systemImage: "message.badge.circle"
+            ) {
+                onOpenRoute(.meguriBlockedUsers)
             }
         }
     }

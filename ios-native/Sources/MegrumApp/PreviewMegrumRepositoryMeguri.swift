@@ -29,9 +29,14 @@ public extension PreviewMegrumRepository {
             authorID: NativePreviewData.viewerID,
             imageURL: URL(string: "https://example.com/native-groom-preview.jpg")!,
             latitude: input.latitude ?? NativePreviewData.grooms.first?.latitude ?? 35.681236,
-            longitude: input.longitude ?? NativePreviewData.grooms.first?.longitude ?? 139.767125
+            longitude: input.longitude ?? NativePreviewData.grooms.first?.longitude ?? 139.767125,
+            groupID: input.groupID,
+            characterID: input.characterID,
+            seriesName: input.seriesName
         )
     }
+
+    func deleteGroomPost(postID: UUID) async throws {}
 
     func markGroomViewed(postID: UUID) async throws {}
 
@@ -72,6 +77,8 @@ public extension PreviewMegrumRepository {
             userID: NativePreviewData.viewerID,
             displayName: input.displayName,
             avatarID: input.avatarID,
+            avatarURL: previewMeguriAvatarURL(from: input),
+            usesPublicProfile: input.usesPublicProfile,
             lastChangedAt: .now
         )
     }
@@ -86,13 +93,38 @@ public extension PreviewMegrumRepository {
             senderID: input.senderID,
             recipientID: input.recipientID,
             sourceGroomReplyID: input.sourceGroomReplyID,
+            sourceGroomPostID: input.sourceGroomPostID,
+            sourceGroomOwnerID: input.sourceGroomOwnerID,
+            sourceGroomImageURL: input.sourceGroomImageURL,
             body: input.body
         )
     }
 
-    func markMeguriMessagesRead(peerID: UUID, readAt: Date) async throws -> [MeguriMessage] {
+    func sendMeguriPhotoMessage(_ input: MeguriPhotoMessageCreateInput) async throws -> MeguriMessage {
+        let photoURL = try await PreviewMeguriMessageMediaStore.shared.storePhoto(input)
+        return MeguriMessage(
+            id: UUID(),
+            senderID: input.senderID,
+            recipientID: input.recipientID,
+            sourceGroomReplyID: input.sourceGroomReplyID,
+            sourceGroomPostID: input.sourceGroomPostID,
+            sourceGroomOwnerID: input.sourceGroomOwnerID,
+            sourceGroomImageURL: input.sourceGroomImageURL,
+            messageType: .image,
+            body: input.body,
+            imageURL: photoURL,
+            imagePath: photoURL.lastPathComponent
+        )
+    }
+
+    func markMeguriMessagesRead(peerID: UUID, sourceGroomPostID: UUID?, includesAllSources: Bool, readAt: Date) async throws -> [MeguriMessage] {
         NativePreviewData.meguriMessages.compactMap { message in
-            guard message.senderID == peerID, message.recipientID == NativePreviewData.viewerID, message.readAt == nil else {
+            guard
+                message.senderID == peerID,
+                message.recipientID == NativePreviewData.viewerID,
+                includesAllSources || message.sourceGroomPostID == sourceGroomPostID,
+                message.readAt == nil
+            else {
                 return nil
             }
             var next = message
@@ -127,6 +159,12 @@ public extension PreviewMegrumRepository {
         )
     }
 
+    func setBoardThreadReaction(threadID: UUID, reaction: BoardMessageReaction?) async throws {}
+
+    func setBoardReplyReaction(replyID: UUID, reaction: BoardMessageReaction?) async throws {}
+
+    func reportBoardThread(threadID: UUID, reason: String) async throws {}
+
     func createBoardThread(_ input: BoardThreadCreateInput) async throws -> BoardThread {
         let imageURLs = previewBoardThreadImageURLs(from: input)
         return BoardThread(
@@ -140,6 +178,9 @@ public extension PreviewMegrumRepository {
             prefecture: input.prefecture,
             imageURLs: imageURLs,
             imagePaths: input.imagePaths,
+            groupID: input.groupID,
+            characterID: input.characterID,
+            seriesName: input.seriesName,
             anonymousDisplayName: input.anonymousDisplayName,
             anonymousAvatarID: input.anonymousAvatarID
         )
@@ -174,6 +215,8 @@ public extension PreviewMegrumRepository {
                 userID: userID,
                 displayName: "みちめぐり",
                 avatarID: "avatar_1",
+                avatarURL: nil,
+                usesPublicProfile: false,
                 lastChangedAt: Date(timeIntervalSince1970: 1_766_000_000)
             )
         }
@@ -182,6 +225,8 @@ public extension PreviewMegrumRepository {
                 userID: userID,
                 displayName: "まくはり民",
                 avatarID: "avatar_3",
+                avatarURL: nil,
+                usesPublicProfile: true,
                 lastChangedAt: Date(timeIntervalSince1970: 1_766_100_000)
             )
         }
@@ -189,7 +234,27 @@ public extension PreviewMegrumRepository {
             userID: userID,
             displayName: "めぐりさん",
             avatarID: "avatar_2",
+            avatarURL: nil,
+            usesPublicProfile: false,
             lastChangedAt: Date(timeIntervalSince1970: 1_766_200_000)
         )
+    }
+
+    private func previewMeguriAvatarURL(from input: MeguriProfileUpdateInput) -> URL? {
+        if let upload = input.avatarUpload {
+            let fileExtension = upload.contentType.lowercased().contains("png") ? "png" : "jpg"
+            let url = FileManager.default.temporaryDirectory
+                .appendingPathComponent("megrum-meguri-profile-avatar-\(UUID().uuidString).\(fileExtension)")
+            do {
+                try upload.data.write(to: url, options: .atomic)
+                return url
+            } catch {
+                return input.avatarURL
+            }
+        }
+        if input.clearsAvatarURL {
+            return nil
+        }
+        return input.avatarURL
     }
 }

@@ -1,11 +1,81 @@
 import Foundation
-import MegrumApp
+@testable import MegrumApp
 import MegrumCore
 import MegrumData
 import XCTest
 
 @MainActor
 final class AuthScreenInputTests: XCTestCase {
+    func testAuthInputRowPresentationStateTogglesPasswordVisibility() {
+        var state = AuthInputRowPresentationState()
+
+        XCTAssertTrue(state.usesSecureInput(for: .password))
+        XCTAssertFalse(state.usesSecureInput(for: .email))
+        XCTAssertEqual(state.passwordVisibilityIconName, "eye")
+
+        state.togglePasswordVisibility()
+
+        XCTAssertFalse(state.usesSecureInput(for: .password))
+        XCTAssertEqual(state.passwordVisibilityIconName, "eye.slash")
+    }
+
+    func testAuthScreenInputStateNormalizesEmailSubmissionAndHandle() {
+        var state = AuthScreenInputState()
+        state.email = " michi@example.com "
+        state.password = "password123"
+        state.handle = " michi_1 "
+        state.identityProviderError = "old provider error"
+
+        let input = state.validatedEmailSubmissionInput(mode: .signUp)
+
+        XCTAssertEqual(input?.email, "michi@example.com")
+        XCTAssertEqual(input?.password, "password123")
+        XCTAssertEqual(input?.handle, "michi_1")
+        XCTAssertEqual(state.email, "michi@example.com")
+        XCTAssertEqual(state.handle, "michi_1")
+        XCTAssertNil(state.inputErrorMessage)
+        XCTAssertNil(state.identityProviderError)
+    }
+
+    func testAuthScreenInputStateKeepsValidationMessageOnInvalidSubmission() {
+        var state = AuthScreenInputState()
+        state.email = "michi@example.com"
+        state.password = ""
+        state.identityProviderError = "old provider error"
+
+        let input = state.validatedEmailSubmissionInput(mode: .signIn)
+
+        XCTAssertNil(input)
+        XCTAssertEqual(state.inputErrorMessage, MegrumAuthInputValidator.missingPasswordMessage)
+        XCTAssertNil(state.identityProviderError)
+    }
+
+    func testAuthScreenInputStatePreparesAndValidatesPasswordReset() {
+        var state = AuthScreenInputState()
+        state.email = " user@example.com "
+        state.passwordResetInputErrorMessage = "old reset error"
+
+        state.preparePasswordResetRoute()
+
+        XCTAssertEqual(state.passwordResetEmail, "user@example.com")
+        XCTAssertFalse(state.hasSubmittedPasswordReset)
+        XCTAssertNil(state.passwordResetInputErrorMessage)
+
+        state.passwordResetEmail = "broken"
+        XCTAssertNil(state.validatedPasswordResetEmail())
+        XCTAssertTrue(state.hasSubmittedPasswordReset)
+        XCTAssertEqual(state.passwordResetInputErrorMessage, MegrumAuthInputValidator.invalidEmailMessage)
+
+        state.passwordResetEmail = " reset@example.com "
+        state.passwordResetEmailChanged()
+        let normalizedEmail = state.validatedPasswordResetEmail()
+
+        XCTAssertEqual(normalizedEmail, "reset@example.com")
+        XCTAssertEqual(state.email, "reset@example.com")
+        XCTAssertTrue(state.hasSubmittedPasswordReset)
+        XCTAssertNil(state.passwordResetInputErrorMessage)
+    }
+
     func testSignInValidationMessagesSeparateEmailAndPassword() {
         XCTAssertEqual(
             MegrumAuthInputValidator.signInValidationMessage(
@@ -106,6 +176,41 @@ final class AuthScreenInputTests: XCTestCase {
         XCTAssertNil(state.errorMessage)
         XCTAssertNil(state.passwordResetMessage)
         XCTAssertNil(state.successMessage)
+    }
+
+    func testAuthStateDoesNotExposeRegisteredEmailSignUpError() async {
+        let state = MegrumAuthState(
+            repository: SupabaseSignUpErrorAuthRepository(message: "User already registered")
+        )
+
+        await state.signUp(email: "michi@example.com", password: "password123", handle: "michi_1")
+
+        XCTAssertEqual(
+            state.errorMessage,
+            MegrumAuthFeedbackText.genericSignUpFailure
+        )
+        XCTAssertFalse(state.errorMessage?.localizedCaseInsensitiveContains("registered") ?? true)
+        XCTAssertNil(state.successMessage)
+        XCTAssertFalse(state.isLoading)
+    }
+
+    func testAuthStateDoesNotExposeUnknownSupabasePasswordResetError() async {
+        let rawMessage = "database_error: users.email lookup failed for michi@example.com"
+        let state = MegrumAuthState(
+            repository: PasswordResetFailingAuthRepository(message: rawMessage)
+        )
+
+        let sent = await state.sendPasswordReset(email: "michi@example.com")
+
+        XCTAssertFalse(sent)
+        XCTAssertEqual(
+            state.errorMessage,
+            MegrumAuthFeedbackText.genericPasswordResetFailure
+        )
+        XCTAssertFalse(state.errorMessage?.contains(rawMessage) ?? true)
+        XCTAssertNil(state.successMessage)
+        XCTAssertNil(state.passwordResetMessage)
+        XCTAssertFalse(state.isLoading)
     }
 
     func testAuthStateReportsStoredSessionLoadFailure() {
@@ -319,6 +424,40 @@ private struct PasswordResetSuccessAuthRepository: MegrumAuthRepository {
     }
 
     func sendPasswordReset(email: String) async throws {}
+
+    func signOut(session: AuthSession) async throws {}
+}
+
+private struct SupabaseSignUpErrorAuthRepository: MegrumAuthRepository {
+    var isConfigured: Bool { true }
+    var message: String
+
+    func signIn(email: String, password: String) async throws -> AuthSession {
+        throw TestAuthError.unused
+    }
+
+    func signUp(_ input: AuthSignUpInput) async throws -> AuthSession {
+        throw SupabaseAuthError.unexpectedStatus(400, message)
+    }
+
+    func signOut(session: AuthSession) async throws {}
+}
+
+private struct PasswordResetFailingAuthRepository: MegrumAuthRepository {
+    var isConfigured: Bool { true }
+    var message: String
+
+    func signIn(email: String, password: String) async throws -> AuthSession {
+        throw TestAuthError.unused
+    }
+
+    func signUp(_ input: AuthSignUpInput) async throws -> AuthSession {
+        throw TestAuthError.unused
+    }
+
+    func sendPasswordReset(email: String) async throws {
+        throw SupabaseAuthError.unexpectedStatus(500, message)
+    }
 
     func signOut(session: AuthSession) async throws {}
 }

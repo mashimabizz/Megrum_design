@@ -4,6 +4,10 @@ import UIKit
 struct GoodsSharePostPayload: Identifiable {
     let id = UUID()
     var text: String
-    var image: UIImage
+    var images: [UIImage]
+
+    var activityItems: [Any] {
+        [text] + images
+    }
 }
 #endif

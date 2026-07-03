@@ -3,7 +3,11 @@ import MegrumCore
 import MegrumData
 
 public struct PreviewMegrumRepository: MegrumRepository {
-    public init() {}
+    private let subscriptionState: UserSubscriptionState
+
+    public init(subscriptionState: UserSubscriptionState = .free) {
+        self.subscriptionState = subscriptionState
+    }
 
     public static func resetTradePhotoLocalStoreForTesting() async {
         await PreviewTradePhotoLocalStore.shared.reset()
@@ -17,8 +21,13 @@ public struct PreviewMegrumRepository: MegrumRepository {
             listings: NativePreviewData.listings,
             proposals: NativePreviewData.proposals,
             grooms: NativePreviewData.grooms,
-            threads: NativePreviewData.threads
+            threads: NativePreviewData.threads,
+            subscriptionState: subscriptionState
         )
+    }
+
+    public func loadSubscriptionState() async throws -> UserSubscriptionState {
+        subscriptionState
     }
 
     public func loadHomeCandidateSections() async throws -> HomeCandidateSections {

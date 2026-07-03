@@ -9,6 +9,7 @@ struct BoardThreadDetailPresentation {
     var authorRelativeTime: String
     var participantAvatars: [BoardParticipantAvatar]
     var replies: [BoardReplyDisplay]
+    var chatMessages: [BoardThreadChatMessageDisplay]
     var participantIDs: [UUID]
 }
 
@@ -29,6 +30,7 @@ struct BoardThreadDetailPresentationBuilder {
             authorRelativeTime: relativeTime(from: thread.createdAt, now: now),
             participantAvatars: participantAvatars,
             replies: replyRows(now: now),
+            chatMessages: chatMessages(now: now),
             participantIDs: participantIDs
         )
     }
@@ -50,8 +52,11 @@ struct BoardThreadDetailPresentationBuilder {
     }
 
     private var authorAvatarURL: URL? {
-        if isThreadAuthorAnonymous || meguriProfilesByUserID[thread.authorID] != nil {
+        if isThreadAuthorAnonymous {
             return nil
+        }
+        if let meguriProfile = meguriProfilesByUserID[thread.authorID] {
+            return meguriProfile.avatarURL
         }
         return profile(for: thread.authorID)?.avatarURL ?? fallbackGroomURL(index: 0)
     }
@@ -76,9 +81,13 @@ struct BoardThreadDetailPresentationBuilder {
             return BoardParticipantAvatar(
                 id: id,
                 avatarID: isAuthor ? authorAvatarID : meguriProfilesByUserID[id]?.avatarID,
-                avatarURL: isAuthor && !isThreadAuthorAnonymous && meguriProfilesByUserID[id] == nil
-                    ? profile(for: id)?.avatarURL ?? fallbackGroomURL(index: index)
-                    : nil,
+                avatarURL: isAuthor
+                    ? avatarURL(
+                        for: id,
+                        fallbackIndex: index,
+                        isThreadAuthorAnonymous: isThreadAuthorAnonymous
+                    )
+                    : meguriProfilesByUserID[id]?.avatarURL,
                 initial: isAuthor ? authorInitial : isMine ? "あ" : displayName.first.map(String.init) ?? "話"
             )
         }
@@ -100,12 +109,55 @@ struct BoardThreadDetailPresentationBuilder {
                 reply: reply,
                 displayName: displayName,
                 avatarID: meguriProfilesByUserID[reply.authorID]?.avatarID,
-                avatarURL: showsPublicAuthorAvatar ? profile(for: reply.authorID)?.avatarURL ?? fallbackGroomURL(index: index + 1) : nil,
+                avatarURL: showsPublicAuthorAvatar
+                    ? profile(for: reply.authorID)?.avatarURL ?? fallbackGroomURL(index: index + 1)
+                    : meguriProfilesByUserID[reply.authorID]?.avatarURL,
                 initial: displayName.first.map(String.init) ?? "話",
                 isMine: isMine,
-                relativeTime: relativeTime(from: reply.createdAt, now: now)
+                relativeTime: relativeTime(from: reply.createdAt, now: now),
+                goodReactionCount: max(0, reply.goodReactionCount ?? 0),
+                badReactionCount: max(0, reply.badReactionCount ?? 0),
+                viewerReaction: reply.viewerReaction
             )
         }
+    }
+
+    private func chatMessages(now: Date) -> [BoardThreadChatMessageDisplay] {
+        let opening = BoardThreadChatMessageDisplay(
+            target: .thread(thread.id),
+            authorID: thread.authorID,
+            displayName: authorDisplayName,
+            avatarID: authorAvatarID,
+            avatarURL: authorAvatarURL,
+            initial: authorInitial,
+            isMine: thread.authorID == viewer?.id,
+            body: thread.body,
+            imageURLs: thread.imageURLs ?? [],
+            isDeleted: thread.status != "visible",
+            relativeTime: relativeTime(from: thread.createdAt, now: now),
+            goodReactionCount: max(0, thread.goodReactionCount ?? 0),
+            badReactionCount: max(0, thread.badReactionCount ?? 0),
+            viewerReaction: thread.viewerReaction
+        )
+        let replyMessages = replyRows(now: now).map { reply in
+            BoardThreadChatMessageDisplay(
+                target: .reply(reply.reply.id),
+                authorID: reply.reply.authorID,
+                displayName: reply.displayName,
+                avatarID: reply.avatarID,
+                avatarURL: reply.avatarURL,
+                initial: reply.initial,
+                isMine: reply.isMine,
+                body: reply.reply.body,
+                imageURLs: [],
+                isDeleted: reply.reply.status == .deleted,
+                relativeTime: reply.relativeTime,
+                goodReactionCount: reply.goodReactionCount,
+                badReactionCount: reply.badReactionCount,
+                viewerReaction: reply.viewerReaction
+            )
+        }
+        return [opening] + replyMessages
     }
 
     private func participantDisplayName(for userID: UUID, fallbackIndex: Int) -> String {
@@ -131,6 +183,20 @@ struct BoardThreadDetailPresentationBuilder {
             return viewer
         }
         return profilesByUserID[userID]?.profile
+    }
+
+    private func avatarURL(
+        for userID: UUID,
+        fallbackIndex: Int,
+        isThreadAuthorAnonymous: Bool
+    ) -> URL? {
+        if isThreadAuthorAnonymous {
+            return nil
+        }
+        if let meguriProfile = meguriProfilesByUserID[userID] {
+            return meguriProfile.avatarURL
+        }
+        return profile(for: userID)?.avatarURL ?? fallbackGroomURL(index: fallbackIndex)
     }
 
     private func fallbackGroomURL(index: Int) -> URL? {

@@ -6,6 +6,9 @@ public struct GroomPost: Identifiable, Codable, Hashable, Sendable {
     public var imageURL: URL
     public var latitude: Double
     public var longitude: Double
+    public var groupID: UUID?
+    public var characterID: UUID?
+    public var seriesName: String?
     public var createdAt: Date
     public var expiresAt: Date?
     public var likeCount: Int
@@ -17,6 +20,9 @@ public struct GroomPost: Identifiable, Codable, Hashable, Sendable {
         imageURL: URL,
         latitude: Double,
         longitude: Double,
+        groupID: UUID? = nil,
+        characterID: UUID? = nil,
+        seriesName: String? = nil,
         createdAt: Date = .now,
         expiresAt: Date? = nil,
         likeCount: Int = 0,
@@ -27,6 +33,9 @@ public struct GroomPost: Identifiable, Codable, Hashable, Sendable {
         self.imageURL = imageURL
         self.latitude = latitude
         self.longitude = longitude
+        self.groupID = groupID
+        self.characterID = characterID
+        self.seriesName = seriesName
         self.createdAt = createdAt
         self.expiresAt = expiresAt
         self.likeCount = likeCount
@@ -42,6 +51,9 @@ public struct GroomPostCreateInput: Equatable, Sendable {
     public var latitude: Double?
     public var longitude: Double?
     public var placeHint: String?
+    public var groupID: UUID?
+    public var characterID: UUID?
+    public var seriesName: String?
 
     public init(
         authorID: UUID,
@@ -50,7 +62,10 @@ public struct GroomPostCreateInput: Equatable, Sendable {
         caption: String? = nil,
         latitude: Double? = nil,
         longitude: Double? = nil,
-        placeHint: String? = nil
+        placeHint: String? = nil,
+        groupID: UUID? = nil,
+        characterID: UUID? = nil,
+        seriesName: String? = nil
     ) {
         self.authorID = authorID
         self.imageData = imageData
@@ -59,6 +74,9 @@ public struct GroomPostCreateInput: Equatable, Sendable {
         self.latitude = latitude
         self.longitude = longitude
         self.placeHint = placeHint
+        self.groupID = groupID
+        self.characterID = characterID
+        self.seriesName = seriesName
     }
 }
 

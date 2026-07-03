@@ -17,11 +17,13 @@ public struct MegrumRootView: View {
     @State private var interstitialAdRequest: AdInterstitialRequest?
     @State private var visualQAProposalRoute: HomeRelationRoute?
     @State private var didOpenVisualQAProposalRoute = false
+    @State private var pendingNotificationRouteIntent: NotificationRouteIntent?
     private let visualQAInitialScreen: VisualQAInitialScreen?
-    @State private var drawerDragTranslation: CGFloat = 0
     @State private var isReturningStoredIncompleteAccountToLogin = false
     @Environment(\.scenePhase) private var scenePhase
     @Binding private var notificationDestinationTab: MegrumTab?
+    @Binding private var notificationRouteLinkPath: String?
+    @Binding private var notificationRouteKindRawValue: String?
 
     public init(
         appState: MegrumAppState = MegrumAppState(),
@@ -29,7 +31,9 @@ public struct MegrumRootView: View {
             repository: PreviewMegrumAuthRepository(),
             initialSession: PreviewMegrumAuthRepository.previewSession()
         ),
-        notificationDestinationTab: Binding<MegrumTab?> = .constant(nil)
+        notificationDestinationTab: Binding<MegrumTab?> = .constant(nil),
+        notificationRouteLinkPath: Binding<String?> = .constant(nil),
+        notificationRouteKindRawValue: Binding<String?> = .constant(nil)
     ) {
         MegrumTabBarAppearance.configure()
         let visualQAInitialScreen = VisualQAPreviewMode.initialScreen(
@@ -42,6 +46,8 @@ public struct MegrumRootView: View {
         _requestedTradesStage = State(initialValue: VisualQATabRouteResolver.requestedTradesStage(for: visualQAInitialScreen))
         self.visualQAInitialScreen = visualQAInitialScreen
         _notificationDestinationTab = notificationDestinationTab
+        _notificationRouteLinkPath = notificationRouteLinkPath
+        _notificationRouteKindRawValue = notificationRouteKindRawValue
     }
 
     public var body: some View {
@@ -68,6 +74,14 @@ public struct MegrumRootView: View {
             }
             selectedTab = destination
             notificationDestinationTab = nil
+        }
+        .onChange(of: notificationRouteLinkPath) { _, linkPath in
+            guard let linkPath else {
+                return
+            }
+            handleNotificationRoute(linkPath: linkPath, kindRawValue: notificationRouteKindRawValue)
+            notificationRouteLinkPath = nil
+            notificationRouteKindRawValue = nil
         }
         .onChange(of: scenePhase) { _, phase in
             guard
@@ -129,15 +143,20 @@ public struct MegrumRootView: View {
             }
         }
         .megrumSlideItemPresentation(item: $drawerDestination) { destination, dismiss in
-            MegrumRootDrawerDestinationSheet(
-                appState: appState,
-                authState: authState,
-                destination: destination,
-                selectedTab: $selectedTab,
-                drawerDestination: $drawerDestination,
-                publicProfileRoute: $publicProfileRoute,
-                onClose: dismiss
-            )
+            MegrumDeferredContent {
+                MegrumRootDrawerDestinationSheet(
+                    appState: appState,
+                    authState: authState,
+                    destination: destination,
+                    selectedTab: $selectedTab,
+                    drawerDestination: $drawerDestination,
+                    publicProfileRoute: $publicProfileRoute,
+                    onOpenRouteIntent: { intent in
+                        applyNotificationRouteIntent(intent)
+                    },
+                    onClose: dismiss
+                )
+            }
         }
         .megrumSlideItemPresentation(item: $publicProfileRoute) { route, _ in
             NavigationStack {
@@ -235,7 +254,7 @@ public struct MegrumRootView: View {
             publicProfileRoute: $publicProfileRoute,
             homeSettingsRoute: $homeSettingsRoute,
             requestedWishSection: $requestedWishSection,
-            drawerDragTranslation: $drawerDragTranslation,
+            pendingNotificationRouteIntent: $pendingNotificationRouteIntent,
             adDisplayContext: adDisplayContext,
             visualQAInitialScreen: visualQAInitialScreen,
             onSignOut: {
@@ -262,12 +281,43 @@ public struct MegrumRootView: View {
         await appState.replaceRepository(
             MegrumAppStateFactory.repository(authSession: authState.session)
         )
+        // アプリアイコンのバッジ（未読通知数）を起動直後から反映できるよう、
+        // ドロワーを開く前に通知を読み込んでおく。
+        await appState.loadNotifications()
     }
 
     private func applyProposalCompletionRoute(_ action: ProposalCompletionAction) {
         let route = ProposalCompletionRouteResolver.resolve(action: action)
         requestedTradesStage = route.requestedTradesStage
         selectedTab = route.selectedTab
+    }
+
+    private func handleNotificationRoute(linkPath: String, kindRawValue: String?) {
+        let kind = kindRawValue.flatMap(MegrumNotificationKind.init(rawValue:))
+        guard let intent = NotificationRouteIntent(linkPath: linkPath, kind: kind) else {
+            selectedTab = MegrumTab(notificationLinkPath: linkPath) ?? .home
+            return
+        }
+        applyNotificationRouteIntent(intent)
+    }
+
+    private func applyNotificationRouteIntent(_ intent: NotificationRouteIntent) {
+        selectedTab = intent.fallbackTab
+        switch intent {
+        case .meguriMessages, .ownGroom:
+            pendingNotificationRouteIntent = intent
+        case .userProfile(let id), .userEvaluations(let id):
+            guard let userID = UUID(uuidString: id) else {
+                return
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
+                publicProfileRoute = PublicProfileRoute(userID: userID)
+            }
+        case .tab, .tradeDetail, .tradeEvidenceCapture, .tradeEvidenceApproval,
+             .tradeEvaluation, .tradeAssistance, .disputeDetail,
+             .meguriBoardThread, .unknown:
+            break
+        }
     }
 
     private func openVisualQAProposalRouteIfNeeded() {

@@ -22,6 +22,40 @@ public enum ReplyThreadStateReducer {
         return next
     }
 
+    public static func settingBoardThreadReaction(
+        _ reaction: BoardMessageReaction?,
+        threadID: UUID,
+        in threads: [BoardThread]
+    ) -> [BoardThread] {
+        threads.map { thread in
+            guard thread.id == threadID else {
+                return thread
+            }
+            var next = thread
+            next.applyBoardReaction(reaction)
+            return next
+        }
+    }
+
+    public static func settingBoardReplyReaction(
+        _ reaction: BoardMessageReaction?,
+        replyID: UUID,
+        in repliesByThreadID: [UUID: [BoardReply]]
+    ) -> [UUID: [BoardReply]] {
+        var next = repliesByThreadID
+        for (threadID, replies) in repliesByThreadID {
+            next[threadID] = replies.map { reply in
+                guard reply.id == replyID else {
+                    return reply
+                }
+                var nextReply = reply
+                nextReply.applyBoardReaction(reaction)
+                return nextReply
+            }
+        }
+        return next
+    }
+
     public static func appendingGroomReply(
         _ reply: GroomReply,
         to repliesByPostID: [UUID: [GroomReply]],
@@ -40,6 +74,63 @@ public enum ReplyThreadStateReducer {
         for (postID, postReplies) in Dictionary(grouping: replies, by: \.groomPostID) {
             next[postID] = postReplies.sorted { $0.createdAt > $1.createdAt }
         }
+        return next
+    }
+}
+
+private extension BoardThread {
+    mutating func applyBoardReaction(_ reaction: BoardMessageReaction?) {
+        let current = BoardReactionCounts(
+            good: goodReactionCount ?? 0,
+            bad: badReactionCount ?? 0,
+            viewerReaction: viewerReaction
+        )
+        let updated = current.applying(reaction)
+        goodReactionCount = updated.good
+        badReactionCount = updated.bad
+        viewerReaction = reaction
+    }
+}
+
+private extension BoardReply {
+    mutating func applyBoardReaction(_ reaction: BoardMessageReaction?) {
+        let current = BoardReactionCounts(
+            good: goodReactionCount ?? 0,
+            bad: badReactionCount ?? 0,
+            viewerReaction: viewerReaction
+        )
+        let updated = current.applying(reaction)
+        goodReactionCount = updated.good
+        badReactionCount = updated.bad
+        viewerReaction = reaction
+    }
+}
+
+private struct BoardReactionCounts {
+    var good: Int
+    var bad: Int
+    var viewerReaction: BoardMessageReaction?
+
+    func applying(_ nextReaction: BoardMessageReaction?) -> BoardReactionCounts {
+        var next = self
+        switch viewerReaction {
+        case .good:
+            next.good = max(0, next.good - 1)
+        case .bad:
+            next.bad = max(0, next.bad - 1)
+        case nil:
+            break
+        }
+
+        switch nextReaction {
+        case .good:
+            next.good += 1
+        case .bad:
+            next.bad += 1
+        case nil:
+            break
+        }
+        next.viewerReaction = nextReaction
         return next
     }
 }

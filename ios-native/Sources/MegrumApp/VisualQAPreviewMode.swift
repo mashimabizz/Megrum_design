@@ -20,6 +20,11 @@ enum VisualQAInitialScreen: String, Equatable {
     case authPasswordReset = "auth-password-reset"
     case accountSetup = "account-setup"
     case meguri
+    case groomArchive = "groom-archive"
+    case meguriProfileSettings = "meguri-profile-settings"
+    case meguriMessages = "meguri-messages"
+    case meguriMessageThread = "meguri-message-thread"
+    case subscriptionSettings = "subscription-settings"
     case individualListings = "individual-listings"
     case individualListingHaves = "individual-listing-haves"
     case individualListingWish = "individual-listing-wish"
@@ -28,6 +33,8 @@ enum VisualQAInitialScreen: String, Equatable {
     case individualListingExchange = "individual-listing-exchange"
     case ownProfile = "own-profile"
     case publicProfile = "public-profile"
+    case inventory
+    case wish
 
     var isAuthRoute: Bool {
         switch self {
@@ -42,6 +49,7 @@ enum VisualQAInitialScreen: String, Equatable {
 enum VisualQAPreviewMode {
     static let environmentKey = "MEGRUM_VISUAL_QA_PREVIEW_AUTH"
     static let initialScreenEnvironmentKey = "MEGRUM_VISUAL_QA_INITIAL_SCREEN"
+    static let subscriptionEnvironmentKey = "MEGRUM_VISUAL_QA_PREVIEW_SUBSCRIPTION"
 
     static func isEnabled(environment: [String: String]) -> Bool {
         switch environment[environmentKey]?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {

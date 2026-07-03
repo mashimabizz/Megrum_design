@@ -8,9 +8,7 @@ extension SearchScreen {
                 guard SearchBackSwipeResolver.shouldDismiss(
                     translation: value.translation,
                     predictedEndTranslationWidth: value.predictedEndTranslation.width,
-                    isSuppressedByNestedHorizontalScroll: SearchBackSwipeResolver.isSuppressedByNestedHorizontalScroll(
-                        lastNestedHorizontalScrollDate: lastWishSuggestionHorizontalScrollDate
-                    )
+                    isSuppressedByNestedHorizontalScroll: presentationState.isBackSwipeSuppressed()
                 ) else {
                     return
                 }
@@ -27,6 +25,6 @@ extension SearchScreen {
     }
 
     func markWishSuggestionHorizontalScroll() {
-        lastWishSuggestionHorizontalScrollDate = Date()
+        presentationState.markWishSuggestionHorizontalScroll()
     }
 }

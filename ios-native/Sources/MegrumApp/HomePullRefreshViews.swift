@@ -4,8 +4,8 @@ import SwiftUI
 enum HomePullRefreshPresentation {
     static let triggerDistance: CGFloat = 86
 
-    static func effectivePullOffset(scrollOffset: CGFloat, manualOffset: CGFloat) -> CGFloat {
-        max(max(0, scrollOffset), max(0, manualOffset))
+    static func effectivePullOffset(scrollOffset: CGFloat) -> CGFloat {
+        max(0, scrollOffset)
     }
 
     static func progress(for pullOffset: CGFloat, isRefreshing: Bool) -> CGFloat {
@@ -33,9 +33,7 @@ struct HomePullRefreshScrollView<Content: View>: View {
     var onRefresh: () async -> Void
     @ViewBuilder var content: () -> Content
 
-    @State private var pullOffset: CGFloat = 0
-    @State private var manualPullOffset: CGFloat = 0
-    @State private var isRefreshing = false
+    @State private var presentationState = HomePullRefreshPresentationState()
 
     var body: some View {
         GeometryReader { geometry in
@@ -49,66 +47,30 @@ struct HomePullRefreshScrollView<Content: View>: View {
             .refreshable {
                 await performRefresh()
             }
-            .simultaneousGesture(manualPullGesture)
         }
         .overlay(alignment: .top) {
             HomePullRefreshIndicator(
                 progress: progress,
-                isRefreshing: isRefreshing
+                isRefreshing: presentationState.isRefreshing
             )
             .padding(.top, indicatorTopPadding)
         }
         .onPreferenceChange(HomePullRefreshOffsetPreferenceKey.self) { value in
-            pullOffset = max(0, value)
+            presentationState.updateScrollOffset(value)
         }
     }
 
     private var progress: CGFloat {
-        HomePullRefreshPresentation.progress(
-            for: HomePullRefreshPresentation.effectivePullOffset(
-                scrollOffset: pullOffset,
-                manualOffset: manualPullOffset
-            ),
-            isRefreshing: isRefreshing
-        )
-    }
-
-    private var manualPullGesture: some Gesture {
-        DragGesture(minimumDistance: 8)
-            .onChanged { value in
-                guard canTrackManualPull(for: value) else {
-                    manualPullOffset = 0
-                    return
-                }
-                manualPullOffset = value.translation.height
-            }
-            .onEnded { value in
-                let reachedRefreshDistance = canTrackManualPull(for: value)
-                    && value.translation.height >= HomePullRefreshPresentation.triggerDistance
-                manualPullOffset = 0
-                guard reachedRefreshDistance else {
-                    return
-                }
-                Task { @MainActor in
-                    await performRefresh()
-                }
-            }
-    }
-
-    private func canTrackManualPull(for value: DragGesture.Value) -> Bool {
-        pullOffset >= -1
-            && value.translation.height > 0
-            && value.translation.height > abs(value.translation.width)
+        presentationState.progress
     }
 
     @MainActor
     private func performRefresh() async {
-        guard !isRefreshing else {
+        guard presentationState.beginRefreshIfNeeded() else {
             return
         }
-        isRefreshing = true
         defer {
-            isRefreshing = false
+            presentationState.finishRefresh()
         }
         await onRefresh()
     }

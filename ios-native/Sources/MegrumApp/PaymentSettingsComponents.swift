@@ -14,6 +14,49 @@ enum PaymentSettingsField: Hashable {
     case otherNote
 }
 
+struct PaymentSettingsFormContent: View {
+    var draft: PaymentSettingsDraft
+    @Binding var otherNote: String
+    @Binding var bankName: String
+    @Binding var bankBranchName: String
+    @Binding var bankAccountType: String
+    @Binding var bankAccountNumber: String
+    @Binding var bankAccountHolder: String
+    var focusedField: FocusState<PaymentSettingsField?>.Binding
+    var validationMessage: String?
+    var appErrorMessage: String?
+    var onToggleMethod: (UserPaymentMethod) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 22) {
+            PaymentSettingsSectionTitle("対応できる方法")
+            PaymentSettingsMethodsCard(
+                selectedMethods: draft.methods,
+                otherNote: $otherNote,
+                focusedField: focusedField,
+                onToggleMethod: onToggleMethod
+            )
+
+            if draft.requiresBankAccountDetails {
+                PaymentSettingsSectionTitle("銀行振込の受け取り口座")
+                PaymentSettingsBankCard(
+                    bankName: $bankName,
+                    bankBranchName: $bankBranchName,
+                    bankAccountType: $bankAccountType,
+                    bankAccountNumber: $bankAccountNumber,
+                    bankAccountHolder: $bankAccountHolder,
+                    focusedField: focusedField
+                )
+            }
+
+            PaymentSettingsValidationErrorView(
+                validationMessage: validationMessage,
+                appErrorMessage: appErrorMessage
+            )
+        }
+    }
+}
+
 struct PaymentSettingsSectionTitle: View {
     var title: String
 

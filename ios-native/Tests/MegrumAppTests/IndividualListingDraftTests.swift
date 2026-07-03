@@ -275,6 +275,82 @@ final class IndividualListingDraftTests: XCTestCase {
         XCTAssertNil(IndividualListingListPresentation.optionLogicTitle(for: cashOption))
     }
 
+    func testIndividualListingsPresentationStateDisplaysLocalEditsAndDeleteTarget() {
+        let originalID = UUID()
+        let ownerID = UUID()
+        let original = IndividualListing(
+            id: originalID,
+            ownerID: ownerID,
+            haves: [],
+            note: "変更前",
+            options: []
+        )
+        let updated = IndividualListing(
+            id: originalID,
+            ownerID: ownerID,
+            haves: [],
+            note: "変更後",
+            options: []
+        )
+        var state = IndividualListingsPresentationState()
+
+        state.recordEdited(updated)
+        state.requestDelete(original)
+
+        XCTAssertEqual(state.displayedListings([original]).first?.note, "変更後")
+        XCTAssertEqual(state.pendingDeleteListing?.id, originalID)
+
+        state.clearPendingDelete()
+        state.removeLocalEdit(for: originalID)
+
+        XCTAssertNil(state.pendingDeleteListing)
+        XCTAssertEqual(state.displayedListings([original]).first?.note, "変更前")
+    }
+
+    func testIndividualListingsPresentationStateConsumesInitialEditorAndGatesFreeLimit() {
+        var state = IndividualListingsPresentationState()
+
+        XCTAssertFalse(
+            state.shouldPresentInitialEditor(
+                initiallyPresentsEditor: false,
+                initialEditorOptionKind: nil,
+                initialEditorStep: .haves
+            )
+        )
+
+        XCTAssertTrue(
+            state.shouldPresentInitialEditor(
+                initiallyPresentsEditor: true,
+                initialEditorOptionKind: nil,
+                initialEditorStep: .haves
+            )
+        )
+        XCTAssertFalse(
+            state.shouldPresentInitialEditor(
+                initiallyPresentsEditor: true,
+                initialEditorOptionKind: nil,
+                initialEditorStep: .haves
+            )
+        )
+
+        state.openCreateEditor(optionKind: nil, listings: [], subscriptionState: .free)
+        XCTAssertEqual(state.editorRoute?.id, "create-default")
+
+        state.closeEditor()
+        state.openCreateEditor(
+            optionKind: nil,
+            listings: [
+                IndividualListing(id: UUID(), ownerID: UUID(), haves: [], status: .active),
+                IndividualListing(id: UUID(), ownerID: UUID(), haves: [], status: .paused),
+                IndividualListing(id: UUID(), ownerID: UUID(), haves: [], status: .matched)
+            ],
+            subscriptionState: .free
+        )
+
+        XCTAssertNil(state.editorRoute)
+        XCTAssertTrue(state.showsMegrumPlusUpsell)
+    }
+
     func testIndividualListingInputNormalizerClampsQuantitiesAndTrimsNote() {
         let haveID = UUID()
         let wishID = UUID()
@@ -693,6 +769,8 @@ final class IndividualListingDraftTests: XCTestCase {
 
         let input = try XCTUnwrap(draft.createInput(inventory: [], wishes: [wish]))
         XCTAssertTrue(input.hasOfferCondition)
+        XCTAssertTrue(input.haveIsCashOffer)
+        XCTAssertEqual(input.haveCashAmount, 1_500)
         XCTAssertTrue(input.haveItems.isEmpty)
         XCTAssertEqual(input.wishItems, [ListingItemQuantity(itemID: wish.id, quantity: 1)])
         XCTAssertTrue(input.note?.contains("譲る金額: ¥1500") == true)
@@ -943,12 +1021,105 @@ final class IndividualListingDraftTests: XCTestCase {
         XCTAssertEqual(item.addedToastMessage, "選択肢1（定価：¥1,500）を追加しました")
     }
 
+    func testIndividualListingEditorPresentationStateSeedsStepAndHavesTab() {
+        var draft = IndividualListingDraft(mode: .create(preselectedWishID: nil))
+        draft.setHaveOfferKind(.cash)
+
+        let state = IndividualListingEditorPresentationState(initialStep: .options, draft: draft)
+
+        XCTAssertEqual(state.step, .options)
+        XCTAssertEqual(state.havesTab, .cash)
+    }
+
+    func testIndividualListingEditorPresentationStateStagesAndDeletesOptions() {
+        var state = IndividualListingEditorPresentationState(step: .options)
+        let first = IndividualListingOptionReviewItem(title: "選択肢1", kind: "Wish", detail: "サナ")
+        let secondID = UUID()
+        let second = IndividualListingOptionReviewItem(id: secondID, title: "選択肢2", kind: "条件", detail: "TWICE")
+        let third = IndividualListingOptionReviewItem(title: "選択肢3", kind: "定価", detail: "¥1,500")
+
+        state.appendStagedOption(first)
+        state.appendStagedOption(second)
+        state.appendStagedOption(third)
+        XCTAssertEqual(state.nextOptionTitle, "選択肢4")
+
+        state.deleteStagedOption(id: secondID)
+
+        XCTAssertEqual(state.stagedOptionSummaries.map(\.title), ["選択肢1", "選択肢2"])
+        XCTAssertEqual(state.stagedOptionSummaries.map(\.kind), ["Wish", "定価"])
+    }
+
+    func testIndividualListingEditorPresentationStateTracksSaveErrorAndToast() {
+        var state = IndividualListingEditorPresentationState(step: .haves)
+        let staleToastID = UUID()
+        let currentToastID = UUID()
+        let item = IndividualListingOptionReviewItem(title: "選択肢1", kind: "定価", detail: "¥1,500")
+
+        state.setSaveError("保存できませんでした")
+        XCTAssertEqual(state.saveErrorMessage, "保存できませんでした")
+        state.clearSaveError()
+        XCTAssertNil(state.saveErrorMessage)
+
+        state.showOptionReview()
+        XCTAssertTrue(state.showsOptionReview)
+        state.showOptionAddedToast(for: item, toastID: currentToastID)
+        XCTAssertEqual(state.optionToastMessage, item.addedToastMessage)
+        state.clearOptionToast(ifMatching: staleToastID)
+        XCTAssertEqual(state.optionToastMessage, item.addedToastMessage)
+        state.clearOptionToast(ifMatching: currentToastID)
+        XCTAssertNil(state.optionToastMessage)
+    }
+
     func testBottomBarPresentationKeepsAddOptionTitleStable() {
         XCTAssertEqual(IndividualListingEditorBottomBarPresentation.addOptionTitle, "選択肢に追加")
         XCTAssertEqual(IndividualListingEditorBottomBarPresentation.selectAllVisibleTitle, "すべて登録")
         XCTAssertEqual(IndividualListingEditorBottomBarPresentation.deselectAllVisibleTitle, "すべて解除")
         XCTAssertEqual(IndividualListingEditorBottomBarPresentation.selectedCountTitle(12), "選択中12件")
         XCTAssertEqual(ListingLogic.minimumCountTitle(1), "1個以上")
+    }
+
+    func testFooterLogicPresentationStateShowsMinimumPickerOnlyForAtLeastLogic() {
+        var state = IndividualListingFooterLogicPresentationState()
+
+        XCTAssertEqual(state.minimumChoices(selectedCount: 1), [])
+        XCTAssertEqual(state.minimumChoices(selectedCount: 3), [1, 2, 3])
+
+        XCTAssertEqual(state.selectLogic(.all), .all)
+        XCTAssertFalse(state.isShowingMinimumPicker)
+
+        XCTAssertEqual(state.selectLogic(.atLeast), .atLeast)
+        XCTAssertTrue(state.isShowingMinimumPicker)
+
+        state.dismissMinimumPicker()
+        XCTAssertFalse(state.isShowingMinimumPicker)
+    }
+
+    func testConditionPresentationStateTracksPickerAndTagSheetVisibility() {
+        var state = IndividualListingConditionPresentationState()
+
+        XCTAssertFalse(state.isShowingMemberPicker)
+        XCTAssertFalse(state.isShowingTagSheet)
+
+        state.showMemberPicker()
+        XCTAssertTrue(state.isShowingMemberPicker)
+
+        state.dismissMemberPicker()
+        XCTAssertFalse(state.isShowingMemberPicker)
+
+        state.showTagSheet()
+        XCTAssertTrue(state.isShowingTagSheet)
+    }
+
+    func testReceivePanelPresentationStateTracksOptionBreakdownSheet() {
+        var state = IndividualListingReceivePanelPresentationState()
+
+        XCTAssertFalse(state.isShowingOptionBreakdown)
+
+        state.showOptionBreakdown()
+        XCTAssertTrue(state.isShowingOptionBreakdown)
+
+        state.dismissOptionBreakdown()
+        XCTAssertFalse(state.isShowingOptionBreakdown)
     }
 
     func testIndividualListingEditorSaveFailureCopyIsVisible() {

@@ -70,6 +70,24 @@ final class SupabaseGroomClientTests: XCTestCase {
         XCTAssertEqual(json["p_radius_m"] as? Int, 3_000)
     }
 
+    func testBuildsDeleteGroomPostRequestAsHiddenStatusPatch() throws {
+        let client = SupabaseGroomClient(configuration: configuration)
+        let userID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+        let postID = UUID(uuidString: "00000000-0000-0000-0000-000000000501")!
+
+        let request = try client.makeDeletePostRequest(userID: userID, postID: postID)
+        let body = try XCTUnwrap(request.httpBody)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+
+        XCTAssertEqual(request.httpMethod, "PATCH")
+        XCTAssertEqual(
+            request.url?.absoluteString,
+            "https://example.supabase.co/rest/v1/groom_posts?select=id&id=eq.\(postID.uuidString.lowercased())&user_id=eq.\(userID.uuidString.lowercased())"
+        )
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Prefer"), "return=representation")
+        XCTAssertEqual(json["status"] as? String, "hidden")
+    }
+
     func testLoadNearbyGroomsKeepsPathOnlyRowWhenSignedURLFails() throws {
         let imagePath = "00000000-0000-0000-0000-000000000001/path-only.jpg"
         let configuration = URLSessionConfiguration.ephemeral
@@ -234,6 +252,8 @@ final class SupabaseGroomClientTests: XCTestCase {
     func testBuildsGroomPostCreateRequest() throws {
         let client = SupabaseGroomClient(configuration: configuration)
         let authorID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+        let groupID = UUID(uuidString: "00000000-0000-0000-0000-000000000011")!
+        let characterID = UUID(uuidString: "00000000-0000-0000-0000-000000000012")!
 
         let request = try client.makeCreatePostRequest(
             GroomPostCreateInput(
@@ -242,7 +262,10 @@ final class SupabaseGroomClientTests: XCTestCase {
                 imageContentType: "image/jpeg",
                 caption: " 物販列メモ ",
                 latitude: 35.681236,
-                longitude: 139.767125
+                longitude: 139.767125,
+                groupID: groupID,
+                characterID: characterID,
+                seriesName: " 2026 LIVE "
             ),
             imagePath: "00000000-0000-0000-0000-000000000001/test.jpg"
         )
@@ -251,7 +274,7 @@ final class SupabaseGroomClientTests: XCTestCase {
         let payload = try XCTUnwrap(rows.first)
 
         XCTAssertEqual(request.httpMethod, "POST")
-        XCTAssertEqual(request.url?.absoluteString, "https://example.supabase.co/rest/v1/groom_posts?select=id,user_id,image_url,image_path,published_at,expires_at,created_at,origin_lat,origin_lng")
+        XCTAssertEqual(request.url?.absoluteString, "https://example.supabase.co/rest/v1/groom_posts?select=id,user_id,image_url,image_path,published_at,expires_at,created_at,origin_lat,origin_lng,group_id,character_id,series_name")
         XCTAssertEqual(request.value(forHTTPHeaderField: "Prefer"), "return=representation")
         XCTAssertEqual(payload["user_id"] as? String, authorID.uuidString.lowercased())
         XCTAssertEqual(payload["status"] as? String, "published")
@@ -261,6 +284,9 @@ final class SupabaseGroomClientTests: XCTestCase {
         XCTAssertEqual(payload["caption"] as? String, "物販列メモ")
         XCTAssertEqual(payload["origin_lat"] as? Double, 35.681236)
         XCTAssertEqual(payload["origin_lng"] as? Double, 139.767125)
+        XCTAssertEqual(payload["group_id"] as? String, groupID.uuidString.lowercased())
+        XCTAssertEqual(payload["character_id"] as? String, characterID.uuidString.lowercased())
+        XCTAssertEqual(payload["series_name"] as? String, "2026 LIVE")
     }
 
     func testBuildsGroomViewAndReactionRequests() throws {
@@ -454,6 +480,9 @@ final class SupabaseGroomClientTests: XCTestCase {
         XCTAssertEqual(meguriMessagePayload["sender_id"] as? String, senderID.uuidString.lowercased())
         XCTAssertEqual(meguriMessagePayload["recipient_id"] as? String, recipientID.uuidString.lowercased())
         XCTAssertEqual(meguriMessagePayload["source_groom_reply_id"] as? String, replyID.uuidString.lowercased())
+        XCTAssertEqual(meguriMessagePayload["source_groom_post_id"] as? String, postID.uuidString.lowercased())
+        XCTAssertEqual(meguriMessagePayload["source_groom_owner_id"] as? String, recipientID.uuidString.lowercased())
+        XCTAssertEqual(meguriMessagePayload["source_groom_image_url"] as? String, "https://example.com/groom.jpg")
         XCTAssertEqual(meguriMessagePayload["message_type"] as? String, "text")
         XCTAssertEqual(meguriMessagePayload["body"] as? String, "かわいいです")
     }
@@ -467,7 +496,7 @@ final class SupabaseGroomClientTests: XCTestCase {
         let archiveRequest = try client.makeLoadOwnGroomArchiveRequest(userID: userID, limit: 42)
         XCTAssertEqual(
             archiveRequest.url?.absoluteString,
-            "https://example.supabase.co/rest/v1/groom_posts?select=id,user_id,image_url,image_path,published_at,expires_at,created_at,origin_lat,origin_lng&user_id=eq.00000000-0000-0000-0000-000000000001&status=eq.published&order=published_at.desc.nullslast,created_at.desc&limit=42"
+            "https://example.supabase.co/rest/v1/groom_posts?select=id,user_id,image_url,image_path,published_at,expires_at,created_at,origin_lat,origin_lng,group_id,character_id,series_name&user_id=eq.00000000-0000-0000-0000-000000000001&status=eq.published&order=published_at.desc.nullslast,created_at.desc&limit=42"
         )
 
         let reactionsRequest = try client.makeLoadReactionsRequest(postIDs: [secondPostID, firstPostID])

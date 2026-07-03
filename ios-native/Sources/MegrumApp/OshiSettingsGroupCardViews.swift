@@ -16,20 +16,20 @@ struct OshiSettingsGroupCard: View {
     var onAddMember: (OshiCharacter) -> Void
     var onRequestMember: () -> Void
 
-    @State private var canConfirmRemoval = false
+    @State private var presentationState = OshiSettingsGroupCardPresentationState()
 
     private var summary: String? {
         OshiSettingsPresentationText.groupSummary(for: group)
     }
 
     private func showRemoveConfirmation() {
-        canConfirmRemoval = false
+        presentationState.prepareRemoveConfirmation()
         withAnimation(.snappy(duration: 0.18)) {
             onShowRemoveConfirmation()
         }
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: 250_000_000)
-            canConfirmRemoval = true
+            presentationState.enableRemoveConfirmation()
         }
     }
 
@@ -168,16 +168,16 @@ struct OshiSettingsGroupCard: View {
                     destructiveTitle: OshiSettingsPresentationText.removeGroupConfirmationAction,
                     onCancel: {
                         withAnimation(.snappy(duration: 0.18)) {
-                            canConfirmRemoval = false
+                            presentationState.hideRemoveConfirmation()
                             onHideRemoveConfirmation()
                         }
                     },
                     onConfirm: {
-                        canConfirmRemoval = false
+                        presentationState.hideRemoveConfirmation()
                         onHideRemoveConfirmation()
                         onRemoveGroup()
                     },
-                    isConfirmEnabled: canConfirmRemoval
+                    isConfirmEnabled: presentationState.canConfirmRemoval
                 )
                 .offset(x: 0, y: 44)
                 .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .topTrailing)))

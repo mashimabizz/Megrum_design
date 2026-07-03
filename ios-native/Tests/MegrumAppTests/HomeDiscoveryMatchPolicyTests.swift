@@ -19,6 +19,175 @@ final class HomeDiscoveryMatchPolicyTests: XCTestCase {
         )
     }
 
+    func testHomeDiscoveryRotaryCardPresentationStateTracksSelectionDragAndPositions() {
+        var state = HomeDiscoveryRotaryCardPresentationState()
+
+        XCTAssertEqual(state.countText(itemCount: 0), "0/0")
+        XCTAssertEqual(state.countText(itemCount: 3), "1/3")
+        XCTAssertEqual(state.relativePosition(for: 0, itemCount: 3, reduceMotion: false), 0)
+        XCTAssertEqual(state.relativePosition(for: 1, itemCount: 3, reduceMotion: false), 1)
+        XCTAssertEqual(state.relativePosition(for: 2, itemCount: 3, reduceMotion: false), -1)
+
+        state.updateDragProgress(0.25)
+
+        XCTAssertEqual(state.displayedDragProgress(reduceMotion: false), 0.25)
+        XCTAssertEqual(state.displayedDragProgress(reduceMotion: true), 0)
+        XCTAssertEqual(state.relativePosition(for: 1, itemCount: 3, reduceMotion: false), 0.75)
+        XCTAssertEqual(state.relativePosition(for: 1, itemCount: 3, reduceMotion: true), 1)
+
+        state.settle(indexDelta: 1, itemCount: 3)
+
+        XCTAssertEqual(state.selectedIndex, 1)
+        XCTAssertEqual(state.dragProgress, 0)
+        XCTAssertEqual(state.countText(itemCount: 3), "2/3")
+        XCTAssertEqual(state.relativePosition(for: 0, itemCount: 3, reduceMotion: false), -1)
+
+        state.settle(indexDelta: -2, itemCount: 3)
+
+        XCTAssertEqual(state.selectedIndex, 2)
+
+        state.updateDragProgress(0.4)
+        state.clampSelection(itemCount: 2)
+
+        XCTAssertEqual(state.selectedIndex, 1)
+        XCTAssertEqual(state.dragProgress, 0)
+
+        let horizontalProgress = HomeDiscoveryRotaryCardPresentationState.dragProgress(
+            translation: CGSize(width: -100, height: 8),
+            width: 200
+        )
+
+        XCTAssertEqual(horizontalProgress ?? .nan, 100 / 116, accuracy: 0.0001)
+        XCTAssertNil(
+            HomeDiscoveryRotaryCardPresentationState.dragProgress(
+                translation: CGSize(width: 10, height: 40),
+                width: 200
+            )
+        )
+        XCTAssertEqual(
+            HomeDiscoveryRotaryCardPresentationState.resolvedIndexDelta(
+                translation: CGSize(width: -100, height: 8),
+                projectedTranslationWidth: -120,
+                width: 200
+            ),
+            1
+        )
+        XCTAssertEqual(
+            HomeDiscoveryRotaryCardPresentationState.resolvedIndexDelta(
+                translation: CGSize(width: 100, height: 8),
+                projectedTranslationWidth: 120,
+                width: 200
+            ),
+            -1
+        )
+        XCTAssertEqual(
+            HomeDiscoveryRotaryCardPresentationState.resolvedIndexDelta(
+                translation: CGSize(width: 24, height: 4),
+                projectedTranslationWidth: 24,
+                width: 200
+            ),
+            0
+        )
+        XCTAssertNil(
+            HomeDiscoveryRotaryCardPresentationState.resolvedIndexDelta(
+                translation: CGSize(width: 10, height: 40),
+                projectedTranslationWidth: 10,
+                width: 200
+            )
+        )
+    }
+
+    func testHomeDiscoveryCandidateButtonPresentationStateTracksSelectedGoodsAndTitle() {
+        let firstGoods = HomeDiscoveryFixtures.selectedYellow
+        let secondGoods = HomeDiscoveryFixtures.momoFanmi
+        var state = HomeDiscoveryCandidateButtonPresentationState()
+
+        XCTAssertEqual(state.resolvedSelectedGoods(in: [firstGoods, secondGoods])?.id, firstGoods.id)
+
+        state.hydrateIfNeeded(goods: [firstGoods, secondGoods])
+
+        XCTAssertEqual(state.selectedGoods?.id, firstGoods.id)
+        XCTAssertEqual(
+            state.cardTitle(
+                candidateTitle: "候補",
+                titleStyle: .plain,
+                goods: [firstGoods, secondGoods]
+            ),
+            "候補"
+        )
+
+        state.select(secondGoods)
+
+        XCTAssertEqual(state.resolvedSelectedGoods(in: [firstGoods, secondGoods])?.id, secondGoods.id)
+        XCTAssertEqual(
+            state.cardTitle(
+                candidateTitle: "メンバーでマッチ",
+                titleStyle: .member,
+                goods: [firstGoods, secondGoods]
+            ),
+            HomeDiscoveryCardTitleFormatter.title(
+                for: secondGoods,
+                fallback: "メンバーでマッチ",
+                style: .member
+            )
+        )
+        XCTAssertEqual(
+            state.cardTitle(
+                candidateTitle: "メンバー×タグでマッチ",
+                titleStyle: .memberTag,
+                goods: [firstGoods, secondGoods]
+            ),
+            "メンバー×タグでマッチ"
+        )
+
+        state.hydrateIfNeeded(goods: [firstGoods])
+
+        XCTAssertEqual(state.selectedGoods?.id, secondGoods.id)
+
+        state.resetSelection(goods: [firstGoods])
+
+        XCTAssertEqual(state.selectedGoods?.id, firstGoods.id)
+    }
+
+    func testHomeSelectedGoodsHeaderPresentationStateTracksPresentedSheets() {
+        let listingDetail = HomeIndividualListingDetailContext(
+            listingID: UUID(uuidString: "22222222-2222-2222-2222-222222222201")!,
+            wantedLogic: .one,
+            offeredLogic: .all,
+            offeredItems: [
+                HomeIndividualListingOfferedItem(
+                    id: UUID(uuidString: "22222222-2222-2222-2222-222222222202")!,
+                    title: "トレカ"
+                )
+            ]
+        )
+        let calendarContext = HomePartnerExchangeCalendarContext(
+            ownerName: "はる",
+            methodTitle: "現地交換",
+            dateDetails: [
+                "2099-05-02": HomeExchangeLocalDateDetail(prefecture: "東京都", memo: "東京駅")
+            ],
+            fallbackPrefecture: "東京都",
+            fallbackMemo: "相談"
+        )
+        var state = HomeSelectedGoodsHeaderPresentationState()
+
+        XCTAssertNil(state.presentedListingDetail)
+        XCTAssertNil(state.presentedExchangeCalendar)
+
+        state.presentListingDetail(listingDetail)
+        state.presentExchangeCalendar(calendarContext)
+
+        XCTAssertEqual(state.presentedListingDetail, listingDetail)
+        XCTAssertEqual(state.presentedExchangeCalendar, calendarContext)
+
+        state.dismissListingDetail()
+        state.dismissExchangeCalendar()
+
+        XCTAssertNil(state.presentedListingDetail)
+        XCTAssertNil(state.presentedExchangeCalendar)
+    }
+
     func testGoodsConditionFollowsRequestedPriority() {
         XCTAssertEqual(
             HomeDiscoveryMatchPolicy.goodsCondition(
@@ -212,6 +381,43 @@ final class HomeDiscoveryMatchPolicyTests: XCTestCase {
         XCTAssertEqual(context.initialDateKey, dateKey)
         XCTAssertEqual(context.dateDetails[dateKey]?.prefecture, "東京都")
         XCTAssertEqual(context.dateDetails[dateKey]?.memo, "東京駅付近で相談")
+    }
+
+    func testPartnerExchangeCalendarPresentationStateInitializesSelectionAndMonth() throws {
+        let firstKey = "2099-05-02"
+        let secondKey = "2099-06-03"
+        let context = HomePartnerExchangeCalendarContext(
+            ownerName: "はる",
+            methodTitle: "現地交換",
+            dateDetails: [
+                firstKey: HomeExchangeLocalDateDetail(prefecture: "東京都", memo: "東京駅"),
+                secondKey: HomeExchangeLocalDateDetail(prefecture: "大阪府", memo: "なんば")
+            ],
+            fallbackPrefecture: "東京都",
+            fallbackMemo: "相談"
+        )
+        var state = HomePartnerExchangeCalendarPresentationState(context: context)
+        let expectedDate = try XCTUnwrap(
+            HomeExchangeDateKey.date(from: firstKey, calendar: HomePartnerExchangeCalendarMonthBuilder.calendar)
+        )
+
+        XCTAssertEqual(state.selectedDateKey, firstKey)
+        XCTAssertEqual(
+            state.visibleMonth,
+            HomePartnerExchangeCalendarMonthBuilder.monthStart(
+                containing: expectedDate,
+                calendar: HomePartnerExchangeCalendarMonthBuilder.calendar
+            )
+        )
+        XCTAssertEqual(state.selectedDetail(in: context)?.memo, "東京駅")
+
+        state.selectedDateKey = secondKey
+
+        XCTAssertEqual(state.selectedDetail(in: context)?.prefecture, "大阪府")
+
+        state.selectedDateKey = "2099-07-04"
+
+        XCTAssertNil(state.selectedDetail(in: context))
     }
 
     func testPartnerExchangeCalendarContextParsesDateWhenOnlyTextHasSchedule() throws {
@@ -705,6 +911,48 @@ final class HomeDiscoveryMatchPolicyTests: XCTestCase {
         )
 
         XCTAssertEqual(filtered.map(\.id), [second.id])
+    }
+
+    func testWishHitDetailPresentationStateBuildsProposalSelectionFromSelectedOffer() throws {
+        let first = HomeDiscoveryFixtures.offerGoods[0]
+        let second = HomeDiscoveryFixtures.offerGoods[1]
+        let signals = HomeCandidateConditionSignals(
+            goods: HomeGoodsConditionSignals(hasIndividualListingHit: false, hasWishHit: true),
+            exchange: HomeExchangeConditionSignals(
+                postalAcceptedByBoth: true,
+                localExchangeSelected: true,
+                prefectureMatches: true,
+                dateMatches: false
+            ),
+            wishMatchedOfferGoodsIDs: [first.id, second.id]
+        )
+        let payload = HomeDiscoverySheetPayload(
+            goods: HomeDiscoveryFixtures.selectedYellow,
+            signals: signals,
+            preferredOfferGoodsID: second.id
+        )
+        let offerGoods = HomeWishHitOfferGoodsPolicy.offerGoods(
+            viewerOfferGoods: [first, second],
+            matchedOfferGoodsIDs: signals.wishMatchedOfferGoodsIDs,
+            preferredOfferGoodsID: payload.preferredOfferGoodsID
+        )
+        var state = HomeWishHitDetailPresentationState()
+
+        XCTAssertFalse(state.canStartProposal)
+        state.prepareInitialSelection(preselectFirstOffer: true, offerGoods: offerGoods)
+        let initialSelection = try XCTUnwrap(state.proposalSelection(selection: payload, offerGoods: offerGoods))
+
+        XCTAssertEqual(state.selectedOfferIndices, [0])
+        XCTAssertEqual(initialSelection.receiverGoodsID, payload.goods.id)
+        XCTAssertEqual(initialSelection.senderGoodsIDs, [second.id])
+        XCTAssertEqual(initialSelection.matchType, .forward)
+        XCTAssertEqual(initialSelection.exchangeMethod, .both)
+
+        state.selectOffer(at: 1)
+        let updatedSelection = try XCTUnwrap(state.proposalSelection(selection: payload, offerGoods: offerGoods))
+
+        XCTAssertEqual(state.selectedOfferIndices, [1])
+        XCTAssertEqual(updatedSelection.senderGoodsIDs, [first.id])
     }
 
     func testWantedOptionPreviewPolicyUsesConditionMatchingGoodsImages() {
@@ -1470,6 +1718,62 @@ final class HomeDiscoveryMatchPolicyTests: XCTestCase {
         XCTAssertEqual(merged.senderGoodsIDs, [firstSenderID, secondSenderID])
         XCTAssertEqual(merged.receiverGoodsID, firstReceiverID)
         XCTAssertEqual(merged.matchType, .perfect)
+    }
+
+    func testHomeDiscoverySheetPresentationStateTracksExtrasWishCopyAndToast() {
+        let receiverID = UUID(uuidString: "00000000-0000-0000-0000-000000000561")!
+        let extraReceiverID = UUID(uuidString: "00000000-0000-0000-0000-000000000562")!
+        let senderID = UUID(uuidString: "00000000-0000-0000-0000-000000000563")!
+        let ownerID = UUID(uuidString: "00000000-0000-0000-0000-000000000564")!
+        let firstToastID = UUID(uuidString: "00000000-0000-0000-0000-000000000565")!
+        let secondToastID = UUID(uuidString: "00000000-0000-0000-0000-000000000566")!
+        let base = HomeDiscoveryProposalSelection(
+            receiverGoodsID: receiverID,
+            senderGoodsIDs: [senderID],
+            matchType: .perfect
+        )
+        let extra = HomeDiscoveryProposalSelection(
+            receiverGoodsID: extraReceiverID,
+            senderGoodsIDs: [],
+            matchType: .forward
+        )
+        var state = HomeDiscoverySheetPresentationState()
+
+        XCTAssertTrue(state.canStartWishCopy)
+        XCTAssertTrue(state.addedExtraCandidateIDs.isEmpty)
+
+        state.showNestedProfile(PublicProfileRoute(userID: ownerID))
+
+        XCTAssertEqual(state.nestedPresentation?.id, "profile-\(ownerID.uuidString)")
+
+        state.addExtraProposalSelectionAndDismiss(extra)
+
+        XCTAssertNil(state.nestedPresentation)
+        XCTAssertEqual(state.addedExtraCandidateIDs, [extraReceiverID])
+        XCTAssertEqual(
+            state.primaryProposalSelection(base).receiverGoodsIDs,
+            [receiverID, extraReceiverID]
+        )
+
+        state.beginWishCopy(goodsID: extraReceiverID)
+
+        XCTAssertFalse(state.canStartWishCopy)
+        XCTAssertEqual(state.copyingWishGoodsID, extraReceiverID)
+
+        state.finishWishCopy()
+
+        XCTAssertTrue(state.canStartWishCopy)
+        XCTAssertNil(state.copyingWishGoodsID)
+
+        state.showWishCopyToast("ほしいものに追加しました", toastID: firstToastID)
+        state.showWishCopyToast("追加できませんでした", toastID: secondToastID)
+        state.clearWishCopyToast(ifMatching: firstToastID)
+
+        XCTAssertEqual(state.wishCopyToastMessage, "追加できませんでした")
+
+        state.clearWishCopyToast(ifMatching: secondToastID)
+
+        XCTAssertNil(state.wishCopyToastMessage)
     }
 
     func testHomeProposalRouteUsesSelectedSheetPayloadWhenHomeListsDoNotContainTappedGoods() throws {

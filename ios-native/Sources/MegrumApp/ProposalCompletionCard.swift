@@ -41,15 +41,15 @@ struct ProposalCompletionCard: View {
 
 private struct ProposalCompletionCheckmarkBadge: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var isShown = false
+    @State private var presentationState = ProposalCompletionAnimationPresentationState()
 
     var body: some View {
         ZStack {
             Circle()
                 .fill(MegrumTheme.lavender.opacity(0.12))
                 .frame(width: 78, height: 78)
-                .scaleEffect(isShown && !reduceMotion ? 1.16 : 0.82)
-                .opacity(isShown ? 1 : 0.4)
+                .scaleEffect(presentationState.haloScale(reduceMotion: reduceMotion))
+                .opacity(presentationState.haloOpacity)
 
             Circle()
                 .fill(MegrumTheme.lavender)
@@ -60,18 +60,18 @@ private struct ProposalCompletionCheckmarkBadge: View {
                         .foregroundStyle(.white)
                 }
                 .shadow(color: MegrumTheme.lavender.opacity(0.26), radius: 16, y: 8)
-                .scaleEffect(isShown || reduceMotion ? 1 : 0.72)
+                .scaleEffect(presentationState.badgeScale(reduceMotion: reduceMotion))
         }
         .frame(height: 82)
         .onAppear {
-            guard !isShown else {
+            guard !presentationState.isShown else {
                 return
             }
             if reduceMotion {
-                isShown = true
+                presentationState.show()
             } else {
                 withAnimation(.spring(response: 0.42, dampingFraction: 0.64)) {
-                    isShown = true
+                    presentationState.show()
                 }
             }
         }
@@ -80,7 +80,7 @@ private struct ProposalCompletionCheckmarkBadge: View {
 
 private struct ProposalCompletionCelebrationView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var isShown = false
+    @State private var presentationState = ProposalCompletionAnimationPresentationState()
 
     private let sparkles: [ProposalCompletionSparkle] = [
         ProposalCompletionSparkle(id: 0, x: -104, y: -68, size: 13, color: MegrumTheme.pink, symbolName: "sparkle"),
@@ -97,22 +97,22 @@ private struct ProposalCompletionCelebrationView: View {
                     .font(.system(size: sparkle.size, weight: .black))
                     .foregroundStyle(sparkle.color.opacity(0.82))
                     .offset(
-                        x: isShown || reduceMotion ? sparkle.x : sparkle.x * 0.52,
-                        y: isShown || reduceMotion ? sparkle.y : sparkle.y * 0.52
+                        x: presentationState.sparkleOffsetValue(sparkle.x, reduceMotion: reduceMotion),
+                        y: presentationState.sparkleOffsetValue(sparkle.y, reduceMotion: reduceMotion)
                     )
-                    .scaleEffect(isShown || reduceMotion ? 1 : 0.36)
-                    .opacity(isShown ? 1 : 0)
+                    .scaleEffect(presentationState.sparkleScale(reduceMotion: reduceMotion))
+                    .opacity(presentationState.sparkleOpacity)
             }
         }
         .onAppear {
-            guard !isShown else {
+            guard !presentationState.isShown else {
                 return
             }
             if reduceMotion {
-                isShown = true
+                presentationState.show()
             } else {
                 withAnimation(.spring(response: 0.54, dampingFraction: 0.72).delay(0.08)) {
-                    isShown = true
+                    presentationState.show()
                 }
             }
         }

@@ -6,6 +6,7 @@ struct IndividualListingExchangeConditionPanel: View {
     var listing: IndividualListing
     var canEdit: Bool
     var onEdit: () -> Void
+    var onShare: () -> Void
     var onDelete: () -> Void
 
     private var extractedSummary: IndividualListingExchangeSummary? {
@@ -85,6 +86,16 @@ struct IndividualListingExchangeConditionPanel: View {
 
             if canEdit {
                 Divider()
+
+                Button(action: onShare) {
+                    Label("Xで投稿", systemImage: "square.and.arrow.up")
+                        .font(.system(size: 15, weight: .heavy, design: .rounded))
+                        .foregroundStyle(MegrumTheme.ink)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .background(MegrumTheme.lavender.opacity(0.10), in: Capsule())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("この個別募集をXで投稿")
 
                 Button(role: .destructive, action: onDelete) {
                     Text("この交換条件を削除")

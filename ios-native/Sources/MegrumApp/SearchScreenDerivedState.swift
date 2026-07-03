@@ -7,7 +7,7 @@ extension SearchScreen {
     }
 
     var hasSearchCriteria: Bool {
-        SearchCriteriaResolver.hasCriteria(query: query, activeFilterCount: activeFilterCount)
+        SearchCriteriaResolver.hasCriteria(query: presentationState.query, activeFilterCount: activeFilterCount)
     }
 
     func results(in bucket: SearchMatchBucket) -> [SearchResultItem] {
@@ -17,64 +17,64 @@ extension SearchScreen {
     var filteredSearchResults: [SearchResultItem] {
         let filtered = SearchResultFilterPolicy.filteredResults(
             appState.searchResults,
-            selectedMemberID: selectedMemberID,
+            selectedMemberID: filterDraft.selectedMemberID,
             selectedGoodsTypeID: resolvedGoodsTypeID,
             selectedGoodsTagNames: resolvedGoodsTagNames,
-            selectedPaymentMethods: selectedPaymentMethods,
-            selectedExchangeMethod: selectedExchangeMethod,
-            selectedMeetupPrefecture: selectedMeetupPrefecture,
-            conditionMatches: conditionMatches,
+            selectedPaymentMethods: filterDraft.selectedPaymentMethods,
+            selectedExchangeMethod: filterDraft.selectedExchangeMethod,
+            selectedMeetupPrefecture: filterDraft.selectedMeetupPrefecture,
+            conditionMatches: filterDraft.conditionMatches,
             wishes: appState.wishes,
             listings: searchRelevantListings,
             viewerInventory: viewerInventoryForMatching,
             viewer: appState.viewer
         )
-        return SearchResultFilterPolicy.sortedResults(filtered, sort: selectedSort)
+        return SearchResultFilterPolicy.sortedResults(filtered, sort: presentationState.selectedSort)
     }
 
     var queryMatchedGoodsTypeID: UUID? {
-        guard selectedGoodsTypeID == nil else {
+        guard filterDraft.selectedGoodsTypeID == nil else {
             return nil
         }
-        return SearchQueryResolver.matchingGoodsTypeID(query: query, goodsTypes: appState.goodsTypes)
+        return SearchQueryResolver.matchingGoodsTypeID(query: presentationState.query, goodsTypes: appState.goodsTypes)
     }
 
     var queryMatchedTagName: String? {
         guard queryMatchedGoodsTypeID == nil else {
             return nil
         }
-        return SearchQueryResolver.matchingTagName(query: query, tagNames: availableGoodsTagNames)
+        return SearchQueryResolver.matchingTagName(query: presentationState.query, tagNames: availableGoodsTagNames)
     }
 
     var resolvedGoodsTypeID: UUID? {
-        selectedGoodsTypeID ?? queryMatchedGoodsTypeID
+        filterDraft.selectedGoodsTypeID ?? queryMatchedGoodsTypeID
     }
 
     var resolvedGoodsTagNames: Set<String> {
         guard let queryMatchedTagName else {
-            return selectedGoodsTagNames
+            return filterDraft.selectedGoodsTagNames
         }
-        var tagNames = selectedGoodsTagNames
+        var tagNames = filterDraft.selectedGoodsTagNames
         tagNames.insert(queryMatchedTagName)
         return tagNames
     }
 
     var selectedGroup: OshiGroup? {
-        guard let selectedGroupID else {
+        guard let selectedGroupID = filterDraft.selectedGroupID else {
             return nil
         }
         return appState.oshiGroups.first { $0.id == selectedGroupID }
     }
 
     var selectedMember: OshiCharacter? {
-        guard let selectedMemberID else {
+        guard let selectedMemberID = filterDraft.selectedMemberID else {
             return nil
         }
         return appState.oshiCharacters.first { $0.id == selectedMemberID }
     }
 
     var selectedGoodsType: GoodsType? {
-        guard let selectedGoodsTypeID else {
+        guard let selectedGoodsTypeID = filterDraft.selectedGoodsTypeID else {
             return nil
         }
         return appState.goodsTypes.first { $0.id == selectedGoodsTypeID }
@@ -86,7 +86,7 @@ extension SearchScreen {
             wishes: appState.wishes,
             inventory: appState.inventory,
             viewerID: appState.viewer?.id,
-            limitingToGroupID: selectedGroupID,
+            limitingToGroupID: filterDraft.selectedGroupID,
             limit: 20
         )
     }
@@ -110,22 +110,7 @@ extension SearchScreen {
     }
 
     var currentFilterDraft: SearchFilterDraft {
-        SearchFilterDraft(
-            selectedGroupID: selectedGroupID,
-            selectedMemberID: selectedMemberID,
-            selectedGoodsTypeID: selectedGoodsTypeID,
-            selectedGoodsTagNames: selectedGoodsTagNames,
-            selectedPaymentMethods: selectedPaymentMethods,
-            selectedExchangeMethod: selectedExchangeMethod,
-            selectedMeetupDates: selectedMeetupDates,
-            meetupDateDraft: meetupDateDraft,
-            selectedMeetupPrefecture: selectedMeetupPrefecture,
-            meetupPlaceMemo: meetupPlaceMemo,
-            shippingFee: shippingFee,
-            shippingWindow: shippingWindow,
-            allowsOutOfConditionProposal: allowsOutOfConditionProposal,
-            conditionMatches: conditionMatches
-        )
+        filterDraft
     }
 
     var currentDefaultExchangeSettings: HomeDefaultExchangeSettings {
@@ -146,38 +131,38 @@ extension SearchScreen {
 
     var activeFilterCount: Int {
         var count = 0
-        if selectedGroupID != nil { count += 1 }
-        if selectedMemberID != nil { count += 1 }
-        if selectedGoodsTypeID != nil { count += 1 }
-        count += selectedGoodsTagNames.count
-        count += selectedPaymentMethods.count
-        if selectedExchangeMethod != nil { count += 1 }
-        if !selectedMeetupDates.isEmpty { count += 1 }
-        if !selectedMeetupPrefecture.isEmpty { count += 1 }
-        if !meetupPlaceMemo.isBlank { count += 1 }
-        if !shippingFee.isBlank { count += 1 }
-        if !shippingWindow.isBlank { count += 1 }
-        if allowsOutOfConditionProposal { count += 1 }
-        count += conditionMatches.activeCount
+        if filterDraft.selectedGroupID != nil { count += 1 }
+        if filterDraft.selectedMemberID != nil { count += 1 }
+        if filterDraft.selectedGoodsTypeID != nil { count += 1 }
+        count += filterDraft.selectedGoodsTagNames.count
+        count += filterDraft.selectedPaymentMethods.count
+        if filterDraft.selectedExchangeMethod != nil { count += 1 }
+        if !filterDraft.selectedMeetupDates.isEmpty { count += 1 }
+        if !filterDraft.selectedMeetupPrefecture.isEmpty { count += 1 }
+        if !filterDraft.meetupPlaceMemo.isBlank { count += 1 }
+        if !filterDraft.shippingFee.isBlank { count += 1 }
+        if !filterDraft.shippingWindow.isBlank { count += 1 }
+        if filterDraft.allowsOutOfConditionProposal { count += 1 }
+        count += filterDraft.conditionMatches.activeCount
         return count
     }
 
     var activeCriteriaChips: [SearchActiveCriteriaChipItem] {
         SearchActiveCriteriaChipBuilder.chips(
-            query: query,
+            query: presentationState.query,
             selectedGroup: selectedGroup,
             selectedMember: selectedMember,
             selectedGoodsType: selectedGoodsType,
-            selectedGoodsTagNames: selectedGoodsTagNames,
-            selectedPaymentMethods: selectedPaymentMethods,
-            selectedExchangeMethod: selectedExchangeMethod,
-            selectedMeetupDates: selectedMeetupDates,
-            selectedMeetupPrefecture: selectedMeetupPrefecture,
-            meetupPlaceMemo: meetupPlaceMemo,
-            shippingFee: shippingFee,
-            shippingWindow: shippingWindow,
-            allowsOutOfConditionProposal: allowsOutOfConditionProposal,
-            conditionMatches: conditionMatches
+            selectedGoodsTagNames: filterDraft.selectedGoodsTagNames,
+            selectedPaymentMethods: filterDraft.selectedPaymentMethods,
+            selectedExchangeMethod: filterDraft.selectedExchangeMethod,
+            selectedMeetupDates: filterDraft.selectedMeetupDates,
+            selectedMeetupPrefecture: filterDraft.selectedMeetupPrefecture,
+            meetupPlaceMemo: filterDraft.meetupPlaceMemo,
+            shippingFee: filterDraft.shippingFee,
+            shippingWindow: filterDraft.shippingWindow,
+            allowsOutOfConditionProposal: filterDraft.allowsOutOfConditionProposal,
+            conditionMatches: filterDraft.conditionMatches
         )
     }
 
@@ -194,23 +179,24 @@ extension SearchScreen {
 
     var selectedSuggestionActions: Set<SearchSuggestionAction> {
         var actions = Set<SearchSuggestionAction>()
-        if let selectedGroupID {
+        if let selectedGroupID = filterDraft.selectedGroupID {
             actions.insert(.group(selectedGroupID))
         }
-        if let selectedGroupID, let selectedMemberID {
+        if let selectedGroupID = filterDraft.selectedGroupID,
+           let selectedMemberID = filterDraft.selectedMemberID {
             actions.insert(.member(groupID: selectedGroupID, memberID: selectedMemberID))
         }
-        if let selectedGoodsTypeID {
+        if let selectedGoodsTypeID = filterDraft.selectedGoodsTypeID {
             actions.insert(.goodsType(selectedGoodsTypeID))
         }
-        for tagName in selectedGoodsTagNames {
+        for tagName in filterDraft.selectedGoodsTagNames {
             actions.insert(.tag(tagName))
         }
-        for method in selectedPaymentMethods {
+        for method in filterDraft.selectedPaymentMethods {
             actions.insert(.payment(method))
         }
-        if !selectedMeetupPrefecture.isEmpty {
-            actions.insert(.meetupPrefecture(selectedMeetupPrefecture))
+        if !filterDraft.selectedMeetupPrefecture.isEmpty {
+            actions.insert(.meetupPrefecture(filterDraft.selectedMeetupPrefecture))
         }
         return actions
     }

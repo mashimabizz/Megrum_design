@@ -17,31 +17,25 @@ struct ProposalMeetupCalendarEditor: View {
     var onRemoveDraft: (Int) -> Void
     var onOpenPlaceEntry: (Int) -> Void
 
-    @State private var displayMode: ProposalMeetupCalendarDisplayMode = Self.initialDisplayMode()
+    @State private var displayState = ProposalMeetupCalendarDisplayState()
 
     private let calendar = Calendar.current
-
-    private static func initialDisplayMode(
-        environment: [String: String] = ProcessInfo.processInfo.environment
-    ) -> ProposalMeetupCalendarDisplayMode {
-        VisualQAPreviewMode.initialScreen(environment: environment) == .proposalMeetupMonth ? .month : .week
-    }
 
     var body: some View {
         ProposalMeetupCalendarCard {
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
-                    if displayMode == .week {
+                    if displayState.showsWeekTitle {
                         Text(ProposalMeetupCalendarModel.monthTitle(anchorDate: anchorDate, calendar: calendar))
                             .font(.system(size: 18, weight: .black, design: .rounded))
                             .foregroundStyle(MegrumTheme.ink)
                     }
 
                     Spacer(minLength: 0)
-                    ProposalMeetupCalendarModeToggle(selection: $displayMode)
+                    ProposalMeetupCalendarModeToggle(selection: $displayState.displayMode)
                 }
 
-                switch displayMode {
+                switch displayState.displayMode {
                 case .week:
                     ProposalMeetupCalendarWeekEditor(
                         drafts: drafts,
@@ -61,7 +55,7 @@ struct ProposalMeetupCalendarEditor: View {
                         onShiftMonth: onShiftMonth,
                         onSelectDay: { day in
                             onSelectMonthDay(day)
-                            displayMode = .week
+                            displayState.showWeek()
                         }
                     )
                 }

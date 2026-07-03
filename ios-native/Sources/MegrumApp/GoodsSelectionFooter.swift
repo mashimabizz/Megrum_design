@@ -4,6 +4,7 @@ import SwiftUI
 struct GoodsSelectionFooter: View {
     var selectedCount: Int
     var onTag: () -> Void
+    var onShare: () -> Void
     var onDelete: () -> Void
     var onCancel: () -> Void
 
@@ -22,6 +23,7 @@ struct GoodsSelectionFooter: View {
 
                 HStack(spacing: GoodsSelectionFooterMetrics.actionSpacing) {
                     GoodsSelectionFooterButton(title: "シリーズを設定", systemImage: "tag", role: nil, action: onTag)
+                    GoodsSelectionFooterButton(title: "Xで投稿", systemImage: "square.and.arrow.up", role: nil, action: onShare)
                     GoodsSelectionFooterButton(title: "削除する", systemImage: "trash", role: .destructive, action: onDelete)
                 }
             }

@@ -4,6 +4,176 @@ import MegrumCore
 import XCTest
 
 final class TradeChatAffordanceTests: XCTestCase {
+    func testFullScreenRemoteImagePresentationStateTracksZoomDragAndDismiss() {
+        var state = FullScreenRemoteImagePresentationState()
+
+        XCTAssertEqual(state.backgroundOpacity, 0)
+        XCTAssertEqual(state.imagePresentationScale, 0.9)
+        XCTAssertEqual(state.contentOpacity, 0)
+
+        state.show()
+
+        XCTAssertEqual(state.backgroundOpacity, 0.58)
+        XCTAssertEqual(state.imagePresentationScale, 1)
+        XCTAssertEqual(state.contentOpacity, 1)
+
+        state.updateMagnification(2.5)
+        XCTAssertEqual(state.scale, 2.5)
+        state.endMagnification()
+        XCTAssertEqual(state.lastScale, 2.5)
+
+        state.updateDrag(translation: CGSize(width: 20, height: 30))
+        XCTAssertEqual(state.offset, CGSize(width: 20, height: 30))
+        XCTAssertEqual(state.imageOffset, CGSize(width: 20, height: 30))
+        state.finishZoomedDrag()
+        XCTAssertEqual(state.lastOffset, CGSize(width: 20, height: 30))
+
+        state.updateMagnification(0.2)
+        state.endMagnification()
+        XCTAssertEqual(state.scale, 1)
+        XCTAssertEqual(state.lastScale, 1)
+        XCTAssertEqual(state.offset, .zero)
+
+        state.updateDrag(translation: CGSize(width: 12, height: 120))
+        XCTAssertEqual(state.dismissDragOffset, 120)
+        XCTAssertTrue(state.shouldDismissAfterDrag(predictedEndTranslation: CGSize(width: 0, height: 120)))
+
+        state.resetDismissDragOffset()
+        state.updateDrag(translation: CGSize(width: 80, height: 20))
+        XCTAssertEqual(state.dismissDragOffset, 0)
+
+        state.updateDrag(translation: CGSize(width: 0, height: 60))
+        XCTAssertFalse(state.shouldDismissAfterDrag(predictedEndTranslation: CGSize(width: 0, height: 100)))
+        state.prepareDismissal()
+
+        XCTAssertFalse(state.isVisible)
+        XCTAssertEqual(state.dismissDragOffset, 0)
+    }
+
+    func testTradesScreenPresentationStateConsumesStageAndClearsSelection() {
+        var state = TradesScreenPresentationState()
+        let proposalID = UUID(uuidString: "20000000-0000-0000-0000-000000002301")!
+        state.selectedPendingProposalIDs = [proposalID]
+
+        let didConsume = state.consumeRequestedStage(.completed)
+
+        XCTAssertTrue(didConsume)
+        XCTAssertEqual(state.selectedStage, .completed)
+
+        state.clearPendingSelection()
+
+        XCTAssertTrue(state.selectedPendingProposalIDs.isEmpty)
+        XCTAssertFalse(state.isSelectingPendingProposals)
+    }
+
+    func testTradesScreenPresentationStateGatesDetailSnapshotSynchronizationUntilSettled() {
+        var state = TradesScreenPresentationState()
+        let proposalID = UUID(uuidString: "20000000-0000-0000-0000-000000002302")!
+        let snapshot = TradeListDisplaySnapshot.current(
+            proposals: [],
+            messagesByProposalID: [:],
+            viewerReadAtByProposalID: [:]
+        )
+
+        state.prepareToOpenDetail(snapshot: snapshot)
+
+        XCTAssertFalse(
+            state.shouldSynchronizeActiveDetailListSnapshot(
+                detailRoute: TradeDetailRoute(proposalID: proposalID)
+            )
+        )
+
+        state.markDetailSettled(proposalID: proposalID)
+
+        XCTAssertTrue(
+            state.shouldSynchronizeActiveDetailListSnapshot(
+                detailRoute: TradeDetailRoute(proposalID: proposalID)
+            )
+        )
+
+        state.markDetailRouteDismissed()
+
+        XCTAssertTrue(state.shouldSynchronizeActiveDetailListSnapshot(detailRoute: nil))
+
+        state.clearActiveDetailListSnapshot()
+
+        XCTAssertFalse(state.shouldSynchronizeActiveDetailListSnapshot(detailRoute: nil))
+    }
+
+    func testTradesScreenPresentationStateTogglesPendingSelection() {
+        var state = TradesScreenPresentationState()
+        let firstID = UUID(uuidString: "20000000-0000-0000-0000-000000002303")!
+        let secondID = UUID(uuidString: "20000000-0000-0000-0000-000000002304")!
+
+        state.startPendingProposalSelection(proposalID: firstID)
+        state.togglePendingProposalSelection(proposalID: secondID)
+        state.togglePendingProposalSelection(proposalID: firstID)
+
+        XCTAssertEqual(state.selectedPendingProposalIDs, [secondID])
+        XCTAssertTrue(state.isSelectingPendingProposals)
+
+        state.selectedStage = .inProgress
+
+        XCTAssertFalse(state.isSelectingPendingProposals)
+    }
+
+    func testCounterProposalDraftStateOrdersTagsAndTrimsSubmittedMessage() {
+        let availableTags = CounterProposalDraftState.availableConditionTags(
+            defaultOptions: ["即日発送", "同日発送", "終演後OK"],
+            proposalTags: ["追加条件", "即日発送"]
+        )
+        var state = CounterProposalDraftState(
+            exchangeMethod: .hand,
+            selectedConditionTags: ["追加条件", "即日発送"],
+            message: "  この条件でお願いします  "
+        )
+
+        XCTAssertEqual(availableTags, ["即日発送", "同日発送", "終演後OK", "追加条件"])
+        XCTAssertEqual(state.orderedConditionTags(in: availableTags), ["即日発送", "追加条件"])
+        XCTAssertEqual(state.submittedMessage, "この条件でお願いします")
+
+        state.toggleConditionTag("即日発送")
+        state.toggleConditionTag("同日発送")
+
+        XCTAssertEqual(state.selectedConditionTags, ["追加条件", "同日発送"])
+        XCTAssertEqual(state.orderedConditionTags(in: availableTags), ["同日発送", "追加条件"])
+
+        state.message = "   "
+        XCTAssertNil(state.submittedMessage)
+    }
+
+    func testTradeEvaluationDraftStateUsesDefaultStarsAndOptionalComment() {
+        var state = TradeEvaluationDraftState()
+
+        XCTAssertEqual(state.stars, 5)
+        XCTAssertNil(state.submittedComment)
+
+        state.stars = 3
+        state.comment = "  丁寧に対応してくれました  "
+
+        XCTAssertEqual(state.stars, 3)
+        XCTAssertEqual(state.submittedComment, "丁寧に対応してくれました")
+    }
+
+    func testTradeDisputeDraftStateTrimsFactMemoAndTracksSubmitAvailability() {
+        var state = TradeDisputeDraftState()
+
+        XCTAssertEqual(state.category, .wrong)
+        XCTAssertFalse(state.canSubmit)
+
+        state.category = .noshow
+        state.factMemo = "  相手が来ませんでした  \n"
+
+        XCTAssertEqual(state.category, .noshow)
+        XCTAssertEqual(state.trimmedFactMemo, "相手が来ませんでした")
+        XCTAssertTrue(state.canSubmit)
+
+        state.factMemo = "   "
+
+        XCTAssertEqual(state.trimmedFactMemo, "")
+        XCTAssertFalse(state.canSubmit)
+    }
+
     func testTradeStagesExposePendingInProgressAndCompletedBuckets() {
         XCTAssertEqual(TradeStage.allCases, [.pending, .inProgress, .completed])
         XCTAssertTrue(TradeStage.pending.contains(.sent))
@@ -226,6 +396,77 @@ final class TradeChatAffordanceTests: XCTestCase {
         )
     }
 
+    func testTradeDetailSlidePresentationStateCoordinatesPresentationDragAndDismissal() {
+        let route = TradeDetailRoute(proposalID: UUID(uuidString: "20000000-0000-0000-0000-000000002305")!)
+        let presentationToken = UUID(uuidString: "20000000-0000-0000-0000-000000002306")!
+        let dismissalToken = UUID(uuidString: "20000000-0000-0000-0000-000000002307")!
+        var state = TradeDetailSlidePresentationState()
+
+        let preparedToken = state.preparePresentation(route: route, token: presentationToken)
+
+        XCTAssertEqual(preparedToken, presentationToken)
+        XCTAssertEqual(state.visibleRoute, route)
+        XCTAssertFalse(state.isDetailPresented)
+        XCTAssertEqual(state.dragOffset, 0)
+        XCTAssertFalse(state.isTrackingDismissDrag)
+        XCTAssertTrue(
+            state.canCompletePresentation(
+                token: presentationToken,
+                route: route,
+                currentRoute: route
+            )
+        )
+        XCTAssertFalse(
+            state.canCompletePresentation(
+                token: UUID(uuidString: "20000000-0000-0000-0000-000000002308")!,
+                route: route,
+                currentRoute: route
+            )
+        )
+
+        state.markPresented()
+
+        XCTAssertTrue(state.isDetailPresented)
+        XCTAssertEqual(state.contentOffset(screenWidth: 390), 0)
+        XCTAssertFalse(
+            state.beginTrackingDismissDragIfNeeded(
+                translation: CGSize(width: 24, height: 80),
+                screenWidth: 390
+            )
+        )
+        XCTAssertTrue(
+            state.beginTrackingDismissDragIfNeeded(
+                translation: CGSize(width: 128, height: 12),
+                screenWidth: 390
+            )
+        )
+        XCTAssertTrue(state.isTrackingDismissDrag)
+        XCTAssertEqual(state.dragOffset, 128)
+        XCTAssertEqual(state.contentOffset(screenWidth: 390), 128)
+        XCTAssertTrue(
+            state.shouldDismiss(
+                translation: CGSize(width: 128, height: 12),
+                predictedEndTranslationWidth: 128,
+                screenWidth: 390
+            )
+        )
+
+        let preparedDismissalToken = state.prepareDismissal(token: dismissalToken)
+        state.markDismissed()
+
+        XCTAssertEqual(preparedDismissalToken, dismissalToken)
+        XCTAssertFalse(state.isTrackingDismissDrag)
+        XCTAssertFalse(state.isDetailPresented)
+        XCTAssertEqual(state.contentOffset(screenWidth: 390), 390)
+        XCTAssertTrue(state.canCompleteDismissal(token: dismissalToken))
+
+        state.completeDismissal()
+
+        XCTAssertNil(state.visibleRoute)
+        XCTAssertEqual(state.dragOffset, 0)
+        XCTAssertFalse(state.isTrackingDismissDrag)
+    }
+
     func testTradeStageRouteRequestPrefersExplicitPendingDestination() {
         XCTAssertEqual(
             TradeStageRouteRequestResolver.resolve(current: .completed, requested: .pending),
@@ -353,6 +594,105 @@ final class TradeChatAffordanceTests: XCTestCase {
         XCTAssertFalse(presentation.showsResponseInstruction)
         XCTAssertFalse(presentation.showsPaymentSelector)
         XCTAssertEqual(presentation.primaryActionTitle(selectedExchangeMethod: nil), "出品に応じる")
+    }
+
+    func testTradeDetailPinnedSummaryPresentationStateUsesDefaultAgreementMethodOnlyWhenNeeded() {
+        let viewerID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+        let partnerID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+        let needsChoiceProposal = TradeProposal(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000408")!,
+            senderID: partnerID,
+            receiverID: viewerID,
+            status: .sent,
+            exchangeMethod: .both,
+            senderGoodsIDs: [UUID(uuidString: "11111111-1111-1111-1111-111111111111")!],
+            receiverGoodsIDs: [UUID(uuidString: "22222222-2222-2222-2222-222222222222")!],
+            cashOffer: false
+        )
+        let fixedMethodProposal = TradeProposal(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000409")!,
+            senderID: partnerID,
+            receiverID: viewerID,
+            status: .sent,
+            exchangeMethod: .hand,
+            senderGoodsIDs: [UUID(uuidString: "11111111-1111-1111-1111-111111111111")!],
+            receiverGoodsIDs: [UUID(uuidString: "22222222-2222-2222-2222-222222222222")!],
+            cashOffer: false
+        )
+        let needsChoicePresentation = TradeProposalResponsePresentation(
+            proposal: needsChoiceProposal,
+            viewerID: viewerID,
+            proposedPaymentMethods: [],
+            proposedPaymentOtherNote: nil,
+            availablePaymentMethods: [],
+            availablePaymentOtherNote: nil
+        )
+        let fixedMethodPresentation = TradeProposalResponsePresentation(
+            proposal: fixedMethodProposal,
+            viewerID: viewerID,
+            proposedPaymentMethods: [],
+            proposedPaymentOtherNote: nil,
+            availablePaymentMethods: [],
+            availablePaymentOtherNote: nil
+        )
+        var state = TradeDetailPinnedSummaryPresentationState()
+
+        XCTAssertEqual(needsChoicePresentation.defaultSelectedExchangeMethod, .mail)
+        XCTAssertEqual(
+            state.agreementExchangeMethod(for: needsChoicePresentation),
+            needsChoicePresentation.defaultSelectedExchangeMethod
+        )
+        state.selectedExchangeMethod = .mail
+        XCTAssertEqual(state.agreementExchangeMethod(for: needsChoicePresentation), .mail)
+        XCTAssertNil(state.agreementExchangeMethod(for: fixedMethodPresentation))
+
+        state.openTradeContentDetails()
+        XCTAssertEqual(state.detailRoute, .tradeContent)
+    }
+
+    func testTradeAgreementMethodSelectionStateReturnsMethodOnlyWhenChoiceIsNeeded() {
+        var state = TradeAgreementMethodSelectionState()
+
+        XCTAssertEqual(state.agreementExchangeMethod(needsChoice: true), .hand)
+        XCTAssertNil(state.agreementExchangeMethod(needsChoice: false))
+
+        state.selectedExchangeMethod = .mail
+
+        XCTAssertEqual(state.agreementExchangeMethod(needsChoice: true), .mail)
+    }
+
+    func testTradeDetailRoutePresentationStateTracksEvidenceListAndRemoteImage() {
+        let url = URL(string: "https://example.com/evidence.jpg")!
+        var state = TradeDetailRoutePresentationState()
+
+        XCTAssertFalse(state.isShowingEvidenceList)
+        XCTAssertNil(state.selectedRemoteImage)
+
+        state.showEvidenceList()
+        state.selectRemoteImage(RemoteImageSelection(url: url))
+
+        XCTAssertTrue(state.isShowingEvidenceList)
+        XCTAssertEqual(state.selectedRemoteImage?.url, url)
+
+        state.clearSelectedRemoteImage()
+
+        XCTAssertNil(state.selectedRemoteImage)
+    }
+
+    func testTradeDetailPhotoPresentationStatePresentsEvidenceSources() {
+        var state = TradeDetailPhotoPresentationState()
+
+        XCTAssertFalse(state.isShowingEvidenceSourceDialog)
+        XCTAssertFalse(state.isShowingEvidenceCamera)
+        XCTAssertFalse(state.isShowingEvidencePhotoLibraryPicker)
+
+        state.showEvidenceSourceDialog()
+        state.showEvidenceCamera()
+        state.showEvidencePhotoLibraryPicker()
+
+        XCTAssertTrue(state.isShowingEvidenceSourceDialog)
+        XCTAssertTrue(state.isShowingEvidenceCamera)
+        XCTAssertTrue(state.isShowingEvidencePhotoLibraryPicker)
     }
 
     func testTradeCounterProposalSystemMessageNamesActor() {
@@ -1047,6 +1387,78 @@ final class TradeChatAffordanceTests: XCTestCase {
         }
     }
 
+    func testTradeGoodsCarouselPresentationStateTracksSelectionDragAndSwipeDelta() {
+        var state = TradeGoodsCarouselPresentationState()
+
+        XCTAssertEqual(state.countText(itemCount: 0), "0/0")
+        XCTAssertEqual(state.countText(itemCount: 3), "1/3")
+
+        state.updateDragProgress(0.5)
+
+        XCTAssertEqual(state.displayedDragProgress(reduceMotion: false), 0.5)
+        XCTAssertEqual(state.displayedDragProgress(reduceMotion: true), 0)
+        XCTAssertEqual(state.tableRotation(itemCount: 3, reduceMotion: false), 60)
+
+        state.settle(indexDelta: 1, itemCount: 3)
+
+        XCTAssertEqual(state.selectedIndex, 1)
+        XCTAssertEqual(state.dragProgress, 0)
+        XCTAssertEqual(state.countText(itemCount: 3), "2/3")
+
+        state.settle(indexDelta: -2, itemCount: 3)
+
+        XCTAssertEqual(state.selectedIndex, 2)
+
+        state.updateDragProgress(0.4)
+        state.clampSelection(itemCount: 2)
+
+        XCTAssertEqual(state.selectedIndex, 1)
+        XCTAssertEqual(state.dragProgress, 0)
+        let horizontalProgress = TradeGoodsCarouselPresentationState.dragProgress(
+            translation: CGSize(width: -100, height: 8),
+            width: 200
+        )
+
+        XCTAssertEqual(horizontalProgress ?? .nan, 100 / 116, accuracy: 0.0001)
+        XCTAssertNil(
+            TradeGoodsCarouselPresentationState.dragProgress(
+                translation: CGSize(width: 10, height: 40),
+                width: 200
+            )
+        )
+        XCTAssertEqual(
+            TradeGoodsCarouselPresentationState.resolvedIndexDelta(
+                translation: CGSize(width: -100, height: 8),
+                projectedTranslationWidth: -120,
+                width: 200
+            ),
+            1
+        )
+        XCTAssertEqual(
+            TradeGoodsCarouselPresentationState.resolvedIndexDelta(
+                translation: CGSize(width: 100, height: 8),
+                projectedTranslationWidth: 120,
+                width: 200
+            ),
+            -1
+        )
+        XCTAssertEqual(
+            TradeGoodsCarouselPresentationState.resolvedIndexDelta(
+                translation: CGSize(width: 24, height: 4),
+                projectedTranslationWidth: 24,
+                width: 200
+            ),
+            0
+        )
+        XCTAssertNil(
+            TradeGoodsCarouselPresentationState.resolvedIndexDelta(
+                translation: CGSize(width: 10, height: 40),
+                projectedTranslationWidth: 10,
+                width: 200
+            )
+        )
+    }
+
     func testTradeDetailHeroDistinguishesIncomingAndOutgoingProposals() {
         let viewerID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
         let partnerID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
@@ -1340,6 +1752,29 @@ final class TradeChatAffordanceTests: XCTestCase {
         XCTAssertFalse(context.shouldShowQuickActions(isComposerFocused: true))
     }
 
+    func testTradeMessageInputPresentationStateTracksComposerFocusForQuickActions() {
+        let context = TradeMessageInputContext(
+            isSending: false,
+            canUseCamera: true,
+            proposalStatus: .agreed,
+            supportsHandExchange: true,
+            showsCounterProposal: false
+        )
+        var state = TradeMessageInputPresentationState()
+
+        XCTAssertTrue(state.shouldShowQuickActions(context: context))
+
+        state.setComposerFocused(true)
+
+        XCTAssertTrue(state.isComposerFocused)
+        XCTAssertFalse(state.shouldShowQuickActions(context: context))
+
+        state.setComposerFocused(false)
+
+        XCTAssertFalse(state.isComposerFocused)
+        XCTAssertTrue(state.shouldShowQuickActions(context: context))
+    }
+
     func testArrivalQuickActionsMapToSendableMessageBodies() {
         XCTAssertEqual(TradeArrivalQuickAction.enroute.messageBody, "向かっています")
         XCTAssertEqual(TradeArrivalQuickAction.arrived.messageBody, "到着しました")
@@ -1399,6 +1834,44 @@ final class TradeChatAffordanceTests: XCTestCase {
             label: "現在地"
         )
         XCTAssertFalse(invalid.isSubmittable)
+    }
+
+    func testTradeDetailInteractionStateClearsDraftOnlyAfterSuccessfulSend() {
+        var state = TradeDetailInteractionState()
+        state.draftMessage = "よろしくお願いします"
+
+        state.clearDraftAfterSend(succeeded: false)
+        XCTAssertEqual(state.draftMessage, "よろしくお願いします")
+
+        state.clearDraftAfterSend(succeeded: true)
+        XCTAssertTrue(state.draftMessage.isEmpty)
+    }
+
+    func testTradeDetailInteractionStateConsumesLocationShareOnce() {
+        let coordinate = MegrumLocationCoordinate(latitude: 35.443707, longitude: 139.638031)
+        var state = TradeDetailInteractionState()
+
+        XCTAssertNil(state.consumeLocationCoordinate(coordinate))
+        state.startWaitingForLocation()
+
+        XCTAssertEqual(state.consumeLocationCoordinate(coordinate), coordinate)
+        XCTAssertFalse(state.isWaitingToShareLocation)
+        XCTAssertNil(state.consumeLocationCoordinate(coordinate))
+    }
+
+    func testTradeDetailInteractionStateTracksEvaluationAndToast() {
+        var state = TradeDetailInteractionState()
+
+        state.markEvaluationSubmitted()
+        state.showToast("評価を送信しました")
+        XCTAssertTrue(state.didSubmitEvaluation)
+        XCTAssertEqual(state.toastMessage, "評価を送信しました")
+
+        state.clearToast(ifMatching: "別の通知")
+        XCTAssertEqual(state.toastMessage, "評価を送信しました")
+
+        state.clearToast(ifMatching: "評価を送信しました")
+        XCTAssertNil(state.toastMessage)
     }
 
     func testOutfitPhotoIntentUsesTypedMessageDefaults() {

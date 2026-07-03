@@ -124,7 +124,10 @@ struct GoodsTile: View {
             }
             .overlay(alignment: .topTrailing) {
                 if usesImageOnlyCard {
-                    GoodsCollectionTagPlate(text: GoodsTileCollectionCardStyle.tagLine(for: item))
+                    GoodsCollectionTagPlate(
+                        text: GoodsTileCollectionCardStyle.tagLine(for: item),
+                        foregroundColor: item.tags.isEmpty ? MegrumTheme.conditionExact : MegrumTheme.ink
+                    )
                 } else if let tag = item.tags.first {
                     GoodsTagPill(name: tag.name, fontSize: 11, horizontalPadding: 9)
                         .padding(8)

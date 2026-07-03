@@ -33,6 +33,8 @@ public struct SupabaseMegrumRepository: MegrumRepository {
     let faceRecognitionClient: SupabaseFaceRecognitionClient
     let goodsSeriesSuggestionClient: SupabaseGoodsSeriesSuggestionClient
     let chatPhotoStorage: SupabaseChatPhotoStorage
+    let meguriMessageMediaStorage: SupabaseMeguriMessageMediaStorage
+    let profilePhotoStorage: SupabaseProfilePhotoStorage
     let entitlementClient: SupabaseEntitlementClient
     let viewerID: UUID
 
@@ -40,10 +42,12 @@ public struct SupabaseMegrumRepository: MegrumRepository {
         self.client = client
         let oshiClient = SupabaseOshiClient(client: client)
         self.oshiClient = oshiClient
+        let profilePhotoStorage = SupabaseProfilePhotoStorage(client: client)
+        self.profilePhotoStorage = profilePhotoStorage
         let accountProfilePersistence = SupabaseAccountProfilePersistence(
             client: client,
             oshiClient: oshiClient,
-            profilePhotoStorage: SupabaseProfilePhotoStorage(client: client),
+            profilePhotoStorage: profilePhotoStorage,
             userID: viewerID
         )
         self.accountProfilePersistence = accountProfilePersistence
@@ -91,6 +95,7 @@ public struct SupabaseMegrumRepository: MegrumRepository {
         self.faceRecognitionClient = SupabaseFaceRecognitionClient(client: client)
         self.goodsSeriesSuggestionClient = SupabaseGoodsSeriesSuggestionClient(client: client)
         self.chatPhotoStorage = SupabaseChatPhotoStorage(client: client)
+        self.meguriMessageMediaStorage = SupabaseMeguriMessageMediaStorage(client: client)
         self.entitlementClient = SupabaseEntitlementClient(client: client)
         self.viewerID = viewerID
         self.initialSnapshotLoader = SupabaseInitialSnapshotLoader(

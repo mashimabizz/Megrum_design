@@ -25,9 +25,7 @@ struct TradeDetailPinnedSummaryArea: View {
     var onAgree: (ExchangeMethod?) -> Void
     var onReject: () -> Void
     var onCounterProposal: () -> Void
-    @State private var detailRoute: TradeSummaryDetailRoute?
-    @State private var selectedExchangeMethod: ExchangeMethod?
-    @State private var selectedPaymentOptionID: String?
+    @State private var presentationState = TradeDetailPinnedSummaryPresentationState()
 
     private var isInitialSenderWaitingForPartner: Bool {
         guard let viewerID else {
@@ -61,7 +59,7 @@ struct TradeDetailPinnedSummaryArea: View {
                     label: proposalSummaryLabel,
                     summary: tradeSummaryLine,
                     action: {
-                        detailRoute = .tradeContent
+                        presentationState.openTradeContentDetails()
                     }
                 )
             }
@@ -80,7 +78,7 @@ struct TradeDetailPinnedSummaryArea: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
         .background(.white.opacity(0.56))
-        .sheet(item: $detailRoute) { route in
+        .sheet(item: $presentationState.detailRoute) { route in
             TradeSummaryDetailSheet(
                 route: route,
                 proposal: proposal,
@@ -120,16 +118,12 @@ struct TradeDetailPinnedSummaryArea: View {
         if responsePresentation.showsResponseControls {
             TradeIncomingProposalResponseCard(
                 presentation: responsePresentation,
-                selectedExchangeMethod: $selectedExchangeMethod,
-                selectedPaymentOptionID: $selectedPaymentOptionID,
+                selectedExchangeMethod: $presentationState.selectedExchangeMethod,
+                selectedPaymentOptionID: $presentationState.selectedPaymentOptionID,
                 isCondensedForKeyboard: isMessageComposerFocused,
                 isResponding: isResponding,
                 onAgree: {
-                    onAgree(
-                        responsePresentation.needsExchangeMethodSelection
-                            ? selectedExchangeMethod ?? responsePresentation.defaultSelectedExchangeMethod
-                            : nil
-                    )
+                    onAgree(presentationState.agreementExchangeMethod(for: responsePresentation))
                 },
                 onReject: onReject,
                 onCounterProposal: onCounterProposal

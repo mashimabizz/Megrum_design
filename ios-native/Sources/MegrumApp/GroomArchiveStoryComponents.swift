@@ -33,6 +33,8 @@ struct GroomArchiveInsightPill: View {
 struct GroomArchiveInsightsSheet: View {
     var groom: GroomPost
     @ObservedObject var appState: MegrumAppState
+    @State private var messageState = GroomArchiveReactionMessageDraftState()
+    @State private var profileRoute: MeguriUserProfileRoute?
 
     private var likes: [GroomReaction] {
         appState.groomReactions(for: groom.id).sorted { $0.createdAt > $1.createdAt }
@@ -66,9 +68,15 @@ struct GroomArchiveInsightsSheet: View {
                     ForEach(likes) { reaction in
                         GroomArchiveUserReactionRow(
                             userID: reaction.userID,
-                            profile: appState.publicProfilesByUserID[reaction.userID]?.profile,
+                            identity: reactionIdentity(userID: reaction.userID),
                             subtitle: reaction.createdAt.formatted(date: .abbreviated, time: .shortened),
-                            commentBody: nil
+                            commentBody: nil,
+                            onOpenProfile: profileAction(userID: reaction.userID),
+                            onMessage: messageAction(
+                                userID: reaction.userID,
+                                suggestedBody: "いいねありがとうございます",
+                                sourceGroomReplyID: nil
+                            )
                         )
                     }
                 }
@@ -82,9 +90,15 @@ struct GroomArchiveInsightsSheet: View {
                     ForEach(replies) { reply in
                         GroomArchiveUserReactionRow(
                             userID: reply.senderID,
-                            profile: appState.publicProfilesByUserID[reply.senderID]?.profile,
+                            identity: reactionIdentity(userID: reply.senderID),
                             subtitle: reply.createdAt.formatted(date: .abbreviated, time: .shortened),
-                            commentBody: reply.body
+                            commentBody: reply.body,
+                            onOpenProfile: profileAction(userID: reply.senderID),
+                            onMessage: messageAction(
+                                userID: reply.senderID,
+                                suggestedBody: "コメントありがとうございます",
+                                sourceGroomReplyID: reply.id
+                            )
                         )
                     }
                 }
@@ -92,5 +106,119 @@ struct GroomArchiveInsightsSheet: View {
             .padding(22)
         }
         .background(MegrumTheme.canvas)
+        .sheet(item: $profileRoute) { route in
+            NavigationStack {
+                MeguriUserProfileRouteScreen(
+                    appState: appState,
+                    userID: route.userID,
+                    onClose: { profileRoute = nil },
+                    onOpenMessage: { userID in
+                        profileRoute = nil
+                        messageAction(
+                            userID: userID,
+                            suggestedBody: "",
+                            sourceGroomReplyID: nil
+                        )?()
+                    }
+                )
+            }
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+        }
+        .sheet(item: $messageState.target, onDismiss: { messageState.dismiss() }) { target in
+            GroomArchiveReactionMessageSheet(
+                target: target,
+                isSending: appState.sendingMeguriMessageRecipientID == target.userID,
+                draft: $messageState.draft,
+                onCancel: { messageState.dismiss() },
+                onSend: sendReactionMessage
+            )
+            .presentationDetents([.medium])
+            .presentationDragIndicator(.visible)
+        }
+        .alert("\(SubscriptionCatalog.currentPremiumDisplayName)でやり取りできます", isPresented: $messageState.isShowingMegrumPlusPrompt) {
+            Button("詳しく見る") {
+                messageState.showMegrumPlus()
+            }
+            Button("あとで", role: .cancel) {}
+        } message: {
+            Text("\(SubscriptionCatalog.currentPremiumDisplayName)に入ると、めぐり内で届いたメッセージの本文表示と返信ができるようになります。")
+        }
+        .sheet(isPresented: $messageState.isShowingMegrumPlus) {
+            NavigationStack {
+                SubscriptionSettingsScreen(appState: appState)
+            }
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
+        }
+    }
+
+    private func messageAction(
+        userID: UUID,
+        suggestedBody: String,
+        sourceGroomReplyID: UUID?
+    ) -> (() -> Void)? {
+        guard userID != appState.viewer?.id else {
+            return nil
+        }
+        let profile = appState.publicProfilesByUserID[userID]?.profile
+        let displayName = profile?.displayName.nilIfBlank
+            ?? profile?.handle.nilIfBlank
+            ?? "ユーザー"
+        return {
+            guard appState.subscriptionState.hasMeguriMessageAccess else {
+                messageState.showMegrumPlusPrompt()
+                return
+            }
+            messageState.compose(
+                to: GroomArchiveReactionMessageTarget(
+                    userID: userID,
+                    displayName: displayName,
+                    sourceGroom: groom,
+                    sourceGroomReplyID: sourceGroomReplyID,
+                    suggestedBody: suggestedBody
+                )
+            )
+        }
+    }
+
+    private func profileAction(userID: UUID) -> (() -> Void)? {
+        guard userID != appState.viewer?.id else {
+            return nil
+        }
+        return {
+            profileRoute = MeguriUserProfileRoute(userID: userID)
+        }
+    }
+
+    private func reactionIdentity(userID: UUID) -> MeguriProfileIdentity {
+        let profile = appState.publicProfilesByUserID[userID]?.profile
+        return appState.meguriIdentity(
+            for: userID,
+            fallbackName: profile?.displayName,
+            fallbackHandle: profile?.handle,
+            fallbackAvatarURL: profile?.avatarURL
+        )
+    }
+
+    private func sendReactionMessage() {
+        guard let target = messageState.target else {
+            return
+        }
+        guard appState.subscriptionState.hasMeguriMessageAccess else {
+            messageState.showMegrumPlusPrompt()
+            return
+        }
+        Task {
+            let sent = await appState.sendMeguriMessage(
+                recipientID: target.userID,
+                body: messageState.trimmedDraft,
+                sourceGroomReplyID: target.sourceGroomReplyID,
+                sourceGroomPostID: target.sourceGroom.id,
+                sourceGroomOwnerID: target.sourceGroom.authorID,
+                sourceGroomImageURL: target.sourceGroom.imageURL
+            )
+            messageState.clearAfterSend(sent)
+        }
     }
 }

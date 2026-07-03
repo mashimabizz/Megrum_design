@@ -14,40 +14,29 @@ struct OshiMasterSelectSheet: View {
     var onSelect: (OshiGroup) -> Void
     var onRegisterSelected: (([OshiGroup]) -> Void)?
 
-    @State private var searchText = ""
-    @State private var selectedGenreID: UUID?
-    @State private var pendingSelectedGroupIDs: Set<UUID> = []
+    @State private var sheetState = OshiMasterSelectSheetState()
 
     private var categoryOptions: [OshiCategoryOption] {
         [OshiCategoryOption(id: nil, title: "すべて")] + genres.map { OshiCategoryOption(id: $0.id, title: $0.name) }
     }
 
     private var filteredGroups: [OshiGroup] {
-        let normalized = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        return groups.filter { group in
-            if let selectedGenreID, group.genreID != selectedGenreID {
-                return false
-            }
-            guard !normalized.isEmpty else {
-                return true
-            }
-            return ([group.name] + group.aliases).contains { $0.localizedCaseInsensitiveContains(normalized) }
-        }
+        sheetState.filteredGroups(from: groups)
     }
 
     private var pendingSelectedGroups: [OshiGroup] {
-        OshiMasterSelectionReducer.selectedGroups(from: groups, selectedIDs: pendingSelectedGroupIDs)
+        sheetState.pendingSelectedGroups(from: groups)
     }
 
     private var scrollBottomPadding: CGFloat {
         OshiMasterSelectLayoutMetrics.bottomContentPadding
-            + (pendingSelectedGroupIDs.isEmpty ? 0 : OshiMasterSelectLayoutMetrics.selectedActionExtraPadding)
+            + (sheetState.hasPendingSelection ? OshiMasterSelectLayoutMetrics.selectedActionExtraPadding : 0)
     }
 
     var body: some View {
         VStack(spacing: 0) {
             OshiMasterSelectHeader(
-                onRequest: { onRequest(searchText.nilIfBlank) },
+                onRequest: { onRequest(sheetState.requestSearchText) },
                 onClose: onClose
             )
 
@@ -65,22 +54,22 @@ struct OshiMasterSelectSheet: View {
         .safeAreaInset(edge: .bottom) {
             OshiMasterSelectFooter(
                 categoryOptions: categoryOptions,
-                selectedGenreID: $selectedGenreID,
-                searchText: $searchText,
+                selectedGenreID: $sheetState.selectedGenreID,
+                searchText: $sheetState.searchText,
                 allowsMultipleSelection: allowsMultipleSelection,
-                pendingSelectionCount: pendingSelectedGroupIDs.count,
+                pendingSelectionCount: sheetState.pendingSelectionCount,
                 onRegister: registerPendingSelection
             )
         }
         .onAppear(perform: resetPendingSelection)
         .onChange(of: selectedGroupIDs) { _, _ in
-            pendingSelectedGroupIDs = pendingSelectedGroupIDs.subtracting(selectedGroupIDs)
+            sheetState.removeLockedPendingSelection(selectedGroupIDs: selectedGroupIDs)
         }
-        .animation(.snappy(duration: 0.18), value: pendingSelectedGroupIDs)
+        .animation(.snappy(duration: 0.18), value: sheetState.pendingSelectedGroupIDs)
     }
 
     private func isSelected(_ group: OshiGroup) -> Bool {
-        selectedGroupIDs.contains(group.id) || pendingSelectedGroupIDs.contains(group.id)
+        sheetState.isSelected(group, selectedGroupIDs: selectedGroupIDs)
     }
 
     private func handleCandidateTap(_ group: OshiGroup) {
@@ -88,11 +77,7 @@ struct OshiMasterSelectSheet: View {
             onSelect(group)
             return
         }
-        pendingSelectedGroupIDs = OshiMasterSelectionReducer.toggling(
-            groupID: group.id,
-            selectedIDs: pendingSelectedGroupIDs,
-            lockedIDs: selectedGroupIDs
-        )
+        sheetState.togglePendingGroup(group.id, lockedIDs: selectedGroupIDs)
     }
 
     private func registerPendingSelection() {
@@ -100,7 +85,7 @@ struct OshiMasterSelectSheet: View {
         guard !selectedGroups.isEmpty else {
             return
         }
-        pendingSelectedGroupIDs = []
+        sheetState.clearPendingSelection()
         if let onRegisterSelected {
             onRegisterSelected(selectedGroups)
         } else {
@@ -109,6 +94,6 @@ struct OshiMasterSelectSheet: View {
     }
 
     private func resetPendingSelection() {
-        pendingSelectedGroupIDs = []
+        sheetState.clearPendingSelection()
     }
 }

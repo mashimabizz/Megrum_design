@@ -2,7 +2,7 @@
 
 最終更新: 2026-06-29
 
-ステータス: Draft v0.3（現行Swift Native退会申請RPCとAPNs token失効経路を確認・退会完了処理/取消処理/Auth削除/Storage削除/外部連携解除は未確認）
+ステータス: Draft v0.4（退会申請RPCで通知deviceを失効するmigrationを追加・退会完了処理/取消処理/Auth削除/Storage削除/外部連携解除は未確認）
 
 ## 目的
 
@@ -50,7 +50,7 @@ APNs token / 端末通知まわりで確認できた処理:
 - APNs device tokenは `notification_devices` に `push_provider='apns'`、`native_device_token` として保存される。
 - ログアウト経路では、登録済みtokenがある場合に `notification_devices.revoked_at` をPATCHする `revokeRegisteredNativePushDeviceToken()` の呼び出しがある。
 - `send-apns-notification` Edge Functionは、APNsが410、`BadDeviceToken` 又は `Unregistered` を返した場合に該当deviceの `revoked_at` を更新する。
-- ただし、退会申請成功時に端末tokenを必ず失効させる処理、削除完了時にtokenを横断削除又は無効化する処理、Expo tokenを含む全端末tokenの削除処理は未確認。
+- iter1226.267で、退会申請RPC成功時に `notification_devices.revoked_at` を未失効の全deviceへ設定するmigrationを追加した。削除完了時の横断削除、外部push provider側の完全削除、Expo tokenを含む本番データでの適用確認は未確認。
 
 Auth session / Keychainまわりで確認できた処理:
 - live authでは `KeychainAuthSessionStore` がAuthSessionを端末内Keychainへ保存し、access token、refresh token、expires、token type、user id、emailを保持し得る。
@@ -222,7 +222,7 @@ Megrumサポートです。
 | 削除申請理由と任意メモを保存する | 確認済（`account_deletion_requests`） |
 | 削除申請後に削除予定日が残る | 確認済（30日後予定日） |
 | 削除完了通知を送れる | 未 |
-| APNs tokenを削除又は無効化できる | 一部確認済（ログアウト時のclient-side revokeとAPNs失効応答時のEdge Function revoke）。退会申請/削除完了への連動は未確認 |
+| APNs tokenを削除又は無効化できる | 一部確認済（ログアウト時のclient-side revoke、APNs失効応答時のEdge Function revoke、退会申請RPCでの全device revoke migration）。削除完了時の横断削除、本番適用、外部provider側の完全削除は未確認 |
 | 端末内Keychain sessionを削除できる | 一部確認済（ログアウト時のlocal clear）。退会申請/削除完了、他端末session、外部認証事業者側sessionへの連動は未確認 |
 | Sign in with Appleのtoken revoke要否を確認した | 未 |
 | Googleログイン連携解除の要否を確認した | 未 |

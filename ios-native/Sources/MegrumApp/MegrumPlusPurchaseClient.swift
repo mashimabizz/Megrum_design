@@ -29,7 +29,7 @@ enum MegrumPlusPurchaseError: LocalizedError, Equatable {
         case .storeKitUnavailable:
             "この環境ではApp Store課金を利用できません。"
         case .productUnavailable:
-            "メグルムプラスの商品情報を取得できませんでした。"
+            "\(SubscriptionCatalog.currentPremiumDisplayName)の商品情報を取得できませんでした。"
         case .verificationFailed:
             "購入情報を確認できませんでした。"
         }
@@ -48,7 +48,7 @@ struct StoreKitMegrumPlusPurchaseClient: MegrumPlusPurchaseClient {
         let product = try await product(for: productID)
         return MegrumPlusPurchaseOffer(
             productID: product.id,
-            displayName: product.displayName.isEmpty ? "メグルムプラス" : product.displayName,
+            displayName: product.displayName.isEmpty ? SubscriptionCatalog.currentPremiumDisplayName : product.displayName,
             priceText: product.displayPrice
         )
         #else

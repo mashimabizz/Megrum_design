@@ -7,7 +7,7 @@ extension ProposalCreateFlow {
             handoffMethod: exchangeMethod.listingHandoffDraft,
             localPrefecture: currentMeetupPrefecture,
             localPlaceMemo: meetupPlaceMemo,
-            localSchedule: Self.dateText(meetupStartAt),
+            localSchedule: ProposalCreateDisplayTextFormatter.dateText(meetupStartAt),
             shippingFee: shippingFee,
             shippingDays: shippingDays,
             acceptsOutsideCondition: true

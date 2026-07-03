@@ -13,11 +13,7 @@ struct HomeDiscoverySheetView: View {
     var onAddExtraProposalSelection: (HomeDiscoveryProposalSelection) -> Void = { _ in }
     var onOpenOwnerProfile: (UUID) -> Void = { _ in }
     var onStartProposal: (HomeDiscoveryProposalSelection) -> Void = { _ in }
-    @State private var nestedPresentation: HomeDiscoveryNestedPresentation?
-    @State private var addedExtraSelections: [HomeDiscoveryProposalSelection] = []
-    @State private var wishCopyToastMessage: String?
-    @State private var wishCopyToastID = UUID()
-    @State private var copyingWishGoodsID: UUID?
+    @State private var presentationState = HomeDiscoverySheetPresentationState()
 
     var body: some View {
         HomeDiscoverySheetContent(
@@ -25,22 +21,22 @@ struct HomeDiscoverySheetView: View {
             viewerOfferGoods: viewerOfferGoods,
             addedExtraCandidateIDs: addedExtraCandidateIDs,
             presentationContext: presentationContext,
-            copyingWishGoodsID: copyingWishGoodsID,
+            copyingWishGoodsID: presentationState.copyingWishGoodsID,
             onClose: onClose,
             onOpenOwnerProfile: openOwnerProfile,
-            onOpenNestedSheet: { nestedPresentation = .discoverySheet($0) },
+            onOpenNestedSheet: { presentationState.showNestedSheet($0) },
             onStartProposal: submitSelection,
             onCopyToWish: copyGoodsToWish
         )
             .overlay(alignment: .bottom) {
-                if let wishCopyToastMessage {
+                if let wishCopyToastMessage = presentationState.wishCopyToastMessage {
                     MeguriToastView(message: wishCopyToastMessage)
                         .padding(.bottom, 24)
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
-            .animation(.spring(response: 0.32, dampingFraction: 0.88), value: wishCopyToastMessage)
-            .sheet(item: $nestedPresentation) { presentation in
+            .animation(.spring(response: 0.32, dampingFraction: 0.88), value: presentationState.wishCopyToastMessage)
+            .sheet(item: $presentationState.nestedPresentation) { presentation in
                 switch presentation {
                 case .discoverySheet(let sheet):
                     HomeDiscoverySheetView(
@@ -49,12 +45,11 @@ struct HomeDiscoverySheetView: View {
                         viewerOfferGoods: viewerOfferGoods,
                         presentationContext: .additionalCandidate,
                         onClose: {
-                            nestedPresentation = nil
+                            presentationState.closeNestedPresentation()
                         },
                         onAddExtraCandidate: onAddExtraCandidate,
                         onAddExtraProposalSelection: { selection in
-                            addedExtraSelections.append(selection)
-                            nestedPresentation = nil
+                            presentationState.addExtraProposalSelectionAndDismiss(selection)
                         },
                         onOpenOwnerProfile: onOpenOwnerProfile,
                         onStartProposal: submitSelection
@@ -78,13 +73,13 @@ struct HomeDiscoverySheetView: View {
     }
 
     private var addedExtraCandidateIDs: Set<UUID> {
-        Set(addedExtraSelections.flatMap(\.receiverGoodsIDs))
+        presentationState.addedExtraCandidateIDs
     }
 
     private func submitSelection(_ selection: HomeDiscoveryProposalSelection) {
         switch presentationContext {
         case .primary:
-            onStartProposal(selection.includingExtraSelections(addedExtraSelections))
+            onStartProposal(presentationState.primaryProposalSelection(selection))
         case .additionalCandidate:
             onAddExtraProposalSelection(selection)
         }
@@ -96,14 +91,14 @@ struct HomeDiscoverySheetView: View {
             canPresentNestedProfile: appState != nil
         ) {
         case .nested(let route):
-            nestedPresentation = .publicProfile(route)
+            presentationState.showNestedProfile(route)
         case .parent(let userID):
             onOpenOwnerProfile(userID)
         }
     }
 
     private func copyGoodsToWish(_ goods: HomeMockGoods) {
-        guard copyingWishGoodsID == nil else {
+        guard presentationState.canStartWishCopy else {
             return
         }
         guard let appState else {
@@ -111,7 +106,7 @@ struct HomeDiscoverySheetView: View {
             return
         }
 
-        copyingWishGoodsID = goods.id
+        presentationState.beginWishCopy(goodsID: goods.id)
         Task { @MainActor in
             if appState.oshiGroups.isEmpty {
                 await appState.loadOshiGroups()
@@ -124,13 +119,13 @@ struct HomeDiscoverySheetView: View {
                 groups: appState.oshiGroups,
                 goodsTypes: appState.goodsTypes
             ) else {
-                copyingWishGoodsID = nil
+                presentationState.finishWishCopy()
                 showWishCopyToast(HomeWishCopyInputBuilder.failureToastMessage)
                 return
             }
 
             let saved = await appState.createGoodsEntry(input)
-            copyingWishGoodsID = nil
+            presentationState.finishWishCopy()
             showWishCopyToast(
                 saved
                     ? HomeWishCopyInputBuilder.successToastMessage
@@ -141,17 +136,13 @@ struct HomeDiscoverySheetView: View {
 
     private func showWishCopyToast(_ message: String) {
         let toastID = UUID()
-        wishCopyToastID = toastID
         withAnimation {
-            wishCopyToastMessage = message
+            presentationState.showWishCopyToast(message, toastID: toastID)
         }
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: 2_000_000_000)
-            guard wishCopyToastID == toastID else {
-                return
-            }
             withAnimation {
-                wishCopyToastMessage = nil
+                presentationState.clearWishCopyToast(ifMatching: toastID)
             }
         }
     }

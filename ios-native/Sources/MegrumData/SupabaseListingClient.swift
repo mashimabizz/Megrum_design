@@ -10,6 +10,9 @@ public struct SupabaseListingUpdateInput: Equatable, Sendable {
     public var haveItems: [ListingItemQuantity]?
     public var haveLogic: ListingLogic?
     public var haveMinimumCount: Int?
+    public var haveIsCashOffer: Bool?
+    public var haveCashAmount: Int?
+    public var clearsHaveCashAmount: Bool
     public var status: IndividualListingStatus?
     public var note: String?
     public var clearsNote: Bool
@@ -18,6 +21,9 @@ public struct SupabaseListingUpdateInput: Equatable, Sendable {
         haveItems: [ListingItemQuantity]? = nil,
         haveLogic: ListingLogic? = nil,
         haveMinimumCount: Int? = nil,
+        haveIsCashOffer: Bool? = nil,
+        haveCashAmount: Int? = nil,
+        clearsHaveCashAmount: Bool = false,
         status: IndividualListingStatus? = nil,
         note: String? = nil,
         clearsNote: Bool = false
@@ -25,6 +31,9 @@ public struct SupabaseListingUpdateInput: Equatable, Sendable {
         self.haveItems = haveItems
         self.haveLogic = haveLogic
         self.haveMinimumCount = haveMinimumCount
+        self.haveIsCashOffer = haveIsCashOffer
+        self.haveCashAmount = haveCashAmount
+        self.clearsHaveCashAmount = clearsHaveCashAmount
         self.status = status
         self.note = note
         self.clearsNote = clearsNote
@@ -142,6 +151,9 @@ public final class SupabaseListingClient: @unchecked Sendable {
                     haveItems: input.haveItems,
                     haveLogic: input.haveLogic,
                     haveMinimumCount: input.haveMinimumCount,
+                    haveIsCashOffer: input.haveIsCashOffer,
+                    haveCashAmount: input.haveCashAmount,
+                    clearsHaveCashAmount: input.haveCashAmount == nil,
                     status: status,
                     note: input.note,
                     clearsNote: input.note == nil

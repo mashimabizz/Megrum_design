@@ -3,13 +3,14 @@ import MegrumDesign
 import SwiftUI
 
 struct MeguriMapCreationDropPin: View {
-    @State private var hasDropped = false
+    @State private var presentationState = MeguriMapCreationPromptPresentationState()
 
     var body: some View {
         VStack(spacing: 0) {
-            Text("Mg")
-                .font(.system(size: 16, weight: .black, design: .rounded))
-                .foregroundStyle(.white)
+            Image("MegrumBrandIcon", bundle: .main)
+                .resizable()
+                .scaledToFit()
+                .padding(8)
                 .frame(width: 54, height: 54)
                 .background(
                     LinearGradient(
@@ -30,13 +31,13 @@ struct MeguriMapCreationDropPin: View {
                 .frame(width: 14, height: 8)
                 .offset(y: -1)
         }
-        .offset(y: hasDropped ? 0 : -78)
-        .opacity(hasDropped ? 1 : 0.18)
-        .scaleEffect(hasDropped ? 1 : 0.88, anchor: .bottom)
+        .offset(y: presentationState.dropPinYOffset)
+        .opacity(presentationState.dropPinOpacity)
+        .scaleEffect(presentationState.dropPinScale, anchor: .bottom)
         .onAppear {
-            hasDropped = false
+            presentationState.prepare()
             withAnimation(.interpolatingSpring(stiffness: 250, damping: 17).delay(0.02)) {
-                hasDropped = true
+                presentationState.show()
             }
         }
         .accessibilityHidden(true)
@@ -263,19 +264,19 @@ struct MeguriMapCreationPromptCallout: View {
     var onCreateGroom: () -> Void
     var onCreateThread: () -> Void
 
-    @State private var isVisible = false
+    @State private var presentationState = MeguriMapCreationPromptPresentationState()
 
     var body: some View {
         calloutWithPointer
         .frame(width: MeguriMapCreationPromptLayout.calloutSize.width)
-        .opacity(isVisible ? 1 : 0)
-        .scaleEffect(isVisible ? 1 : 0.96, anchor: placement.scaleAnchor)
-        .animation(.easeOut(duration: 0.18), value: isVisible)
+        .opacity(presentationState.calloutOpacity)
+        .scaleEffect(presentationState.calloutScale, anchor: placement.scaleAnchor)
+        .animation(.easeOut(duration: 0.18), value: presentationState.isVisible)
         .onAppear {
-            isVisible = false
+            presentationState.prepare()
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.20) {
                 withAnimation(.easeOut(duration: 0.18)) {
-                    isVisible = true
+                    presentationState.show()
                 }
             }
         }

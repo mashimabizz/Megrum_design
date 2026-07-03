@@ -2,8 +2,7 @@ import MegrumCore
 
 extension BoardThreadComposerSheet {
     var canSubmit: Bool {
-        isShowingLocationStep
-            && contentMessage == nil
+        contentMessage == nil
             && locationMessage == nil
             && !appState.isCreatingBoardThread
     }
@@ -11,9 +10,6 @@ extension BoardThreadComposerSheet {
     var missingContextMessage: String? {
         if let contentMessage {
             return contentMessage
-        }
-        guard isShowingLocationStep else {
-            return nil
         }
         return locationMessage
     }
@@ -49,11 +45,11 @@ extension BoardThreadComposerSheet {
     }
 
     var primaryActionTitle: String {
-        isShowingLocationStep ? "この場所で作成する" : "最後に場所を決める"
+        "チャットルームを作成する"
     }
 
     var primaryActionEnabled: Bool {
-        isShowingLocationStep ? canSubmit : canAdvanceToLocationStep
+        contentMessage == nil && !appState.isCreatingBoardThread
     }
 
     var submitLatitude: Double? {
@@ -69,19 +65,21 @@ extension BoardThreadComposerSheet {
     }
 
     var submitCoordinate: MegrumLocationCoordinate? {
-        guard let selectedCoordinate,
+        guard let coordinate = selectedCoordinate ?? baseCoordinate,
               MeguriAccessPolicy.canCreateAt(
-                  selectedCoordinate,
+                  coordinate,
                   currentCoordinate: baseCoordinate
               )
         else {
             return nil
         }
-        return selectedCoordinate
+        return coordinate
     }
 
     var baseCoordinate: MegrumLocationCoordinate? {
-        locationState.coordinate ?? fallbackCoordinate
+        locationState.coordinate
+            ?? fallbackCoordinate
+            ?? (locksCreationCoordinate ? initialCreationCoordinate : nil)
     }
 
     var submitPrefecture: String? {

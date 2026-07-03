@@ -11,13 +11,16 @@ struct MeguriHomeContent: View {
     var mapGrooms: [GroomPost]
     var threads: [BoardThread]
     var currentCoordinate: MegrumLocationCoordinate?
+    var subscriptionState: UserSubscriptionState
     var notice: MegrumLocationNotice?
     var isRequestingLocation: Bool
     var unreadMessageCount: Int
+    var isContentFilterActive: Bool
     @Binding var selectedMapKind: MeguriMapKind
+    var onOpenContentFilter: () -> Void
     var onRecenterMap: () -> Void
     var onOpenMessages: () -> Void
-    var onSelectGroom: (GroomPost) -> Void
+    var onSelectGroom: (GroomPost, UnitPoint) -> Void
     var onSelectThread: (BoardThread) -> Void
     var onTapMapCoordinate: (MegrumLocationCoordinate) -> Void
     var pendingCreationCoordinate: MegrumLocationCoordinate?
@@ -38,6 +41,7 @@ struct MeguriHomeContent: View {
                     threads: threads,
                     currentCoordinate: currentCoordinate,
                     viewerID: viewer?.id,
+                    subscriptionState: subscriptionState,
                     onSelectGroom: onSelectGroom,
                     onSelectThread: onSelectThread,
                     onTapCoordinate: onTapMapCoordinate,
@@ -49,12 +53,16 @@ struct MeguriHomeContent: View {
                 .ignoresSafeArea()
 
                 VStack(spacing: 0) {
-                    HStack {
+                    HStack(spacing: 10) {
+                        MeguriHomeFilterButton(
+                            isActive: isContentFilterActive,
+                            action: onOpenContentFilter
+                        )
                         MeguriHomeMapKindCycleButton(selectedKind: $selectedMapKind)
                         Spacer()
                     }
                     .padding(.horizontal, 18)
-                    .padding(.top, 30)
+                    .padding(.top, MeguriHomeTopControlsLayout.topPadding(safeAreaTop: proxy.safeAreaInsets.top))
 
                     if let notice {
                         MeguriHomeNoticeCard(notice: notice, action: onNoticeAction)
@@ -86,9 +94,39 @@ struct MeguriHomeContent: View {
                     onOpenGroomArchive: onOpenGroomArchive
                 )
                 .padding(.horizontal, 18)
-                .padding(.bottom, max(proxy.safeAreaInsets.bottom - 44, 0))
+                .padding(.bottom, MeguriHomeUtilityLayout.bottomPadding(safeAreaBottom: proxy.safeAreaInsets.bottom))
             }
         }
+    }
+}
+
+private struct MeguriHomeFilterButton: View {
+    var isActive: Bool
+    var action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "line.3.horizontal.decrease.circle.fill")
+                .font(.system(size: 22, weight: .heavy))
+                .foregroundStyle(isActive ? .white : MegrumTheme.lavender)
+                .frame(width: 48, height: 48)
+                .background {
+                    if isActive {
+                        Circle()
+                            .fill(MegrumTheme.lavender)
+                    } else {
+                        Circle()
+                            .fill(.regularMaterial)
+                    }
+                }
+                .overlay {
+                    Circle()
+                        .stroke(.white.opacity(0.66), lineWidth: 1)
+                }
+                .shadow(color: MegrumTheme.ink.opacity(0.12), radius: 12, y: 6)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("めぐりの表示をフィルター")
     }
 }
 
@@ -181,7 +219,7 @@ private struct MeguriHomeSelfProfileButton: View {
         Button(action: action) {
             MeguriProfileAvatarView(
                 avatarID: avatarID,
-                avatarURL: viewer?.avatarURL,
+                avatarURL: meguriProfile?.avatarURL,
                 fallback: displayName,
                 size: 54
             )

@@ -132,6 +132,15 @@ struct MegrumRootAuthenticatedContent<AuthenticatedTabs: View>: View {
                         adPlacement: .publicProfileFooterBanner
                     )
                 }
+            } else if visualQAInitialScreen == .groomArchive {
+                GroomArchiveScreen(
+                    appState: appState,
+                    currentCoordinate: nil
+                )
+            } else if visualQAInitialScreen == .subscriptionSettings {
+                NavigationStack {
+                    SubscriptionSettingsScreen(appState: appState)
+                }
             } else if drawerPageDestination == .profile {
                 NavigationStack {
                     OwnProfileScreen(appState: appState, onClose: onDismissDrawerPage)
@@ -148,7 +157,7 @@ struct MegrumRootAuthenticatedContent<AuthenticatedTabs: View>: View {
 
     @ViewBuilder
     private var loadingContent: some View {
-        if let errorMessage = appState.errorMessage {
+        if !appState.isLoading, let errorMessage = appState.errorMessage {
             NativeLoadingFailureScreen(
                 title: "Megrumを読み込めませんでした",
                 message: errorMessage,

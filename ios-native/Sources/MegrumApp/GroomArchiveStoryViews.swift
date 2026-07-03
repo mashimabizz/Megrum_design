@@ -6,21 +6,31 @@ struct GroomArchiveStoryScreen: View {
     var grooms: [GroomPost]
     var initialGroom: GroomPost
     @ObservedObject var appState: MegrumAppState
+    var onDismiss: (() -> Void)?
     @Environment(\.dismiss) private var dismiss
-    @State private var currentIndex: Int
-    @State private var dragOffset: CGSize = .zero
-    @State private var showsInsights = false
+    @State private var presentationState: GroomArchiveStoryPresentationState
+    @State private var isShowingDeleteConfirmation = false
 
-    init(grooms: [GroomPost], initialGroom: GroomPost, appState: MegrumAppState) {
+    init(
+        grooms: [GroomPost],
+        initialGroom: GroomPost,
+        appState: MegrumAppState,
+        onDismiss: (() -> Void)? = nil
+    ) {
         let sortedGrooms = GroomArchiveOrdering.sorted(grooms.isEmpty ? [initialGroom] : grooms)
         self.grooms = sortedGrooms
         self.initialGroom = initialGroom
         self.appState = appState
-        _currentIndex = State(initialValue: sortedGrooms.firstIndex(where: { $0.id == initialGroom.id }) ?? 0)
+        self.onDismiss = onDismiss
+        _presentationState = State(
+            initialValue: GroomArchiveStoryPresentationState(
+                initialIndex: sortedGrooms.firstIndex(where: { $0.id == initialGroom.id }) ?? 0
+            )
+        )
     }
 
     private var currentGroom: GroomPost {
-        grooms[max(0, min(currentIndex, grooms.count - 1))]
+        grooms[max(0, min(presentationState.currentIndex, grooms.count - 1))]
     }
 
     var body: some View {
@@ -43,8 +53,8 @@ struct GroomArchiveStoryScreen: View {
                 }
             }
             .padding(.horizontal, 8)
-            .offset(y: dragOffset.height * 0.20)
-            .scaleEffect(max(0.92, 1 - abs(dragOffset.height) / 900))
+            .offset(y: presentationState.imageYOffset)
+            .scaleEffect(presentationState.imageScale)
 
             HStack(spacing: 0) {
                 Color.clear
@@ -60,7 +70,7 @@ struct GroomArchiveStoryScreen: View {
                 HStack(spacing: 6) {
                     ForEach(grooms.indices, id: \.self) { index in
                         Capsule()
-                            .fill(index <= currentIndex ? .white : .white.opacity(0.28))
+                            .fill(index <= presentationState.currentIndex ? .white : .white.opacity(0.28))
                             .frame(height: 3)
                     }
                 }
@@ -83,7 +93,7 @@ struct GroomArchiveStoryScreen: View {
                     Spacer()
 
                     Button {
-                        dismiss()
+                        dismissStory()
                     } label: {
                         Image(systemName: "xmark")
                             .font(.system(size: 16, weight: .heavy))
@@ -99,50 +109,84 @@ struct GroomArchiveStoryScreen: View {
 
                 Spacer()
 
-                GroomArchiveInsightPill(
-                    likeCount: appState.groomReactions(for: currentGroom.id).count,
-                    commentCount: appState.groomReplies(for: currentGroom.id).count,
-                    action: { showsInsights = true }
-                )
-                .padding(.horizontal, 22)
+                HStack {
+                    Spacer()
+                    GroomViewerOwnerBottomControls(
+                        likeCount: appState.groomReactions(for: currentGroom.id).count,
+                        commentCount: appState.groomReplies(for: currentGroom.id).count,
+                        isDeleting: appState.deletingGroomPostID == currentGroom.id,
+                        onOpenInsights: { presentationState.showInsights() },
+                        onDelete: { isShowingDeleteConfirmation = true }
+                    )
+                }
+                .padding(.horizontal, 18)
                 .padding(.bottom, 28)
             }
         }
         .gesture(
             DragGesture(minimumDistance: 12)
                 .onChanged { value in
-                    dragOffset = value.translation
+                    presentationState.updateDrag(value.translation)
                 }
                 .onEnded { value in
-                    if value.translation.height < -76 {
-                        showsInsights = true
-                    } else if value.translation.height > 110 {
-                        dismiss()
+                    switch presentationState.dragOutcome(for: value.translation) {
+                    case .showInsights:
+                        presentationState.showInsights()
+                    case .dismiss:
+                        dismissStory()
+                    case .none:
+                        break
                     }
                     withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
-                        dragOffset = .zero
+                        presentationState.resetDrag()
                     }
                 }
         )
-        .sheet(isPresented: $showsInsights) {
+        .sheet(isPresented: $presentationState.showsInsights) {
             GroomArchiveInsightsSheet(groom: currentGroom, appState: appState)
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
         }
+        .confirmationDialog("このグルームを削除しますか？", isPresented: $isShowingDeleteConfirmation, titleVisibility: .visible) {
+            Button("削除する", role: .destructive) {
+                deleteCurrentGroom()
+            }
+            Button("キャンセル", role: .cancel) {}
+        } message: {
+            Text("削除すると、めぐりホームとグルームアーカイブから表示されなくなります。")
+        }
+        #if os(iOS)
+        .statusBarHidden(true)
+        #endif
     }
 
     private func move(by delta: Int) {
-        let nextIndex = currentIndex + delta
-        guard grooms.indices.contains(nextIndex) else {
-            if delta > 0 {
-                dismiss()
-            }
-            return
-        }
         var transaction = Transaction()
         transaction.disablesAnimations = true
+        var outcome = GroomArchiveStoryMoveOutcome.unchanged
         withTransaction(transaction) {
-            currentIndex = nextIndex
+            outcome = presentationState.move(by: delta, itemCount: grooms.count)
+        }
+        if outcome == .dismiss {
+            dismissStory()
+        }
+    }
+
+    private func dismissStory() {
+        if let onDismiss {
+            onDismiss()
+        } else {
+            dismiss()
+        }
+    }
+
+    private func deleteCurrentGroom() {
+        let target = currentGroom
+        Task {
+            let deleted = await appState.deleteOwnGroom(target)
+            if deleted {
+                dismissStory()
+            }
         }
     }
 }

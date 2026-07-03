@@ -21,6 +21,30 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertNil(state.errorMessage)
     }
 
+#if DEBUG
+    func testDebugToggleMegrumPremiumEntitlementSwitchesPlanLocally() {
+        let state = MegrumAppState(repository: PreviewMegrumRepository())
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+
+        XCTAssertFalse(state.subscriptionState.isMegrumPlusActive)
+
+        state.debugToggleMegrumPremiumEntitlement(now: now)
+
+        XCTAssertTrue(state.subscriptionState.isMegrumPlusActive)
+        XCTAssertTrue(state.subscriptionState.hasMeguriMessageAccess)
+        XCTAssertTrue(state.subscriptionState.hasMeguriBoardExtendedAccess)
+        XCTAssertEqual(state.subscriptionState.planType, .megrumPlusMonthly)
+        XCTAssertEqual(state.subscriptionState.loadedAt, now)
+
+        state.debugToggleMegrumPremiumEntitlement(now: now.addingTimeInterval(60))
+
+        XCTAssertFalse(state.subscriptionState.isMegrumPlusActive)
+        XCTAssertFalse(state.subscriptionState.hasMeguriMessageAccess)
+        XCTAssertFalse(state.subscriptionState.hasMeguriBoardExtendedAccess)
+        XCTAssertNil(state.subscriptionState.planType)
+    }
+#endif
+
     func testAppStateCreatesPreviewIndividualListing() async {
         let state = MegrumAppState(repository: PreviewMegrumRepository())
 
@@ -563,6 +587,35 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertEqual(state.threads.first?.id, record?.id)
     }
 
+    func testAppStateCanCreatePreviewBoardThreadTwice() async {
+        let state = MegrumAppState(repository: PreviewMegrumRepository())
+        await state.loadInitialData()
+        let initialCount = state.threads.count
+
+        let firstCreated = await state.createBoardThread(
+            title: "一件目のチャットルーム",
+            body: "北口にいます",
+            scope: .nearby3km,
+            latitude: 35.681236,
+            longitude: 139.767125
+        )
+        let secondCreated = await state.createBoardThread(
+            title: "二件目のチャットルーム",
+            body: "南口に移動しました",
+            scope: .nearby3km,
+            latitude: 35.681236,
+            longitude: 139.767125
+        )
+
+        XCTAssertTrue(firstCreated)
+        XCTAssertTrue(secondCreated)
+        XCTAssertEqual(state.threads.count, initialCount + 2)
+        XCTAssertEqual(state.threads.prefix(2).map(\.title), ["二件目のチャットルーム", "一件目のチャットルーム"])
+        XCTAssertEqual(Set(state.threads.prefix(2).map(\.id)).count, 2)
+        XCTAssertFalse(state.isCreatingBoardThread)
+        XCTAssertNil(state.errorMessage)
+    }
+
     func testAppStateCreatesNearbyBoardThreadWithoutViewerPrefecture() async {
         let state = MegrumAppState(repository: NoPrefectureBoardCreationRepository())
         await state.loadInitialData()
@@ -599,6 +652,33 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertEqual(state.grooms.count, initialCount + 1)
         XCTAssertEqual(state.grooms.first?.authorID, state.viewer?.id)
         XCTAssertFalse(state.isCreatingGroomPost)
+    }
+
+    func testAppStateCanCreatePreviewGroomPostTwice() async {
+        let state = MegrumAppState(repository: PreviewMegrumRepository())
+        await state.loadInitialData()
+        let initialCount = state.grooms.count
+
+        let firstCreated = await state.createGroomPost(
+            imageData: Data([0xff, 0xd8, 0xff, 0x00]),
+            imageContentType: "image/jpeg",
+            latitude: 35.681236,
+            longitude: 139.767125
+        )
+        let secondCreated = await state.createGroomPost(
+            imageData: Data([0xff, 0xd8, 0xff, 0x01]),
+            imageContentType: "image/jpeg",
+            latitude: 35.681236,
+            longitude: 139.767125
+        )
+
+        XCTAssertTrue(firstCreated)
+        XCTAssertTrue(secondCreated)
+        XCTAssertEqual(state.grooms.count, initialCount + 2)
+        XCTAssertEqual(Set(state.grooms.prefix(2).map(\.id)).count, 2)
+        XCTAssertEqual(state.grooms.prefix(2).map(\.authorID), [state.viewer?.id, state.viewer?.id])
+        XCTAssertFalse(state.isCreatingGroomPost)
+        XCTAssertNil(state.errorMessage)
     }
 
     func testAppStateMarksPreviewGroomViewedAndLiked() async {
@@ -745,14 +825,45 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertFalse(state.isLoadingGroomArchive)
     }
 
-    func testAppStateLoadsAndSendsPreviewMeguriMessages() async {
+    func testAppStateDeletesOwnGroomFromVisibleCollectionsAndEngagementCaches() async {
         let state = MegrumAppState(repository: PreviewMegrumRepository())
+
+        await state.loadInitialData()
+        await state.loadGroomMapPosts()
+        await state.loadGroomArchive()
+
+        let groom = try! XCTUnwrap(state.ownGroomArchive.first)
+        XCTAssertFalse(state.groomReactions(for: groom.id).isEmpty)
+        XCTAssertFalse(state.groomReplies(for: groom.id).isEmpty)
+
+        let deleted = await state.deleteOwnGroom(groom)
+
+        XCTAssertTrue(deleted)
+        XCTAssertFalse(state.grooms.contains { $0.id == groom.id })
+        XCTAssertFalse(state.groomMapPosts.contains { $0.id == groom.id })
+        XCTAssertFalse(state.ownGroomArchive.contains { $0.id == groom.id })
+        XCTAssertTrue(state.groomReactions(for: groom.id).isEmpty)
+        XCTAssertTrue(state.groomReplies(for: groom.id).isEmpty)
+        XCTAssertNil(state.deletingGroomPostID)
+        XCTAssertNil(state.errorMessage)
+    }
+
+    func testAppStateLoadsAndSendsPreviewMeguriMessages() async {
+        let state = MegrumAppState(
+            repository: PreviewMegrumRepository(
+                subscriptionState: UserSubscriptionState(
+                    entitlements: [
+                        UserEntitlement(key: .megrumPlus, isActive: true, source: .subscription)
+                    ]
+                )
+            )
+        )
         let recipientID = UUID(uuidString: "22222222-2222-2222-2222-222222222222")!
 
         await state.loadInitialData()
 
         XCTAssertEqual(state.meguriMessages.first?.body, "グルーム見ました。会場付近ですか？")
-        XCTAssertEqual(state.meguriPendingReplyCount, 1)
+        XCTAssertEqual(state.meguriPendingReplyCount, 2)
 
         let sent = await state.sendMeguriMessage(
             recipientID: recipientID,
@@ -766,17 +877,114 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertNil(state.errorMessage)
     }
 
+    func testAppStateSendsPreviewMeguriPhotoMessagesForPremiumUsers() async {
+        let state = MegrumAppState(
+            repository: PreviewMegrumRepository(
+                subscriptionState: UserSubscriptionState(
+                    entitlements: [
+                        UserEntitlement(key: .megrumPlus, isActive: true, source: .subscription)
+                    ]
+                )
+            )
+        )
+        let recipientID = UUID(uuidString: "22222222-2222-2222-2222-222222222222")!
+
+        await state.loadInitialData()
+        let initialMessageCount = state.meguriMessages.count
+
+        let sent = await state.sendMeguriPhotoMessage(
+            recipientID: recipientID,
+            imageData: Data([0xFF, 0xD8, 0xFF]),
+            imageContentType: "image/jpeg"
+        )
+        let message = try! XCTUnwrap(state.meguriMessages.last)
+
+        XCTAssertTrue(sent)
+        XCTAssertEqual(state.meguriMessages.count, initialMessageCount + 1)
+        XCTAssertEqual(message.messageType, .image)
+        XCTAssertEqual(message.recipientID, recipientID)
+        XCTAssertTrue(message.imageURL?.isFileURL == true)
+        XCTAssertNotNil(message.imagePath)
+        XCTAssertNil(state.sendingMeguriMessageRecipientID)
+        XCTAssertNil(state.errorMessage)
+    }
+
+    func testAppStateBlocksPreviewMeguriMessageSendForFreeUsers() async {
+        let state = MegrumAppState(repository: PreviewMegrumRepository())
+        let recipientID = UUID(uuidString: "22222222-2222-2222-2222-222222222222")!
+
+        await state.loadInitialData()
+        let initialMessageCount = state.meguriMessages.count
+
+        let sent = await state.sendMeguriMessage(
+            recipientID: recipientID,
+            body: "近くにいます"
+        )
+
+        XCTAssertFalse(sent)
+        XCTAssertEqual(state.meguriMessages.count, initialMessageCount)
+        XCTAssertEqual(state.errorMessage, "Megrumプレミアムでめぐり内のメッセージのやり取りができます")
+        XCTAssertNil(state.sendingMeguriMessageRecipientID)
+    }
+
+    func testAppStateBlocksPreviewMeguriPhotoMessageSendForFreeUsers() async {
+        let state = MegrumAppState(repository: PreviewMegrumRepository())
+        let recipientID = UUID(uuidString: "22222222-2222-2222-2222-222222222222")!
+
+        await state.loadInitialData()
+        let initialMessageCount = state.meguriMessages.count
+
+        let sent = await state.sendMeguriPhotoMessage(
+            recipientID: recipientID,
+            imageData: Data([0xFF, 0xD8, 0xFF]),
+            imageContentType: "image/jpeg"
+        )
+
+        XCTAssertFalse(sent)
+        XCTAssertEqual(state.meguriMessages.count, initialMessageCount)
+        XCTAssertEqual(state.errorMessage, "Megrumプレミアムでめぐり内のメッセージのやり取りができます")
+        XCTAssertNil(state.sendingMeguriMessageRecipientID)
+    }
+
     func testAppStateMarksPreviewMeguriMessagesRead() async {
         let state = MegrumAppState(repository: PreviewMegrumRepository())
         let peerID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+        let firstSourceID = UUID(uuidString: "00000000-0000-0000-0000-000000000502")!
+        let secondSourceID = UUID(uuidString: "00000000-0000-0000-0000-000000000503")!
 
         await state.loadInitialData()
 
-        XCTAssertNil(state.meguriMessages(with: peerID).first?.readAt)
+        XCTAssertEqual(
+            state.meguriMessageThreads.map(\.sourceGroomPostID),
+            [firstSourceID, secondSourceID]
+        )
+        XCTAssertNil(
+            state.meguriMessages(
+                in: MeguriMessageConversationKey(
+                    peerID: peerID,
+                    sourceGroomPostID: firstSourceID
+                )
+            ).first?.readAt
+        )
 
-        await state.markMeguriMessagesRead(peerID: peerID)
+        await state.markMeguriMessagesRead(peerID: peerID, sourceGroomPostID: firstSourceID)
 
-        XCTAssertNotNil(state.meguriMessages(with: peerID).first?.readAt)
+        XCTAssertNotNil(
+            state.meguriMessages(
+                in: MeguriMessageConversationKey(
+                    peerID: peerID,
+                    sourceGroomPostID: firstSourceID
+                )
+            ).first?.readAt
+        )
+        XCTAssertNil(
+            state.meguriMessages(
+                in: MeguriMessageConversationKey(
+                    peerID: peerID,
+                    sourceGroomPostID: secondSourceID
+                )
+            ).first?.readAt
+        )
         XCTAssertNil(state.errorMessage)
     }
 
@@ -850,6 +1058,33 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertEqual(state.userOshiSelections.first?.groupID, groupID)
         XCTAssertEqual(state.userOshiSelections.first?.kind, .box)
         XCTAssertFalse(state.isSavingAccountSetup)
+    }
+
+    func testAppStateCompletesAccountSetupFromInput() async {
+        let state = MegrumAppState(repository: PreviewMegrumRepository())
+        let groupID = UUID(uuidString: "00000000-0000-0000-0000-000000000012")!
+        let birthDate = ProfileBirthDateCodec.date(from: "2000-04-05")
+
+        let completed = await state.completeAccountSetup(
+            AccountSetupInput(
+                handle: "michirion2",
+                displayName: "みち2",
+                gender: .male,
+                prefecture: "大阪府",
+                birthDate: birthDate,
+                oshiSelections: [
+                    AccountSetupOshiInput(groupID: groupID, characterID: nil, kind: .box)
+                ]
+            )
+        )
+
+        XCTAssertTrue(completed)
+        XCTAssertEqual(state.viewer?.handle, "michirion2")
+        XCTAssertEqual(state.viewer?.displayName, "みち2")
+        XCTAssertEqual(state.viewer?.prefecture, "大阪府")
+        XCTAssertEqual(ProfileBirthDateCodec.string(from: state.viewer?.birthDate), "2000-04-05")
+        XCTAssertEqual(state.viewer?.gender, .male)
+        XCTAssertEqual(state.userOshiSelections.first?.groupID, groupID)
     }
 
     func testAppStateFallsBackWhenAccountSetupInputOmitsNameAndHandle() async {
@@ -1368,6 +1603,14 @@ final class MegrumAppStateTests: XCTestCase {
         )
 
         XCTAssertTrue(submitted)
+        XCTAssertTrue(
+            state.messages(for: proposalID).contains { message in
+                message.messageType == .system
+                    && message.meta["action"] == "evaluation_submitted"
+                    && message.meta["stars"] == "5"
+            }
+        )
+        await state.loadMessages(proposalID: proposalID)
         XCTAssertTrue(
             state.messages(for: proposalID).contains { message in
                 message.messageType == .system

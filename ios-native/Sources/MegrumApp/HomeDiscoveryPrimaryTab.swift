@@ -10,6 +10,10 @@ enum HomeDiscoveryPrimaryTab: String, CaseIterable, Identifiable {
         Self.allCases.firstIndex(of: self) ?? 0
     }
 
+    static var visibleTabs: [HomeDiscoveryPrimaryTab] {
+        [.candidates]
+    }
+
     var title: String {
         switch self {
         case .candidates:

@@ -49,6 +49,26 @@ extension GoodsCollectionScreen {
         .previewItemsByTag()
     }
 
+    func bulkTagGoogleLensItems(for itemIDs: Set<UUID>) -> [GoodsGoogleLensSearchItem] {
+        GoodsGoogleLensSearchItemFactory.items(from: bulkTagTargetItems(for: itemIDs))
+    }
+
+    func openBulkTagGoogleLensSearch(itemID: GoodsGoogleLensSearchItem.ID, for itemIDs: Set<UUID>) {
+        guard let item = bulkTagGoogleLensItems(for: itemIDs).first(where: { $0.id == itemID }),
+              case let .imageURL(imageURL) = item.source,
+              let lensURL = GoogleLensSearchURLBuilder.url(forImageURL: imageURL)
+        else {
+            bulkTagGoogleLensErrorMessage = "Google Lensを開けませんでした。画像を選び直してください。"
+            return
+        }
+        bulkTagGoogleLensErrorMessage = nil
+        #if os(iOS)
+        bulkTagLensBrowserRoute = MegrumInAppBrowserRoute(url: lensURL)
+        #else
+        openURL(lensURL)
+        #endif
+    }
+
     func bulkTagTargetItems(for itemIDs: Set<UUID>) -> [GoodsItem] {
         items.filter { itemIDs.contains($0.id) && isOwnedItem($0) }
     }

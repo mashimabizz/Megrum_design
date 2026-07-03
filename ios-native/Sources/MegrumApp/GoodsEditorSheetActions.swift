@@ -4,7 +4,7 @@ extension GoodsEditorSheet {
     func save() async {
         lastSaveFailure = nil
         let saved: Bool
-        var createdInventoryItems: [GoodsItem] = []
+        var createdItems: [GoodsItem] = []
         switch draft.mode {
         case .create:
             guard let input = draft.createInput(
@@ -16,9 +16,7 @@ extension GoodsEditorSheet {
             }
             if let created = await appState.createGoodsEntryRecord(input) {
                 saved = true
-                if input.kind == .inventory {
-                    createdInventoryItems = [created]
-                }
+                createdItems = [created]
             } else {
                 saved = false
             }
@@ -37,8 +35,8 @@ extension GoodsEditorSheet {
             return
         }
         if saved {
-            if !createdInventoryItems.isEmpty {
-                onCreatedInventoryItems(createdInventoryItems)
+            if !createdItems.isEmpty {
+                onCreatedInventoryItems(createdItems)
             }
             dismiss()
         } else {

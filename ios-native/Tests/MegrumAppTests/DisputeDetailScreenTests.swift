@@ -4,6 +4,19 @@ import MegrumCore
 import XCTest
 
 final class DisputeDetailScreenTests: XCTestCase {
+    func testDisputeDetailPresentationStateTracksTradeRequestAndWithdrawConfirmation() {
+        var state = DisputeDetailPresentationState()
+
+        state.openLateRequest()
+        XCTAssertEqual(state.presentedRequestKind, .late)
+
+        state.openCancellationRequest()
+        XCTAssertEqual(state.presentedRequestKind, .cancellation)
+
+        state.requestWithdrawConfirmation()
+        XCTAssertTrue(state.isShowingWithdrawConfirmation)
+    }
+
     func testTicketModelNormalizesReplyWindowStatus() {
         let submittedAt = Date(timeIntervalSince1970: 1_800)
         let deadline = submittedAt.addingTimeInterval(86_400)

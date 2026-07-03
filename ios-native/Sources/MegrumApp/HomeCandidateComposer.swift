@@ -18,35 +18,17 @@ enum HomeCandidateComposer {
             partnerUsersByID: context.partnerScope.usersByID
         )
 
-        var matched: [GoodsItem] = []
-        var possible: [GoodsItem] = []
-        var conditionSignalsByItemID: [UUID: HomeCandidateConditionSignals] = [:]
+        var sectionsBuilder = HomeCandidateSectionsBuilder()
 
         for candidate in sortedCandidates(context.partnerScope.inventory) where HomeCandidateRowMapper.isMarketAvailable(candidate) {
-            let evaluation = HomeCandidatePartnerOfferEvaluation(candidate: candidate, context: context)
-            conditionSignalsByItemID[candidate.id] = evaluation.signals
-
-            switch evaluation.bucket {
-            case .matched:
-                matched.append(evaluation.candidateItem)
-            case .possible:
-                possible.append(evaluation.candidateItem)
-            case .none:
-                break
-            }
+            sectionsBuilder.addPartnerCandidate(candidate, context: context)
         }
 
         for viewerItem in context.viewerInventory where HomeCandidateRowMapper.isMarketAvailable(viewerItem) {
-            conditionSignalsByItemID[viewerItem.id] = HomeCandidateViewerOfferSignalsBuilder.signals(
-                viewerItem: viewerItem,
-                context: context
-            )
+            sectionsBuilder.addViewerItem(viewerItem, context: context)
         }
 
-        return HomeCandidateSections(
-            matchedItems: deduplicated(matched),
-            possibleItems: deduplicated(possible),
-            conditionSignalsByItemID: conditionSignalsByItemID,
+        return sectionsBuilder.sections(
             mutualMatchCandidates: mutualMatchCandidates
         )
     }

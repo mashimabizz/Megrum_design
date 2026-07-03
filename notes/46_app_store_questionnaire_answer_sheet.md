@@ -24,8 +24,8 @@ App Store Connectで入力するAge Rating、Content Rights、Export Compliance�
 | 公開プロフィール / 性別 / 活動エリア | 性別、活動エリア、年齢、評価、完了取引数、支払い方法要約等がプロフィール、ホーム候補、交換条件等で表示され得る。本人確認、法的性別確認、安全確認、支払能力確認ではない |
 | 会員間支払い | 支払い設定、銀行振込、口座番号、口座名義、PayPay対応可否、現金交換、金額指定、成立後支払い情報スナップショットを出す場合あり。Financial Info / Payment Info候補であり、Megrumは送金、収納代行、回収、返金、チャージバック、エスクロー、本人確認、口座名義確認、支払能力確認、外部ID/送金リンク/QR真正性確認を行わない |
 | 位置情報 / 地図 | 近くのグルーム、スポット掲示板、返信範囲、現在地共有、待ち合わせ候補、現地交換モード、作成位置、閲覧者位置、地図表示、場所名表示、逆ジオコーディングを出す場合あり。Swift NativeではCoreLocation、MapKit、CLGeocoder、精密な緯度経度、精度、時刻、場所名、半径、距離/近接判定、公開範囲を扱い得る |
-| IAP | 初回で隠すならNo、出すならYes。出す場合は手動有料権限上書きが購入証明や返金確定に見えない説明も確認 |
-| 広告 | Google Mobile Ads SDK / AdMob / SKAdNetwork構成あり。`MEGRUM_ADS_ENABLED=YES`、test ads有効、検索native/やりとりbanner unit idあり。出す場合はAdvertising回答、App Privacy、ATT/Tracking、test ads除去、広告通報導線を確認 |
+| IAP | 初回で隠すならNo、出すならYes。2026-07-03時点のチェックイン既定は `MEGRUM_PLUS_IAP_ENABLED=NO` で購入/復元/商品照会を停止。出す場合は手動有料権限上書きが購入証明や返金確定に見えない説明も確認 |
+| 広告 | Google Mobile Ads SDK / AdMob / SKAdNetwork構成あり。2026-07-03時点のチェックイン既定は `MEGRUM_ADS_ENABLED=NO`、AdMob app id/unit id/test unit id空。広告を出す場合はAdvertising回答、App Privacy、ATT/Tracking、test ads除去、広告通報導線を確認 |
 | 外部AI | 初回で隠す又は送信前説明/同意を必須。出す場合はOpenAI等の送信先、画像又は画像URL、web search、保持、学習利用、削除可否を確認 |
 | 顔候補付け | 初回で出す場合、Face ID/本人確認ではない説明、Sensitive Info回答、`member_face_profiles`読み取り範囲、学習データ追加可否を確認 |
 | Kidsカテゴリ | No |

@@ -13,6 +13,7 @@ struct ProfileVisualHero: View {
     var tagSize: ProfileVisualTagSize = .regular
     var avatarSize: CGFloat = 116
     var density: ProfileVisualHeroDensity = .regular
+    var showsStats: Bool = true
     var actionTitle: String
     var showsAction: Bool = true
     var isPrimaryAction: Bool = false
@@ -37,11 +38,13 @@ struct ProfileVisualHero: View {
                                 .foregroundStyle(MegrumTheme.ink)
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.80)
-                            Text("@\(handle)")
-                                .font(.system(size: density.handleFontSize, weight: .semibold, design: .rounded))
-                                .foregroundStyle(MegrumTheme.lavender.opacity(0.86))
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.76)
+                            if let profileHandle {
+                                Text("@\(profileHandle)")
+                                    .font(.system(size: density.handleFontSize, weight: .semibold, design: .rounded))
+                                    .foregroundStyle(MegrumTheme.lavender.opacity(0.86))
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.76)
+                            }
 
                             if let profileBio {
                                 Text(profileBio)
@@ -53,20 +56,22 @@ struct ProfileVisualHero: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .layoutPriority(1)
 
-                        VStack(alignment: .trailing, spacing: 7) {
-                            ProfileVisualStatCluster(
-                                tradeCount: tradeCount,
-                                ratingText: ratingText,
-                                density: density
-                            )
-
-                            if let conditionActionTitle, let onConditionAction {
-                                ProfileVisualConditionButton(
-                                    title: conditionActionTitle,
-                                    systemImage: conditionActionSystemImage,
-                                    density: density,
-                                    action: onConditionAction
+                        if showsStats {
+                            VStack(alignment: .trailing, spacing: 7) {
+                                ProfileVisualStatCluster(
+                                    tradeCount: tradeCount,
+                                    ratingText: ratingText,
+                                    density: density
                                 )
+
+                                if let conditionActionTitle, let onConditionAction {
+                                    ProfileVisualConditionButton(
+                                        title: conditionActionTitle,
+                                        systemImage: conditionActionSystemImage,
+                                        density: density,
+                                        action: onConditionAction
+                                    )
+                                }
                             }
                         }
                     }
@@ -126,6 +131,10 @@ struct ProfileVisualHero: View {
 
     private var profileBio: String? {
         bio.nilIfBlank
+    }
+
+    private var profileHandle: String? {
+        handle.nilIfBlank
     }
 
     private var tagSpacing: CGFloat {

@@ -177,6 +177,8 @@ public struct IndividualListingCreateInput: Equatable, Sendable {
     public var haveItems: [ListingItemQuantity]
     public var haveLogic: ListingLogic
     public var haveMinimumCount: Int
+    public var haveIsCashOffer: Bool
+    public var haveCashAmount: Int?
     public var wishItems: [ListingItemQuantity]
     public var wishLogic: ListingLogic
     public var wishMinimumCount: Int
@@ -191,6 +193,8 @@ public struct IndividualListingCreateInput: Equatable, Sendable {
         haveItems: [ListingItemQuantity],
         haveLogic: ListingLogic = .all,
         haveMinimumCount: Int = 1,
+        haveIsCashOffer: Bool = false,
+        haveCashAmount: Int? = nil,
         wishItems: [ListingItemQuantity],
         wishLogic: ListingLogic = .one,
         wishMinimumCount: Int = 1,
@@ -204,6 +208,8 @@ public struct IndividualListingCreateInput: Equatable, Sendable {
         self.haveItems = haveItems
         self.haveLogic = haveLogic
         self.haveMinimumCount = max(1, haveMinimumCount)
+        self.haveIsCashOffer = haveIsCashOffer
+        self.haveCashAmount = haveCashAmount.map { max(0, $0) }
         self.wishItems = wishItems
         self.wishLogic = wishLogic
         self.wishMinimumCount = max(1, wishMinimumCount)

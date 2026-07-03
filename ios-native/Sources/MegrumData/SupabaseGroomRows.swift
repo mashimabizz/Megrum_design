@@ -11,7 +11,10 @@ struct GroomFeedRow: Decodable, Sendable {
         "expires_at",
         "created_at",
         "origin_lat",
-        "origin_lng"
+        "origin_lng",
+        "group_id",
+        "character_id",
+        "series_name"
     ].joined(separator: ",")
 
     var id: UUID
@@ -23,6 +26,9 @@ struct GroomFeedRow: Decodable, Sendable {
     var createdAt: Date?
     var originLat: Double?
     var originLng: Double?
+    var groupId: UUID?
+    var characterId: UUID?
+    var seriesName: String?
     var likeCount: Int?
 
     func post(signedURLs: [String: URL] = [:]) -> GroomPost? {
@@ -40,6 +46,9 @@ struct GroomFeedRow: Decodable, Sendable {
             imageURL: url,
             latitude: latitude,
             longitude: longitude,
+            groupID: groupId,
+            characterID: characterId,
+            seriesName: SupabaseTextNormalizer.optional(seriesName),
             createdAt: publishedAt ?? createdAt ?? .now,
             expiresAt: expiresAt,
             likeCount: max(0, likeCount ?? 0)
@@ -92,6 +101,10 @@ struct GroomFeedRow: Decodable, Sendable {
     private var normalizedImageURL: String? {
         SupabaseTextNormalizer.optional(imageUrl)
     }
+}
+
+struct GroomPostDeleteRow: Decodable, Sendable {
+    var id: UUID
 }
 
 struct GroomViewRow: Decodable, Sendable {

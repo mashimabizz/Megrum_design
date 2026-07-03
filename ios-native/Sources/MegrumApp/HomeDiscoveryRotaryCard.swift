@@ -13,8 +13,7 @@ struct HomeDiscoveryRotaryCard: View {
     var onActivate: ((HomeMockGoods) -> Void)? = nil
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var selectedIndex = 0
-    @State private var dragProgress: Double = 0
+    @State private var presentationState = HomeDiscoveryRotaryCardPresentationState()
 
     var body: some View {
         HomeDiscoveryRotaryCardStage(
@@ -47,11 +46,10 @@ struct HomeDiscoveryRotaryCard: View {
             }
         }
         .onChange(of: goods.map(\.id)) { _, _ in
-            selectedIndex = min(selectedIndex, max(0, goods.count - 1))
-            dragProgress = 0
+            presentationState.clampSelection(itemCount: goods.count)
             notifySelection()
         }
-        .onChange(of: selectedIndex) { _, _ in
+        .onChange(of: presentationState.selectedIndex) { _, _ in
             notifySelection()
         }
         .onAppear {
@@ -60,10 +58,10 @@ struct HomeDiscoveryRotaryCard: View {
     }
 
     private var selectedGoods: HomeMockGoods? {
-        guard goods.indices.contains(selectedIndex) else {
+        guard goods.indices.contains(presentationState.selectedIndex) else {
             return nil
         }
-        return goods[selectedIndex]
+        return goods[presentationState.selectedIndex]
     }
 
     private func conditionTags(for goods: HomeMockGoods) -> HomeConditionTagSet {
@@ -74,15 +72,11 @@ struct HomeDiscoveryRotaryCard: View {
         )
     }
 
-    private var displayedDragProgress: Double {
-        reduceMotion ? 0 : dragProgress
-    }
-
     private var countText: String {
         guard !goods.isEmpty else {
             return "0/0"
         }
-        return "\(selectedIndex + 1)/\(goods.count)"
+        return presentationState.countText(itemCount: goods.count)
     }
 
     private var visibleEntries: [HomeRotaryEntry] {
@@ -101,30 +95,30 @@ struct HomeDiscoveryRotaryCard: View {
     }
 
     private func relativePosition(for index: Int) -> Double {
-        guard !goods.isEmpty else {
-            return 0
-        }
-        let count = goods.count
-        let forward = (index - selectedIndex + count) % count
-        let backward = (selectedIndex - index + count) % count
-        let shortest = forward <= backward ? Double(forward) : -Double(backward)
-        return shortest - displayedDragProgress
+        presentationState.relativePosition(
+            for: index,
+            itemCount: goods.count,
+            reduceMotion: reduceMotion
+        )
     }
 
     private func handleDragChanged(translation: CGSize, width: CGFloat) {
         guard goods.count > 1, !reduceMotion else {
             return
         }
-        guard let progress = carouselDragProgress(translation: translation, width: width) else {
+        guard let progress = HomeDiscoveryRotaryCardPresentationState.dragProgress(
+            translation: translation,
+            width: width
+        ) else {
             if abs(translation.height) > abs(translation.width) {
-                dragProgress = 0
+                presentationState.resetDragProgress()
             }
             return
         }
         var transaction = Transaction()
         transaction.disablesAnimations = true
         withTransaction(transaction) {
-            dragProgress = progress
+            presentationState.updateDragProgress(progress)
         }
     }
 
@@ -134,38 +128,18 @@ struct HomeDiscoveryRotaryCard: View {
         width: CGFloat
     ) {
         guard goods.count > 1 else {
-            dragProgress = 0
+            presentationState.resetDragProgress()
             return
         }
-        guard isHorizontalCarouselDrag(translation) else {
-            dragProgress = 0
+        guard let delta = HomeDiscoveryRotaryCardPresentationState.resolvedIndexDelta(
+            translation: translation,
+            projectedTranslationWidth: projectedTranslationWidth,
+            width: width
+        ) else {
+            presentationState.resetDragProgress()
             return
-        }
-        let denominator = max(width * 0.58, 72)
-        let projectedProgress = -Double(projectedTranslationWidth / denominator)
-        let actualProgress = -Double(translation.width / denominator)
-        let progress = abs(projectedProgress) > abs(actualProgress) ? projectedProgress : actualProgress
-        let delta: Int
-        if progress > 0.34 {
-            delta = 1
-        } else if progress < -0.34 {
-            delta = -1
-        } else {
-            delta = 0
         }
         settleCarousel(indexDelta: delta)
-    }
-
-    private func carouselDragProgress(translation: CGSize, width: CGFloat) -> Double? {
-        guard isHorizontalCarouselDrag(translation) else {
-            return nil
-        }
-        let denominator = max(width * 0.58, 72)
-        return max(-1.15, min(1.15, -Double(translation.width / denominator)))
-    }
-
-    private func isHorizontalCarouselDrag(_ translation: CGSize) -> Bool {
-        HorizontalSwipeIntentResolver.isHorizontalSwipe(translation)
     }
 
     private func handleTap(position: Double) {
@@ -180,10 +154,7 @@ struct HomeDiscoveryRotaryCard: View {
 
     private func settleCarousel(indexDelta: Int) {
         let updates = {
-            if indexDelta != 0 {
-                selectedIndex = wrappedIndex(selectedIndex + indexDelta)
-            }
-            dragProgress = 0
+            presentationState.settle(indexDelta: indexDelta, itemCount: goods.count)
         }
 
         guard !reduceMotion else {
@@ -192,10 +163,6 @@ struct HomeDiscoveryRotaryCard: View {
         }
 
         withAnimation(.interactiveSpring(response: 0.46, dampingFraction: 0.82, blendDuration: 0.12), updates)
-    }
-
-    private func wrappedIndex(_ index: Int) -> Int {
-        (index % goods.count + goods.count) % goods.count
     }
 
     private func notifySelection() {

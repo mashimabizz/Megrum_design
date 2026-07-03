@@ -79,7 +79,7 @@ private struct SettingsMenuRowBadge: View {
             .foregroundStyle(.white)
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
-            .background(MegrumTheme.pink, in: Capsule())
+            .background(MegrumTheme.conditionExact, in: Capsule())
     }
 }
 

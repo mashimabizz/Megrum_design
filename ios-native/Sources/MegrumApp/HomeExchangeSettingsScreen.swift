@@ -18,24 +18,15 @@ struct HomeExchangeSettingsScreen: View {
     var individualListings: [IndividualListing] = []
     var onClose: (() -> Void)?
 
-    @State private var draftPreference = HomeDefaultExchangeSettings.standard.preference
-    @State private var draftLocalPrefecture = ""
-    @State private var draftLocalDateKeys: Set<String> = []
-    @State private var draftLocalDateDetails: [String: HomeExchangeLocalDateDetail] = [:]
-    @State private var draftMailShippingFee = HomeDefaultExchangeSettings.standard.mailShippingFee
-    @State private var draftMailShippingDays = HomeDefaultExchangeSettings.standard.mailShippingDays
-    @State private var visibleMonth = HomeExchangeCalendarMonthBuilder.monthStart(containing: Date())
-    @State private var editingDate: HomeExchangeEditingDate?
-    @State private var didLoadDraft = false
-    @State private var hasUserEditedDraft = false
+    @State private var draftState = HomeExchangeSettingsDraftState()
 
     var body: some View {
         HomeExchangeSettingsContent(
-            draftPreference: $draftPreference,
-            draftLocalPrefecture: $draftLocalPrefecture,
-            draftMailShippingFee: $draftMailShippingFee,
-            draftMailShippingDays: $draftMailShippingDays,
-            visibleMonth: $visibleMonth,
+            draftPreference: $draftState.preference,
+            draftLocalPrefecture: $draftState.localPrefecture,
+            draftMailShippingFee: $draftState.mailShippingFee,
+            draftMailShippingDays: $draftState.mailShippingDays,
+            visibleMonth: $draftState.visibleMonth,
             selectedDateKeys: displayedLocalDateKeys,
             dateDetails: displayedLocalDateDetails,
             onClose: closeScreen,
@@ -49,7 +40,7 @@ struct HomeExchangeSettingsScreen: View {
                 action: save
             )
         }
-        .sheet(item: $editingDate) { editingDate in
+        .sheet(item: $draftState.editingDate) { editingDate in
             HomeExchangeLocalDateDetailSheet(
                 dateKeys: editingDate.dateKeys,
                 initialDetail: initialDetail(for: editingDate.dateKeys),
@@ -70,52 +61,32 @@ struct HomeExchangeSettingsScreen: View {
     }
 
     private func loadDraftIfNeeded() {
-        guard !didLoadDraft else {
-            return
-        }
-        didLoadDraft = true
-        draftPreference = HomeExchangePreference(rawValue: storedPreferenceRawValue) ?? HomeDefaultExchangeSettings.standard.preference
-        draftLocalPrefecture = storedLocalPrefecture
-        draftLocalDateKeys = Set(HomeExchangeDateKey.normalizedKeys(from: storedLocalDateKeysRawValue))
-        draftLocalDateDetails = HomeExchangeLocalDateDetailCodec.decode(storedLocalDateDetailsRawValue)
-        draftMailShippingFee = IndividualListingShippingFeeDraft(rawValue: storedMailShippingFeeRawValue) ?? HomeDefaultExchangeSettings.standard.mailShippingFee
-        draftMailShippingDays = IndividualListingShippingDaysDraft(rawValue: storedMailShippingDaysRawValue) ?? HomeDefaultExchangeSettings.standard.mailShippingDays
-        discardUnsetDraftDateDetails(Array(draftLocalDateKeys))
-
-        if let firstSelectedDate = draftLocalDateKeys.sorted().compactMap({ HomeExchangeDateKey.date(from: $0) }).first {
-            visibleMonth = HomeExchangeCalendarMonthBuilder.monthStart(containing: firstSelectedDate)
-        } else {
-            visibleMonth = HomeExchangeCalendarMonthBuilder.monthStart(containing: Date())
-        }
+        draftState.loadIfNeeded(
+            storedPreferenceRawValue: storedPreferenceRawValue,
+            storedLocalPrefecture: storedLocalPrefecture,
+            storedLocalDateKeysRawValue: storedLocalDateKeysRawValue,
+            storedLocalDateDetailsRawValue: storedLocalDateDetailsRawValue,
+            storedMailShippingFeeRawValue: storedMailShippingFeeRawValue,
+            storedMailShippingDaysRawValue: storedMailShippingDaysRawValue,
+            isListingReflectedDate: isListingReflectedDate
+        )
     }
 
     private func selectPreference(_ preference: HomeExchangePreference) {
-        hasUserEditedDraft = true
         withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
-            draftPreference = preference
+            draftState.selectPreference(preference)
         }
     }
 
     private func save() {
-        let settings = currentSettings
+        let settings = draftState.currentSettings
         persistLocally(settings)
         Task {
             if await appState.saveExchangeSettings(settings) {
-                hasUserEditedDraft = false
+                draftState.markSaveSucceeded()
                 closeScreen()
             }
         }
-    }
-
-    private var currentSettings: HomeDefaultExchangeSettings {
-        HomeDefaultExchangeSettings(
-            preference: draftPreference,
-            localPrefecture: primaryLocalPrefecture,
-            localDateKeys: Array(draftLocalDateKeys),
-            localDateDetails: draftLocalDateDetails.filter { draftLocalDateKeys.contains($0.key) },
-            mailShippingFee: draftMailShippingFee,
-            mailShippingDays: draftMailShippingDays
-        )
     }
 
     private func persistLocally(_ settings: HomeDefaultExchangeSettings) {
@@ -129,15 +100,11 @@ struct HomeExchangeSettingsScreen: View {
     }
 
     private func applyRemoteSettingsIfPossible(_ settings: HomeDefaultExchangeSettings?) {
-        guard let settings, !hasUserEditedDraft else {
+        guard draftState.applyRemoteSettingsIfPossible(settings),
+              let settings
+        else {
             return
         }
-        draftPreference = settings.preference
-        draftLocalPrefecture = settings.localPrefecture
-        draftLocalDateKeys = Set(settings.localDateKeys)
-        draftLocalDateDetails = settings.localDateDetails
-        draftMailShippingFee = settings.mailShippingFee
-        draftMailShippingDays = settings.mailShippingDays
         persistLocally(settings)
     }
 
@@ -151,87 +118,36 @@ struct HomeExchangeSettingsScreen: View {
         }
     }
 
-    private var primaryLocalPrefecture: String {
-        draftLocalPrefecture.nilIfBlank
-            ?? draftLocalDateKeys.sorted().compactMap { draftLocalDateDetails[$0]?.prefecture.nilIfBlank }.first
-            ?? ""
-    }
-
     private var reflectedListingDateDetails: [String: HomeExchangeLocalDateDetail] {
         HomeExchangeListingConditionReflector.reflectedDetails(from: individualListings)
     }
 
     private var displayedLocalDateKeys: Set<String> {
-        draftLocalDateKeys.union(reflectedListingDateDetails.keys)
+        draftState.displayedLocalDateKeys(reflectedDetails: reflectedListingDateDetails)
     }
 
     private var displayedLocalDateDetails: [String: HomeExchangeLocalDateDetail] {
-        draftLocalDateDetails.merging(reflectedListingDateDetails) { _, reflected in
-            reflected
-        }
+        draftState.displayedLocalDateDetails(reflectedDetails: reflectedListingDateDetails)
     }
 
     private func tapDate(_ day: HomeExchangeCalendarDay) {
-        hasUserEditedDraft = true
-        if !isListingReflectedDate(day.key) {
-            selectDate(day.key)
-        }
-        editingDate = HomeExchangeEditingDate(dateKeys: [day.key])
+        draftState.tapDate(day, isListingReflectedDate: isListingReflectedDate)
     }
 
     private func finishDragSelection(_ days: [HomeExchangeCalendarDay]) {
-        let keys = HomeExchangeDateKey.normalizedKeys(from: HomeExchangeDateKey.rawValue(from: days.map(\.key)))
-        guard !keys.isEmpty else {
-            return
-        }
-        hasUserEditedDraft = true
-        keys
-            .filter { !isListingReflectedDate($0) }
-            .forEach(selectDate)
-        let editableKeys = keys.filter { !isListingReflectedDate($0) }
-        editingDate = HomeExchangeEditingDate(dateKeys: editableKeys.isEmpty ? keys : editableKeys)
-    }
-
-    private func selectDate(_ key: String) {
-        draftLocalDateKeys.insert(key)
-        if draftLocalDateDetails[key] == nil {
-            draftLocalDateDetails[key] = HomeExchangeLocalDateDetail(prefecture: "", memo: "")
-        }
+        draftState.finishDragSelection(days, isListingReflectedDate: isListingReflectedDate)
     }
 
     private func saveDateDetail(_ keys: [String], detail: HomeExchangeLocalDateDetail) {
-        hasUserEditedDraft = true
-        guard detail.prefecture.nilIfBlank != nil else {
-            removeDateDetail(keys)
-            return
-        }
-        keys.forEach { key in
-            draftLocalDateKeys.insert(key)
-            draftLocalDateDetails[key] = detail
-        }
+        draftState.saveDateDetail(keys, detail: detail, isListingReflectedDate: isListingReflectedDate)
     }
 
     private func removeDateDetail(_ keys: [String]) {
-        hasUserEditedDraft = true
-        keys.forEach { key in
-            guard !isListingReflectedDate(key) else {
-                return
-            }
-            draftLocalDateKeys.remove(key)
-            draftLocalDateDetails.removeValue(forKey: key)
-        }
+        draftState.removeDateDetail(keys, isListingReflectedDate: isListingReflectedDate)
     }
 
     private func discardUnsetDraftDateDetails(_ keys: [String]) {
-        keys.forEach { key in
-            guard !isListingReflectedDate(key),
-                  draftLocalDateDetails[key]?.prefecture.nilIfBlank == nil
-            else {
-                return
-            }
-            draftLocalDateKeys.remove(key)
-            draftLocalDateDetails.removeValue(forKey: key)
-        }
+        draftState.discardUnsetDraftDateDetails(keys, isListingReflectedDate: isListingReflectedDate)
     }
 
     private func initialDetail(for keys: [String]) -> HomeExchangeLocalDateDetail {

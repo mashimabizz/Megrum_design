@@ -25,7 +25,7 @@ struct GroomArchiveMap: View {
             }
 
             ForEach(grooms) { groom in
-                Annotation("過去のグルーム", coordinate: groom.coordinate) {
+                Annotation("", coordinate: groom.coordinate) {
                     Button {
                         onSelect(groom)
                     } label: {
@@ -111,9 +111,16 @@ enum GroomArchiveMapRegion {
         return MKCoordinateRegion(
             center: region.center,
             span: MKCoordinateSpan(
-                latitudeDelta: min(max(region.span.latitudeDelta, 0.014), 0.18),
-                longitudeDelta: min(max(region.span.longitudeDelta, 0.014), 0.18)
+                latitudeDelta: min(max(region.span.latitudeDelta, 0.018), 0.22),
+                longitudeDelta: min(max(region.span.longitudeDelta * 1.28, 0.018), 0.22)
             )
+        )
+    }
+
+    static func focusedRegion(for groom: GroomPost) -> MKCoordinateRegion {
+        MKCoordinateRegion(
+            center: groom.coordinate,
+            span: MKCoordinateSpan(latitudeDelta: 0.0065, longitudeDelta: 0.0065)
         )
     }
 

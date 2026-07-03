@@ -118,6 +118,142 @@ final class TradeRequestDraftProposalCreateFlowTests: XCTestCase {
         XCTAssertEqual(namedPlace.placeName, "会場ロビー")
     }
 
+    func testProposalMeetupCurrentLocationDraftResolverRequiresMeetupAndCoordinate() {
+        let coordinate = MegrumLocationCoordinate(latitude: 35.681236, longitude: 139.767125)
+        let draft = ProposalMeetupCandidateDraft(placeName: "会場ロビー")
+
+        XCTAssertNil(
+            ProposalMeetupCurrentLocationDraftResolver.resolvedDraft(
+                currentDraft: draft,
+                coordinate: coordinate,
+                requiresMeetupBeforeSubmit: false
+            )
+        )
+        XCTAssertNil(
+            ProposalMeetupCurrentLocationDraftResolver.resolvedDraft(
+                currentDraft: draft,
+                coordinate: nil,
+                requiresMeetupBeforeSubmit: true
+            )
+        )
+
+        let resolved = ProposalMeetupCurrentLocationDraftResolver.resolvedDraft(
+            currentDraft: draft,
+            coordinate: coordinate,
+            requiresMeetupBeforeSubmit: true
+        )
+
+        XCTAssertEqual(resolved?.placeName, "会場ロビー")
+        XCTAssertEqual(resolved?.latitudeText, "35.681236")
+        XCTAssertEqual(resolved?.longitudeText, "139.767125")
+    }
+
+    func testProposalMeetupCandidateSelectionReducerKeepsExpectedIndexAfterRemoval() {
+        XCTAssertEqual(
+            ProposalMeetupCandidateSelectionReducer.selectedIndexAfterRemoving(
+                removedIndex: 0,
+                selectedIndex: 2,
+                remainingCount: 3
+            ),
+            1
+        )
+        XCTAssertEqual(
+            ProposalMeetupCandidateSelectionReducer.selectedIndexAfterRemoving(
+                removedIndex: 1,
+                selectedIndex: 1,
+                remainingCount: 2
+            ),
+            1
+        )
+        XCTAssertEqual(
+            ProposalMeetupCandidateSelectionReducer.selectedIndexAfterRemoving(
+                removedIndex: 2,
+                selectedIndex: 0,
+                remainingCount: 2
+            ),
+            0
+        )
+        XCTAssertNil(
+            ProposalMeetupCandidateSelectionReducer.selectedIndexAfterRemoving(
+                removedIndex: 0,
+                selectedIndex: 0,
+                remainingCount: 0
+            )
+        )
+    }
+
+    func testProposalMeetupPlaceDraftResolverFindsLatestPreviousReusableDraft() throws {
+        let resolved = try XCTUnwrap(
+            ProposalMeetupPlaceDraftResolver.previousReusableDraft(
+                before: 3,
+                in: [
+                    ProposalMeetupCandidateDraft(placeName: " 北口 "),
+                    ProposalMeetupCandidateDraft(placeName: " "),
+                    ProposalMeetupCandidateDraft(placeName: " 南口 "),
+                    ProposalMeetupCandidateDraft(placeName: " 現在の候補 ")
+                ]
+            )
+        )
+
+        XCTAssertEqual(resolved.normalizedPlaceName, "南口")
+    }
+
+    func testProposalMeetupPlaceDraftResolverUsesCoordinateOnlyDraft() throws {
+        let resolved = try XCTUnwrap(
+            ProposalMeetupPlaceDraftResolver.previousReusableDraft(
+                before: 2,
+                in: [
+                    ProposalMeetupCandidateDraft(latitudeText: "not", longitudeText: "139.1"),
+                    ProposalMeetupCandidateDraft(latitudeText: "35.681236", longitudeText: "139.767125"),
+                    ProposalMeetupCandidateDraft(placeName: "現在の候補")
+                ]
+            )
+        )
+
+        XCTAssertEqual(resolved.latitudeText, "35.681236")
+        XCTAssertEqual(resolved.longitudeText, "139.767125")
+    }
+
+    func testProposalMeetupPlaceDraftResolverIgnoresCurrentAndInvalidDrafts() {
+        let resolved = ProposalMeetupPlaceDraftResolver.previousReusableDraft(
+            before: 1,
+            in: [
+                ProposalMeetupCandidateDraft(placeName: " ", latitudeText: "91", longitudeText: "139.1"),
+                ProposalMeetupCandidateDraft(placeName: "現在の候補")
+            ]
+        )
+
+        XCTAssertNil(resolved)
+    }
+
+    func testProposalScheduleTextDateParserParsesSupportedLocalScheduleFormats() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "Asia/Tokyo") ?? .current
+        let now = try XCTUnwrap(
+            calendar.date(from: DateComponents(year: 2026, month: 6, day: 30, hour: 10))
+        )
+
+        for sample in ["6月7日", "6/7", "6.7", " 6月7日　"] {
+            let date = try XCTUnwrap(ProposalScheduleTextDateParser.date(from: sample, now: now))
+            let components = calendar.dateComponents([.year, .month, .day, .hour], from: date)
+
+            XCTAssertEqual(components.year, 2026)
+            XCTAssertEqual(components.month, 6)
+            XCTAssertEqual(components.day, 7)
+            XCTAssertEqual(components.hour, 12)
+        }
+    }
+
+    func testProposalScheduleTextDateParserIgnoresBlankDefaultAndUnsupportedText() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "Asia/Tokyo") ?? .current
+        let now = calendar.date(from: DateComponents(year: 2026, month: 6, day: 30, hour: 10)) ?? Date()
+
+        XCTAssertNil(ProposalScheduleTextDateParser.date(from: " ", now: now))
+        XCTAssertNil(ProposalScheduleTextDateParser.date(from: IndividualListingExchangeSummary.defaultLocalSchedule, now: now))
+        XCTAssertNil(ProposalScheduleTextDateParser.date(from: "来週あたり", now: now))
+    }
+
     func testProposalScheduleContextFiltersDedupesAndFindsSelectedOverlap() throws {
         let viewerID = UUID(uuidString: "00000000-0000-0000-0000-000000000101")!
         let partnerID = UUID(uuidString: "00000000-0000-0000-0000-000000000202")!
@@ -173,6 +309,30 @@ final class TradeRequestDraftProposalCreateFlowTests: XCTestCase {
         XCTAssertEqual(context.schedules(on: start, calendar: calendar).map(\.id), [duplicatedID, partnerSchedule.id])
     }
 
+    func testProposalScheduleBackgroundPresentationStateTracksVisibleMode() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let anchor = try XCTUnwrap(
+            DateComponents(calendar: calendar, timeZone: calendar.timeZone, year: 2026, month: 6, day: 5).date
+        )
+        let context = ProposalScheduleContext(
+            schedules: [],
+            viewerID: nil,
+            partnerID: UUID(uuidString: "00000000-0000-0000-0000-000000000202")!,
+            selectedStartAt: anchor,
+            selectedEndAt: anchor.addingTimeInterval(1_800)
+        )
+
+        var state = ProposalScheduleBackgroundPresentationState()
+
+        XCTAssertEqual(state.mode, .fiveDays)
+        XCTAssertEqual(state.visibleDays(context: context, anchorDate: anchor, calendar: calendar).count, 5)
+
+        state.mode = .month
+
+        XCTAssertEqual(state.visibleDays(context: context, anchorDate: anchor, calendar: calendar).count, 30)
+    }
+
     func testProposalMeetupCalendarModelShiftsWeekByFiveDays() {
         let calendar = Calendar(identifier: .gregorian)
         let anchor = Date(timeIntervalSince1970: 86_400 * 3)
@@ -185,6 +345,22 @@ final class TradeRequestDraftProposalCreateFlowTests: XCTestCase {
         )
         XCTAssertEqual(ProposalMeetupCalendarModel.visibleDayCount, 5)
         XCTAssertEqual(ProposalMeetupCalendarModel.monthColumnCount, 7)
+    }
+
+    func testProposalMeetupCalendarDisplayStateUsesVisualQAMonthAndReturnsToWeek() {
+        var state = ProposalMeetupCalendarDisplayState(
+            environment: ["MEGRUM_VISUAL_QA_INITIAL_SCREEN": "proposal-meetup-month"]
+        )
+
+        XCTAssertEqual(state.displayMode, .month)
+        XCTAssertFalse(state.showsWeekTitle)
+
+        state.showWeek()
+
+        XCTAssertEqual(state.displayMode, .week)
+        XCTAssertTrue(state.showsWeekTitle)
+
+        XCTAssertEqual(ProposalMeetupCalendarDisplayState(environment: [:]).displayMode, .week)
     }
 
     func testProposalMeetupCalendarMonthGridPadsToSevenColumns() throws {

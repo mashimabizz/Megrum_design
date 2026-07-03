@@ -7,30 +7,22 @@ struct TradeDetailSlidePresentationOverlay: View {
     @ObservedObject var appState: MegrumAppState
     var proposals: [TradeProposal]
 
-    @State private var visibleRoute: TradeDetailRoute?
-    @State private var isDetailPresented = false
-    @State private var dragOffset: CGFloat = 0
-    @State private var isTrackingDismissDrag = false
-    @State private var transitionToken = UUID()
+    @State private var presentationState = TradeDetailSlidePresentationState()
 
     var body: some View {
         GeometryReader { proxy in
-            if let visibleRoute {
+            if let visibleRoute = presentationState.visibleRoute {
                 ZStack(alignment: .leading) {
                     detailView(for: visibleRoute)
                         .frame(width: proxy.size.width, height: proxy.size.height)
                         .background(MegrumTheme.canvas.ignoresSafeArea())
-                        .offset(x: TradeDetailSlidePresentationResolver.contentOffset(
-                            isPresented: isDetailPresented,
-                            dragOffset: dragOffset,
-                            screenWidth: proxy.size.width
-                        ))
+                        .offset(x: presentationState.contentOffset(screenWidth: proxy.size.width))
                         .shadow(color: MegrumTheme.ink.opacity(0.16), radius: 24, x: -8, y: 0)
                         .contentShape(Rectangle())
                         .simultaneousGesture(backSwipeGesture(screenWidth: proxy.size.width), including: .gesture)
                         .zIndex(1)
 
-                    if isDetailPresented {
+                    if presentationState.isDetailPresented {
                         leadingEdgeSwipeCaptureArea(screenWidth: proxy.size.width, screenHeight: proxy.size.height)
                             .zIndex(2)
                     }
@@ -38,9 +30,9 @@ struct TradeDetailSlidePresentationOverlay: View {
             }
         }
         .ignoresSafeArea()
-        .allowsHitTesting(visibleRoute != nil)
+        .allowsHitTesting(presentationState.hasVisibleRoute)
         .onAppear {
-            if let detailRoute, visibleRoute == nil {
+            if let detailRoute, !presentationState.hasVisibleRoute {
                 presentDetail(detailRoute)
             }
         }
@@ -119,16 +111,7 @@ struct TradeDetailSlidePresentationOverlay: View {
     }
 
     private func handleBackSwipeChanged(translation: CGSize, screenWidth: CGFloat) {
-        guard isTrackingDismissDrag
-                || TradeDetailSlideBackSwipeResolver.interactiveOffset(
-                    translation: translation,
-                    screenWidth: screenWidth
-                ) != nil
-        else {
-            return
-        }
-        isTrackingDismissDrag = true
-        updateDragOffset(max(0, min(translation.width, screenWidth)))
+        updateDismissDrag(translation: translation, screenWidth: screenWidth)
     }
 
     private func handleBackSwipeEnded(
@@ -136,12 +119,12 @@ struct TradeDetailSlidePresentationOverlay: View {
         predictedEndTranslationWidth: CGFloat,
         screenWidth: CGFloat
     ) {
-        let shouldDismiss = TradeDetailSlideBackSwipeResolver.shouldDismiss(
+        let shouldDismiss = presentationState.shouldDismiss(
             translation: translation,
             predictedEndTranslationWidth: predictedEndTranslationWidth,
             screenWidth: screenWidth
         )
-        guard isTrackingDismissDrag || shouldDismiss else {
+        guard presentationState.isTrackingDismissDrag || shouldDismiss else {
             return
         }
         if shouldDismiss {
@@ -156,39 +139,37 @@ struct TradeDetailSlidePresentationOverlay: View {
     }
 
     private func presentDetail(_ route: TradeDetailRoute) {
-        let token = UUID()
-        transitionToken = token
+        var token = UUID()
         var transaction = Transaction()
         transaction.disablesAnimations = true
         withTransaction(transaction) {
-            visibleRoute = route
-            isDetailPresented = false
-            dragOffset = 0
-            isTrackingDismissDrag = false
+            token = presentationState.preparePresentation(route: route)
         }
         Task { @MainActor in
             await Task.yield()
-            guard transitionToken == token,
-                  visibleRoute == route,
-                  detailRoute == route else {
+            guard presentationState.canCompletePresentation(
+                token: token,
+                route: route,
+                currentRoute: detailRoute
+            ) else {
                 return
             }
             withAnimation(TradeDetailSlidePresentationMetrics.animation) {
-                isDetailPresented = true
+                presentationState.markPresented()
             }
         }
     }
 
     private func beginDismissal(clearsRoute: Bool) {
-        guard visibleRoute != nil else {
+        guard presentationState.hasVisibleRoute else {
             resetDismissDrag()
             return
         }
-        let token = UUID()
-        transitionToken = token
-        isTrackingDismissDrag = false
+        guard let token = presentationState.prepareDismissal() else {
+            return
+        }
         withAnimation(TradeDetailSlidePresentationMetrics.animation) {
-            isDetailPresented = false
+            presentationState.markDismissed()
         }
         Task { @MainActor in
             do {
@@ -196,14 +177,13 @@ struct TradeDetailSlidePresentationOverlay: View {
             } catch {
                 return
             }
-            guard transitionToken == token else {
+            guard presentationState.canCompleteDismissal(token: token) else {
                 return
             }
             var transaction = Transaction()
             transaction.disablesAnimations = true
             withTransaction(transaction) {
-                visibleRoute = nil
-                dragOffset = 0
+                presentationState.completeDismissal()
                 if clearsRoute {
                     detailRoute = nil
                 }
@@ -211,22 +191,33 @@ struct TradeDetailSlidePresentationOverlay: View {
         }
     }
 
+    private func updateDismissDrag(translation: CGSize, screenWidth: CGFloat) {
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            _ = presentationState.beginTrackingDismissDragIfNeeded(
+                translation: translation,
+                screenWidth: screenWidth
+            )
+        }
+    }
+
     private func updateDragOffset(_ offset: CGFloat) {
         var transaction = Transaction()
         transaction.disablesAnimations = true
         withTransaction(transaction) {
-            dragOffset = offset
+            presentationState.setDragOffset(offset)
         }
     }
 
     private func resetDismissDrag(animated: Bool = false) {
-        isTrackingDismissDrag = false
-        guard dragOffset != 0 else {
+        presentationState.stopTrackingDismissDrag()
+        guard presentationState.dragOffset != 0 else {
             return
         }
         if animated {
             withAnimation(TradeDetailSlidePresentationMetrics.animation) {
-                dragOffset = 0
+                presentationState.setDragOffset(0)
             }
         } else {
             updateDragOffset(0)

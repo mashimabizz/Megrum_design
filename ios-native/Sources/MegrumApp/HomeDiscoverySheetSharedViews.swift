@@ -10,8 +10,7 @@ struct HomeSelectedGoodsHeader: View {
     var listingNote: String?
     var listingDetail: HomeIndividualListingDetailContext?
     var onOpenOwnerProfile: (UUID) -> Void = { _ in }
-    @State private var presentedListingDetail: HomeIndividualListingDetailContext?
-    @State private var presentedExchangeCalendar: HomePartnerExchangeCalendarContext?
+    @State private var presentationState = HomeSelectedGoodsHeaderPresentationState()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -36,7 +35,7 @@ struct HomeSelectedGoodsHeader: View {
                         HomeExchangeMethodBlock(
                             summary: exchangeSummary,
                             onOpenCalendar: exchangeCalendarContext.map { context in
-                                { presentedExchangeCalendar = context }
+                                { presentationState.presentExchangeCalendar(context) }
                             }
                         )
                     }
@@ -45,7 +44,7 @@ struct HomeSelectedGoodsHeader: View {
 
                     if let listingDetail {
                         HomeListingDetailButton {
-                            presentedListingDetail = listingDetail
+                            presentationState.presentListingDetail(listingDetail)
                         }
                     }
                 }
@@ -57,12 +56,12 @@ struct HomeSelectedGoodsHeader: View {
                 HomeListingNoteBox(note: listingNote)
             }
         }
-        .sheet(item: $presentedListingDetail) { detail in
+        .sheet(item: $presentationState.presentedListingDetail) { detail in
             HomeIndividualListingDetailPopup(detail: detail)
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
         }
-        .sheet(item: $presentedExchangeCalendar) { context in
+        .sheet(item: $presentationState.presentedExchangeCalendar) { context in
             HomePartnerExchangeCalendarSheet(context: context)
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)

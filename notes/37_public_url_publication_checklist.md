@@ -20,7 +20,7 @@
 | `ios-native/Sources/MegrumApp/AuthLegalConsentNotice.swift` | 登録同意文は `https://megrum.jp/terms` と `https://megrum.jp/privacy` へリンクする | 公開正URLを `/legal/*` にするなら、完成ビルド側のリンク更新又は公開リダイレクト方針が必要 |
 | `ios-native/Sources/MegrumApp/LegalDocumentContent.swift` / `SettingsLegalViews.swift` | アプリ内法務表示は要約であり、正式本文ではない旨を表示している | アプリ内要約と公開本文が矛盾しないかを確認。要約だけを正式規約として扱わない |
 | `ios-native/App/PrivacyInfo.xcprivacy` | `NSPrivacyTracking=false` とUserDefaults Required Reason APIのみ | Privacy ManifestだけでApp Privacy回答が完結するわけではない。App Store Connect回答、公開Privacy、SDK/通信監査の一致を別途確認 |
-| `ios-native/Config/MegrumNative.xcconfig` / AdMob | `MEGRUM_ADS_ENABLED=YES`、AdMob app id、`MEGRUM_ADMOB_TEST_ADS_ENABLED=YES`、検索native/やりとりbanner unit idあり。`NSUserTrackingUsageDescription`、ATT要求、UMP同意管理は未確認 | 広告を出す場合は公開Privacy/Support/Review Notes/App Privacy/Privacy Manifest/ATT/Google公式開示/test ads除去を一致させる。広告を出さない場合はSDK初期化/広告リクエストが発生しないことを確認するまでNo-Go |
+| `ios-native/Config/MegrumNative.xcconfig` / AdMob | 2026-07-03時点のチェックイン既定は `MEGRUM_ADS_ENABLED=NO`、AdMob app id/unit id/test unit id空、Releaseは `MEGRUM_ADMOB_TEST_ADS_ENABLED=NO`。Google Mobile Ads SDK linkとSKAdNetworkItemsは残る | 広告を出す場合はlocal/CI設定で明示的に有効化し、公開Privacy/Support/Review Notes/App Privacy/Privacy Manifest/ATT/Google公式開示/test ads除去を一致させる。広告を出さない場合も実ビルドでSDK初期化/広告リクエストなしを確認する |
 
 No-Go:
 - App Store Connectに `https://megrum.jp/legal/privacy` を入力する一方で、実際に公開済みなのが `https://megrum.jp/privacy` の旧短縮ページだけである。
@@ -130,7 +130,7 @@ No-Go:
 - 返金
 - 動作環境
 - 代表者名、住所、電話番号を非公表にする場合の個別開示方針
-- 有料導線が見える場合、購入ボタン、復元ボタン、価格、StoreKit商品、App Store Connect価格、IAP Availability、サーバー検証、返金/取消/期限切れ同期、Privacy/App Privacyとの一致
+- 有料導線が見える場合、購入ボタン、復元ボタン、価格、StoreKit商品、App Store Connect価格、IAP Availability、サーバー検証、返金/取消/期限切れ同期、Privacy/App Privacyとの一致。2026-07-03時点のチェックイン既定は `MEGRUM_PLUS_IAP_ENABLED=NO` で購入/復元/商品照会を停止
 
 No-Go:
 - App Store Connectの価格と異なる

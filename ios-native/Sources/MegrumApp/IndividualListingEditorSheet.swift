@@ -6,18 +6,11 @@ struct IndividualListingEditorSheet: View {
     @ObservedObject var appState: MegrumAppState
     var onLocalEditSaved: ((IndividualListing) -> Void)?
     var onSaved: (() -> Void)?
+    var onCreatedListing: ((IndividualListing) -> Void)?
 
     @Environment(\.dismiss) var dismiss
     @State var draft: IndividualListingDraft
-    @State var step: IndividualListingEditorStep
-    @State var havesTab: IndividualListingHavesStep.Tab = .goods
-    @State var haveSelectionFilter = IndividualListingSelectionFilter()
-    @State var wishSelectionFilter = IndividualListingSelectionFilter()
-    @State var stagedOptionSummaries: [IndividualListingOptionReviewItem] = []
-    @State var showsOptionReview = false
-    @State var optionToastMessage: String?
-    @State var optionToastID = UUID()
-    @State var saveErrorMessage: String?
+    @State var presentationState: IndividualListingEditorPresentationState
 
     init(
         appState: MegrumAppState,
@@ -25,11 +18,13 @@ struct IndividualListingEditorSheet: View {
         initialOptionKind: IndividualListingOptionKind? = nil,
         defaultExchangeSummary: IndividualListingExchangeSummary = IndividualListingExchangeSummary(),
         initialStep: IndividualListingEditorStep = .haves,
-        onSaved: (() -> Void)? = nil
+        onSaved: (() -> Void)? = nil,
+        onCreatedListing: ((IndividualListing) -> Void)? = nil
     ) {
         self.appState = appState
         self.onLocalEditSaved = nil
         self.onSaved = onSaved
+        self.onCreatedListing = onCreatedListing
         var draft = IndividualListingDraft(
             mode: .create(preselectedWishID: preselectedWishID),
             defaultExchangeSummary: defaultExchangeSummary
@@ -37,9 +32,14 @@ struct IndividualListingEditorSheet: View {
         if let initialOptionKind {
             draft.setOptionKind(initialOptionKind)
         }
-        self._draft = State(initialValue: draft)
-        self._step = State(initialValue: initialOptionKind == nil ? initialStep : .options)
-        self._havesTab = State(initialValue: draft.haveOfferKind == .cash ? .cash : .goods)
+        let resolvedInitialStep = initialOptionKind == nil ? initialStep : .options
+        _draft = State(initialValue: draft)
+        _presentationState = State(
+            initialValue: IndividualListingEditorPresentationState(
+                initialStep: resolvedInitialStep,
+                draft: draft
+            )
+        )
     }
 
     init(
@@ -52,19 +52,24 @@ struct IndividualListingEditorSheet: View {
         self.appState = appState
         self.onLocalEditSaved = onLocalEditSaved
         self.onSaved = onSaved
+        self.onCreatedListing = nil
         let draft = IndividualListingDraft(mode: .edit(listing))
-        self._draft = State(initialValue: draft)
-        self._step = State(initialValue: initialStep)
-        self._havesTab = State(initialValue: draft.haveOfferKind == .cash ? .cash : .goods)
+        _draft = State(initialValue: draft)
+        _presentationState = State(
+            initialValue: IndividualListingEditorPresentationState(
+                initialStep: initialStep,
+                draft: draft
+            )
+        )
     }
 
     var body: some View {
         IndividualListingEditorContent(
             draft: $draft,
-            havesTab: $havesTab,
-            haveSelectionFilter: $haveSelectionFilter,
-            wishSelectionFilter: $wishSelectionFilter,
-            step: step,
+            havesTab: $presentationState.havesTab,
+            haveSelectionFilter: $presentationState.haveSelectionFilter,
+            wishSelectionFilter: $presentationState.wishSelectionFilter,
+            step: presentationState.step,
             inventory: appState.inventory,
             wishes: appState.wishes,
             genres: appState.oshiGenres,
@@ -75,7 +80,7 @@ struct IndividualListingEditorSheet: View {
             optionReviewCount: optionReviewItems.count,
             onBack: goBack,
             onSelectStep: selectStep,
-            onShowOptionReview: { showsOptionReview = true },
+            onShowOptionReview: { presentationState.showOptionReview() },
             onToggleHave: toggleHave,
             onToggleWish: toggleWish,
             onLoadCharacters: loadConditionCharacters,
@@ -85,12 +90,12 @@ struct IndividualListingEditorSheet: View {
         .megrumHiddenNavigationBar()
         .safeAreaInset(edge: .bottom) {
             IndividualListingEditorBottomBar(
-                step: step,
-                havesTab: havesTab,
+                step: presentationState.step,
+                havesTab: presentationState.havesTab,
                 optionKind: draft.optionKind,
                 selectedHaveCount: draft.selectedHaveIDs.count,
                 selectedWishCount: draft.optionKind == .condition ? max(1, draft.conditionMemberIDs.count) : draft.selectedWishIDs.count,
-                stagedOptionCount: stagedOptionSummaries.count,
+                stagedOptionCount: presentationState.stagedOptionSummaries.count,
                 haveLogic: haveLogicBinding,
                 haveMinimumCount: haveMinimumCountBinding,
                 wishLogic: wishLogicBinding,
@@ -108,13 +113,13 @@ struct IndividualListingEditorSheet: View {
             )
         }
         .overlay(alignment: .bottom) {
-            if let optionToastMessage {
+            if let optionToastMessage = presentationState.optionToastMessage {
                 IndividualListingOptionAddedToast(message: optionToastMessage)
                     .padding(.bottom, 112)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
-        .sheet(isPresented: $showsOptionReview) {
+        .sheet(isPresented: $presentationState.showsOptionReview) {
             IndividualListingOptionReviewSheet(
                 items: optionReviewItems,
                 onDelete: deleteOptionReviewItem
@@ -125,10 +130,10 @@ struct IndividualListingEditorSheet: View {
             isPresented: saveErrorBinding
         ) {
             Button("OK", role: .cancel) {
-                saveErrorMessage = nil
+                presentationState.clearSaveError()
             }
         } message: {
-            Text(saveErrorMessage ?? IndividualListingEditorSaveFailurePresentation.fallbackMessage)
+            Text(presentationState.saveErrorMessage ?? IndividualListingEditorSaveFailurePresentation.fallbackMessage)
         }
         .onAppear {
             draft.ensureDefaultCondition(
@@ -148,7 +153,7 @@ struct IndividualListingEditorSheet: View {
         .onChange(of: draft.conditionGroupID) { _, _ in
             loadSelectedConditionCharacters()
         }
-        .onChange(of: havesTab) { _, newValue in
+        .onChange(of: presentationState.havesTab) { _, newValue in
             draft.setHaveOfferKind(newValue == .cash ? .cash : .goods)
         }
     }

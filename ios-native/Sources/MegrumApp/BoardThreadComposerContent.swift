@@ -11,6 +11,7 @@ struct BoardThreadComposerContent: View {
     @Binding var bodyText: String
     @Binding var anonymousDisplayName: String
     @Binding var anonymousAvatarID: String
+    @Binding var metadataDraft: MeguriContentMetadataDraft
     @Binding var thumbnailItem: PhotosPickerItem?
     var missingContextMessage: String?
     var isShowingLocationStep: Bool
@@ -22,7 +23,17 @@ struct BoardThreadComposerContent: View {
     #if canImport(UIKit)
     var thumbnailPreviewImage: UIImage?
     #endif
+    var groups: [OshiGroup]
+    var characters: [OshiCharacter]
+    var userOshiSelections: [UserOshiSelection]
+    var inventory: [GoodsItem]
+    var wishes: [WishItem]
+    var isLoadingGroups: Bool
+    var isLoadingCharacters: Bool
     var onRemoveThumbnail: () -> Void
+    var onLoadGroups: () async -> Void
+    var onLoadCharacters: (OshiGroup?) async -> Void
+    var onLoadUserOshiSelections: () async -> Void
     var onRequestLocation: () -> Void
     var onOutOfRange: (String) -> Void
     var onLocationStepAppear: () -> Void
@@ -40,6 +51,21 @@ struct BoardThreadComposerContent: View {
                 BoardThreadTitleField(title: $title)
 
                 BoardThreadBodyEditor(bodyText: $bodyText)
+
+                MeguriContentMetadataFields(
+                    title: "トピックとシリーズ",
+                    draft: $metadataDraft,
+                    groups: groups,
+                    characters: characters,
+                    userOshiSelections: userOshiSelections,
+                    inventory: inventory,
+                    wishes: wishes,
+                    isLoadingGroups: isLoadingGroups,
+                    isLoadingCharacters: isLoadingCharacters,
+                    onLoadGroups: onLoadGroups,
+                    onLoadCharacters: onLoadCharacters,
+                    onLoadUserOshiSelections: onLoadUserOshiSelections
+                )
 
                 if !locksCreationCoordinate, isShowingLocationStep {
                     locationStep

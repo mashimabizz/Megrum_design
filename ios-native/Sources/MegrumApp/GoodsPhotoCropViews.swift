@@ -33,9 +33,7 @@ struct GoodsPhotoCropSheet: View {
     var onCancel: () -> Void
     var onApply: ([GoodsPhotoUpload]) -> Void
 
-    @State private var frames: [TradingCardCropFrame]
-    @State private var selectedFrameID: UUID?
-    @State private var message: String?
+    @State private var presentationState: GoodsPhotoCropSheetPresentationState
 
     init(
         session: GoodsPhotoCropSession,
@@ -47,8 +45,7 @@ struct GoodsPhotoCropSheet: View {
         self.title = title
         self.onCancel = onCancel
         self.onApply = onApply
-        _frames = State(initialValue: session.initialFrames)
-        _selectedFrameID = State(initialValue: session.initialFrames.first?.id)
+        _presentationState = State(initialValue: GoodsPhotoCropSheetPresentationState(initialFrames: session.initialFrames))
     }
 
     var body: some View {
@@ -62,19 +59,19 @@ struct GoodsPhotoCropSheet: View {
 
                     GoodsCropFrameCanvas(
                         imageData: session.upload.data,
-                        frames: $frames,
-                        selectedFrameID: $selectedFrameID
+                        frames: $presentationState.frames,
+                        selectedFrameID: $presentationState.selectedFrameID
                     )
                     .frame(height: 430)
 
                     GoodsCropPreviewStrip(
                         imageData: session.upload.data,
-                        frames: frames,
-                        selectedFrameID: $selectedFrameID,
+                        frames: presentationState.frames,
+                        selectedFrameID: $presentationState.selectedFrameID,
                         onDelete: deleteFrame
                     )
 
-                    if let message {
+                    if let message = presentationState.message {
                         Text(message)
                             .font(.caption.weight(.bold))
                             .foregroundStyle(Color.red)
@@ -92,8 +89,8 @@ struct GoodsPhotoCropSheet: View {
                             .background(MegrumTheme.lavender, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                     }
                     .buttonStyle(.plain)
-                    .disabled(frames.isEmpty)
-                    .opacity(frames.isEmpty ? 0.45 : 1)
+                    .disabled(!presentationState.canApply)
+                    .opacity(presentationState.canApply ? 1 : 0.45)
                 }
                 .padding(.horizontal, 18)
                 .padding(.top, 16)
@@ -108,35 +105,31 @@ struct GoodsPhotoCropSheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("全削除", action: clearFrames)
-                        .disabled(frames.isEmpty)
+                        .disabled(!presentationState.canApply)
                 }
             }
         }
     }
 
     private func deleteFrame(_ frameID: UUID) {
-        frames.removeAll { $0.id == frameID }
-        if selectedFrameID == frameID {
-            selectedFrameID = frames.first?.id
-        }
+        presentationState.deleteFrame(frameID)
     }
 
     private func clearFrames() {
-        frames = []
-        selectedFrameID = nil
+        presentationState.clearFrames()
     }
 
     private func applyCrops() {
         do {
-            let results = try TradingCardBulkRecognizer.cropFramesSynchronously(frames, in: session.upload.data)
+            let results = try TradingCardBulkRecognizer.cropFramesSynchronously(presentationState.frames, in: session.upload.data)
             let uploads = results.map(\.upload)
             guard !uploads.isEmpty else {
-                message = "切り取り枠を追加してください。"
+                presentationState.showEmptyFrameMessage()
                 return
             }
             onApply(uploads)
         } catch {
-            message = error.localizedDescription
+            presentationState.showFailureMessage(error.localizedDescription)
         }
     }
 }

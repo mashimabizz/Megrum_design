@@ -4,9 +4,7 @@ extension AuthScreen {
     func setRoute(_ nextRoute: AuthFlowRoute) {
         route = nextRoute
         if nextRoute == .passwordReset {
-            passwordResetEmail = MegrumAuthInputValidator.normalizedEmail(email)
-            hasSubmittedPasswordReset = false
-            passwordResetInputErrorMessage = nil
+            inputState.preparePasswordResetRoute()
         }
         clearFeedback()
         focusedField = nil
@@ -21,24 +19,16 @@ extension AuthScreen {
     }
 
     func handlePasswordResetEmailChanged() {
-        hasSubmittedPasswordReset = false
-        passwordResetInputErrorMessage = nil
+        inputState.passwordResetEmailChanged()
         authState.clearFeedback()
     }
 
     func sendPasswordReset() async {
-        hasSubmittedPasswordReset = true
-        let normalizedEmail = MegrumAuthInputValidator.normalizedEmail(passwordResetEmail)
-        identityProviderError = nil
-        inputErrorMessage = nil
-        passwordResetInputErrorMessage = nil
-        if let validationMessage = MegrumAuthInputValidator.passwordResetValidationMessage(email: normalizedEmail) {
+        guard let normalizedEmail = inputState.validatedPasswordResetEmail() else {
             authState.clearFeedback()
-            passwordResetInputErrorMessage = validationMessage
             return
         }
 
-        email = normalizedEmail
         let sent = await authState.sendPasswordReset(email: normalizedEmail)
         if sent {
             focusedField = nil
@@ -47,28 +37,21 @@ extension AuthScreen {
 
     func submit() async {
         focusedField = nil
-        identityProviderError = nil
-        email = MegrumAuthInputValidator.normalizedEmail(email)
-        if mode == .signUp {
-            handle = MegrumAuthInputValidator.normalizedHandle(handle) ?? ""
-        }
-        inputErrorMessage = validationMessage
-        guard inputErrorMessage == nil else {
+        guard let input = inputState.validatedEmailSubmissionInput(mode: mode) else {
             authState.clearFeedback()
             return
         }
 
         switch mode {
         case .signIn:
-            await authState.signIn(email: email, password: password)
+            await authState.signIn(email: input.email, password: input.password)
         case .signUp:
-            await authState.signUp(email: email, password: password, handle: handle)
+            await authState.signUp(email: input.email, password: input.password, handle: input.handle)
         }
     }
 
     func clearFeedback() {
-        inputErrorMessage = nil
-        identityProviderError = nil
+        inputState.clearFeedback()
         authState.clearFeedback()
     }
 }

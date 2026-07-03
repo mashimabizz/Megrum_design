@@ -10,6 +10,9 @@ public struct MeguriMessage: Identifiable, Codable, Hashable, Sendable {
     public var senderID: UUID
     public var recipientID: UUID
     public var sourceGroomReplyID: UUID?
+    public var sourceGroomPostID: UUID?
+    public var sourceGroomOwnerID: UUID?
+    public var sourceGroomImageURL: URL?
     public var messageType: MeguriMessageType
     public var body: String?
     public var imageURL: URL?
@@ -27,6 +30,9 @@ public struct MeguriMessage: Identifiable, Codable, Hashable, Sendable {
         senderID: UUID,
         recipientID: UUID,
         sourceGroomReplyID: UUID? = nil,
+        sourceGroomPostID: UUID? = nil,
+        sourceGroomOwnerID: UUID? = nil,
+        sourceGroomImageURL: URL? = nil,
         messageType: MeguriMessageType = .text,
         body: String? = nil,
         imageURL: URL? = nil,
@@ -43,6 +49,9 @@ public struct MeguriMessage: Identifiable, Codable, Hashable, Sendable {
         self.senderID = senderID
         self.recipientID = recipientID
         self.sourceGroomReplyID = sourceGroomReplyID
+        self.sourceGroomPostID = sourceGroomPostID
+        self.sourceGroomOwnerID = sourceGroomOwnerID
+        self.sourceGroomImageURL = sourceGroomImageURL
         self.messageType = messageType
         self.body = body
         self.imageURL = imageURL
@@ -61,17 +70,60 @@ public struct MeguriMessageCreateInput: Equatable, Sendable {
     public var senderID: UUID
     public var recipientID: UUID
     public var sourceGroomReplyID: UUID?
+    public var sourceGroomPostID: UUID?
+    public var sourceGroomOwnerID: UUID?
+    public var sourceGroomImageURL: URL?
     public var body: String
 
     public init(
         senderID: UUID,
         recipientID: UUID,
         sourceGroomReplyID: UUID? = nil,
+        sourceGroomPostID: UUID? = nil,
+        sourceGroomOwnerID: UUID? = nil,
+        sourceGroomImageURL: URL? = nil,
         body: String
     ) {
         self.senderID = senderID
         self.recipientID = recipientID
         self.sourceGroomReplyID = sourceGroomReplyID
+        self.sourceGroomPostID = sourceGroomPostID
+        self.sourceGroomOwnerID = sourceGroomOwnerID
+        self.sourceGroomImageURL = sourceGroomImageURL
+        self.body = body
+    }
+}
+
+public struct MeguriPhotoMessageCreateInput: Equatable, Sendable {
+    public var senderID: UUID
+    public var recipientID: UUID
+    public var sourceGroomReplyID: UUID?
+    public var sourceGroomPostID: UUID?
+    public var sourceGroomOwnerID: UUID?
+    public var sourceGroomImageURL: URL?
+    public var imageData: Data
+    public var imageContentType: String
+    public var body: String?
+
+    public init(
+        senderID: UUID,
+        recipientID: UUID,
+        sourceGroomReplyID: UUID? = nil,
+        sourceGroomPostID: UUID? = nil,
+        sourceGroomOwnerID: UUID? = nil,
+        sourceGroomImageURL: URL? = nil,
+        imageData: Data,
+        imageContentType: String,
+        body: String? = nil
+    ) {
+        self.senderID = senderID
+        self.recipientID = recipientID
+        self.sourceGroomReplyID = sourceGroomReplyID
+        self.sourceGroomPostID = sourceGroomPostID
+        self.sourceGroomOwnerID = sourceGroomOwnerID
+        self.sourceGroomImageURL = sourceGroomImageURL
+        self.imageData = imageData
+        self.imageContentType = imageContentType
         self.body = body
     }
 }

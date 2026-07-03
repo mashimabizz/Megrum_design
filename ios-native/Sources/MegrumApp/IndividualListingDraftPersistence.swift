@@ -68,6 +68,8 @@ extension IndividualListingDraft {
             },
             haveLogic: haveLogic,
             haveMinimumCount: haveLogic == .atLeast ? resolvedHaveMinimumCount : 1,
+            haveIsCashOffer: haveOfferKind == .cash,
+            haveCashAmount: haveOfferKind == .cash && haveCashPricingMode == .specifiedAmount ? haveCashAmount : nil,
             wishItems: selectedWishItems.map { item in
                 ListingItemQuantity(itemID: item.id, quantity: wishQuantity(for: item.id))
             },

@@ -8,12 +8,12 @@ struct HomeDiscoveryCandidateButton: View {
     var onSelect: (HomeDiscoverySheet) -> Void
     var onSearch: (HomeDiscoveryCandidate, HomeMockGoods?) -> Void
 
-    @State private var selectedGoods: HomeMockGoods?
+    @State private var presentationState = HomeDiscoveryCandidateButtonPresentationState()
 
     var body: some View {
         VStack(spacing: 0) {
             Button {
-                onSearch(candidate, selectedGoods ?? candidate.goods.first)
+                onSearch(candidate, presentationState.resolvedSelectedGoods(in: candidate.goods))
             } label: {
                 Text(cardTitle)
                     .font(.system(size: 14.5, weight: .regular))
@@ -37,7 +37,7 @@ struct HomeDiscoveryCandidateButton: View {
                 },
                 showsConditionOverlay: false,
                 onSelectionChange: { goods in
-                    selectedGoods = goods
+                    presentationState.select(goods)
                 },
                 onActivate: { goods in
                     onSelect(candidate.sheet(selectedGoods: goods))
@@ -46,26 +46,25 @@ struct HomeDiscoveryCandidateButton: View {
             .frame(height: max(118, cardHeight - 42))
 
             HomeDiscoveryCandidateConditionTags(
-                conditionTags: candidate.conditionTags(for: selectedGoods)
+                conditionTags: candidate.conditionTags(
+                    for: presentationState.resolvedSelectedGoods(in: candidate.goods)
+                )
             )
             .padding(.top, 2)
         }
         .onAppear {
-            selectedGoods = selectedGoods ?? candidate.goods.first
+            presentationState.hydrateIfNeeded(goods: candidate.goods)
         }
         .onChange(of: candidate.goods.map(\.id)) { _, _ in
-            selectedGoods = candidate.goods.first
+            presentationState.resetSelection(goods: candidate.goods)
         }
     }
 
     private var cardTitle: String {
-        if titleStyle == .memberTag {
-            return candidate.title
-        }
-        return HomeDiscoveryCardTitleFormatter.title(
-            for: selectedGoods ?? candidate.goods.first,
-            fallback: candidate.title,
-            style: titleStyle
+        presentationState.cardTitle(
+            candidateTitle: candidate.title,
+            titleStyle: titleStyle,
+            goods: candidate.goods
         )
     }
 }

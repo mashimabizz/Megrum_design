@@ -2,6 +2,23 @@ import MegrumCore
 import MegrumDesign
 import SwiftUI
 
+enum MeguriHomeUtilityLayout {
+    static let tabBarClearance: CGFloat = 116
+
+    static func bottomPadding(safeAreaBottom: CGFloat) -> CGFloat {
+        safeAreaBottom + tabBarClearance
+    }
+}
+
+enum MeguriHomeTopControlsLayout {
+    static let minimumTopPadding: CGFloat = 58
+    static let safeAreaGap: CGFloat = 10
+
+    static func topPadding(safeAreaTop: CGFloat) -> CGFloat {
+        max(minimumTopPadding, safeAreaTop + safeAreaGap)
+    }
+}
+
 struct MeguriMapRecenterButton: View {
     var isRequesting: Bool
     var size: CGFloat = 48
@@ -83,18 +100,20 @@ struct MeguriMessageInboxButton: View {
                     .shadow(color: MegrumTheme.lavender.opacity(0.30), radius: 16, y: 8)
 
                 if unreadCount > 0 {
-                    Text(unreadCount > 99 ? "99+" : "\(unreadCount)")
-                        .font(.system(size: 10, weight: .black, design: .rounded))
-                        .foregroundStyle(.white)
-                        .frame(minWidth: 20, minHeight: 20)
-                        .padding(.horizontal, unreadCount > 9 ? 5 : 0)
-                        .background(MegrumTheme.pink, in: Capsule())
-                        .offset(x: size >= 80 ? 2 : 4, y: size >= 80 ? 0 : -4)
+                    MeguriUnreadCountBadge(count: unreadCount, size: .homeInbox)
+                        .offset(x: size >= 80 ? 8 : 14, y: size >= 80 ? -4 : -12)
                 }
             }
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("めぐりメッセージを開く")
+        .accessibilityLabel(accessibilityLabel)
+    }
+
+    private var accessibilityLabel: String {
+        guard unreadCount > 0 else {
+            return "めぐりメッセージを開く"
+        }
+        return "めぐりメッセージを開く、未読\(unreadCount)件"
     }
 }
 

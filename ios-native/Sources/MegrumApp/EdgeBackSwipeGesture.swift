@@ -91,9 +91,7 @@ private struct InteractiveBackSwipeModifier: ViewModifier {
     var action: () -> Void
 
     @Environment(\.megrumBackSwipeHandledBySlidePresentation) private var isHandledBySlidePresentation
-    @State private var dragOffset: CGFloat = 0
-    @State private var isTrackingBackSwipe = false
-    @State private var containerWidth = InteractiveBackSwipeResolver.defaultScreenWidth
+    @State private var presentationState = InteractiveBackSwipePresentationState()
 
     private let resetAnimation = Animation.interactiveSpring(response: 0.28, dampingFraction: 0.86)
 
@@ -104,7 +102,7 @@ private struct InteractiveBackSwipeModifier: ViewModifier {
         } else {
             content
                 .background(widthReader)
-                .offset(x: dragOffset)
+                .offset(x: presentationState.dragOffset)
                 .contentShape(Rectangle())
                 .simultaneousGesture(
                     DragGesture(minimumDistance: InteractiveBackSwipeResolver.minimumTrackingTranslation)
@@ -119,10 +117,10 @@ private struct InteractiveBackSwipeModifier: ViewModifier {
         GeometryReader { proxy in
             Color.clear
                 .onAppear {
-                    updateContainerWidth(proxy.size.width)
+                    presentationState.updateContainerWidth(proxy.size.width)
                 }
                 .onChange(of: proxy.size.width) { _, newValue in
-                    updateContainerWidth(newValue)
+                    presentationState.updateContainerWidth(newValue)
                 }
         }
     }
@@ -133,34 +131,26 @@ private struct InteractiveBackSwipeModifier: ViewModifier {
             return
         }
 
-        guard isTrackingBackSwipe || InteractiveBackSwipeResolver.trackedOffset(
-            translation: value.translation,
-            screenWidth: containerWidth
-        ) != nil else {
+        guard presentationState.beginTrackingIfNeeded(translation: value.translation) else {
             return
         }
 
-        isTrackingBackSwipe = true
-        dragOffset = InteractiveBackSwipeResolver.trackedOffset(
-            translation: value.translation,
-            screenWidth: containerWidth
-        ) ?? 0
+        presentationState.dragOffset = presentationState.trackedOffset(translation: value.translation)
     }
 
     private func handleDragEnded(_ value: DragGesture.Value) {
-        guard isTrackingBackSwipe else {
+        guard presentationState.isTrackingBackSwipe else {
             return
         }
-        isTrackingBackSwipe = false
-
-        guard isEnabled,
-              !isSuppressed(),
-              InteractiveBackSwipeResolver.shouldTrigger(
+        let shouldTrigger = isEnabled
+            && !isSuppressed()
+            && presentationState.shouldTrigger(
                 translation: value.translation,
-                predictedEndTranslationWidth: value.predictedEndTranslation.width,
-                screenWidth: containerWidth
-              )
-        else {
+                predictedEndTranslationWidth: value.predictedEndTranslation.width
+            )
+        presentationState.stopTracking()
+
+        guard shouldTrigger else {
             resetDrag(animated: true)
             return
         }
@@ -169,25 +159,17 @@ private struct InteractiveBackSwipeModifier: ViewModifier {
         action()
     }
 
-    private func updateContainerWidth(_ width: CGFloat) {
-        let normalizedWidth = max(width, 1)
-        guard abs(containerWidth - normalizedWidth) > 0.5 else {
-            return
-        }
-        containerWidth = normalizedWidth
-    }
-
     private func resetDrag(animated: Bool) {
-        guard dragOffset != 0 || isTrackingBackSwipe else {
+        guard presentationState.dragOffset != 0 || presentationState.isTrackingBackSwipe else {
             return
         }
-        isTrackingBackSwipe = false
+        presentationState.stopTracking()
         if animated {
             withAnimation(resetAnimation) {
-                dragOffset = 0
+                presentationState.resetDragOffset()
             }
         } else {
-            dragOffset = 0
+            presentationState.resetDragOffset()
         }
     }
 }

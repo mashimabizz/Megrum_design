@@ -34,12 +34,22 @@ struct AppDrawerScreen: View {
                 }
 
                 NavigationLink {
-                    BlockedUsersScreen(appState: appState)
+                    BlockedUsersScreen(appState: appState, context: .exchange)
                 } label: {
                     AppDrawerScreenRouteLabel(
-                        title: "ブロックした人",
+                        title: "グッズ交換でブロックした人",
                         subtitle: "一覧と解除",
                         systemImage: "person.crop.circle.badge.xmark"
+                    )
+                }
+
+                NavigationLink {
+                    BlockedUsersScreen(appState: appState, context: .meguri)
+                } label: {
+                    AppDrawerScreenRouteLabel(
+                        title: "めぐりでブロックした人",
+                        subtitle: "一覧と解除",
+                        systemImage: "message.badge.circle"
                     )
                 }
 

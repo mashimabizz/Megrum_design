@@ -14,8 +14,7 @@ struct UserReportSheet: View {
     var onSubmit: (UserReportReason, String) -> Void
 
     @Environment(\.dismiss) private var dismiss
-    @State private var reason: UserReportReason = .harassment
-    @State private var note = ""
+    @State private var draftState = UserReportDraftState()
 
     var body: some View {
         Form {
@@ -25,7 +24,7 @@ struct UserReportSheet: View {
             }
 
             Section("理由") {
-                Picker("理由", selection: $reason) {
+                Picker("理由", selection: $draftState.reason) {
                     ForEach(UserReportReason.allCases) { reason in
                         Text(reason.displayName).tag(reason)
                     }
@@ -33,7 +32,7 @@ struct UserReportSheet: View {
             }
 
             Section("補足") {
-                TextEditor(text: $note)
+                TextEditor(text: $draftState.note)
                     .frame(minHeight: 120)
             }
         }
@@ -47,7 +46,8 @@ struct UserReportSheet: View {
             }
             ToolbarItem(placement: .confirmationAction) {
                 Button("送信") {
-                    onSubmit(reason, note)
+                    let submission = draftState.submission
+                    onSubmit(submission.reason, submission.note)
                     dismiss()
                 }
                 .disabled(isSubmitting)

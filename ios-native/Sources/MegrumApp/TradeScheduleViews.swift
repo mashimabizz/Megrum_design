@@ -7,22 +7,20 @@ struct TradeScheduleSheet: View {
     @ObservedObject var appState: MegrumAppState
     var proposal: TradeProposal
     @Environment(\.dismiss) private var dismiss
-    @State private var mode: TradeScheduleCalendarMode = .fiveDays
-    @State private var anchorDate = Date()
-    @State private var isShowingScheduleEditor = false
+    @State private var presentationState = TradeSchedulePresentationState()
 
     private let calendar = Calendar.current
 
     private var calendarWindow: TradeScheduleCalendarWindow {
-        TradeScheduleCalendarWindow(mode: mode, anchorDate: anchorDate, calendar: calendar)
+        presentationState.calendarWindow(calendar: calendar)
     }
 
     private var visibleInterval: DateInterval {
-        calendarWindow.visibleInterval
+        presentationState.visibleInterval(calendar: calendar)
     }
 
     private var reloadKey: String {
-        calendarWindow.reloadKey
+        presentationState.reloadKey(calendar: calendar)
     }
 
     private var schedules: [PersonalSchedule] {
@@ -36,7 +34,7 @@ struct TradeScheduleSheet: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                Picker("表示", selection: $mode) {
+                Picker("表示", selection: $presentationState.mode) {
                     ForEach(TradeScheduleCalendarMode.allCases) { mode in
                         Text(mode.title).tag(mode)
                     }
@@ -49,7 +47,7 @@ struct TradeScheduleSheet: View {
                     ScheduleLoadingNotice()
                 }
 
-                switch mode {
+                switch presentationState.mode {
                 case .fiveDays:
                     fiveDayView
                 case .month:
@@ -69,7 +67,7 @@ struct TradeScheduleSheet: View {
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button {
-                    isShowingScheduleEditor = true
+                    presentationState.showScheduleEditor()
                 } label: {
                     Label("更新", systemImage: "plus")
                 }
@@ -78,28 +76,28 @@ struct TradeScheduleSheet: View {
 
             ToolbarItem(placement: .primaryAction) {
                 Button {
-                    moveAnchor(by: mode == .month ? 1 : 5)
+                    moveAnchor(by: presentationState.mode == .month ? 1 : 5)
                 } label: {
                     Image(systemName: "chevron.right")
                 }
-                .accessibilityLabel(mode == .month ? "次の月" : "次の週")
+                .accessibilityLabel(presentationState.mode == .month ? "次の月" : "次の週")
             }
 
             ToolbarItem(placement: .primaryAction) {
                 Button {
-                    moveAnchor(by: mode == .month ? -1 : -5)
+                    moveAnchor(by: presentationState.mode == .month ? -1 : -5)
                 } label: {
                     Image(systemName: "chevron.left")
                 }
-                .accessibilityLabel(mode == .month ? "前の月" : "前の週")
+                .accessibilityLabel(presentationState.mode == .month ? "前の月" : "前の週")
             }
         }
-        .sheet(isPresented: $isShowingScheduleEditor) {
+        .sheet(isPresented: $presentationState.isShowingScheduleEditor) {
             NavigationStack {
                 ScheduleEditorSheet(
                     appState: appState,
                     proposal: proposal,
-                    defaultDate: anchorDate
+                    defaultDate: presentationState.anchorDate
                 )
             }
             .presentationDetents([.medium, .large])
@@ -135,6 +133,6 @@ struct TradeScheduleSheet: View {
     }
 
     private func moveAnchor(by value: Int) {
-        anchorDate = calendarWindow.movedAnchor(by: value)
+        presentationState.moveAnchor(by: value, calendar: calendar)
     }
 }

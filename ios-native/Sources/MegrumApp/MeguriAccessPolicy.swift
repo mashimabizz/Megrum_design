@@ -81,9 +81,13 @@ enum MeguriAccessPolicy {
     static func canOpenBoard(
         _ thread: BoardThread,
         currentCoordinate: MegrumLocationCoordinate?,
-        viewerID: UUID?
+        viewerID: UUID?,
+        subscriptionState: UserSubscriptionState = .free
     ) -> Bool {
         if thread.authorID == viewerID {
+            return true
+        }
+        if subscriptionState.hasMeguriBoardExtendedAccess {
             return true
         }
         guard let distance = distanceMeters(from: currentCoordinate, to: thread) else {
@@ -122,9 +126,13 @@ enum MeguriAccessPolicy {
     static func boardAccessMessage(
         _ thread: BoardThread,
         currentCoordinate: MegrumLocationCoordinate?,
-        viewerID: UUID?
+        viewerID: UUID?,
+        subscriptionState: UserSubscriptionState = .free
     ) -> String {
         if thread.authorID == viewerID {
+            return ""
+        }
+        if subscriptionState.hasMeguriBoardExtendedAccess {
             return ""
         }
         guard let distance = distanceMeters(from: currentCoordinate, to: thread) else {

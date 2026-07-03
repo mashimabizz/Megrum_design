@@ -26,7 +26,7 @@ struct HomeExchangeSettingsCalendarGrid: View {
     var onTapDay: (HomeExchangeCalendarDay) -> Void
     var onFinishDragSelection: ([HomeExchangeCalendarDay]) -> Void
 
-    @State private var dragPreviewKeys: Set<String> = []
+    @State private var dragPreviewState = HomeExchangeCalendarDragPreviewState()
 
     var body: some View {
         GeometryReader { proxy in
@@ -69,36 +69,25 @@ struct HomeExchangeSettingsCalendarGrid: View {
     }
 
     private var activeSelectedDateKeys: Set<String> {
-        selectedDateKeys.union(dragPreviewKeys)
+        dragPreviewState.activeSelectedDateKeys(selectedDateKeys: selectedDateKeys)
     }
 
     private func dragSelectionGesture(in size: CGSize) -> some Gesture {
         DragGesture(minimumDistance: 8, coordinateSpace: .local)
             .onChanged { value in
                 let finalDays = selectedDays(in: value, size: size)
-                let resolvedKeys = HomeExchangeCalendarDragSelectionResolver.resolvedKeys(
-                    accumulatedKeys: dragPreviewKeys,
-                    finalKeys: finalDays.map(\.key),
-                    visibleKeys: flattenedDays.map(\.key)
+                dragPreviewState.updatePreview(
+                    finalDays: finalDays,
+                    visibleDays: flattenedDays
                 )
-                let nextPreviewKeys = Set(resolvedKeys)
-                guard !nextPreviewKeys.isEmpty,
-                      nextPreviewKeys != dragPreviewKeys else {
-                    return
-                }
-                dragPreviewKeys = nextPreviewKeys
             }
             .onEnded { value in
                 let finalDays = selectedDays(in: value, size: size)
-                let resolvedKeys = HomeExchangeCalendarDragSelectionResolver.resolvedKeys(
-                    accumulatedKeys: dragPreviewKeys,
-                    finalKeys: finalDays.map(\.key),
-                    visibleKeys: flattenedDays.map(\.key)
+                let days = dragPreviewState.finishDragSelection(
+                    finalDays: finalDays,
+                    visibleDays: flattenedDays
                 )
-                let dayByKey = Dictionary(uniqueKeysWithValues: flattenedDays.map { ($0.key, $0) })
-                let days = resolvedKeys.compactMap { dayByKey[$0] }
                 onFinishDragSelection(days)
-                dragPreviewKeys = []
             }
     }
 

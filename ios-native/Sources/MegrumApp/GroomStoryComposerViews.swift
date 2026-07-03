@@ -14,12 +14,24 @@ struct GroomStoryComposerScreen: View {
     var locksCreationCoordinate: Bool
     var currentCoordinate: MegrumLocationCoordinate?
     var isRequestingLocation: Bool
+    var groups: [OshiGroup]
+    var characters: [OshiCharacter]
+    var userOshiSelections: [UserOshiSelection]
+    var inventory: [GoodsItem]
+    var wishes: [WishItem]
+    var isLoadingGroups: Bool
+    var isLoadingCharacters: Bool
     var onRequestLocation: () -> Void
     var onOpenCamera: () -> Void
-    var onPublish: (Data, String, String?, MegrumLocationCoordinate) async -> Bool
+    var onLoadGroups: () async -> Void
+    var onLoadCharacters: (OshiGroup?) async -> Void
+    var onLoadUserOshiSelections: () async -> Void
+    var onPublish: (Data, String, String?, MegrumLocationCoordinate, MeguriContentMetadataDraft) async -> Bool
     var onDiscard: () -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var presentationState = GroomStoryComposerPresentationState()
+    @State private var metadataDraft = MeguriContentMetadataDraft()
+    @State private var isShowingMetadataPrompt = false
 
     private var hasPhotoDraft: Bool {
         draftPhotoData != nil
@@ -28,8 +40,12 @@ struct GroomStoryComposerScreen: View {
     private var canCreateAtSelectedLocation: Bool {
         MeguriAccessPolicy.canCreateAt(
             selectedCreationCoordinate,
-            currentCoordinate: currentCoordinate
+            currentCoordinate: effectiveCurrentCoordinate
         )
+    }
+
+    private var effectiveCurrentCoordinate: MegrumLocationCoordinate? {
+        currentCoordinate ?? (locksCreationCoordinate ? selectedCreationCoordinate : nil)
     }
 
     var body: some View {
@@ -41,8 +57,8 @@ struct GroomStoryComposerScreen: View {
                     photoData: draftPhotoData,
                     textOverlays: $presentationState.textOverlays,
                     isCreating: isCreating,
-                    onClose: closeComposer,
-                    onPublish: publishDraftPhoto
+                    onClose: returnToPhotoSelection,
+                    onPublish: presentMetadataPrompt
                 )
             } else {
                 VStack(spacing: 0) {
@@ -71,6 +87,40 @@ struct GroomStoryComposerScreen: View {
             }
 
             GroomStoryComposerToastOverlay(message: presentationState.toastMessage)
+
+            if isShowingMetadataPrompt {
+                Color.black.opacity(0.54)
+                    .ignoresSafeArea()
+                    .transition(.opacity)
+                    .onTapGesture {
+                        withAnimation(.smooth(duration: 0.18)) {
+                            isShowingMetadataPrompt = false
+                        }
+                    }
+
+                MeguriContentMetadataPrompt(
+                    title: "トピックとシリーズを設定",
+                    draft: $metadataDraft,
+                    groups: groups,
+                    characters: characters,
+                    userOshiSelections: userOshiSelections,
+                    inventory: inventory,
+                    wishes: wishes,
+                    isLoadingGroups: isLoadingGroups,
+                    isLoadingCharacters: isLoadingCharacters,
+                    isSubmitting: isCreating,
+                    onLoadGroups: onLoadGroups,
+                    onLoadCharacters: onLoadCharacters,
+                    onLoadUserOshiSelections: onLoadUserOshiSelections,
+                    onCancel: {
+                        withAnimation(.smooth(duration: 0.18)) {
+                            isShowingMetadataPrompt = false
+                        }
+                    },
+                    onSubmit: publishDraftPhoto
+                )
+                .transition(.scale(scale: 0.96).combined(with: .opacity))
+            }
         }
         .onAppear(perform: seedSelectedCoordinateForFinalStepIfNeeded)
         .onChange(of: currentCoordinate) { _, _ in
@@ -99,7 +149,47 @@ struct GroomStoryComposerScreen: View {
         onOpenCamera()
     }
 
+    private func presentMetadataPrompt() {
+        guard draftPhotoData != nil else {
+            showToast("投稿する写真を選択してください")
+            return
+        }
+        guard let selectedCreationCoordinate else {
+            if currentCoordinate == nil {
+                onRequestLocation()
+            }
+            showToast("最後に地図上でピンを立ててください")
+            return
+        }
+        if currentCoordinate == nil {
+            onRequestLocation()
+        }
+        guard canCreateAtSelectedLocation else {
+            showToast(
+                MeguriAccessPolicy.creationLocationMessage(
+                    selectedCoordinate: selectedCreationCoordinate,
+                    currentCoordinate: effectiveCurrentCoordinate
+                )
+            )
+            return
+        }
+        withAnimation(.smooth(duration: 0.18)) {
+            isShowingMetadataPrompt = true
+        }
+        Task {
+            if groups.isEmpty {
+                await onLoadGroups()
+            }
+            if let group = groups.first(where: { $0.id == metadataDraft.groupID }) {
+                await onLoadCharacters(group)
+            }
+        }
+    }
+
     private func publishDraftPhoto() {
+        guard !isCreating else {
+            return
+        }
         guard let draftPhotoData else {
             showToast("投稿する写真を選択してください")
             return
@@ -118,7 +208,7 @@ struct GroomStoryComposerScreen: View {
             showToast(
                 MeguriAccessPolicy.creationLocationMessage(
                     selectedCoordinate: selectedCreationCoordinate,
-                    currentCoordinate: currentCoordinate
+                    currentCoordinate: effectiveCurrentCoordinate
                 )
             )
             return
@@ -133,11 +223,14 @@ struct GroomStoryComposerScreen: View {
                 photoUpload.data,
                 photoUpload.contentType,
                 presentationState.captionForPublish,
-                selectedCreationCoordinate
+                selectedCreationCoordinate,
+                metadataDraft
             )
             guard published else {
+                showToast("グルームを投稿できませんでした")
                 return
             }
+            isShowingMetadataPrompt = false
             onDiscard()
             dismiss()
         }
@@ -180,6 +273,17 @@ struct GroomStoryComposerScreen: View {
         draftPhotoContentType = "image/jpeg"
         selectedPhotoItem = nil
         selectedCreationCoordinate = nil
+        metadataDraft = MeguriContentMetadataDraft()
+        isShowingMetadataPrompt = false
+        presentationState.clearCaptionAfterPhotoReset()
+    }
+
+    private func returnToPhotoSelection() {
+        draftPhotoData = nil
+        draftPhotoContentType = "image/jpeg"
+        selectedPhotoItem = nil
+        metadataDraft = MeguriContentMetadataDraft()
+        isShowingMetadataPrompt = false
         presentationState.clearCaptionAfterPhotoReset()
     }
 

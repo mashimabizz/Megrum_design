@@ -3,11 +3,11 @@ import MegrumCore
 
 extension ProposalCreateFlow {
     var senderCashAmount: Int? {
-        return TradeAmountFormatter.cashInputValue(from: senderCashAmountText)
+        valueSelectionState.senderCashAmount
     }
 
     var receiverCashAmount: Int? {
-        return TradeAmountFormatter.cashInputValue(from: receiverCashAmountText)
+        valueSelectionState.receiverCashAmount
     }
 
     var proposalCashAmount: Int? {
@@ -25,7 +25,7 @@ extension ProposalCreateFlow {
     }
 
     var requiresPaymentStep: Bool {
-        senderCashAmount != nil || receiverCashAmount != nil
+        valueSelectionState.requiresPaymentStep
     }
 
     var senderSelectionCount: Int {
@@ -128,7 +128,7 @@ extension ProposalCreateFlow {
             return nil
         }
         let options = paymentOptionSections.flatMap(\.options)
-        if let selectedPaymentOptionID,
+        if let selectedPaymentOptionID = valueSelectionState.selectedPaymentOptionID,
            let selected = options.first(where: { $0.id == selectedPaymentOptionID }) {
             return selected
         }

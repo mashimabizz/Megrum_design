@@ -5,6 +5,12 @@ enum MegrumAuthStateError: Error {
     case timedOut
 }
 
+enum MegrumAuthFeedbackText {
+    static let genericFailure = "認証に失敗しました。時間をおいてもう一度お試しください"
+    static let genericSignUpFailure = "登録を完了できませんでした。入力内容を確認してもう一度お試しください"
+    static let genericPasswordResetFailure = "再設定メールを送信できませんでした。時間をおいてもう一度お試しください"
+}
+
 extension MegrumAuthState {
     func withAuthTimeout<T: Sendable>(
         nanoseconds: UInt64,
@@ -45,7 +51,7 @@ extension MegrumAuthState {
         return false
     }
 
-    func normalizedMessage(from error: Error) -> String {
+    func normalizedMessage(from error: Error, context: MegrumAuthErrorContext = .authentication) -> String {
         if case let SupabaseAuthError.unexpectedStatus(_, message) = error, let message {
             if message.contains("Invalid login credentials") {
                 return "メールアドレスまたはパスワードが正しくありません"
@@ -54,7 +60,7 @@ extension MegrumAuthState {
                 return "メール認証が完了していません。受信メールを確認してください"
             }
             if message.localizedCaseInsensitiveContains("already registered") {
-                return "このメールアドレスはすでに登録されています"
+                return context.fallbackMessage
             }
             if message.localizedCaseInsensitiveContains("invalid email")
                 || message.localizedCaseInsensitiveContains("validate email") {
@@ -68,7 +74,7 @@ extension MegrumAuthState {
                 || message.localizedCaseInsensitiveContains("security purposes") {
                 return "送信間隔が短すぎます。しばらく待ってから再度お試しください"
             }
-            return message
+            return context.fallbackMessage
         }
         if case MegrumRepositoryError.unsupportedMutation = error {
             return "このログイン方法はまだ利用できません"
@@ -76,6 +82,23 @@ extension MegrumAuthState {
         if case MegrumAuthStateError.timedOut = error {
             return "通信に時間がかかっています。接続を確認してもう一度お試しください"
         }
-        return "認証に失敗しました。時間をおいてもう一度お試しください"
+        return context.fallbackMessage
+    }
+}
+
+enum MegrumAuthErrorContext {
+    case authentication
+    case signUp
+    case passwordReset
+
+    var fallbackMessage: String {
+        switch self {
+        case .authentication:
+            return MegrumAuthFeedbackText.genericFailure
+        case .signUp:
+            return MegrumAuthFeedbackText.genericSignUpFailure
+        case .passwordReset:
+            return MegrumAuthFeedbackText.genericPasswordResetFailure
+        }
     }
 }

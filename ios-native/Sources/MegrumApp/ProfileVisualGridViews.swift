@@ -72,7 +72,10 @@ private struct ProfileVisualGridTile: View {
                 }
             }
             .overlay(alignment: .topTrailing) {
-                GoodsCollectionTagPlate(text: GoodsTileCollectionCardStyle.tagLine(for: item.tags))
+                GoodsCollectionTagPlate(
+                    text: GoodsTileCollectionCardStyle.tagLine(for: item.tags),
+                    foregroundColor: item.tags.isEmpty ? MegrumTheme.conditionExact : MegrumTheme.ink
+                )
             }
             .overlay(alignment: .bottomTrailing) {
                 if item.quantity > 1 {

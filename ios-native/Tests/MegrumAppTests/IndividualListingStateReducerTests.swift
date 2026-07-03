@@ -14,6 +14,68 @@ final class IndividualListingStateReducerTests: XCTestCase {
         )
     }
 
+    func testActiveSelectionStateKeepsSelectionAndFallsBackWhenListingChanges() {
+        let first = makeListing(idSuffix: "908")
+        let second = makeListing(idSuffix: "909")
+        var state = IndividualListingActiveSelectionState()
+
+        state.reconcile(with: [first.id, second.id])
+
+        XCTAssertEqual(state.activeListingID, first.id)
+        XCTAssertEqual(state.activeListing(in: [first, second])?.id, first.id)
+        XCTAssertEqual(state.activeListingIndex(in: [first, second]), 0)
+
+        state.activeListingID = second.id
+        state.reconcile(with: [first.id, second.id])
+
+        XCTAssertEqual(state.activeListingID, second.id)
+        XCTAssertEqual(state.activeListingIndex(in: [first, second]), 1)
+
+        state.reconcile(with: [first.id])
+
+        XCTAssertEqual(state.activeListingID, first.id)
+
+        state.reconcile(with: [])
+
+        XCTAssertNil(state.activeListingID)
+        XCTAssertNil(state.activeListing(in: []))
+        XCTAssertEqual(state.activeListingIndex(in: []), 0)
+    }
+
+    func testLocalScheduleStatePreservesScheduleTextTransitions() throws {
+        let july18 = try XCTUnwrap(Calendar.current.date(from: DateComponents(year: 2026, month: 7, day: 18)))
+        let august2 = try XCTUnwrap(Calendar.current.date(from: DateComponents(year: 2026, month: 8, day: 2)))
+        var state = IndividualListingLocalScheduleState(localSchedule: "7/18", now: july18)
+
+        XCTAssertEqual(state.mode, .dates)
+        XCTAssertEqual(state.onDatePickerAppearText(), "7/18")
+
+        state.mode = .consult
+        XCTAssertEqual(
+            state.localScheduleTextAfterModeChange(currentLocalSchedule: "7/18"),
+            IndividualListingExchangeSummary.defaultLocalSchedule
+        )
+        XCTAssertNil(state.onDatePickerAppearText())
+
+        state.mode = .dates
+        XCTAssertEqual(
+            state.localScheduleTextAfterModeChange(
+                currentLocalSchedule: IndividualListingExchangeSummary.defaultLocalSchedule
+            ),
+            "7/18"
+        )
+        XCTAssertEqual(state.localScheduleTextAfterDateChange(august2), "8/2")
+
+        state.applyExternalLocalSchedule(IndividualListingExchangeSummary.defaultLocalSchedule)
+
+        XCTAssertEqual(state.mode, .consult)
+
+        state.applyExternalLocalSchedule("9月3日、午後")
+
+        XCTAssertEqual(state.mode, .dates)
+        XCTAssertEqual(state.onDatePickerAppearText(), "9/3")
+    }
+
     func testUpsertingNewListingInsertsAtFront() {
         let existing = makeListing(idSuffix: "901")
         let inserted = makeListing(idSuffix: "902")

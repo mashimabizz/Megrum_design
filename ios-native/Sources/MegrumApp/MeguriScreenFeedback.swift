@@ -29,10 +29,11 @@ extension MeguriScreen {
     }
 
     var notice: MegrumLocationNotice? {
-        MeguriNoticeResolver.notice(
+        let shouldSuppressAppError = appState.isLoading || appState.isLoadingMeguri || appState.isLoadingGroomMap
+        return MeguriNoticeResolver.notice(
             localMessage: localNoticeMessage,
             locationNotice: locationState.meguriNotice,
-            appErrorMessage: appState.errorMessage
+            appErrorMessage: shouldSuppressAppError ? nil : appState.errorMessage
         )
     }
 

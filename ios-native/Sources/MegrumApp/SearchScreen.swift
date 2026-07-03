@@ -18,30 +18,11 @@ struct SearchScreen: View {
     @AppStorage(HomeExchangeSettingsStorageKeys.localDateKeys) var exchangeLocalDateKeysRawValue = ""
     @AppStorage(HomeExchangeSettingsStorageKeys.mailShippingFee) var exchangeMailShippingFeeRawValue = HomeDefaultExchangeSettings.standard.mailShippingFee.rawValue
     @AppStorage(HomeExchangeSettingsStorageKeys.mailShippingDays) var exchangeMailShippingDaysRawValue = HomeDefaultExchangeSettings.standard.mailShippingDays.rawValue
-    @State var query = ""
-    @State var queryDraft = ""
-    @State var selectedGroupID: UUID?
-    @State var selectedMemberID: UUID?
-    @State var selectedGoodsTypeID: UUID?
-    @State var selectedGoodsTagNames: Set<String> = []
-    @State var selectedPaymentMethods: Set<UserPaymentMethod> = []
-    @State var selectedExchangeMethod: ExchangeMethod?
-    @State var selectedMeetupDates: [Date] = []
-    @State var meetupDateDraft = Date()
-    @State var selectedMeetupPrefecture = ""
-    @State var meetupPlaceMemo = ""
-    @State var shippingFee = ""
-    @State var shippingWindow = ""
-    @State var allowsOutOfConditionProposal = false
-    @State var conditionMatches = SearchConditionMatchFilters()
-    @State var selectedSort: SearchResultSort = .newest
-    @State var isApplyingSuggestion = false
+    @State var presentationState = SearchScreenPresentationState()
+    @State var filterDraft = SearchFilterDraft()
     @State var searchTask: Task<Void, Never>?
-    @State var appliedInitialCriteriaID: String?
     @State var proposalTargetItem: GoodsItem?
     @State var profileRoute: PublicProfileRoute?
-    @State var isShowingFilters = false
-    @State var lastWishSuggestionHorizontalScrollDate: Date?
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -55,7 +36,7 @@ struct SearchScreen: View {
                 results: filteredSearchResults,
                 suggestionSections: searchSuggestionSections,
                 selectedSuggestionActions: selectedSuggestionActions,
-                sort: $selectedSort,
+                sort: $presentationState.selectedSort,
                 appState: appState,
                 viewerID: appState.viewer?.id,
                 adDisplayContext: adDisplayContext,
@@ -64,7 +45,7 @@ struct SearchScreen: View {
                 },
                 onRemoveActiveCriteria: removeActiveCriteria,
                 onFilterTap: {
-                    isShowingFilters = true
+                    presentationState.showFilters()
                 },
                 onSelectSuggestion: applySuggestion,
                 onWishSuggestionHorizontalDrag: markWishSuggestionHorizontalScroll,
@@ -80,10 +61,10 @@ struct SearchScreen: View {
             )
 
             SearchFooterBar(
-                query: $queryDraft,
+                query: $presentationState.queryDraft,
                 activeFilterCount: activeFilterCount,
                 onFilterTap: {
-                    isShowingFilters = true
+                    presentationState.showFilters()
                 }
             ) {
                 submitSearch()
@@ -96,9 +77,7 @@ struct SearchScreen: View {
         .searchScreenTabBarVisibility()
         .megrumInteractiveBackSwipe(
             isSuppressed: {
-                SearchBackSwipeResolver.isSuppressedByNestedHorizontalScroll(
-                    lastNestedHorizontalScrollDate: lastWishSuggestionHorizontalScrollDate
-                )
+                presentationState.isBackSwipeSuppressed()
             },
             action: {
                 closeSearch()
@@ -108,9 +87,9 @@ struct SearchScreen: View {
             await loadFiltersAndSearch()
             onRequestInterstitial(.searchBrowseInterstitial)
         }
-        .onChange(of: selectedGroupID) { _, newValue in
+        .onChange(of: filterDraft.selectedGroupID) { _, newValue in
             if newValue == nil {
-                selectedMemberID = nil
+                filterDraft.selectedMemberID = nil
             }
             Task {
                 await appState.loadOshiCharacters(group: selectedGroup)
@@ -134,7 +113,7 @@ struct SearchScreen: View {
                 )
             }
         }
-        .sheet(isPresented: $isShowingFilters) {
+        .sheet(isPresented: $presentationState.isShowingFilters) {
             NavigationStack {
                 SearchFilterSheet(
                     appState: appState,

@@ -4,43 +4,29 @@ import SwiftUI
 
 extension ProposalCreateSheet {
     func prepareOnAppear() {
-        selectedSenderGoodsID = selectedSenderID
-        boundMeetupEnd(after: meetupStartAt)
+        draftState.selectedSenderGoodsID = selectedSenderID
+        boundMeetupEnd(after: draftState.meetupStartAt)
         requestLocationIfNeeded()
     }
 
     func toggleConditionTag(_ tag: String) {
-        if selectedConditionTags.contains(tag) {
-            selectedConditionTags.remove(tag)
-        } else {
-            selectedConditionTags.insert(tag)
-        }
+        draftState.toggleConditionTag(tag)
     }
 
     func handleExchangeMethodChange() {
-        selectedConditionTags = selectedConditionTags.intersection(Set(conditionTagOptions))
+        draftState.pruneConditionTags(to: conditionTagOptions)
         requestLocationIfNeeded()
     }
 
     func boundMeetupEnd(after startAt: Date) {
-        if meetupEndAt <= startAt {
-            meetupEndAt = startAt.addingTimeInterval(30 * 60)
-        }
+        draftState.boundMeetupEnd(after: startAt)
     }
 
     func applyCurrentLocation(_ coordinate: MegrumLocationCoordinate?) {
-        guard let coordinate, configuration.requiresMeetupBeforeSubmit else {
-            return
-        }
-        if meetupPlaceName.isBlank {
-            meetupPlaceName = "現在地"
-        }
-        if meetupLatitudeText.isBlank {
-            meetupLatitudeText = ProposalMeetupMapDraft.coordinateText(coordinate.latitude)
-        }
-        if meetupLongitudeText.isBlank {
-            meetupLongitudeText = ProposalMeetupMapDraft.coordinateText(coordinate.longitude)
-        }
+        draftState.applyCurrentLocation(
+            coordinate,
+            requiresMeetupBeforeSubmit: configuration.requiresMeetupBeforeSubmit
+        )
     }
 
     func requestLocationIfNeeded() {
@@ -63,9 +49,9 @@ extension ProposalCreateSheet {
                 receiverID: targetItem.ownerID,
                 senderGoodsIDs: [selectedSenderID],
                 receiverGoodsIDs: resolvedReceiverGoodsIDs,
-                exchangeMethod: exchangeMethod,
+                exchangeMethod: draftState.exchangeMethod,
                 conditionTags: orderedConditionTags,
-                message: message,
+                message: draftState.message,
                 status: targetStatus,
                 meetup: meetup,
                 listingID: listingID

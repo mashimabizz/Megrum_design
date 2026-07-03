@@ -170,7 +170,7 @@ struct GroomArchiveLimitNotice: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("無料プランは最新10件まで")
                         .font(.system(size: 13, weight: .black, design: .rounded))
-                    Text("メグルムプラスでアーカイブを無制限に残せます")
+                    Text("\(SubscriptionCatalog.currentPremiumDisplayName)でアーカイブを無制限に残せます")
                         .font(.system(size: 11, weight: .bold, design: .rounded))
                         .foregroundStyle(MegrumTheme.muted)
                 }
@@ -185,7 +185,7 @@ struct GroomArchiveLimitNotice: View {
             .overlay(Capsule().stroke(.white.opacity(0.66), lineWidth: 1))
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("メグルムプラスでグルームアーカイブを無制限にする")
+        .accessibilityLabel("\(SubscriptionCatalog.currentPremiumDisplayName)でグルームアーカイブを無制限にする")
     }
 }
 

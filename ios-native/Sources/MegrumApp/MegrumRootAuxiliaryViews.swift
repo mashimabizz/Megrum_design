@@ -50,8 +50,7 @@ struct NativeLoadingFailureScreen: View {
     var onRetry: () async -> Void
     var onSignOut: () async -> Void
 
-    @State private var isRetrying = false
-    @State private var isSigningOut = false
+    @State private var presentationState = NativeLoadingFailurePresentationState()
 
     var body: some View {
         VStack(spacing: 18) {
@@ -72,19 +71,19 @@ struct NativeLoadingFailureScreen: View {
 
             VStack(spacing: 10) {
                 Button(action: retry) {
-                    Label(isRetrying ? "再読み込み中" : "再読み込み", systemImage: "arrow.clockwise")
+                    Label(presentationState.retryTitle, systemImage: "arrow.clockwise")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(MegrumTheme.lavender)
-                .disabled(isRetrying || isSigningOut)
+                .disabled(presentationState.actionsDisabled)
 
                 Button(role: .destructive, action: signOut) {
-                    Label(isSigningOut ? "ログアウト中" : "ログアウトしてやり直す", systemImage: "rectangle.portrait.and.arrow.right")
+                    Label(presentationState.signOutTitle, systemImage: "rectangle.portrait.and.arrow.right")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
-                .disabled(isRetrying || isSigningOut)
+                .disabled(presentationState.actionsDisabled)
             }
             .controlSize(.large)
             .padding(.top, 6)
@@ -97,17 +96,17 @@ struct NativeLoadingFailureScreen: View {
 
     private func retry() {
         Task {
-            isRetrying = true
+            presentationState.beginRetry()
             await onRetry()
-            isRetrying = false
+            presentationState.finishRetry()
         }
     }
 
     private func signOut() {
         Task {
-            isSigningOut = true
+            presentationState.beginSignOut()
             await onSignOut()
-            isSigningOut = false
+            presentationState.finishSignOut()
         }
     }
 }

@@ -14,7 +14,7 @@ struct GoodsInventoryCreateMetaFooterView: View {
     var onBack: () -> Void
     var onSave: () -> Void
 
-    @State private var isShowingMemberDialog = false
+    @State private var presentationState = GoodsInventoryCreateMetaFooterPresentationState()
 
     var body: some View {
         VStack(spacing: 10) {
@@ -23,7 +23,7 @@ struct GoodsInventoryCreateMetaFooterView: View {
                     footerButton(
                         title: "メンバー登録",
                         systemImage: "person.crop.circle.badge.plus",
-                        action: { isShowingMemberDialog = true }
+                        action: { presentationState.showMemberDialog() }
                     )
                     .disabled(selectedCount == 0 || memberOptions.isEmpty || isCreatingGoodsEntry)
                 }
@@ -53,7 +53,7 @@ struct GoodsInventoryCreateMetaFooterView: View {
         }
         .confirmationDialog(
             "メンバーを登録",
-            isPresented: $isShowingMemberDialog,
+            isPresented: $presentationState.isShowingMemberDialog,
             titleVisibility: .visible
         ) {
             ForEach(memberOptions) { member in
@@ -71,10 +71,7 @@ struct GoodsInventoryCreateMetaFooterView: View {
     }
 
     private var saveTitle: String {
-        if selectedCount == 0, totalCount > 0 {
-            return "画像を選択してください"
-        }
-        return "\(totalCount)件まとめて登録"
+        presentationState.saveTitle(selectedCount: selectedCount, totalCount: totalCount)
     }
 
     private func footerButton(title: String, systemImage: String, action: @escaping () -> Void) -> some View {

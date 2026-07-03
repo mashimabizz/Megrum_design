@@ -140,6 +140,7 @@ public protocol MegrumRepository: Sendable {
     func createGoodsEntry(_ input: GoodsEntryInput) async throws -> GoodsItem
     func updateGoodsEntry(itemID: UUID, kind: GoodsEntryKind, input: GoodsEntryUpdateInput) async throws -> GoodsItem
     func suggestGoodsSeriesNamesFromImage(_ input: GoodsSeriesSuggestionInput) async throws -> [String]
+    func uploadGoodsGoogleLensSearchPhoto(_ upload: GoodsPhotoUpload) async throws -> URL
     func searchGoods(_ input: GoodsSearchInput) async throws -> [GoodsItem]
     func archiveGoodsItem(itemID: UUID) async throws
     func deleteGoodsItem(itemID: UUID) async throws
@@ -193,6 +194,7 @@ public protocol MegrumRepository: Sendable {
     func loadGroomReactions(postIDs: [UUID]) async throws -> [GroomReaction]
     func loadGroomReplies(postIDs: [UUID]) async throws -> [GroomReply]
     func createGroomPost(_ input: GroomPostCreateInput) async throws -> GroomPost
+    func deleteGroomPost(postID: UUID) async throws
     func markGroomViewed(postID: UUID) async throws
     func setGroomLiked(postID: UUID, isLiked: Bool) async throws
     func reportGroom(_ input: GroomReportCreateInput) async throws -> GroomReportTicket
@@ -203,10 +205,14 @@ public protocol MegrumRepository: Sendable {
     func saveMeguriProfile(_ input: MeguriProfileUpdateInput) async throws -> MeguriProfile
     func loadMeguriMessages() async throws -> [MeguriMessage]
     func sendMeguriMessage(_ input: MeguriMessageCreateInput) async throws -> MeguriMessage
-    func markMeguriMessagesRead(peerID: UUID, readAt: Date) async throws -> [MeguriMessage]
+    func sendMeguriPhotoMessage(_ input: MeguriPhotoMessageCreateInput) async throws -> MeguriMessage
+    func markMeguriMessagesRead(peerID: UUID, sourceGroomPostID: UUID?, includesAllSources: Bool, readAt: Date) async throws -> [MeguriMessage]
     func loadBoardThreads(latitude: Double?, longitude: Double?, prefecture: String?, scope: BoardThread.Audience) async throws -> [BoardThread]
     func loadBoardReplies(threadID: UUID, latitude: Double?, longitude: Double?, prefecture: String?, scope: BoardThread.Audience) async throws -> [BoardReply]
     func sendBoardReply(_ input: BoardReplyCreateInput) async throws -> BoardReply
+    func setBoardThreadReaction(threadID: UUID, reaction: BoardMessageReaction?) async throws
+    func setBoardReplyReaction(replyID: UUID, reaction: BoardMessageReaction?) async throws
+    func reportBoardThread(threadID: UUID, reason: String) async throws
     func createBoardThread(_ input: BoardThreadCreateInput) async throws -> BoardThread
     func loadMailingAddress() async throws -> MailingAddress?
     func saveMailingAddress(_ address: MailingAddress) async throws -> MailingAddress
@@ -244,4 +250,5 @@ public extension MegrumRepository {
     func saveMeguriProfile(_: MeguriProfileUpdateInput) async throws -> MeguriProfile {
         throw MegrumRepositoryError.unsupportedMutation
     }
+
 }

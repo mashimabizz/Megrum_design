@@ -10,13 +10,18 @@ extension MegrumAppState {
         errorMessage = nil
         do {
             let messages = try await repository.loadMessages(proposalID: proposalID, limit: limit)
+            let displayMessages = TradeMessageStateReducer.messagesPreservingViewerEvaluationNotices(
+                remoteMessages: messages,
+                existingMessages: messagesByProposalID[proposalID] ?? [],
+                viewerID: viewer?.id
+            )
             messagesByProposalID = TradeMessageStateReducer.replacingMessages(
                 in: messagesByProposalID,
                 proposalID: proposalID,
-                messages: messages
+                messages: displayMessages
             )
             await refreshPartnerReadState(proposalID: proposalID)
-            await markProposalRead(proposalID: proposalID, messages: messages)
+            await markProposalRead(proposalID: proposalID, messages: displayMessages)
         } catch {
             errorMessage = "メッセージを読み込めませんでした"
         }

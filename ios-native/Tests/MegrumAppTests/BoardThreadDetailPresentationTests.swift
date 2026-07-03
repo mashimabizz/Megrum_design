@@ -3,6 +3,26 @@ import MegrumCore
 import XCTest
 
 final class BoardThreadDetailPresentationTests: XCTestCase {
+    func testBoardThreadReplyComposerStateTrimsBlocksAndClearsOnlyAfterSuccess() {
+        var state = BoardThreadReplyComposerState()
+
+        XCTAssertNil(state.replyBodyForSubmission(isSending: false))
+
+        state.draftReply = "  いま北口です  "
+
+        XCTAssertEqual(state.trimmedReply, "いま北口です")
+        XCTAssertEqual(state.replyBodyForSubmission(isSending: false), "いま北口です")
+        XCTAssertNil(state.replyBodyForSubmission(isSending: true))
+
+        state.clearDraftAfterSend(succeeded: false)
+
+        XCTAssertEqual(state.draftReply, "  いま北口です  ")
+
+        state.clearDraftAfterSend(succeeded: true)
+
+        XCTAssertEqual(state.draftReply, "")
+    }
+
     func testAnonymousBoardRepliesDoNotExposePublicProfiles() {
         let authorID = uuid("001")
         let replyAuthorID = uuid("002")
@@ -153,6 +173,81 @@ final class BoardThreadDetailPresentationTests: XCTestCase {
         XCTAssertEqual(presentation.authorName, "めぐり名")
         XCTAssertEqual(presentation.authorAvatarID, "avatar_4")
         XCTAssertNil(presentation.authorAvatarURL)
+    }
+
+    func testThreadBodyAppearsAsOpeningChatMessageWithReactions() {
+        let authorID = uuid("001")
+        let viewerID = uuid("003")
+        let thread = BoardThread(
+            id: uuid("101"),
+            authorID: authorID,
+            title: "近くにいますか？",
+            body: "入口前にいます",
+            audience: .nearby3km,
+            createdAt: Date(timeIntervalSince1970: 1_000),
+            goodReactionCount: 3,
+            badReactionCount: 1,
+            viewerReaction: .good
+        )
+
+        let presentation = BoardThreadDetailPresentationBuilder(
+            thread: thread,
+            replies: [],
+            viewer: UserProfile(id: viewerID, handle: "viewer", displayName: "閲覧者"),
+            profilesByUserID: [:],
+            meguriProfilesByUserID: [:],
+            grooms: []
+        )
+        .makePresentation(now: Date(timeIntervalSince1970: 1_060))
+
+        XCTAssertEqual(presentation.chatMessages.count, 1)
+        XCTAssertEqual(presentation.chatMessages[0].target, .thread(thread.id))
+        XCTAssertEqual(presentation.chatMessages[0].body, "入口前にいます")
+        XCTAssertEqual(presentation.chatMessages[0].goodReactionCount, 3)
+        XCTAssertEqual(presentation.chatMessages[0].badReactionCount, 1)
+        XCTAssertEqual(presentation.chatMessages[0].viewerReaction, .good)
+    }
+
+    func testBoardMessageReactionOptimisticUpdateSwitchesCounts() {
+        let threadID = uuid("101")
+        let replyID = uuid("201")
+        let thread = BoardThread(
+            id: threadID,
+            authorID: uuid("001"),
+            title: "近くにいますか？",
+            body: "入口前です",
+            audience: .nearby3km,
+            goodReactionCount: 2,
+            badReactionCount: 0,
+            viewerReaction: .good
+        )
+        let reply = BoardReply(
+            id: replyID,
+            threadID: threadID,
+            authorID: uuid("002"),
+            body: "います",
+            goodReactionCount: 0,
+            badReactionCount: 1,
+            viewerReaction: .bad
+        )
+
+        let updatedThreads = ReplyThreadStateReducer.settingBoardThreadReaction(
+            .bad,
+            threadID: threadID,
+            in: [thread]
+        )
+        XCTAssertEqual(updatedThreads[0].goodReactionCount, 1)
+        XCTAssertEqual(updatedThreads[0].badReactionCount, 1)
+        XCTAssertEqual(updatedThreads[0].viewerReaction, .bad)
+
+        let updatedReplies = ReplyThreadStateReducer.settingBoardReplyReaction(
+            nil,
+            replyID: replyID,
+            in: [threadID: [reply]]
+        )
+        XCTAssertEqual(updatedReplies[threadID]?[0].goodReactionCount, 0)
+        XCTAssertEqual(updatedReplies[threadID]?[0].badReactionCount, 0)
+        XCTAssertNil(updatedReplies[threadID]?[0].viewerReaction)
     }
 
     private func uuid(_ suffix: String) -> UUID {

@@ -49,7 +49,7 @@ extension View {
 
 private struct MegrumInteractionFeedbackModifier: ViewModifier {
     var clipsToBounds: Bool
-    @State private var ripples: [MegrumTapRipple] = []
+    @State private var presentationState = MegrumInteractionFeedbackPresentationState()
 
     @ViewBuilder
     func body(content: Content) -> some View {
@@ -67,7 +67,7 @@ private struct MegrumInteractionFeedbackModifier: ViewModifier {
             .simultaneousGesture(tapGesture)
             .overlay(alignment: .topLeading) {
                 GeometryReader { proxy in
-                    ForEach(ripples) { ripple in
+                    ForEach(presentationState.ripples) { ripple in
                         MegrumTapRippleView(origin: ripple.location)
                             .frame(width: proxy.size.width, height: proxy.size.height, alignment: .topLeading)
                             .allowsHitTesting(false)
@@ -85,25 +85,19 @@ private struct MegrumInteractionFeedbackModifier: ViewModifier {
     }
 
     private func addRipple(at location: CGPoint) {
-        let ripple = MegrumTapRipple(location: location)
-        ripples.append(ripple)
+        let ripple = presentationState.addRipple(at: location)
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: 720_000_000)
-            ripples.removeAll { $0.id == ripple.id }
+            presentationState.removeRipple(id: ripple.id)
         }
     }
-}
-
-private struct MegrumTapRipple: Identifiable, Equatable {
-    let id = UUID()
-    var location: CGPoint
 }
 
 private struct MegrumTapRippleView: View {
     var origin: CGPoint
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-    @State private var progress: CGFloat = 0
+    @State private var animationState = MegrumTapRippleAnimationState()
 
     var body: some View {
         ZStack {
@@ -135,18 +129,18 @@ private struct MegrumTapRippleView: View {
                 )
         }
         .frame(width: rippleDiameter, height: rippleDiameter)
-        .scaleEffect(reduceMotion ? 0.98 : 0.22 + progress * 1.08)
-        .opacity(1 - progress)
+        .scaleEffect(animationState.scale(reduceMotion: reduceMotion))
+        .opacity(animationState.opacity)
         .position(origin)
         .allowsHitTesting(false)
         .onAppear {
             withAnimation(.easeOut(duration: reduceMotion ? 0.12 : 0.62)) {
-                progress = 1
+                animationState.finish()
             }
         }
     }
 
     private var rippleDiameter: CGFloat {
-        reduceMotion ? 64 : 174
+        animationState.diameter(reduceMotion: reduceMotion)
     }
 }

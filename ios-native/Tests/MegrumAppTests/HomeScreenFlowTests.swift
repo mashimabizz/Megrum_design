@@ -25,11 +25,11 @@ final class HomeScreenFlowTests: XCTestCase {
 
     func testHomePullRefreshProgressClampsToTriggerDistance() {
         XCTAssertEqual(
-            HomePullRefreshPresentation.effectivePullOffset(scrollOffset: -20, manualOffset: 18),
-            18
+            HomePullRefreshPresentation.effectivePullOffset(scrollOffset: -20),
+            0
         )
         XCTAssertEqual(
-            HomePullRefreshPresentation.effectivePullOffset(scrollOffset: 34, manualOffset: 12),
+            HomePullRefreshPresentation.effectivePullOffset(scrollOffset: 34),
             34
         )
         XCTAssertEqual(
@@ -59,6 +59,26 @@ final class HomeScreenFlowTests: XCTestCase {
         XCTAssertEqual(progress, 1)
         XCTAssertEqual(HomePullRefreshPresentation.indicatorOpacity(progress: progress), 1)
         XCTAssertEqual(HomePullRefreshPresentation.indicatorScale(progress: progress), 1)
+    }
+
+    func testHomePullRefreshPresentationStateTracksTopOverscrollAndRefreshLifecycle() {
+        var state = HomePullRefreshPresentationState()
+
+        state.updateScrollOffset(-12)
+        XCTAssertEqual(state.pullOffset, 0)
+        XCTAssertEqual(state.progress, 0)
+
+        state.updateScrollOffset(HomePullRefreshPresentation.triggerDistance / 2)
+        XCTAssertEqual(state.progress, 0.5, accuracy: 0.001)
+
+        XCTAssertTrue(state.beginRefreshIfNeeded())
+        XCTAssertFalse(state.beginRefreshIfNeeded())
+        XCTAssertEqual(state.progress, 1)
+
+        state.finishRefresh()
+
+        XCTAssertFalse(state.isRefreshing)
+        XCTAssertEqual(state.progress, 0)
     }
 
     func testMutualMatchEmptyStatePromptsListingCreationWhenNoListingsExist() {
@@ -222,6 +242,13 @@ final class HomeScreenFlowTests: XCTestCase {
         XCTAssertNil(VisualQATabRouteResolver.requestedTradesStage(for: .proposalComplete))
     }
 
+    func testVisualQATabRouteResolverCanOpenMeguriMessageRoutes() {
+        XCTAssertEqual(VisualQATabRouteResolver.initialTab(for: .meguriMessages), .meguri)
+        XCTAssertEqual(VisualQATabRouteResolver.initialTab(for: .meguriMessageThread), .meguri)
+        XCTAssertNil(VisualQATabRouteResolver.requestedTradesStage(for: .meguriMessages))
+        XCTAssertNil(VisualQATabRouteResolver.requestedTradesStage(for: .meguriMessageThread))
+    }
+
     func testVisualQAProposalRoutePrefersPartnerOwnedGoods() {
         let viewerID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
         let partnerID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
@@ -327,13 +354,14 @@ final class HomeScreenFlowTests: XCTestCase {
 
     func testFloatingActionsSitJustAboveFooter() {
         XCTAssertEqual(FloatingActionLayoutMetrics.leadingPadding, 24)
-        XCTAssertEqual(FloatingActionLayoutMetrics.bottomGapAboveFooter, 12)
+        XCTAssertEqual(FloatingActionLayoutMetrics.bottomGapAboveFooter, 24)
         XCTAssertEqual(FloatingActionLayoutMetrics.homeSearchBottomPadding, FloatingActionLayoutMetrics.bottomGapAboveFooter)
-        XCTAssertEqual(FloatingActionLayoutMetrics.contentBottomPadding, 104)
+        XCTAssertEqual(FloatingActionLayoutMetrics.contentBottomPadding, 116)
     }
 
     func testTabBarTitleIsLiftedAboveGlassFooter() {
-        XCTAssertEqual(MegrumTabBarLayoutMetrics.titleVerticalAdjustment, -4)
+        XCTAssertEqual(MegrumTabBarLayoutMetrics.titleVerticalAdjustment, -8)
+        XCTAssertEqual(MegrumTabBarLayoutMetrics.imageVerticalInset, 3)
     }
 
     func testHomeCandidatePriorityFrameUsesRnLikeBothAndOneSideMetrics() {
@@ -364,6 +392,7 @@ final class HomeScreenFlowTests: XCTestCase {
         XCTAssertEqual(HomeDiscoveryPrimaryTab.mutual.title, "相互マッチ(β版)")
         XCTAssertEqual(HomeDiscoveryPrimaryTab.allCases.map(\.title), ["マッチ候補", "相互マッチ(β版)"])
         XCTAssertEqual(HomeDiscoveryPrimaryTab.allCases.map(\.index), [0, 1])
+        XCTAssertEqual(HomeDiscoveryPrimaryTab.visibleTabs.map(\.title), ["マッチ候補"])
     }
 
     func testHomeDiscoveryTopTabsUseEqualHalfWidthMetrics() {

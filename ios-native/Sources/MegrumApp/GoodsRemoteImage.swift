@@ -90,7 +90,7 @@ private enum GoodsRemoteImageLoadState {
 }
 
 private struct GoodsImageSkeleton: View {
-    @State private var isPulsing = false
+    @State private var presentationState = GoodsImageSkeletonPresentationState()
 
     var body: some View {
         ZStack {
@@ -115,10 +115,10 @@ private struct GoodsImageSkeleton: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
             .padding(14)
         }
-        .opacity(isPulsing ? 0.72 : 1)
-        .animation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true), value: isPulsing)
+        .opacity(presentationState.opacity)
+        .animation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true), value: presentationState.isPulsing)
         .onAppear {
-            isPulsing = true
+            presentationState.startPulsing()
         }
     }
 }

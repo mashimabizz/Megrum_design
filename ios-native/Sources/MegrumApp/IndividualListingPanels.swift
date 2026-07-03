@@ -11,7 +11,7 @@ struct IndividualListingReceivePanel: View {
     var goodsTypes: [GoodsType]
     var canEdit: Bool
     var onAddCondition: () -> Void
-    @State private var showsOptionBreakdown = false
+    @State private var presentationState = IndividualListingReceivePanelPresentationState()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -26,7 +26,7 @@ struct IndividualListingReceivePanel: View {
             VStack(spacing: 0) {
                 if IndividualListingListPresentation.usesCollapsedOptionSummary(optionCount: options.count) {
                     Button {
-                        showsOptionBreakdown = true
+                        presentationState.showOptionBreakdown()
                     } label: {
                         IndividualListingCollapsedOptionsRow(
                             options: options,
@@ -70,7 +70,7 @@ struct IndividualListingReceivePanel: View {
             RoundedRectangle(cornerRadius: 24, style: .continuous)
                 .strokeBorder(MegrumTheme.ink.opacity(0.07), lineWidth: 1)
         }
-        .sheet(isPresented: $showsOptionBreakdown) {
+        .sheet(isPresented: $presentationState.isShowingOptionBreakdown) {
             IndividualListingOptionBreakdownSheet(
                 options: options,
                 wishByID: wishByID,

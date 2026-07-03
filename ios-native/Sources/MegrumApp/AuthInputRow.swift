@@ -12,7 +12,7 @@ struct AuthInputRow: View {
     @Binding var text: String
     var kind: FieldKind
     var onChange: (() -> Void)?
-    @State private var showsPassword = false
+    @State private var presentationState = AuthInputRowPresentationState()
 
     var body: some View {
         HStack(spacing: 19) {
@@ -22,7 +22,7 @@ struct AuthInputRow: View {
                 .frame(width: 31)
 
             Group {
-                if kind == .password && !showsPassword {
+                if presentationState.usesSecureInput(for: kind) {
                     SecureField(title, text: $text)
                 } else {
                     TextField(title, text: $text)
@@ -39,7 +39,7 @@ struct AuthInputRow: View {
 
             if kind == .password {
                 Button(action: togglePasswordVisibility) {
-                    Image(systemName: showsPassword ? "eye.slash" : "eye")
+                    Image(systemName: presentationState.passwordVisibilityIconName)
                         .font(.system(size: 22, weight: .semibold))
                         .foregroundStyle(MegrumTheme.muted.opacity(0.78))
                 }
@@ -59,6 +59,6 @@ struct AuthInputRow: View {
     }
 
     private func togglePasswordVisibility() {
-        showsPassword.toggle()
+        presentationState.togglePasswordVisibility()
     }
 }

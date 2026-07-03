@@ -7,7 +7,13 @@ struct MeguriMessageList: View {
     var messages: [MeguriMessage]
     var viewerID: UUID?
     var isLoading: Bool
+    var canReadIncomingMessages: Bool
+    var peerAvatarID: String?
+    var peerAvatarURL: URL?
+    var peerFallback: String
     var onOpenPremium: () -> Void = {}
+    var onOpenPeerProfile: () -> Void = {}
+    var onOpenImage: (URL) -> Void = { _ in }
 
     var body: some View {
         ScrollView {
@@ -20,8 +26,15 @@ struct MeguriMessageList: View {
                     ForEach(messages) { message in
                         MeguriMessageBubble(
                             message: message,
+                            viewerID: viewerID,
                             isMine: message.senderID == viewerID,
-                            onOpenPremium: onOpenPremium
+                            canReadIncomingMessages: canReadIncomingMessages,
+                            peerAvatarID: peerAvatarID,
+                            peerAvatarURL: peerAvatarURL,
+                            peerFallback: peerFallback,
+                            onOpenPremium: onOpenPremium,
+                            onOpenPeerProfile: onOpenPeerProfile,
+                            onOpenImage: onOpenImage
                         )
                         .id(message.id)
                     }
@@ -66,54 +79,320 @@ private struct MeguriMessageEmptyState: View {
 
 struct MeguriMessageBubble: View {
     var message: MeguriMessage
+    var viewerID: UUID?
     var isMine: Bool
+    var canReadIncomingMessages: Bool
+    var peerAvatarID: String?
+    var peerAvatarURL: URL?
+    var peerFallback: String
     var onOpenPremium: () -> Void = {}
+    var onOpenPeerProfile: () -> Void = {}
+    var onOpenImage: (URL) -> Void = { _ in }
 
     var body: some View {
-        VStack(alignment: isMine ? .trailing : .leading, spacing: 4) {
-            if message.locked && !isMine {
-                Button(action: onOpenPremium) {
-                    MeguriLockedMessageBubbleContent()
+        HStack(alignment: .bottom, spacing: 8) {
+            if !isMine {
+                Button(action: onOpenPeerProfile) {
+                    MeguriProfileAvatarView(
+                        avatarID: peerAvatarID,
+                        avatarURL: peerAvatarURL,
+                        fallback: peerFallback,
+                        size: 30
+                    )
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("プレミアムでメッセージを表示")
-            } else {
-                Text(messageText)
-                    .font(.system(size: 15, weight: .bold, design: .rounded))
-                    .foregroundStyle(isMine ? .white : MegrumTheme.ink)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                    .background(
-                        isMine ? AnyShapeStyle(MegrumTheme.lavender) : AnyShapeStyle(.white.opacity(0.9)),
-                        in: RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    )
+                .accessibilityLabel("\(peerFallback)のプロフィールを開く")
             }
 
-            Text(message.createdAt.formatted(date: .omitted, time: .shortened))
-                .font(.system(size: 11, weight: .bold, design: .rounded))
-                .foregroundStyle(MegrumTheme.muted)
+            if isMine {
+                Spacer(minLength: 0)
+            }
+
+            messageRow
+
+            if !isMine {
+                Spacer(minLength: 0)
+            }
         }
         .frame(maxWidth: .infinity, alignment: isMine ? .trailing : .leading)
     }
 
+    private var messageRow: some View {
+        HStack(alignment: .bottom, spacing: 6) {
+            if isMine {
+                MeguriMessageMeta(message: message, isMine: isMine)
+            }
+
+            messageContentStack
+
+            if !isMine {
+                MeguriMessageMeta(message: message, isMine: isMine)
+            }
+        }
+    }
+
+    private var messageContentStack: some View {
+        VStack(alignment: isMine ? .trailing : .leading, spacing: 4) {
+            if let sourceGroomImageURL = message.sourceGroomImageURL {
+                MeguriGroomReplyContextCard(
+                    imageURL: sourceGroomImageURL,
+                    title: groomContextTitle,
+                    isMine: isMine
+                )
+            }
+            if shouldMosaic {
+                MeguriLockedMessageBubbleContent(
+                    text: lockedMessageText,
+                    onOpenPremium: onOpenPremium
+                )
+            } else {
+                visibleMessageContent
+            }
+        }
+    }
+
+    private var shouldMosaic: Bool {
+        !isMine && (message.locked || !canReadIncomingMessages)
+    }
+
+    private var groomContextTitle: String {
+        if let viewerID, message.sourceGroomOwnerID == viewerID {
+            return "あなたのグルームに返信しました"
+        }
+        return isMine ? "グルームに返信しました" : "グルームへの返信"
+    }
+
+    private var lockedMessageText: String {
+        if let body = message.body?.nilIfBlank {
+            return body
+        }
+        return message.messageType == .image ? "画像が届いています" : "メッセージが届いています"
+    }
+
     private var messageText: String {
         if message.locked {
-            return "このメッセージは現在表示できません"
+            return lockedMessageText
         }
         if let body = message.body, !body.isEmpty {
             return body
         }
         return message.messageType == .image ? "画像" : ""
     }
+
+    @ViewBuilder
+    private var visibleMessageContent: some View {
+        if message.messageType == .image {
+            MeguriPhotoMessageBubble(photoURL: message.imageURL, onOpenImage: onOpenImage)
+            if let body = message.body?.nilIfBlank {
+                textBubble(body)
+            }
+        } else {
+            textBubble(messageText)
+        }
+    }
+
+    private func textBubble(_ text: String) -> some View {
+        ViewThatFits(in: .horizontal) {
+            compactTextBubble(text)
+            wrappedTextBubble(text)
+        }
+    }
+
+    private func compactTextBubble(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 15, weight: .bold, design: .rounded))
+            .foregroundStyle(isMine ? .white : MegrumTheme.ink)
+            .multilineTextAlignment(isMine ? .trailing : .leading)
+            .fixedSize(horizontal: true, vertical: false)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(
+                isMine ? AnyShapeStyle(MegrumTheme.lavender) : AnyShapeStyle(.white.opacity(0.9)),
+                in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+            )
+    }
+
+    private func wrappedTextBubble(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 15, weight: .bold, design: .rounded))
+            .foregroundStyle(isMine ? .white : MegrumTheme.ink)
+            .multilineTextAlignment(isMine ? .trailing : .leading)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: 270, alignment: isMine ? .trailing : .leading)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(
+                isMine ? AnyShapeStyle(MegrumTheme.lavender) : AnyShapeStyle(.white.opacity(0.9)),
+                in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+            )
+    }
+}
+
+private struct MeguriGroomReplyContextCard: View {
+    var imageURL: URL
+    var title: String
+    var isMine: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.system(size: 12, weight: .black, design: .rounded))
+                .foregroundStyle(isMine ? .white.opacity(0.92) : MegrumTheme.ink.opacity(0.82))
+
+            AsyncImage(url: imageURL) { phase in
+                switch phase {
+                case .success(let image):
+                    image
+                        .resizable()
+                        .scaledToFill()
+                case .failure:
+                    GroomImageFailureView(
+                        message: "画像を読み込めませんでした",
+                        foregroundColor: isMine ? .white.opacity(0.84) : MegrumTheme.muted
+                    )
+                default:
+                    MegrumTheme.sky.opacity(isMine ? 0.20 : 0.12)
+                        .overlay {
+                            ProgressView()
+                                .controlSize(.small)
+                        }
+                }
+            }
+            .frame(width: 156, height: 196)
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        }
+        .padding(10)
+        .background(
+            isMine ? AnyShapeStyle(MegrumTheme.lavender.opacity(0.92)) : AnyShapeStyle(.white.opacity(0.92)),
+            in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(isMine ? .white.opacity(0.24) : MegrumTheme.lavender.opacity(0.12), lineWidth: 1)
+        }
+        .accessibilityElement(children: .combine)
+    }
+}
+
+struct MeguriMessageMeta: View {
+    var message: MeguriMessage
+    var isMine: Bool
+
+    var body: some View {
+        Text(message.createdAt.formatted(date: .omitted, time: .shortened))
+            .font(.system(size: 10.5, weight: .bold, design: .rounded))
+            .foregroundStyle(MegrumTheme.muted.opacity(0.82))
+            .padding(.bottom, 3)
+            .frame(minWidth: 28, alignment: isMine ? .trailing : .leading)
+    }
+}
+
+struct MeguriPhotoMessageBubble: View {
+    var photoURL: URL?
+    var onOpenImage: (URL) -> Void
+
+    private let thumbnailSize = CGSize(width: 150, height: 150)
+
+    var body: some View {
+        Group {
+            if let photoURL {
+                Button {
+                    onOpenImage(photoURL)
+                } label: {
+                    thumbnailContent(photoURL: photoURL)
+                }
+                .buttonStyle(.plain)
+            } else {
+                photoPlaceholderContent
+            }
+        }
+        .frame(width: thumbnailSize.width, height: thumbnailSize.height)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(alignment: .topLeading) {
+            Label("写真", systemImage: "photo.fill")
+                .font(.system(size: 10.5, weight: .heavy, design: .rounded))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
+                .background(.black.opacity(0.46), in: Capsule())
+                .padding(7)
+        }
+        .accessibilityLabel(photoURL == nil ? "写真を表示できません" : "写真を拡大表示")
+    }
+
+    private func thumbnailContent(photoURL: URL) -> some View {
+        Group {
+            if photoURL.isFileURL {
+                LocalURLImage(url: photoURL, contentMode: .fill) {
+                    photoPlaceholderContent
+                }
+            } else {
+                AsyncImage(url: photoURL) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .scaledToFill()
+                    case .failure:
+                        photoPlaceholderContent
+                    case .empty:
+                        MegrumTheme.sky.opacity(0.12)
+                            .overlay {
+                                ProgressView()
+                            }
+                    @unknown default:
+                        Color.clear
+                    }
+                }
+            }
+        }
+    }
+
+    private var photoPlaceholderContent: some View {
+        MegrumTheme.sky.opacity(0.16)
+            .overlay {
+                VStack(spacing: 6) {
+                    Image(systemName: "photo")
+                        .font(.system(size: 22, weight: .bold))
+                    Text("写真")
+                        .font(.system(size: 11, weight: .heavy, design: .rounded))
+                }
+                .foregroundStyle(MegrumTheme.muted)
+            }
+    }
 }
 
 struct MeguriMessageInput: View {
     @Binding var text: String
     var isSending: Bool
+    var canUseCamera: Bool
+    var onOpenCamera: () -> Void
+    var onOpenPhotoLibrary: () -> Void
     var onSend: () -> Void
 
     var body: some View {
         HStack(spacing: 10) {
+            Menu {
+#if os(iOS)
+                Button(action: onOpenCamera) {
+                    Label("写真を撮る", systemImage: "camera.fill")
+                }
+                .disabled(!canUseCamera || isSending)
+#endif
+
+                Button(action: onOpenPhotoLibrary) {
+                    Label("アルバムから選ぶ", systemImage: "photo.on.rectangle")
+                }
+                .disabled(isSending)
+            } label: {
+                Image(systemName: "plus")
+                    .font(.system(size: 17, weight: .heavy))
+                    .foregroundStyle(MegrumTheme.ink)
+                    .frame(width: 38, height: 38)
+                    .background(.white.opacity(0.9), in: Circle())
+            }
+            .accessibilityLabel("メッセージ操作")
+
             TextField("メッセージ", text: $text, axis: .vertical)
                 .font(.system(size: 16, weight: .bold, design: .rounded))
                 .lineLimit(1...4)

@@ -136,6 +136,11 @@ struct BoardReplyRow: Decodable, Sendable {
     var body: String?
     var status: String?
     var createdAt: Date?
+    var reactionCount: Int?
+    var goodReactionCount: Int?
+    var badReactionCount: Int?
+    var viewerReacted: Bool?
+    var viewerReactionType: String?
 
     var reply: BoardReply? {
         let status = BoardReply.Status(rawValue: status ?? "visible") ?? .visible
@@ -145,7 +150,43 @@ struct BoardReplyRow: Decodable, Sendable {
             authorID: authorId,
             body: body ?? "",
             status: status,
-            createdAt: createdAt ?? .now
+            createdAt: createdAt ?? .now,
+            goodReactionCount: max(0, goodReactionCount ?? reactionCount ?? 0),
+            badReactionCount: max(0, badReactionCount ?? 0),
+            viewerReaction: BoardMessageReaction(rawValue: viewerReactionType ?? "")
+                ?? ((viewerReacted ?? false) ? .good : nil)
         )
+    }
+}
+
+struct BoardThreadReactionPayload: Encodable, Sendable {
+    var pThreadId: UUID
+    var pReactionType: String?
+
+    init(threadID: UUID, reaction: BoardMessageReaction?) {
+        self.pThreadId = threadID
+        self.pReactionType = reaction?.rawValue
+    }
+}
+
+struct BoardReplyReactionPayload: Encodable, Sendable {
+    var pReplyId: UUID
+    var pReactionType: String?
+
+    init(replyID: UUID, reaction: BoardMessageReaction?) {
+        self.pReplyId = replyID
+        self.pReactionType = reaction?.rawValue
+    }
+}
+
+struct BoardThreadReportPayload: Encodable, Sendable {
+    var pThreadId: UUID
+    var pReason: String
+
+    init(threadID: UUID, reason: String) {
+        self.pThreadId = threadID
+        self.pReason = SupabaseTextNormalizer.trimmed(reason).isEmpty
+            ? "user_report"
+            : SupabaseTextNormalizer.trimmed(reason)
     }
 }

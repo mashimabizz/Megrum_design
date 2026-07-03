@@ -20,19 +20,23 @@ extension MegrumAppState {
     }
 
     public func createIndividualListing(_ input: IndividualListingCreateInput) async -> Bool {
+        await createIndividualListingRecord(input) != nil
+    }
+
+    public func createIndividualListingRecord(_ input: IndividualListingCreateInput) async -> IndividualListing? {
         guard !isCreatingIndividualListing else {
-            return false
+            return nil
         }
         guard input.hasOfferCondition, input.hasReceivableCondition else {
             errorMessage = "譲るものと求めるものを選択してください"
-            return false
+            return nil
         }
         guard MegrumPlusAccessPolicy.canCreateIndividualListing(
             listings: listings,
             subscriptionState: subscriptionState
         ) else {
             errorMessage = MegrumPlusAccessPolicy.individualListingLimitMessage(listings: listings)
-            return false
+            return nil
         }
 
         let normalizedInput = IndividualListingInputNormalizer.normalized(input)
@@ -44,12 +48,12 @@ extension MegrumAppState {
             listings = IndividualListingStateReducer.upserting(created, into: listings)
             isCreatingIndividualListing = false
             refreshHomeCandidatesAfterListingMutation()
-            return true
+            return created
         } catch {
             MegrumAppLogger.general.error("Individual listing create failed: \(String(describing: error), privacy: .public)")
             errorMessage = "個別募集を作成できませんでした"
             isCreatingIndividualListing = false
-            return false
+            return nil
         }
     }
 

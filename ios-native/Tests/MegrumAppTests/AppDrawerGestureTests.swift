@@ -47,8 +47,11 @@ final class AppDrawerGestureTests: XCTestCase {
             )
         )
         XCTAssertEqual(
-            AppDrawerSettingsBadgePolicy.paymentBadgeText(methods: []),
+            AppDrawerSettingsBadgePolicy.paymentBadgeText(methods: [], hasLoadedSettings: true),
             "要設定"
+        )
+        XCTAssertNil(
+            AppDrawerSettingsBadgePolicy.paymentBadgeText(methods: [], hasLoadedSettings: false)
         )
         XCTAssertNil(
             AppDrawerSettingsBadgePolicy.paymentBadgeText(methods: [.paypay])
@@ -381,6 +384,37 @@ final class AppDrawerGestureTests: XCTestCase {
                 translation: CGSize(width: -4, height: 2)
             )
         )
+    }
+
+    func testAppDrawerOverlayPresentationStateTracksClosingAndTapSuppression() {
+        var state = AppDrawerOverlayPresentationState()
+
+        XCTAssertTrue(state.canSelectDestination)
+        XCTAssertTrue(state.beginClosing())
+        XCTAssertFalse(state.beginClosing())
+        XCTAssertFalse(state.canSelectDestination)
+
+        state.handlePresentationChange(isPresented: true)
+
+        XCTAssertFalse(state.isClosing)
+        XCTAssertTrue(state.canSelectDestination)
+
+        state.updateDrawerItemTapSuppression(translation: CGSize(width: -36, height: 2))
+
+        XCTAssertTrue(state.isSuppressingDrawerItemTap)
+        XCTAssertFalse(state.canSelectDestination)
+        XCTAssertTrue(state.finishDrawerItemTapSuppression(translation: CGSize(width: -36, height: 2)))
+
+        state.clearDrawerItemTapSuppression()
+
+        XCTAssertTrue(state.canSelectDestination)
+        XCTAssertFalse(state.finishDrawerItemTapSuppression(translation: CGSize(width: -4, height: 2)))
+        XCTAssertFalse(state.isSuppressingDrawerItemTap)
+
+        XCTAssertTrue(state.beginClosing())
+        state.finishClosing()
+
+        XCTAssertFalse(state.isClosing)
     }
 
     func testClosedDrawerIgnoresVerticalSwipe() {

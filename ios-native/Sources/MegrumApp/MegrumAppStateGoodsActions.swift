@@ -101,6 +101,10 @@ extension MegrumAppState {
         try await repository.suggestGoodsSeriesNamesFromImage(input)
     }
 
+    public func uploadGoodsGoogleLensSearchPhoto(_ upload: GoodsPhotoUpload) async throws -> URL {
+        try await repository.uploadGoodsGoogleLensSearchPhoto(upload)
+    }
+
     public func searchGoods(
         query: String,
         groupID: UUID? = nil,

@@ -60,6 +60,23 @@ final class OshiSettingsDraftTests: XCTestCase {
         XCTAssertEqual(OshiSettingsPresentationText.removeGroupConfirmationAction, "削除する")
     }
 
+    func testOshiSettingsGroupCardPresentationStateDelaysRemoveConfirmation() {
+        var state = OshiSettingsGroupCardPresentationState()
+
+        XCTAssertFalse(state.canConfirmRemoval)
+
+        state.enableRemoveConfirmation()
+        XCTAssertTrue(state.canConfirmRemoval)
+
+        state.prepareRemoveConfirmation()
+        XCTAssertFalse(state.canConfirmRemoval)
+
+        state.enableRemoveConfirmation()
+        state.hideRemoveConfirmation()
+
+        XCTAssertFalse(state.canConfirmRemoval)
+    }
+
     func testMemberRequestCopyAndPendingMemberTitle() {
         let requestID = uuid("10000000-0000-0000-0000-000000000206")
         let member = OshiSettingsMemberDraft(
@@ -89,6 +106,81 @@ final class OshiSettingsDraftTests: XCTestCase {
         XCTAssertTrue(pendingContext.canCreateCharacterRequest)
     }
 
+    func testOshiSettingsPresentationStateTogglesOnlyMemberSelectableGroups() {
+        var state = OshiSettingsPresentationState()
+        let group = OshiGroup(id: uuid("10000000-0000-0000-0000-000000000501"), name: "TWICE")
+        let solo = OshiGroup(
+            id: uuid("10000000-0000-0000-0000-000000000502"),
+            name: "ソロ",
+            kind: .solo
+        )
+        let groupDraft = OshiSettingsGroupDraft(masterGroup: group, priority: 1)
+        let soloDraft = OshiSettingsGroupDraft(masterGroup: solo, priority: 2)
+
+        state.toggleExpandedGroup(soloDraft)
+        XCTAssertNil(state.expandedGroupKey)
+
+        state.toggleExpandedGroup(groupDraft)
+        XCTAssertEqual(state.expandedGroupKey, groupDraft.key)
+        state.toggleExpandedGroup(groupDraft)
+        XCTAssertNil(state.expandedGroupKey)
+    }
+
+    func testOshiSettingsPresentationStateFiltersAvailableCharacters() {
+        let group = OshiGroup(id: uuid("10000000-0000-0000-0000-000000000503"), name: "TWICE")
+        let sana = OshiCharacter(
+            id: uuid("10000000-0000-0000-0000-000000000504"),
+            groupID: group.id,
+            name: "サナ",
+            displayOrder: 2
+        )
+        let momo = OshiCharacter(
+            id: uuid("10000000-0000-0000-0000-000000000505"),
+            groupID: group.id,
+            name: "モモ",
+            displayOrder: 1
+        )
+        let nayeon = OshiCharacter(
+            id: uuid("10000000-0000-0000-0000-000000000506"),
+            groupID: group.id,
+            name: "ナヨン",
+            displayOrder: 1
+        )
+        var draft = OshiSettingsGroupDraft(masterGroup: group, priority: 1)
+        draft.members.append(OshiSettingsMemberDraft(character: momo))
+        var state = OshiSettingsPresentationState()
+
+        state.setCharacters([sana, momo, nayeon], for: group.id)
+
+        XCTAssertEqual(
+            state.availableCharacters(for: draft).map(\.name),
+            ["ナヨン", "サナ"]
+        )
+    }
+
+    func testOshiSettingsPresentationStateBuildsAndPersistsGroups() {
+        let userID = uuid("10000000-0000-0000-0000-000000000507")
+        let group = OshiGroup(id: uuid("10000000-0000-0000-0000-000000000508"), name: "TWICE")
+        let selection = UserOshiSelection(
+            id: uuid("10000000-0000-0000-0000-000000000509"),
+            userID: userID,
+            groupID: group.id,
+            characterID: nil,
+            kind: .box,
+            priority: 3,
+            groupName: "TWICE"
+        )
+        var state = OshiSettingsPresentationState()
+
+        state.applyPreparedGroups(selections: [selection], masterGroups: [group])
+        XCTAssertEqual(state.groups.map(\.name), ["TWICE"])
+        XCTAssertEqual(state.groups.first?.priority, 3)
+
+        state.setPersistedGroups(state.groups, success: "保存しました")
+        XCTAssertEqual(state.groups.first?.priority, 1)
+        XCTAssertEqual(state.noticeMessage, "保存しました")
+    }
+
     func testMasterSelectSheetUsesCompactTagLayoutMetrics() {
         XCTAssertEqual(OshiMasterSelectLayoutMetrics.candidateTagMinimumWidth, 44)
         XCTAssertEqual(OshiMasterSelectLayoutMetrics.candidateTagMinHeight, 44)
@@ -111,9 +203,95 @@ final class OshiSettingsDraftTests: XCTestCase {
         XCTAssertEqual(OshiSettingsPresentationText.masterSelectionCountTitle(selectionCount: 2), "2件選択中")
     }
 
+    func testOshiMasterSelectSheetStateFiltersByGenreSearchAndAliases() {
+        let idolGenreID = uuid("10000000-0000-0000-0000-000000000211")
+        let animeGenreID = uuid("10000000-0000-0000-0000-000000000212")
+        let bts = OshiGroup(
+            id: uuid("10000000-0000-0000-0000-000000000213"),
+            name: "BTS",
+            aliases: ["バンタン"],
+            genreID: idolGenreID
+        )
+        let twice = OshiGroup(
+            id: uuid("10000000-0000-0000-0000-000000000214"),
+            name: "TWICE",
+            genreID: idolGenreID
+        )
+        let anime = OshiGroup(
+            id: uuid("10000000-0000-0000-0000-000000000215"),
+            name: "アニメ作品",
+            kind: .work,
+            genreID: animeGenreID
+        )
+        var state = OshiMasterSelectSheetState()
+
+        state.selectedGenreID = idolGenreID
+        state.searchText = " バンタン "
+
+        XCTAssertEqual(state.filteredGroups(from: [bts, twice, anime]).map(\.id), [bts.id])
+        XCTAssertEqual(state.requestSearchText, "バンタン")
+
+        state.searchText = "  "
+
+        XCTAssertEqual(state.filteredGroups(from: [bts, twice, anime]).map(\.id), [bts.id, twice.id])
+        XCTAssertNil(state.requestSearchText)
+    }
+
+    func testOshiMasterSelectSheetStateTracksPendingSelectionAndLockedIDs() {
+        let locked = OshiGroup(id: uuid("10000000-0000-0000-0000-000000000216"), name: "登録済み")
+        let bts = OshiGroup(id: uuid("10000000-0000-0000-0000-000000000217"), name: "BTS")
+        let twice = OshiGroup(id: uuid("10000000-0000-0000-0000-000000000218"), name: "TWICE")
+        var state = OshiMasterSelectSheetState()
+
+        state.togglePendingGroup(locked.id, lockedIDs: [locked.id])
+        XCTAssertTrue(state.pendingSelectedGroupIDs.isEmpty)
+
+        state.togglePendingGroup(bts.id, lockedIDs: [locked.id])
+        state.togglePendingGroup(twice.id, lockedIDs: [locked.id])
+
+        XCTAssertEqual(state.pendingSelectedGroups(from: [locked, bts, twice]).map(\.id), [bts.id, twice.id])
+        XCTAssertTrue(state.isSelected(bts, selectedGroupIDs: []))
+        XCTAssertTrue(state.isSelected(locked, selectedGroupIDs: [locked.id]))
+
+        state.removeLockedPendingSelection(selectedGroupIDs: [bts.id])
+
+        XCTAssertEqual(state.pendingSelectedGroupIDs, [twice.id])
+
+        state.clearPendingSelection()
+
+        XCTAssertFalse(state.hasPendingSelection)
+    }
+
     func testOshiRequestSheetUsesFixedFooterMetrics() {
         XCTAssertEqual(OshiRequestSheetLayoutMetrics.submitButtonHeight, 58)
         XCTAssertGreaterThanOrEqual(OshiRequestSheetLayoutMetrics.scrollBottomPadding, 100)
+    }
+
+    func testOshiRequestDraftStateBuildsTrimmedPayloadAndKeepsGenre() {
+        let genreID = uuid("10000000-0000-0000-0000-000000000210")
+        var state = OshiRequestDraftState(initialName: "  TWICE  ")
+
+        XCTAssertTrue(state.canSubmit)
+
+        state.note = "  公式作品名です  "
+        state.kind = .work
+        state.genreID = genreID
+
+        XCTAssertEqual(state.payload.name, "TWICE")
+        XCTAssertEqual(state.payload.note, "公式作品名です")
+        XCTAssertEqual(state.payload.kind, .work)
+        XCTAssertEqual(state.payload.genreID, genreID)
+    }
+
+    func testOshiMemberRequestDraftStateTrimsNameAndOmitsBlankNote() {
+        var state = OshiMemberRequestDraftState(initialName: "  サナ  ")
+
+        XCTAssertTrue(state.canSubmit)
+
+        state.note = "   \n"
+
+        XCTAssertEqual(state.payload.name, "サナ")
+        XCTAssertNil(state.payload.note)
     }
 
     func testMasterSelectionReducerTogglesMultipleGroupsAndKeepsLockedIDs() {

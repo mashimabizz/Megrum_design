@@ -46,7 +46,14 @@ extension MegrumAppState {
         }
     }
 
-    public func saveMeguriProfile(displayName: String, avatarID: String) async -> Bool {
+    public func saveMeguriProfile(
+        displayName: String,
+        avatarID: String,
+        avatarURL: URL? = nil,
+        avatarUpload: GoodsPhotoUpload? = nil,
+        clearsAvatarURL: Bool = false,
+        usesPublicProfile: Bool = false
+    ) async -> Bool {
         guard !isSavingMeguriProfile else {
             return false
         }
@@ -56,6 +63,10 @@ extension MegrumAppState {
             input = try MeguriProfileValidation.validate(
                 displayName: displayName,
                 avatarID: avatarID,
+                avatarURL: avatarURL,
+                avatarUpload: avatarUpload,
+                clearsAvatarURL: clearsAvatarURL,
+                usesPublicProfile: usesPublicProfile,
                 existingProfile: meguriProfile
             )
         } catch let error as MeguriProfileValidationError {

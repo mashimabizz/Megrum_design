@@ -15,7 +15,7 @@ struct HomeWishHitDetailSheet: View {
     var onStartProposal: (HomeDiscoveryProposalSelection) -> Void
     var onCopyToWish: (HomeMockGoods) -> Void
     var isWishCopyInProgress: Bool
-    @State private var selectedOfferIndex: Int?
+    @State private var presentationState = HomeWishHitDetailPresentationState()
 
     var body: some View {
         HomeSheetScaffold(
@@ -23,7 +23,7 @@ struct HomeWishHitDetailSheet: View {
             showsWishCopyButton: false,
             wishCopyButtonDisabled: isWishCopyInProgress,
             wishCopyButtonAction: { onCopyToWish(selection.goods) },
-            bottomButtonDisabled: selectedOfferIndex == nil,
+            bottomButtonDisabled: !presentationState.canStartProposal,
             bottomButtonAction: startProposal
         ) {
             HomeSelectedGoodsHeader(
@@ -51,9 +51,9 @@ struct HomeWishHitDetailSheet: View {
             } else {
                 HomeGoodsImagePanelPagedGrid(
                     goods: offerGoods,
-                    selectedIndices: selectedOfferIndex.map { [$0] } ?? [],
+                    selectedIndices: presentationState.selectedOfferIndices,
                     selectedBannerText: "これを譲る",
-                    onSelect: { selectedOfferIndex = $0 }
+                    onSelect: { presentationState.selectOffer(at: $0) }
                 )
                 .overlay(alignment: .bottomTrailing) {
                     Text("\(offerGoods.count)件の候補")
@@ -95,29 +95,20 @@ struct HomeWishHitDetailSheet: View {
     }
 
     private func prepareInitialSelection() {
-        guard preselectFirstOffer else {
-            selectedOfferIndex = nil
-            return
-        }
-        selectedOfferIndex = offerGoods.isEmpty ? nil : 0
+        presentationState.prepareInitialSelection(
+            preselectFirstOffer: preselectFirstOffer,
+            offerGoods: offerGoods
+        )
     }
 
     private func startProposal() {
-        guard let selectedOfferIndex,
-              offerGoods.indices.contains(selectedOfferIndex)
-        else {
+        guard let proposalSelection = presentationState.proposalSelection(
+            selection: selection,
+            offerGoods: offerGoods
+        ) else {
             return
         }
-        onStartProposal(
-            HomeDiscoveryProposalSelection(
-                receiverGoodsID: selection.goods.id,
-                senderGoodsIDs: [offerGoods[selectedOfferIndex].id],
-                matchType: .forward,
-                receiverGoods: selection.goods,
-                senderGoods: [offerGoods[selectedOfferIndex]],
-                exchangeMethod: selection.signals.preferredProposalExchangeMethod
-            )
-        )
+        onStartProposal(proposalSelection)
     }
 }
 

@@ -3,7 +3,7 @@ import MegrumDesign
 import SwiftUI
 
 struct NotificationCenterContent: View {
-    @Binding var filter: NotificationCenterFilter
+    @Binding var presentationState: NotificationCenterPresentationState
     var isLoading: Bool
     var notifications: [MegrumNotification]
     var onSelectNotification: (MegrumNotification) -> Void
@@ -11,7 +11,7 @@ struct NotificationCenterContent: View {
     var body: some View {
         List {
             Section {
-                Picker("表示", selection: $filter) {
+                Picker("表示", selection: $presentationState.filter) {
                     ForEach(NotificationCenterFilter.allCases) { filter in
                         Text(filter.title).tag(filter)
                     }
@@ -68,24 +68,10 @@ private struct NotificationCenterEmptyRow: View {
 
 private extension NotificationCenterContent {
     private var visibleNotifications: [MegrumNotification] {
-        switch filter {
-        case .all:
-            notifications
-        case .unread:
-            notifications.filter(\.isUnread)
-        case .trades:
-            notifications.filter { $0.kind.isTradeRelatedForCenter }
-        }
+        presentationState.visibleNotifications(in: notifications)
     }
 
     private var emptyTitle: String {
-        switch filter {
-        case .all:
-            "まだ通知はありません"
-        case .unread:
-            "未読の通知はありません"
-        case .trades:
-            "取引の通知はありません"
-        }
+        presentationState.emptyTitle
     }
 }

@@ -4,6 +4,2594 @@
 
 ---
 
+## イテレーション1226.266：iOS 27対応・タブ/ヘッダー透過刷新・体感性能改善ほか
+
+### 背景・問題意識
+
+iPhone実機（iOS 27）で、タブバー下の白帯・ヘッダー/ステータスバーの不透過・タブ切替やドロワー操作のカクつき・ホーム引っ張り更新後の候補消失・起動クラッシュなど、多数のUI/UX問題が報告された。シミュレータ（iOS 26.5）と実機（iOS 27）で挙動が異なるものが多く、実機のビュー階層ダンプで原因を特定しながら順に解消した。
+
+### 変更内容
+
+#### 下端・タブバー・ヘッダーの透過（Liquid Glass対応）
+- `AppDrawerForegroundLayer.swift`：ドロワー閉時は`clipShape`を無効化（セーフエリア境界でコンテンツが切れてタブバー下に canvas が露出する根本原因）。開閉時のみ角丸クリップ。
+- `MegrumScrollEdgeEffectSuppressor.swift`（新規）：iOS 26/27 が自動付与する scroll edge effect（iOS 27では不透明白帯になりタブバー領域を塗り潰す）を、UIKit APIで全ての親スクロール（ページャ含む）から無効化。SwiftUIの`scrollEdgeEffectHidden`はiOS 27のUIKitページャに届かないため。
+- `NativePageTabViewStyle.swift`：`MegrumStatusBarProgressiveBlur`（ステータスバー領域の半透明プログレッシブブラー、不透明度72%）等のヘルパー追加。
+- `AppChrome.swift`：`megrumTranslucentTopChromeBackground` / `megrumPinnedTranslucentTopChrome`（ピン留め半透明クローム＋実測高さ配信）を追加。
+- やりとり/マイグッズ/ウィッシュ/ホームの各画面をコンテンツがステータスバー・タブバーの裏まで潜る構造に変更し、ヘッダーは半透明ガラス化。
+
+#### 折りたたみヘッダー
+- `MegrumTopChromeCollapse.swift`（新規）：下スクロールでタイトルを隠し上スクロールで戻すトラッカー。スクロール量は**スクロールビュー自身の座標空間**で計測（コンテナのアニメーションをスクロールと誤認してヘッダーが消えたままになる不具合の修正）。レイアウトジャンプ（80pt超）は基準リセット。
+- ホーム/マイグッズ/ウィッシュ/個別募集に適用。ホームは`MegrumCollapsingTopChromeContainer`で折りたたみ状態を隔離し、トグル時に重いマッチ候補計算が再実行されない構造。
+
+#### 体感性能（カクつき対策）
+- `MegrumAuthenticatedTabsView.swift`：ドロワーのドラッグ状態を`AppDrawerInteractiveHost`に隔離。スワイプ中にアプリ全体（ホームの候補計算含む）が毎フレーム再評価されていたのを解消。
+- `MegrumDeferredContent.swift`（新規）：重い画面の構築を1フレーム遅らせるラッパー（スケルトン表示）。めぐりタブとドロワー遷移先に適用。
+- `GoodsGrid.swift`：マイグッズ/ウィッシュのグッズ画像に「左上から一列ずつ上から降りてくる」階段入場アニメーション（初回表示のみ）。
+- クローム高さの初期推定値（`estimatedPinnedChromeBottomEdge`）でフィルター行が最初から定位置に表示。
+
+#### 機能追加・修正
+- めぐりメッセージ一覧をListに変換し、スワイプで「削除」（`MeguriHiddenThreadStore.swift`＝ローカル非表示、新着で自動再表示。サーバー側は削除しない）。
+- Google Lens検索をアプリ内ブラウザ（`MegrumInAppSafariView.swift`＝SFSafariViewController）で表示。
+- グルーム返信欄：フォーカス時のみ送信ボタン表示、いいね列は非表示。
+- 長押し選択フッター（マイグッズ/ウィッシュ/個別募集）をタブバーの上に配置（`GoodsSelectionFooterMetrics.bottomPadding` 24→106）。
+- アプリアイコンのバッジ＝未読通知＋やりとり要対応＋めぐり要返信の合計（`MegrumAppState.appIconBadgeCount`）。起動時に通知を読み込むよう変更。
+- ホーム候補取得失敗時に自分の在庫を候補のように見せるフォールバックを廃止（「更新すると候補が消える」混乱の元）。
+- `MegrumNative.xcconfig`：広告無効化でAdMob App IDが空になると起動即クラッシュするため、Google公式サンプルApp IDをプレースホルダ設定（表示可否は`MEGRUM_ADS_ENABLED`で制御）。
+
+#### 開発支援（DEBUGビルド限定）
+- VisualQA初期画面に `inventory` / `wish` を追加。
+- `MEGRUM_DEBUG_DUMP_HIERARCHY=1`：起動8秒後にビュー階層をstdoutへダンプ（`--console`で実機調査可能）。`MEGRUM_DEBUG_TRIGGER_REFRESH=1`で引っ張り更新の自動実行も。
+- `MEGRUM_DEBUG_AUTO_SIGNIN_EMAIL/_PASSWORD`：自動サインイン（シミュレータでのライブデータ検証用）。
+
+### 影響範囲
+
+- ホーム/やりとり/マイグッズ/ウィッシュ/個別募集/めぐり（一覧・グルーム）/ドロワー全般のクローム・遷移・スクロール挙動
+- アプリアイコンバッジ、起動時の通知読み込み
+- データモデル変更なし（めぐりスレッド非表示は端末ローカルのUserDefaultsのみ）
+
+### 確認方法
+
+- iOSシミュレータ（iOS 26.5）＋iPhone 15実機（iOS 27.0）で目視確認。実機はビュー階層ダンプで原因特定
+- `SIMCTL_CHILD_MEGRUM_VISUAL_QA_PREVIEW_AUTH=1 SIMCTL_CHILD_MEGRUM_VISUAL_QA_INITIAL_SCREEN=inventory xcrun simctl launch ...` 等
+
+### セルフレビュー結果
+
+- ✅ ブランドカラー直書きなし（MegrumTheme経由）、iOS標準コンポーネント優先（List/swipeActions/SFSafariViewController/標準scroll edge API）
+- ✅ シミュレータで各画面の静止/スクロール/折りたたみ/ドロワー開閉/バッジ表示をスクリーンショット確認、実機でオーナー確認済み
+- ⚠️ めぐりメッセージの「削除」はローカル非表示。サーバー側削除が必要なら別途Supabase設計
+- ⚠️ 本コミットは未コミットのまま溜まっていた iter1226.208〜265 相当の変更（web公開前チェック・Supabase migration含む）を同梱
+
+---
+
+## イテレーション1226.265：公開前チェックと安全ヘッダー
+
+### 背景・問題意識
+
+Zenn「Webサービス公開前のチェックリスト」に沿ってMegrumを確認したところ、公開Webのセキュリティヘッダー、`/legal/*` の到達性、404ページ、公開前No-Go項目の一元管理が不足していた。App Store提出や公開URL確認で、古い短縮法務文面・未確認の広告/AI/Storage項目を見落とさないようにする必要があった。
+
+### 変更内容
+
+#### `web/next.config.ts`
+- 全パスにHSTS、CSP `frame-ancestors 'none'`、`X-Content-Type-Options: nosniff`、`X-Frame-Options: DENY`、Referrer Policy、Permissions Policyを追加した。
+- `/admin`、`/auth`、`/login`、パスワード再設定系に `Cache-Control: private, no-store` を追加した。
+
+#### `web/src/app/auth/callback/route.ts`
+- Web認証後の `next` を同一originのpathだけに正規化し、外部URLやscheme付き文字列は `/admin` にfallbackするようにした。
+- `next=mobile` のNative callback分岐と、mobile scheme allowlistは維持した。
+
+#### `web/src/app/auth/actions.ts`
+- Web管理画面ログイン、Googleログイン開始、パスワード再設定、新パスワード設定で、未知のSupabase error messageをそのまま画面へ返さず、固定の利用者向け文言へ丸めた。
+- 既存の入力不足、認証情報不一致、メール未確認、rate limit、同一パスワードの分岐文言は維持した。
+
+#### `web/src/app/not-found.tsx`
+- 公開Web向けの404ページを追加し、`noindex` とトップ/サポート導線を持たせた。
+
+#### `web/src/app/legal/privacy/page.tsx`
+#### `web/src/app/legal/terms/page.tsx`
+- App Store入力候補だった `/legal/privacy` と `/legal/terms` でも、既存の `/privacy`、`/terms` と同じ公開法務本文へ到達できるようにした。
+
+#### `supabase/functions/suggest-goods-series/index.ts`
+- OpenAI APIや認証確認で失敗した時に、外部レスポンス本文や環境変数名つき詳細をそのまま返さず、固定の公開エラーコードへ丸めるようにした。
+- `openai_failed` の内部Errorから `response.text()` を外し、HTTPレスポンスにも外部API本文を含めないようにした。
+
+#### `supabase/functions/send-apns-notification/index.ts`
+- Supabase/APNs配送周辺の失敗時に、PostgRESTレスポンス本文や設定エラー詳細をそのまま返さず、固定の公開エラーコードへ丸めるようにした。
+- unread count取得、device revoke、Supabase fetchの内部Errorから `response.text()` を外した。
+
+#### `ios-native/Sources/MegrumApp/GoodsGoogleLensSearchModels.swift`
+- Google Lensへ開く前に表示する、送信先・画像URL送信・プライバシーポリシーに関する確認文言を共通定義した。
+
+#### `ios-native/Sources/MegrumApp/GoodsGoogleLensPickerSheet.swift`
+- Google Lens画像検索の候補をタップした時、すぐ外部検索を開かず、Native alertで送信先と扱いを確認してから `onSelect` を呼ぶようにした。
+- 候補リスト上にも、画像又は画像URLがGoogle Lensへ送られることを説明する補足文を追加した。
+
+#### `ios-native/Tests/MegrumAppTests/GoodsEditorDraftTests.swift`
+- Google Lens送信前確認文言が、送信先、画像又は画像URL、プライバシーポリシー、Megrum URLへの一時アップロードを含むことを確認するテストを追加した。
+
+#### `ios-native/Sources/MegrumApp/MegrumAuthStateSupport.swift`
+#### `ios-native/Sources/MegrumApp/MegrumAuthStateSignUpActions.swift`
+- Native認証で未知のSupabase error messageをそのまま表示せず、ログイン、登録、パスワード再設定の文脈別固定文言へ丸めるようにした。
+- `already registered` 系の登録エラーは、登録済みメールアドレスの列挙につながらないよう、登録文脈の一般文言へ丸めた。
+
+#### `ios-native/Tests/MegrumAppTests/AuthScreenInputTests.swift`
+- 登録済みメールエラーと未知のパスワード再設定エラーが、Supabaseの生messageではなく固定文言になることを確認するテストを追加した。
+
+#### `ios-native/Config/MegrumNative.xcconfig`
+- チェックイン既定を広告OFF、AdMob app id/unit id/test unit id空、test ads OFFへ変更した。
+- 提出ビルドで意図せずAdMob SDK初期化や広告リクエストが発生しない安全側の既定にした。
+- `MEGRUM_PLUS_IAP_ENABLED=NO` を追加し、チェックイン既定ではメグルムプラスのStoreKit購入・復元を出さない安全側の既定にした。
+
+#### `ios-native/Config/MegrumNative.local.xcconfig.example`
+- 広告検証時だけlocal configへ明示的に埋めるAdMob設定欄を追加した。
+- メグルムプラスのIAP検証時だけ明示的に有効化する `MEGRUM_PLUS_IAP_ENABLED` を追加した。
+
+#### `ios-native/App/Info.plist`
+- `MegrumPlusIAPEnabled` を追加し、build settingの `MEGRUM_PLUS_IAP_ENABLED` をアプリ実行時設定へ渡せるようにした。
+
+#### `ios-native/Sources/MegrumApp/MegrumPlusRuntimeConfiguration.swift`
+- 環境変数又はInfo.plistからIAP有効/無効を読む実行時設定を追加した。
+- 未設定、空文字、未解決placeholderは無効として扱い、`1`、`true`、`yes`、`on` だけを有効扱いにした。
+
+#### `ios-native/Sources/MegrumApp/SubscriptionSettingsScreen.swift`
+#### `ios-native/Sources/MegrumApp/SubscriptionSettingsContent.swift`
+- IAP無効時は購入/復元ボタンを表示せず、StoreKitの商品情報照会、購入、復元actionを早期停止するようにした。
+- 状態更新、サーバー由来の有料権限表示、DEBUGビルドの確認用切り替えは維持した。
+
+#### `ios-native/Tests/MegrumAppTests/SettingsScreenTests.swift`
+- `MegrumPlusRuntimeConfiguration` が既定でIAP無効になることと、明示的なtrue系値だけで有効になることを確認するテストを追加した。
+
+#### `supabase/migrations/20260703120000_harden_meguri_board_media_storage_policy.sql`
+- `meguri-board-media` bucketをprivateとして再宣言し、旧 `Meguri board media readable by authenticated` policyを削除した。
+- `can_view_meguri_board_media_object(target_name, viewer_id)` を追加し、表示可能な掲示板thread/replyの `image_paths` に紐づくobjectだけStorage selectできるようにした。
+- `image_paths` 参照のため、掲示板thread/replyにGIN indexを追加した。
+
+#### `supabase/migrations/20260703123000_revoke_notification_devices_on_account_deletion.sql`
+- `request_account_deletion_for_viewer()` を置き換え、退会申請成功時に同じユーザーの未失効 `notification_devices` へ `revoked_at` を設定するようにした。
+- 進行中取引ガード、理由/メモ正規化、`users.account_status='deletion_requested'`、`account_deletion_requests` 保存、返却形式は維持した。
+
+#### `notes/76_zenn_web_service_prelaunch_checklist.md`
+- Zenn記事の項目をMegrum向けに、セキュリティ、ログイン/メール、SEO/OGP、決済/広告/外部AI、アクセシビリティ/性能、運用/法務へ分けてチェックリスト化した。
+- 今回実装済みの対策と、公開前No-Goとして残るAdMob/ATT、削除運用、DNS/backup/2FA、公開法務文面同期を明示した。
+- Google Lensの可視導線を対策済みとして、AI-01をNo-GoからPartialへ更新した。OpenAI系FunctionをUI露出する場合の残対応は維持した。
+- `meguri-board-media` のauthenticated-wide readを対策済みとして、SEC-11をNo-GoからPartialへ更新した。本番policy確認、signed URL期間、削除時cleanupは残対応として維持した。
+- 退会申請時の通知device失効を追加済みとしてOPS-02の証拠を更新した。Auth削除、Apple/Google連携解除、削除完了ジョブはNo-Goとして維持した。
+
+#### `notes/54_prelaunch_security_audit_checklist.md`
+#### `notes/45_account_deletion_privacy_request_runbook.md`
+#### `notes/17_legal_alignment.md`
+- `meguri-board-media` のStorage selectが、authenticated全体ではなく表示可能な掲示板content紐づきへ縮小されたことを追記した。
+- live適用後のpolicy確認、近距離scopeとStorage policyの境界、削除/通報/保持、signed URL期間は公開前確認に残した。
+- 退会申請時に通知deviceを失効するmigrationを追記しつつ、削除完了処理や外部連携解除は未完了として残した。
+
+#### `notes/24_app_store_submission_pack.md`
+#### `notes/27_app_privacy_data_inventory.md`
+#### `notes/37_public_url_publication_checklist.md`
+#### `notes/43_app_privacy_connect_answer_sheet.md`
+#### `notes/44_privacy_manifest_sdk_audit.md`
+#### `notes/46_app_store_questionnaire_answer_sheet.md`
+#### `notes/50_release_go_no_go_decision_matrix.md`
+#### `notes/48_external_service_vendor_register.md`
+#### `notes/59_initial_release_scope_exposure_audit.md`
+- AdMobの現行チェックイン既定を広告OFF/ID空/test ads OFFとして同期し、広告を出す場合だけlocal/CIで明示的に有効化する前提へ更新した。
+- Google Mobile Ads SDK linkとSKAdNetworkItemsは残るため、広告を出さない提出でも実ビルドでSDK初期化/広告リクエストなしを確認する残対応は維持した。
+- Megrum Plus IAPの現行チェックイン既定を `MEGRUM_PLUS_IAP_ENABLED=NO` として同期し、初回提出で有料導線を出す場合だけlocal/CIで明示的に有効化する前提へ更新した。
+- IAPを出さない提出でも、実ビルドで購入/復元ボタン、StoreKit商品照会、購入、復元actionが発生しないことを確認する残対応を追加した。
+
+### 影響範囲
+
+- 公開Webと管理WebのHTTPレスポンスヘッダー、Web認証後の戻り先正規化、Web認証画面の未知エラー文言、`/legal/*` aliasページ、404表示、OpenAI/APNs Edge Functionのエラー返却に影響する。
+- Swift Native iOSは、Google Lens画像検索を開く直前の確認表示にだけ影響する。Google Lens URL生成、画像アップロード処理、タグ付け、候補選択、登録保存、認証状態は変更していない。
+- Native認証は、Supabase Auth失敗時の表示文言に影響する。入力validation、OAuth URL生成、session保存、ログイン成功処理は変更していない。
+- Swift Native iOSのチェックイン既定では広告SDK起動と広告表示を止める。広告表示コード、placement、AdDisplayPolicy、Google Mobile Ads SDK dependencyは削除していない。
+- Swift Native iOSのチェックイン既定では、Megrum Plusの購入/復元ボタン、StoreKit商品照会、購入、復元actionを止める。サーバー由来の有料権限表示、状態更新、StoreKit client実装、購入同期RPC境界は削除していない。
+- Supabaseは `meguri-board-media` のStorage select policy、その判定用関数/index、退会申請RPC成功時の通知device失効に影響する。掲示板thread/replyの作成RPC、アプリ側の署名URL生成、Storage upload/delete policyは変更していない。
+- 退会申請RPCは通知deviceを失効するが、30日後の削除完了ジョブ、Authユーザー削除又は無効化、Apple/Google連携解除は変更していない。
+- App Store Connect設定、AdMob設定、DNS設定は変更していない。
+- 状態遷移・用語・アプリのデータモデル定義変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` は更新不要。
+
+### 確認方法
+
+- `npm run lint --prefix web`
+  - passed
+- `npm run build --prefix web`
+  - passed
+- `git diff --check -- web/src/app/auth/actions.ts web/next.config.ts web/src/app/auth/callback/route.ts web/src/app/not-found.tsx web/src/app/legal/privacy/page.tsx web/src/app/legal/terms/page.tsx supabase/functions/suggest-goods-series/index.ts supabase/functions/send-apns-notification/index.ts notes/76_zenn_web_service_prelaunch_checklist.md notes/08_design_iterations.md`
+  - passed
+- `web/node_modules/.bin/tsc --noEmit --target es2022 --lib es2022,dom --module nodenext --moduleResolution nodenext --skipLibCheck supabase/functions/suggest-goods-series/index.ts`
+  - passed
+- `web/node_modules/.bin/tsc --noEmit --target es2022 --lib es2022,dom --module nodenext --moduleResolution nodenext --skipLibCheck supabase/functions/send-apns-notification/index.ts`
+  - passed
+- `npm run start --prefix web -- -p 3099`
+  - passed（検証後に停止）
+- `curl -sS -D - -o /tmp/megrum-home.html http://localhost:3099/`
+  - passed（200、HSTS/CSP/nosniff/frame/referrer/permissions headerあり）
+- `curl -sS -D - -o /tmp/megrum-legal-privacy.html http://localhost:3099/legal/privacy`
+  - passed（200、公開法務本文へ到達、canonicalは `/privacy`）
+- `curl -sS -D - -o /tmp/megrum-legal-terms.html http://localhost:3099/legal/terms`
+  - passed（200、公開法務本文へ到達、canonicalは `/terms`）
+- `curl -sS -D - -o /tmp/megrum-404.html http://localhost:3099/no-such-page`
+  - passed（404、`noindex`、公式ページ導線あり）
+- `curl -sS -D - -o /tmp/megrum-admin.html http://localhost:3099/admin`
+  - passed（307 `/login`、`Cache-Control: private, no-store`）
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-zenn-google-lens-build`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-zenn-google-lens --enable-xctest --disable-swift-testing -j 1 --filter 'GoodsEditorDraftTests/testGoogleLensSearchDisclosureMentionsExternalImageHandling|GoodsEditorDraftTests/testGoogleLensSearchURLBuilderEncodesImageURL'`
+  - failed（今回未変更の `MegrumTabBarLayoutMetrics.imageVerticalInset` がテストターゲット側で参照されており、テストビルドが停止）
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-zenn-auth-build`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-zenn-auth-test --enable-xctest --disable-swift-testing -j 1 --filter 'AuthScreenInputTests/testAuthStateDoesNotExposeRegisteredEmailSignUpError|AuthScreenInputTests/testAuthStateDoesNotExposeUnknownSupabasePasswordResetError'`
+  - failed（今回未変更の `MegrumTabBarLayoutMetrics.imageVerticalInset` がテストターゲット側で参照されており、テストビルドが停止）
+- `rg -n "Meguri board media readable by authenticated|can_view_meguri_board_media_object|meguri-board-media" supabase/migrations/20260703120000_harden_meguri_board_media_storage_policy.sql`
+  - passed（旧policy削除、新しいcontent紐づきpolicyを確認）
+- `supabase db lint --local`
+  - failed（local Postgres `127.0.0.1:54322` が起動しておらず接続不可）
+- `git diff --check -- web/next.config.ts web/src/app/auth/callback/route.ts web/src/app/auth/actions.ts web/src/app/not-found.tsx web/src/app/legal/privacy/page.tsx web/src/app/legal/terms/page.tsx supabase/functions/suggest-goods-series/index.ts supabase/functions/send-apns-notification/index.ts ios-native/Sources/MegrumApp/GoodsGoogleLensSearchModels.swift ios-native/Sources/MegrumApp/GoodsGoogleLensPickerSheet.swift ios-native/Sources/MegrumApp/MegrumAuthStateSupport.swift ios-native/Sources/MegrumApp/MegrumAuthStateSignUpActions.swift ios-native/Tests/MegrumAppTests/GoodsEditorDraftTests.swift ios-native/Tests/MegrumAppTests/AuthScreenInputTests.swift supabase/migrations/20260703120000_harden_meguri_board_media_storage_policy.sql supabase/migrations/20260703123000_revoke_notification_devices_on_account_deletion.sql notes/76_zenn_web_service_prelaunch_checklist.md notes/54_prelaunch_security_audit_checklist.md notes/45_account_deletion_privacy_request_runbook.md notes/17_legal_alignment.md notes/08_design_iterations.md`
+  - passed
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -configuration Debug -showBuildSettings | rg '(^    (PRODUCT_BUNDLE_IDENTIFIER|MEGRUM_ADS_ENABLED|MEGRUM_ADMOB_TEST_ADS_ENABLED|MEGRUM_ADMOB_APP_ID|MEGRUM_ADMOB_SEARCH_NATIVE_UNIT_ID|MEGRUM_ADMOB_TRADES_BANNER_UNIT_ID|MEGRUM_ADMOB_TEST_BANNER_UNIT_ID|MEGRUM_ADMOB_TEST_NATIVE_UNIT_ID|MEGRUM_AD_PROVIDER|MEGRUM_AD_PLACEHOLDERS_ENABLED) =)'`
+  - passed（Debug: `MEGRUM_ADS_ENABLED=NO`。target overrideにより `MEGRUM_ADMOB_TEST_ADS_ENABLED=YES` は残るが、広告OFFのため既定ではSDK起動条件を満たさない）
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -configuration Release -showBuildSettings | rg '(^    (PRODUCT_BUNDLE_IDENTIFIER|MEGRUM_ADS_ENABLED|MEGRUM_ADMOB_TEST_ADS_ENABLED|MEGRUM_ADMOB_APP_ID|MEGRUM_ADMOB_SEARCH_NATIVE_UNIT_ID|MEGRUM_ADMOB_TRADES_BANNER_UNIT_ID|MEGRUM_ADMOB_TEST_BANNER_UNIT_ID|MEGRUM_ADMOB_TEST_NATIVE_UNIT_ID|MEGRUM_AD_PROVIDER|MEGRUM_AD_PLACEHOLDERS_ENABLED) =)'`
+  - passed（Release: `MEGRUM_ADS_ENABLED=NO`、`MEGRUM_ADMOB_TEST_ADS_ENABLED=NO`）
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild-zenn-ad-config CODE_SIGNING_ALLOWED=NO build`
+  - passed
+- `git diff --check -- ios-native/Config/MegrumNative.xcconfig ios-native/Config/MegrumNative.local.xcconfig.example notes/76_zenn_web_service_prelaunch_checklist.md notes/17_legal_alignment.md notes/37_public_url_publication_checklist.md notes/59_initial_release_scope_exposure_audit.md notes/27_app_privacy_data_inventory.md notes/44_privacy_manifest_sdk_audit.md notes/48_external_service_vendor_register.md notes/46_app_store_questionnaire_answer_sheet.md notes/43_app_privacy_connect_answer_sheet.md notes/24_app_store_submission_pack.md`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-zenn-iap-build`
+  - passed
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -configuration Release -showBuildSettings | rg '(^    (MEGRUM_PLUS_IAP_ENABLED|MEGRUM_ADS_ENABLED|MEGRUM_ADMOB_TEST_ADS_ENABLED|PRODUCT_BUNDLE_IDENTIFIER) =)'`
+  - passed（Release: `MEGRUM_PLUS_IAP_ENABLED=NO`、`MEGRUM_ADS_ENABLED=NO`、`MEGRUM_ADMOB_TEST_ADS_ENABLED=NO`）
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild-zenn-iap-config CODE_SIGNING_ALLOWED=NO build`
+  - passed
+- `git diff --check -- ios-native/Sources/MegrumApp/MegrumPlusRuntimeConfiguration.swift ios-native/Sources/MegrumApp/SubscriptionSettingsScreen.swift ios-native/Sources/MegrumApp/SubscriptionSettingsContent.swift ios-native/App/Info.plist ios-native/Config/MegrumNative.xcconfig ios-native/Config/MegrumNative.local.xcconfig.example ios-native/Tests/MegrumAppTests/SettingsScreenTests.swift`
+  - passed
+
+### セルフレビュー結果
+- ✅ Zennチェックリストから、コードで安全に対策できるWebヘッダー、no-store、Web認証callbackの戻り先正規化、法務URL alias、404を先に反映した。
+- ✅ Web認証actionの未知エラーは、Supabase内部messageをそのまま画面表示しない固定文言に寄せた。
+- ✅ OpenAI/APNs系Edge Functionの外部レスポンス本文を、クライアント向けHTTPレスポンスへ流さないようにした。
+- ✅ Google Lensへ画像又は画像URLを送る可視導線は、外部送信前にユーザーが確認できるようにした。
+- ✅ Native認証の未知Supabase error messageと登録済みメール表示は、ユーザー向け固定文言へ丸めた。
+- ✅ AdMobは初回提出で誤ってSDK初期化や広告リクエストが発生しないよう、チェックイン既定を広告OFF/ID空/test ads OFFへ寄せた。
+- ✅ Megrum Plus IAPは初回提出で誤って購入/復元やStoreKit商品照会が発生しないよう、チェックイン既定をIAP OFFへ寄せた。
+- ✅ `meguri-board-media` のStorage selectは、認証済み全体から表示可能掲示板content紐づきへ縮小した。
+- ✅ 退会申請RPC成功時に、未失効の通知deviceを配送対象から外すようにした。
+- ✅ 法務本文、AdMob/ATT、OpenAI系UI露出判断、Storage本番適用確認、backup、2FA、DNSなど、外部設定やowner判断が必要な項目は完了扱いにせずNo-Go/要確認として残した。
+- ✅ iOSアプリの取引状態、通知、課金、登録/保存フローは変更していない。
+- ✅ 既存の未コミット変更は戻していない。
+
+## イテレーション1226.264：search結果 native ad の attribution を強化
+
+### 背景・問題意識
+
+AdMob native ad validator で `Ad attribution missing` が出ていた。Google の checklist では attribution badge と AdChoices overlay が必須で、attribution は `"Ad"`, `"Advertisement"`, `"Sponsored"` のように明示的に表示される必要がある。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/AdNativeUIKitBridge.swift`
+- native ad の attribution ラベルを `広告` から `Ad` に変更した。
+- ラベルの表示幅を見直し、カード左上に独立した badge として見えやすくした。
+- `AdChoicesView` を右上の白い小さな container に包み、背景に埋もれにくい見た目へ寄せた。
+- 既存の `AdChoicesView` と native ad view の接続はそのまま維持した。
+
+### 影響範囲
+
+- search 結果の native ad card の見た目のみ。
+- ad placement、表示条件、ロード条件、検索結果の並び順、DB、認証、通知、取引状態は変更していない。
+
+### 確認方法
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild-admob-fix CODE_SIGNING_ALLOWED=NO build`
+  - passed
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild-admob-fix-2 CODE_SIGNING_ALLOWED=NO build`
+  - passed
+- `xcrun simctl launch --terminate-running-process booted tokyo.megrum.native.preview`
+  - passed
+- `xcrun simctl io booted screenshot /tmp/megrum-simshots/megrum-home-preview.png`
+  - passed（Simulator 起動後のホーム画面を確認）
+
+### セルフレビュー結果
+- ✅ Google の native ad checklist に合わせて attribution 表記を英語の badge に寄せた。
+- ✅ `AdChoices` の視認性を上げるため、右上に独立した container を追加した。
+- ✅ 既存の native ad view の接続や表示条件は壊していない。
+- ⚠️ 現在のデスクトップでは Simulator ウィンドウを前面化できず、検索結果画面の ad card までの UI 再確認はできなかった。Simulator の起動自体とビルド成功は確認済み。
+
+## イテレーション1226.263：めぐりメッセージをグルーム起点ごとに分離
+
+### 背景・問題意識
+
+めぐりメッセージ一覧は相手ユーザー単位で1スレッドに束ねていたため、同じ相手と別グルーム起点でやり取りしても1件のチャットに畳まれていた。これにより「めぐりでチャットが2件できない」ように見え、既読も相手単位でまとめて付いてしまっていた。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MeguriMessageReadStateReducer.swift`
+- 会話キーを `peerID + sourceGroomPostID` に拡張し、同じ相手でも別グルーム起点なら別スレッドとして集計するようにした。
+- 未返信件数、未読判定、既読反映も同じ会話キー単位へ揃えた。
+
+#### `ios-native/Sources/MegrumApp/MeguriMessageViews.swift`
+- めぐりメッセージ詳細は peer 単位ではなく会話スコープ付きルートで開くようにした。
+- 一覧行にグルーム起点のコンテキストピルを追加し、同じ相手の複数チャットを見分けやすくした。
+- 会話内から送る追加入力も、開いているグルーム起点を保持して同じ会話へ積み上がるようにした。
+
+#### `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+#### `ios-native/Sources/MegrumApp/MegrumAppStateMeguriMessageActions.swift`
+#### `ios-native/Sources/MegrumApp/MegrumAuthenticatedTabContentView.swift`
+- 会話キー単位のメッセージ取得 helper を追加した。
+- 既読更新は「会話単位」と「相手全体」の両モードを持てるようにして、一覧から開いた会話だけを既読にできるようにした。
+- 一覧から開くメッセージ詳細ルートへ `sourceGroomPostID` を渡すようにした。
+
+#### `ios-native/Sources/MegrumApp/MegrumRepository.swift`
+#### `ios-native/Sources/MegrumApp/PreviewMegrumRepositoryMeguri.swift`
+#### `ios-native/Sources/MegrumApp/SupabaseMegrumRepositoryMeguri.swift`
+#### `ios-native/Sources/MegrumData/SupabaseMeguriMessageClient.swift`
+- 既読更新APIに `sourceGroomPostID` と「全ソース対象か」の指定を足し、会話単位の既読PATCHを組めるようにした。
+
+#### `ios-native/Sources/MegrumApp/NativePreviewMeguriData.swift`
+- 同じ相手から別グルーム起点で届く2件目の preview メッセージを追加し、Simulator で複数チャット表示を確認できるようにした。
+
+#### `ios-native/Tests/MegrumAppTests/MeguriMessageReadStateReducerTests.swift`
+#### `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+#### `ios-native/Tests/MegrumDataTests/SupabaseMeguriMessageClientTests.swift`
+- 同一 peer の別グルーム会話が2スレッドに分かれること、既読が対象会話だけへ付くこと、REST request に `source_groom_post_id` 条件が付くことを追加した。
+
+### 影響範囲
+
+- めぐりメッセージ一覧、未返信バッジ、めぐりメッセージ詳細、既読更新に影響する。
+- チャットルーム作成、グルーム投稿、DB schema、認証、通知、課金、取引状態、ユーザー表示文言の文面は変更していない。
+- 状態遷移・用語・データモデルの定義変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` は更新不要。
+
+### 確認方法
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1 --filter 'MeguriMessageReadStateReducerTests|MegrumAppStateTests/testAppStateMarksPreviewMeguriMessagesRead|SupabaseMeguriMessageClientTests'`
+  - passed（22 tests）
+
+### セルフレビュー結果
+- ✅ 同じ相手でも別グルーム起点なら、一覧上は別チャットとして並ぶ。
+- ✅ 一覧から開いた会話の送信・既読は、その会話の `source_groom_post_id` を維持する。
+- ✅ プロフィール導線や通知導線のような「相手全体」を開く経路は残している。
+- ✅ 既存の未コミット変更は戻していない。
+
+---
+
+## イテレーション1226.262：完了済み取引の評価待ち表示補正
+
+### 背景・問題意識
+
+やり取り一覧の完了済みタブで、自分が評価送信済みの取引にも「評価待ち」バッジが出ることがあった。評価送信直後にローカルの評価完了通知を追加していても、その後のメッセージ再取得でサーバ側の system message がまだ返らない場合、一覧側の評価待ち判定材料が失われるため。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/TradeMessageStateReducer.swift`
+- サーバ再取得メッセージに自分の評価完了通知が含まれない場合だけ、既存ローカルの自分の評価完了通知を保持する helper を追加した。
+- サーバ側に自分の評価完了通知が返ってきた場合はローカル通知を重複保持しないようにした。
+
+#### `ios-native/Sources/MegrumApp/MegrumAppStateTradeMessageActions.swift`
+- `loadMessages` の置き換え時に、上記 helper を通した表示用メッセージを保存し、既読位置計算にも同じ配列を使うようにした。
+
+#### `ios-native/Tests/MegrumAppTests/TradeMessageStateReducerTests.swift`
+- 評価送信済みのローカル通知が再取得で欠けても保持されること、サーバ通知が返った後は重複しないことを追加した。
+
+#### `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- Preview の評価送信後に `loadMessages` しても評価完了通知が残ることを確認した。
+
+### 影響範囲
+
+- 完了済み取引の一覧カード右上「評価待ち」バッジ、完了済みタブの評価待ち件数、評価待ち優先並びに影響する。
+- 評価保存API、取引状態、DB schema、通知、認証、課金、ナビゲーション、ユーザー表示文言は変更していない。
+- 状態遷移・用語・データモデルの定義変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` は更新不要。
+
+### 確認方法
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-trade-evaluation-badge --enable-xctest --disable-swift-testing -j 1 --filter 'TradeMessageStateReducerTests|TradeChatAffordanceTests/testEvaluationAttentionRequiresSettledCompletedTradeAndMissingViewerEvaluation|TradeChatAffordanceTests/testTradeCardPresentationMarksSettledCompletedTradeAsEvaluationAttention|TradeChatAffordanceTests/testTradeListOrderingPrioritizesCompletedEvaluationAttention|MegrumAppStateTests/testAppStateAddsEvidenceApprovesAndSubmitsPreviewEvaluation'`
+  - passed（11 tests）
+
+### セルフレビュー結果
+- ✅ 自分が評価送信済みの場合は、メッセージ再取得後も評価完了通知が消えず、既存の `TradeEvaluationAttentionPolicy` が「評価待ちではない」と判定できる。
+- ✅ サーバ側の評価完了通知が取得できる状態では、ローカル通知を重複表示しない。
+- ✅ 通常メッセージの置き換え、他取引のメッセージ bucket、評価保存順序、DB/API 境界は変更していない。
+- ✅ 既存の未コミット変更は戻していない。
+
+---
+
+## イテレーション1226.261：グルーム編集UIと掲示板チャット幅調整
+
+### 背景・問題意識
+
+グルーム編集中のテキスト追加操作で、右上の文字アイコン、左寄せの入力プレビュー、下部の文字サイズスライダー、削除ターゲットの大きな説明表示がストーリー編集体験として重く見えていた。また、編集後の投稿画像が大きくなりすぎて投稿失敗につながる可能性があり、オープンチャットの吹き出し幅も本文量に合っていなかった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/GroomStoryEditorView.swift`
+- 右上の `Aa` ボタンを外し、テキスト追加は写真タップで始める形に整理した。
+- 左上の閉じるボタンを画面左上寄りへ移動し、投稿矢印を右端寄りにした。
+- テキスト入力中のプレビューを中央寄せにし、文字サイズ操作を左側の縦三角スライダーへ移した。
+- 下部の横スライダーを廃止し、色選択だけを下部ツールバーとして残した。
+- ドラッグ削除ターゲットの説明文を外し、ゴミ箱アイコンを小さく下寄りにした。
+
+#### `ios-native/Sources/MegrumApp/GroomStoryPhotoCanvas.swift`
+- グルーム上のテキスト表示を中央揃えにし、長文が画面内で折り返しやすい幅に調整した。
+
+#### `ios-native/Sources/MegrumApp/GroomStoryComposerViews.swift`
+- 編集画面の左上ボタンは地図へ戻さず、写真選択ステップへ戻るようにした。
+
+#### `ios-native/Sources/MegrumApp/GroomStoryExportRenderer.swift`
+- 投稿用に書き出した JPEG を段階的に圧縮し、アップロード上限を超えにくくした。
+
+#### `ios-native/Sources/MegrumApp/BoardThreadDetailReplyViews.swift`
+- オープンチャットのテキストだけの吹き出しを `ViewThatFits` で短文は短い幅、長文は最大幅で折り返す表示にした。
+- 時刻表示は既存の吹き出し横 HStack に残し、吹き出し幅変更後も時刻が離れない構造を維持した。
+
+#### `ios-native/Tests/MegrumAppTests/MeguriAccessPolicyTests.swift`
+- グルーム投稿画像の書き出し予算が Supabase 側のアップロード上限を下回ることをテストで固定した。
+
+### 影響範囲
+
+- グルーム写真編集、グルーム投稿画像生成、めぐりのオープンチャット表示に影響する。
+- DB schema、API contract、認証、通知、課金、取引状態には触れていない。
+- 用語・状態遷移・データモデルの定義変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` は更新不要。
+
+### 確認方法
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-groom-editor-chat --enable-xctest --disable-swift-testing -j 1 --filter 'MeguriAccessPolicyTests|BoardThreadDetailPresentationTests|SupabaseGroomClientTests'`
+  - passed（51 tests）
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'platform=iOS Simulator,id=C70DDDBB-2602-49E0-8F95-1F043BCCED76' -derivedDataPath /tmp/megrum-native-groom-editor-chat-sim-build CODE_SIGNING_ALLOWED=NO ONLY_ACTIVE_ARCH=YES build`
+  - passed
+- `xcrun simctl install C70DDDBB-2602-49E0-8F95-1F043BCCED76 /tmp/megrum-native-groom-editor-chat-sim-build/Build/Products/Debug-iphonesimulator/MegrumNative.app`
+  - passed
+- `xcrun simctl launch C70DDDBB-2602-49E0-8F95-1F043BCCED76 tokyo.megrum.native.preview`
+  - passed
+- `git diff --check -- ios-native/Sources/MegrumApp/GroomStoryEditorView.swift ios-native/Sources/MegrumApp/GroomStoryPhotoCanvas.swift ios-native/Sources/MegrumApp/GroomStoryComposerViews.swift ios-native/Sources/MegrumApp/GroomStoryExportRenderer.swift ios-native/Sources/MegrumApp/BoardThreadDetailReplyViews.swift`
+  - passed
+
+### セルフレビュー結果
+- ✅ テキスト編集UIは見た目と操作配置の変更に留め、投稿前メタデータ設定や位置条件の判定は維持した。
+- ✅ 投稿画像の圧縮はクライアント側の書き出し品質調整に限定し、Storage/API の契約は変えていない。
+- ✅ オープンチャットの時刻表示は既存の左右配置を残し、吹き出し幅だけを本文量に合わせた。
+- ✅ Simulator には反映済み。実ログイン/実投稿まではローカルの Simulator セッションがログイン状態でないため未実施。
+- ✅ 既存の未コミット変更は戻していない。
+
+---
+
+## イテレーション1226.260：下端フッター位置とホーム更新判定
+
+### 背景・問題意識
+
+iOS の下端安全領域付近で、メインタブバーや各画面の下部操作が一部隠れて見える状態があった。また、ホーム画面の引っぱり更新が通常のスワイプでも走りやすく、個別募集一覧と同じように「先頭で一定以上引っぱった時だけ更新」に寄せる必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MegrumTabBarAppearance.swift`
+- メインタブバーのラベルとアイコンを少し上へ寄せる共通メトリクスを追加した。
+
+#### `ios-native/Sources/MegrumApp/FloatingActionLayoutMetrics.swift`
+- マイグッズ/ウィッシュ/個別募集などの浮遊ボタン、検索下部余白、クイックアクションの下部余白を少し上げた。
+
+#### `ios-native/Sources/MegrumApp/GoodsGridPresentation.swift`
+- マイグッズ/ウィッシュの複数選択フッター下部余白を増やし、下端に重なりにくくした。
+
+#### `ios-native/Sources/MegrumApp/MeguriHomeChromeViews.swift`
+- めぐりホーム左下の現在地、メッセージ、グルームアーカイブの縦並びをフッター上に収まるように持ち上げた。
+
+#### `ios-native/Sources/MegrumApp/TradesScreen.swift`
+- やりとり一覧の打診中/進行中/完了済みフッターを少し上げた。
+
+#### `ios-native/Sources/MegrumApp/HomePullRefreshViews.swift` / `ios-native/Sources/MegrumApp/HomePullRefreshPresentationState.swift`
+- ホーム独自の手動Drag更新判定を外し、SwiftUI 標準の `.refreshable` による先頭引っぱり更新へ寄せた。
+- 更新完了時にインジケータの進捗オフセットをリセットするようにした。
+
+#### `ios-native/Tests/MegrumAppTests/HomeScreenFlowTests.swift` / `ios-native/Tests/MegrumAppTests/GoodsGridLayoutTests.swift` / `ios-native/Tests/MegrumAppTests/MeguriAccessPolicyTests.swift` / `ios-native/Tests/MegrumAppTests/MegrumTabBarAppearanceTests.swift`
+- 下端配置メトリクスとホーム更新表示状態の期待値を更新した。
+
+### 影響範囲
+
+- ホーム、やりとり一覧、めぐりホーム、マイグッズ、ウィッシュ、個別募集一覧の下端付近の表示位置に影響する。
+- ホームの更新ジェスチャーは標準 `.refreshable` の先頭引っぱり挙動に寄せた。
+- 保存処理、DB/API、認証、通知、課金、取引状態、ユーザー表示文言には触れていない。
+- 状態遷移・用語・データモデルの変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` は更新不要。
+
+### 確認方法
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-footer-refresh --enable-xctest --disable-swift-testing -j 1 --filter 'HomeScreenFlowTests|MeguriAccessPolicyTests|GoodsGridLayoutTests|MegrumTabBarAppearanceTests'`
+  - passed（118 tests）
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'platform=iOS Simulator,id=C70DDDBB-2602-49E0-8F95-1F043BCCED76' -derivedDataPath /tmp/megrum-native-footer-refresh-sim-build CODE_SIGNING_ALLOWED=NO ONLY_ACTIVE_ARCH=YES build`
+  - passed
+- `git diff --check`
+  - passed
+
+### セルフレビュー結果
+- ✅ 下端の表示調整は既存の共通メトリクスに寄せ、画面ごとの個別ずらしを増やさないようにした。
+- ✅ ホーム更新は個別募集一覧と同じ標準 `.refreshable` を主に使い、通常スワイプでの手動更新判定を外した。
+- ✅ タブ構成、ナビゲーション、保存順序、DB/API境界、通知、認証、課金、取引状態は変更していない。
+- ✅ 既存の未コミット変更は戻していない。
+
+---
+
+## イテレーション1226.259：グルーム編集画面の全面化と文字操作
+
+### 背景・問題意識
+
+グルーム写真選択後の編集画面で、キャンバス外の上下に黒い余白が残り、投稿矢印やテキスト操作がストーリー編集画面として画面端に寄っていなかった。また、作成済みテキストの再編集、文字サイズ変更、二本指回転、削除ターゲットの見え方を整える必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/GroomStoryEditorView.swift`
+- 編集キャンバスを画面全面に広げ、角丸フレームと外側余白を外した。
+- 閉じる/Aa/投稿矢印を安全領域内の画面隅へ配置し、投稿矢印を右下の全画面編集面に出るようにした。
+- テキスト入力時のツールバーへ文字サイズスライダーを追加し、作成済みテキストをタップして再編集できるようにした。
+- 既存のドラッグ移動/ピンチ拡大縮小に加えて、二本指回転で文字角度を変更できるようにした。
+- ドラッグ削除ターゲットを下側へ寄せ、表示領域を小さくした。
+
+#### `ios-native/Sources/MegrumApp/GroomStoryPhotoCanvas.swift`
+- 写真キャンバスを GeometryReader で親サイズに合わせ、背景ぼかしと前面写真が画面全面のキャンバス内で描画されるようにした。
+- テキストオーバーレイの回転角を表示・書き出し双方で反映するようにした。
+
+#### `ios-native/Sources/MegrumApp/GroomStoryTextOverlay.swift`
+- テキストオーバーレイに回転角を保持する `rotationDegrees` を追加した。
+
+### 影響範囲
+
+- グルーム写真編集、テキスト追加/再編集、編集済みグルーム画像の書き出しに影響する。
+- 投稿保存、位置情報、トピック/シリーズ設定、DB/API、通知、認証、課金、取引状態には触れていない。
+- 状態遷移・用語・DBデータモデルの変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` は更新不要。
+
+### 確認方法
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-groom-editor-build`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-groom-editor-tests --enable-xctest --disable-swift-testing -j 1 --filter 'MeguriAccessPolicyTests|GroomViewerPresentationTests|GroomPostLocalMutationTests|GroomInteractionStateReducerTests'`
+  - passed（44 tests）
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild-groom-editor CODE_SIGNING_ALLOWED=NO build`
+  - passed
+- Simulator `C70DDDBB-2602-49E0-8F95-1F043BCCED76` に install/launch
+  - passed（Visual QA preview auth で `meguri` 起動）
+- `git diff --check`
+  - passed
+
+### セルフレビュー結果
+- ✅ 編集キャンバスと写真描画は全面化し、操作ボタンは安全領域を見て配置した。
+- ✅ テキストの追加、再編集、色変更、サイズ変更、移動、拡大縮小、回転、削除は同じ `GroomStoryTextOverlay` 状態で扱うようにした。
+- ✅ 書き出し側も同じ表示部品を使うため、回転角が投稿画像へ反映される。
+- ✅ 保存順序、投稿payload、位置情報ガード、トピック/シリーズ保存、DB/API境界は変更していない。
+- ✅ 既存の未コミット変更は戻していない。
+
+---
+
+## イテレーション1226.258：めぐりトピックと保存不具合修正
+
+### 背景・問題意識
+
+グルーム/チャットルーム/めぐりフィルターの分類UIで「推し」表記が残り、トピック側の検索入力もシリーズ側と揃っていなかった。また、グルーム投稿・チャットルーム作成・めぐりプロフィール保存で、位置情報や1ヶ月ロック判定によりボタン押下後に保存できないケースがあった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MeguriContentMetadataFields.swift` / `ios-native/Sources/MegrumApp/MeguriContentMetadataSuggestions.swift`
+- めぐり内の分類名を「トピック」に変更し、「これ以外のトピックから選ぶ」押下時にトピック検索入力を出すようにした。
+- トピック検索候補を pure helper に分離し、シリーズ検索と同じ絞り込み挙動にした。
+
+#### `ios-native/Sources/MegrumApp/GroomStoryComposerViews.swift` / `ios-native/Sources/MegrumApp/MeguriScreenGroomActions.swift`
+- グルーム投稿のメタデータポップアップ名を「トピックとシリーズ」に変更した。
+- 固定ピンから投稿する場合、現在地取得待ちだけで投稿が止まらないように、選択済み座標を有効座標として扱うようにした。
+
+#### `ios-native/Sources/MegrumApp/MeguriBoardComposerViews.swift` / `ios-native/Sources/MegrumApp/MeguriBoardComposerActions.swift` / `ios-native/Sources/MegrumApp/MeguriBoardComposerDerivedState.swift`
+- チャットルーム作成の主ボタンを、本文入力が揃えば押せるようにした。
+- 固定作成地点やフォールバック座標がある場合は、現在地未取得でも作成可否判定に使えるようにした。
+
+#### `ios-native/Sources/MegrumApp/MeguriProfileSettingsSheet.swift` / `ios-native/Sources/MegrumApp/MeguriProfileSettingsDraftState.swift` / `ios-native/Sources/MegrumCore/MeguriProfileModels.swift`
+- グッズ交換プロフィール同期ONで保存する時、めぐり側の既存表示名・アイコン値を保持し、同期トグルだけの保存が1ヶ月ロックに誤判定されないようにした。
+- めぐりプロフィールの1ヶ月変更制限を表示名変更だけに限定し、アイコン変更と公開プロフィール同期切り替えは保存できるようにした。
+
+#### `supabase/migrations/20260701030000_relax_meguri_profile_avatar_lock.sql`
+- `set_meguri_profile_for_viewer` のロック判定を表示名変更だけに限定し、アイコン変更・`uses_public_profile` 切り替えでは `last_changed_at` を更新しないようにした。
+
+#### `ios-native/Sources/MegrumApp/MeguriHomeChromeViews.swift` / `ios-native/Sources/MegrumApp/HomeDiscoveryExperience.swift` / `ios-native/Sources/MegrumApp/HomeDiscoveryExperienceChrome.swift`
+- めぐり左下の位置情報・メッセージ・グルームアーカイブ操作列をフッター上に見える余白へ再調整した。
+- ホームの「相互マッチ（ベータ版）」タブ切り替え表示を非表示にし、マッチ候補だけを表示する構成にした。相互マッチ関連コード自体は残した。
+
+#### `ios-native/Tests/MegrumAppTests/MeguriAccessPolicyTests.swift` / `ios-native/Tests/MegrumCoreTests/MeguriProfileValidationTests.swift` / `ios-native/Tests/MegrumAppTests/HomeScreenFlowTests.swift`
+- トピック検索候補、左下操作列の余白、公開プロフィール同期保存値、アイコン変更のロック対象外化、ホーム表示タブの非表示化をテストで固定した。
+
+### 影響範囲
+
+- グルーム投稿、チャットルーム作成、めぐりフィルター、めぐりプロフィール保存、めぐりホーム左下操作列、ホームのマッチ候補表示に影響する。
+- `groom_posts` / `meguri_board_threads` の既存 `group_id` / `character_id` / `series_name` 保存面は維持した。
+- プロフィール保存RPCの制限だけ変更し、表示名の1ヶ月変更制限は維持した。アイコン変更・公開プロフィール同期トグルは制限対象外にした。
+- 状態遷移に新規追加はないため `notes/09_state_machines.md` は更新不要。用語とデータモデルの意味が変わったため `notes/10_glossary.md` と `notes/05_data_model.md` は更新した。
+
+### 確認方法
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-meguri-topic-post-profile --enable-xctest --disable-swift-testing -j 1 --filter 'MeguriAccessPolicyTests|MeguriProfileValidationTests|HomeScreenFlowTests|SupabaseGroomClientTests|SupabaseBoardClientTests|SupabaseMeguriProfileClientTests'`
+  - passed（116 tests）
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'platform=iOS Simulator,id=C70DDDBB-2602-49E0-8F95-1F043BCCED76' -derivedDataPath /tmp/megrum-native-xcodebuild-meguri-topic-fixes CODE_SIGNING_ALLOWED=NO build`
+  - passed
+- Simulator `C70DDDBB-2602-49E0-8F95-1F043BCCED76` に install/launch し、Visual QA で `meguri` / `home` / `meguri-profile-settings` を確認
+  - めぐり左下操作列、フィルターの「トピック」表記と検索入力、ホームの相互マッチタブ非表示、プロフィール保存・同期トグルON保存を確認
+
+### セルフレビュー結果
+- ✅ めぐり内UIでの分類名をトピックへ揃え、内部の推し/シリーズデータ構造は維持した。
+- ✅ グルーム投稿・チャットルーム作成の保存payloadは既存フィールドを使い、位置情報ガードだけを実作成地点に合わせて調整した。
+- ✅ 表示名の1ヶ月制限は維持し、アイコン変更と公開プロフィール同期だけ保存できるようにした。
+- ✅ 通知、認証、課金、取引状態、グッズ交換側の保存処理には触れていない。
+- ✅ 既存の未コミット変更は戻していない。
+
+---
+
+## イテレーション1226.257：グルーム削除と右下操作整理
+
+### 背景・問題意識
+
+自分のグルーム閲覧時に削除導線がなく、グルームアーカイブ側でも同じ操作ができない状態だった。また、グルーム閲覧のいいね数・コメント数が横並びで、右下操作との役割が分かりにくかったため、自分の投稿と他人の投稿で右下操作を整理する必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/GroomViewerChromeViews.swift`
+- いいね数・コメント数を縦に並べる `GroomViewerEngagementColumn` を追加し、他人のグルームでは左に返信入力、右下にいいねボタン、その上に反応数が積まれる構成にした。
+- 自分のグルーム用に `GroomViewerOwnerBottomControls` を追加し、右下の点点点メニューから「削除する」を選べるようにした。
+
+#### `ios-native/Sources/MegrumApp/GroomViewerScreen.swift` / `ios-native/Sources/MegrumApp/GroomArchiveStoryViews.swift`
+- 自分のグルーム表示とグルームアーカイブ表示に削除確認を追加し、削除成功時は閲覧画面を閉じるようにした。
+- 他人のグルームでは既存の返信入力といいね操作を維持し、右下の点点点は出さないようにした。
+
+#### `ios-native/Sources/MegrumApp/MegrumAppStateGroomActions.swift` / `ios-native/Sources/MegrumApp/GroomPostLocalMutation.swift`
+- 自分の投稿だけを削除できる `deleteOwnGroom(_:)` を追加し、めぐりホーム、地図上の投稿、グルームアーカイブ、反応キャッシュから対象投稿を楽観的に除外するようにした。
+- 失敗時は削除前の表示状態と反応キャッシュを戻し、削除エラーを表示するようにした。
+
+#### `ios-native/Sources/MegrumApp/MegrumRepository.swift` / `ios-native/Sources/MegrumApp/SupabaseMegrumRepositoryMeguri.swift`
+- グルーム削除を repository 境界に追加し、Supabase 実装ではログイン中ユーザー本人の投稿だけを対象にした。
+
+#### `ios-native/Sources/MegrumData/SupabaseGroomClient.swift` / `ios-native/Sources/MegrumData/SupabaseGroomClientRequests.swift` / `ios-native/Sources/MegrumData/SupabaseGroomPayloads.swift` / `ios-native/Sources/MegrumData/SupabaseGroomRows.swift`
+- 物理削除ではなく、既存の `hidden` 状態へ PATCH する削除リクエストを追加した。
+
+#### `ios-native/Tests/MegrumAppTests/GroomPostLocalMutationTests.swift` / `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift` / `ios-native/Tests/MegrumDataTests/SupabaseGroomClientTests.swift`
+- 対象投稿だけを除外する pure mutation、AppState の楽観削除、Supabase の `hidden` PATCH リクエストをテストで固定した。
+
+### 影響範囲
+
+- グルーム閲覧、グルームアーカイブ閲覧、自分のグルーム削除、グルーム右下の反応表示に影響する。
+- 削除は既存の `hidden` 状態を使う論理削除で、DB schema は変更していない。
+- グルーム返信入力、他人のグルームのいいね、グルーム返信からめぐりメッセージへつなぐ導線は維持した。
+- `published --> hidden` の状態遷移は `notes/09_state_machines.md` に既に記載済みのため更新不要。新用語とデータモデル追加もないため、`notes/10_glossary.md`、`notes/05_data_model.md` も更新不要と判断した。
+
+### 確認方法
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-groom-delete-actions --enable-xctest --disable-swift-testing -j 1 --filter 'GroomPostLocalMutationTests|MegrumAppStateTests/testAppStateDeletesOwnGroomFromVisibleCollectionsAndEngagementCaches|SupabaseGroomClientTests/testBuildsDeleteGroomPostRequestAsHiddenStatusPatch|GroomViewerPresentationTests|MeguriAccessPolicyTests'`
+  - passed（38 tests）
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild-groom-delete-actions CODE_SIGNING_ALLOWED=NO build`
+  - passed
+
+### セルフレビュー結果
+- ✅ 自分のグルーム削除は本人投稿だけを対象にし、既存の `hidden` 状態へ寄せた。
+- ✅ グルーム閲覧とアーカイブ閲覧の削除導線を揃えた。
+- ✅ 他人のグルームでは返信入力といいね操作を維持し、右下の点点点は表示しない。
+- ✅ DB schema、認証、通知、課金、取引状態、グッズ交換側の保存処理、ユーザー表示文言には触れていない。
+- ✅ 既存の未コミット変更は戻していない。
+
+---
+
+## イテレーション1226.256：グルーム表示とめぐり分類導線調整
+
+### 背景・問題意識
+
+グルーム閲覧時に上下の白い領域が残り、ユーザー情報と閉じるボタンの背後にも不要な半透明黒背景が出ていた。加えて、グルームをピン位置から開閉する没入表示、めぐりホーム左下操作列のフッター直上配置、グルーム/チャットルーム/フィルターでの推し・シリーズ選択、チャットルーム作成の最終ボタン導線を整える必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/GroomViewerImmersivePresentationChrome.swift`
+- グルーム閲覧オーバーレイに `sourceAnchor` を渡し、表示時は元ピン側から拡大、閉じる時は同じ方向へ縮小しながらフェードする transition にした。
+
+#### `ios-native/Sources/MegrumApp/MegrumAuthenticatedTabContentView.swift`
+- めぐり側のグルーム閲覧中は背景を黒で全画面に敷き、上下の白い領域が出ないようにした。
+
+#### `ios-native/Sources/MegrumApp/GroomViewerChromeViews.swift`
+- グルーム閲覧のユーザー情報、メニュー、閉じるボタンから不要な半透明黒背景を外した。
+
+#### `ios-native/Sources/MegrumApp/MeguriHomeChromeViews.swift`
+- 左下の位置情報、メッセージ、グルームアーカイブ操作列をフッター直上へ寄せ、グルームアーカイブが隠れない余白に調整した。
+
+#### `ios-native/Sources/MegrumApp/MeguriContentMetadataSuggestions.swift`
+- 自分の推し、選択済み推しに紐づくメンバー・キャラクター、マイグッズ/ウィッシュ由来のシリーズ候補、検索候補の生成を共通の pure helper に分離した。
+
+#### `ios-native/Sources/MegrumApp/MeguriContentMetadataFields.swift`
+- 推し・シリーズ入力を、自分の推し候補、その他候補、グループや作品選択時のみのメンバー・キャラクター、シリーズ候補と検索入力の構成にした。
+
+#### `ios-native/Sources/MegrumApp/GroomStoryComposerViews.swift` / `ios-native/Sources/MegrumApp/MeguriGroomPresentationModifiers.swift`
+- グルーム投稿時に推し・シリーズ設定ポップアップを挟み、投稿時に `MeguriContentMetadataDraft` を保存処理へ渡すようにした。
+
+#### `ios-native/Sources/MegrumApp/BoardThreadComposerContent.swift` / `ios-native/Sources/MegrumApp/MeguriBoardComposerViews.swift` / `ios-native/Sources/MegrumApp/MeguriBoardComposerActions.swift` / `ios-native/Sources/MegrumApp/MeguriBoardComposerDerivedState.swift`
+- チャットルーム作成画面に同じ推し・シリーズ入力を追加し、主ボタンを最初から「チャットルームを作成する」にして直接作成へ進むようにした。
+
+#### `ios-native/Sources/MegrumApp/MeguriScreen.swift`
+- めぐりホームのフィルターにも同じ推し・シリーズ選択データを渡すようにした。
+
+#### `ios-native/Tests/MegrumAppTests/MeguriAccessPolicyTests.swift`
+- 左下操作列がフッター直上に残る余白値を更新した。
+
+### 影響範囲
+
+- グルーム閲覧、グルーム投稿時の推し・シリーズ設定、チャットルーム作成、めぐりホームフィルター、めぐりホーム左下操作列に影響する。
+- DB schema と API contract は変更せず、既存の `groupID` / `characterID` / `seriesName` 保存面を利用した。
+- 状態遷移、用語、データモデルの新規追加はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` は更新不要と判断した。
+
+### 確認方法
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-meguri-groom-board-metadata --enable-xctest --disable-swift-testing -j 1 --filter 'MeguriAccessPolicyTests|GroomViewerPresentationTests|SupabaseBoardClientTests|SupabaseGroomClientTests'`
+  - passed（56 tests）
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild-meguri-groom-metadata CODE_SIGNING_ALLOWED=NO build`
+  - passed
+
+### セルフレビュー結果
+- ✅ グルーム閲覧の背景、上部クローム、開閉アニメーション、左下操作列、投稿/チャットルーム/フィルターの推し・シリーズ選択を対象内に限定して変更した。
+- ✅ チャットルーム作成は既存の作成処理へ直接進め、保存payloadの既存フィールドを利用する形にした。
+- ✅ DB schema、認証、通知、課金、取引状態、グッズ交換側の保存処理には触れていない。
+- ✅ 既存の未コミット変更は戻していない。
+
+---
+
+## イテレーション1226.255：打診現在地反映判定の純粋化
+
+### 背景・問題意識
+
+`ProposalCreateFlowActions.applyCurrentLocationToSelectedMeetupCandidate()` は、現地入力が必要か、現在地座標があるか、候補draftへ現在地を反映するかの判定を action 内に直接持っていた。待ち合わせ候補の表示・保存・送信payloadは変えず、現在地反映の可否判定だけをテスト可能な pure policy として分離する必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalMeetupPlaceDraftResolver.swift`
+- `ProposalMeetupCurrentLocationDraftResolver` を追加し、現地入力が必要で現在地座標がある場合だけ、現在地を反映した `ProposalMeetupCandidateDraft` を返すようにした。
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlowActions.swift`
+- `applyCurrentLocationToSelectedMeetupCandidate()` の条件分岐を resolver 呼び出しへ寄せ、action側は戻り値の反映だけを担当するようにした。
+
+#### `ios-native/Tests/MegrumAppTests/TradeRequestDraftProposalCreateFlowTests.swift`
+- 現地入力不要、座標なし、座標ありの既存挙動をテストで固定した。
+
+### 影響範囲
+
+- 打診作成フローの待ち合わせ候補への現在地反映判定に影響する。
+- UI、ユーザー表示文言、候補保存、送信payload、保存順序、API、DB、通知、認証、課金、取引状態は変更していない。
+- 状態遷移、用語、データモデルに変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` は更新不要と判断した。
+
+### 確認方法
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-current-location --enable-xctest --disable-swift-testing -j 1 --filter 'ProposalCreateFlowTests|TradeRequestDraftProposalCreateFlowTests'`
+  - passed（82 tests）
+
+### セルフレビュー結果
+- ✅ 現在地反映の可否判定だけを pure resolver へ移し、候補draftの反映処理と送信payloadは維持した。
+- ✅ 現地入力不要、座標なし、座標ありの既存挙動を対象テストで確認した。
+- ✅ UI、ナビゲーション、ユーザー表示文言、DB/API、通知、認証、課金、取引状態には触れていない。
+- ✅ 既存の未コミット変更は戻していない。
+
+---
+
+## イテレーション1226.254：打診戻るステップ解決の純粋化
+
+### 背景・問題意識
+
+`ProposalCreateFlowActions.previousStep()` は、現在ステップが表示対象に含まれるか、先頭ステップではないか、戻り先がどこかの判定を action 内に直接持っていた。打診作成フローの戻る操作、アニメーション、表示ステップ順は変えず、戻り先解決だけをテスト可能な pure policy として分離する必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateNavigationPolicy.swift`
+- `ProposalPreviousStepResolver` を追加し、現在ステップと表示ステップ配列から戻り先ステップまたは`nil`を返すようにした。
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlowActions.swift`
+- `previousStep()` の配列探索を resolver 呼び出しへ寄せ、action側は戻り先の反映とアニメーションだけを担当するようにした。
+
+#### `ios-native/Tests/MegrumAppTests/ProposalCreateFlowTests.swift`
+- 先頭ステップ、途中ステップ、確認ステップ、表示対象外ステップの既存挙動をテストで固定した。
+
+### 影響範囲
+
+- 打診作成フローの戻る操作の内部判定に影響する。
+- UI、ユーザー表示文言、表示ステップ順、送信payload、保存順序、API、DB、通知、認証、課金、取引状態は変更していない。
+- 状態遷移、用語、データモデルに変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` は更新不要と判断した。
+
+### 確認方法
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-prev-step --enable-xctest --disable-swift-testing -j 1 --filter 'ProposalCreateFlowTests|TradeRequestDraftProposalCreateFlowTests'`
+  - passed（81 tests）
+
+### セルフレビュー結果
+- ✅ 戻り先ステップの解決だけを pure resolver へ移し、戻る操作のアニメーションと表示順は維持した。
+- ✅ 先頭、途中、確認、表示対象外の既存挙動を対象テストで確認した。
+- ✅ UI、ナビゲーションの表示仕様、ユーザー表示文言、DB/API、通知、認証、課金、取引状態には触れていない。
+- ✅ 既存の未コミット変更は戻していない。
+
+---
+
+## イテレーション1226.253：めぐり左下操作列のフッター直上寄せ
+
+### 背景・問題意識
+
+めぐりホーム左側の位置情報・メッセージ・グルームアーカイブの縦位置が高く、フッター直上に並んで見えない状態だった。ボタンの種類、並び順、タップ挙動、バッジ表示は変えず、下端の余白だけをフッター直上へ寄せる必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MeguriHomeChromeViews.swift`
+- `MeguriHomeUtilityLayout.footerGap` を12ptに調整し、下からグルームアーカイブ・メッセージ・位置情報アイコンの順でフッター直上へ積まれるようにした。
+
+#### `ios-native/Tests/MegrumAppTests/MeguriAccessPolicyTests.swift`
+- 操作列の下余白計算を固定するテスト期待値を更新した。
+
+### 影響範囲
+
+- めぐりホーム左下の操作列の表示位置に影響する。
+- 位置情報、メッセージ一覧、グルームアーカイブのボタン順・タップ挙動、未読バッジ、フッター表示、ナビゲーション、DB/API、通知、認証、課金、取引状態、ユーザー表示文言は変更していない。
+- 状態遷移、用語、データモデルに変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` は更新不要と判断した。
+
+### 確認方法
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-meguri-left-controls-footer-tight --enable-xctest --disable-swift-testing -j 1 --filter 'MeguriAccessPolicyTests/testMeguriHomeUtilityLayoutKeepsControlsAboveTabBar'`
+  - passed
+
+### セルフレビュー結果
+- ✅ 操作列の下端位置のみを変更し、下からグルームアーカイブ・メッセージ・位置情報の順序は維持した。
+- ✅ DB/API、通知、認証、課金、取引状態、ユーザー表示文言には触れていない。
+- ✅ 既存の未コミット変更は戻していない。
+
+---
+
+## イテレーション1226.252：打診送信ステータス解決の純粋化
+
+### 背景・問題意識
+
+`ProposalCreateFlowActions.proposalSubmissionTargetStatus` は、送信可能か、デフォルトのtarget statusがあるか、上書きstatusを使うかの判定を action 内に直接持っていた。打診作成・再打診の送信処理、payload、保存順序は変えず、送信時のtarget status解決だけをテスト可能な pure policy として分離する必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalSubmissionTargetStatusResolver.swift`
+- 送信可否、デフォルトtarget status、上書きstatusから、送信に使うtarget statusまたは`nil`を返す pure resolver を追加した。
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlowActions.swift`
+- `proposalSubmissionTargetStatus` の分岐を resolver 呼び出しへ寄せ、action側は結果の受け取りだけを担当するようにした。
+
+#### `ios-native/Tests/MegrumAppTests/ProposalCreateFlowTests.swift`
+- 通常時、上書きあり、送信不可、デフォルトtargetなしの既存挙動をテストで固定した。
+
+### 影響範囲
+
+- 打診作成フローの送信時target status解決に関する内部判定に影響する。
+- UI、ユーザー表示文言、送信payload、保存順序、API、DB、通知、認証、課金、取引状態は変更していない。
+- 状態遷移、用語、データモデルに変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` は更新不要と判断した。
+
+### 確認方法
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-submission-status --enable-xctest --disable-swift-testing -j 1 --filter 'ProposalCreateFlowTests|TradeRequestDraftProposalCreateFlowTests'`
+  - passed（80 tests）
+
+### セルフレビュー結果
+- ✅ 送信時target statusの解決だけを pure resolver へ移し、打診送信・再打診送信のpayloadや保存順序は維持した。
+- ✅ 通常、上書き、送信不可、デフォルトtargetなしの既存挙動を対象テストで確認した。
+- ✅ UI、ナビゲーション、ユーザー表示文言、DB/API、通知、認証、課金、取引状態には触れていない。
+- ✅ 既存の未コミット変更は戻していない。
+
+---
+
+## イテレーション1226.251：打診初期ステップ適用判定の純粋化
+
+### 背景・問題意識
+
+`ProposalCreateFlowInitialStateActions.applyInitialStepIfNeeded()` は、初期表示したいステップが表示対象に含まれるか、前段階を進められるか、未完了なら後で再試行するかの判定を action 内に直接持っていた。打診作成フローの初期表示・ナビゲーション・送信payloadは変えず、初期ステップ適用判定だけをテスト可能な pure policy として分離する必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateNavigationPolicy.swift`
+- 初期ステップの解決結果を `ProposalInitialStepResolution` として追加した。
+- `ProposalInitialStepResolver` を追加し、初期ステップを適用する、非表示として消費する、前段階未完了で待つ、の3結果を返すようにした。
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlowInitialStateActions.swift`
+- 初期ステップ適用判定を resolver 呼び出しへ寄せ、action側は選択ステップの反映と one-shot flag 更新だけを担当するようにした。
+
+#### `ios-native/Tests/MegrumAppTests/ProposalCreateFlowTests.swift`
+- 前段階が進められる場合は初期ステップを適用し、前段階未完了なら待ち、表示対象外なら消費済みにする既存挙動をテストで固定した。
+
+### 影響範囲
+
+- 打診作成フローの初期表示ステップ適用に関する内部判定に影響する。
+- UI、ユーザー表示文言、送信payload、保存順序、API、DB、通知、認証、課金、取引状態は変更していない。
+- 状態遷移、用語、データモデルに変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` は更新不要と判断した。
+
+### 確認方法
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-initial-step --enable-xctest --disable-swift-testing -j 1 --filter 'ProposalCreateFlowTests|TradeRequestDraftProposalCreateFlowTests'`
+  - passed（79 tests）
+
+### セルフレビュー結果
+- ✅ 初期ステップの解決判定だけを pure policy へ移し、表示される初期ステップや再試行タイミングは維持した。
+- ✅ 初期ステップ適用、前段階未完了時の待機、非表示ステップの消費済み扱いを対象テストで確認した。
+- ✅ UI、ナビゲーション、ユーザー表示文言、DB/API、通知、認証、課金、取引状態には触れていない。
+- ✅ 既存の未コミット変更は戻していない。
+
+---
+
+## イテレーション1226.250：打診待ち合わせ初期値解決の純粋化
+
+### 背景・問題意識
+
+`ProposalCreateFlowInitialStateActions.seedDefaultMeetupConditionsIfNeeded()` は、個別募集由来の現地条件、デフォルト交換設定、viewer都道府県、相手都道府県の優先順位と日程補正を action 内に直接持っていた。打診作成画面の表示・入力状態・送信payloadは変えず、待ち合わせ初期値の解決だけをテスト可能な純粋ロジックとして分離する必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalMeetupConditionDraftResolver.swift`
+- 待ち合わせ都道府県、場所メモ、開始/終了時刻をまとめた `ProposalMeetupConditionDraft` と、既存の優先順位で初期値を返す pure resolver を追加した。
+- ローカル日程文字列を既存 `ProposalScheduleTextDateParser` で解釈し、既存どおり30分後を終了時刻として返すようにした。
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlowInitialStateActions.swift`
+- 待ち合わせ初期値の分岐を resolver 呼び出しへ寄せ、action側は戻り値の反映だけを担当するようにした。
+
+#### `ios-native/Tests/MegrumAppTests/ProposalCreateFlowTests.swift`
+- 個別募集由来の現地条件が最優先されること、viewer都道府県と相手都道府県のfallback、日程解析時の終了時刻補正をテストで固定した。
+
+### 影響範囲
+
+- 打診作成フローの初期表示時に待ち合わせ条件を埋める内部処理に影響する。
+- UI、ユーザー表示文言、送信payload、保存順序、API、DB、通知、認証、課金、取引状態は変更していない。
+- 状態遷移、用語、データモデルに変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` は更新不要と判断した。
+
+### 確認方法
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-meetup-defaults --enable-xctest --disable-swift-testing -j 1 --filter 'ProposalCreateFlowTests|TradeRequestDraftProposalCreateFlowTests'`
+  - passed（77 tests）
+
+### セルフレビュー結果
+- ✅ 待ち合わせ初期値の優先順位だけを pure resolver へ移し、画面表示や送信payloadは変更していない。
+- ✅ 個別募集由来、デフォルト交換設定、viewer都道府県、相手都道府県、日程解析時の30分終了補正を対象テストで確認した。
+- ✅ UI、ナビゲーション、ユーザー表示文言、DB/API、通知、認証、課金、取引状態には触れていない。
+- ✅ 既存の未コミット変更は戻していない。
+
+## イテレーション1226.249：打診送料初期値解決の純粋化
+
+### 背景・問題意識
+
+`ProposalCreateFlowInitialStateActions.seedDefaultShippingConditionsIfNeeded()` は、個別募集由来の送料条件、初期引数、デフォルト交換設定の優先順位を action 内に直接持っていた。打診作成画面の表示や送信payloadは変えず、送料初期値の解決だけをテスト可能な純粋ロジックとして分離する必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalShippingConditionDraftResolver.swift`
+- 送料負担と発送目安をまとめた `ProposalShippingConditionDraft` と、既存の優先順位で初期値を返す pure resolver を追加した。
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlowInitialStateActions.swift`
+- 送料初期値の分岐を resolver 呼び出しへ寄せ、action側は戻り値の反映だけを担当するようにした。
+
+#### `ios-native/Tests/MegrumAppTests/ProposalCreateFlowTests.swift`
+- 個別募集由来の送料条件が最優先されること、初期引数とデフォルト交換設定の補完順、郵送対象外時の既存fallbackをテストで固定した。
+
+### 影響範囲
+
+- 打診作成フローの初期表示時に送料負担・発送目安を埋める内部処理に影響する。
+- UI、ユーザー表示文言、送信payload、保存順序、API、DB、通知、認証、課金、取引状態は変更していない。
+- 状態遷移、用語、データモデルに変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` は更新不要と判断した。
+
+### 確認方法
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-shipping --enable-xctest --disable-swift-testing -j 1 --filter 'ProposalCreateFlowTests|TradeRequestDraftProposalCreateFlowTests'`
+  - passed（76 tests）
+
+### セルフレビュー結果
+- ✅ 送料初期値の優先順位だけを pure resolver へ移し、画面表示や送信payloadは変更していない。
+- ✅ 個別募集由来、初期引数、デフォルト交換設定、郵送対象外fallbackの既存挙動を対象テストで確認した。
+- ✅ UI、ナビゲーション、ユーザー表示文言、DB/API、通知、認証、課金、取引状態には触れていない。
+- ✅ 既存の未コミット変更は戻していない。
+
+## イテレーション1226.248：めぐり左下操作列のフッター直上配置
+
+### 背景・問題意識
+
+めぐりホーム左側の位置情報・メッセージ・グルームアーカイブの縦位置が高く、フッター直上に並んで見えない状態だった。ボタンの種類や並び順、タップ挙動は変えず、下端の基準位置だけをフッター直上へ寄せる必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MeguriHomeChromeViews.swift`
+- `MeguriHomeUtilityLayout` の下余白を92ptに調整し、左下操作列がフッター直上に配置されるようにした。
+
+#### `ios-native/Tests/MegrumAppTests/MeguriAccessPolicyTests.swift`
+- 操作列の下余白計算を固定するテスト期待値を更新した。
+
+### 影響範囲
+
+- めぐりホーム左下の操作列の表示位置に影響する。
+- 位置情報、メッセージ一覧、グルームアーカイブのボタン順・タップ挙動、バッジ表示、フッター表示、ナビゲーション、DB/API、通知、認証、課金、取引状態、ユーザー表示文言は変更していない。
+- 状態遷移、用語、データモデルに変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` は更新不要と判断した。
+
+### 確認方法
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-meguri-left-controls-lower --enable-xctest --disable-swift-testing -j 1 --filter 'MeguriAccessPolicyTests/testMeguriHomeUtilityLayoutKeepsControlsAboveTabBar'`
+  - passed
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'platform=iOS Simulator,id=C70DDDBB-2602-49E0-8F95-1F043BCCED76' -derivedDataPath /tmp/megrum-native-meguri-left-controls-lower-build CODE_SIGNING_ALLOWED=NO ONLY_ACTIVE_ARCH=YES build`
+  - passed
+- Simulator に install/launch して、`/tmp/megrum-visual-checks/meguri_left_controls_lower_92.png` で目視確認
+  - passed
+
+### セルフレビュー結果
+- ✅ 操作列の下端位置のみを変更し、ボタンの順序・機能・バッジ表示は維持した。
+- ✅ シミュレーターのスクリーンショットで、グルームアーカイブがフッター直上、上にメッセージ・位置情報が並ぶことを確認した。
+- ✅ DB/API、通知、認証、課金、取引状態、ユーザー表示文言には触れていない。
+- ✅ 既存の未コミット変更は戻していない。
+
+## イテレーション1226.247：打診交換方法変更ステップ解決の純粋化
+
+### 背景・問題意識
+
+`ProposalCreateFlowInitialStateActions.handleExchangeMethodChange()` は、交換方法変更で不要になった待ち合わせ・送料・支払方法ステップから移動先を決める分岐を action 内に直接持っていた。ユーザーに見える遷移先や初期ステップ適用順は変えず、ステップ解決だけをテスト可能な純粋ロジックとして分離する必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalExchangeMethodStepResolver.swift`
+- 現在ステップと各ステップ要否から、交換方法変更後に維持または移動するステップを返す pure resolver を追加した。
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlowInitialStateActions.swift`
+- 交換方法変更時のステップ分岐を resolver 呼び出しへ寄せ、action側は結果の反映と初期ステップ適用だけを担当するようにした。
+
+#### `ios-native/Tests/MegrumAppTests/ProposalCreateFlowTests.swift`
+- 待ち合わせ、送料、支払方法、通常ステップの移動/維持ケースをテストで固定した。
+
+### 影響範囲
+
+- 打診作成フローの交換方法変更時の現在ステップ補正に影響する。
+- UI、ユーザー表示文言、初期ステップ適用順、保存payload、API、DB、通知、認証、課金、取引状態は変更していない。
+- 状態遷移、用語、データモデルに変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` は更新不要と判断した。
+
+### 確認方法
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-meetup-end-date --enable-xctest --disable-swift-testing -j 1 --filter 'ProposalCreateFlowTests|TradeRequestDraftProposalCreateFlowTests'`
+  - passed（75 tests）
+
+### セルフレビュー結果
+- ✅ 交換方法変更後のステップ解決だけを pure resolver へ移し、見える遷移先は変更していない。
+- ✅ 不要ステップからの移動と維持の既存挙動を対象テストで確認した。
+- ✅ UI、ナビゲーション、ユーザー表示文言、DB/API、通知、認証、課金、取引状態には触れていない。
+- ✅ 既存の未コミット変更は戻していない。
+
+## イテレーション1226.246：打診待ち合わせ終了時刻補正の純粋化
+
+### 背景・問題意識
+
+`ProposalCreateFlowActions.ensureMeetupEndAfterStart(_:)` は、待ち合わせ開始時刻の変更時に、終了時刻が開始以下なら30分後へ補正する規則を action 内に直接持っていた。入力UIや候補保存は変えず、開始/終了時刻の補正規則だけをテスト可能な純粋ロジックとして分離する必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalMeetupEndDateResolver.swift`
+- 開始時刻、現在の終了時刻、最小時間幅から補正後の終了時刻を返す pure resolver を追加した。
+- 終了時刻が開始以下なら開始30分後、開始より後なら既存の終了時刻を維持する挙動を固定した。
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlowActions.swift`
+- 待ち合わせ終了時刻補正を resolver 呼び出しへ寄せ、action側は結果の代入だけを担当するようにした。
+
+#### `ios-native/Tests/MegrumAppTests/ProposalCreateFlowTests.swift`
+- 終了時刻が開始前、開始と同時、開始後の3ケースをテストで固定した。
+
+### 影響範囲
+
+- 打診作成フローの待ち合わせ開始時刻変更時の終了時刻補正に影響する。
+- UI、ユーザー表示文言、候補保存、送信payload、API、DB、通知、認証、課金、取引状態は変更していない。
+- 状態遷移、用語、データモデルに変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` は更新不要と判断した。
+
+### 確認方法
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-meetup-end-date --enable-xctest --disable-swift-testing -j 1 --filter 'ProposalCreateFlowTests|TradeRequestDraftProposalCreateFlowTests'`
+  - passed（74 tests）
+
+### セルフレビュー結果
+- ✅ 待ち合わせ終了時刻の補正規則だけを pure resolver へ移し、入力UIや保存処理は変更していない。
+- ✅ 開始前・同時・開始後の既存挙動を対象テストで確認した。
+- ✅ UI、ナビゲーション、ユーザー表示文言、DB/API、通知、認証、課金、取引状態には触れていない。
+- ✅ 既存の未コミット変更は戻していない。
+
+## イテレーション1226.245：打診待ち合わせ送信候補解決の純粋化
+
+### 背景・問題意識
+
+`ProposalCreateFlowActions.preparedMeetupCandidatesForSubmission()` は、打診送信直前に、現地交換では待ち合わせ候補が必須、郵送のみでは候補なしで送信する、という判定を action 内に直接持っていた。送信処理、保存payload、取引状態は変えず、送信前候補解決だけをテスト可能な純粋ロジックとして分離する必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalMeetupSubmissionCandidatesResolver.swift`
+- 待ち合わせ必須フラグと候補配列から、送信に使う候補配列または送信不可の `nil` を返す pure resolver を追加した。
+- 待ち合わせ不要なら空配列、必須で候補なしなら `nil`、必須で候補ありなら候補をそのまま返す既存挙動を固定した。
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlowActions.swift`
+- 送信直前の待ち合わせ候補解決を resolver 呼び出しへ寄せ、action 側は結果の受け取りだけを担当するようにした。
+
+#### `ios-native/Tests/MegrumAppTests/ProposalCreateFlowTests.swift`
+- 待ち合わせ不要、必須だが候補なし、必須かつ候補ありの3ケースをテストで固定した。
+
+### 影響範囲
+
+- 打診作成フローの送信直前の待ち合わせ候補解決に影響する。
+- `appState.createProposal` / `appState.reviseProposal`、保存payload生成、送信順序、UI、ユーザー表示文言、ナビゲーション、API、DB、通知、認証、課金、取引状態は変更していない。
+- 状態遷移、用語、データモデルに変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` は更新不要と判断した。
+
+### 確認方法
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-meetup-submission --enable-xctest --disable-swift-testing -j 1 --filter 'ProposalCreateFlowTests|TradeRequestDraftProposalCreateFlowTests'`
+  - passed（73 tests）
+
+### セルフレビュー結果
+- ✅ 送信前の待ち合わせ候補解決だけを pure resolver へ移し、送信処理と保存payloadは変更していない。
+- ✅ 待ち合わせ不要・必須候補なし・必須候補ありの既存挙動を対象テストで確認した。
+- ✅ UI、ナビゲーション、ユーザー表示文言、DB/API、通知、認証、課金、取引状態には触れていない。
+- ✅ 既存の未コミット変更は戻していない。
+
+## イテレーション1226.244：打診表示テキスト生成の純粋化
+
+### 背景・問題意識
+
+`ProposalCreateFlowActions` は、打診作成フローの送信payloadや初期化処理と同じ extension 内に、交換方法タイトルと日付表示文字列の生成を持っていた。UI文言や表示タイミングは変えず、表示用テキスト生成だけを純粋な formatter として分離し、確認画面・完了画面・待ち合わせサマリーが同じ規則を使い続けることをテストで固定する必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateDisplayTextFormatter.swift`
+- `ExchangeMethod` から既存の交換方法タイトルを返す pure formatter を追加した。
+- `Date` から日本語ロケールの月日表示を返す pure formatter を追加した。
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlowActions.swift`
+- 送信draft作成時の交換方法タイトル生成を formatter 呼び出しへ寄せた。
+- action extension から表示用テキスト生成の static helper を取り除いた。
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlowInitialStateActions.swift`
+- Visual QA 初期完了表示に使う交換方法タイトル生成を formatter 呼び出しへ寄せた。
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlowMeetupDerivedState.swift`
+- 待ち合わせサマリーの日付表示生成を formatter 呼び出しへ寄せた。
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlowExchangeDerivedState.swift`
+- 交換条件サマリーの日程表示生成を formatter 呼び出しへ寄せた。
+
+#### `ios-native/Tests/MegrumAppTests/ProposalCreateFlowTests.swift`
+- 交換方法タイトル3種と日本語月日表示をテストで固定した。
+
+### 影響範囲
+
+- 打診作成フローの確認表示、完了表示、待ち合わせ/交換条件サマリーの内部表示文字列生成に影響する。
+- ユーザー表示文言、UIレイアウト、ナビゲーション、保存payload、API、DB、通知、認証、課金、取引状態は変更していない。
+- 状態遷移、用語、データモデルに変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` は更新不要と判断した。
+
+### 確認方法
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-display-text --enable-xctest --disable-swift-testing -j 1 --filter 'ProposalCreateFlowTests|TradeRequestDraftProposalCreateFlowTests'`
+  - passed（72 tests）
+
+### セルフレビュー結果
+- ✅ 表示用テキスト生成だけを pure formatter へ移し、送信payload生成や保存順序は変更していない。
+- ✅ 既存の交換方法タイトルと月日表示を対象テストで確認した。
+- ✅ UI、ナビゲーション、ユーザー表示文言、DB/API、通知、認証、課金、取引状態には触れていない。
+- ✅ 既存の未コミット変更は戻していない。
+
+## イテレーション1226.243：打診支払い候補選択の純粋化
+
+### 背景・問題意識
+
+`ProposalCreateValueSelectionState.syncPaymentSelectionIfNeeded(options:)` は、打診作成フローで支払い方法ステップが必要になった時に、既存選択を維持するか、候補先頭へ切り替えるか、選択を解除するかの判断を mutable state 内に直接持っていた。表示順、候補生成、保存payloadは変えず、支払い候補の選択解決だけをテスト可能な純粋ロジックとして分離する必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalPaymentOptionSelectionResolver.swift`
+- 現在の選択ID、支払いステップ要否、候補一覧から次の選択IDを返す pure resolver を追加した。
+- 支払いステップ不要または候補なしなら `nil`、現在の選択が候補内にあれば維持、候補外なら先頭候補を選ぶ既存挙動を固定した。
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateValueSelectionState.swift`
+- 支払い候補選択の分岐を resolver 呼び出しへ寄せ、state側は結果の代入だけを担当するようにした。
+
+#### `ios-native/Tests/MegrumAppTests/ProposalCreateFlowTests.swift`
+- 選択解除、候補なし解除、既存選択維持、候補外選択の先頭fallbackをテストで固定した。
+
+### 影響範囲
+
+- 打診作成フローの支払い方法候補選択同期に影響する。
+- 支払い候補の生成順、UI、ユーザー表示文言、ナビゲーション、保存payload、API、DB、通知、認証、課金、取引状態は変更していない。
+- 状態遷移、用語、データモデルに変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` は更新不要と判断した。
+
+### 確認方法
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-payment-selection --enable-xctest --disable-swift-testing -j 1 --filter 'ProposalCreateFlowTests|TradeRequestDraftProposalCreateFlowTests'`
+  - passed（71 tests）
+
+### セルフレビュー結果
+- ✅ 支払い候補の選択解決だけを pure resolver へ移し、候補生成や表示順は変更していない。
+- ✅ 解除、維持、fallbackの既存挙動を対象テストで確認した。
+- ✅ UI、ナビゲーション、ユーザー表示文言、DB/API、通知、認証、課金、取引状態には触れていない。
+- ✅ 既存の未コミット変更は戻していない。
+
+## イテレーション1226.242：打診メッセージ文字数制限の純粋化
+
+### 背景・問題意識
+
+`ProposalCreateFlowActions.enforceMessageLimit(_:)` は、打診作成時のメッセージ文字数制限を action 内で直接切り詰めていた。UIや入力タイミングは変えず、制限値に基づく文字列切り詰めだけを純粋ロジックとしてテスト可能にする必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalMessageDraftLimiter.swift`
+- 任意の文字列を指定文字数まで安全に切り詰める pure limiter を追加した。
+- `limit <= 0` の場合は空文字を返し、Unicode の文字境界を保ったまま `prefix` で制限するようにした。
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlowActions.swift`
+- メッセージ制限の直接実装を limiter 呼び出しへ寄せ、action側は入力値との差分がある場合だけ `message` を更新するようにした。
+
+#### `ios-native/Tests/MegrumAppTests/ProposalCreateFlowTests.swift`
+- 制限内、超過、0文字制限、絵文字を含む入力の切り詰めをテストで固定した。
+
+### 影響範囲
+
+- 打診作成フローのメッセージ入力時の内部制限処理に影響する。
+- UI、ユーザー表示文言、ナビゲーション、保存payload、API、DB、通知、認証、課金、取引状態は変更していない。
+- 状態遷移、用語、データモデルに変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` は更新不要と判断した。
+
+### 確認方法
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-meetup-place-resolver --enable-xctest --disable-swift-testing -j 1 --filter 'ProposalCreateFlowTests|TradeRequestDraftProposalCreateFlowTests'`
+  - passed（70 tests）
+
+### セルフレビュー結果
+- ✅ メッセージ文字数制限だけを pure limiter へ移し、保存処理や通信処理には触れていない。
+- ✅ 文字境界を含む制限挙動を対象テストで確認した。
+- ✅ UI、ナビゲーション、ユーザー表示文言、DB/API、通知、認証、課金、取引状態には触れていない。
+- ✅ 既存の未コミット変更は戻していない。
+
+## イテレーション1226.241：打診日程文字列パースの純粋化
+
+### 背景・問題意識
+
+`ProposalCreateFlowActions.date(fromScheduleText:)` は、個別募集や既定の交換条件に入っている日程文字列から待ち合わせ初期日時を推定するパース規則を action extension 内に持っていた。初期seedの副作用と文字列パース規則を分け、日付表記の対応範囲をテストで固定する必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalScheduleTextDateParser.swift`
+- `6月7日`、`6/7`、`6.7` 形式を当年の12時として解釈する純粋 parser を追加した。
+- 空文字、`相談して決める`、未対応テキストは `nil` にする既存挙動を維持した。
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlowInitialStateActions.swift`
+- 待ち合わせ初期条件のseed時に、新しい parser を呼び出すようにした。
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlowActions.swift`
+- action extension から日程文字列パース本体を削除した。
+
+#### `ios-native/Tests/MegrumAppTests/TradeRequestDraftProposalCreateFlowTests.swift`
+- 対応している日程表記と、空文字・既定文言・未対応文言をテストで固定した。
+
+### 影響範囲
+
+- 打診作成フローの待ち合わせ初期条件seed時の日程文字列解釈に影響する。
+- パース規則、UI、ユーザー表示文言、ナビゲーション、保存payload、API、DB、通知、認証、課金、取引状態は変更していない。
+- 状態遷移、用語、データモデルに変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` は更新不要と判断した。
+
+### 確認方法
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-meetup-place-resolver --enable-xctest --disable-swift-testing -j 1 --filter 'ProposalCreateFlowTests|TradeRequestDraftProposalCreateFlowTests'`
+  - passed（69 tests）
+
+### セルフレビュー結果
+- ✅ 日程文字列パース規則だけを pure parser へ移し、初期seedの副作用は既存 action に残した。
+- ✅ 対応表記と除外表記を対象テストで確認した。
+- ✅ UI、ナビゲーション、ユーザー表示文言、DB/API、通知、認証、課金、取引状態には触れていない。
+- ✅ 既存の未コミット変更は戻していない。
+
+## イテレーション1226.240：打診待ち合わせ場所候補解決の純粋化
+
+### 背景・問題意識
+
+`ProposalCreateFlowMeetupActions.previousMeetupPlaceDraft(before:)` は、待ち合わせ場所シートで前回入力した場所候補を再利用できるかどうかの判定を action 内に直接持っていた。UI、保存payload、ステップ遷移は変えず、場所名または有効な座標を持つ候補を拾う純粋ロジックだけをテスト可能な境界へ寄せる必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalMeetupPlaceDraftResolver.swift`
+- 指定indexを除外し、直近の再利用可能な待ち合わせ場所候補を返す純粋 resolver を追加した。
+- 再利用可能条件は、既存挙動どおり「場所名が空でない」または「緯度経度が有効な座標として解釈できる」とした。
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlowMeetupActions.swift`
+- `previousMeetupPlaceDraft(before:)` のインライン判定を resolver 呼び出しへ寄せ、action側は表示候補一覧を渡すだけにした。
+
+#### `ios-native/Tests/MegrumAppTests/TradeRequestDraftProposalCreateFlowTests.swift`
+- 場所名あり、座標のみ、現在編集中候補と無効座標を除外するケースをテストで固定した。
+
+### 影響範囲
+
+- 打診作成フローの待ち合わせ場所シートで、前回入力した場所候補を初期値として拾う内部判定に影響する。
+- UI、ユーザー表示文言、ナビゲーション、保存payload、API、DB、通知、認証、課金、取引状態は変更していない。
+- 状態遷移、用語、データモデルに変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` は更新不要と判断した。
+
+### 確認方法
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-meetup-place-resolver --enable-xctest --disable-swift-testing -j 1 --filter 'ProposalCreateFlowTests|TradeRequestDraftProposalCreateFlowTests'`
+  - passed（67 tests）
+
+### セルフレビュー結果
+- ✅ 待ち合わせ場所候補の再利用判定だけを純粋 resolver へ移し、保存処理や通信処理には触れていない。
+- ✅ 既存の除外index、場所名、座標のみ、無効座標の挙動を対象テストで確認した。
+- ✅ UI、ナビゲーション、ユーザー表示文言、DB/API、通知、認証、課金、取引状態には触れていない。
+- ✅ 既存の未コミット変更は戻していない。
+
+## イテレーション1226.239：めぐりグルーム退避量の追加調整
+
+### 背景・問題意識
+
+グルーム閲覧時にDynamic Island/ステータス領域付近の黒い領域とヘッダーが近く見え、めぐりホーム左下の現在地・メッセージ・グルームアーカイブボタンもタブバーへ寄りすぎて見切れやすい状態が残っていた。既存のフィルター、推し/メンバー・キャラクター/シリーズmetadata、投稿payloadは維持したまま、上端/下端の退避量だけを追加調整する必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/GroomViewerScreen.swift`
+- グルーム閲覧時の黒い上端領域をより大きく取り、ストーリー進捗バーとユーザー情報がその下から始まるようにした。
+
+#### `ios-native/Sources/MegrumApp/MeguriHomeChromeViews.swift`
+- めぐりホーム左下ユーティリティ群の下端余白を増やし、グルームアーカイブボタンがタブバー上に見える位置へ上げた。
+
+#### `ios-native/Tests/MegrumAppTests/GroomViewerPresentationTests.swift`
+#### `ios-native/Tests/MegrumAppTests/MeguriAccessPolicyTests.swift`
+- グルーム閲覧上端クロームと、めぐりホーム下端ユーティリティ配置の期待値を更新した。
+
+### 影響範囲
+
+- めぐりホームの左下ユーティリティ配置と、グルーム閲覧の上端クローム位置に影響する。
+- 既存のめぐり左上フィルター、グルーム/チャットルーム作成時の推し・メンバー/キャラクター・シリーズ設定、保存payload、RPC境界は維持した。
+- 状態遷移、用語、データモデルに追加変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` は更新不要と判断した。
+
+### 確認方法
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-meguri-groom-filter-layout-latest --enable-xctest --disable-swift-testing -j 1 --filter 'MeguriAccessPolicyTests|GroomViewerPresentationTests|SupabaseGroomClientTests|SupabaseBoardClientTests'`
+  - passed（56 tests）
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'platform=iOS Simulator,id=C70DDDBB-2602-49E0-8F95-1F043BCCED76' -derivedDataPath /tmp/megrum-native-meguri-groom-latest-build CODE_SIGNING_ALLOWED=NO ONLY_ACTIVE_ARCH=YES build`
+  - passed
+- `SIMCTL_CHILD_MEGRUM_VISUAL_QA_PREVIEW_AUTH=1 SIMCTL_CHILD_MEGRUM_VISUAL_QA_INITIAL_SCREEN=meguri xcrun simctl launch --terminate-running-process C70DDDBB-2602-49E0-8F95-1F043BCCED76 tokyo.megrum.native.preview`
+  - passed
+- `xcrun simctl io C70DDDBB-2602-49E0-8F95-1F043BCCED76 screenshot /tmp/megrum-visual-checks/meguri_home_latest_layout.png`
+  - passed（左上フィルターと左下ユーティリティ群がタブバー上に表示されることを目視）
+
+### セルフレビュー結果
+- ✅ レイアウト定数の追加調整に限定し、保存処理や通信処理は変更していない。
+- ✅ 既存の推し・メンバー/キャラクター・シリーズ設定、フィルター、保存payloadを維持した。
+- ✅ DB/API、状態遷移、通知、認証、課金、取引状態には触れていない。
+- ✅ 既存の未コミット変更は戻していない。
+
+## イテレーション1226.238：めぐりグルーム安全領域の再調整
+
+### 背景・問題意識
+
+めぐりホーム左下の現在地・メッセージ・グルームアーカイブボタンがタブバーへ近づき、特にグルームアーカイブが見切れやすい状態が残っていた。また、グルーム閲覧時はDynamic Island/ステータス領域付近の黒い領域を前提に、ストーリー進捗バーとユーザー情報をその直下へ配置する必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/GroomViewerScreen.swift`
+- グルーム閲覧の上端レイアウトを、黒い上端領域とクローム開始位置に分けて計算するようにした。
+- ストーリー進捗バーとユーザー情報が黒い上端領域の下から始まるよう、固定的に大きく逃がしていた余白を安全領域ベースへ再調整した。
+
+#### `ios-native/Sources/MegrumApp/MeguriHomeChromeViews.swift`
+- めぐりホーム左下の現在地・メッセージ・グルームアーカイブボタン群の下端余白を増やし、タブバー上に収まる位置へ上げた。
+
+#### `ios-native/Sources/MegrumApp/GroomStoryComposerViews.swift`
+- グルーム投稿前の中央ポップアップ見出しを「推しとシリーズを設定」に合わせ、投稿直前の設定導線であることが伝わるようにした。
+
+#### `ios-native/Tests/MegrumAppTests/GroomViewerPresentationTests.swift`
+#### `ios-native/Tests/MegrumAppTests/MeguriAccessPolicyTests.swift`
+- グルーム閲覧上端クロームと、めぐりホーム下端ユーティリティ配置の期待値を更新した。
+
+### 影響範囲
+
+- めぐりホームの左下ユーティリティ配置、グルーム閲覧の上端クローム位置、グルーム投稿前ポップアップの見出しに影響する。
+- 推し/メンバー・キャラクター/シリーズの保存payload、DB/API、通知、認証、課金、取引状態は変更していない。
+- 状態遷移、用語、データモデルに変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` は更新不要と判断した。
+
+### 確認方法
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-meguri-groom-layout --enable-xctest --disable-swift-testing -j 1 --filter 'GroomViewerPresentationTests|MeguriAccessPolicyTests'`
+  - passed（32 tests）
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'platform=iOS Simulator,id=C70DDDBB-2602-49E0-8F95-1F043BCCED76' -derivedDataPath /tmp/megrum-native-meguri-groom-layout-build CODE_SIGNING_ALLOWED=NO build`
+  - passed
+- `SIMCTL_CHILD_MEGRUM_VISUAL_QA_PREVIEW_AUTH=1 SIMCTL_CHILD_MEGRUM_VISUAL_QA_INITIAL_SCREEN=meguri xcrun simctl launch --terminate-running-process C70DDDBB-2602-49E0-8F95-1F043BCCED76 tokyo.megrum.native.preview`
+  - passed
+- `xcrun simctl io C70DDDBB-2602-49E0-8F95-1F043BCCED76 screenshot /tmp/megrum-visual-checks/meguri_visualqa_home.png`
+  - passed（めぐりホーム左上フィルター、左下ボタン群がタブバー上に表示されることを目視）
+
+### セルフレビュー結果
+- ✅ レイアウト定数と投稿前ポップアップ見出しの調整に限定し、保存処理や通信処理は変更していない。
+- ✅ 既存の推し・メンバー・シリーズ設定、フィルター、保存payloadは維持した。
+- ✅ DB/API、状態遷移、通知、認証、課金、取引状態には触れていない。
+- ✅ 既存の未コミット変更は戻していない。
+
+## イテレーション1226.237：打診待ち合わせ候補削除の純粋化
+
+### 背景・問題意識
+
+`ProposalCreateFlowMeetupActions.removeMeetupCandidate` は、待ち合わせ候補を削除した後にどの候補を選択状態にするかの分岐をaction内で直接持っていた。画面遷移や保存payloadは変えず、削除後の選択index決定だけを純粋ロジックとしてテスト可能にする必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalMeetupCandidateSelectionReducer.swift`
+- 削除位置、現在の選択index、削除後件数から次の選択indexを返す純粋 reducer を追加した。
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlowMeetupActions.swift`
+- 待ち合わせ候補削除後のindex決定を reducer 呼び出しへ寄せ、action側は空配列時のリセットと候補適用だけを担当するようにした。
+
+#### `ios-native/Tests/MegrumAppTests/TradeRequestDraftProposalCreateFlowTests.swift`
+- 選択より前、選択中、選択より後、空配列の削除ケースをテストで固定した。
+
+### 影響範囲
+
+- 打診作成フロー内の待ち合わせ候補削除時の内部状態決定に影響する。
+- 保存payload生成、API、ステップ遷移、画面文言、ナビゲーション、DB/API、通知、認証、課金、取引状態は変更していない。
+- 状態遷移、用語、データモデルに変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` は更新不要と判断した。
+
+### 確認方法
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-meetup-selection --enable-xctest --disable-swift-testing -j 1 --filter 'ProposalCreateFlowTests|TradeRequestDraftProposalCreateFlowTests'`
+  - passed（64 tests）
+
+### セルフレビュー結果
+- ✅ 待ち合わせ候補削除後のindex決定だけを reducer へ移し、保存処理や通信処理には触れていない。
+- ✅ 既存の削除後選択挙動を対象テストで確認した。
+- ✅ UI、ナビゲーション、ユーザー表示文言、DB/API、通知、認証、課金、取引状態には触れていない。
+- ✅ 既存の未コミット変更は戻していない。
+
+## イテレーション1226.236：打診作成グッズ選択の純粋化
+
+### 背景・問題意識
+
+`ProposalCreateFlowSelectionActions` は、出すもの/受け取るものの選択IDをトグルする処理、表示候補の変化に合わせて選択を残す処理、初期候補から選択をseedする処理を画面action内で直接扱っていた。打診作成の保存順序や画面遷移は変えず、選択集合の純粋な状態変換だけをテスト可能な境界へ寄せる必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateGoodsSelectionReducer.swift`
+- グッズ選択IDの `toggle`、候補リスト変化時の reconcile、初期候補からの seed を行う純粋 reducer を追加した。
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlowSelectionActions.swift`
+- 出すもの/受け取るものの選択actionから集合操作を reducer 呼び出しへ寄せ、画面側は選択モード変更と状態反映だけを担当するようにした。
+
+#### `ios-native/Tests/MegrumAppTests/ProposalCreateFlowTests.swift`
+- reducer の toggle / seed / reconcile を単体テストで固定した。
+
+### 影響範囲
+
+- 打診作成フロー内のグッズ選択状態の内部実装に影響する。
+- 保存payload生成、打診作成/再打診API、ステップ遷移、画面文言、ナビゲーション、DB/API、通知、認証、課金、取引状態は変更していない。
+- 状態遷移、用語、データモデルに変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` は更新不要と判断した。
+
+### 確認方法
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-selection --enable-xctest --disable-swift-testing -j 1 --filter 'ProposalCreateFlowTests|TradeRequestDraftProposalCreateFlowTests'`
+  - passed（63 tests）
+- `git diff --check -- ios-native/Sources/MegrumApp/ProposalCreateGoodsSelectionReducer.swift ios-native/Sources/MegrumApp/ProposalCreateFlowSelectionActions.swift ios-native/Tests/MegrumAppTests/ProposalCreateFlowTests.swift`
+  - passed
+
+### セルフレビュー結果
+- ✅ 選択集合の純粋ロジックだけを reducer へ移し、保存処理や通信処理には触れていない。
+- ✅ 既存の選択seed、候補変化時の選択維持、toggle挙動を対象テストで確認した。
+- ✅ UI、ナビゲーション、ユーザー表示文言、DB/API、通知、認証、課金、取引状態には触れていない。
+- ✅ 既存の未コミット変更は戻していない。
+
+## イテレーション1226.235：めぐりグルーム表示位置の退避調整
+
+### 背景・問題意識
+
+めぐりホームの左下ユーティリティ群がタブバーに近く、グルームアーカイブボタンが見切れやすい状態になっていた。また、グルーム閲覧時はDynamic Island/ステータス領域付近に黒い領域が残る前提で、ストーリー進捗バーとユーザー情報をその下へ退避させる必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MeguriHomeChromeViews.swift`
+- 左下の現在地、メッセージ、グルームアーカイブボタンの下端余白を増やし、タブバー上に収まるように調整した。
+- 左上のフィルター/表示切替行がDynamic Island/ステータス領域へ寄りすぎないよう、上端余白の計算を追加した。
+
+#### `ios-native/Sources/MegrumApp/MeguriHomeViews.swift`
+- 左上のフィルター/表示切替行に上端余白計算を適用した。
+
+#### `ios-native/Sources/MegrumApp/GroomViewerScreen.swift`
+- グルーム閲覧クロームの上端余白を増やし、黒い上端領域の下側に進捗バーとユーザー情報が配置されるようにした。
+- 上端の表示不可領域を黒いレイヤーとして明示し、画像やクロームがその領域へ入り込まないようにした。
+
+#### `ios-native/Tests/MegrumAppTests/MeguriAccessPolicyTests.swift`
+#### `ios-native/Tests/MegrumAppTests/GroomViewerPresentationTests.swift`
+- 下端/上端の退避量をテストで固定した。
+- グルーム閲覧時の黒い上端領域の高さをレイアウトテストで固定した。
+
+### 影響範囲
+
+- めぐりホームの左下ユーティリティボタン位置と、グルーム閲覧画面の上端クローム位置に影響する。
+- グルーム/チャットルームの推し・メンバー・シリーズ設定、フィルター、保存payload、DB/API、通知、認証、課金、取引状態、ユーザー表示文言は変更していない。
+- 状態遷移、用語、データモデルに変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` は更新不要と判断した。
+
+### 確認方法
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-meguri-layout-metadata --enable-xctest --disable-swift-testing -j 1 --filter 'MeguriAccessPolicyTests|GroomViewerPresentationTests|SupabaseGroomClientTests|SupabaseBoardClientTests'`
+  - passed（56 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-meguri-groom-filter-2 --enable-xctest --disable-swift-testing -j 1 --filter 'MeguriAccessPolicyTests|GroomViewerPresentationTests|SupabaseGroomClientTests|SupabaseBoardClientTests'`
+  - passed（56 tests）
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'platform=iOS Simulator,id=C70DDDBB-2602-49E0-8F95-1F043BCCED76' -derivedDataPath /tmp/megrum-native-meguri-filter-layout-build CODE_SIGNING_ALLOWED=NO ONLY_ACTIVE_ARCH=YES build`
+  - passed
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'platform=iOS Simulator,id=C70DDDBB-2602-49E0-8F95-1F043BCCED76' -derivedDataPath /tmp/megrum-native-meguri-groom-visual CODE_SIGNING_ALLOWED=NO build`
+  - passed
+- `git diff --check -- ios-native/Sources/MegrumApp/MeguriHomeChromeViews.swift ios-native/Sources/MegrumApp/MeguriHomeViews.swift ios-native/Sources/MegrumApp/GroomViewerScreen.swift ios-native/Tests/MegrumAppTests/MeguriAccessPolicyTests.swift ios-native/Tests/MegrumAppTests/GroomViewerPresentationTests.swift notes/08_design_iterations.md`
+  - passed
+- `xcrun simctl install C70DDDBB-2602-49E0-8F95-1F043BCCED76 /tmp/megrum-native-meguri-filter-layout-build/Build/Products/Debug-iphonesimulator/MegrumNative.app`
+  - passed
+- `xcrun simctl install C70DDDBB-2602-49E0-8F95-1F043BCCED76 /tmp/megrum-native-meguri-groom-visual/Build/Products/Debug-iphonesimulator/MegrumNative.app`
+  - passed
+- `SIMCTL_CHILD_MEGRUM_VISUAL_QA_PREVIEW_AUTH=1 SIMCTL_CHILD_MEGRUM_VISUAL_QA_INITIAL_SCREEN=meguri xcrun simctl launch C70DDDBB-2602-49E0-8F95-1F043BCCED76 tokyo.megrum.native.preview`
+  - passed
+- `xcrun simctl io C70DDDBB-2602-49E0-8F95-1F043BCCED76 screenshot /tmp/megrum-meguri-filter-layout-home.png`
+  - passed（めぐりホーム左上フィルターが上端領域下に表示され、左下ボタン群がタブバー上に表示されることを目視）
+- `xcrun simctl io C70DDDBB-2602-49E0-8F95-1F043BCCED76 screenshot --mask black /tmp/megrum-meguri-latest-home-after.png`
+  - passed（めぐりホーム左上フィルターが表示され、左下の現在地/メッセージ/グルームアーカイブがタブバー上に表示されることを目視）
+
+### セルフレビュー結果
+- ✅ レイアウト定数の調整に限定し、保存処理や通信処理には触れていない。
+- ✅ 既存の推し・メンバー・シリーズメタデータ導線とフィルター挙動は維持し、対象テストで確認した。
+- ✅ DB/API、状態遷移、通知、認証、課金、取引状態、ユーザー表示文言には触れていない。
+- ✅ 既存の未コミット変更は戻していない。
+
+## イテレーション1226.234：ホーム候補セクション生成の責務整理
+
+### 背景・問題意識
+
+`HomeCandidateComposer.sections` はホーム候補の文脈生成、相互マッチ候補生成、相手グッズの matched/possible 分類、自分グッズの条件シグナル生成、重複排除を1つの関数で扱っていた。候補表示の挙動やランキングは変えず、セクション生成時の蓄積責務だけを小さな値型へ切り出し、今後のホーム候補ロジック変更をテストで守りやすくする必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeCandidateSectionsBuilder.swift`
+- 相手候補の評価結果を matched / possible へ蓄積し、条件シグナルを保持する `HomeCandidateSectionsBuilder` を追加した。
+- 自分の出品アイテムに対する条件シグナル生成も同じ builder に集約した。
+- 最終的な `HomeCandidateSections` 生成時に、既存の重複排除と相互マッチ候補の受け渡しを維持した。
+
+#### `ios-native/Sources/MegrumApp/HomeCandidateComposer.swift`
+- `sections(from:viewerOshiSelections:)` を文脈生成、相互マッチ候補生成、builder への投入、結果返却の薄い orchestration に整理した。
+
+### 影響範囲
+
+- ホーム候補セクション生成の内部構造に影響する。
+- 候補の並び順、matched / possible 分類、条件シグナル、相互マッチ候補、UI表示、ナビゲーション、保存処理、DB/API、通知、認証、課金、取引状態、ユーザー表示文言は変更していない。
+- 状態遷移、用語、データモデルに変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` は更新不要と判断した。
+
+### 確認方法
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-composer-builder --enable-xctest --disable-swift-testing -j 1 --filter 'HomeCandidateComposerTests|HomeDiscoveryMatchPolicyTests|HomeMutualMatchConditionPoliciesTests|HomeScreenFlowTests'`
+  - passed（160 tests）
+
+### セルフレビュー結果
+- ✅ 候補分類の蓄積責務だけを `HomeCandidateSectionsBuilder` へ移し、保存処理や通信処理には触れていない。
+- ✅ 既存のソート、重複排除、条件シグナル、相互マッチ候補の出力を維持した。
+- ✅ UI、ナビゲーション、ユーザー表示文言、DB/API、通知、認証、課金、取引状態には触れていない。
+- ✅ 既存の未コミット変更は戻していない。
+
+## イテレーション1226.233：取引詳細証跡操作の責務整理
+
+### 背景・問題意識
+
+`TradeDetailScreen` は状態群を `TradeDetailInteractionState` / `TradeDetailPhotoPresentationState` / `TradeDetailRoutePresentationState` へ分けた一方で、証跡写真のカメラ/アルバム表示や拒否操作の副作用クロージャが `body` と `bodyBeforeDialogs` に残っていた。取引状態や送信処理は変えず、SwiftUI の宣言部分から操作の orchestration を薄く切り出す必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/TradeDetailPhotoPresentationState.swift`
+- 証跡写真のソース選択、カメラ、アルバム表示を開く小さな mutation method を追加した。
+
+#### `ios-native/Sources/MegrumApp/TradeDetailScreenActions.swift`
+- 拒否実行、証跡ソース選択表示、証跡カメラ表示、証跡アルバム表示の action method を追加した。
+
+#### `ios-native/Sources/MegrumApp/TradeDetailScreen.swift`
+#### `ios-native/Sources/MegrumApp/TradeDetailScreenPresentation.swift`
+- `confirmationDialog`、証跡一覧sheet、証跡追加footer から直接 state を mutate していた箇所を action method 呼び出しへ寄せた。
+
+#### `ios-native/Tests/MegrumAppTests/TradeChatAffordanceTests.swift`
+- `TradeDetailPhotoPresentationState` の証跡ソース表示 mutation をテストで固定した。
+
+### 影響範囲
+
+- 取引詳細画面の証跡写真まわりの表示状態操作に影響する。
+- 取引状態、打診/合意/完了、証跡写真の保存処理、メッセージ送信、DB/API、ナビゲーション構造、通知、認証、課金、ユーザー表示文言は変更していない。
+- 状態遷移、用語、データモデルに変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` は更新不要と判断した。
+
+### 確認方法
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-trade-actions --enable-xctest --disable-swift-testing -j 1 --filter 'TradeChatAffordanceTests|TradeEvidencePhotoStateReducerTests|TradeMessageStateReducerTests|TradeProposalStateReducerTests'`
+  - passed（103 tests）
+- `git diff --check -- ios-native/Sources/MegrumApp/TradeDetailScreen.swift ios-native/Sources/MegrumApp/TradeDetailScreenActions.swift ios-native/Sources/MegrumApp/TradeDetailScreenPresentation.swift ios-native/Sources/MegrumApp/TradeDetailPhotoPresentationState.swift ios-native/Tests/MegrumAppTests/TradeChatAffordanceTests.swift notes/08_design_iterations.md`
+  - passed
+- `git diff --check --no-index /dev/null ios-native/Sources/MegrumApp/TradeDetailPhotoPresentationState.swift`
+  - passed（未追跡ファイルのため個別確認）
+
+### セルフレビュー結果
+- ✅ 証跡写真の表示状態 mutation と拒否実行の呼び出し口だけを action method へ移した。
+- ✅ 取引状態、保存順序、DB/API境界、証跡画像アップロード、メッセージ送信は変更していない。
+- ✅ 子Viewへ親モデル全体を追加で渡す変更はしていない。
+- ✅ 既存の未コミット変更は戻していない。
+
+## イテレーション1226.232：支払い設定フォーム責務整理
+
+### 背景・問題意識
+
+`PaymentSettingsScreen` は支払い方法の編集状態を `PaymentSettingsEditingState` へ寄せた一方で、フォームの構造と銀行口座セクション表示条件が画面本体に残っていた。支払い情報の保存順序や文言は変えず、画面本体を薄い orchestration に近づける必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/PaymentSettingsDraft.swift`
+- 銀行口座詳細入力が必要かを表す `requiresBankAccountDetails` を追加し、支払い方法選択に紐づく表示条件を draft 側の意味ある派生状態へ寄せた。
+
+#### `ios-native/Sources/MegrumApp/PaymentSettingsComponents.swift`
+- `PaymentSettingsFormContent` を追加し、支払い方法カード、銀行口座カード、validation/error 表示を専用Viewへ分離した。
+
+#### `ios-native/Sources/MegrumApp/PaymentSettingsScreen.swift`
+- 画面本体は `PaymentSettingsFormContent` に必要最小限の `Binding` と callback を渡す構成へ整理した。
+- `.task` / `.onChange` / 保存処理 / close 処理の呼び出し順は維持した。
+
+#### `ios-native/Tests/MegrumAppTests/SettingsScreenTests.swift`
+- `PaymentSettingsDraft.requiresBankAccountDetails` が銀行振込の選択状態に追従することを既存の draft test に追加した。
+
+### 影響範囲
+
+- 支払い方法設定画面のSwiftUI構造と派生状態に影響する。
+- 保存payload、保存順序、Supabase/API、公開プロフィールsummary、ナビゲーション、ユーザー表示文言、取引状態、通知、認証、課金は変更していない。
+- 状態遷移、用語、データモデルに変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` は更新不要と判断した。
+
+### 確認方法
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-payment --enable-xctest --disable-swift-testing -j 1 --filter 'SettingsScreenTests|SupabasePaymentSettingsPersistenceTests'`
+  - passed（50 tests）
+- `git diff --check -- ios-native/Sources/MegrumApp/PaymentSettingsScreen.swift ios-native/Sources/MegrumApp/PaymentSettingsComponents.swift ios-native/Sources/MegrumApp/PaymentSettingsDraft.swift ios-native/Tests/MegrumAppTests/SettingsScreenTests.swift`
+  - passed
+
+### セルフレビュー結果
+- ✅ フォーム構造だけを専用Viewへ分け、画面側の保存・読み込み orchestration は維持した。
+- ✅ 子Viewへ `MegrumAppState` や親状態全体を渡さず、必要な draft 値、Binding、callback だけを渡した。
+- ✅ 支払い情報の保存順序、DB/API境界、通知、認証、課金、取引状態には触れていない。
+- ✅ 既存の未コミット変更は戻していない。
+
+## イテレーション1226.231：めぐり推しフィルター導線
+
+### 背景・問題意識
+
+めぐりホームでグルーム/チャットルームを推しやシリーズで絞り込める入口がなく、投稿時にもその分類を保存できなかった。また、グルーム閲覧時の上部黒領域とホーム左下ユーティリティの安全領域配置を調整する必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumCore/GroomModels.swift`
+- グルーム投稿/作成入力へ任意の `groupID` / `characterID` / `seriesName` を追加した。
+
+#### `ios-native/Sources/MegrumCore/MeguriBoardModels.swift`
+- チャットルーム/作成入力へ任意の `groupID` / `characterID` / `seriesName` を追加した。
+
+#### `ios-native/Sources/MegrumData/SupabaseGroomRows.swift`
+#### `ios-native/Sources/MegrumData/SupabaseGroomPayloads.swift`
+#### `ios-native/Sources/MegrumData/SupabaseBoardRows.swift`
+#### `ios-native/Sources/MegrumData/SupabaseBoardClient.swift`
+- Supabaseのselect/insert/RPC payloadで推しL1/L2/シリーズを読み書きできるようにした。
+
+#### `ios-native/Sources/MegrumApp/MeguriContentMetadata.swift`
+#### `ios-native/Sources/MegrumApp/MeguriContentMetadataFields.swift`
+- 推しL1/L2/シリーズの入力・フィルター状態・一致判定を小さな値型と共通Viewへ分けた。
+
+#### `ios-native/Sources/MegrumApp/MeguriHomeViews.swift`
+#### `ios-native/Sources/MegrumApp/MeguriHomeChromeViews.swift`
+#### `ios-native/Sources/MegrumApp/MeguriScreen.swift`
+- めぐりホーム左上にフィルター入口を追加し、グルーム/チャットルーム一覧を選択中の推しL1/L2/シリーズで絞り込むようにした。
+- 左下の現在地/メッセージ/グルームアーカイブ操作がタブバー上に収まるよう、下端余白の下限を固定した。
+
+#### `ios-native/Sources/MegrumApp/MeguriBoardComposerViews.swift`
+#### `ios-native/Sources/MegrumApp/BoardThreadComposerContent.swift`
+#### `ios-native/Sources/MegrumApp/MeguriBoardComposerActions.swift`
+- チャットルーム作成画面に推しL1/L2/シリーズ入力を追加し、保存payloadへ渡すようにした。
+
+#### `ios-native/Sources/MegrumApp/GroomStoryComposerViews.swift`
+#### `ios-native/Sources/MegrumApp/MeguriScreenGroomActions.swift`
+#### `ios-native/Sources/MegrumApp/MeguriGroomPresentationModifiers.swift`
+- グルーム編集画面の投稿直前に中央ポップアップで推しL1/L2/シリーズを設定できるようにし、投稿payloadへ渡すようにした。
+
+#### `ios-native/Sources/MegrumApp/GroomViewerScreen.swift`
+- グルーム閲覧時のステータスバー/ユーザー名を上部黒領域の下へ寄せるため、上部chrome余白に下限値を持たせた。
+
+#### `supabase/migrations/20260630083000_add_meguri_content_metadata.sql`
+- `groom_posts` / `meguri_board_threads` に `group_id` / `character_id` / `series_name` を追加し、関連RPCの返却/作成引数へ反映した。
+
+#### `ios-native/Tests/MegrumAppTests/MeguriAccessPolicyTests.swift`
+#### `ios-native/Tests/MegrumAppTests/GroomViewerPresentationTests.swift`
+#### `ios-native/Tests/MegrumDataTests/SupabaseGroomClientTests.swift`
+#### `ios-native/Tests/MegrumDataTests/SupabaseBoardClientTests.swift`
+- フィルター一致判定、左下ユーティリティ下端余白、グルーム閲覧上部余白、Supabase payload/selectをテストで固定した。
+
+### 影響範囲
+
+- めぐりホーム、グルーム投稿、チャットルーム作成、グルーム閲覧上部chrome、グルーム/チャットルーム取得RPCに影響する。
+- 取引状態、打診、取引チャット、通知、認証、課金、支払い、既存の閲覧可否判定は変更していない。
+- データモデルに任意列を追加したため `notes/05_data_model.md` を更新した。状態遷移と用語自体は変えていないため、`notes/09_state_machines.md` / `notes/10_glossary.md` は更新不要と判断した。
+
+### 確認方法
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-meguri-content-tags --enable-xctest --disable-swift-testing -j 1 --filter 'MeguriAccessPolicyTests|SupabaseGroomClientTests|SupabaseBoardClientTests|GroomViewerPresentationTests'`
+  - passed（55 tests）
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'platform=iOS Simulator,id=C70DDDBB-2602-49E0-8F95-1F043BCCED76' -derivedDataPath /tmp/megrum-native-meguri-content-tags-build CODE_SIGNING_ALLOWED=NO ONLY_ACTIVE_ARCH=YES build`
+  - passed
+- `xcrun simctl install C70DDDBB-2602-49E0-8F95-1F043BCCED76 /tmp/megrum-native-meguri-content-tags-build/Build/Products/Debug-iphonesimulator/MegrumNative.app`
+  - passed
+- `SIMCTL_CHILD_MEGRUM_VISUAL_QA_PREVIEW_AUTH=1 SIMCTL_CHILD_MEGRUM_VISUAL_QA_INITIAL_SCREEN=meguri xcrun simctl launch --terminate-running-process C70DDDBB-2602-49E0-8F95-1F043BCCED76 tokyo.megrum.native.preview`
+  - passed
+- `xcrun simctl io C70DDDBB-2602-49E0-8F95-1F043BCCED76 screenshot /tmp/megrum-meguri-home-content-tags-final.png`
+  - passed（左下ユーティリティがタブバー上に表示されることを確認）
+
+### セルフレビュー結果
+- ✅ グルーム/チャットルームの推し・シリーズ情報は任意メタデータとして追加し、既存投稿は未設定のまま扱える。
+- ✅ フィルターはクライアント側表示対象の絞り込みで、既存の公開範囲・現在地閲覧判定は変更していない。
+- ✅ 保存処理は既存のcreate経路へ任意値を渡す形に留め、取引状態、通知、認証、課金、支払いには触れていない。
+- ✅ 既存の未コミット変更は戻していない。
+
+## イテレーション1226.230：Groom閲覧Drag状態分離
+
+### 背景・問題意識
+
+`GroomViewerScreen` は下方向ドラッグ中のoffset、scale、corner radius、dismiss閾値をView内のstate/computed property/gesture closureへ直接持っていた。グルーム閲覧の見た目、閉じる操作、返信、いいね、通報/ブロックは変えずに、drag表示状態だけをテスト可能な値型へ分離する必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/GroomViewerDragPresentationState.swift`
+- 下方向dragのtranslation、progress、vertical offset、scale、corner radius、dismiss判定を値型として追加した。
+- 既存と同じくprogress分母320、scale下限0.88、corner radius最大28、dismiss閾値100pt超、上方向dragは無視する挙動を維持した。
+
+#### `ios-native/Sources/MegrumApp/GroomViewerScreen.swift`
+- `dragOffset` とView内のdrag数値計算を `GroomViewerDragPresentationState` へ委譲した。
+- gesture closureは状態更新、dismiss判定、resetだけを呼ぶ薄いorchestrationにした。
+
+#### `ios-native/Tests/MegrumAppTests/GroomViewerPresentationTests.swift`
+- 下方向drag時のprogress/offset/scale/radius、dismiss閾値、reset、上方向drag無視、clampをテストで固定した。
+
+### 影響範囲
+
+- グルーム閲覧画面のdrag中表示計算に影響する。
+- レイアウト、表示文言、グルーム閲覧のpresentation、返信、いいね、通報/ブロック、保存処理、DB/API、通知、認証、課金、取引状態は変更していない。
+- 状態遷移、用語、データモデルに変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` は更新不要と判断した。
+
+### 確認方法
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-groom-drag-state --enable-xctest --disable-swift-testing -j 1 --filter 'GroomViewerPresentationTests|GroomInteractionStateReducerTests|MeguriAccessPolicyTests'`
+  - passed
+- `git diff --check -- ios-native/Sources/MegrumApp/GroomViewerScreen.swift ios-native/Tests/MegrumAppTests/GroomViewerPresentationTests.swift notes/08_design_iterations.md`
+  - passed
+- `git diff --check --no-index /dev/null ios-native/Sources/MegrumApp/GroomViewerDragPresentationState.swift`
+  - passed
+- `git diff --check --no-index /dev/null ios-native/Tests/MegrumAppTests/GroomViewerPresentationTests.swift`
+  - passed
+
+### セルフレビュー結果
+- ✅ drag中表示の計算とdismiss閾値だけを値型へ分離した。
+- ✅ 下方向dragのみ反映、100pt超でdismiss、scale/radiusの既存数値を維持した。
+- ✅ 保存処理、DB/API、通知、認証、課金、取引状態、状態遷移、データモデル、ユーザー表示文言は変更していない。
+- ✅ 既存の未コミット変更は戻していない。
+
+## イテレーション1226.229：Groom閲覧フッター経路整理
+
+### 背景・問題意識
+
+グルーム閲覧時に下フッターや上下の白いpresentation下地が見える経路が残っていた。グルーム本文、返信、いいね、通報/ブロック、地図上の閲覧可否は変えずに、閲覧中の表示経路を黒背景の没入viewerへ揃える必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MegrumAuthenticatedTabsView.swift`
+- グルーム閲覧中に親ZStack側で別の黒い覆いを重ねる処理を外し、専用viewer overlayとレイヤー競合しないようにした。
+- tab bar/status bar非表示の制御は維持した。
+
+#### `ios-native/Sources/MegrumApp/MeguriMapViews.swift`
+- iOSでは地図上の単体グルームを小さい詳細sheetではなく `groomViewerImmersiveOverlay` で開くようにした。
+- グルームクラスターの没入viewer表示、macOS側のsheet fallback、チャットルームのスライド表示は維持した。
+
+### 影響範囲
+
+- めぐり地図およびめぐりホームから開くグルーム閲覧のpresentationに影響する。
+- 返信、いいね、通報/ブロック、グルーム閲覧可否、保存処理、DB/API、通知、認証、課金、取引状態、ユーザー表示文言は変更していない。
+- 状態遷移、用語、データモデルに変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` は更新不要と判断した。
+
+### 確認方法
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-groom-viewer-footer-safearea --enable-xctest --disable-swift-testing -j 1 --filter 'GroomViewerPresentationTests|GroomInteractionStateReducerTests|MeguriAccessPolicyTests'`
+  - passed
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'platform=iOS Simulator,id=C70DDDBB-2602-49E0-8F95-1F043BCCED76' -derivedDataPath /tmp/megrum-native-groom-viewer-build CODE_SIGNING_ALLOWED=NO build`
+  - passed
+- `xcrun simctl install C70DDDBB-2602-49E0-8F95-1F043BCCED76 /tmp/megrum-native-groom-viewer-build/Build/Products/Debug-iphonesimulator/MegrumNative.app`
+  - passed
+- `SIMCTL_CHILD_MEGRUM_VISUAL_QA_PREVIEW_AUTH=1 SIMCTL_CHILD_MEGRUM_VISUAL_QA_INITIAL_SCREEN=meguri xcrun simctl launch --terminate-running-process C70DDDBB-2602-49E0-8F95-1F043BCCED76 tokyo.megrum.native.preview`
+  - passed
+- `xcrun simctl io C70DDDBB-2602-49E0-8F95-1F043BCCED76 screenshot /tmp/megrum-groom-viewer-meguri.png`
+  - passed（めぐりホーム起動を確認。Simulator入力CLIがないため、グルームviewer内のタップ遷移目視までは未実施）
+- `git diff --check -- ios-native/Sources/MegrumApp/MegrumAuthenticatedTabsView.swift ios-native/Sources/MegrumApp/MeguriMapViews.swift notes/08_design_iterations.md`
+  - passed
+
+### セルフレビュー結果
+- ✅ グルーム閲覧中の下フッター/上下白下地に関わるpresentation経路だけを変更した。
+- ✅ グルーム本文、返信、いいね、通報/ブロック、閲覧可否、保存処理、DB/API、通知、認証、課金、取引状態、表示文言は変更していない。
+- ✅ 既存の未コミット変更は戻していない。
+
+## イテレーション1226.228：GoodsGridアクション判定分離
+
+### 背景・問題意識
+
+`GoodsGrid.handle(_:)` は、detail/add/edit/hide/report/deleteなどのアクションごとに、callback有無、所有者判定、未接続時メッセージ生成を直接持っていた。長押しメニューやクイック操作の挙動、表示文言、callback実行順を変えずに、アクションの行き先判定だけをテスト可能なpure policyへ寄せる必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/GoodsTileActionPolicy.swift`
+- `GoodsGridTileActionPolicy` と `GoodsGridTileActionDestination` を追加し、各 `GoodsTileAction` の実行先を値として解決できるようにした。
+- 既存の未接続メッセージ文言、owner/remote判定、report/delete/edit/hideの可否を維持した。
+
+#### `ios-native/Sources/MegrumApp/GoodsGrid.swift`
+- `handle(_:, item:)` を `GoodsGridTileActionPolicy.destination(for:)` の結果を実行するだけに薄くした。
+- sheet表示、alert表示、各callbackの呼び出し意味は維持した。
+
+#### `ios-native/Tests/MegrumAppTests/GoodsGridLayoutTests.swift`
+- `GoodsGridTileActionPolicy` のowner/remote/未接続時のdestinationと文言をテストで固定した。
+
+### 影響範囲
+
+- グッズグリッドのアクション実行可否判定に影響する。
+- レイアウト、表示文言、主タップ、長押し選択、context menu、保存処理、DB/API、通知、認証、課金、取引状態は変更していない。
+- 状態遷移、用語、データモデルに変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` は更新不要と判断した。
+
+### 確認方法
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-goods-action-policy --enable-xctest --disable-swift-testing -j 1 --filter 'GoodsGridLayoutTests|GoodsPhotoURLResolverTests|SupabaseGoodsInventoryRowModelsTests|SupabaseOwnedGoodsPersistenceTests'`
+  - passed
+- `git diff --check -- ios-native/Sources/MegrumApp/GoodsGrid.swift ios-native/Sources/MegrumApp/GoodsTileActionPolicy.swift ios-native/Tests/MegrumAppTests/GoodsGridLayoutTests.swift notes/08_design_iterations.md`
+  - passed
+
+### セルフレビュー結果
+- ✅ アクション実行可否と未接続メッセージ生成だけをpure policyへ分離した。
+- ✅ detail/add/edit/hide/report/delete、owner/remote判定、callback呼び出し、表示文言は維持した。
+- ✅ 保存処理、DB/API、通知、認証、課金、取引状態、状態遷移、データモデル、ユーザー表示文言は変更していない。
+- ✅ 既存の未コミット変更は戻していない。
+
+## イテレーション1226.227：GoodsGrid主タップ判定分離
+
+### 背景・問題意識
+
+`GoodsGrid` は各タイルの主タップ時に、選択モード、外部open callback、owner profile callback、詳細sheet表示の優先順位を `body` 内のclosureで直接判定していた。グッズ一覧のタップ挙動や表示文言を変えずに、主タップの行き先判定だけをテスト可能なpure policyへ寄せる必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/GoodsTileActionPolicy.swift`
+- `GoodsGridPrimaryTapPolicy` と `GoodsGridPrimaryTapDestination` を追加し、主タップ時の行き先を値として解決できるようにした。
+- 既存と同じく、選択モードのtoggle、外部open、他ユーザーowner profile、詳細表示の順で優先する。
+
+#### `ios-native/Sources/MegrumApp/GoodsGrid.swift`
+- `body` 内の `onOpenDetail` closureから分岐を外し、`handlePrimaryTap(_:)` へ委譲した。
+- sheet、alert、context menu、長押し選択、各アクションcallbackの意味は維持した。
+
+#### `ios-native/Tests/MegrumAppTests/GoodsGridLayoutTests.swift`
+- `GoodsGridPrimaryTapPolicy` の優先順位をテストで固定した。
+
+### 影響範囲
+
+- グッズグリッドの主タップ行き先判定に影響する。
+- レイアウト、表示文言、長押し選択、context menu、削除/編集/通報callback、保存処理、DB/API、通知、認証、課金、取引状態は変更していない。
+- 状態遷移、用語、データモデルに変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` は更新不要と判断した。
+
+### 確認方法
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-goods-primary-tap --enable-xctest --disable-swift-testing -j 1 --filter 'GoodsGridLayoutTests|GoodsPhotoURLResolverTests|SupabaseGoodsInventoryRowModelsTests|SupabaseOwnedGoodsPersistenceTests'`
+  - passed
+- `git diff --check -- ios-native/Sources/MegrumApp/GoodsGrid.swift ios-native/Sources/MegrumApp/GoodsTileActionPolicy.swift ios-native/Tests/MegrumAppTests/GoodsGridLayoutTests.swift`
+  - passed
+
+### セルフレビュー結果
+- ✅ 主タップの行き先判定だけをpure policyへ分離した。
+- ✅ 選択モード、外部open、owner profile、詳細sheet表示の優先順位は維持した。
+- ✅ 保存処理、DB/API、通知、認証、課金、取引状態、状態遷移、データモデル、ユーザー表示文言は変更していない。
+- ✅ 既存の未コミット変更は戻していない。
+
+## イテレーション1226.226：Groom閲覧Overlay没入化
+
+### 背景・問題意識
+
+グルーム閲覧時に標準 `fullScreenCover` のpresentation chrome由来で、下タブバー相当のフッターや上下の白い下地が残るケースがあった。返信、いいね、通報/ブロック、アーカイブ反応などのグルーム内機能は変えずに、閲覧画面だけを黒背景の没入表示へ固定する必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/GroomViewerImmersivePresentationChrome.swift`
+- グルーム閲覧専用の `groomViewerImmersiveOverlay` を追加し、標準 `fullScreenCover` ではなく同階層の黒背景オーバーレイとして表示できるようにした。
+- 表示中はtab bar/status barを非表示にし、上下安全領域まで黒背景で覆うようにした。
+
+#### `ios-native/Sources/MegrumApp/GroomViewerScreen.swift`
+- `GroomViewerPresentationModifier` のiOS表示を `groomViewerImmersiveOverlay` に差し替え、閉じる処理をoverlayのdismiss closureへ接続した。
+
+#### `ios-native/Sources/MegrumApp/MegrumAuthenticatedTabContentView.swift`
+- めぐりホームから開くグルーム閲覧を標準 `fullScreenCover` から専用overlayへ差し替えた。
+
+#### `ios-native/Sources/MegrumApp/MeguriMapViews.swift`
+- 地図上のグルーム群から開く閲覧も専用overlayへ差し替えた。
+
+#### `ios-native/Sources/MegrumApp/GroomArchiveScreen.swift`
+- アーカイブから開くストーリー閲覧も専用overlayへ差し替えた。
+
+#### `ios-native/Sources/MegrumApp/GroomArchiveStoryViews.swift`
+- 専用overlayでも閉じられるように、閉じる操作を任意の `onDismiss` 経由へ接続した。
+
+### 影響範囲
+
+- グルーム閲覧/グルームアーカイブ閲覧のpresentation方法に影響する。
+- グルーム画像、返信、いいね、通報/ブロック、アーカイブ反応、保存処理、DB/API、通知、認証、課金、取引状態、ユーザー表示文言は変更していない。
+- 状態遷移、用語、データモデルに変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` は更新不要と判断した。
+
+### 確認方法
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-groom-overlay --enable-xctest --disable-swift-testing -j 1 --filter 'GroomViewerPresentationTests|GroomInteractionStateReducerTests|MeguriAccessPolicyTests'`
+  - passed
+- `git diff --check -- ios-native/Sources/MegrumApp/GroomViewerImmersivePresentationChrome.swift ios-native/Sources/MegrumApp/GroomViewerScreen.swift ios-native/Sources/MegrumApp/MegrumAuthenticatedTabContentView.swift ios-native/Sources/MegrumApp/MeguriMapViews.swift ios-native/Sources/MegrumApp/GroomArchiveScreen.swift ios-native/Sources/MegrumApp/GroomArchiveStoryViews.swift`
+  - passed
+
+### セルフレビュー結果
+- ✅ グルーム閲覧のpresentation方法だけを標準カバーから専用overlayへ差し替えた。
+- ✅ 下タブバー相当のフッターと上下の白い下地が閲覧中に見えないよう、黒背景とtab bar/status bar非表示を同じpresentationに集約した。
+- ✅ 返信、いいね、通報/ブロック、アーカイブ反応、DB/API、通知、認証、課金、取引状態、状態遷移、データモデル、ユーザー表示文言は変更していない。
+- ✅ 既存の未コミット変更は戻していない。
+
+## イテレーション1226.225：TradeDetail Slide表示状態分離
+
+### 背景・問題意識
+
+`TradeDetailSlidePresentationOverlay` は、表示中route、表示完了flag、右スワイプdrag offset、dismiss drag追跡、transition tokenを個別 `@State` として持っていた。取引詳細の右側スライド表示、戻るボタン、右スワイプdismiss、detail route clearingのタイミングを変えずに、presentation状態だけを小さな値型へ寄せる必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/TradeDetailSlidePresentationState.swift`
+- `TradeDetailSlidePresentationState` を追加し、表示中route、表示完了flag、drag offset、dismiss drag追跡、transition tokenをまとめた。
+- 表示準備、表示完了guard、dismiss準備、dismiss完了guard、drag追跡、offset計算を状態型へ移した。
+
+#### `ios-native/Sources/MegrumApp/TradesDetailPresentationModifier.swift`
+- 個別の `visibleRoute` / `isDetailPresented` / `dragOffset` / `isTrackingDismissDrag` / `transitionToken` を `TradeDetailSlidePresentationState` に置き換えた。
+- `detailRoute` binding、スライドin/out、戻るボタン、右スワイプdismiss、`TradeDetailScreen` / `TradeDetailUnavailableScreen` の表示は維持した。
+
+#### `ios-native/Tests/MegrumAppTests/TradeChatAffordanceTests.swift`
+- `TradeDetailSlidePresentationState` の表示準備、表示完了guard、drag追跡、dismiss判定、dismiss完了までの状態遷移をテストで固定した。
+
+### 影響範囲
+
+- 取引詳細のスライドpresentation状態に影響する。
+- 取引詳細本文、チャット、合意/拒否/再打診/完了/評価/通報、保存処理、DB/API、通知、認証、課金、取引状態、ユーザー表示文言は変更していない。
+- 状態遷移、用語、データモデルに変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` は更新不要と判断した。
+
+### 確認方法
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-trade-detail-slide --enable-xctest --disable-swift-testing -j 1 --filter 'TradeChatAffordanceTests|EdgeBackSwipeGestureTests'`
+  - passed
+- `git diff --check -- ios-native/Sources/MegrumApp/TradesDetailPresentationModifier.swift ios-native/Tests/MegrumAppTests/TradeChatAffordanceTests.swift notes/08_design_iterations.md`
+  - passed
+- `git diff --check --no-index /dev/null ios-native/Sources/MegrumApp/TradeDetailSlidePresentationState.swift`
+  - passed
+
+### セルフレビュー結果
+- ✅ 取引詳細のスライドpresentation状態だけを値型へ分離した。
+- ✅ `detailRoute` binding、スライド表示、右スワイプdismiss、戻るボタン、route clearing timingは維持した。
+- ✅ 保存処理、DB/API、通知、認証、課金、取引状態、状態遷移、データモデル、ユーザー表示文言は変更していない。
+- ✅ 既存の未コミット変更は戻していない。
+
+## イテレーション1226.224：Groom閲覧没入表示修正
+
+### 背景・問題意識
+
+グルーム閲覧時に下タブバー相当のフッターや、フルスクリーン表示の上下安全領域に白い下地が見えるケースがあり、閲覧体験を邪魔していた。グルーム画像の表示ロジック、投稿・返信・いいね・通報/ブロック導線は変えずに、閲覧画面のpresentation chromeだけを没入表示へ寄せる必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/GroomViewerImmersivePresentationChrome.swift`
+- グルーム閲覧用の共通modifierを追加し、黒背景、安全領域無視、黒いpresentation背景、暗色表示、status bar非表示、tab bar非表示をまとめた。
+
+#### `ios-native/Sources/MegrumApp/GroomViewerScreen.swift`
+- 通常のグルーム閲覧fullScreenCoverに共通modifierを適用した。
+
+#### `ios-native/Sources/MegrumApp/MegrumAuthenticatedTabContentView.swift`
+- めぐりホームから開くグルーム閲覧fullScreenCoverに共通modifierを適用した。
+
+#### `ios-native/Sources/MegrumApp/MeguriMapViews.swift`
+- 地図上のグルーム群から開く閲覧fullScreenCoverにも同じ没入表示を適用した。
+
+#### `ios-native/Sources/MegrumApp/GroomArchiveScreen.swift`
+- グルームアーカイブのストーリー閲覧fullScreenCoverにも同じ没入表示を適用した。
+
+#### `ios-native/Sources/MegrumApp/SystemTabBarVisibilityHost.swift`
+- フルスクリーンカバー内からでも親階層、presenting階層、root階層の `UITabBarController` を探してtab bar非表示を反映できるようにした。
+
+### 影響範囲
+
+- グルーム閲覧/グルームアーカイブ閲覧の表示クロムに影響する。
+- グルーム画像の拡大方式、ページ送り、返信、いいね、通報/ブロック、アーカイブ反応表示、DB/API、通知、認証、課金、取引状態、保存処理、ユーザー表示文言は変更していない。
+- 状態遷移、用語、データモデルに変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` は更新不要と判断した。
+
+### 確認方法
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-groom-immersive --enable-xctest --disable-swift-testing -j 1 --filter 'GroomViewerPresentationTests|GroomInteractionStateReducerTests|MeguriAccessPolicyTests'`
+  - passed
+- `git diff --check -- ios-native/Sources/MegrumApp/GroomViewerScreen.swift ios-native/Sources/MegrumApp/MegrumAuthenticatedTabContentView.swift ios-native/Sources/MegrumApp/MeguriMapViews.swift ios-native/Sources/MegrumApp/GroomArchiveScreen.swift ios-native/Sources/MegrumApp/SystemTabBarVisibilityHost.swift notes/08_design_iterations.md`
+  - passed
+- `git diff --check --no-index /dev/null ios-native/Sources/MegrumApp/GroomViewerImmersivePresentationChrome.swift`
+  - passed
+
+### セルフレビュー結果
+- ✅ グルーム閲覧の表示クロムだけを共通modifierへ寄せた。
+- ✅ グルーム画像、返信、いいね、通報/ブロック、アーカイブ反応、ナビゲーションの意味は維持した。
+- ✅ 保存処理、DB/API、通知、認証、課金、取引状態、状態遷移、データモデル、ユーザー表示文言は変更していない。
+- ✅ 既存の未コミット変更は戻していない。
+
+## イテレーション1226.223：SubscriptionSettings表示状態分離
+
+### 背景・問題意識
+
+`SubscriptionSettingsScreen` は購入offer、offer読み込み中、購入/復元中、成功メッセージ、エラーメッセージを画面直下の個別 `@State` として持っていた。StoreKit購入、復元、Supabase同期、開発用プラン切替、戻る導線、表示文言を変えずに、購読紹介画面のpresentation状態だけを小さな値型へ寄せる必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/SubscriptionSettingsPresentationState.swift`
+- `SubscriptionSettingsPresentationState` を追加し、購入offer、offer読み込み中、購入/復元中、成功/エラーメッセージをまとめた。
+- offerのfallback表示、offer二重読み込み防止、購入/復元の二重実行防止、成功/エラーメッセージの相互排他を状態型へ移した。
+
+#### `ios-native/Sources/MegrumApp/SubscriptionSettingsScreen.swift`
+- 個別の `offer` / `isLoadingOffer` / `isPurchasing` / `purchaseMessage` / `purchaseErrorMessage` を `SubscriptionSettingsPresentationState` に置き換えた。
+- `purchaseClient.loadOffer`、`purchaseClient.purchase`、`purchaseClient.restore`、`appState.applyVerifiedMegrumPlusPurchase`、`appState.debugToggleMegrumPremiumEntitlement` の呼び出し順は維持した。
+
+#### `ios-native/Tests/MegrumAppTests/SettingsScreenTests.swift`
+- `SubscriptionSettingsPresentationState` のfallback offer表示、offer読み込み中状態、購入/復元中状態、成功/エラーメッセージの相互排他をテストで固定した。
+
+### 影響範囲
+
+- 購読紹介画面のpresentation状態に影響する。
+- StoreKit購入/復元、Supabase同期、課金状態、開発用プラン切替、ナビゲーション、DB/API、通知、認証、取引状態、ユーザー表示文言は変更していない。
+- 状態遷移、用語、データモデルに変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` は更新不要と判断した。
+
+### 確認方法
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-subscription-settings --enable-xctest --disable-swift-testing -j 1 --filter 'SettingsScreenTests|MegrumPlusAccessPolicyTests|SubscriptionModelsTests'`
+  - passed
+- `git diff --check -- ios-native/Sources/MegrumApp/SubscriptionSettingsScreen.swift ios-native/Sources/MegrumApp/SubscriptionSettingsContent.swift ios-native/Tests/MegrumAppTests/SettingsScreenTests.swift`
+  - passed
+- `git diff --check --no-index /dev/null ios-native/Sources/MegrumApp/SubscriptionSettingsPresentationState.swift`
+  - passed
+
+### セルフレビュー結果
+- ✅ 購読紹介画面のpresentation状態だけを値型へ分離した。
+- ✅ StoreKit購入/復元、Supabase同期、debugプラン切替、戻る導線、ユーザー表示文言は維持した。
+- ✅ DB/API、通知、認証、課金状態、取引状態、状態遷移、データモデルは変更していない。
+- ✅ 既存の未コミット変更は戻していない。
+
+## イテレーション1226.222：SearchScreen表示状態分離
+
+### 背景・問題意識
+
+`SearchScreen` は検索語の入力中/適用済み状態、sort、初期条件適用済みID、フィルターsheet表示、サジェスト適用中フラグ、横スクロール後の戻るスワイプ抑制時刻を画面直下の個別状態として持っていた。検索API呼び出し、フィルター条件、検索結果表示、打診/プロフィール遷移を変えずに、検索画面のpresentation状態だけを小さな値型へ寄せる必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/SearchScreenPresentationState.swift`
+- `SearchScreenPresentationState` を追加し、検索語、検索語draft、sort、フィルターsheet表示、初期条件適用、サジェスト適用中、戻るスワイプ抑制時刻をまとめた。
+- query同期、初期条件の二重適用防止、フィルターsheet表示、横スクロール抑制判定を状態型へ移した。
+
+#### `ios-native/Sources/MegrumApp/SearchScreen*.swift`
+- `SearchScreen` と search/filter/suggestion/back-swipe actionから、該当する個別状態参照を `SearchScreenPresentationState` 経由へ置き換えた。
+- `searchTask`、`proposalTargetItem`、`profileRoute` は副作用とnavigation状態として画面側に残した。
+- 検索ロード、検索API引数、検索スケジュール、サジェスト適用、active criteria削除、フィルターsheetのapply、打診作成/プロフィール遷移は維持した。
+
+#### `ios-native/Tests/MegrumAppTests/SearchScreenTests.swift`
+- `SearchScreenPresentationState` のquery同期、フィルターsheet表示、サジェスト適用中フラグ、横スクロール後の戻るスワイプ抑制、初期条件の二重適用防止をテストで固定した。
+
+### 影響範囲
+
+- 検索画面のpresentation状態に影響する。
+- 検索条件の意味、検索API、検索結果filter/sort、検索結果広告挿入、打診作成、プロフィール表示、通報導線、DB/API、通知、認証、課金、取引状態、ユーザー表示文言は変更していない。
+- 状態遷移、用語、データモデルに変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` は更新不要と判断した。
+
+### 確認方法
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-search-screen --enable-xctest --disable-swift-testing -j 1 --filter 'SearchScreenTests'`
+  - passed
+- `git diff --check -- ios-native/Sources/MegrumApp/SearchScreen.swift ios-native/Sources/MegrumApp/SearchScreenDerivedState.swift ios-native/Sources/MegrumApp/SearchScreenSearchActions.swift ios-native/Sources/MegrumApp/SearchScreenFilterActions.swift ios-native/Sources/MegrumApp/SearchScreenSuggestionActions.swift ios-native/Sources/MegrumApp/SearchScreenBackSwipeActions.swift ios-native/Sources/MegrumApp/SearchScreenPresentationState.swift ios-native/Tests/MegrumAppTests/SearchScreenTests.swift`
+  - passed
+- `git diff --check --no-index /dev/null ios-native/Sources/MegrumApp/SearchScreenPresentationState.swift`
+  - passed
+
+### セルフレビュー結果
+- ✅ 検索画面のpresentation状態だけを値型へ分離した。
+- ✅ 検索実行、検索API引数、検索結果filter/sort、サジェスト、active criteria削除、フィルター適用、打診/プロフィール遷移は維持した。
+- ✅ 保存処理、DB/API、通知、認証、課金、取引状態、状態遷移、データモデル、ユーザー表示文言は変更していない。
+- ✅ 既存の未コミット変更は戻していない。
+
+## イテレーション1226.221：AppDrawer Overlay状態分離
+
+### 背景・問題意識
+
+`AppDrawerOverlay` はドロワーの閉じ中状態と、項目上でドラッグした時に誤タップを抑制する状態を個別 `@State` として持っていた。左ドロワーの開閉ジェスチャー、項目選択、ログアウト、バッジ表示を変えずに、presentation状態の意味だけを小さな値型へ寄せる必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/AppDrawerOverlayPresentationState.swift`
+- `AppDrawerOverlayPresentationState` を追加し、閉じ中フラグ、項目タップ抑制フラグ、選択可否、閉じ開始/完了、表示再開時のreset、ドラッグ抑制判定をまとめた。
+
+#### `ios-native/Sources/MegrumApp/AppDrawerOverlay.swift`
+- 個別の `isClosing` / `isSuppressingDrawerItemTap` を `AppDrawerOverlayPresentationState` に置き換えた。
+- `.task` 直下の通知/支払い設定読み込みを `loadDrawerDataIfNeeded()` へ寄せ、body側は薄いorchestrationにした。
+- 左ドロワーの表示位置、開閉アニメーション、項目選択、ログアウト、バッジ表示は維持した。
+
+#### `ios-native/Tests/MegrumAppTests/AppDrawerGestureTests.swift`
+- `AppDrawerOverlayPresentationState` の閉じ中状態とタップ抑制状態のライフサイクルをテストで固定した。
+
+### 影響範囲
+
+- 左ドロワーoverlay内のpresentation状態に影響する。
+- 左ドロワー項目、開閉ジェスチャー、ログアウト実行、通知/支払い設定読み込み、保存処理、Supabase API、DB schema、通知、認証、課金、取引状態、ユーザー表示文言は変更していない。
+- 状態遷移、用語、データモデルに変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` は更新不要と判断した。
+
+### 確認方法
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-app-drawer --enable-xctest --disable-swift-testing -j 1 --filter 'AppDrawerGestureTests'`
+  - passed
+
+### セルフレビュー結果
+- ✅ 左ドロワーoverlayのpresentation状態だけを値型へ分離した。
+- ✅ 左ドロワーの項目構成、選択導線、ログアウト、バッジ表示、通知/支払い設定読み込み順は維持した。
+- ✅ 保存処理、DB/API、通知、認証、課金、取引状態、状態遷移、データモデル、ユーザー表示文言は変更していない。
+- ✅ 既存の未コミット変更は戻していない。
+
+## イテレーション1226.220：グルーム閲覧全画面表示修正
+
+### 背景・問題意識
+
+グルーム閲覧をめぐりタブ内のoverlayとして表示すると、iOSのTabView/タブバー下地やsafe area由来の白い領域が閲覧画面の上下に残る場合があった。グルーム閲覧中はフッターや白い下地を見せず、画像閲覧画面を黒背景で画面全体に出す必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MegrumAuthenticatedTabContentView.swift`
+- めぐりホームから開くグルーム閲覧を、TabView内overlayではなくiOSの `fullScreenCover` 経由に戻した。
+- iOSではfull-screen、macOSテストビルドではsheetに落とす小さなpresentation helperを追加した。
+- グルーム閲覧の背景を黒で明示し、上下safe areaやタブバー下地が白く見えないようにした。
+
+#### `ios-native/Sources/MegrumApp/GroomViewerScreen.swift`
+- ローカルのグルーム閲覧presentationもiOSでは `fullScreenCover` を使う形へ戻し、黒背景を明示した。
+- グルーム閲覧の本文UI、ページ進行、返信、いいね、通報、ブロック、既読/engagement読み込みは維持した。
+
+### 影響範囲
+
+- めぐりのグルーム閲覧presentationに影響する。
+- グルーム投稿、返信、いいね、通報、ブロック、DB/API、通知、認証、課金、取引状態、ユーザー表示文言は変更していない。
+- 状態遷移、用語、データモデルに変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` は更新不要と判断した。
+
+### 確認方法
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-groom-viewer-footer-fix-2 --enable-xctest --disable-swift-testing -j 1 --filter 'GroomViewerPresentationTests|GroomInteractionStateReducerTests'`
+  - passed
+- `git diff --check -- ios-native/Sources/MegrumApp/GroomViewerScreen.swift ios-native/Sources/MegrumApp/MegrumAuthenticatedTabContentView.swift`
+  - passed
+
+### セルフレビュー結果
+- ✅ グルーム閲覧の表示経路だけをTabView overlayから全画面presentationへ戻した。
+- ✅ グルーム閲覧中の本文UI、操作、読み込み処理、ユーザー表示文言は維持した。
+- ✅ 保存処理、DB/API、通知、認証、課金、取引状態、状態遷移、データモデルは変更していない。
+- ✅ 既存の未コミット変更は戻していない。
+
+## イテレーション1226.219：BirthDate Calendar表示状態分離
+
+### 背景・問題意識
+
+`AccountSetupBirthDateCalendar` は表示中の月と月/年ナビゲーション可否をView内の `@State` とprivate helperに直接持っていた。生年月日の選択・未来日ブロック・アクセシビリティ表示を変えずに、カレンダーの表示月状態だけを小さな値型へ寄せる必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/AccountSetupBirthDateCalendarPresentationState.swift`
+- `AccountSetupBirthDateCalendarPresentationState` を追加し、表示中の月、月タイトル、選択同期、前月/翌月/前年/翌年ナビゲーションをまとめた。
+- `maxDate` を越える翌月/翌年移動を防ぐ判定を状態型へ移した。
+
+#### `ios-native/Sources/MegrumApp/AccountSetupBirthDateCalendar.swift`
+- 個別の `visibleMonth` をpresentation stateに置き換えた。
+- 日付グリッド生成、選択変更callback、未来日disable、表示文言、アクセシビリティlabelは維持した。
+
+#### `ios-native/Tests/MegrumAppTests/AccountSetupScreenTests.swift`
+- 表示月初期化、前月/翌年移動、選択同期、`maxDate` 月で翌月へ進まないことをテストで固定した。
+
+### 影響範囲
+
+- 初回アカウント設定の生年月日カレンダー表示月に影響する。
+- 生年月日validation、未来日ブロック、保存処理、アカウント設定payload、Supabase API、DB schema、ナビゲーション、通知、認証、課金、取引状態、ユーザー表示文言は変更していない。
+- 状態遷移、用語、データモデルに変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` は更新不要と判断した。
+
+### 確認方法
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-account-toast-state --enable-xctest --disable-swift-testing -j 1 --filter 'AccountSetupScreenTests|AccountSetupSessionPolicyTests|OnboardingOshiSelectionTests|AccountSetupProfileDraftTests|AccountSetupToastStateTests|MegrumAppStateTests'`
+  - passed
+- `git diff --check -- ios-native/Sources/MegrumApp/AccountSetupBirthDateCalendar.swift ios-native/Sources/MegrumApp/AccountSetupBirthDateCalendarPresentationState.swift ios-native/Tests/MegrumAppTests/AccountSetupScreenTests.swift notes/08_design_iterations.md`
+  - passed
+
+### セルフレビュー結果
+- ✅ カレンダー表示月とナビゲーション可否だけを値型へ分離した。
+- ✅ 生年月日選択、未来日disable、日付生成、保存payload、ユーザー表示文言は維持した。
+- ✅ 保存処理、DB/API、通知、認証、課金、取引状態、状態遷移、データモデルは変更していない。
+- ✅ 既存の未コミット変更は戻していない。
+
+## イテレーション1226.218：Settings Presentation状態分離
+
+### 背景・問題意識
+
+`SettingsScreen` は設定内NavigationStackのpathとログアウト中flagを個別 `@State` として持ち、読み込み失敗画面も再試行/ログアウト中表示をView内の個別状態として持っていた。ナビゲーション先やログアウト処理を変えずに、画面presentation状態だけを小さな値型へ寄せる必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/SettingsPresentationState.swift`
+- `SettingsPresentationState` を追加し、設定画面のnavigation pathとログアウト中flagをまとめた。
+- route追加、二重ログアウト防止、ログアウト完了時のflag解除を状態型へ移した。
+
+#### `ios-native/Sources/MegrumApp/NativeLoadingFailurePresentationState.swift`
+- `NativeLoadingFailurePresentationState` を追加し、読み込み失敗画面の再試行中/ログアウト中表示状態をまとめた。
+- ボタンtitleとdisabled判定を状態型へ移した。
+
+#### `ios-native/Sources/MegrumApp/SettingsScreen.swift`
+- 個別の `navigationPath` / `isSigningOut` を `SettingsPresentationState` に置き換えた。
+- 設定内の遷移先、ログアウト実行、設定画面dismiss、初期データ読み込みは維持した。
+
+#### `ios-native/Sources/MegrumApp/MegrumRootAuxiliaryViews.swift`
+- 読み込み失敗画面の再試行/ログアウト表示を `NativeLoadingFailurePresentationState` に寄せた。
+- 再試行とログアウトのcallback呼び出し順は維持した。
+
+#### `ios-native/Tests/MegrumAppTests/SettingsScreenTests.swift`
+- 設定画面のroute追加とログアウト中flagのライフサイクルをテストで固定した。
+- 読み込み失敗画面のbutton title、disabled判定、再試行/ログアウト状態遷移をテストで固定した。
+
+### 影響範囲
+
+- 設定画面の内部navigation状態とログアウト中表示、読み込み失敗画面のbutton表示状態に影響する。
+- 設定メニュー構成、各遷移先、ログアウト実行、初期データ読み込み、表示文言、保存処理、Supabase API、DB schema、通知、認証、課金、取引状態は変更していない。
+- 状態遷移、用語、データモデルに変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` は更新不要と判断した。
+
+### 確認方法
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-account-deletion --enable-xctest --disable-swift-testing -j 1 --filter 'SettingsScreenTests|MegrumAppStateTests'`
+  - passed
+- `git diff --check -- ios-native/Sources/MegrumApp/SettingsScreen.swift ios-native/Sources/MegrumApp/SettingsPresentationState.swift ios-native/Sources/MegrumApp/NativeLoadingFailurePresentationState.swift ios-native/Sources/MegrumApp/MegrumRootAuxiliaryViews.swift ios-native/Tests/MegrumAppTests/SettingsScreenTests.swift notes/08_design_iterations.md`
+  - passed
+
+### セルフレビュー結果
+- ✅ 設定画面と読み込み失敗画面のpresentation状態だけを値型へ分離した。
+- ✅ navigation先、ログアウトcallback、再試行callback、dismiss、初期データ読み込みは維持した。
+- ✅ 保存処理、DB/API、通知、認証、課金、取引状態、ユーザー表示文言は変更していない。
+- ✅ 状態遷移、用語、データモデルは変更していない。
+- ✅ 既存の未コミット変更は戻していない。
+
+## イテレーション1226.217：LoginSecurity再設定入力状態分離
+
+### 背景・問題意識
+
+`LoginSecuritySettingsScreen` はパスワード再設定メールの入力値と入力エラーを画面内の個別 `@State` として持っていた。認証処理やフィードバック表示順を変えずに、再設定メール入力のprefill、正規化、validation状態だけを小さな値型へ寄せる必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/LoginSecurityPasswordResetState.swift`
+- `LoginSecurityPasswordResetState` を追加し、再設定メール入力値と入力エラーをまとめた。
+- 空欄時だけログインメールをprefillする処理、メール正規化、送信前validation、入力エラーclearを状態型へ移した。
+
+#### `ios-native/Sources/MegrumApp/SettingsLoginSecurityViews.swift`
+- 個別の `resetEmail` / `resetInputErrorMessage` を `LoginSecurityPasswordResetState` に置き換えた。
+- `authState.sendPasswordReset(email:)`、`authState.clearFeedback()`、ログアウト導線、表示文言、フィードバック優先順は維持した。
+
+#### `ios-native/Tests/MegrumAppTests/SettingsScreenTests.swift`
+- ログインメールのprefill、手入力後はprefillで上書きしないこと、正規化、validation、入力エラーclearをテストで固定した。
+
+### 影響範囲
+
+- ログインとセキュリティ画面のパスワード再設定入力状態に影響する。
+- 認証Repository呼び出し、ログアウト導線、表示文言、ナビゲーション、保存処理、Supabase API、DB schema、通知、課金、取引状態は変更していない。
+- 状態遷移、用語、データモデルに変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` は更新不要と判断した。
+
+### 確認方法
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-account-deletion --enable-xctest --disable-swift-testing -j 1 --filter 'SettingsScreenTests|MegrumAppStateTests'`
+  - passed
+- `git diff --check -- ios-native/Sources/MegrumApp/SettingsLoginSecurityViews.swift ios-native/Sources/MegrumApp/LoginSecurityPasswordResetState.swift ios-native/Tests/MegrumAppTests/SettingsScreenTests.swift notes/08_design_iterations.md`
+  - passed
+
+### セルフレビュー結果
+- ✅ パスワード再設定メールの入力状態とvalidationだけを値型へ分離した。
+- ✅ 認証処理、ログアウト処理、フィードバック表示順、ユーザー表示文言は維持した。
+- ✅ 認証/通知/課金/取引状態、DB/API、状態遷移、データモデルは変更していない。
+- ✅ 既存の未コミット変更は戻していない。
+
+## イテレーション1226.216：住所設定Draft状態分離
+
+### 背景・問題意識
+
+`AddressSettingsScreen` は宛名、郵便番号、住所各フィールド、郵便番号lookup済み判定、入力エラーを個別の `@State` として持っていた。保存処理や郵便番号lookupのタイミングを変えずに、住所draftの正規化とvalidation表示状態だけを小さな値型へ寄せる必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/AddressSettingsDraftState.swift`
+- `AddressSettingsDraftState` を追加し、住所入力欄、最後に反映した郵便番号、入力エラーをまとめた。
+- `MailingAddress` 生成、既存住所反映、郵便番号入力正規化、lookup要否判定、lookup結果反映、validation message管理を状態型へ移した。
+
+#### `ios-native/Sources/MegrumApp/AddressSettingsScreen.swift`
+- 個別の住所入力 `@State` 群を `AddressSettingsDraftState` に置き換えた。
+- `appState.loadMailingAddress()`、`appState.lookupPostalCode(_:)`、`appState.saveMailingAddress(_:)` の呼び出し順と250ms debounce、画面dismissは維持した。
+
+#### `ios-native/Tests/MegrumAppTests/SettingsScreenTests.swift`
+- 住所draftからtrim済み `MailingAddress` が作られることを固定した。
+- 保存済み住所反映、郵便番号lookup要否、lookup結果反映、郵便番号正規化、入力エラーclearをテストで固定した。
+
+### 影響範囲
+
+- 住所設定画面の一時入力状態と郵便番号lookup判定に影響する。
+- 住所保存Repository呼び出し、保存validation、郵便番号lookup API呼び出し、ナビゲーション、Supabase API、DB schema、通知、認証、課金、取引状態、ユーザー表示文言は変更していない。
+- 状態遷移、用語、データモデルに変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` は更新不要と判断した。
+
+### 確認方法
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-account-deletion --enable-xctest --disable-swift-testing -j 1 --filter 'SettingsScreenTests|MegrumAppStateTests'`
+  - passed
+- `git diff --check -- ios-native/Sources/MegrumApp/AddressSettingsScreen.swift ios-native/Sources/MegrumApp/AddressSettingsDraftState.swift ios-native/Tests/MegrumAppTests/SettingsScreenTests.swift notes/08_design_iterations.md`
+  - passed
+
+### セルフレビュー結果
+- ✅ 住所draft、郵便番号lookup判定、validation表示状態だけを値型へ分離した。
+- ✅ 住所保存、郵便番号lookup、dismiss、キーボード完了ボタン、ユーザー表示文言は維持した。
+- ✅ `MegrumAppStateTests` で住所保存validationも通っていることを確認した。
+- ✅ DB/API、状態遷移、通知、認証、課金、取引状態、データモデルは変更していない。
+- ✅ 既存の未コミット変更は戻していない。
+
+## イテレーション1226.215：Interaction Feedback表示状態分離
+
+### 背景・問題意識
+
+`MegrumInteractionFeedbackModifier` はtap rippleの配列とripple animationの進捗をView内に直接持っていた。触覚フィードバックやgesture挙動を変えずに、表示状態だけを小さな値型へ寄せ、ripple追加/削除とreduce motion時の表示値をテスト可能にする必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MegrumInteractionFeedbackPresentationState.swift`
+- `MegrumInteractionFeedbackPresentationState` を追加し、tap rippleの追加/削除を値型へ移した。
+- `MegrumTapRippleAnimationState` を追加し、rippleのdiameter、scale、opacityを値型で表現した。
+
+#### `ios-native/Sources/MegrumApp/MegrumInteractionFeedback.swift`
+- View内の `ripples` 配列と `progress` をpresentation stateへ置き換えた。
+- tap gesture、0.72秒後のripple削除、haptics、reduce motion/reduce transparencyの表示挙動は維持した。
+
+#### `ios-native/Tests/MegrumAppTests/MegrumInteractionFeedbackTests.swift`
+- ripple追加/削除と、reduce motion時を含むscale/opacity/diameter算出をテストで固定した。
+
+### 影響範囲
+
+- `megrumInteractionFeedback` modifierを使う画面のtap ripple表示に影響する。
+- 触覚フィードバック、gesture、ユーザー表示文言、ナビゲーション、保存処理、Supabase API、DB schema、通知、認証、課金、取引状態は変更していない。
+- 状態遷移、用語、データモデルに変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` は更新不要と判断した。
+
+### 確認方法
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-interaction-feedback --enable-xctest --disable-swift-testing -j 1 --filter 'MegrumInteractionFeedbackTests'`
+  - passed
+- `git diff --check -- ios-native/Sources/MegrumApp/MegrumInteractionFeedback.swift ios-native/Sources/MegrumApp/MegrumInteractionFeedbackPresentationState.swift ios-native/Tests/MegrumAppTests/MegrumInteractionFeedbackTests.swift notes/08_design_iterations.md`
+  - passed
+
+### セルフレビュー結果
+- ✅ tap ripple表示状態とanimation値だけを値型へ分離した。
+- ✅ haptics、gesture、ripple削除タイミング、reduce motion/reduce transparencyの見え方は維持した。
+- ✅ 保存処理、DB/API、ナビゲーション、通知、認証、課金、取引状態、ユーザー表示文言は変更していない。
+- ✅ 既存の未コミット変更は戻していない。
+
+## イテレーション1226.214：退会Draft状態分離
+
+### 背景・問題意識
+
+`AccountDeletionScreen` は退会手続きのstep、選択理由、メモ、validation、最終確認dialog表示を画面内の複数 `@State` として持っていた。退会申請の実行順や進行中取引ブロックを変えずに、入力draftとvalidation状態だけを小さな値型へ寄せ、画面側は表示と `MegrumAppState` への申請依頼に集中させる必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/AccountDeletionDraftState.swift`
+- `AccountDeletionDraftState` を追加し、退会step、選択理由、メモ、validation message、最終確認dialog状態をまとめた。
+- 理由toggle、メモ文字数制限、進行中取引エラー、理由step validation、申請input生成を状態型へ移した。
+
+#### `ios-native/Sources/MegrumApp/AccountDeletionScreen.swift`
+- 個別の `step` / `selectedReasons` / `note` / `validationMessage` / `showsFinalConfirmation` を `AccountDeletionDraftState` に置き換えた。
+- 進行中取引チェック、確認dialog、退会申請の `appState.requestAccountDeletion(_:)` 呼び出し、完了callbackは維持した。
+
+#### `ios-native/Tests/MegrumAppTests/SettingsScreenTests.swift`
+- 理由選択、メモ制限、申請input正規化、step移動、最終確認dialog要求を `AccountDeletionDraftState` のテストで固定した。
+- 進行中取引ブロックと退会理由validationの既存テストも維持した。
+
+### 影響範囲
+
+- 設定内の退会画面の一時入力状態に影響する。
+- 退会申請Repository呼び出し、進行中取引判定、確認dialog文言、ナビゲーション、Supabase API、DB schema、通知、認証、課金、取引状態、ユーザー表示文言は変更していない。
+- 状態遷移、用語、データモデルに変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` は更新不要と判断した。
+
+### 確認方法
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-account-deletion --enable-xctest --disable-swift-testing -j 1 --filter 'SettingsScreenTests|MegrumAppStateTests'`
+  - passed
+- `git diff --check -- ios-native/Sources/MegrumApp/AccountDeletionScreen.swift ios-native/Sources/MegrumApp/AccountDeletionDraftState.swift ios-native/Tests/MegrumAppTests/SettingsScreenTests.swift notes/08_design_iterations.md`
+  - passed
+
+### セルフレビュー結果
+- ✅ 退会入力draftとvalidation状態だけを値型へ分離した。
+- ✅ 退会申請の保存順序、Repository境界、進行中取引ブロック、確認dialog、完了callbackは維持した。
+- ✅ `MegrumAppStateTests` で退会申請がRepository経由で実行されることを確認した。
+- ✅ 状態遷移、用語、データモデル、通知、認証、課金、取引状態、ユーザー表示文言は変更していない。
+- ✅ 既存の未コミット変更は戻していない。
+
+## イテレーション1226.213：PaymentSettings編集状態分離
+
+### 背景・問題意識
+
+`PaymentSettingsScreen` は支払い方法のdraft、保存前validation、外部リロード時にユーザー入力を守るflagを画面内の複数 `@State` として持っていた。保存処理やSupabase永続化順序を変えずに、編集状態とpayload生成だけを小さな値型へ寄せ、画面側は入力Bindingと保存オーケストレーションに絞る必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/PaymentSettingsEditingState.swift`
+- `PaymentSettingsEditingState` を追加し、`PaymentSettingsDraft`、validation message、ユーザー編集済みflagをまとめた。
+- 現在値の反映、支払い方法toggle、自由入力制限、保存用settings生成、保存成功後の編集flag解除を値型へ移した。
+
+#### `ios-native/Sources/MegrumApp/PaymentSettingsScreen.swift`
+- 個別の `draft` / `validationMessage` / `hasUserEditedDraft` を `PaymentSettingsEditingState` に置き換えた。
+- 画面側は `appState.loadPaymentSettings()` と `appState.savePaymentSettings(_:)` の呼び出し順、閉じる導線、キーボードfocus制御を維持した。
+
+#### `ios-native/Tests/MegrumAppTests/SettingsScreenTests.swift`
+- 外部リロード中もユーザー入力が上書きされないことを `PaymentSettingsEditingState` のテストで固定した。
+- 保存前validation、その他入力の文字数制限、viewer未読込時の保存ブロックをテストで固定した。
+
+### 影響範囲
+
+- 左ドロワーの支払い方法設定画面の編集状態に影響する。
+- 保存する `UserPaymentSettings` の正規化、保存順序、Supabase API、DB schema、ナビゲーション、ユーザー表示文言、通知、認証、課金、取引状態は変更していない。
+- 状態遷移、用語、データモデルに変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` は更新不要と判断した。
+
+### 確認方法
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-payment --enable-xctest --disable-swift-testing -j 1 --filter 'SettingsScreenTests|SupabasePaymentSettingsPersistenceTests'`
+  - passed
+- `git diff --check -- ios-native/Sources/MegrumApp/PaymentSettingsScreen.swift ios-native/Sources/MegrumApp/PaymentSettingsEditingState.swift ios-native/Tests/MegrumAppTests/SettingsScreenTests.swift`
+  - passed
+
+### セルフレビュー結果
+- ✅ 編集draft、validation、外部リロード保護flagだけを値型へ分離した。
+- ✅ 既存の保存順序、正規化、画面遷移、キーボード完了ボタン、閉じる導線は維持した。
+- ✅ Supabase永続化テストも同時に通し、DB/API境界を変更していないことを確認した。
+- ✅ 状態遷移、用語、データモデル、通知、認証、課金、取引状態、ユーザー表示文言は変更していない。
+- ✅ 既存の未コミット変更は戻していない。
+
+## イテレーション1226.212：AccountSetup Toast状態分離
+
+### 背景・問題意識
+
+`AccountSetupScreen` は追加リクエスト時のtoast表示に `toastMessage` と `toastID` を個別の `@State` として持ち、古い非表示タスクが新しいtoastを消さないための判定も画面内に直接持っていた。表示文言や表示時間を変えずに、一時表示状態だけを小さな値型へ寄せ、画面側の副作用を薄くする必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/AccountSetupToastState.swift`
+- `AccountSetupToastState` を追加し、toast message と識別子を1つの値型で扱うようにした。
+- `showToast` と `clearToast(ifMatching:)` を持たせ、古いclear要求が新しいtoastを消さない判定を状態型へ移した。
+
+#### `ios-native/Sources/MegrumApp/AccountSetupScreen.swift`
+- `toastMessage` / `toastID` の個別 `@State` を `AccountSetupToastState` に置き換えた。
+- toast文言、表示位置、アニメーション、2.2秒後に消える挙動は変更していない。
+
+#### `ios-native/Tests/MegrumAppTests/AccountSetupToastStateTests.swift`
+- 新しいtoastを表示した後、古いIDによるclear要求ではtoastが消えず、現在IDでだけ消えることを追加した。
+
+### 影響範囲
+
+- 認証後オンボーディングのtoast一時表示状態に影響する。
+- ユーザー表示文言、画面レイアウト、ナビゲーション、保存処理、Supabase API、DB schema、通知、認証、課金、取引状態は変更していない。
+- 状態遷移、用語、データモデルに変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` は更新不要と判断した。
+
+### 確認方法
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-account-toast-state --enable-xctest --disable-swift-testing -j 1 --filter 'AccountSetupScreenTests|AccountSetupSessionPolicyTests|OnboardingOshiSelectionTests|AccountSetupProfileDraftTests|AccountSetupToastStateTests|MegrumAppStateTests'`
+  - passed
+- `git diff --check -- ios-native/Sources/MegrumApp/AccountSetupProfileState.swift ios-native/Sources/MegrumApp/AccountSetupScreen.swift ios-native/Sources/MegrumApp/MegrumAppStateProfileSettingsActions.swift ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift notes/08_design_iterations.md`
+  - passed
+- `git diff --check --no-index /dev/null ios-native/Sources/MegrumApp/AccountSetupToastState.swift || test $? -eq 1`
+  - passed
+- `git diff --check --no-index /dev/null ios-native/Tests/MegrumAppTests/AccountSetupToastStateTests.swift || test $? -eq 1`
+  - passed
+
+### セルフレビュー結果
+- ✅ toast一時状態と stale clear 判定だけを値型へ分離した。
+- ✅ toast文言、表示時間、表示位置、アニメーションは維持した。
+- ✅ 保存処理、AccountSetup完了payload、repository境界、画面遷移は変更していない。
+- ✅ DB/API、状態遷移、通知、認証、課金、取引状態、ユーザー表示文言は変更していない。
+- ✅ 既存の未コミット変更は戻していない。
+
+## イテレーション1226.211：グルーム閲覧クローム遮蔽修正
+
+### 背景・問題意識
+
+グルーム閲覧中に、親画面側のフッターや上下の白い安全領域背景が見えてしまい、閲覧体験を邪魔していた。標準TabView自体は維持しつつ、グルームViewer表示中だけ余計なクロームと親背景が見えないようにする必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/SystemTabBarVisibilityHost.swift`
+- 標準TabViewのタブバーを、グルームViewer表示中だけUIKit側でも明示的に非表示へ切り替える小さなHostを追加した。
+- Viewerが閉じた時やHost破棄時にはタブバーを再表示する。
+
+#### `ios-native/Sources/MegrumApp/MegrumAuthenticatedTabContentView.swift`
+- グルームViewer表示中に `SystemTabBarVisibilityHost` を使い、フッターが残らないようにした。
+- Viewerの拡大アニメーション中も、画面全体に黒背景を先に敷き、上下に白い親背景が見えないようにした。
+
+#### `ios-native/Sources/MegrumApp/GroomViewerScreen.swift`
+- fallbackのViewer表示でも同じく全画面黒背景を敷き、拡大/縮小中の白い余白混入を防ぐようにした。
+
+### 影響範囲
+
+- めぐり内のグルーム閲覧表示に影響する。
+- 標準TabView構成、タブ順、グルームの表示内容、いいね、返信、通報、ブロック、保存処理、DB/API、通知、認証、課金、取引状態は変更していない。
+- 状態遷移、用語、データモデルに変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` は更新不要と判断した。
+
+### 確認方法
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-groom-viewer-chrome --enable-xctest --disable-swift-testing -j 1 --filter 'GroomViewerPresentationTests|MegrumTabBarAppearanceTests'`
+  - passed
+- `git diff --check -- ios-native/Sources/MegrumApp/GroomViewerScreen.swift ios-native/Sources/MegrumApp/MegrumAuthenticatedTabContentView.swift`
+  - passed
+- `git diff --check --no-index /dev/null ios-native/Sources/MegrumApp/SystemTabBarVisibilityHost.swift || test $? -eq 1`
+  - passed
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -configuration Debug -destination 'generic/platform=iOS' -derivedDataPath /tmp/megrum-ios-native-device-build -allowProvisioningUpdates build`
+  - passed
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -configuration Debug -destination 'platform=iOS Simulator,id=C70DDDBB-2602-49E0-8F95-1F043BCCED76' -derivedDataPath /tmp/megrum-native-groom-viewer-sim CODE_SIGNING_ALLOWED=NO build`
+  - passed
+- `SIMCTL_CHILD_MEGRUM_VISUAL_QA_PREVIEW_AUTH=1 SIMCTL_CHILD_MEGRUM_VISUAL_QA_INITIAL_SCREEN=meguri xcrun simctl launch --terminate-running-process C70DDDBB-2602-49E0-8F95-1F043BCCED76 tokyo.megrum.native.preview`
+  - passed: めぐり画面まで起動確認
+- `xcrun devicectl device install app --device 7F6C74EF-5786-5316-920A-F7F1CC3FE2A4 /tmp/megrum-ios-native-device-build/Build/Products/Debug-iphoneos/MegrumNative.app`
+  - passed
+- `xcrun devicectl device process launch --device 7F6C74EF-5786-5316-920A-F7F1CC3FE2A4 tokyo.megrum.native.preview`
+  - failed: iPhoneがロック中でSBMainWorkspaceに起動拒否された
+
+### セルフレビュー結果
+- ✅ グルームViewer中だけ標準タブバーを隠し、閉じた後は再表示される構成にした。
+- ✅ Viewer表示/遷移中の親背景の白い上下領域が出ないよう、全画面黒背景を固定した。
+- ✅ 標準TabView構成、画面遷移、ユーザー表示文言、グルームの各アクションは変更していない。
+- ✅ DB/API、保存処理、状態遷移、通知、認証、課金、取引状態は変更していない。
+- ✅ 既存の未コミット変更は戻していない。
+
+## イテレーション1226.210：AccountSetup入力Payload境界分離
+
+### 背景・問題意識
+
+`AccountSetupProfileDraft` 分離後も、`AccountSetupScreen.save()` はプロフィール入力を個別引数として `MegrumAppState.completeAccountSetup(...)` へ渡していた。画面側を保存payloadの組み立てからさらに薄くし、既存の正規化・validation・repository保存順序を保ったまま、型付き `AccountSetupInput` 境界へ寄せる必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/AccountSetupProfileState.swift`
+- `AccountSetupProfileDraft.accountSetupInput(oshiSelections:)` を追加し、プロフィールdraftから既存 `AccountSetupInput` を作れるようにした。
+- 正規化は行わず、従来通り `MegrumAppState` 側に残した。
+
+#### `ios-native/Sources/MegrumApp/MegrumAppStateProfileSettingsActions.swift`
+- `completeAccountSetup(_ input: AccountSetupInput)` を追加し、既存の個別引数版はこの型付き入力へ委譲する形にした。
+- handle / displayName / prefecture の正規化、birthDate / gender / oshi validation、repository保存順序、error文言は変更していない。
+
+#### `ios-native/Sources/MegrumApp/AccountSetupScreen.swift`
+- 保存時に `draft.accountSetupInput(oshiSelections:)` を `MegrumAppState` へ渡すようにし、画面側から保存payloadの個別フィールド展開を削除した。
+
+#### `ios-native/Tests/MegrumAppTests/AccountSetupProfileDraftTests.swift`
+- draftが入力値を正規化せず `AccountSetupInput` へ写すことを追加した。
+
+#### `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- `AccountSetupInput` 直渡しでも既存通り保存が完了することを追加した。
+
+### 影響範囲
+
+- 認証後オンボーディングの保存入力境界に影響する。
+- ユーザー表示文言、画面レイアウト、ナビゲーション、Supabase API、DB schema、通知、認証、課金、取引状態、保存順序は変更していない。
+- 状態遷移、用語、データモデルに変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` は更新不要と判断した。
+
+### 確認方法
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-account-profile-input --enable-xctest --disable-swift-testing -j 1 --filter 'AccountSetupScreenTests|AccountSetupSessionPolicyTests|OnboardingOshiSelectionTests|AccountSetupProfileDraftTests|MegrumAppStateTests'`
+  - passed
+- `git diff --check -- ios-native/Sources/MegrumApp/AccountSetupProfileState.swift ios-native/Sources/MegrumApp/AccountSetupScreen.swift ios-native/Sources/MegrumApp/MegrumAppStateProfileSettingsActions.swift ios-native/Tests/MegrumAppTests/AccountSetupProfileDraftTests.swift ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+  - passed
+
+### セルフレビュー結果
+- ✅ 画面側の保存payload展開だけを型付き入力へ寄せ、正規化・validation・保存順序は維持した。
+- ✅ 既存の個別引数版 `completeAccountSetup` は残し、既存呼び出し元との互換性を維持した。
+- ✅ 画面レイアウト、ステップ順、ナビゲーション、ユーザー表示文言は変更していない。
+- ✅ DB/API、通知、認証、課金、取引状態は変更していない。
+- ✅ 既存の未コミット変更は戻していない。
+
+## イテレーション1226.209：AccountSetup Profile Draft分離
+
+### 背景・問題意識
+
+`AccountSetupScreen` はプロフィール入力値を `AccountSetupProfileState` に持つ一方で、ステップvalidationと保存直前validationのたびに `displayName` / `handle` / `prefecture` / `birthDate` / `gender` を個別引数としてばらしていた。保存順序や画面遷移を変えずに、プロフィール入力の読み出し責務だけを小さなdraftへ寄せる必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/AccountSetupProfileState.swift`
+- `AccountSetupProfileDraft` を追加し、現在のプロフィール入力値からvalidation用snapshotを作れるようにした。
+- 既存 `AccountSetupDraftValidator` をそのまま呼ぶ薄い委譲に留め、validation文言と順序は変更していない。
+
+#### `ios-native/Sources/MegrumApp/AccountSetupScreen.swift`
+- ステップvalidationと保存直前validationで `profileState.draft` を使うようにした。
+- `completeAccountSetup` の呼び出し順、渡す値、画面遷移は変更していない。
+
+#### `ios-native/Tests/MegrumAppTests/AccountSetupProfileDraftTests.swift`
+- draft経由でも既存のstep validationと全体validation順序が維持されることを追加した。
+
+### 影響範囲
+
+- 認証後オンボーディングの内部入力読み出しに影響する。
+- ユーザー表示文言、画面レイアウト、ナビゲーション、Supabase API、DB schema、通知、認証、課金、取引状態、保存順序は変更していない。
+- 状態遷移、用語、データモデルに変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` は更新不要と判断した。
+
+### 確認方法
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-account-profile-draft --enable-xctest --disable-swift-testing -j 1 --filter 'AccountSetupScreenTests|AccountSetupSessionPolicyTests|OnboardingOshiSelectionTests|AccountSetupProfileDraftTests'`
+  - passed
+- `git diff --check -- ios-native/Sources/MegrumApp/AccountSetupProfileState.swift ios-native/Sources/MegrumApp/AccountSetupScreen.swift ios-native/Tests/MegrumAppTests/AccountSetupProfileDraftTests.swift`
+  - passed
+
+### セルフレビュー結果
+- ✅ validation文言、validation順序、保存payload、保存順序は維持した。
+- ✅ 画面レイアウト、ステップ順、ナビゲーションは変更していない。
+- ✅ DB/API、通知、認証、課金、取引状態、ユーザー表示文言は変更していない。
+- ✅ 既存の未コミット変更は戻していない。
+
+## イテレーション1226.208：MutualMatchレビューItem生成分離
+
+### 背景・問題意識
+
+`HomeMutualMatchExchangeReviewPolicy` と `HomeMutualMatchPaymentReviewPolicy` は、条件レビューItemの生成helperをそれぞれ持っていた。交換条件と支払条件の分岐は分離できた一方で、共通の `HomeMutualMatchConditionReviewItem` 生成責務が各Policyに残っていたため、表示文言や判定を変えずに生成処理だけを専用Factoryへ寄せる必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeMutualMatchConditionReviewItemFactory.swift`
+- `HomeMutualMatchConditionReviewItemFactory.make(...)` を追加し、レビューItem生成を1か所に集約した。
+
+#### `ios-native/Sources/MegrumApp/HomeMutualMatchExchangeReviewPolicy.swift`
+- private `item(...)` helper を削除し、交換条件レビューItem生成をFactoryへ委譲した。
+- 交換手段、都道府県、日程、送料に関する既存の分岐と title/detail/status は変更していない。
+
+#### `ios-native/Sources/MegrumApp/HomeMutualMatchPaymentReviewPolicy.swift`
+- private `item(...)` helper を削除し、支払条件レビューItem生成をFactoryへ委譲した。
+- cash option 判定、payment status ごとの title/detail/status は変更していない。
+
+### 影響範囲
+
+- ホーム相互マッチ候補の条件確認内部ロジックに影響する。
+- ユーザー表示文言、画面レイアウト、ナビゲーション、Supabase API、DB schema、通知、認証、課金、取引状態、保存順序は変更していない。
+- 状態遷移、用語、データモデルに変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` は更新不要と判断した。
+
+### 確認方法
+- `git diff --check -- ios-native/Sources/MegrumApp/HomeMutualMatchConditionReviewItemFactory.swift ios-native/Sources/MegrumApp/HomeMutualMatchExchangeReviewPolicy.swift ios-native/Sources/MegrumApp/HomeMutualMatchPaymentReviewPolicy.swift notes/08_design_iterations.md`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-mutual-review-item-factory --enable-xctest --disable-swift-testing -j 1 --filter 'HomeCandidateComposerTests|HomeDiscoveryMatchPolicyTests|HomeMutualMatchConditionPoliciesTests|HomeScreenFlowTests'`
+  - passed
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild-refactor-home-mutual-review-item-factory CODE_SIGNING_ALLOWED=NO -jobs 1 build`
+  - passed
+
+### セルフレビュー結果
+- ✅ レビューItem生成だけを専用Factoryへ分離し、交換条件/支払条件の分岐、title/detail/status は維持した。
+- ✅ 画面レイアウト、ナビゲーション、ユーザー表示文言は変更していない。
+- ✅ DB/API、保存処理、状態遷移、通知、認証、課金、取引状態は変更していない。
+- ✅ 既存の未コミット変更は戻していない。
+
 ## イテレーション1226.207：MutualMatch交換Review分離
 
 ### 背景・問題意識
@@ -689,6 +3277,2175 @@
 - ✅ Simulator確認は `simctl` の起動/スクリーンショットで行い、ユーザー側のマウス操作を奪わないようにした。
 - ⚠️ `simctl` にはタップ入力がないため、任意位置タップやドラッグ操作そのものはコードレビューとビルドで確認し、目視はVisual QAの直接起動画面で確認した。
 - ⚠️ 作業ツリーに多数の未コミット変更があるため、今回の対象外差分は戻していない。
+
+## イテレーション1226.188：グッズ列数のユーザー別保持
+
+### 背景・問題意識
+
+マイグッズ一覧の右上にある3/4/5列切り替えは画面内状態だけで、アプリを閉じて開き直すと初期列数へ戻っていた。また、Wish一覧は上部を独自ヘッダーにした影響で、以前マイグッズと同様に使えていた列数切り替えが表示されなくなっていた。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/GoodsGridColumnPreferenceStore.swift`
+- グッズグリッド列数を `UserDefaults` に保存/復元する小さなStoreを追加した。
+- 保存キーは `entryKind` と viewer ID を含め、同じ端末でもユーザー別、マイグッズ/Wish別に列数を保持するようにした。
+- 3〜5列の範囲外値は `GoodsGridLayout` で正規化するようにした。
+
+#### `ios-native/Sources/MegrumApp/CollectionScreens.swift`
+#### `ios-native/Sources/MegrumApp/GoodsCollectionScreenBody.swift`
+#### `ios-native/Sources/MegrumApp/GoodsCollectionScreenContent.swift`
+- マイグッズなど共通 `GoodsCollectionScreen` の列数を、表示時にユーザー別設定から復元し、切り替え時に保存するようにした。
+- 外側の親画面が列数を管理するケース向けに、表示列数のoverrideを受け取れるようにした。
+
+#### `ios-native/Sources/MegrumApp/GoodsCollectionDisplayViews.swift`
+#### `ios-native/Sources/MegrumApp/WishCollectionTopChrome.swift`
+#### `ios-native/Sources/MegrumApp/WishCollectionScreen.swift`
+- Wish一覧の上部ヘッダー右側に、マイグッズと同じ列数切り替えボタンを表示するようにした。
+- Wishページでは親の `WishCollectionScreen` が列数を保持し、内側の共通グリッドへ列数を渡すようにした。
+- 個別募集タブ表示中は列数切り替えを出さず、Wish一覧の時だけ表示するようにした。
+
+#### `ios-native/Tests/MegrumAppTests/GoodsGridLayoutTests.swift`
+- 列数設定がユーザー別・マイグッズ/Wish別に保存されること、範囲外の列数が3〜5列へ正規化されることを追加テストした。
+
+### 影響範囲
+
+- マイグッズ一覧とWish一覧の列数切り替え、アプリ再起動後の復元に影響する。
+- 保存先は端末内 `UserDefaults` で、DBスキーマやSupabase APIは変更していない。
+- 個別募集タブ、グッズ編集、長押し選択、フィルター、追加導線は維持した。
+- 状態遷移や用語追加はないため、`notes/09_state_machines.md` と `notes/10_glossary.md` の更新は不要と判断した。
+
+### 確認方法
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build-grid-columns --enable-xctest --disable-swift-testing -j 1 --filter GoodsGridLayoutTests`
+  - passed：33 tests, 0 failures
+- `git diff --check -- ios-native/Sources/MegrumApp/GoodsGridColumnPreferenceStore.swift ios-native/Sources/MegrumApp/CollectionScreens.swift ios-native/Sources/MegrumApp/GoodsCollectionScreenBody.swift ios-native/Sources/MegrumApp/GoodsCollectionScreenContent.swift ios-native/Sources/MegrumApp/GoodsCollectionDisplayViews.swift ios-native/Sources/MegrumApp/WishCollectionScreen.swift ios-native/Sources/MegrumApp/WishCollectionTopChrome.swift ios-native/Tests/MegrumAppTests/GoodsGridLayoutTests.swift`
+  - passed
+
+### セルフレビュー結果
+- ✅ マイグッズの列数はユーザー別に保持され、次回表示時に復元される。
+- ✅ Wish一覧にもマイグッズと同じ列数切り替えを戻し、Wish側もユーザー別に保持される。
+- ✅ マイグッズ/Wishそれぞれで別の列数を持てるようにした。
+- ✅ DB/APIを触らず、端末内表示設定として閉じた。
+- ⚠️ Simulator/実機での目視確認は今回未実行。Swift Package対象テストで保存ロジックとコンパイルを確認した。
+- ⚠️ 作業ツリーに多数の未コミット変更があるため、今回の対象外差分は戻していない。
+
+## イテレーション1226.187：個別募集の譲る金額保存修正
+
+### 背景・問題意識
+
+個別募集の作成/編集で、譲る側を `定価で選ぶ` または `金額指定` にした場合、アプリ側の入力としては進められる一方で、Supabase の `listings` テーブル制約と `validate_listing_haves()` trigger は従来通り `have_ids` に `kind=for_trade` のグッズが1件以上入ることを要求していた。そのため、最後の保存時に `have_ids=[]` / `have_qtys=[]` の入力がDB側で拒否され、画面上は `保存できませんでした` になる可能性があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumCore/IndividualListingModels.swift`
+- `IndividualListingCreateInput` に `haveIsCashOffer` と `haveCashAmount` を追加し、譲る側が金額扱いかどうかを保存入力として明示できるようにした。
+
+#### `ios-native/Sources/MegrumApp/IndividualListingDraftPersistence.swift`
+#### `ios-native/Sources/MegrumApp/IndividualListingInputNormalizer.swift`
+- 個別募集 draft の `haveOfferKind == .cash` を `haveIsCashOffer=true` として `createInput` に渡すようにした。
+- 保存可否判定は `note` 内の表示用メタ行ではなく、`haveIsCashOffer` を正として判定するようにした。
+
+#### `ios-native/Sources/MegrumData/SupabaseListingClient.swift`
+#### `ios-native/Sources/MegrumData/SupabaseListingRows.swift`
+- 個別募集の作成/更新 payload に `have_is_cash_offer` と `have_cash_amount` を含めるようにした。
+- 更新時にグッズ譲渡へ戻した場合、古い `have_cash_amount` を `null` に戻せるようにした。
+
+#### `supabase/migrations/20260629233000_add_listing_have_cash_offer.sql`
+- `listings.have_is_cash_offer` と `listings.have_cash_amount` を追加した。
+- `have_is_cash_offer=true` の時だけ `have_ids=[]` / `have_qtys=[]` を許可し、通常のグッズ譲渡では従来通り `have_ids` 必須を維持する制約へ更新した。
+- `validate_listing_haves()` を更新し、金額譲渡では `have_group_id` / `have_goods_type_id` を `null` にして保存できるようにした。
+
+#### `ios-native/Tests/MegrumAppTests/IndividualListingDraftTests.swift`
+#### `ios-native/Tests/MegrumDataTests/SupabaseListingClientTests.swift`
+- 譲る側が金額指定の draft で `haveIsCashOffer` / `haveCashAmount` が立つことを確認した。
+- 作成/更新 payload が `have_is_cash_offer` と `have_cash_amount` を送ること、グッズ譲渡へ戻す更新では `have_cash_amount=null` を送ることを追加テストした。
+
+#### `notes/05_data_model.md`
+- `listings` の保存モデルを v2.61 に更新し、譲る側の定価/金額指定用カラムと制約を追記した。
+
+### 影響範囲
+
+- 個別募集の作成/編集で、譲る側を定価/金額指定にした時の保存に影響する。
+- 通常のグッズを譲る個別募集では、従来通り `kind=for_trade` の `have_ids` が必須。
+- 個別募集の状態遷移、表示文言、用語追加はないため、`notes/09_state_machines.md` と `notes/10_glossary.md` の更新は不要と判断した。
+- この修正はDB migrationの適用が必要。未適用のDBでは新カラムが存在しないため、アプリ payload を受けられない。
+
+### 確認方法
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build-individual-listing-save --enable-xctest --disable-swift-testing -j 1 --filter 'IndividualListingDraftTests|SupabaseListingClientTests'`
+  - passed：60 tests, 0 failures
+
+### セルフレビュー結果
+- ✅ 保存失敗の原因だった「金額譲渡なのに `have_ids` 必須」というアプリ入力とDB制約の不一致を解消した。
+- ✅ 通常のグッズ譲渡の必須制約と既存 trigger 検証は維持した。
+- ✅ 更新時に金額譲渡からグッズ譲渡へ戻しても、古い金額値が残らない payload にした。
+- ⚠️ 実DBへの migration 適用はこの作業内では実行していない。
+- ⚠️ 作業ツリーに多数の未コミット変更があるため、今回の対象外差分は戻していない。
+
+## イテレーション1226.186：めぐりプロフィール同期保存修正
+
+### 背景・問題意識
+
+めぐりプロフィール設定で `グッズ交換プロフィールと同じにする` をONにして保存しても、めぐり専用プロフィール側の古い表示名/アイコン値を保存入力に使ってしまい、グッズ交換プロフィールに合わせた状態として復元されないことがあった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MeguriProfileSettingsDraftState.swift`
+- `usesPublicProfile=true` の既存プロフィールを hydrate する時は、グッズ交換プロフィールの表示名/アイコンURLで draft を復元するようにした。
+- トグルON時に draft 内のローカルアイコン選択/アップロード状態をクリアし、グッズ交換プロフィールの表示名/アイコンURLへ同期する `syncPublicProfile` を追加した。
+
+#### `ios-native/Sources/MegrumApp/MeguriProfileSettingsSheet.swift`
+- トグルON時に draft をグッズ交換プロフィールへ同期するようにした。
+- 保存時は、ONの場合に `appState.viewer` の表示名/アイコンURLを `saveMeguriProfile` に渡し、ローカルアップロードや削除フラグは送らないようにした。
+
+#### `ios-native/Tests/MegrumAppTests/MeguriAccessPolicyTests.swift`
+- `usesPublicProfile=true` のプロフィールを読み込んだ時に、draft がグッズ交換プロフィールの表示名/アイコンURLへ復元されるテストを追加した。
+
+### 影響範囲
+
+- めぐりプロフィール設定画面のトグルON/OFF、保存、再表示時の復元に影響する。
+- Supabase RPC/payload、DBスキーマ、めぐりプロフィールの公開プロフィール参照ロジック自体は変更していない。
+- 状態遷移IDや用語追加はないため、`notes/09_state_machines.md` と `notes/10_glossary.md` の更新は不要と判断した。
+
+### 確認方法
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build-meguri-profile-save --enable-xctest --disable-swift-testing -j 1 --filter MeguriAccessPolicyTests`
+  - passed：25 tests, 0 failures
+
+### セルフレビュー結果
+- ✅ トグルON時の見た目だけでなく、保存入力もグッズ交換プロフィールの表示名/アイコンURLへ揃えた。
+- ✅ 再表示時も `usesPublicProfile=true` ならグッズ交換プロフィール値で draft が復元されるようにした。
+- ✅ 既存の専用めぐりプロフィール名/アイコン選択、写真撮影/アルバム選択、保存エラー表示は維持した。
+- ⚠️ 作業ツリーに多数の未コミット変更があるため、今回の対象外差分は戻していない。
+
+## イテレーション1226.185：グルーム閲覧と未設定バッジ調整
+
+### 背景・問題意識
+
+マイグッズ/Wishのシリーズ未設定状態と左ドロワーの要設定表示が、数値バッジと異なる色で見落としやすかった。また、めぐりホームからグルームを開いた時の下シート風の出方や、グルーム閲覧中にプロフィールが裏に回る挙動を、画面内で自然に前面遷移する体験へ揃える必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/GoodsGridDisplayViews.swift`
+#### `ios-native/Sources/MegrumApp/GoodsTileCollectionOverlays.swift`
+#### `ios-native/Sources/MegrumApp/GoodsTileViews.swift`
+#### `ios-native/Sources/MegrumApp/ProfileVisualGridViews.swift`
+- 画像中心のグッズカードでシリーズ未設定の場合だけ、右上プレート文字色を数値バッジと同じ `MegrumTheme.conditionExact` にした。
+- 既存のシリーズ表示文言、タグ表示、数量バッジ、タップ/長押し挙動は維持した。
+
+#### `ios-native/Sources/MegrumApp/AppDrawerOverlay.swift`
+- 左ドロワーの通知数、支払い方法、交換条件のバッジ色を `MegrumTheme.conditionExact` に統一した。
+- バッジの表示条件と支払い/交換設定の判定は維持した。
+
+#### `ios-native/Sources/MegrumApp/MeguriHomeMapBackdrop.swift`
+#### `ios-native/Sources/MegrumApp/MeguriHomeViews.swift`
+#### `ios-native/Sources/MegrumApp/MeguriScreen.swift`
+#### `ios-native/Sources/MegrumApp/MeguriScreenGroomActions.swift`
+#### `ios-native/Sources/MegrumApp/MeguriScreenPresentationModifiers.swift`
+- ホーム地図のグルームタップ位置を `MapProxy` から `UnitPoint` として渡し、閲覧画面の拡大/収縮アニメーションの起点に使うようにした。
+- 通知など地図上のタップ位置がない導線は中央起点のまま開く。
+
+#### `ios-native/Sources/MegrumApp/GroomViewerScreen.swift`
+#### `ios-native/Sources/MegrumApp/GroomViewerChromeViews.swift`
+- グルーム閲覧を `fullScreenCover` ではなく画面内オーバーレイに変更し、タップした位置から拡大し、閉じる時も同じ起点へ収縮する遷移にした。
+- 下スワイプ時は画像だけではなく閲覧画面全体が追従し、閾値を超えると閉じるようにした。
+- 上部ステータスバーを現在グルームだけ20秒で左から右へ進む表示にし、20秒経過で次のグルームへ進むようにした。
+- 自分のグルームのいいね/コメント数を右下へ寄せ、他人のグルームはいいねボタンの上にいいね数/コメント数をまとめて表示するようにした。
+- グルーム閲覧を画面内オーバーレイ化したことで、左上ユーザーから開くめぐりプロフィールと、その先のメッセージ画面は既存の右スライドオーバーレイの前面表示に乗るようにした。
+
+### 影響範囲
+
+- めぐりホームのグルーム閲覧、プロフィール/メッセージの右スライド導線、グルームいいね/返信送信、通報/ブロックメニューに影響する。
+- グッズカードのシリーズ設定/未設定判定、左ドロワーの設定バッジ色に影響する。
+- DBスキーマ、通知種別、用語、状態遷移IDの追加はないため、`notes/09_state_machines.md` と `notes/10_glossary.md` の更新は不要と判断した。
+
+### 確認方法
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-build`
+  - passed
+
+### セルフレビュー結果
+- ✅ シリーズ未設定と左ドロワーの要設定バッジを、数値バッジと同じ赤へ統一した。
+- ✅ グルーム閲覧は下シートではなく、地図上のグルーム位置を起点にしたオーバーレイ遷移へ変更した。
+- ✅ 20秒進行バー、下スワイプ全体追従、右下リアクション表示を追加した。
+- ✅ 既存のめぐりプロフィール/メッセージの右スライドモジュールは再利用し、グルーム閲覧の上に出るレイヤー構成へ寄せた。
+- ⚠️ 作業ツリーに多数の未コミット変更があるため、今回の対象外差分は戻していない。
+- ⚠️ Simulatorでの目視確認は今回未実行。Swift Packageビルドで型・構文の整合を確認した。
+
+## イテレーション1226.184：選択済みX投稿と募集一括削除
+
+### 背景・問題意識
+
+マイグッズ/Wishの長押し複数選択フッターから、選択した画像群をそのままX投稿できる導線が必要だった。また、個別募集は一覧上部の条件チップを長押しして複数選択し、まとめて削除できるようにしつつ、X投稿は各個別募集カード単位の操作として置く必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/GoodsSelectionFooter.swift`
+#### `ios-native/Sources/MegrumApp/GoodsCollectionActionViews.swift`
+#### `ios-native/Sources/MegrumApp/GoodsCollectionScreenBody.swift`
+#### `ios-native/Sources/MegrumApp/GoodsCollectionShareActions.swift`
+- マイグッズ/Wishの複数選択フッターに `Xで投稿` ボタンを追加した。
+- 選択済みアイテムから既存のX投稿画像/文面生成フローを呼び出し、登録直後ではなく選択投稿用の案内文とポスト文を出せるようにした。
+
+#### `ios-native/Sources/MegrumApp/GoodsSharePostContext.swift`
+#### `ios-native/Sources/MegrumApp/GoodsSharePromptOverlay.swift`
+#### `ios-native/Sources/MegrumApp/GoodsSharePostTextBuilder.swift`
+#### `ios-native/Sources/MegrumApp/GoodsSharePostRenderer.swift`
+- X投稿コンテキストに、案内タイトル/説明/ボタン文言/ポスト冒頭文の上書きを追加した。
+- 既存の登録直後共有、Wish共有、個別募集共有の画像生成とActivity Sheet導線は維持した。
+
+#### `ios-native/Sources/MegrumApp/IndividualListingsScreen.swift`
+#### `ios-native/Sources/MegrumApp/IndividualListingListViews.swift`
+#### `ios-native/Sources/MegrumApp/IndividualListingListChromeViews.swift`
+#### `ios-native/Sources/MegrumApp/IndividualListingSelectionFooter.swift`
+- 個別募集の条件チップを長押しすると複数選択モードに入り、チップタップで選択/解除できるようにした。
+- 複数選択中は下部に削除専用フッターを表示し、確認ダイアログ後に選択した個別募集を順に削除するようにした。
+- 選択中は右下の `募集を追加` ボタンを隠し、操作対象を削除に絞った。
+
+#### `ios-native/Sources/MegrumApp/IndividualListingExchangeConditionPanel.swift`
+#### `ios-native/Sources/MegrumApp/ProfileVisualTabContent.swift`
+#### `ios-native/Sources/MegrumApp/PublicExchangeConditionsScreen.swift`
+- 自分の個別募集カードでは、既存の削除ボタンの上に `Xで投稿` ボタンを追加した。
+- 読み取り専用の公開プロフィール/公開交換条件では編集不可のまま、X投稿/削除ボタンは表示されない状態を維持した。
+
+#### `ios-native/Tests/MegrumAppTests/GoodsSharePostTextBuilderTests.swift`
+- 選択済みアイテム用のカスタム冒頭文でも、重複なしのハッシュタグ付きポスト文が生成されることを追加テストした。
+
+### 影響範囲
+
+- マイグッズ/Wishの画像長押し選択、シリーズ設定、削除、登録直後X投稿は維持した。
+- 個別募集の単体編集、条件追加、交換条件編集、単体削除、作成数制限、支払い方法を含む個別募集共有画像/文面は維持した。
+- 状態遷移、DBスキーマ、用語追加はないため、`notes/09_state_machines.md` と `notes/10_glossary.md` の更新は不要と判断した。
+
+### 確認方法
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build-bulk-share --enable-xctest --disable-swift-testing -j 1 --filter GoodsSharePostTextBuilderTests`
+  - passed：6 tests, 0 failures
+- `git diff --check -- ios-native/Sources/MegrumApp/GoodsSharePostContext.swift ios-native/Sources/MegrumApp/GoodsSharePromptOverlay.swift ios-native/Sources/MegrumApp/GoodsSharePostTextBuilder.swift ios-native/Sources/MegrumApp/GoodsSharePostRenderer.swift ios-native/Sources/MegrumApp/GoodsSelectionFooter.swift ios-native/Sources/MegrumApp/GoodsCollectionActionViews.swift ios-native/Sources/MegrumApp/GoodsCollectionScreenBody.swift ios-native/Sources/MegrumApp/GoodsCollectionShareActions.swift ios-native/Sources/MegrumApp/IndividualListingsScreen.swift ios-native/Sources/MegrumApp/IndividualListingListViews.swift ios-native/Sources/MegrumApp/IndividualListingListChromeViews.swift ios-native/Sources/MegrumApp/IndividualListingExchangeConditionPanel.swift ios-native/Sources/MegrumApp/IndividualListingSelectionFooter.swift ios-native/Sources/MegrumApp/ProfileVisualTabContent.swift ios-native/Sources/MegrumApp/PublicExchangeConditionsScreen.swift ios-native/Tests/MegrumAppTests/GoodsSharePostTextBuilderTests.swift`
+  - passed
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.5' -derivedDataPath /tmp/megrum-native-xcodebuild-bulk-share-device CODE_SIGNING_ALLOWED=NO ONLY_ACTIVE_ARCH=YES build -quiet`
+  - passed
+
+### セルフレビュー結果
+- ✅ マイグッズ/Wishの一括選択フッターにX投稿を追加し、選択済みアイテムから自動で画像と文面を作る既存経路へ接続した。
+- ✅ 個別募集のX投稿はカード単位に置き、複数選択フッターには削除だけを出すようにした。
+- ✅ 公開プロフィールなど読み取り専用カードの編集不可挙動は維持した。
+- ✅ `generic/platform=iOS Simulator` のXcodeビルドはディスク空き不足で失敗したため、実在Simulator + `ONLY_ACTIVE_ARCH=YES` のホストビルドで確認した。
+- ⚠️ 既存作業ツリーに多数の未コミット変更があるため、今回の対象外差分は戻していない。
+
+## イテレーション1226.183：チャットルームの会話UI化
+
+### 背景・問題意識
+
+めぐりのチャットルーム詳細が下シートと掲示板風カードの見た目になっており、めぐりメッセージと同じ右スライド遷移・会話UIへ揃える必要があった。また、話題説明は投稿者の最初の発言として扱い、各発言には小さなグッド/バッド反応を付けられる必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MegrumAuthenticatedTabContentView.swift`
+#### `ios-native/Sources/MegrumApp/MeguriScreen.swift`
+#### `ios-native/Sources/MegrumApp/MeguriScreenBoardActions.swift`
+#### `ios-native/Sources/MegrumApp/MeguriScreenPresentationModifiers.swift`
+#### `ios-native/Sources/MegrumApp/MeguriMapViews.swift`
+#### `ios-native/Sources/MegrumApp/MeguriBoardThreadRoute.swift`
+- めぐりホーム/マップからチャットルーム詳細を開く導線を、下シートではなく `MegrumSlideItemPresentationOverlay` 系の右スライド表示へ変更した。
+- 既存の右スワイプで戻る挙動に乗るよう、詳細ルートを親側で持つ形へ移した。
+
+#### `ios-native/Sources/MegrumApp/BoardThreadDetailScreen.swift`
+#### `ios-native/Sources/MegrumApp/BoardThreadDetailComponents.swift`
+#### `ios-native/Sources/MegrumApp/BoardThreadDetailPresentation.swift`
+#### `ios-native/Sources/MegrumApp/BoardThreadDetailReplyViews.swift`
+#### `ios-native/Sources/MegrumApp/BoardReplyInputView.swift`
+- 詳細画面を掲示板カードではなくチャットタイムライン表示へ変更した。
+- スレッド本文を投稿者の最初のチャット発言として表示し、既存のスレッド添付画像もその発言内に表示するようにした。
+- 参加者表示、投稿主表示、「この話題への返信」系の見出しを詳細画面から外した。
+- 右上を通報アイコンに変更し、確認ダイアログから通報できるようにした。
+- 各発言の下に小さな `good` / `bad` ボタンと件数を表示し、自分の発言では右下、相手の発言では左下に寄せた。
+
+#### `ios-native/Sources/MegrumCore/MeguriBoardModels.swift`
+#### `ios-native/Sources/MegrumData/SupabaseBoardRows.swift`
+#### `ios-native/Sources/MegrumData/SupabaseBoardReplyRows.swift`
+#### `ios-native/Sources/MegrumData/SupabaseBoardClient.swift`
+#### `ios-native/Sources/MegrumApp/MegrumRepository.swift`
+#### `ios-native/Sources/MegrumApp/MegrumRepositoryCommunityDefaults.swift`
+#### `ios-native/Sources/MegrumApp/SupabaseMegrumRepositoryMeguri.swift`
+#### `ios-native/Sources/MegrumApp/PreviewMegrumRepositoryMeguri.swift`
+#### `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+#### `ios-native/Sources/MegrumApp/MegrumAppStateMeguriActions.swift`
+#### `ios-native/Sources/MegrumApp/ReplyThreadStateReducer.swift`
+#### `supabase/migrations/20260629220000_add_meguri_board_good_bad_reactions.sql`
+- `BoardMessageReaction.good/bad` と、スレッド/返信の反応件数・自分の反応状態を追加した。
+- `set_meguri_board_thread_message_reaction()` / `set_meguri_board_reply_message_reaction()` / `report_meguri_board_thread()` RPCへ接続し、AppState側は楽観更新と失敗時ロールバックを行うようにした。
+- 旧 `useful` リアクションは `good` に含めて返す互換集計にした。
+
+#### `ios-native/Tests/MegrumAppTests/BoardThreadDetailPresentationTests.swift`
+- スレッド本文が最初のチャット発言になること、good/bad の楽観更新で件数が入れ替わることをテストした。
+
+#### `notes/05_data_model.md`
+- チャットルーム反応の `good` / `bad` 種別、旧 `useful` の互換扱い、一覧RPCの表示用集計を追記した。
+
+### 影響範囲
+
+- めぐりチャットルーム詳細は右スライドの会話画面として開く。
+- スレッド作成、返信送信、閲覧範囲・現在地/都道府県チェック、既存の通報テーブル、旧 `useful` 系RPC互換は維持した。
+- 状態識別子やライフサイクルは変更していないため、`notes/09_state_machines.md` と `notes/10_glossary.md` の更新は不要と判断した。
+
+### 確認方法
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build-board-chat --enable-xctest --disable-swift-testing -j 1 --filter BoardThreadDetailPresentationTests`
+  - passed：6 tests, 0 failures
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild-board-chat CODE_SIGNING_ALLOWED=NO build -quiet`
+  - passed
+
+### セルフレビュー結果
+- ✅ チャットルーム詳細の表示方法をめぐりメッセージ側の右スライド/右スワイプ系へ寄せた。
+- ✅ 投稿説明を最初の発言として扱い、画面上で投稿主情報や参加者欄を先に見せない構造にした。
+- ✅ グッド/バッドはスレッド本文と返信の両方を対象にし、旧 `useful` データも `good` として読めるようにした。
+- ✅ 添付画像、返信送信、読み込み、閲覧制限メッセージは残した。
+- ⚠️ 既存作業ツリーに多数の未コミット変更があるため、今回の対象外差分は戻していない。
+
+## イテレーション1226.182：めぐり時刻位置の調整
+
+### 背景・問題意識
+
+めぐりのメッセージ画面で、短い送信メッセージの吹き出しと送信時刻の間に大きな余白が出ていた。取引チャットと同じように、時刻が吹き出しのすぐそばに見える必要がある。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MeguriMessageConversationViews.swift`
+- テキスト吹き出しを `ViewThatFits` で短文用と折り返し用に分け、短文では見た目の吹き出し幅だけでレイアウトされるようにした。
+- 長文では最大幅制約を文字側へ寄せ、背景の外側に見えない幅が残らないようにした。
+- グルーム返信コンテキストカードも背景外の最大幅制約を外し、時刻との距離が余分に広がらないようにした。
+
+#### `ios-native/Sources/MegrumApp/MeguriLockedMessageViews.swift`
+- プレミアム未表示のモザイク吹き出しで、背景外に固定幅を持たないようにした。
+
+### 影響範囲
+
+- めぐりメッセージの行内で、送信時刻が吹き出し近くに表示される。
+- メッセージ本文、画像、グルーム返信カード、未読/ロック表示、取引チャット側の表示ロジックは変更していない。
+- 状態遷移、DB、用語への変更はないため、`notes/09_state_machines.md` と `notes/10_glossary.md` の更新は不要と判断した。
+
+### 確認方法
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build-meguri-time --enable-xctest --disable-swift-testing -j 1 --filter MeguriMessageReadStateReducerTests`
+  - passed：13 tests, 0 failures
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild-meguri-time CODE_SIGNING_ALLOWED=NO build -quiet`
+  - passed
+
+### セルフレビュー結果
+- ✅ 取引チャットと同じく、時刻をメッセージ行の中で吹き出しの隣に置く構造を維持した。
+- ✅ 今回の原因だった、背景の外側に残る不可視の最大幅をめぐり側から取り除いた。
+- ✅ 既存の画像メッセージ、グルーム返信、プレミアム未表示メッセージの分岐は維持した。
+- ⚠️ 既存作業ツリーにめぐり関連の未コミット変更が多く、今回は時刻位置に必要な最小差分だけを追加した。
+
+## イテレーション1226.181：シリーズ登録のGoogle Lens導線
+
+### 背景・問題意識
+
+マイグッズ登録のシリーズ登録では、画像からシリーズ名を確認したい場面が多い。既存のAI候補ボタンより、選択中グッズを明示してGoogle Lensで画像検索できる導線へ統一し、他のシリーズ登録シートでも同じ操作に揃える。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/GoodsBulkTagSheet.swift`
+#### `ios-native/Sources/MegrumApp/GoodsGoogleLensPickerSheet.swift`
+#### `ios-native/Sources/MegrumApp/GoodsGoogleLensSearchModels.swift`
+- シリーズ登録シートから「画像からシリーズ名称の候補を出す」AI候補ボタンを削除した。
+- `GoogleLensで探す` ボタンを追加し、選択中または関連するグッズ画像の一覧から検索対象を選べるようにした。
+- Google Lens起動URLを生成するヘルパーと、ローカル画像/保存済み画像URLの両方を扱える検索アイテムモデルを追加した。
+
+#### `ios-native/Sources/MegrumApp/GoodsEditorScreen.swift`
+#### `ios-native/Sources/MegrumApp/GoodsEditorSheetGoogleLensActions.swift`
+#### `ios-native/Sources/MegrumApp/GoodsEditorSheetInventoryFlow.swift`
+- マイグッズ登録の選択済み画像一括シリーズ登録、単体のシリーズ登録で同じGoogle Lens導線を使うようにした。
+- 保存前ローカル画像は検索時に既存のグッズ画像ストレージへアップロードし、その公開URLをGoogle Lensへ渡すようにした。
+- 旧AI候補取得用のEditor内State/アクションファイルを削除した。
+
+#### `ios-native/Sources/MegrumApp/CollectionScreens.swift`
+#### `ios-native/Sources/MegrumApp/GoodsCollectionScreenBody.swift`
+#### `ios-native/Sources/MegrumApp/GoodsCollectionBulkTagActions.swift`
+#### `ios-native/Sources/MegrumApp/IndividualListingConditionTab.swift`
+- コレクション一括シリーズ登録と取引条件のシリーズ登録でも、画像URLを持つグッズ/WishからGoogle Lens検索できるようにした。
+
+#### `ios-native/Sources/MegrumApp/MegrumRepository.swift`
+#### `ios-native/Sources/MegrumApp/MegrumRepositoryDefaults.swift`
+#### `ios-native/Sources/MegrumApp/MegrumAppStateGoodsActions.swift`
+#### `ios-native/Sources/MegrumApp/SupabaseMegrumRepositoryCatalog.swift`
+#### `ios-native/Sources/MegrumApp/PreviewMegrumRepositoryGoods.swift`
+- 保存前画像をGoogle Lens検索用にアップロードするRepository/AppStateメソッドを追加した。
+- Supabase版は既存の `goods-photos` アップロード経路を再利用し、Preview版は固定URLを返すようにした。
+
+#### `ios-native/Tests/MegrumAppTests/GoodsEditorDraftTests.swift`
+- Google Lens URL生成と、選択中メタから検索用アイテムを作る挙動のテストを追加した。
+
+### 影響範囲
+
+- シリーズ登録シートの候補チップ/手入力/登録確定の挙動は維持した。
+- Google Lens検索は外部ブラウザ起動であり、シリーズ名の保存やグッズ登録自体は自動実行しない。
+- DBスキーマ、状態遷移、用語追加はないため、`notes/09_state_machines.md` と `notes/10_glossary.md` の更新は不要と判断した。
+
+### 確認方法
+- `rg -n "画像からシリーズ名称|imageSuggestionNames|isSuggestingFromImage|imageSuggestionError|canSuggestFromImage|onSuggestFromImage|requestSelectedCreateMetaImageSeriesSuggestions|requestDraftImageSeriesSuggestions|selectedCreateMetaSeriesSuggestionInput|draftSeriesSuggestionInput|GoodsEditorImageSeriesSuggestionState|imageSeriesSuggestionState|GoodsEditorSheetSeriesSuggestions" ios-native/Sources/MegrumApp ios-native/Tests || true`
+  - passed：該当なし
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build-google-lens --enable-xctest --disable-swift-testing -j 1 --filter GoodsEditorDraftTests`
+  - passed：36 tests, 0 failures
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild-google-lens CODE_SIGNING_ALLOWED=NO build`
+  - passed
+
+### セルフレビュー結果
+- ✅ シリーズ登録シート全体でAI候補ボタンを表示しない状態に統一した。
+- ✅ 保存前画像はアップロード後の公開URL、保存済み画像は既存URLを使い、Google Lensに渡す入力を明確に分けた。
+- ✅ 候補チップ、手入力、タグ追加、一括適用、既存シリーズ履歴の表示は維持した。
+- ⚠️ 実機/SimulatorでGoogle Lens外部ブラウザが実際に開く目視確認は未実行。URL生成とiOSホストビルドで補完した。
+
+## イテレーション1226.180：ホーム候補広告の一時撤去
+
+### 背景・問題意識
+
+ホーム画面のマッチ候補タブでパネルを動かしたときの挙動が不自然になっており、直近で追加したホーム候補内広告がスクロール/カード操作の手触りに干渉している可能性があった。まずは原因切り分けと体験優先のため、ホーム候補タブ内の広告表示を一旦止める。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeDiscoveryExperience.swift`
+- マッチ候補タブの候補セクション末尾に置いていた `AdBannerSlot(placement: .homeFeedBanner)` を削除した。
+- 広告の配置定義、広告表示ポリシー、検索結果/やりとり一覧/プロフィール等の他広告枠は変更していない。
+
+### 影響範囲
+
+- ホーム画面のマッチ候補タブでは、無料ユーザーやプレビュー対象ユーザーでもホーム末尾広告が表示されなくなる。
+- ホーム候補カード、横スワイプの状態計算、検索結果ネイティブ広告、やりとり一覧広告、広告抑止ポリシーは維持した。
+- DB/API、状態遷移、用語追加はないため、`notes/09_state_machines.md` と `notes/10_glossary.md` の更新は不要と判断した。
+
+### 確認方法
+- `rg -n "AdBannerSlot|homeFeedBanner" ios-native/Sources/MegrumApp/HomeDiscoveryExperience.swift`
+  - passed：該当なし
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build-home-ad-removal --enable-xctest --disable-swift-testing -j 1 --filter 'HomeDiscoveryMatchPolicyTests|HomeScreenFlowTests|AdDisplayPolicyTests'`
+  - passed：144 tests, 0 failures
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'platform=iOS Simulator,name=iPhone 17' -derivedDataPath /tmp/megrum-native-xcodebuild-home-ad-removal CODE_SIGNING_ALLOWED=NO build`
+  - passed
+- `xcrun simctl install booted /tmp/megrum-native-xcodebuild-home-ad-removal/Build/Products/Debug-iphonesimulator/MegrumNative.app`
+  - passed
+- `SIMCTL_CHILD_MEGRUM_VISUAL_QA_PREVIEW_AUTH=1 SIMCTL_CHILD_MEGRUM_VISUAL_QA_INITIAL_SCREEN=home xcrun simctl launch --terminate-running-process booted tokyo.megrum.native.preview`
+  - passed：`/tmp/megrum-home-ad-removed-after-wait.png` でホーム候補タブ内に広告枠が出ていないことを確認
+
+### セルフレビュー結果
+- ✅ ホーム候補タブから広告Viewを完全に外し、候補カード周辺のレイアウト/ジェスチャーに広告Subviewが混ざらない状態へ戻した。
+- ✅ 広告基盤や他画面の広告配置は触らず、今回の不具合疑い箇所だけを狭く止めた。
+- ✅ Simulator確認はユーザー側のマウスを動かさず、`simctl` 起動とスクリーンショットで実施した。
+- ⚠️ Visual QA起動では候補カードが空の状態だったため、カードを実際に横スワイプする目視確認は未実行。コード上の削除確認と既存のホーム候補スワイプ/表示テストで補完した。
+
+## イテレーション1226.179：めぐりプロフィール連携とプロフィール導線
+
+### 背景・問題意識
+
+めぐりプロフィールは匿名アイコン/名前を使う前提だったが、ユーザーが希望する場合はグッズ交換側の公開プロフィールと同じ表示名・アイコンをめぐり内でも使える必要がある。また、めぐりのいいね/メッセージ一覧/会話内で相手アイコンや名前を押したとき、公開プロフィール利用中の相手は既存プロフィールを、匿名の相手はめぐり用の限定プロフィールを表示する導線が必要だった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumCore/MeguriProfileModels.swift`
+#### `ios-native/Sources/MegrumData/SupabaseMeguriProfileRows.swift`
+#### `ios-native/Sources/MegrumApp/SupabaseMegrumRepositoryMeguri.swift`
+#### `ios-native/Sources/MegrumApp/MegrumAppStateMeguriProfileActions.swift`
+#### `supabase/migrations/20260629152000_add_meguri_public_profile_identity.sql`
+- `meguri_profiles.uses_public_profile` を追加し、めぐりプロフィールがグッズ交換側の公開プロフィールを使うかを保存できるようにした。
+- `set_meguri_profile_for_viewer()` に `p_uses_public_profile` を追加し、匿名利用時だけ表示名重複をチェックするようにした。
+- 1ヶ月変更ロックは表示名/アイコン/アップロード画像の実変更だけを対象にし、公開プロフィール連携のON/OFFだけではロックしないようにした。
+
+#### `ios-native/Sources/MegrumApp/MeguriProfileSettingsSheet.swift`
+#### `ios-native/Sources/MegrumApp/MeguriProfileSettingsDraftState.swift`
+- めぐりプロフィール設定に「グッズ交換プロフィールと同じにする」トグルを追加した。
+- ON時は表示名とアイコンのプレビューをグッズ交換プロフィール由来にし、めぐり独自の写真変更/既定アイコン選択はOFF時だけ操作できるようにした。
+- 既存の自分でアップロードした写真と既定6アイコンの選択機能は、匿名プロフィール用として維持した。
+
+#### `ios-native/Sources/MegrumApp/MeguriProfileIdentity.swift`
+#### `ios-native/Sources/MegrumApp/MeguriUserProfileRoute.swift`
+#### `ios-native/Sources/MegrumApp/ProfileVisualHero.swift`
+- めぐり内の表示名/ハンドル/アイコンを解決する共通resolverを追加した。
+- 公開プロフィール連携中のユーザーは既存 `PublicUserProfileScreen` を表示し、匿名ユーザーはアイコン、名前、推しタグ、メッセージ送信ボタンだけの限定プロフィールを表示するようにした。
+- 限定プロフィールではハンドルや実績数を出さないよう、`ProfileVisualHero` に統計表示のON/OFFを追加した。
+
+#### `ios-native/Sources/MegrumApp/MeguriMessageViews.swift`
+#### `ios-native/Sources/MegrumApp/MeguriMessageConversationViews.swift`
+#### `ios-native/Sources/MegrumApp/MegrumAuthenticatedTabContentView.swift`
+#### `ios-native/Sources/MegrumApp/GroomViewerScreen.swift`
+#### `ios-native/Sources/MegrumApp/GroomArchiveReactionViews.swift`
+#### `ios-native/Sources/MegrumApp/GroomArchiveStoryComponents.swift`
+#### `ios-native/Sources/MegrumApp/MegrumAppStateGroomActions.swift`
+- めぐりメッセージ一覧/会話の相手アイコン・名前、グルームviewerの投稿者、グルームアーカイブ反応行から、めぐりプロフィール表示へ遷移できるようにした。
+- 公開プロフィール利用中の相手のめぐりメッセージ一覧では、公開プロフィールの表示名/ハンドル/アイコンを使うようにした。
+- グルームアーカイブの反応ユーザーについて、公開プロフィールとめぐりプロフィールの両方を読み込むようにした。
+
+#### `notes/05_data_model.md`
+- `meguri_profiles.uses_public_profile` と `set_meguri_profile_for_viewer()` の新引数、匿名時だけの表示名ユニーク制約を追記した。
+
+### 影響範囲
+
+- めぐりプロフィール設定、めぐりメッセージ一覧/会話、グルームviewer、グルームアーカイブ反応一覧、`meguri_profiles` のDBスキーマ/RPCに影響する。
+- 既存のめぐり独自プロフィール、アップロード済みアイコン、既定6アイコン、めぐりメッセージのプレミアム制限、グッズ交換側の公開プロフィール画面の既存機能は維持した。
+- 画面遷移は既存の右スライドpresentationを使い、めぐりメッセージから限定プロフィールの「メッセージを送る」を押した場合も同じめぐり会話へ戻す導線にした。
+
+### 確認方法
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build-meguri-profile-link --enable-xctest --disable-swift-testing -j 1 --filter 'MeguriProfileValidationTests|SupabaseMeguriProfileClientTests|MeguriMessageReadStateReducerTests'`
+  - passed：24 tests, 0 failures
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'platform=iOS Simulator,name=iPhone 17' -derivedDataPath /tmp/megrum-native-xcodebuild-meguri-profile-link CODE_SIGNING_ALLOWED=NO build`
+  - passed
+- `xcrun simctl install booted /tmp/megrum-native-xcodebuild-meguri-profile-link/Build/Products/Debug-iphonesimulator/MegrumNative.app`
+  - passed
+- `SIMCTL_CHILD_MEGRUM_VISUAL_QA_PREVIEW_AUTH=1 SIMCTL_CHILD_MEGRUM_VISUAL_QA_INITIAL_SCREEN=meguri-profile-settings xcrun simctl launch --terminate-running-process booted tokyo.megrum.native.preview`
+  - passed：`/tmp/megrum-meguri-profile-link-settings.png` でトグル、既存アイコン/写真変更導線、保存ボタンの表示を確認
+- `SIMCTL_CHILD_MEGRUM_VISUAL_QA_PREVIEW_AUTH=1 SIMCTL_CHILD_MEGRUM_VISUAL_QA_INITIAL_SCREEN=meguri-messages xcrun simctl launch --terminate-running-process booted tokyo.megrum.native.preview`
+  - passed：`/tmp/megrum-meguri-profile-link-messages.png` で公開プロフィール連携中の相手名/ハンドル/アイコンが一覧へ出ることを確認
+- `SIMCTL_CHILD_MEGRUM_VISUAL_QA_PREVIEW_AUTH=1 SIMCTL_CHILD_MEGRUM_VISUAL_QA_INITIAL_SCREEN=meguri-message-thread xcrun simctl launch --terminate-running-process booted tokyo.megrum.native.preview`
+  - passed：`/tmp/megrum-meguri-profile-link-thread.png` で会話画面が表示され、既存のプレミアム案内と入力制限が維持されていることを確認
+- `git diff --check -- ios-native/Sources/MegrumCore/MeguriProfileModels.swift ios-native/Sources/MegrumData/SupabaseMeguriProfileRows.swift ios-native/Sources/MegrumApp/MegrumAppStateMeguriProfileActions.swift ios-native/Sources/MegrumApp/SupabaseMegrumRepositoryMeguri.swift ios-native/Sources/MegrumApp/PreviewMegrumRepositoryMeguri.swift ios-native/Sources/MegrumApp/MeguriProfileSettingsDraftState.swift ios-native/Sources/MegrumApp/MeguriProfileSettingsSheet.swift ios-native/Sources/MegrumApp/MeguriProfileIdentity.swift ios-native/Sources/MegrumApp/MeguriMessageReadStateReducer.swift ios-native/Sources/MegrumApp/MeguriMessageViews.swift ios-native/Sources/MegrumApp/MeguriMessageConversationViews.swift ios-native/Sources/MegrumApp/MeguriUserProfileRoute.swift ios-native/Sources/MegrumApp/MegrumAuthenticatedTabContentView.swift ios-native/Sources/MegrumApp/MeguriScreen.swift ios-native/Sources/MegrumApp/MeguriScreenPresentationModifiers.swift ios-native/Sources/MegrumApp/GroomViewerScreen.swift ios-native/Sources/MegrumApp/GroomViewerChromeViews.swift ios-native/Sources/MegrumApp/GroomArchiveReactionViews.swift ios-native/Sources/MegrumApp/GroomArchiveStoryComponents.swift ios-native/Sources/MegrumApp/MegrumAppStateGroomActions.swift ios-native/Sources/MegrumApp/ProfileVisualHero.swift ios-native/Sources/MegrumApp/MegrumAppStateMeguriMessageActions.swift ios-native/Tests/MegrumCoreTests/MeguriProfileValidationTests.swift ios-native/Tests/MegrumDataTests/SupabaseMeguriProfileClientTests.swift ios-native/Tests/MegrumAppTests/MeguriMessageReadStateReducerTests.swift notes/05_data_model.md notes/08_design_iterations.md supabase/migrations/20260629152000_add_meguri_public_profile_identity.sql`
+  - passed
+- `rg -n "[[:blank:]]$" ios-native/Sources/MegrumApp/MeguriProfileIdentity.swift ios-native/Sources/MegrumApp/MeguriProfileSettingsDraftState.swift ios-native/Sources/MegrumApp/MeguriUserProfileRoute.swift supabase/migrations/20260629152000_add_meguri_public_profile_identity.sql`
+  - passed：該当なし
+
+### セルフレビュー結果
+- ✅ 公開プロフィール連携ONでは、めぐり側の表示名/アイコンをグッズ交換プロフィール由来に寄せた。
+- ✅ 匿名めぐりプロフィールでは、公開プロフィールのハンドルや実アイコンURLへ漏れないようresolver側で分岐した。
+- ✅ プロフィール表示は公開プロフィール利用中なら既存 `PublicUserProfileScreen`、匿名なら限定表示に分けた。
+- ✅ めぐりメッセージのプレミアム制限、右スライドpresentation、既存のメッセージ送信導線は維持した。
+- ✅ シミュレーター確認はユーザー側のマウスを動かさず、`simctl` 起動とスクリーンショットで実施した。
+
+## イテレーション1226.178：めぐり通知遷移とグルーム表示調整
+
+### 背景・問題意識
+
+めぐり読み込み時に一瞬だけ「読み込めませんでした」表示が挟まることがあり、最終的には正常表示されるにもかかわらず不安定に見えていた。また、通知バッジ色、通知タップ後の遷移、通常のグルーム viewer での自分の投稿の反応表示を、既存のめぐり/フッター表現に揃える必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MegrumRootAuthenticatedContent.swift`
+#### `ios-native/Sources/MegrumApp/MeguriScreenFeedback.swift`
+- 初期読み込み中またはめぐり/グルームマップ読み込み中は、既存の失敗文言を表示せずローディング/通常表示を優先するようにした。
+
+#### `ios-native/Sources/MegrumApp/AppDrawerOverlay.swift`
+#### `ios-native/Sources/MegrumApp/SettingsMenuRowLabel.swift`
+- 左ドロワーと設定行の数値バッジ色を、フッターやめぐり未読バッジと同じ `MegrumTheme.conditionExact` に揃えた。
+
+#### `ios-native/App/MegrumNativeApp.swift`
+#### `ios-native/Sources/MegrumApp/NotificationRouteIntent.swift`
+#### `ios-native/Sources/MegrumApp/MegrumRootView.swift`
+#### `ios-native/Sources/MegrumApp/MegrumAuthenticatedTabContentView.swift`
+#### `ios-native/Sources/MegrumApp/MeguriScreen.swift`
+#### `supabase/functions/send-apns-notification/index.ts`
+- APNs payload に通知種別 `kind` を含め、アプリ側では `linkPath` と `kind` から通知ルート意図を解釈するようにした。
+- グルーム返信/めぐりメッセージ通知は対象ユーザーとのめぐりメッセージ画面を右スライド表示で開くようにした。
+- グルームいいね通知はめぐりタブへ切り替え、該当する自分のグルーム viewer を開くようにした。
+- `grooms` 系 linkPath は `peerId` があればメッセージへ、なければ自分のグルームへ向けるようにして、古い payload にも耐えられる分岐にした。
+
+#### `ios-native/Sources/MegrumApp/GroomViewerScreen.swift`
+#### `ios-native/Sources/MegrumApp/GroomViewerChromeViews.swift`
+#### `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+#### `ios-native/Sources/MegrumApp/MegrumAppStateGroomActions.swift`
+- 通常のグルーム viewer でも、投稿者名の横に `12分前` のような投稿経過時間を表示するようにした。
+- 自分のグルームでは下部にアーカイブと同じ反応ピルを出し、タップで反応一覧を開けるようにした。
+- 通知から選択された投稿が現在のフィード配列に含まれていなくても、その投稿を viewer の表示対象に含めるようにした。
+- 自分のグルームを開いたときは、その投稿のいいね/コメントを読み込んで反応数を更新するようにした。
+
+### 影響範囲
+
+- 初期/めぐり読み込み表示、左ドロワー/設定の通知バッジ、APNs通知タップ時のMeguriルーティング、通常グルーム viewer のヘッダー/自分用下部表示に影響する。
+- 既存の取引通知タブ遷移、めぐりメッセージ一覧/詳細の右スライド表示、他人のグルームへのいいね/返信操作、グルームアーカイブの反応一覧は維持した。
+- 状態遷移名や新用語は追加していないため、`notes/09_state_machines.md` と `notes/10_glossary.md` の追加更新は不要と判断した。
+
+### 確認方法
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1 --filter 'NotificationRouteTests|GroomViewerPresentationTests'`
+  - passed：7 tests, 0 failures
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'platform=iOS Simulator,name=iPhone 17' -derivedDataPath /tmp/megrum-native-xcodebuild-meguri-notification CODE_SIGNING_ALLOWED=NO build`
+  - passed
+- `SIMCTL_CHILD_MEGRUM_VISUAL_QA_PREVIEW_AUTH=1 SIMCTL_CHILD_MEGRUM_VISUAL_QA_INITIAL_SCREEN=meguri xcrun simctl launch --terminate-running-process booted tokyo.megrum.native.preview`
+  - passed：`/tmp/megrum-meguri-notification-home.png` でめぐりホームに一瞬の失敗カードが残っていないことを確認
+- `SIMCTL_CHILD_MEGRUM_VISUAL_QA_PREVIEW_AUTH=1 SIMCTL_CHILD_MEGRUM_VISUAL_QA_INITIAL_SCREEN=drawer-open xcrun simctl launch --terminate-running-process booted tokyo.megrum.native.preview`
+  - passed：`/tmp/megrum-drawer-notification-badge.png` で通知バッジがフッター同等の赤になっていることを確認
+- `git diff --check`
+  - passed
+
+### セルフレビュー結果
+- ✅ 読み込み中は失敗画面/失敗noticeを出さず、実際にローディングが続いている状態を優先する。
+- ✅ 通知の `kind` が届かない古い payload でも、`/meguri-messages` と `peerId` 付き `/grooms` はメッセージへ、`/grooms/{id}` は自分のグルームへ向かう。
+- ✅ 自分のグルームの反応数はアーカイブと同じ反応データを使い、他人のグルームの返信/いいね導線は維持した。
+- ✅ `baguette` は未インストールだったため、ユーザー側のマウスを動かさず `simctl` 起動とスクリーンショットで確認した。
+- ⚠️ Deno が未インストールだったため、`supabase/functions/send-apns-notification/index.ts` のDeno型チェックは未実行。
+
+## イテレーション1226.177：グルームアーカイブ時系列軸と返信引用
+
+### 背景・問題意識
+
+グルームアーカイブは地図下部の一覧で過去投稿を選ぶ構造だったが、過去のグルームを地図上で俯瞰しながら時系列でなぞれる導線にしたい。また、グルームの反応一覧から相手へめぐりメッセージを送り、その会話内で「どのグルームへの返信か」をInstagramストーリー返信のように本文前へ見せる必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/GroomArchiveScreen.swift`
+#### `ios-native/Sources/MegrumApp/GroomArchiveTimelineAxis.swift`
+#### `ios-native/Sources/MegrumApp/GroomArchiveMapViews.swift`
+#### `ios-native/Sources/MegrumApp/GroomArchivePresentationState.swift`
+- 地図下部のアーカイブ一覧を廃止し、画面右端に古い投稿から新しい投稿へ並ぶ縦軸を追加した。
+- 軸のタップ/ドラッグで近いグルームへフォーカスし、地図カメラを該当グルームへアニメーション移動するようにした。
+- 選択中の軸位置には日付ラベルを左側へ出し、最初の投稿位置には横線を出すようにした。
+- 初回表示時は投稿済みグルーム全体が画面に収まるよう、現在地を含めずアーカイブ投稿だけで地図範囲を決めるようにした。
+- 地図上の「過去のグルーム」アノテーション文字を非表示にした。
+
+#### `ios-native/Sources/MegrumApp/GroomArchiveReactionViews.swift`
+#### `ios-native/Sources/MegrumApp/GroomArchiveStoryComponents.swift`
+#### `ios-native/Sources/MegrumApp/GroomArchiveReactionMessageState.swift`
+#### `ios-native/Sources/MegrumApp/GroomArchiveReactionMessageSheet.swift`
+- グルームアーカイブの反応一覧で、いいね/コメント行の右側から相手へめぐりメッセージを送れるようにした。
+- 自分自身の反応行には送信アイコンを出さず、既存の反応一覧表示は維持した。
+- 非プレミアム状態では会話画面の送信導線と同じアラートを出し、Megrumプレミアム紹介画面へ進めるようにした。
+
+#### `ios-native/Sources/MegrumCore/MeguriMessageModels.swift`
+#### `ios-native/Sources/MegrumData/SupabaseMeguriMessageClient.swift`
+#### `ios-native/Sources/MegrumData/SupabaseGroomPayloads.swift`
+#### `ios-native/Sources/MegrumApp/MeguriMessageConversationViews.swift`
+#### `ios-native/Sources/MegrumApp/MegrumAppStateFactory.swift`
+#### `ios-native/Sources/MegrumApp/VisualQAPreviewMode.swift`
+#### `ios-native/Sources/MegrumApp/NativePreviewMeguriData.swift`
+#### `supabase/migrations/20260629113000_add_groom_source_context_to_meguri_messages.sql`
+- めぐりメッセージに `source_groom_post_id` / `source_groom_owner_id` / `source_groom_image_url` を追加し、グルーム返信文脈を会話本文の前へ表示できるようにした。
+- `list_meguri_messages_for_viewer()` は新列を返し、既存の `source_groom_reply_id` のみの行は `groom_replies.groom_snapshot` から文脈を補完するようにした。
+- 会話画面では本文や画像の前に「あなたのグルームに返信しました」カードと対象グルーム画像を表示するようにした。
+- Visual QAではプレビュー画像をBundle内のテスト画像へ差し替え、必要な時だけ `MEGRUM_VISUAL_QA_PREVIEW_SUBSCRIPTION=megrum_plus` でプレミアム状態のスクリーンショットを撮れるようにした。
+
+#### `notes/05_data_model.md`
+- `meguri_messages` のグルーム引用文脈列と、RPCで既存返信から補完する仕様を追記した。
+
+### 影響範囲
+
+- グルームアーカイブ地図、アーカイブストーリーの反応一覧、めぐりメッセージの本文表示、`meguri_messages` のDBスキーマ/RPCに影響する。
+- グルーム投稿タップでストーリーを開く動作、無料ユーザー向けめぐり本文/画像ロック、既存のグルーム返信通知、取引チャットのメッセージ表示は維持した。
+- 状態遷移名や新用語は追加していないため、`notes/09_state_machines.md` と `notes/10_glossary.md` の追加更新は不要と判断した。
+
+### 確認方法
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build-groom-archive-axis --enable-xctest --disable-swift-testing -j 1 --filter 'GroomInteractionStateReducerTests|MegrumAppStateTests/testAppState(LoadsOwnGroomArchiveWithEngagement|SendsPreviewGroomReply|LoadsAndSendsPreviewMeguriMessages)|SupabaseMeguriMessageClientTests|SupabaseGroomClientTests/testBuildsGroomReplyRequestAndMeguriMessagePayload'`
+  - passed：13 tests, 0 failures
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build-groom-archive-axis --enable-xctest --disable-swift-testing -j 1 --filter 'SupabaseGroomClientTests/testBuildsGroomReplyAndMeguriMessageRequests'`
+  - passed：1 test, 0 failures
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'platform=iOS Simulator,name=iPhone 17' -derivedDataPath /tmp/megrum-native-xcodebuild-groom-archive-axis CODE_SIGNING_ALLOWED=NO build`
+  - passed
+- `SIMCTL_CHILD_MEGRUM_VISUAL_QA_PREVIEW_AUTH=1 SIMCTL_CHILD_MEGRUM_VISUAL_QA_INITIAL_SCREEN=groom-archive xcrun simctl launch --terminate-running-process booted tokyo.megrum.native.preview`
+  - passed：`/tmp/megrum-groom-archive-axis.png` で右軸、下部一覧なし、全投稿が収まる初期地図、アノテーション文字非表示を確認
+- `SIMCTL_CHILD_MEGRUM_VISUAL_QA_PREVIEW_AUTH=1 SIMCTL_CHILD_MEGRUM_VISUAL_QA_INITIAL_SCREEN=meguri-message-thread SIMCTL_CHILD_MEGRUM_VISUAL_QA_PREVIEW_SUBSCRIPTION=megrum_plus xcrun simctl launch --terminate-running-process booted tokyo.megrum.native.preview`
+  - passed：めぐり会話画面でグルーム返信文脈カードが本文の前に表示されることを確認
+
+### セルフレビュー結果
+- ✅ アーカイブ選択は下部一覧ではなく右端の時系列軸へ集約した。
+- ✅ 軸タップ/ドラッグの実装は `DragGesture(minimumDistance: 0)` で、指が近い時系列位置に追従する。
+- ✅ グルーム返信文脈カードは本文/画像ロックとは別に表示できるため、無料受信者でも「何への返信か」は分かる。
+- ✅ DB列追加は既存行を `groom_replies.groom_snapshot` から補完し、旧データの表示文脈をできるだけ維持する。
+- ✅ シミュレーター確認はユーザー側のマウスを動かさず、`simctl` 起動とスクリーンショットで実施した。
+
+## イテレーション1226.176：めぐりメッセージ一覧優先とブロック導線
+
+### 背景・問題意識
+
+めぐりホームのメッセージアイコンから、一覧を飛ばして会話画面へ遷移してしまうケースがあり、未読相手を確認する導線として不自然だった。また、めぐりメッセージの右スワイプ戻り、ロック済み本文のblur、時刻表示、ブロック/通報導線を取引チャットに近い手触りへ揃える必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MegrumAuthenticatedTabContentView.swift`
+#### `ios-native/Sources/MegrumApp/MegrumSlidePresentationGesture.swift`
+#### `ios-native/Sources/MegrumApp/MegrumSlidePresentationOverlay.swift`
+- めぐりホームのメッセージアイコン押下時は詳細ルートを必ずクリアしてから一覧を開くようにし、最初にメッセージ一覧が出る状態へ戻した。
+- 右スライド表示に全画面スワイプ戻りの指定を追加し、めぐりメッセージ一覧/詳細では画面内のどこから右へドラッグしても、指の移動に追従して戻れるようにした。
+- 既存の右スライド画面は既定では従来の端スワイプ挙動を維持する。
+
+#### `ios-native/Sources/MegrumApp/MeguriLockedMessageViews.swift`
+#### `ios-native/Sources/MegrumApp/MeguriMessageConversationViews.swift`
+- ロック済みメッセージのblurを少し弱めつつ、本文が読めない強さは維持した。
+- 会話画面のロック済み本文は、実際の3行程度の黒い本文が吹き出し内にあるように見える密度とサイズでblurされるようにした。
+- めぐりメッセージの時刻表示を取引チャットに合わせ、相手メッセージは吹き出し右外の下、自分のメッセージは吹き出し左外の下へ配置した。
+
+#### `ios-native/Sources/MegrumApp/MeguriMessageViews.swift`
+#### `ios-native/Sources/MegrumApp/MeguriMessagesPresentationState.swift`
+#### `ios-native/Sources/MegrumApp/MeguriMessageReadStateReducer.swift`
+#### `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- 会話画面右上にメニューを追加し、「ブロックする」「通報する」を選べるようにした。
+- ブロック時は確認ダイアログを挟み、該当相手とのめぐりメッセージを未読数・一覧・詳細から除外するようにした。
+- 通報は既存のユーザー通報シートへ接続し、通報後も既存の通報フローを使う。
+
+#### `ios-native/Sources/MegrumApp/BlockedUsersContent.swift`
+#### `ios-native/Sources/MegrumApp/BlockedUsersScreen.swift`
+#### `ios-native/Sources/MegrumApp/SettingsModels.swift`
+#### `ios-native/Sources/MegrumApp/SettingsScreen.swift`
+#### `ios-native/Sources/MegrumApp/SettingsScreenSections.swift`
+#### `ios-native/Sources/MegrumApp/AppDrawerScreen.swift`
+#### `ios-native/Sources/MegrumApp/PrivacySettingsContent.swift`
+- 設定内のブロックした人一覧を、グッズ交換向けとめぐり向けで別項目に分けた。
+- めぐり側のブロック一覧でも、既存のブロック解除処理を使って解除できるようにした。
+
+#### `ios-native/Tests/MegrumAppTests/EdgeBackSwipeGestureTests.swift`
+#### `ios-native/Tests/MegrumAppTests/MeguriMessageReadStateReducerTests.swift`
+#### `ios-native/Tests/MegrumAppTests/BlockedUserStateReducerTests.swift`
+#### `ios-native/Tests/MegrumAppTests/SettingsScreenTests.swift`
+- 全画面スワイプ指定、ブロック相手のめぐりメッセージ除外、ロック済み本文の3行blur密度、設定ルート分岐をテストした。
+
+### 影響範囲
+
+- めぐりメッセージ一覧/詳細、めぐり未読数、めぐりメッセージのロック済み本文表示、設定/左ドロワー/プライバシー設定のブロック一覧導線に影響する。
+- 取引チャット、既存の通報シート、既存ブロック解除処理、無料ユーザーの送信制限とプレミアム誘導は維持した。
+- 状態遷移名や用語集に新規概念は追加していないため、`notes/09_state_machines.md` と `notes/10_glossary.md` の追加更新は不要と判断した。
+
+### 確認方法
+- `git diff --check -- ios-native/Sources/MegrumApp/MegrumAuthenticatedTabContentView.swift ios-native/Sources/MegrumApp/MegrumSlidePresentationGesture.swift ios-native/Sources/MegrumApp/MegrumSlidePresentationOverlay.swift ios-native/Sources/MegrumApp/MeguriMessageViews.swift ios-native/Sources/MegrumApp/MeguriMessagesPresentationState.swift ios-native/Sources/MegrumApp/MeguriLockedMessageViews.swift ios-native/Sources/MegrumApp/MeguriMessageConversationViews.swift ios-native/Sources/MegrumApp/MeguriMessageReadStateReducer.swift ios-native/Sources/MegrumApp/MegrumAppState.swift ios-native/Sources/MegrumApp/BlockedUsersContent.swift ios-native/Sources/MegrumApp/BlockedUsersScreen.swift ios-native/Sources/MegrumApp/SettingsModels.swift ios-native/Sources/MegrumApp/SettingsScreen.swift ios-native/Sources/MegrumApp/SettingsScreenSections.swift ios-native/Sources/MegrumApp/AppDrawerScreen.swift ios-native/Sources/MegrumApp/PrivacySettingsContent.swift ios-native/Tests/MegrumAppTests/EdgeBackSwipeGestureTests.swift ios-native/Tests/MegrumAppTests/MeguriMessageReadStateReducerTests.swift ios-native/Tests/MegrumAppTests/BlockedUserStateReducerTests.swift ios-native/Tests/MegrumAppTests/SettingsScreenTests.swift`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build-meguri-message-fixes --enable-xctest --disable-swift-testing -j 1 --filter 'EdgeBackSwipeGestureTests|MeguriMessageReadStateReducerTests|BlockedUserStateReducerTests|SettingsScreenTests|MegrumAppStateTests/testAppState(ReportsPreviewUser|BlocksUserAndRemovesVisibleGoods|LoadsAndUnblocksPreviewBlockedUsers|LoadsAndSendsPreviewMeguriMessages|BlocksPreviewMeguriMessageSendForFreeUsers)'`
+  - passed：75 tests, 0 failures
+- `xcodebuild -list -project ios-native/MegrumNative.xcodeproj`
+  - passed：`MegrumNative` schemeを確認
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'platform=iOS Simulator,name=iPhone 17' -derivedDataPath /tmp/megrum-native-xcodebuild-meguri-message-fixes CODE_SIGNING_ALLOWED=NO build`
+  - passed
+- `SIMCTL_CHILD_MEGRUM_VISUAL_QA_PREVIEW_AUTH=1 SIMCTL_CHILD_MEGRUM_VISUAL_QA_INITIAL_SCREEN=meguri-messages xcrun simctl launch --terminate-running-process booted tokyo.megrum.native.preview`
+  - passed：`/tmp/megrum-meguri-messages-list-2.png` で一覧が表示され、フッター非表示、実文字blurのプレビュー、赤い未読バッジを確認
+- `SIMCTL_CHILD_MEGRUM_VISUAL_QA_PREVIEW_AUTH=1 SIMCTL_CHILD_MEGRUM_VISUAL_QA_INITIAL_SCREEN=meguri-message-thread xcrun simctl launch --terminate-running-process booted tokyo.megrum.native.preview`
+  - passed：`/tmp/megrum-meguri-message-thread.png` で会話画面、右上メニュー、3行程度の実文字blur、相手メッセージの外側時刻表示を確認
+
+### セルフレビュー結果
+- ✅ ホームのメッセージアイコンは、詳細ルートの残留に左右されず一覧を先に開く。
+- ✅ めぐりメッセージ一覧/詳細の右スワイプ戻りは、画面内のドラッグ位置に関係なく指の移動へ追従する。
+- ✅ blurは弱めたが、本文が読めるほどにはしていない。
+- ✅ ブロック/通報は既存のユーザー通報・ブロック解除処理を使い、別の保存モデルは追加していない。
+- ✅ シミュレーター確認はユーザー側のマウスを動かさず、`simctl` 起動とスクリーンショットで実施した。
+
+## イテレーション1226.175：めぐりプロフィール画像と県外掲示板プレミアム
+
+### 背景・問題意識
+
+めぐりプロフィールのアイコンは既定6種のみだったため、ユーザー自身の写真を設定できる導線が必要になった。また、Megrumプレミアムの価値として、めぐり内メッセージに加えて県外の掲示板閲覧も明示し、開発中は状態を切り替えて確認できる必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumCore/MeguriProfileModels.swift`
+#### `ios-native/Sources/MegrumData/SupabaseMeguriProfileRows.swift`
+#### `ios-native/Sources/MegrumApp/SupabaseMegrumRepositoryMeguri.swift`
+#### `ios-native/Sources/MegrumApp/PreviewMegrumRepositoryMeguri.swift`
+- `MeguriProfile.avatarURL` と保存入力の画像アップロード/削除フラグを追加し、Supabase保存とプレビュー保存の両方でカスタムアイコンURLを扱えるようにした。
+- 既存の1ヶ月変更ロックは、名前・既定アイコン・カスタムアイコン変更のいずれにも同じルールで適用する。
+
+#### `ios-native/Sources/MegrumApp/MeguriProfileSettingsSheet.swift`
+#### `ios-native/Sources/MegrumApp/MeguriProfileSettingsDraftState.swift`
+#### `ios-native/Sources/MegrumApp/MeguriProfileAvatarView.swift`
+- 設定シート上部のアイコン下ラベルをなくし、アイコン右下に黒背景/白十字の追加バッジを重ねた。
+- アイコン押下で「写真を撮る」「アルバムから選ぶ」の2択を表示し、選んだ画像をめぐりプロフィールアイコンとして保存できるようにした。
+- 既定6種アイコン選択は残し、既定アイコンを選んだ場合はカスタム画像を解除する。
+
+#### `ios-native/Sources/MegrumApp/MeguriAccessPolicy.swift`
+#### `ios-native/Sources/MegrumCore/SubscriptionModels.swift`
+#### `ios-native/Sources/MegrumApp/SubscriptionSettingsContent.swift`
+#### `ios-native/Sources/MegrumApp/MegrumAppStateSubscriptionActions.swift`
+- `megrum_plus` / 旧 `premium` / 旧 `meguri_plus` が有効なユーザーは、県外の掲示板も閲覧できるようにした。
+- Megrumプレミアム紹介画面の「できること」に、めぐり内メッセージと県外掲示板閲覧を明示した。
+- DEBUGビルドだけ、紹介画面上部にプレミアム/無料プランをローカルで切り替える大きい開発用ボタンを追加した。
+
+#### `supabase/migrations/20260629090000_add_meguri_profile_avatar_url.sql`
+- `meguri_profiles.avatar_url` を追加し、`set_meguri_profile_for_viewer` RPCでカスタムアイコンURLを保存できるようにした。
+
+#### `ios-native/Sources/MegrumApp/VisualQAPreviewMode.swift`
+#### `ios-native/Sources/MegrumApp/MegrumRootAuthenticatedContent.swift`
+#### `ios-native/Sources/MegrumApp/MeguriScreen.swift`
+- シミュレータ目視確認用に、めぐりプロフィール設定とMegrumプレミアム紹介画面を直接開ける Visual QA 入口を追加した。
+
+### 影響範囲
+
+- めぐりプロフィール設定、めぐりプロフィール表示、めぐりメッセージ相手アイコン、掲示板閲覧可否、Megrumプレミアム紹介画面に影響する。
+- 既定6アイコン、めぐりプロフィール名の保存、無料プランの県内/近距離掲示板閲覧、StoreKit購入/復元導線は維持した。
+
+### 確認方法
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build-meguri-profile-premium --enable-xctest --disable-swift-testing -j 1 --filter 'SubscriptionModelsTests|MeguriAccessPolicyTests|MeguriProfileValidationTests|SupabaseMeguriProfileClientTests'`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build-meguri-profile-premium --enable-xctest --disable-swift-testing -j 1 --filter 'MegrumAppStateTests/testDebugToggleMegrumPremiumEntitlementSwitchesPlanLocally|SubscriptionModelsTests|MeguriAccessPolicyTests|MeguriProfileValidationTests|SupabaseMeguriProfileClientTests'`
+  - passed
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'id=C70DDDBB-2602-49E0-8F95-1F043BCCED76' -derivedDataPath /tmp/megrum-native-xcodebuild-meguri-profile-avatar CODE_SIGNING_ALLOWED=NO build`
+  - passed
+- `SIMCTL_CHILD_MEGRUM_VISUAL_QA_PREVIEW_AUTH=1 SIMCTL_CHILD_MEGRUM_VISUAL_QA_INITIAL_SCREEN=meguri-profile-settings xcrun simctl launch --terminate-running-process C70DDDBB-2602-49E0-8F95-1F043BCCED76 tokyo.megrum.native.preview`
+  - passed：`/tmp/megrum-meguri-profile-settings-after-wait.png` で、アイコン下ラベル削除、黒背景/白十字の追加バッジ、既定6アイコンの継続表示を確認
+- 同起動状態でアイコンを押下
+  - passed：`/tmp/megrum-meguri-avatar-menu.png` で、「写真を撮る」「アルバムから選ぶ」の2択を確認
+- `SIMCTL_CHILD_MEGRUM_VISUAL_QA_PREVIEW_AUTH=1 SIMCTL_CHILD_MEGRUM_VISUAL_QA_INITIAL_SCREEN=subscription-settings xcrun simctl launch --terminate-running-process C70DDDBB-2602-49E0-8F95-1F043BCCED76 tokyo.megrum.native.preview`
+  - passed：`/tmp/megrum-subscription-settings-premium-board.png` で「県外の掲示板も閲覧可能」の追加を確認
+  - passed：`/tmp/megrum-subscription-debug-button-top.png` でDEBUG用プラン切り替えボタンが上部に大きく表示されることを確認
+
+### セルフレビュー結果
+- ✅ めぐりプロフィール画像は写真/アルバムから設定でき、既定アイコン選択も残した。
+- ✅ カスタムアイコンがある場合は、めぐりプロフィール表示やメッセージ相手アイコンで優先表示する。
+- ✅ Megrumプレミアム紹介画面に県外掲示板閲覧を追加し、戻るボタンと既存購入/復元導線を維持した。
+- ✅ DEBUG用切り替えはローカル状態だけを変更し、StoreKit/サーバー同期へは流さない。押下先の無料/有効切り替えは単体テストで確認した。
+- ✅ 県外掲示板の有料開放は既存の掲示板作成可否や無料ユーザーの近距離閲覧ルールを変えない。
+
+## イテレーション1226.174：めぐりメッセージ画像送信と実文字blur
+
+### 背景・問題意識
+
+めぐりメッセージのロック済み本文が、実際の文字ではなく色付きの四角形をぼかした見た目になっており、届いたメッセージの本文が背後にある感覚が弱かった。また、めぐりメッセージでも取引チャットと同じように画像を送れるようにし、一覧/詳細の右スライド表示をより明確に揃える必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MeguriLockedMessageViews.swift`
+- 一覧プレビューとチャット本文のモザイクを、黒い実テキストへblurをかける表現へ変更した。
+- チャット本文側は約3行分の吹き出し内に実テキストを配置し、その上に `メッセージを見る` ボタンを重ねる形にした。
+
+#### `ios-native/Sources/MegrumApp/MeguriMessageConversationViews.swift`
+#### `ios-native/Sources/MegrumApp/MeguriMessageViews.swift`
+#### `ios-native/Sources/MegrumApp/MeguriMessagePhotoPresentationState.swift`
+- 左側の相手メッセージに相手アイコンを表示し、吹き出しを並べる構成を維持したまま、ロック済み本文はボタン付きblur吹き出しとして表示するようにした。
+- めぐりメッセージ入力に画像追加メニューを追加し、iOS標準の写真ライブラリ選択と既存 `NativeCameraCaptureView` による撮影導線を接続した。
+- 画像メッセージはチャット内サムネイルとして表示し、タップで既存の全画面画像ビューアを開けるようにした。
+
+#### `ios-native/Sources/MegrumCore/MeguriMessageModels.swift`
+#### `ios-native/Sources/MegrumData/SupabaseMeguriMessageClient.swift`
+#### `ios-native/Sources/MegrumApp/SupabaseMeguriMessageMediaStorage.swift`
+#### `ios-native/Sources/MegrumApp/SupabaseMegrumRepositoryMeguri.swift`
+#### `ios-native/Sources/MegrumApp/MegrumAppStateMeguriMessageActions.swift`
+#### `ios-native/Sources/MegrumApp/PreviewMeguriMessageMediaStore.swift`
+#### `ios-native/Sources/MegrumApp/PreviewMegrumRepositoryMeguri.swift`
+- `MeguriPhotoMessageCreateInput` を追加し、めぐり画像メッセージの入力境界を定義した。
+- `meguri-message-media` private Storageへ画像を保存し、`meguri_messages.message_type='image'` / `image_path` として送信する経路を追加した。
+- めぐりメッセージ取得時は `image_path` から署名URLを作り、表示可能な会話だけ画像URLを持つようにした。
+- プレビューRepositoryでは一時ディレクトリに画像を保存し、ローカルファイルURLでサムネイル表示できるようにした。
+
+#### `ios-native/Sources/MegrumApp/MegrumSlidePresentationOverlay.swift`
+#### `ios-native/Sources/MegrumApp/MegrumSlidePresentationComponents.swift`
+#### `ios-native/Sources/MegrumApp/MegrumSlidePresentationGesture.swift`
+- 共通スライド表示の直接の条件分岐ラッパーにもtrailing transitionを追加し、一覧/詳細の表示がフェードに見える余地を減らした。
+- 右スライドのtransition定義を共通化した。
+
+#### `ios-native/Tests/MegrumDataTests/SupabaseMeguriMessageClientTests.swift`
+#### `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+#### `ios-native/Tests/MegrumAppTests/SupabaseMeguriMessageMediaStorageTests.swift`
+- めぐり画像メッセージinsert request、送信者ID配下のStorage path、プレミアム/無料ユーザーの画像送信可否を確認するテストを追加した。
+
+#### `notes/09_state_machines.md`
+#### `notes/10_glossary.md`
+- めぐりメッセージの画像送信、実テキストblur、Megrumプレミアムでの本文表示/テキスト返信/画像送信の扱いを追記した。
+
+### 影響範囲
+
+- めぐりメッセージ一覧、めぐりメッセージ詳細、ロック済み本文表示、プレミアム導線、画像メッセージ送信/表示に影響する。
+- 既存のテキスト送信、無料ユーザーの送信ブロック、初回プレミアム案内、未読数、既読化、グルーム返信からの会話作成は維持した。
+- Supabase schema / migration は変更せず、既存 `meguri_messages` と `meguri-message-media` bucket を利用した。
+
+### 確認方法
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build-meguri-message-media --enable-xctest --disable-swift-testing -j 1 --filter 'SupabaseMeguriMessageClientTests|SupabaseMeguriMessageMediaStorageTests|MegrumAppStateTests/testAppState(LoadsAndSendsPreviewMeguriMessages|SendsPreviewMeguriPhotoMessagesForPremiumUsers|BlocksPreviewMeguriMessageSendForFreeUsers|BlocksPreviewMeguriPhotoMessageSendForFreeUsers|MarksPreviewMeguriMessagesRead)|MeguriMessageReadStateReducerTests'`
+  - passed
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild-meguri-message-media CODE_SIGNING_ALLOWED=NO build`
+  - passed
+- `xcrun simctl install C70DDDBB-2602-49E0-8F95-1F043BCCED76 /tmp/megrum-native-xcodebuild-meguri-message-media/Build/Products/Debug-iphonesimulator/MegrumNative.app`
+  - passed
+- `SIMCTL_CHILD_MEGRUM_VISUAL_QA_PREVIEW_AUTH=1 SIMCTL_CHILD_MEGRUM_VISUAL_QA_INITIAL_SCREEN=meguri-messages xcrun simctl launch --terminate-running-process C70DDDBB-2602-49E0-8F95-1F043BCCED76 tokyo.megrum.native.preview`
+  - passed：`/tmp/megrum-meguri-message-list-media.png` で、フッターなし、一覧先頭プレビュー、実文字blur、未読赤バッジを確認
+- `SIMCTL_CHILD_MEGRUM_VISUAL_QA_PREVIEW_AUTH=1 SIMCTL_CHILD_MEGRUM_VISUAL_QA_INITIAL_SCREEN=meguri-message-thread xcrun simctl launch --terminate-running-process C70DDDBB-2602-49E0-8F95-1F043BCCED76 tokyo.megrum.native.preview`
+  - passed：`/tmp/megrum-meguri-message-thread-media.png` で、相手アイコン、実文字blur吹き出し、上乗せCTA、プレミアム案内、画像追加ボタンを確認
+
+### セルフレビュー結果
+- ✅ ロック済み本文は色付きブロックではなく、実テキストをぼかした見た目にした。
+- ✅ モザイク下の説明文ではなく、モザイク上の `メッセージを見る` ボタンからプレミアム導線へ進める。
+- ✅ めぐりメッセージで写真ライブラリ/カメラから画像を送信し、チャット内で表示できる。
+- ✅ 無料ユーザーはテキスト/画像送信できず、既存のMegrumプレミアム案内を出す。
+- ✅ 一覧/詳細は共通右スライド表示のtransitionを強め、右スワイプ戻りの既存挙動を維持した。
+
+## イテレーション1226.173：めぐりメッセージ右スライド化
+
+### 背景・問題意識
+
+めぐり左下のメッセージアイコンから開く一覧が、タブ内の表示に留まってフッターが残り、先頭プレビューが上端に寄って見切れることがあった。また、一覧からチャット詳細へ進む動きも、取引詳細と同じように右側から重なる導線へ揃える必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MegrumAuthenticatedTabContentView.swift`
+- めぐりメッセージ一覧とチャット詳細の表示状態をタブコンテンツ直下のZStackへ移し、フッターを含む画面全体の上に右スライド表示するようにした。
+- 一覧から各チャット詳細を開くときも、別の右スライド表示として重ねるようにした。
+- めぐりタブ再タップ時は、メッセージ一覧/詳細を閉じてめぐりホーム状態へ戻すようにした。
+
+#### `ios-native/Sources/MegrumApp/MeguriMessageViews.swift`
+- メッセージ一覧内の `NavigationLink` 遷移をやめ、行タップを親の右スライド詳細表示へ委譲する構成にした。
+- 一覧行のラベルを全幅のタップ領域にし、アイコン/名前/プレビュー付近のタップで詳細表示へ進めるようにした。
+- 一覧/詳細とも画面のどこでも右スワイプで戻れるようにし、詳細には左上の戻るボタンを追加した。
+- めぐりホーム側のナビゲーションバー非表示指定が一覧/詳細へ伝播しないよう、ナビゲーションバー表示を明示した。
+
+#### `ios-native/Sources/MegrumApp/MeguriScreen.swift`
+#### `ios-native/Sources/MegrumApp/MeguriScreenResetActions.swift`
+- めぐりホーム内でメッセージシートを直接持つ構成をやめ、親タブへ `onOpenMessages` を通知するだけにした。
+
+#### `ios-native/Sources/MegrumApp/AppChrome.swift`
+#### `ios-native/Sources/MegrumApp/VisualQAPreviewMode.swift`
+#### `ios-native/Sources/MegrumApp/MegrumRootRouting.swift`
+- iOSのみナビゲーションバー表示を戻す `megrumVisibleNavigationBar()` を追加した。
+- Simulator目視確認用に `meguri-messages` / `meguri-message-thread` のVisual QA初期画面を追加した。
+
+#### `ios-native/Tests/MegrumAppTests/EdgeBackSwipeGestureTests.swift`
+#### `ios-native/Tests/MegrumAppTests/HomeScreenFlowTests.swift`
+- めぐりメッセージの右スワイプ戻り判定と、Visual QAルーティングの対象テストを追加した。
+
+### 影響範囲
+
+- めぐりホーム左下メッセージアイコン、めぐりメッセージ一覧、めぐりチャット詳細、めぐりタブ再タップ時の戻り挙動に影響する。
+- メッセージ読み込み、未読数、本文モザイク、プレミアム制御、送信可否、Supabase/API/DB schemaは変更していない。
+- 取引一覧/取引チャットの実装は変更していない。
+
+### 確認方法
+- `git diff --check -- ios-native/Sources/MegrumApp/AppChrome.swift ios-native/Sources/MegrumApp/MeguriMessageViews.swift ios-native/Sources/MegrumApp/VisualQAPreviewMode.swift ios-native/Sources/MegrumApp/MegrumRootRouting.swift ios-native/Sources/MegrumApp/MeguriScreen.swift ios-native/Sources/MegrumApp/MeguriScreenResetActions.swift ios-native/Sources/MegrumApp/MegrumAuthenticatedTabContentView.swift ios-native/Tests/MegrumAppTests/HomeScreenFlowTests.swift ios-native/Tests/MegrumAppTests/EdgeBackSwipeGestureTests.swift`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build-meguri-message-nav --enable-xctest --disable-swift-testing -j 1 --filter 'EdgeBackSwipeGestureTests|HomeScreenFlowTests/testVisualQATabRouteResolverCanOpenMeguriMessageRoutes|MeguriMessageReadStateReducerTests|MegrumAppStateTests.testAppStateLoadsAndSendsPreviewMeguriMessages|MegrumAppStateTests.testAppStateBlocksPreviewMeguriMessageSendForFreeUsers'`
+  - passed
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'platform=iOS Simulator,id=C70DDDBB-2602-49E0-8F95-1F043BCCED76' -derivedDataPath /tmp/megrum-native-xcodebuild-meguri-message-nav CODE_SIGNING_ALLOWED=NO build`
+  - passed
+- `xcrun simctl install C70DDDBB-2602-49E0-8F95-1F043BCCED76 /tmp/megrum-native-xcodebuild-meguri-message-nav/Build/Products/Debug-iphonesimulator/MegrumNative.app`
+  - passed
+- `MEGRUM_VISUAL_QA_INITIAL_SCREEN=meguri-messages` 相当のSimulator起動後、`/tmp/megrum-meguri-message-list-final.png` を目視確認
+  - passed：フッター非表示、一覧先頭プレビュー表示、右スライド一覧表示を確認
+- `MEGRUM_VISUAL_QA_INITIAL_SCREEN=meguri-message-thread` 相当のSimulator起動後、`/tmp/megrum-meguri-message-thread-final.png` を目視確認
+  - passed：チャット詳細がフッターなしで表示され、戻るボタンとプレミアム導線を確認
+
+### セルフレビュー結果
+- ✅ メッセージ一覧はタブ内ではなく画面全体の上に右スライド表示され、フッターが残らない。
+- ✅ 一覧からチャット詳細へ進む際も右スライド表示として重なる。
+- ✅ 一覧/詳細のどこでも右スワイプで戻れる判定を維持した。
+- ✅ めぐりタブ再タップ時はメッセージ表示を閉じてホーム状態へ戻す。
+- ✅ メッセージデータ取得、未読数、送信、プレミアム制御、DB/APIは変更していない。
+
+## イテレーション1226.172：Megrumプレミアム表記と支払いバッジ安定化
+
+### 背景・問題意識
+
+有料機能の紹介画面やめぐりメッセージ導線に旧称の「メグルムプラス」が残っており、現在のユーザー向け名称である「Megrumプレミアム」と揃っていなかった。また、左ドロワーの「支払い方法の設定」は、保存済みユーザーでも初回表示時に支払い詳細の読み込み前の空値を見て「要設定」と出ることがあり、設定済み状態と矛盾していた。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumCore/SubscriptionModels.swift`
+- 現行有料プランのユーザー向け表示名を `SubscriptionCatalog.currentPremiumDisplayName = "Megrumプレミアム"` として定義した。
+- 既存の `megrum_plus` 権限キー、StoreKit product id、`isMegrumPlusActive` 判定は互換のため維持した。
+- めぐり内メッセージの本文表示・返信を現行プランの対象機能として表示名にも反映した。
+
+#### `ios-native/Sources/MegrumApp/SubscriptionSettingsScreen.swift`
+#### `ios-native/Sources/MegrumApp/SubscriptionSettingsContent.swift`
+#### `ios-native/Sources/MegrumApp/MegrumPlusPurchaseClient.swift`
+- 紹介画面、購入成功/失敗文言、StoreKit商品fallback名を `Megrumプレミアム` 表記に統一した。
+- 「できること」に `めぐり内でメッセージのやり取りが可能` を表示するようにした。
+- 紹介画面左上に「戻る」ボタンを追加し、ドロワー/シート/NavigationStackの文脈に応じて閉じられるようにした。
+
+#### `ios-native/Sources/MegrumApp/AppDrawerModels.swift`
+#### `ios-native/Sources/MegrumApp/AppDrawerOverlay.swift`
+#### `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+#### `ios-native/Sources/MegrumApp/MegrumAppStateAccountSettingsActions.swift`
+- 左ドロワーの有料導線名を `Megrumプレミアム` に統一した。
+- 支払い設定の詳細読み込み完了フラグを持たせ、読み込み前の空状態では「要設定」バッジを出さないようにした。
+- ドロワー表示時に支払い設定をバックグラウンドで読み込み、失敗してもドロワーを開いただけではエラー表示しないようにした。
+
+#### `ios-native/Sources/MegrumApp/MeguriMessageViews.swift`
+#### `ios-native/Sources/MegrumApp/MeguriLockedMessageViews.swift`
+#### `ios-native/Sources/MegrumApp/MeguriMessageReadStateReducer.swift`
+#### `ios-native/Sources/MegrumApp/MegrumAppStateMeguriMessageActions.swift`
+#### `ios-native/Sources/MegrumApp/GroomArchiveChromeViews.swift`
+#### `ios-native/Sources/MegrumApp/SettingsScreenSections.swift`
+#### `ios-native/Sources/MegrumApp/SettingsLegalViews.swift`
+- めぐりメッセージ、グルームアーカイブ、設定一覧、法務確認用のユーザー向け名称を `Megrumプレミアム` へ揃えた。
+
+#### `notes/09_state_machines.md`
+#### `notes/10_glossary.md`
+#### `notes/16_monetization.md`
+- ユーザー向け表示名を `Megrumプレミアム` に更新し、内部互換キーとして `megrum_plus` を維持する方針を明記した。
+
+### 影響範囲
+
+- Megrumプレミアム紹介画面、左ドロワー、めぐりメッセージの有料導線、グルームアーカイブ上限導線、設定/法務表示、支払い方法設定バッジに影響する。
+- StoreKit product id、Supabase schema、`user_entitlements.feature_key='megrum_plus'`、旧Premium/旧めぐりPlus互換判定、購入同期RPCは変更していない。
+
+### 確認方法
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build-premium-copy --enable-xctest --disable-swift-testing -j 1 --filter 'SubscriptionModelsTests|AppDrawerGestureTests|SettingsScreenTests|MeguriMessageReadStateReducerTests|MegrumAppStateTests.testAppStateBlocksPreviewMeguriMessageSendForFreeUsers'`
+  - passed
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+  - passed
+
+### セルフレビュー結果
+- ✅ ユーザー向け名称は `Megrumプレミアム` に統一し、内部キーや購入IDは互換維持した。
+- ✅ 紹介画面に戻るボタンを追加し、左ドロワーから開いた場合も閉じられる。
+- ✅ 「できること」に、めぐり内でメッセージのやり取りが可能なことを追加した。
+- ✅ 支払い方法設定は、詳細読み込み前の一瞬だけ「要設定」と表示しないようにした。
+- ✅ DB schema、StoreKit product id、購入同期RPC、旧権限互換は変更していない。
+
+## イテレーション1226.171：グッズ登録メンバー紐づけ任意化
+
+### 背景・問題意識
+
+マイグッズ/リッシュの初期登録で、写真選択後にメンバー紐づけの確認画面が割り込むことがあり、まず画像と基本情報を登録したい流れを止めていた。メンバー紐づけ情報は将来の学習データとして活かす余地を残しつつ、初期登録時点では必須にせず、手動で必要なときだけ登録できる形へ寄せる。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/GoodsEditorMemberLinkingPolicy.swift`
+- 初期登録時の自動メンバー紐づけ確認表示と、保存時のメンバー必須判定を制御するポリシーを追加した。
+- 現時点では `presentsAutomaticFaceTaggingReview` と `requiresMemberAssignmentDuringCreate` をどちらも `false` にし、後から再有効化できる境界を残した。
+
+#### `ios-native/Sources/MegrumApp/GoodsEditorSheetInventoryPhotoActions.swift`
+- 写真選択/切り取り後の顔検出・メンバー紐づけ確認シートを、初期登録では自動表示しないようにした。
+
+#### `ios-native/Sources/MegrumApp/GoodsEditorSheetPresentation.swift`
+#### `ios-native/Sources/MegrumApp/GoodsEditorSheetPresentationActions.swift`
+#### `ios-native/Sources/MegrumApp/GoodsEditorSheetInventoryFlow.swift`
+- メンバー選択可能な推しでも、初期登録保存時はメンバー未設定を保存ブロック条件にしないようにした。
+
+#### `ios-native/Sources/MegrumApp/GoodsInventoryCreateMetaTilePresentation.swift`
+#### `ios-native/Tests/MegrumAppTests/GoodsInventoryCreateMetaTilePresentationTests.swift`
+- 詳細ステップの画像タイル警告数から、メンバー未設定分を除外した。
+- 初期登録でメンバー紐づけが任意であることをテストで固定した。
+
+### 影響範囲
+
+- マイグッズ/リッシュの初期登録フロー、写真選択後の自動メンバー紐づけ確認、詳細ステップの画像タイル警告数に影響する。
+- 手動のメンバー登録導線、シリーズ登録、写真選択/切り取り、保存済みの `characterID` / `characterName`、DB schema、Storage、Supabase API は変更していない。
+
+### 確認方法
+- `git diff --check -- ios-native/Sources/MegrumApp/GoodsEditorMemberLinkingPolicy.swift ios-native/Sources/MegrumApp/GoodsEditorSheetInventoryPhotoActions.swift ios-native/Sources/MegrumApp/GoodsEditorSheetPresentation.swift ios-native/Sources/MegrumApp/GoodsEditorSheetPresentationActions.swift ios-native/Sources/MegrumApp/GoodsEditorSheetInventoryFlow.swift ios-native/Sources/MegrumApp/GoodsInventoryCreateMetaTilePresentation.swift ios-native/Tests/MegrumAppTests/GoodsInventoryCreateMetaTilePresentationTests.swift`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build-goods-member-linking --enable-xctest --disable-swift-testing -j 1 --filter 'GoodsInventoryCreateMetaTilePresentationTests|GoodsEditorDraftTests|FaceTaggingServiceTests'`
+  - passed
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+  - passed
+
+### セルフレビュー結果
+- ✅ 添付画像の詳細ステップ自体は残し、その1つ前に出ることがある自動メンバー紐づけ確認だけを止めた。
+- ✅ メンバー紐づけは初期登録では任意にしつつ、手動登録と既存データ項目は残した。
+- ✅ シリーズ未設定の警告は維持し、メンバー未設定だけを警告/保存ブロックから外した。
+- ✅ DB schema、Storage、Supabase API、既存の写真保存処理、シリーズ登録導線は変更していない。
+
+## イテレーション1226.170：めぐりメッセージ表示制御
+
+### 背景・問題意識
+
+めぐりホームのメッセージ未読数、メッセージ一覧、チャット画面で、未読バッジが小さく、一覧が下シート表示になっており、無料ユーザー向けの本文非表示/送信制御も画面ごとに揃っていなかった。めぐるむプレミアム導線へつながる形で、受信メッセージの本文表示と返信を有料範囲として明確化する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MeguriUnreadCountBadge.swift`
+- めぐり用の未読数バッジを共通化し、ホーム左下メッセージアイコン用は従来より大きいサイズ、一覧行用は小型サイズに分けた。
+- バッジ色をフッターの未読表示に近い強い赤系の `MegrumTheme.conditionExact` に統一した。
+
+#### `ios-native/Sources/MegrumApp/MeguriHomeChromeViews.swift`
+#### `ios-native/Sources/MegrumApp/MeguriMessageViews.swift`
+- めぐりホームのメッセージアイコン未読数とメッセージ一覧行の未読数を `MeguriUnreadCountBadge` に置き換えた。
+- メッセージ一覧行の相手アイコン右下に出ていた赤丸を削除した。
+- 無料ユーザーの受信メッセージプレビューは、実際の本文を読み取れないモザイク表示にした。
+
+#### `ios-native/Sources/MegrumApp/MeguriScreen.swift`
+- メッセージ一覧の表示を下からのsheetではなく、既存の右スライドpresentationへ変更した。
+
+#### `ios-native/Sources/MegrumApp/MeguriMessageConversationViews.swift`
+#### `ios-native/Sources/MegrumApp/MeguriLockedMessageViews.swift`
+#### `ios-native/Sources/MegrumApp/MeguriMessagesPresentationState.swift`
+- チャット画面の相手メッセージに相手アイコンと左寄せ吹き出しを表示するようにした。
+- 無料ユーザーの受信本文は、チャット画面でも実本文を使ったモザイク表示に揃えた。
+- 無料ユーザーがチャットを開いた時、または送信しようとした時に、メグルムプラスでやり取りできる案内を表示し、メグルムプラス紹介画面へ進めるようにした。
+
+#### `ios-native/Sources/MegrumApp/MegrumAppStateMeguriMessageActions.swift`
+#### `ios-native/Sources/MegrumCore/SubscriptionModels.swift`
+#### `ios-native/Sources/MegrumApp/SubscriptionSettingsContent.swift`
+- めぐりメッセージの本文表示/返信権限を `hasMeguriMessageAccess` として定義し、メグルムプラス、旧めぐりPlus、旧Premiumで許可するようにした。
+- 無料ユーザーからのめぐりメッセージ送信を状態更新層でもブロックするようにした。
+- メグルムプラス紹介画面に、めぐりメッセージの表示・返信を有料機能として追加した。
+
+#### `ios-native/Sources/MegrumApp/PreviewMegrumRepository.swift`
+#### `ios-native/Tests/MegrumCoreTests/SubscriptionModelsTests.swift`
+#### `ios-native/Tests/MegrumAppTests/MeguriMessageReadStateReducerTests.swift`
+#### `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- preview repositoryへ購読状態を注入できるようにし、有料/無料のめぐりメッセージ送信制御と権限判定をテストした。
+
+#### `notes/09_state_machines.md`
+#### `notes/10_glossary.md`
+#### `notes/16_monetization.md`
+- めぐりメッセージ本文表示/返信をメグルムプラスの範囲として整理し、無料ユーザーは着信・未読・モザイクプレビューまでに留める方針を記録した。
+
+### 影響範囲
+
+- めぐりホーム左下のメッセージアイコン、メッセージ一覧、めぐりチャット画面、メグルムプラス紹介画面に影響する。
+- DB schema、Supabase RPC、取引チャット、打診/合意/完了状態、通知配送処理は変更していない。
+
+### 確認方法
+- `git diff --check -- ios-native/Sources/MegrumApp/MeguriUnreadCountBadge.swift ios-native/Sources/MegrumApp/MeguriHomeChromeViews.swift ios-native/Sources/MegrumApp/MeguriScreen.swift ios-native/Sources/MegrumApp/MeguriMessageViews.swift ios-native/Sources/MegrumApp/MeguriMessageConversationViews.swift ios-native/Sources/MegrumApp/MeguriLockedMessageViews.swift ios-native/Sources/MegrumApp/MeguriMessagesPresentationState.swift ios-native/Sources/MegrumApp/MegrumAppStateMeguriMessageActions.swift ios-native/Sources/MegrumApp/PreviewMegrumRepository.swift ios-native/Sources/MegrumApp/SubscriptionSettingsContent.swift ios-native/Sources/MegrumCore/SubscriptionModels.swift ios-native/Tests/MegrumCoreTests/SubscriptionModelsTests.swift ios-native/Tests/MegrumAppTests/MeguriMessageReadStateReducerTests.swift ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift notes/08_design_iterations.md notes/09_state_machines.md notes/10_glossary.md notes/16_monetization.md`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build-meguri-messages --enable-xctest --disable-swift-testing -j 1 --filter 'SubscriptionModelsTests|MeguriMessageReadStateReducerTests|MegrumAppStateTests.testAppStateLoadsAndSendsPreviewMeguriMessages|MegrumAppStateTests.testAppStateBlocksPreviewMeguriMessageSendForFreeUsers'`
+  - passed
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+  - passed
+
+### セルフレビュー結果
+- ✅ 未読バッジの色/サイズを一覧とホームで共通化し、ホーム側は約2倍の視認性にした。
+- ✅ 受信本文のモザイク表示を一覧とチャット画面で同じ部品に揃えた。
+- ✅ 無料ユーザーは受信本文を読めず、送信もUI層と状態更新層の両方で止まる。
+- ✅ 無料ユーザーがチャットを開いた時と送信しようとした時のメグルムプラス導線を追加した。
+- ✅ 永続化、DB schema、通知配送、取引チャット、打診/合意/完了状態は変更していない。
+
+## イテレーション1226.169：SwiftUI状態境界継続整理
+
+### 背景・問題意識
+
+Swift Nativeの認証画面、支払い設定、ログイン/セキュリティ設定、設定画面、通知センター、住所設定、アカウント初期設定の生年月日カレンダー、推し設定、推しマスター選択シート、推し追加リクエストシート、アカウント削除、ブロックした人、自分のプロフィール、公開プロフィール予定、めぐりプロフィール設定、めぐりメッセージ画面、スポット掲示板詳細、グルームアーカイブstory、グルームviewer、グルームstory作成、アプリdrawer overlay、共通インタラクションフィードバック、共通interactive back swipe、共通slide presentation、ホームpull refresh、ホーム交換条件設定、ホーム詳細シート、相互マッチ詳細シート、検索フィルター、検索結果グリッド、公開プロフィール、公開プロフィール通報シート、個別募集エディタ、個別募集一覧、Wish画面、グッズリモート画像placeholder、グッズグリッド、グッズ一括シリーズ設定シート、グッズ通報シート、個人スケジュール画面、取引スケジュールシート、スケジュール作成シート、打診作成フロー、再打診シート、評価シート、通報シート、異議詳細画面、取引一覧、取引詳細画面、取引証跡一覧シートは、画面内で扱うローカル状態が増えており、今後の認証入力、保存処理、金額入力、設定内ナビゲーション/サインアウト、通知フィルター表示、住所入力、初期設定の生年月日カレンダー表示、プロフィール編集、ブロック解除、drawer item tap抑止、絞り込み、初期表示条件、検索結果sheet/profile/report表示、スポット掲示板返信下書き、グルームアーカイブstory移動/drag、グルーム返信下書き/通報確認、グルームcaption/toast表示、tap ripple表示、interactive back swipe、slide dismiss gesture、pull refresh表示、ホーム交換条件カレンダーdrag preview、ホーム詳細nested sheet/Wishコピーtoast、相互マッチ詳細pair/nested sheet、画像placeholder表示、写真入力導線、写真切り取りsheet表示、写真切り取りdrag preview、チャット入力導線、チャット入力quick action表示、シリーズ候補選択、個別募集一覧操作、Wish/個別募集セクション切り替え、公開プロフィール通報入力、グッズグリッド操作、グッズ通報入力、推しマスター検索/複数選択、推し/メンバー追加リクエスト入力、めぐりプロフィール入力、めぐりメッセージ入力、個人/取引/公開プロフィールスケジュール表示、通報本文入力、異議詳細操作、証跡写真削除、取引一覧操作の変更時に、UI表示と状態更新の責務が混ざりやすい。仕様、レイアウト、ナビゲーション、保存順序、DB/API境界は維持したまま、画面直下の状態を意味単位の小さな値型へ分離した。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/AuthScreenInputState.swift`
+- 認証画面のメール、パスワード、任意ユーザーID、パスワード再設定メール、送信済み判定、ローカルvalidation error、identity provider errorを `AuthScreenInputState` に集約した。
+- パスワード再設定route初期化、入力変更時feedback解除、再設定メールvalidation、ログイン/登録入力の正規化とvalidationを値型メソッドへ分離した。
+
+#### `ios-native/Sources/MegrumApp/AuthScreen.swift`
+#### `ios-native/Sources/MegrumApp/AuthScreenActions.swift`
+#### `ios-native/Sources/MegrumApp/AuthScreenDerivedState.swift`
+#### `ios-native/Sources/MegrumApp/AuthScreenIdentityProviderActions.swift`
+- 個別 `@State` のうち、認証入力とローカルfeedback状態を `inputState` へ置き換えた。
+- `MegrumAuthState.signIn`、`MegrumAuthState.signUp`、`MegrumAuthState.sendPasswordReset`、Apple/Google OAuth session、nonce生成、feedback表示優先順位、表示文言、route切り替えは変更していない。
+
+#### `ios-native/Sources/MegrumApp/AuthInputRowPresentationState.swift`
+- 認証入力rowのパスワード表示/非表示状態、secure input利用判定、表示切り替えアイコン名を `AuthInputRowPresentationState` に集約した。
+
+#### `ios-native/Sources/MegrumApp/AuthInputRow.swift`
+- 個別 `@State` のパスワード表示フラグを `presentationState` へ置き換えた。
+- メール/パスワード入力binding、`SecureField` / `TextField` の表示条件、onChange callback、キーボード/ContentType、表示文言、レイアウトは変更していない。
+
+#### `ios-native/Sources/MegrumApp/PaymentSettingsEditingState.swift`
+- 支払い設定画面の `draft`、validation message、ユーザー編集済み判定を `PaymentSettingsEditingState` に集約した。
+- 現在値の反映、ユーザー編集中の外部更新抑止、保存前validation、保存成功時の編集済み解除を値型メソッドへ分離した。
+
+#### `ios-native/Sources/MegrumApp/PaymentSettingsScreen.swift`
+- 画面直下の `PaymentSettingsDraft` / validation / edited flag を `PaymentSettingsEditingState` へ置き換えた。
+- 支払い設定の保存呼び出し、閉じる導線、表示文言、入力レイアウト、`appState.savePaymentSettings` の順序は維持した。
+
+#### `ios-native/Sources/MegrumApp/LoginSecurityPasswordResetState.swift`
+- ログイン/セキュリティ設定のパスワード再設定メール入力と入力validation errorを `LoginSecurityPasswordResetState` に集約した。
+- セッションメールのprefill、メール正規化、送信前validation、入力feedback解除を値型メソッドへ分離した。
+
+#### `ios-native/Sources/MegrumApp/SettingsLoginSecurityViews.swift`
+- 個別 `@State` を `passwordResetState` へ置き換えた。
+- `authState.clearFeedback`、`authState.sendPasswordReset`、sign out、feedback表示優先順位、表示文言、フォームレイアウトは変更していない。
+
+#### `ios-native/Sources/MegrumApp/SettingsPresentationState.swift`
+- 設定画面のNavigationStack pathとサインアウト中フラグを `SettingsPresentationState` に集約した。
+- route追加、サインアウト開始の二重実行抑止、完了時のフラグ解除を値型メソッドへ分離した。
+
+#### `ios-native/Sources/MegrumApp/SettingsScreen.swift`
+- 個別 `@State` を `presentationState` へ置き換えた。
+- `loadInitialSettingsData`、`onSignOut`、閉じる導線、各設定destination、表示文言は変更していない。
+
+#### `ios-native/Sources/MegrumApp/NativeLoadingFailurePresentationState.swift`
+- 初期読み込み失敗画面の再読み込み中/ログアウト中フラグ、ボタン文言、共通disabled判定を `NativeLoadingFailurePresentationState` に集約した。
+
+#### `ios-native/Sources/MegrumApp/MegrumRootAuxiliaryViews.swift`
+- 個別 `@State` の再読み込み中/ログアウト中フラグを `presentationState` へ置き換えた。
+- `onRetry` / `onSignOut` の非同期呼び出し順、ボタン構成、表示文言、失敗画面レイアウトは変更していない。
+
+#### `ios-native/Sources/MegrumApp/NotificationCenterPresentationState.swift`
+- 通知センターの表示フィルター、空表示タイトル、フィルター済み通知リスト生成を `NotificationCenterPresentationState` に集約した。
+- 全件/未読/取引関連通知の判定を値型メソッドへ分離した。
+
+#### `ios-native/Sources/MegrumApp/NotificationsScreen.swift`
+#### `ios-native/Sources/MegrumApp/NotificationCenterContent.swift`
+- 個別 `@State` を `presentationState` へ置き換えた。
+- `appState.loadNotifications`、既読化、通知リンクのroute intent、fallback tab遷移、ツールバー、表示文言は変更していない。
+
+#### `ios-native/Sources/MegrumApp/AddressSettingsDraftState.swift`
+- 住所設定画面の宛名、郵便番号、都道府県、市区町村、番地、補足住所、電話番号、最後に反映した郵便番号、入力validation errorを `AddressSettingsDraftState` に集約した。
+- 保存用 `MailingAddress` の生成、既存住所の反映、郵便番号正規化、郵便番号lookup要否判定、lookup結果反映、validation error clearを値型メソッドへ分離した。
+
+#### `ios-native/Sources/MegrumApp/AddressSettingsScreen.swift`
+- 個別 `@State` を `draftState` へ置き換え、画面側にはフォーカスと郵便番号lookup taskの寿命管理を残した。
+- `appState.loadMailingAddress`、`appState.lookupPostalCode`、`appState.saveMailingAddress`、保存前validation、保存成功時dismiss、表示文言、フォームレイアウトは変更していない。
+
+#### `ios-native/Sources/MegrumApp/AccountSetupBirthDateCalendarPresentationState.swift`
+- アカウント初期設定の生年月日カレンダー表示月、月タイトル、選択日同期、前後月/年前後移動可否を `AccountSetupBirthDateCalendarPresentationState` に集約した。
+
+#### `ios-native/Sources/MegrumApp/AccountSetupBirthDateCalendar.swift`
+- 個別 `@State` の表示月を `presentationState` へ置き換えた。
+- 生年月日selection binding、日付タップ時の `onSelectionChange`、未来日disable、曜日/日付grid、表示文言、カレンダーのアクセシビリティlabelは変更していない。
+
+#### `ios-native/Sources/MegrumApp/AccountDeletionDraftState.swift`
+- アカウント削除画面のステップ、退会理由、任意メモ、validation message、最終確認dialog表示状態を `AccountDeletionDraftState` に集約した。
+- 理由toggle、メモ上限、理由ステップvalidation、進行中取引時のvalidation message、送信用input生成を値型メソッドへ分離した。
+
+#### `ios-native/Sources/MegrumApp/AccountDeletionScreen.swift`
+- 個別 `@State` を `draftState` へ置き換え、画面側には退会可否読み込み、退会申請task、閉じる導線を残した。
+- `appState.loadAccountDeletionEligibility`、`appState.requestAccountDeletion`、進行中取引ブロック、最終確認dialog、保存順序、表示文言、フォームレイアウトは変更していない。
+
+#### `ios-native/Sources/MegrumApp/BlockedUsersPresentationState.swift`
+- ブロックした人画面の解除対象ユーザーと解除確認dialog表示状態を `BlockedUsersPresentationState` に集約した。
+- 解除対象の設定、解除対象ID参照、解除完了後のpending解除を値型メソッドへ分離した。
+
+#### `ios-native/Sources/MegrumApp/BlockedUsersScreen.swift`
+- 個別 `@State` を `presentationState` へ置き換えた。
+- `appState.loadBlockedUsers`、`appState.unblockUser`、confirmation dialogの表示文言、refreshable、navigation titleは変更していない。
+
+#### `ios-native/Sources/MegrumApp/OshiSettingsPresentationState.swift`
+- 推し設定画面のグループ下書き、グループ別メンバー候補、展開中グループ、削除確認、保存/読み込み状態、notice/error、マスター選択sheet、リクエストsheetを `OshiSettingsPresentationState` に集約した。
+- メンバー選択対応グループだけの展開切り替え、初期グループ反映、メンバー候補保持、保存成功時のreprioritize、利用可能メンバーの除外/並び替えを値型メソッドへ分離した。
+
+#### `ios-native/Sources/MegrumApp/OshiSettingsScreen.swift`
+#### `ios-native/Sources/MegrumApp/OshiSettingsScreenActions.swift`
+#### `ios-native/Sources/MegrumApp/OshiSettingsScreenDerivedState.swift`
+- 個別 `@State` を `presentationState` へ置き換えた。
+- `appState.loadOshiGroups`、`appState.loadUserOshiSelections`、`appState.loadOshiCharacters`、`appState.createOshiRequest`、`appState.createCharacterRequest`、`appState.saveOshiSelections`、追加/削除/リクエスト文言、保存input生成は変更していない。
+
+#### `ios-native/Sources/MegrumApp/OshiSettingsGroupCardPresentationState.swift`
+- 推し設定グループカードの削除確認popoverで、確認ボタンを有効化するまでのローカル状態を `OshiSettingsGroupCardPresentationState` に集約した。
+
+#### `ios-native/Sources/MegrumApp/OshiSettingsGroupCardViews.swift`
+- 個別 `@State` の削除確定可否フラグを `presentationState` へ置き換えた。
+- 削除確認popover、250ms遅延、キャンセル/確定callback、メンバー追加/削除、展開表示、表示文言は変更していない。
+
+#### `ios-native/Sources/MegrumApp/OshiRequestDraftState.swift`
+- 推し追加リクエストシートの名前、補足メモ、種別、ジャンルと、メンバー追加リクエストシートの名前、補足メモを値型へ集約した。
+- 送信可否、名前trim、空メモのnil化、payload生成を値型プロパティへ分離した。
+
+#### `ios-native/Sources/MegrumApp/OshiSettingsRequestSheets.swift`
+- 推し追加/メンバー追加リクエストシートの個別 `@State` を `draftState` へ置き換えた。
+- `OshiRequestSheetContent`、`OshiMemberRequestSheetContent`、送信footer、close callback、表示文言、sheet背景は変更していない。
+
+#### `ios-native/Sources/MegrumApp/OshiMasterSelectSheetState.swift`
+- 推しマスター選択シートの検索文字列、選択ジャンル、複数選択中グループIDを `OshiMasterSelectSheetState` に集約した。
+- 検索/ジャンル絞り込み、既存選択済みIDを含む選択判定、ロック済みIDの仮選択除外、登録対象のマスター順保持を値型へ分離した。
+
+#### `ios-native/Sources/MegrumApp/OshiSettingsSheetViews.swift`
+- 推しマスター選択シートの個別 `@State` を `sheetState` へ置き換えた。
+- `OshiMasterSelectHeader`、`OshiMasterSelectFooter`、候補grid、登録callback、単一選択時の即時callback、検索/ジャンルUI、表示文言は変更していない。
+
+#### `ios-native/Sources/MegrumApp/OwnProfilePresentationState.swift`
+- 自分のプロフィール画面のローカル下書き、編集下書き、プロフィール編集sheet、スケジュールsheet、保存完了alert、プロフィールタブ選択を `OwnProfilePresentationState` に集約した。
+- プロフィール編集sheetの初期下書き生成、スケジュールsheet開閉、保存成功時のローカル下書きclearと完了alert表示を値型メソッドへ分離した。
+
+#### `ios-native/Sources/MegrumApp/OwnProfileScreen.swift`
+- 個別 `@State` を `presentationState` へ置き換えた。
+- `OwnProfileEditDraft`、`appState.updateOwnProfile`、avatar upload/clear payload、補助データ読み込み、閉じる導線、表示文言、タブ/シート構成は変更していない。
+
+#### `ios-native/Sources/MegrumApp/OwnProfileEditProfileFieldsPresentationState.swift`
+- プロフィール編集フォームの生年月日ピッカー展開状態、chevron回転角、表示文字列、未設定時のDatePicker fallback日付を `OwnProfileEditProfileFieldsPresentationState` に集約した。
+
+#### `ios-native/Sources/MegrumApp/OwnProfileEditFormViews.swift`
+- 個別 `@State` の生年月日ピッカー展開フラグを `presentationState` へ置き換えた。
+- 名前、ユーザーネーム、自己紹介、生年月日、性別、活動エリアの入力binding、DatePicker、保存payload、表示文言は変更していない。
+
+#### `ios-native/Sources/MegrumApp/ProfileSchedulePresentationState.swift`
+- 公開プロフィール予定画面の表示モードと基準日を `ProfileSchedulePresentationState` に集約した。
+- 表示範囲、reload key、5日表示日、月表示日、日別予定抽出、基準日の移動を値型メソッドへ分離した。
+
+#### `ios-native/Sources/MegrumApp/ProfileScheduleScreen.swift`
+- 個別 `@State` と日付計算を `presentationState` へ置き換えた。
+- `appState.loadProfileSchedules`、公開予定の表示、戻る導線、表示文言、レイアウトは変更していない。
+
+#### `ios-native/Sources/MegrumApp/MeguriProfileSettingsDraftState.swift`
+- めぐりプロフィール設定シートの表示名、匿名アイコン、保存失敗alert状態を `MeguriProfileSettingsDraftState` に集約した。
+- 現在プロフィール/ビューアー名からの下書き反映、空入力時だけの再反映、保存可否、avatar fallback、保存失敗messageを値型メソッドへ分離した。
+
+#### `ios-native/Sources/MegrumApp/MeguriProfileSettingsSheet.swift`
+- 個別 `@State` を `draftState` へ置き換えた。
+- `appState.loadMeguriProfile`、`appState.saveMeguriProfile`、ロック表示、保存成功時dismiss、表示文言、アイコン選択UI、validation責務は変更していない。
+
+#### `ios-native/Sources/MegrumApp/MeguriMessagesPresentationState.swift`
+- めぐりメッセージ画面の送信下書きとMegrum Plus sheet表示状態を `MeguriMessagesPresentationState` に集約した。
+- 送信成功時だけ下書きをclearする処理とPlus sheet表示を値型メソッドへ分離した。
+
+#### `ios-native/Sources/MegrumApp/MeguriMessageViews.swift`
+- めぐりメッセージ画面の個別 `@State` を `presentationState` へ置き換えた。
+- `appState.sendMeguriMessage`、送信中判定、送信成功時のみ下書きclear、メッセージ既読化、Megrum Plus sheet、表示文言は変更していない。
+
+#### `ios-native/Sources/MegrumApp/BoardThreadReplyComposerState.swift`
+- スポット掲示板詳細の返信下書き、trim済み送信用本文、送信中/空入力guard、送信成功時の下書きclearを `BoardThreadReplyComposerState` に集約した。
+
+#### `ios-native/Sources/MegrumApp/BoardThreadDetailScreen.swift`
+- 個別 `@State` の返信下書きを `replyComposerState` へ置き換えた。
+- `appState.loadBoardReplies`、`appState.sendBoardReply`、送信payload、返信範囲判定、送信成功時scroll、参加者プロフィール読み込み、表示文言は変更していない。
+
+#### `ios-native/Sources/MegrumApp/MeguriMapCreationPromptPresentationState.swift`
+- めぐりマップ作成プロンプトのドロップピン/吹き出し表示状態と、表示前後のoffset/opacity/scaleを `MeguriMapCreationPromptPresentationState` に集約した。
+
+#### `ios-native/Sources/MegrumApp/MeguriMapCreationPromptViews.swift`
+- 個別 `@State` のドロップピン落下済みフラグと吹き出し表示フラグを `presentationState` へ置き換えた。
+- ドロップピン表示、吹き出し配置、pointer offset、遅延表示、作成callback、表示文言、アクセシビリティlabelは変更していない。
+
+#### `ios-native/Sources/MegrumApp/GroomArchiveStoryPresentationState.swift`
+- グルームアーカイブstoryの現在index、drag offset、画像offset/scale、左右タップ移動結果、上/下スワイプ結果、インサイトsheet表示状態を `GroomArchiveStoryPresentationState` に集約した。
+- 先頭より前では移動せず、末尾より後ではdismissする既存の画像送り境界と、上スワイプ/下スワイプの閾値判定を値型メソッドへ分離した。
+
+#### `ios-native/Sources/MegrumApp/GroomArchivePresentationState.swift`
+- グルームアーカイブ画面の選択中グルーム、選択中グルームID、Megrum Plus sheet表示状態を `GroomArchivePresentationState` に集約した。
+
+#### `ios-native/Sources/MegrumApp/GroomArchiveScreen.swift`
+- 個別 `@State` の選択中グルームとMegrum Plus sheet表示フラグを `presentationState` へ置き換えた。
+- map/thumbnail選択、story fullScreenCover/sheet、Megrum Plus sheet、Map camera、archive読み込み、表示文言は変更していない。
+
+#### `ios-native/Sources/MegrumApp/GroomArchiveStoryViews.swift`
+- 個別 `@State` の現在index、drag offset、インサイトsheet表示フラグを `presentationState` へ置き換えた。
+- 現在story index、ドラッグoffset、左右タップ移動、上スワイプ閾値、下スワイプdismiss、インサイトsheet内容、表示文言は変更していない。
+
+#### `ios-native/Sources/MegrumApp/GroomViewerLikeButtonPresentationState.swift`
+- グルームviewerのいいねボタンburst token、burst表示状態、アイコンscaleを `GroomViewerLikeButtonPresentationState` に集約した。
+
+#### `ios-native/Sources/MegrumApp/GroomViewerInteractionState.swift`
+- グルームviewerの返信下書き、trim済み送信用本文、送信中/空入力guard、送信成功時の下書きclear、通報/ブロック確認表示状態を `GroomViewerInteractionState` に集約した。
+
+#### `ios-native/Sources/MegrumApp/GroomViewerScreen.swift`
+- 個別 `@State` の返信下書きと通報/ブロック確認フラグを `interactionState` へ置き換えた。
+- 現在表示index、下方向drag dismiss、既読化、プロフィール読み込み、返信送信payload、いいね、通報/ブロック処理、表示文言は変更していない。
+
+#### `ios-native/Sources/MegrumApp/GroomViewerChromeViews.swift`
+- いいねボタンの個別 `@State` を `presentationState` へ置き換えた。
+- いいねbutton action、like count表示、burst表示、620ms後の非表示、アクセシビリティ文言は変更していない。
+
+#### `ios-native/Sources/MegrumApp/GroomStoryComposerPresentationState.swift`
+- グルームstory作成画面のcaption入力、投稿用caption、toast message、toast IDを `GroomStoryComposerPresentationState` に集約した。
+- 写真リセット時のcaption clear、toast表示、古いtoast IDのclear抑止を値型メソッドへ分離した。
+
+#### `ios-native/Sources/MegrumApp/GroomStoryComposerViews.swift`
+- 個別 `@State` のcaption/toast状態を `presentationState` へ置き換えた。
+- 写真選択、カメラ利用不可toast、位置未選択toast、1km圏外toast、投稿callback、投稿成功時dismiss、写真リセット、表示文言は変更していない。
+
+#### `ios-native/Sources/MegrumApp/MegrumInteractionFeedbackPresentationState.swift`
+- 共通インタラクションフィードバックのtap ripple配列、ripple追加/削除、ripple animation progress、reduce motion時の直径/scale/opacityを `MegrumInteractionFeedbackPresentationState` と `MegrumTapRippleAnimationState` に集約した。
+
+#### `ios-native/Sources/MegrumApp/MegrumInteractionFeedback.swift`
+- 個別 `@State` のripple配列とripple progressを値型状態へ置き換えた。
+- SpatialTapGesture、ripple表示、720ms後の削除、reduce motion/reduce transparency時の見た目、haptics helperは変更していない。
+
+#### `ios-native/Sources/MegrumApp/MegrumSlidePresentationDragState.swift`
+- 共通slide presentation overlayのdismiss drag offset、tracking状態、tracking開始判定、drag offset clamp、dismiss判定を `MegrumSlidePresentationDragState` に集約した。
+
+#### `ios-native/Sources/MegrumApp/MegrumSlidePresentationOverlay.swift`
+- bool/item両方のpresentation overlayで、個別 `@State` のdrag offsetとdismiss trackingフラグを `dragState` へ置き換えた。
+- leading edge capture、slide content modifier、dismiss animation、interactive offsetのno-animation transaction、item/idによる表示切り替えは変更していない。
+
+#### `ios-native/Sources/MegrumApp/AppDrawerOverlayPresentationState.swift`
+- アプリdrawer overlayの閉じ中フラグ、drawer item tap抑止フラグ、閉じ開始/終了、表示再開時のclosing解除、dragによるtap抑止開始/終了を `AppDrawerOverlayPresentationState` に集約した。
+
+#### `ios-native/Sources/MegrumApp/AppDrawerOverlay.swift`
+- 個別 `@State` のclosing/tap suppressionフラグを `presentationState` へ置き換えた。
+- drawer表示、バッジ計算、ログアウトtask、destination選択callback、閉じるanimation、tap抑止duration、通知読み込みは変更していない。
+
+#### `ios-native/Sources/MegrumApp/InteractiveBackSwipePresentationState.swift`
+- 共通interactive back swipeのdrag offset、tracking状態、container width、width正規化、tracking開始判定、tracked offset、trigger判定を `InteractiveBackSwipePresentationState` に集約した。
+
+#### `ios-native/Sources/MegrumApp/EdgeBackSwipeGesture.swift`
+- `InteractiveBackSwipeModifier` の個別 `@State` を `presentationState` へ置き換えた。
+- slide presentation配下では無効化する環境判定、DragGesture、suppressed時のreset、reset animation、action呼び出し順序、従来のedge-only back swipe resolverは変更していない。
+
+#### `ios-native/Sources/MegrumApp/HomeExchangeSettingsDraftState.swift`
+- ホーム交換条件設定の交換方法、都道府県、日付キー、日付詳細、郵送条件、表示月、編集対象日、初回読み込み済み、ユーザー編集済み判定を `HomeExchangeSettingsDraftState` に集約した。
+- AppStorageからの初期読み込み、remote反映時のユーザー編集保護、保存成功時の編集済み解除、日付ドラッグ選択、反映済み個別募集日付の保護を値型メソッドへ分離した。
+
+#### `ios-native/Sources/MegrumApp/HomeExchangeSettingsScreen.swift`
+- 個別 `@State` を `draftState` へ置き換え、画面はAppStorage永続化、remote save、閉じる導線を担当する形に整理した。
+- `appState.loadExchangeSettings`、`appState.saveExchangeSettings`、ローカル保存順序、個別募集から反映された日付の読み取り専用挙動、表示文言、レイアウトは変更していない。
+
+#### `ios-native/Sources/MegrumApp/HomeExchangeLocalDateDetailEditorState.swift`
+- ホーム交換条件の日付詳細シートの都道府県、メモ、完了済み判定を `HomeExchangeLocalDateDetailEditorState` に集約した。
+- 保存用detailのtrimと、dismiss時にcancel扱いするかの判定を値型へ分離した。
+
+#### `ios-native/Sources/MegrumApp/HomeExchangeDateDetailSheet.swift`
+- 個別 `@State` を `editorState` へ置き換えた。
+- 保存、削除、キャンセルcallback、読み取り専用表示、表示文言、シートdetentは変更していない。
+
+#### `ios-native/Sources/MegrumApp/HomePullRefreshPresentationState.swift`
+- ホームpull refreshのscroll offset、手動pull offset、refresh中フラグ、progress算出、手動pull追跡可否、refresh二重実行抑止を `HomePullRefreshPresentationState` に集約した。
+
+#### `ios-native/Sources/MegrumApp/HomePullRefreshViews.swift`
+- 個別 `@State` のpull offset、手動pull offset、refresh中フラグを `presentationState` へ置き換えた。
+- `.refreshable`、手動下方向dragでのrefresh開始、refresh中のindicator表示、二重refresh抑止、indicatorのscale/opacity、表示位置は変更していない。
+
+#### `ios-native/Sources/MegrumApp/HomeExchangeCalendarDragPreviewState.swift`
+- ホーム交換条件カレンダーのdrag preview key、選択済みkeyとの合成、preview更新、drag終了時の表示日復元とclearを `HomeExchangeCalendarDragPreviewState` に集約した。
+
+#### `ios-native/Sources/MegrumApp/HomeExchangeSettingsCalendarGrid.swift`
+- 個別 `@State` のdrag preview key集合を `dragPreviewState` へ置き換えた。
+- day index算出、横方向同一行drag判定、drag selection resolver、日付cell表示、drag終了時の `onFinishDragSelection` callbackは変更していない。
+
+#### `ios-native/Sources/MegrumApp/HomeWishHitDetailPresentationState.swift`
+- ホームWishヒット詳細シートの選択中の譲る候補index、初期選択、選択表示、提案開始payload生成を `HomeWishHitDetailPresentationState` に集約した。
+- 候補が未選択又は範囲外の場合は提案開始payloadを作らない既存guardを値型メソッドへ分離した。
+
+#### `ios-native/Sources/MegrumApp/HomeWishHitDetailSheet.swift`
+- 個別 `@State` を `presentationState` へ置き換えた。
+- Wishヒット候補抽出、相手グッズヘッダー、譲れる候補グリッド、他の交換候補行、Wishコピー、提案開始callback、表示文言は変更していない。
+
+#### `ios-native/Sources/MegrumApp/HomePartnerExchangeCalendarPresentationState.swift`
+- 相手の交換条件カレンダーシートの表示月、選択日キー、選択日の詳細解決を `HomePartnerExchangeCalendarPresentationState` に集約した。
+
+#### `ios-native/Sources/MegrumApp/HomePartnerExchangeCalendarSheet.swift`
+- 個別 `@State` を `presentationState` へ置き換えた。
+- 初期表示月、初期選択日、カレンダー表示、日別メモ表示、fallback都道府県/メモ、表示文言は変更していない。
+
+#### `ios-native/Sources/MegrumApp/HomeMutualMatchSelectedPreviewPresentationState.swift`
+- 相互マッチ詳細カードの確認ポイントhelp popover表示状態を `HomeMutualMatchSelectedPreviewPresentationState` に集約した。
+
+#### `ios-native/Sources/MegrumApp/HomeMutualMatchDetailPresentationState.swift`
+- 相互マッチ詳細シートの選択pair ID、nested presentation、追加候補selectionを `HomeMutualMatchDetailPresentationState` に集約した。
+- 追加候補IDの算出、選択pair更新、初期選択seed、nested profile/sheet表示、親proposal selectionへの追加候補mergeを値型メソッドへ分離した。
+
+#### `ios-native/Sources/MegrumApp/HomeMutualMatchDetailSheet.swift`
+- 個別 `@State` の選択pair ID、nested presentation、追加候補selectionを `presentationState` へ置き換えた。
+- 相互マッチpair生成、選択pair fallback、他候補行、partner scoped payload生成、提案開始payload、公開プロフィールrouting、表示文言は変更していない。
+
+#### `ios-native/Sources/MegrumApp/HomeMutualMatchDetailSheetComponents.swift`
+- 個別 `@State` の確認ポイントhelp表示フラグを `presentationState` へ置き換えた。
+- 交換プレビュー、確認ポイント生成、popover本文、アクセシビリティ文言、表示文言、レイアウトは変更していない。
+
+#### `ios-native/Sources/MegrumApp/HomeDiscoveryRotaryCardPresentationState.swift`
+- ホーム候補カードの選択index、ドラッグ進捗、カウント表示、相対位置計算、index wrap、ドラッグ量からの移動方向判定を `HomeDiscoveryRotaryCardPresentationState` に集約した。
+
+#### `ios-native/Sources/MegrumApp/HomeDiscoveryRotaryCard.swift`
+- 個別 `@State` の選択indexとドラッグ進捗を `presentationState` へ置き換えた。
+- 候補カードstage、条件タグ表示、選択変更callback、activation callback、横スワイプ、縦スクロール優先判定、accessibility adjustable action、reduce motion時の挙動、表示文言は変更していない。
+
+#### `ios-native/Sources/MegrumApp/HomeDiscoveryCandidateButtonPresentationState.swift`
+- ホーム候補ボタンの選択中グッズ、初期選択、候補リスト変更時の先頭リセット、選択グッズfallback、カードタイトル生成を `HomeDiscoveryCandidateButtonPresentationState` に集約した。
+
+#### `ios-native/Sources/MegrumApp/HomeDiscoveryCandidateButton.swift`
+- 個別 `@State` の選択中グッズを `presentationState` へ置き換えた。
+- 検索callback、詳細sheet callback、条件タグ表示、候補カード、選択変更callback、表示文言は変更していない。
+
+#### `ios-native/Sources/MegrumApp/HomeDiscoverySheetPresentationState.swift`
+- ホーム詳細シートのnested presentation、追加候補selection、Wishコピーtoast message/toast ID、Wishコピー中グッズIDを `HomeDiscoverySheetPresentationState` に集約した。
+- 追加候補IDの算出、親proposal selectionへの追加候補merge、nested profile/sheet表示、Wishコピー中の二重実行抑止、古いtoast IDのclear抑止を値型メソッドへ分離した。
+
+#### `ios-native/Sources/MegrumApp/HomeDiscoverySheets.swift`
+- 個別 `@State` のnested presentation、追加候補selection、Wishコピーtoast、コピー中IDを `presentationState` へ置き換えた。
+- 詳細シート内容、追加候補sheet、公開プロフィールsheet、提案開始callback、Wishコピーinput生成、`appState.createGoodsEntry`、表示文言は変更していない。
+
+#### `ios-native/Sources/MegrumApp/HomeSelectedGoodsHeaderPresentationState.swift`
+- ホーム選択グッズヘッダーの個別募集詳細sheet対象と相手交換条件カレンダーsheet対象を `HomeSelectedGoodsHeaderPresentationState` に集約した。
+
+#### `ios-native/Sources/MegrumApp/HomeDiscoverySheetSharedViews.swift`
+- 個別 `@State` の個別募集詳細sheet対象と相手交換条件カレンダーsheet対象を `presentationState` へ置き換えた。
+- オーナー概要表示、交換方法ブロック、個別募集詳細popup、相手交換条件カレンダーsheet、表示文言、シートdetentは変更していない。
+
+#### `ios-native/Sources/MegrumApp/SearchFilterSheetState.swift`
+- 検索フィルターシートのドラフト条件、日付ピッカー展開状態、タグピッカー表示状態を `SearchFilterSheetState` に集約した。
+- グループ選択時のメンバー・タグクリア、日付追加/削除、デフォルト条件適用、リセットを値型メソッドへ分離した。
+
+#### `ios-native/Sources/MegrumApp/SearchFilterViews.swift`
+- 個別 `@State` を `sheetState` へ置き換えた。
+- 検索条件の適用、保存済みフィルター、条件セクション、表示文言、レイアウト、検索結果フィルタリングの意味は変更していない。
+
+#### `ios-native/Sources/MegrumApp/SearchGoodsTagSelectionState.swift`
+- 検索フィルター内のシリーズ選択シートの検索文字列、正規化、候補絞り込み、追加可否、重複判定を `SearchGoodsTagSelectionState` に集約した。
+
+#### `ios-native/Sources/MegrumApp/SearchGoodsTagSelectionViews.swift`
+- 個別 `@State` の検索文字列を `selectionState` へ置き換えた。
+- 選択済みタグの追加/削除、候補表示順、追加後の検索欄クリア、表示文言、navigation title、完了導線は変更していない。
+
+#### `ios-native/Sources/MegrumApp/SearchScreen.swift`
+#### `ios-native/Sources/MegrumApp/SearchScreenDerivedState.swift`
+#### `ios-native/Sources/MegrumApp/SearchScreenFilterActions.swift`
+#### `ios-native/Sources/MegrumApp/SearchScreenSearchActions.swift`
+#### `ios-native/Sources/MegrumApp/SearchScreenSuggestionActions.swift`
+- 検索画面本体のグループ、メンバー、グッズ種別、タグ、支払い方法、交換方法、日付、都道府県、郵送条件、条件一致フィルターの個別 `@State` を既存の `SearchFilterDraft` へ集約した。
+- 初期条件適用、サジェスト選択、チップ削除、デフォルト交換/支払い条件適用、検索APIへの値渡し、active filter count、検索結果フィルタリングの意味は変更していない。
+
+#### `ios-native/Sources/MegrumApp/SearchResultGridPresentationState.swift`
+- 検索結果グリッドのホーム詳細sheet、deferred profile user ID、通報対象グッズを `SearchResultGridPresentationState` に集約した。
+- 詳細sheet表示、打診開始時のsheet解除、プロフィール遷移のdeferred消費、通報sheet表示/解除を値型メソッドへ分離した。
+
+#### `ios-native/Sources/MegrumApp/SearchResultGridViews.swift`
+- 個別 `@State` を `presentationState` へ置き換えた。
+- 検索結果grid layout、native ad挿入、ホーム詳細sheet生成、deferred presentation delay、打診開始callback、プロフィールcallback、通報callbackは変更していない。
+
+#### `ios-native/Sources/MegrumApp/PublicUserProfilePresentationState.swift`
+- 公開プロフィール画面の表示タブ、グッズ打診target、個別募集打診target、予定/交換条件sheet、通報/ブロックtargetを `PublicUserProfilePresentationState` に集約した。
+- グッズ優先の主打診開始、個別募集選択、proposal action無効時の抑止、ブロック確認dialogのdismiss処理を値型メソッドへ分離した。
+
+#### `ios-native/Sources/MegrumApp/PublicUserProfileScreen.swift`
+#### `ios-native/Sources/MegrumApp/PublicUserProfileScreenActions.swift`
+- 個別 `@State` を `presentationState` へ置き換えた。
+- `appState.loadPublicUserProfile`、`appState.loadPublicExchangeContent`、`appState.reportUser`、`appState.blockUser`、打診作成flow、予定/交換条件/通報sheet、表示文言、閉じる導線は変更していない。
+
+#### `ios-native/Sources/MegrumApp/UserReportDraftState.swift`
+- 公開プロフィール通報シートの理由と補足メモを `UserReportDraftState` に集約した。
+- 送信時に渡す理由とraw noteを値型プロパティへ分離し、AppState側のメモ正規化責務は維持した。
+
+#### `ios-native/Sources/MegrumApp/PublicUserProfileModerationViews.swift`
+- 個別 `@State` を `draftState` へ置き換えた。
+- 通報対象表示、理由Picker、補足TextEditor、送信callback、dismiss、表示文言は変更していない。
+
+#### `ios-native/Sources/MegrumApp/IndividualListingEditorPresentationState.swift`
+- 個別募集エディタのステップ、譲るものタブ、譲る/欲しい選択フィルター、追加済み選択肢レビュー、レビューsheet、追加toast、保存エラーを `IndividualListingEditorPresentationState` に集約した。
+- 初期ステップ/タブ決定、選択肢追加タイトル、staged option削除、保存エラーclear、toast表示/一致時clearを値型メソッドへ分離した。
+
+#### `ios-native/Sources/MegrumApp/IndividualListingEditorSheet.swift`
+#### `ios-native/Sources/MegrumApp/IndividualListingEditorSheetActions.swift`
+#### `ios-native/Sources/MegrumApp/IndividualListingEditorSheetDerivedState.swift`
+#### `ios-native/Sources/MegrumApp/IndividualListingEditorSheetSelectionState.swift`
+- 個別 `@State` のうち、画面進行、選択フィルター、選択肢レビュー、toast、保存エラーを `presentationState` へ置き換えた。
+- `IndividualListingDraft`、`draft.createInput`、`appState.createIndividualListing`、`appState.updateIndividualListing`、ローカル編集反映、dismiss、選択/数量/交換条件ロジック、表示文言、レイアウトは変更していない。
+
+#### `ios-native/Sources/MegrumApp/IndividualListingFooterLogicPresentationState.swift`
+- 個別募集エディタ下部のロジック選択セグメントで使う最小個数picker表示状態と、選択数からの最小個数候補生成を `IndividualListingFooterLogicPresentationState` に集約した。
+
+#### `ios-native/Sources/MegrumApp/IndividualListingFooterLogicSegment.swift`
+- 個別 `@State` の最小個数picker表示状態を `presentationState` へ置き換えた。
+- `.atLeast` 選択時のpopover表示、選択値のBinding更新、最小個数候補、picker dismiss、表示文言、segment layoutは変更していない。
+
+#### `ios-native/Sources/MegrumApp/IndividualListingConditionPresentationState.swift`
+- 個別募集条件タブのメンバーpicker表示状態とシリーズ追加sheet表示状態を `IndividualListingConditionPresentationState` に集約した。
+
+#### `ios-native/Sources/MegrumApp/IndividualListingConditionTab.swift`
+- 個別 `@State` のsheet表示フラグを `presentationState` へ置き換えた。
+- メンバー候補絞り込み、メンバーtoggle callback、シリーズ候補生成、シリーズ追加上限/重複判定、数量入力、表示文言は変更していない。
+
+#### `ios-native/Sources/MegrumApp/IndividualListingReceivePanelPresentationState.swift`
+- 個別募集の求めるものパネルで使う選択肢内訳sheet表示状態を `IndividualListingReceivePanelPresentationState` に集約した。
+
+#### `ios-native/Sources/MegrumApp/IndividualListingPanels.swift`
+- 個別 `@State` の選択肢内訳sheet表示フラグを `presentationState` へ置き換えた。
+- 選択肢3件以上の折りたたみ判定、内訳sheet表示内容、追加導線、譲るものパネル、表示文言は変更していない。
+
+#### `ios-native/Sources/MegrumApp/IndividualListingsPresentationState.swift`
+- 個別募集一覧の編集route、ローカル更新済み一覧、初回editor表示済み判定、削除確認対象、Megrum Plus誘導sheet表示状態を `IndividualListingsPresentationState` に集約した。
+- 表示一覧のローカル差し替え、初回editor表示のone-shot消費、Plus上限時のcreate抑止、削除確認対象のclearを値型メソッドへ分離した。
+
+#### `ios-native/Sources/MegrumApp/IndividualListingsScreen.swift`
+- 個別 `@State` を `presentationState` へ置き換えた。
+- `appState.loadIndividualListings`、`appState.archiveIndividualListing`、editor sheet、Plus誘導sheet、AppStorageの交換条件初期値、表示文言、削除確認dialogは変更していない。
+
+#### `ios-native/Sources/MegrumApp/IndividualListingActiveSelectionState.swift`
+- 個別募集表示カードの選択中listing ID、一覧変更時の選択維持/先頭fallback、選択中listingとindexの解決を `IndividualListingActiveSelectionState` に集約した。
+
+#### `ios-native/Sources/MegrumApp/IndividualListingListViews.swift`
+#### `ios-native/Sources/MegrumApp/ProfileVisualTabContent.swift`
+- 個別 `@State` と重複していたactive listing解決処理を `selectionState` へ置き換えた。
+- 個別募集一覧のConditionStrip、個別募集カード、編集/追加/交換条件/削除callback、プロフィール内の個別募集タップ導線、表示文言は変更していない。
+
+#### `ios-native/Sources/MegrumApp/IndividualListingLocalScheduleState.swift`
+- 個別募集の交換条件日程入力における「相談して決める/日程を指定」モード、選択日、日程文字列の生成と外部文字列反映を `IndividualListingLocalScheduleState` に集約した。
+- `7/18`、`9月3日`、年付き日付の既存parseと、空文字/デフォルト文言を相談モードへ戻す挙動を値型メソッドへ分離した。
+
+#### `ios-native/Sources/MegrumApp/IndividualListingLocalScheduleField.swift`
+- 個別 `@State` を `scheduleState` へ置き換えた。
+- segmented picker、graphical DatePicker、`localSchedule` bindingへの保存文字列、表示文言、フォームレイアウトは変更していない。
+
+#### `ios-native/Sources/MegrumApp/WishCollectionPresentationState.swift`
+- Wish画面の選択中セクションを `WishCollectionPresentationState` に集約した。
+- 外部から要求されたWish/個別募集セクションを適用し、消費できたかを返す処理を値型メソッドへ分離した。
+
+#### `ios-native/Sources/MegrumApp/WishCollectionScreen.swift`
+- 個別 `@State` を `presentationState` へ置き換えた。
+- Wish/個別募集のTabView、segmented picker、外部要求消費、Wish一覧、個別募集一覧、表示文言は変更していない。
+
+#### `ios-native/Sources/MegrumApp/GoodsBulkTagSheetState.swift`
+- グッズ一括シリーズ設定シートの入力下書きと選択中候補名を `GoodsBulkTagSheetState` に集約した。
+- 入力値trim、適用可否判定、候補タップ時の入力欄反映、候補再タップ時の選択解除と入力欄clear判定を値型メソッドへ分離した。
+
+#### `ios-native/Sources/MegrumApp/GoodsBulkTagSheet.swift`
+- 個別 `@State` を `sheetState` へ置き換えた。
+- 候補一覧、画像からの候補検索、テキストフィールド、適用時のtrim済みタグ渡し、dismiss、表示文言、シート利用元は変更していない。
+
+#### `ios-native/Sources/MegrumApp/TagCandidatePreviewSelectionState.swift`
+- シリーズ候補プレビューのプレビュー中候補名、選択済み判定、選択上限時のdisable判定を `TagCandidatePreviewSelectionState` に集約した。
+
+#### `ios-native/Sources/MegrumApp/TagCandidatePreviewSelector.swift`
+- 個別 `@State` のプレビュー中候補名を `previewState` へ置き換えた。
+- 1回目タップでプレビュー、2回目/選択済みタップでtoggle、プレビュー解除、画像popover、選択上限時の表示、表示文言は変更していない。
+
+#### `ios-native/Sources/MegrumApp/GoodsInventoryCreateMetaFooterPresentationState.swift`
+- グッズ一括登録のメタ情報footerにあるメンバー登録dialog表示状態と保存ボタン文言生成を `GoodsInventoryCreateMetaFooterPresentationState` に集約した。
+
+#### `ios-native/Sources/MegrumApp/GoodsInventoryCreateMetaFooterView.swift`
+- 個別 `@State` のメンバー登録dialog表示フラグを `presentationState` へ置き換えた。
+- メンバー割り当てcallback、シリーズ登録callback、戻る/保存callback、button disabled条件、confirmation dialog文言は変更していない。
+
+#### `ios-native/Sources/MegrumApp/ProposalScheduleBackgroundPresentationState.swift`
+- 打診作成フローのスケジュール背景セクションにあるカレンダー表示モードと、表示日リスト生成を `ProposalScheduleBackgroundPresentationState` に集約した。
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateScheduleViews.swift`
+- 個別 `@State` の表示モードを `presentationState` へ置き換えた。
+- 週/月segmented picker、予定なし表示、重複banner、5日表示、月表示grid、予定strip、表示文言は変更していない。
+
+#### `ios-native/Sources/MegrumApp/ProposalMeetupCalendarDisplayState.swift`
+- 打診作成の待ち合わせ候補カレンダーにある週/月表示モード、Visual QA月表示初期化、週タイトル表示可否を `ProposalMeetupCalendarDisplayState` に集約した。
+- 月表示で日付を選んだ後に週表示へ戻す操作を値型メソッドへ分離した。
+
+#### `ios-native/Sources/MegrumApp/ProposalMeetupCalendarEditor.swift`
+- 個別 `@State` の週/月表示モードを `displayState` へ置き換えた。
+- 週/月toggle、Visual QA初期月表示、日付選択callback、週/月エディタ切り替え、待ち合わせ候補draft編集は変更していない。
+
+#### `ios-native/Sources/MegrumApp/ProposalCompletionAnimationPresentationState.swift`
+- 打診完了カードのチェックバッジ/装飾sparkleの表示済み状態と、reduce motionを加味したscale/offset/opacityを `ProposalCompletionAnimationPresentationState` に集約した。
+
+#### `ios-native/Sources/MegrumApp/ProposalCompletionCard.swift`
+- 個別 `@State` の表示済みフラグを `presentationState` へ置き換えた。
+- 完了カードの本文、チェックバッジ、sparkle配置、onAppearアニメーション、reduce motion時の即時表示、表示文言は変更していない。
+
+#### `ios-native/Sources/MegrumApp/GoodsReportDraftState.swift`
+- グッズ通報シートの理由と補足メモを `GoodsReportDraftState` に集約した。
+- 送信時に渡す理由とraw noteを値型プロパティへ分離し、AppState側のメモ正規化責務は維持した。
+
+#### `ios-native/Sources/MegrumApp/GoodsGridDisplayViews.swift`
+- グッズ通報シートの個別 `@State` を `draftState` へ置き換えた。
+- 通報対象表示、理由Picker、補足TextEditor、送信callback、dismiss、表示文言は変更していない。
+
+#### `ios-native/Sources/MegrumApp/GoodsGridPresentationState.swift`
+- グッズグリッドの詳細sheet対象、通報sheet対象、未接続action alert messageを `GoodsGridPresentationState` に集約した。
+- 詳細表示、通報表示、alert message表示/解除を値型メソッドへ分離した。
+
+#### `ios-native/Sources/MegrumApp/GoodsGrid.swift`
+- 個別 `@State` を `presentationState` へ置き換えた。
+- detail sheet、通報sheet、未接続action alert、各action callback、表示文言、context menu/selection挙動は変更していない。
+
+#### `ios-native/Sources/MegrumApp/GoodsImageSkeletonPresentationState.swift`
+- グッズリモート画像placeholderのpulsing状態とopacityを `GoodsImageSkeletonPresentationState` に集約した。
+
+#### `ios-native/Sources/MegrumApp/GoodsRemoteImage.swift`
+- `GoodsImageSkeleton` の個別 `@State` を `presentationState` へ置き換えた。
+- リモート画像のロード/キャッシュ/retry、UIKit/AsyncImage分岐、fallback表示、placeholderレイアウト、pulsing animationは変更していない。
+
+#### `ios-native/Sources/MegrumApp/ScheduleEditorDraftState.swift`
+- スケジュール作成シートの予定名、場所、開始/終了日時、終日フラグ、メモを `ScheduleEditorDraftState` に集約した。
+- 保存可否判定、開始日時変更時の終了日時補正、終日切替時の日付境界補正、保存input生成、初期開始日時の算出を値型へ分離した。
+
+#### `ios-native/Sources/MegrumApp/ScheduleEditorSheet.swift`
+- 個別 `@State` を `draftState` へ置き換えた。
+- `appState.createSchedule`、dismiss、表示文言、フォームレイアウト、保存inputの値渡しは変更していない。
+
+#### `ios-native/Sources/MegrumApp/PersonalSchedulePresentationState.swift`
+- 個人スケジュール画面の表示モード、基準日、予定追加sheet表示状態を `PersonalSchedulePresentationState` に集約した。
+- カレンダー表示範囲、reload key、基準日の移動、予定追加sheet表示を値型メソッドへ分離した。
+
+#### `ios-native/Sources/MegrumApp/PersonalScheduleScreen.swift`
+- 個別 `@State` を `presentationState` へ置き換えた。
+- `appState.loadPersonalSchedules`、`ScheduleEditorSheet`、表示モード、前後移動、予定追加導線、表示文言、レイアウトは変更していない。
+
+#### `ios-native/Sources/MegrumApp/TradeSchedulePresentationState.swift`
+- 取引スケジュールシートの表示モード、基準日、予定追加sheet表示状態を `TradeSchedulePresentationState` に集約した。
+- カレンダー表示範囲、reload key、基準日の移動、予定追加sheet表示を値型メソッドへ分離した。
+
+#### `ios-native/Sources/MegrumApp/TradeScheduleViews.swift`
+- 個別 `@State` を `presentationState` へ置き換えた。
+- `appState.loadSchedules`、`ScheduleEditorSheet`、表示モード、前後移動、予定追加導線、表示文言、レイアウトは変更していない。
+
+#### `ios-native/Sources/MegrumApp/CounterProposalDraftState.swift`
+- 再打診シートの交換方法、選択済み条件タグ、メッセージ下書きを `CounterProposalDraftState` に集約した。
+- 条件タグ候補の重複排除、選択タグの表示順、送信メッセージの空白除去、タグトグルを値型メソッドへ分離した。
+
+#### `ios-native/Sources/MegrumApp/CounterProposalSheet.swift`
+- 個別 `@State` を `draftState` へ置き換えた。
+- `proposal.counterProposalInput`、`appState.createProposal`、dismiss、表示文言、フォームレイアウト、条件タグの既存表示順は変更していない。
+
+#### `ios-native/Sources/MegrumApp/TradeEvaluationDraftState.swift`
+- 評価シートの星数と任意コメントを `TradeEvaluationDraftState` に集約した。
+- 送信コメントの空白コメント除去を値型プロパティへ分離した。
+
+#### `ios-native/Sources/MegrumApp/TradeEvaluationSheet.swift`
+- 個別 `@State` を `draftState` へ置き換えた。
+- `onSubmit` に渡す星数、任意コメント、送信ボタン状態、表示文言、レイアウトは変更していない。
+
+#### `ios-native/Sources/MegrumApp/TradeDisputeDraftState.swift`
+- 通報シートの申告理由と内容本文を `TradeDisputeDraftState` に集約した。
+- 本文trimと送信可否判定を値型プロパティへ分離した。
+
+#### `ios-native/Sources/MegrumApp/TradeDisputeSheet.swift`
+- 個別 `@State` を `draftState` へ置き換えた。
+- `onSubmit` に渡す申告理由とtrim済み本文、送信中表示、空本文時の送信抑止、表示文言、Form構成は変更していない。
+
+#### `ios-native/Sources/MegrumApp/DisputeDetailPresentationState.swift`
+- 異議詳細画面の追加申請sheet種別と取り下げ確認dialog表示状態を `DisputeDetailPresentationState` に集約した。
+- 遅延/キャンセル申請sheetの表示、取り下げ確認表示を値型メソッドへ分離した。
+
+#### `ios-native/Sources/MegrumApp/DisputeDetailScreen.swift`
+- 個別 `@State` を `presentationState` へ置き換えた。
+- `DisputeDetailStore`、返信下書き、取り下げ処理、追加申請sheet、confirmation dialog、表示文言、ナビゲーションは変更していない。
+
+#### `ios-native/Sources/MegrumApp/TradesScreenPresentationState.swift`
+- 取引一覧画面の選択中ステージ、取り下げ対象の選択済みpending打診ID、詳細表示中の一覧snapshot、詳細presentation settlement IDを `TradesScreenPresentationState` に集約した。
+- requested stageの消費、pending選択開始/切替/解除、詳細表示snapshotの準備、詳細dismiss/settled判定、snapshot同期可否判定を値型メソッドへ分離した。
+
+#### `ios-native/Sources/MegrumApp/TradesScreen.swift`
+- 個別 `@State` を `presentationState` へ置き換えた。
+- `TradeListOrdering`、`TradePendingWithdrawalPolicy`、`appState.rejectProposal`、詳細route animation、snapshot同期delay、badge算出、表示文言、TabView構成は変更していない。
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateInitialStateFlags.swift`
+- 打診作成フローの初期交換方法、初期ステップ、Visual QA状態のone-shot適用フラグを値型へ分離した。
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFilterState.swift`
+- 打診作成フローの私が出す/受け取る側のグループ・グッズ種別フィルタを値型へ分離した。
+- フィルタ判定をView拡張から値型メソッドへ移し、子Viewへ渡すBindingと表示結果は維持した。
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateValueSelectionState.swift`
+- 打診作成フローの選択モード、金額入力、支払い方法選択IDを値型へ分離した。
+- 金額入力正規化、支払い選択同期、グッズ選択時のモード戻し、初期金額適用を値型メソッドへ移した。
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlowBody.swift`
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlowInitialStateActions.swift`
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlowPaymentDerivedState.swift`
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlowSelectionActions.swift`
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlowStepContent.swift`
+- 既存の個別 `@State` を上記の値型状態へ置き換えた。
+- 送信payload生成、打診作成/再打診、ステップ構成、待ち合わせ候補、支払い設定読み込み、住所導線は変更していない。
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateSheetDraftState.swift`
+- 旧打診作成シートの送信元グッズ、交換方法、条件タグ、メッセージ、待ち合わせ日時/場所/座標入力を `ProposalCreateSheetDraftState` に集約した。
+- 条件タグのtoggle/剪定/表示順、待ち合わせ終了時刻補正、現在地反映、待ち合わせinput生成を値型メソッドへ分離した。
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateSheet.swift`
+#### `ios-native/Sources/MegrumApp/ProposalCreateSheetActions.swift`
+#### `ios-native/Sources/MegrumApp/ProposalCreateSheetDerivedState.swift`
+- 個別 `@State` を `draftState` へ置き換えた。
+- 送信payload、`appState.createProposal`、住所読み込み、現在地取得、dismiss、表示文言、フォームレイアウトは変更していない。
+
+#### `ios-native/Sources/MegrumApp/TradeDetailPhotoPresentationState.swift`
+- 取引詳細画面の証跡写真、チャット写真、服装写真のPhotosPicker選択状態と、写真ライブラリ/カメラ/証跡ソースダイアログの表示状態を `TradeDetailPhotoPresentationState` に集約した。
+- アップロード後のPhotosPicker選択解除を値型メソッドへ分離した。
+
+#### `ios-native/Sources/MegrumApp/TradeDetailPinnedSummaryPresentationState.swift`
+- 取引詳細の固定サマリー領域で使う詳細sheet route、応答時の交換方法選択、支払い方法選択IDを `TradeDetailPinnedSummaryPresentationState` に集約した。
+- 交換方法の選択が必要な時だけpresentation defaultを使う応答値決定を値型メソッドへ分離した。
+
+#### `ios-native/Sources/MegrumApp/TradeAgreementMethodSelectionState.swift`
+- 取引詳細の合意CTAで使う交換方法選択状態を `TradeAgreementMethodSelectionState` に分離した。
+- 交換方法選択が必要な時だけ `ExchangeMethod` を返す判定を値型メソッドへ分離した。
+
+#### `ios-native/Sources/MegrumApp/TradeGoodsCarouselPresentationState.swift`
+- 取引グッズカルーセルの選択index、ドラッグ進捗、カウント表示、table rotation、index wrap、ドラッグ量からの移動方向判定を `TradeGoodsCarouselPresentationState` に集約した。
+
+#### `ios-native/Sources/MegrumApp/TradeDetailRoutePresentationState.swift`
+- 取引詳細画面の証跡一覧、評価、通報、拒否確認、再打診、スケジュール、送信不可案内、サポート申請、画像全画面表示、申告詳細、相手プロフィールのroute/presentation状態を `TradeDetailRoutePresentationState` に集約した。
+- 証跡一覧表示、remote image選択/解除を値型メソッドへ分離した。
+
+#### `ios-native/Sources/MegrumApp/TradeDetailInteractionState.swift`
+- 取引詳細画面のメッセージ下書き、現在地共有待ち、評価送信済み、トースト表示、メッセージ入力フォーカスを `TradeDetailInteractionState` に集約した。
+- 送信成功時だけ下書きを消す処理、現在地共有待ちのconsume、評価送信済みmark、トーストの表示/一致時clearを値型メソッドへ分離した。
+
+#### `ios-native/Sources/MegrumApp/TradeMessageInputPresentationState.swift`
+- 取引メッセージ入力バーのcomposer focus状態とquick action表示可否を `TradeMessageInputPresentationState` に集約した。
+
+#### `ios-native/Sources/MegrumApp/TradeMessageInputViews.swift`
+- 個別 `@State` のcomposer focus状態を `presentationState` へ置き換えた。
+- quick action policy、overflow action、TextField binding、送信ボタンdisabled、focus callback、写真/カメラ/現在地/再打診/通報callbackは変更していない。
+
+#### `ios-native/Sources/MegrumApp/GoodsPhotoCropSheetPresentationState.swift`
+- 写真切り取りシートの切り取り枠、選択中枠、エラー/案内message、適用可否を `GoodsPhotoCropSheetPresentationState` に集約した。
+- 枠削除時の選択fallback、全削除、空枠/失敗message表示を値型メソッドへ分離した。
+
+#### `ios-native/Sources/MegrumApp/GoodsPhotoCropViews.swift`
+- 個別 `@State` の切り取り枠、選択中枠、messageを `presentationState` へ置き換えた。
+- 画像クロップ処理、`TradingCardBulkRecognizer.cropFramesSynchronously`、適用callback、canvas/preview binding、閉じる/全削除toolbar、表示文言は変更していない。
+
+#### `ios-native/Sources/MegrumApp/GoodsPhotoCropCanvasDragState.swift`
+- 写真切り取りcanvasのdrag開始点、draft rect、最小サイズ判定、正規化済み切り取り枠生成を `GoodsPhotoCropCanvasDragState` に集約した。
+
+#### `ios-native/Sources/MegrumApp/GoodsPhotoCropCanvasViews.swift`
+- 個別 `@State` のdrag開始点/draft rectを `dragState` へ置き換えた。
+- drag gesture、28pt未満の枠を無視する挙動、座標clamp/正規化、枠追加後の選択更新、canvas表示は変更していない。
+
+#### `ios-native/Sources/MegrumApp/TradeEvidenceListPresentationState.swift`
+- 取引証跡一覧シートの削除確認対象、全画面表示中写真、ローカル削除済み写真IDを `TradeEvidenceListPresentationState` に集約した。
+- 表示対象写真のフィルタリング、写真表示、削除確認、削除時の即時非表示と全画面表示解除を値型メソッドへ分離した。
+
+#### `ios-native/Sources/MegrumApp/FullScreenRemoteImagePresentationState.swift`
+- 全画面リモート画像ビューの表示中フラグ、ズーム倍率、ドラッグoffset、dismiss drag offset、背景opacity、画像表示scale/opacityを `FullScreenRemoteImagePresentationState` に集約した。
+- magnificationのclamp、ズーム解除、ズーム中dragの確定、下方向dragによるdismiss判定、dismiss準備を値型メソッドへ分離した。
+
+#### `ios-native/Sources/MegrumApp/TradeDetailScreen.swift`
+#### `ios-native/Sources/MegrumApp/TradeDetailScreenActions.swift`
+#### `ios-native/Sources/MegrumApp/TradeDetailScreenDerivedState.swift`
+#### `ios-native/Sources/MegrumApp/TradeDetailScreenPresentation.swift`
+- 取引詳細画面直下の写真関連 `@State` を `photoPresentationState` へ置き換えた。
+- 取引詳細画面直下のroute/presentation関連 `@State` を `routePresentationState` へ置き換えた。
+- 取引詳細画面直下のチャット入力/現在地共有/評価送信済み/トースト/フォーカス関連 `@State` を `interactionState` へ置き換えた。
+- 証跡写真、チャット写真、服装写真、カメラシート、写真ライブラリ、証跡一覧、アップロード処理、エラー表示、取引状態表示、メッセージ送信、現在地共有、評価prompt判定は変更していない。
+
+#### `ios-native/Sources/MegrumApp/TradeDetailPinnedSummaryArea.swift`
+- 詳細sheet routeと応答カードの選択状態を `presentationState` へ置き換えた。
+- 取引内容詳細sheet、応答/拒否/再打診callback、応答カード表示、表示文言、取引状態判定は変更していない。
+
+#### `ios-native/Sources/MegrumApp/TradeAgreementCompactBar.swift`
+#### `ios-native/Sources/MegrumApp/TradeDetailStatusViews.swift`
+- 個別の `selectedExchangeMethod` を `methodSelectionState` へ置き換えた。
+- 合意CTA、見送り、条件相談、Picker表示、表示文言、取引状態判定は変更していない。
+
+#### `ios-native/Sources/MegrumApp/TradeDealGoodsCarouselViews.swift`
+- 個別 `@State` の選択indexとドラッグ進捗を `presentationState` へ置き換えた。
+- カルーセル表示、左右スワイプ、縦スクロール優先判定、accessibility adjustable action、stage tap、reduce motion時の挙動、表示文言は変更していない。
+
+#### `ios-native/Sources/MegrumApp/TradeEvidenceListSheet.swift`
+- 個別 `@State` を `presentationState` へ置き換えた。
+- 証跡一覧、空表示、写真追加導線、削除確認dialog、全画面写真表示、削除時の即時非表示、承認footer判定、表示文言は変更していない。
+
+#### `ios-native/Sources/MegrumApp/FullScreenRemoteImageView.swift`
+- 個別 `@State` の表示/ズーム/ドラッグ/dismiss offsetを `presentationState` へ置き換えた。
+- ローカル/リモート画像読み込み、tap dismiss、double tapでのズームリセット、magnification clamp、ズーム中drag、下方向drag dismiss、削除callback、閉じる導線、表示文言は変更していない。
+
+#### `ios-native/Tests/MegrumAppTests/SettingsScreenTests.swift`
+#### `ios-native/Tests/MegrumAppTests/AccountSetupScreenTests.swift`
+#### `ios-native/Tests/MegrumAppTests/AppDrawerGestureTests.swift`
+#### `ios-native/Tests/MegrumAppTests/AuthScreenInputTests.swift`
+#### `ios-native/Tests/MegrumAppTests/EdgeBackSwipeGestureTests.swift`
+#### `ios-native/Tests/MegrumAppTests/BlockedUserStateReducerTests.swift`
+#### `ios-native/Tests/MegrumAppTests/ProposalCreateFlowTests.swift`
+#### `ios-native/Tests/MegrumAppTests/ProposalCreateSheetTests.swift`
+#### `ios-native/Tests/MegrumAppTests/SearchScreenTests.swift`
+#### `ios-native/Tests/MegrumAppTests/ScheduleStateReducerTests.swift`
+#### `ios-native/Tests/MegrumAppTests/TradeScheduleCalendarWindowTests.swift`
+#### `ios-native/Tests/MegrumAppTests/HomeExchangeSettingsScreenTests.swift`
+#### `ios-native/Tests/MegrumAppTests/GoodsEditorDraftTests.swift`
+#### `ios-native/Tests/MegrumAppTests/GoodsGridLayoutTests.swift`
+#### `ios-native/Tests/MegrumAppTests/IndividualListingDraftTests.swift`
+#### `ios-native/Tests/MegrumAppTests/IndividualListingStateReducerTests.swift`
+#### `ios-native/Tests/MegrumAppTests/MegrumPlusAccessPolicyTests.swift`
+#### `ios-native/Tests/MegrumAppTests/OshiSettingsDraftTests.swift`
+#### `ios-native/Tests/MegrumAppTests/MeguriAccessPolicyTests.swift`
+#### `ios-native/Tests/MegrumAppTests/BoardThreadDetailPresentationTests.swift`
+#### `ios-native/Tests/MegrumAppTests/GroomInteractionStateReducerTests.swift`
+#### `ios-native/Tests/MegrumAppTests/MegrumInteractionFeedbackTests.swift`
+#### `ios-native/Tests/MegrumAppTests/MeguriMessageReadStateReducerTests.swift`
+#### `ios-native/Tests/MegrumAppTests/NotificationReadStateReducerTests.swift`
+#### `ios-native/Tests/MegrumAppTests/OwnProfileScreenTests.swift`
+#### `ios-native/Tests/MegrumAppTests/PublicUserProfileScreenTests.swift`
+#### `ios-native/Tests/MegrumAppTests/TradeChatAffordanceTests.swift`
+#### `ios-native/Tests/MegrumAppTests/DisputeDetailScreenTests.swift`
+#### `ios-native/Tests/MegrumAppTests/TradeEvidencePhotoStateReducerTests.swift`
+- 認証画面入力状態、認証入力row presentation状態、支払い設定編集状態、ログイン/セキュリティのパスワード再設定入力状態、設定画面presentation状態、初期読み込み失敗画面presentation状態、通知センターpresentation状態、住所設定下書き状態、アカウント初期設定の生年月日カレンダーpresentation状態、アカウント削除下書き状態、ブロック解除presentation状態、推し設定presentation状態、推し設定グループカードpresentation状態、推しマスター選択シート状態、推し追加/メンバー追加リクエスト下書き状態、自分のプロフィールpresentation状態、プロフィール編集フォームpresentation状態、公開プロフィール予定presentation状態、めぐりプロフィール設定下書き状態、めぐりメッセージpresentation状態、スポット掲示板返信composer状態、めぐりマップ作成プロンプトpresentation状態、グルームviewer interaction状態、グルームviewerいいねボタンpresentation状態、グルームstory作成presentation状態、ホーム交換条件設定ドラフト状態、ホーム交換条件日付詳細編集状態、ホーム詳細シートpresentation状態、相互マッチ詳細シートpresentation状態、相互マッチ詳細カードpresentation状態、検索フィルターシート状態、検索シリーズ選択状態、公開プロフィールpresentation状態、公開プロフィール通報シート状態、個別募集エディタpresentation状態、個別募集フッターロジックpresentation状態、個別募集条件タブpresentation状態、個別募集求めるものパネルpresentation状態、個別募集一覧presentation状態、Wish画面presentation状態、グッズグリッドpresentation状態、グッズ一括シリーズ設定シート状態、シリーズ候補プレビュー選択状態、グッズ一括登録メタfooter presentation状態、打診作成スケジュール背景presentation状態、打診完了カードanimation presentation状態、グッズ通報シート状態、個人スケジュールpresentation状態、取引スケジュールpresentation状態、スケジュール作成下書き状態、再打診シート下書き状態、評価シート下書き状態、通報シート下書き状態、異議詳細presentation状態、取引一覧presentation状態、取引詳細固定サマリーpresentation状態、取引合意CTA交換方法選択状態、取引詳細route presentation状態、取引詳細interaction状態、取引メッセージ入力presentation状態、取引証跡一覧presentation状態、打診作成初期化フラグ、フィルタ状態、金額・支払い選択状態、旧打診作成シート下書き状態のpure stateテストを追加した。
+- ホームWishヒット詳細presentation状態のpure stateテストを追加した。
+- 相手交換条件カレンダーpresentation状態のpure stateテストを追加した。
+- 個別募集表示カードのactive selection stateのpure stateテストを追加した。
+- 個別募集交換条件日程入力状態のpure stateテストを追加した。
+- グルームアーカイブstory presentation状態のpure stateテストを追加した。
+- グルームアーカイブ画面presentation状態のpure stateテストを追加した。
+- 取引グッズカルーセルpresentation状態のpure stateテストを追加した。
+- アプリdrawer overlay presentation状態のpure stateテストを追加した。
+- 共通インタラクションフィードバックpresentation状態とripple animation状態のpure stateテストを追加した。
+- 共通interactive back swipe presentation状態のpure stateテストを追加した。
+- 共通slide presentation drag状態のpure stateテストを追加した。
+- ホームpull refresh presentation状態のpure stateテストを追加した。
+- ホーム交換条件カレンダーdrag preview状態のpure stateテストを追加した。
+- グッズリモート画像placeholder presentation状態のpure stateテストを追加した。
+- 検索結果グリッドpresentation状態のpure stateテストを追加した。
+- ホーム候補カードpresentation状態のpure stateテストを追加した。
+- ホーム候補ボタンpresentation状態のpure stateテストを追加した。
+
+### 影響範囲
+
+- Swift Native iOSの認証画面
+- Swift Native iOSの支払い方法設定画面
+- Swift Native iOSのログイン/セキュリティ設定画面
+- Swift Native iOSの設定画面
+- Swift Native iOSの初期読み込み失敗画面
+- Swift Native iOSの通知センター
+- Swift Native iOSの住所設定画面
+- Swift Native iOSのアカウント初期設定の生年月日カレンダー
+- Swift Native iOSのアカウント削除画面
+- Swift Native iOSのブロックした人画面
+- Swift Native iOSの推し設定画面
+- Swift Native iOSの推しマスター選択シート
+- Swift Native iOSの推し追加/メンバー追加リクエストシート
+- Swift Native iOSの自分のプロフィール画面
+- Swift Native iOSの公開プロフィール予定画面
+- Swift Native iOSのめぐりプロフィール設定シート
+- Swift Native iOSのめぐりメッセージ画面
+- Swift Native iOSのスポット掲示板詳細画面
+- Swift Native iOSのめぐりマップ作成プロンプト
+- Swift Native iOSのグルームアーカイブ画面
+- Swift Native iOSのグルームviewer画面
+- Swift Native iOSのグルームviewerいいねボタン
+- Swift Native iOSのグルームstory作成画面
+- Swift Native iOSのアプリdrawer overlay
+- Swift Native iOSの共通インタラクションフィードバック
+- Swift Native iOSの共通interactive back swipe
+- Swift Native iOSの共通slide presentation overlay
+- Swift Native iOSのホームpull refresh表示
+- Swift Native iOSのホーム交換条件カレンダー
+- Swift Native iOSのホーム交換条件設定画面
+- Swift Native iOSのホームWishヒット詳細シート
+- Swift Native iOSの相手交換条件カレンダーシート
+- Swift Native iOSのホーム候補カード
+- Swift Native iOSのホーム候補ボタン
+- Swift Native iOSのホーム詳細シート
+- Swift Native iOSの相互マッチ詳細シート
+- Swift Native iOSの検索フィルターシート
+- Swift Native iOSの検索画面本体
+- Swift Native iOSの検索結果グリッド
+- Swift Native iOSの公開プロフィール画面
+- Swift Native iOSの公開プロフィール通報シート
+- Swift Native iOSの個別募集エディタ
+- Swift Native iOSの個別募集一覧画面
+- Swift Native iOSのプロフィール内個別募集表示セクション
+- Swift Native iOSの個別募集交換条件日程入力
+- Swift Native iOSのWish画面
+- Swift Native iOSのグッズリモート画像placeholder
+- Swift Native iOSのグッズグリッド
+- Swift Native iOSのグッズ一括シリーズ設定シート
+- Swift Native iOSのグッズ通報シート
+- Swift Native iOSの個人スケジュール画面
+- Swift Native iOSの取引スケジュールシート
+- Swift Native iOSのスケジュール作成シート
+- Swift Native iOSの打診作成フロー
+- Swift Native iOSの打診完了カード
+- Swift Native iOSの旧打診作成シート
+- Swift Native iOSの再打診シート
+- Swift Native iOSの評価シート
+- Swift Native iOSの通報シート
+- Swift Native iOSの異議詳細画面
+- Swift Native iOSの取引一覧画面
+- Swift Native iOSの取引詳細画面の写真入力導線
+- Swift Native iOSの取引グッズカルーセル
+- Swift Native iOSの取引詳細画面のチャット入力、現在地共有、評価prompt、トースト表示
+- Swift Native iOSの取引証跡一覧シートの写真表示、削除確認、承認footer
+- Swift Native iOSの全画面リモート画像ビュー
+
+状態名、取引状態遷移、DB schema、Supabase API contract、ユーザー表示文言、ナビゲーション、保存順序は変更していないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` は更新していない。
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-payment --enable-xctest --disable-swift-testing -j 1 --filter 'SettingsScreenTests|SupabasePaymentSettingsPersistenceTests'`
+  - passed（34 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal --enable-xctest --disable-swift-testing -j 1 --filter 'ProposalCreateFlowTests|TradeRequestDraftProposalCreateFlowTests'`
+  - passed（58 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-current --enable-xctest --disable-swift-testing -j 1 --filter 'ProposalCreateFlowTests/testProposalCompletionAnimationPresentationStateResolvesMotionValues|ProposalCreateFlowTests/testProposalCreateStepsStayInVisibleParityOrder|ProposalCreateFlowTests/testProposalSubmittedSummary'`
+  - passed（5 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-sheet --enable-xctest --disable-swift-testing -j 1 --filter 'ProposalCreateSheetTests|TradeRequestDraftProposalCreateFlowTests/testProposalConfiguration'`
+  - passed（10 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-trade --enable-xctest --disable-swift-testing -j 1 --filter 'TradeChatAffordanceTests|TradeEvidencePhotoStateReducerTests|TradeMessageStateReducerTests|TradeProposalStateReducerTests'`
+  - passed（83 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-current --enable-xctest --disable-swift-testing -j 1 --filter 'TradeChatAffordanceTests/testFullScreenRemoteImagePresentationStateTracksZoomDragAndDismiss|TradeChatAffordanceTests/testTradeDetailRoutePresentationStateTracksEvidenceListAndRemoteImage|TradeDetailPhotoPresentationStateTracksPhotoSourceAndFailure'`
+  - passed（2 tests。`TradeDetailPhotoPresentationStateTracksPhotoSourceAndFailure` は実在しないため未実行）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-current --enable-xctest --disable-swift-testing -j 1 --filter 'TradeEvidencePhotoStateReducerTests/testTradeEvidenceListPresentationStateFiltersLocallyDeletedPhotos|TradeEvidencePhotoStateReducerTests/testTradeEvidenceListPresentationStateClearsPresentedPhotoWhenDeleted|TradeEvidencePhotoStateReducerTests/testTradeEvidenceListPresentationStateTracksDeleteConfirmation|TradeChatAffordanceTests/testFullScreenRemoteImagePresentationStateTracksZoomDragAndDismiss|TradeChatAffordanceTests/testTradeDetailRoutePresentationStateTracksEvidenceListAndRemoteImage'`
+  - passed（5 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-exchange --enable-xctest --disable-swift-testing -j 1 --filter 'HomeExchangeSettingsScreenTests|HomeDiscoveryMatchPolicyTests'`
+  - passed（80 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-current --enable-xctest --disable-swift-testing -j 1 --filter 'HomeScreenFlowTests/testHomePullRefreshProgressClampsToTriggerDistance|HomeScreenFlowTests/testHomePullRefreshIndicatorStaysVisibleWhileRefreshing|HomeScreenFlowTests/testHomePullRefreshPresentationStateTracksManualPullAndRefreshLifecycle'`
+  - passed（3 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-current --enable-xctest --disable-swift-testing -j 1 --filter 'HomeExchangeSettingsScreenTests/testCalendarDragSelectionAllowsOnlyHorizontalSameRow|HomeExchangeSettingsScreenTests/testCalendarDragSelectionResolverKeepsAccumulatedDatesWhenFinalRangeShrinks|HomeExchangeSettingsScreenTests/testCalendarDragPreviewStateAccumulatesAndClearsResolvedDays'`
+  - passed（3 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-wish-hit-presentation --enable-xctest --disable-swift-testing -j 1 --filter 'HomeDiscoveryMatchPolicyTests|HomeScreenFlowTests/testHomeScreenRoutesWishHitSheet'`
+  - failed（`HomeGoodsImagePanelPagedGrid.selectedIndices` が `Set<Int>` を受け取るため、stateの選択index集合型を修正）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-wish-hit-presentation --enable-xctest --disable-swift-testing -j 1 --filter 'HomeDiscoveryMatchPolicyTests|HomeScreenFlowTests/testHomeScreenRoutesWishHitSheet'`
+  - passed（72 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-wish-hit-presentation --enable-xctest --disable-swift-testing -j 1 --filter 'HomeDiscoveryMatchPolicyTests'`
+  - passed（73 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-mutual-match-preview --enable-xctest --disable-swift-testing -j 1 --filter 'HomeMutualMatchConditionPoliciesTests/testSelectedPreviewPresentationStateTracksConditionHelpPopover|HomeMutualMatchConditionPoliciesTests/testReviewPointShowsLocalConditionConcernsEvenWhenMailRouteWins|HomeMutualMatchConditionPoliciesTests/testLocalExchangeKeepsCandidateButAddsDateDiscussionWhenEitherScheduleIsFlexible'`
+  - passed（3 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-current --enable-xctest --disable-swift-testing -j 1 --filter 'HomeMutualMatchConditionPoliciesTests/testMutualMatchDetailPresentationStateTracksSelectionNestedAndExtras|HomeMutualMatchConditionPoliciesTests/testSelectedPreviewPresentationStateTracksConditionHelpPopover|HomeMutualMatchConditionPoliciesTests/testReviewPointShowsLocalConditionConcernsEvenWhenMailRouteWins'`
+  - passed（3 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-counter-proposal --enable-xctest --disable-swift-testing -j 1 --filter 'TradeChatAffordanceTests|MegrumAppStateTests/testAppStateCreatesPreviewCounterProposal'`
+  - passed（74 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-settings-reset --enable-xctest --disable-swift-testing -j 1 --filter 'SettingsScreenTests|AuthScreenInputTests/testPasswordResetUsesSharedEmailValidation|MegrumAppStateTests/testAuthStateSendsPasswordResetThroughRepository|MegrumAppStateTests/testAuthStateValidatesPasswordResetEmail'`
+  - passed（35 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-settings-presentation --enable-xctest --disable-swift-testing -j 1 --filter 'SettingsScreenTests|AuthScreenInputTests/testPasswordResetUsesSharedEmailValidation|MegrumAppStateTests/testAuthStateSendsPasswordResetThroughRepository|MegrumAppStateTests/testAuthStateValidatesPasswordResetEmail'`
+  - passed（43 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-current --enable-xctest --disable-swift-testing -j 1 --filter 'SettingsScreenTests/testNativeLoadingFailurePresentationStateTracksRetryAndSignOutActions|SettingsScreenTests/testSettingsPresentationStateTracksNavigationAndSignOutLifecycle|SettingsScreenTests/testSettingsEssentialRoutesCoverP0Settings'`
+  - passed（3 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-notification-center-presentation --enable-xctest --disable-swift-testing -j 1 --filter 'NotificationReadStateReducerTests|NotificationRouteTests|MegrumAppStateTests/testAppStateLoadsAndMarksPreviewNotificationsRead'`
+  - passed（12 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-current --enable-xctest --disable-swift-testing -j 1 --filter 'MeguriAccessPolicyTests/testMapCreationPromptPresentationStateResolvesDropPinAndCalloutVisibility|MeguriAccessPolicyTests/testMapCreationPromptPositionStaysInsideRightEdge|MeguriAccessPolicyTests/testMapCreationPromptPositionStaysInsideLeftEdge|MeguriAccessPolicyTests/testMapCreationPromptAvoidsPinWhenClampedNearLeftEdge|MeguriAccessPolicyTests/testMapCreationPromptPointerTracksPinWhenCalloutIsClamped'`
+  - passed（5 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-current --enable-xctest --disable-swift-testing -j 1 --filter 'GroomInteractionStateReducerTests/testGroomViewerLikeButtonPresentationStateTracksBurst|GroomInteractionStateReducerTests/testMarkingViewedAddsPostID|GroomInteractionStateReducerTests/testSettingLikedAddsOrRemovesPostID|GroomInteractionStateReducerTests/testLikedIDsUsesLikedPostsFromSnapshot'`
+  - passed（4 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-current --enable-xctest --disable-swift-testing -j 1 --filter 'GroomInteractionStateReducerTests/testGroomViewerInteractionStateTracksReplyAndModerationDialogs|GroomInteractionStateReducerTests/testGroomViewerLikeButtonPresentationStateTracksBurst|GroomInteractionStateReducerTests/testMarkingViewedAddsPostID|GroomInteractionStateReducerTests/testSettingLikedAddsOrRemovesPostID'`
+  - passed（4 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-current --enable-xctest --disable-swift-testing -j 1 --filter 'MeguriAccessPolicyTests/testGroomStoryComposerPresentationStateTracksCaptionAndToastLifecycle|MeguriAccessPolicyTests/testCreationLocationPolicyAllowsInsideOneKilometerAndBlocksOutside|MeguriAccessPolicyTests/testMapCreationPromptPresentationStateResolvesDropPinAndCalloutVisibility'`
+  - passed（3 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-current --enable-xctest --disable-swift-testing -j 1 --filter 'AppDrawerGestureTests/testDrawerItemTapIsSuppressedOnlyAfterRealDrag|AppDrawerGestureTests/testAppDrawerOverlayPresentationStateTracksClosingAndTapSuppression'`
+  - passed（2 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-current --enable-xctest --disable-swift-testing -j 1 --filter 'MegrumInteractionFeedbackTests'`
+  - passed（2 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-current --enable-xctest --disable-swift-testing -j 1 --filter 'EdgeBackSwipeGestureTests/testSlideBackSwipeTracksRightDragAndDismissesByFraction|EdgeBackSwipeGestureTests/testSlideBackSwipeKeepsPreviousScreenForShortOrVerticalDrag|EdgeBackSwipeGestureTests/testSlidePresentationDragStateTracksOffsetAndDismissDecision'`
+  - passed（3 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-current --enable-xctest --disable-swift-testing -j 1 --filter 'EdgeBackSwipeGestureTests/testInteractiveBackSwipeTracksRightHorizontalDragFromAnywhere|EdgeBackSwipeGestureTests/testInteractiveBackSwipeIgnoresLeftAndVerticalDrags|EdgeBackSwipeGestureTests/testInteractiveBackSwipeTriggersAfterThresholdOrProjectedFlick|EdgeBackSwipeGestureTests/testInteractiveBackSwipePresentationStateTracksWidthOffsetAndTrigger'`
+  - passed（4 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-auth-screen --enable-xctest --disable-swift-testing -j 1 --filter 'AuthScreenInputTests|MegrumAppStateTests/testAuthStateSendsPasswordResetThroughRepository|MegrumAppStateTests/testAuthStateValidatesPasswordResetEmail'`
+  - passed（20 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-auth-input-row --enable-xctest --disable-swift-testing -j 1 --filter 'AuthScreenInputTests/testAuthInputRowPresentationStateTogglesPasswordVisibility|AuthScreenInputTests/testAuthScreenInputStateNormalizesEmailSubmissionAndHandle|AuthScreenInputTests/testSignInValidationMessagesSeparateEmailAndPassword|AuthScreenInputTests/testSignUpValidationMessagesSeparatePasswordAndHandle'`
+  - passed（4 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-address-settings --enable-xctest --disable-swift-testing -j 1 --filter 'SettingsScreenTests|MegrumAppStateTests/testAppStateLoadsAndSavesPreviewMailingAddress|MegrumAppStateTests/testAppStateValidatesMailingAddressBeforeSaving|MegrumAppStateTests/testAppStateLooksUpPostalCodeInPreviewRepository|MegrumAppStateInputNormalizerTests/testPostalCodeKeepsFirstSevenDigits'`
+  - passed（40 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-account-birth-calendar --enable-xctest --disable-swift-testing -j 1 --filter 'AccountSetupScreenTests/testBirthDateCalendarPresentationStateTracksVisibleMonthNavigationAndSelection|AccountSetupScreenTests/testBirthDateCalendarBuildsTouchableDaysInStableTimezone|AccountSetupScreenTests/testBirthDateCalendarYearNavigationKeepsMonthAndBounds|AccountSetupScreenTests/testBirthDateIsRequiredForProfileCompletion|AccountSetupScreenTests/testAccountSetupStepsKeepNameAndHandleInput'`
+  - failed（SwiftPM scratchが増えて `/tmp` 書き込み中に `No space left on device`。`/tmp/megrum-ios-native-refactor-*` の再生成可能scratchを削除して再実行）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-current --enable-xctest --disable-swift-testing -j 1 --filter 'AccountSetupScreenTests/testBirthDateCalendarPresentationStateTracksVisibleMonthNavigationAndSelection|AccountSetupScreenTests/testBirthDateCalendarBuildsTouchableDaysInStableTimezone|AccountSetupScreenTests/testBirthDateCalendarYearNavigationKeepsMonthAndBounds|AccountSetupScreenTests/testBirthDateIsRequiredForProfileCompletion|AccountSetupScreenTests/testAccountSetupStepsKeepNameAndHandleInput'`
+  - passed（4 tests。`testBirthDateIsRequiredForProfileCompletion` は実在しないため未実行）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-current --enable-xctest --disable-swift-testing -j 1 --filter 'AccountSetupScreenTests/testAccountSetupDraftValidatorRequiresBirthDate|AccountSetupScreenTests/testAccountSetupDraftValidatorRejectsFutureBirthDate|AccountSetupScreenTests/testBirthDateCalendarPresentationStateTracksVisibleMonthNavigationAndSelection'`
+  - passed（3 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-account-deletion --enable-xctest --disable-swift-testing -j 1 --filter 'SettingsScreenTests|MegrumAppStateTests/testAppStateRequestsAccountDeletionThroughRepository|MegrumAppStateTests/testAppStateRejectsAccountDeletionWhenOngoingTradeExists|SupabaseAccountProfilePersistenceTests/testAccountDeletionPayloadUsesReasonRawValuesAndNormalizedMemo'`
+  - passed（42 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-blocked-users --enable-xctest --disable-swift-testing -j 1 --filter 'BlockedUserStateReducerTests|BlockedUserContentFilterTests|MegrumAppStateTests/testAppStateLoadsAndUnblocksPreviewBlockedUsers'`
+  - passed（6 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-oshi-settings --enable-xctest --disable-swift-testing -j 1 --filter 'OshiSettingsDraftTests|OnboardingOshiSelectionTests|MegrumAppStateTests/testAppStateCreatesOshiRequestInPreviewRepository|MegrumAppStateTests/testAppStateCreatesCharacterRequestInPreviewRepository'`
+  - passed（27 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-current --enable-xctest --disable-swift-testing -j 1 --filter 'OshiSettingsDraftTests/testOshiSettingsGroupCardPresentationStateDelaysRemoveConfirmation|OshiSettingsDraftTests/testOshiSettingsDeleteConfirmationCopy|OshiSettingsDraftTests/testOshiSettingsPresentationStateTogglesOnlyMemberSelectableGroups|OshiSettingsDraftTests/testOshiSettingsPresentationStateFiltersAvailableCharacters'`
+  - passed（4 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-oshi-request-draft --enable-xctest --disable-swift-testing -j 1 --filter 'OshiSettingsDraftTests|OnboardingOshiSelectionTests|MegrumAppStateTests/testAppStateCreatesOshiRequestInPreviewRepository|MegrumAppStateTests/testAppStateCreatesCharacterRequestInPreviewRepository'`
+  - passed（29 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-oshi-master-select-sheet --enable-xctest --disable-swift-testing -j 1 --filter 'OshiSettingsDraftTests|OnboardingOshiSelectionTests'`
+  - passed（31 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-own-profile --enable-xctest --disable-swift-testing -j 1 --filter 'OwnProfileScreenTests|MegrumAppStateTests/testAppStateUpdatesOwnProfileInPreviewRepository|SupabaseUserProfilePersistenceModelsTests'`
+  - passed（24 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-own-profile-fields --enable-xctest --disable-swift-testing -j 1 --filter 'OwnProfileScreenTests/testOwnProfileEditProfileFieldsPresentationStateTracksBirthDatePicker|OwnProfileScreenTests/testProfileDraftNormalizesEditableFields|OwnProfileScreenTests/testOwnProfilePresentationStateOpensEditorFromSummary|OwnProfileScreenTests/testOwnProfilePresentationStateTracksScheduleAndSaveCompletion'`
+  - passed（4 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-meguri-profile-settings --enable-xctest --disable-swift-testing -j 1 --filter 'MeguriAccessPolicyTests|MeguriMessageReadStateReducerTests|BoardThreadDetailPresentationTests'`
+  - passed（29 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-meguri-messages-presentation --enable-xctest --disable-swift-testing -j 1 --filter 'MeguriMessageReadStateReducerTests|MeguriAccessPolicyTests|MegrumAppStateTests/testAppStateSendsPreviewMeguriMessage'`
+  - passed（27 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-current --enable-xctest --disable-swift-testing -j 1 --filter 'BoardThreadDetailPresentationTests/testBoardThreadReplyComposerStateTrimsBlocksAndClearsOnlyAfterSuccess|BoardThreadDetailPresentationTests/testAnonymousBoardRepliesDoNotExposePublicProfiles|ReplyThreadStateReducerTests/testAppendingBoardReplyCreatesBucketAndPreservesOrder'`
+  - passed（3 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-groom-archive-story --enable-xctest --disable-swift-testing -j 1 --filter 'MeguriAccessPolicyTests/testGroomArchiveStoryPresentationStateTracksInsightsSheet|MeguriAccessPolicyTests/testGroomArchiveOverviewMetricsFitFreeArchiveOnOneScreen|MegrumAppStateTests/testAppStateLoadsOwnGroomArchiveWithEngagement'`
+  - passed（3 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-groom-archive-presentation --enable-xctest --disable-swift-testing -j 1 --filter 'MeguriAccessPolicyTests/testGroomArchivePresentationStateTracksSelectedGroomAndPlusSheet|MeguriAccessPolicyTests/testGroomArchiveStoryPresentationStateTracksInsightsSheet|MeguriAccessPolicyTests/testGroomArchiveOverviewMetricsFitFreeArchiveOnOneScreen|MegrumAppStateTests/testAppStateLoadsOwnGroomArchiveWithEngagement|MegrumPlusAccessPolicyTests/testGroomArchiveRequestLimitOnlyCapsFreeUsers'`
+  - passed（5 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-current --enable-xctest --disable-swift-testing -j 1 --filter 'MeguriAccessPolicyTests/testGroomArchiveStoryPresentationStateTracksInsightsSheet|MeguriAccessPolicyTests/testGroomArchiveStoryPresentationStateMovesWithinBoundsAndDismissesAfterLast|MeguriAccessPolicyTests/testGroomArchiveStoryPresentationStateTracksDragDisplayAndOutcomes|MeguriAccessPolicyTests/testGroomArchivePresentationStateTracksSelectedGroomAndPlusSheet|MeguriAccessPolicyTests/testGroomArchiveOverviewMetricsFitFreeArchiveOnOneScreen'`
+  - passed（5 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-search-filter --enable-xctest --disable-swift-testing -j 1 --filter 'SearchScreenTests|HomeDiscoveryMatchPolicyTests/testDefaultExchangeSettingsApplyViewerPreferenceBeforePolicy'`
+  - passed（21 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-search-screen-filter --enable-xctest --disable-swift-testing -j 1 --filter 'SearchScreenTests|HomeDiscoveryMatchPolicyTests/testDefaultExchangeSettingsApplyViewerPreferenceBeforePolicy'`
+  - passed（21 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-search-tag-selection --enable-xctest --disable-swift-testing -j 1 --filter 'SearchScreenTests/testSearchGoodsTagSelectionStateFiltersAndDetectsDuplicateSearchText|SearchScreenTests/testSearchFilterSheetStateManagesPresentationAndDefaultConditions|SearchScreenTests/testSearchFilterDraftKeepsTagsIndependentFromGroupSelection'`
+  - passed（3 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-current --enable-xctest --disable-swift-testing -j 1 --filter 'SearchScreenTests/testSearchResultHomePresentationUsesHomeConditionSignalsAndSheets|SearchScreenTests/testSearchResultGridPresentationStateTracksSheetsReportsAndDeferredProfile'`
+  - passed（2 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-public-profile --enable-xctest --disable-swift-testing -j 1 --filter 'PublicUserProfileScreenTests|PublicProfileProposalOriginTests'`
+  - passed（21 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-user-report --enable-xctest --disable-swift-testing -j 1 --filter 'PublicUserProfileScreenTests|PublicProfileProposalOriginTests|MegrumAppStateTests/testAppStateReportsPreviewUser'`
+  - passed（23 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-rotary-card --enable-xctest --disable-swift-testing -j 1 --filter 'HomeDiscoveryMatchPolicyTests/testHomeDiscoveryRotaryCardPresentationStateTracksSelectionDragAndPositions|HomeDiscoveryMatchPolicyTests/testHorizontalSwipeIntentResolverKeepsVerticalScrollPriority|HomeDiscoveryMatchPolicyTests/testDefaultExchangeSettingsApplyViewerPreferenceBeforePolicy'`
+  - passed（3 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-candidate-button --enable-xctest --disable-swift-testing -j 1 --filter 'HomeDiscoveryMatchPolicyTests/testHomeDiscoveryCandidateButtonPresentationStateTracksSelectedGoodsAndTitle|HomeDiscoveryMatchPolicyTests/testHomeDiscoverySearchCriteriaUsesSelectedMemberAndTag|HomeDiscoveryMatchPolicyTests/testHomeDiscoveryCardTitleUsesSelectedGoodsMemberAndTag|HomeDiscoveryMatchPolicyTests/testHomeDiscoveryCardTitleUsesMemberOnlyForMemberMatchShelf'`
+  - passed（4 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-current --enable-xctest --disable-swift-testing -j 1 --filter 'HomeDiscoveryMatchPolicyTests/testHomeDiscoverySheetPresentationStateTracksExtrasWishCopyAndToast|HomeDiscoveryMatchPolicyTests/testHomeDiscoveryProposalSelectionMergesExtraGoodsSelections|HomeDiscoveryMatchPolicyTests/testHomeWishCopyInputCopiesTappedGoodsAsIndependentWish'`
+  - passed（3 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-individual-listing-editor --enable-xctest --disable-swift-testing -j 1 --filter 'IndividualListingDraftTests|HomeMutualMatchConditionPoliciesTests|HomeDiscoveryMatchPolicyTests/testDefaultExchangeSettingsApplyViewerPreferenceBeforePolicy'`
+  - passed（52 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-individual-listing-footer-logic --enable-xctest --disable-swift-testing -j 1 --filter 'IndividualListingDraftTests/testFooterLogicPresentationStateShowsMinimumPickerOnlyForAtLeastLogic|IndividualListingDraftTests/testBottomBarPresentationKeepsAddOptionTitleStable'`
+  - passed（2 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-individual-listing-footer-logic --enable-xctest --disable-swift-testing -j 1 --filter 'IndividualListingDraftTests/testConditionPresentationStateTracksPickerAndTagSheetVisibility|IndividualListingDraftTests/testConditionTagBuilderDeduplicatesAndFiltersByGroup|IndividualListingDraftTests/testFooterLogicPresentationStateShowsMinimumPickerOnlyForAtLeastLogic'`
+  - passed（3 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-individual-listing-footer-logic --enable-xctest --disable-swift-testing -j 1 --filter 'IndividualListingDraftTests/testReceivePanelPresentationStateTracksOptionBreakdownSheet|IndividualListingDraftTests/testIndividualListingListPresentationUsesListSpecificLabels'`
+  - passed（2 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-individual-listings-screen --enable-xctest --disable-swift-testing -j 1 --filter 'IndividualListingDraftTests|IndividualListingStateReducerTests|MegrumPlusAccessPolicyTests|MegrumAppStateTests/testAppStateCreatesPreviewIndividualListing|MegrumAppStateTests/testAppStateUpdatesPreviewIndividualListing|MegrumAppStateTests/testAppStateArchivesPreviewIndividualListing'`
+  - passed（53 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-individual-listing-active-selection --enable-xctest --disable-swift-testing -j 1 --filter 'IndividualListingStateReducerTests|IndividualListingDraftTests/testIndividualListingListPresentationUsesListSpecificLabels|PublicUserProfileScreenTests|OwnProfileScreenTests'`
+  - passed（40 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-individual-listing-active-selection --enable-xctest --disable-swift-testing -j 1 --filter 'IndividualListingStateReducerTests|IndividualListingDraftTests/testIndividualListingListPresentationUsesListSpecificLabels'`
+  - passed（7 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-wish-collection-presentation --enable-xctest --disable-swift-testing -j 1 --filter 'GoodsGridLayoutTests|MegrumAppStateTests/testAppStateReportsPreviewGoods'`
+  - passed（31 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-schedule --enable-xctest --disable-swift-testing -j 1 --filter 'ScheduleStateReducerTests|MegrumAppStateTests/testAppStateCreatesPreviewScheduleForProposal|SupabaseTradeSchedulePersistenceTests'`
+  - passed（9 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-personal-schedule-presentation --enable-xctest --disable-swift-testing -j 1 --filter 'TradeScheduleCalendarWindowTests|ScheduleStateReducerTests|MegrumAppStateTests/testAppStateCreatesPreviewScheduleForProposal'`
+  - passed（10 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-trade-schedule-presentation --enable-xctest --disable-swift-testing -j 1 --filter 'TradeScheduleCalendarWindowTests|ScheduleStateReducerTests|MegrumAppStateTests/testAppStateCreatesPreviewScheduleForProposal'`
+  - passed（11 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-profile-schedule-presentation --enable-xctest --disable-swift-testing -j 1 --filter 'TradeScheduleCalendarWindowTests|PublicUserProfileScreenTests|ScheduleStateReducerTests|MegrumAppStateTests/testAppStateCreatesPreviewScheduleForProposal'`
+  - passed（26 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-pinned-summary --enable-xctest --disable-swift-testing -j 1 --filter 'TradeChatAffordanceTests|TradeProposalStateReducerTests|TradeMessageStateReducerTests'`
+  - passed（82 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-agreement-method --enable-xctest --disable-swift-testing -j 1 --filter 'TradeChatAffordanceTests|TradeProposalStateReducerTests|TradeMessageStateReducerTests'`
+  - passed（83 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-detail-route --enable-xctest --disable-swift-testing -j 1 --filter 'TradeChatAffordanceTests|TradeEvidencePhotoStateReducerTests|TradeMessageStateReducerTests|TradeProposalStateReducerTests'`
+  - passed（88 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-trade-interaction --enable-xctest --disable-swift-testing -j 1 --filter 'TradeChatAffordanceTests|TradeMessageStateReducerTests|TradeProposalStateReducerTests'`
+  - passed（87 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-current --enable-xctest --disable-swift-testing -j 1 --filter 'TradeChatAffordanceTests/testTradeMessageInputPresentationStateTracksComposerFocusForQuickActions|TradeChatAffordanceTests/testTradeMessageInputContextHidesQuickActionsWhileComposing|TradeChatAffordanceTests/testTradeMessageInputActionPolicyBuildsAgreedHandActions'`
+  - passed（3 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-current --enable-xctest --disable-swift-testing -j 1 --filter 'GoodsEditorDraftTests/testGoodsPhotoCropSheetPresentationStateTracksFramesSelectionAndMessages|GoodsEditorDraftTests/testGoodsPhotoCropCanvasDragStateBuildsFrameAndResetsDraft|GoodsEditorDraftTests/testGoodsPhotoCropCanvasDragStateRejectsSmallDrag|GoodsEditorDraftTests/testTradingCardBulkRecognizerCropsManualFrames|GoodsEditorDraftTests/testTradingCardBulkRecognizerRejectsInvalidImageData'`
+  - passed（5 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-trades-screen --enable-xctest --disable-swift-testing -j 1 --filter 'TradeChatAffordanceTests|TradeMessageStateReducerTests|TradeProposalStateReducerTests'`
+  - passed（90 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-evidence-list --enable-xctest --disable-swift-testing -j 1 --filter 'TradeEvidencePhotoStateReducerTests|TradeChatAffordanceTests|TradeProposalStateReducerTests'`
+  - passed（92 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-trade-goods-carousel --enable-xctest --disable-swift-testing -j 1 --filter 'TradeChatAffordanceTests/testTradeGoodsCarouselPresentationStateTracksSelectionDragAndSwipeDelta|TradeChatAffordanceTests/testTradeGoodsCarouselLayoutKeepsDraggingCardsInsideStage|TradeChatAffordanceTests/testTradeDetailHeroDistinguishesIncomingAndOutgoingProposals'`
+  - passed（3 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-bulk-tag --enable-xctest --disable-swift-testing -j 1 --filter 'GoodsEditorDraftTests|GoodsLocalStateReducerTests'`
+  - passed（33 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-bulk-tag --enable-xctest --disable-swift-testing -j 1 --filter 'GoodsEditorDraftTests/testTagCandidatePreviewSelectionStateTracksPreviewAndSelectionLimit|GoodsEditorDraftTests/testGoodsBulkTagSheetStateTogglesCandidateIntoDraft|GoodsEditorDraftTests/testGoodsBulkTagSheetStateKeepsEditedDraftWhenCandidateIsCleared'`
+  - passed（3 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-goods-meta-footer --enable-xctest --disable-swift-testing -j 1 --filter 'GoodsInventoryCreateMetaTilePresentationTests'`
+  - passed（4 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-schedule-background --enable-xctest --disable-swift-testing -j 1 --filter 'TradeRequestDraftProposalCreateFlowTests/testProposalScheduleBackgroundPresentationStateTracksVisibleMode|TradeRequestDraftProposalCreateFlowTests/testProposalScheduleContextFiltersDedupesAndFindsSelectedOverlap|TradeRequestDraftProposalCreateFlowTests/testProposalMeetupCalendarMonthGridPadsToSevenColumns'`
+  - passed（3 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-current --enable-xctest --disable-swift-testing -j 1 --filter 'TradeRequestDraftProposalCreateFlowTests/testProposalMeetupCalendarDisplayStateUsesVisualQAMonthAndReturnsToWeek|TradeRequestDraftProposalCreateFlowTests/testProposalMeetupCalendarModelShiftsWeekByFiveDays|TradeRequestDraftProposalCreateFlowTests/testProposalMeetupCalendarMonthGridPadsToSevenColumns|HomeScreenFlowTests/testVisualQAPreviewModeParsesInitialScreens'`
+  - failed（初回: `ProposalMeetupCalendarDisplayState()` が `displayMode` / `environment` initializer のデフォルト引数で曖昧）
+  - passed（4 tests、`displayMode` initializerのデフォルト引数を外して再実行）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-goods-report --enable-xctest --disable-swift-testing -j 1 --filter 'GoodsEditorDraftTests|MegrumAppStateTests/testAppStateReportsPreviewGoods|MegrumAppStateTests/testAppStateRejectsReportingOwnGoods|InventoryWishRequestHardeningTests/testBlankGoodsReportNoteIsOmitted|SupabaseGoodsReportClientTests'`
+  - passed（34 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-goods-grid-presentation --enable-xctest --disable-swift-testing -j 1 --filter 'GoodsGridLayoutTests|GoodsEditorDraftTests/testGoodsReportDraftStateKeepsReasonAndRawNoteForSubmission|MegrumAppStateTests/testAppStateReportsPreviewGoods'`
+  - passed（31 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-current --enable-xctest --disable-swift-testing -j 1 --filter 'GoodsGridLayoutTests/testRemoteGoodsImageLoadingRetriesBeforeFallback|GoodsGridLayoutTests/testGoodsImageSkeletonPresentationStateTracksPulsingOpacity'`
+  - passed（2 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-dispute-draft --enable-xctest --disable-swift-testing -j 1 --filter 'TradeChatAffordanceTests|MegrumAppStateTests/testAppStateCreatesPreviewTradeDispute|MegrumAppStateTests/testAppStateRejectsBlankTradeDisputeFactMemo|DisputeDetailScreenTests'`
+  - passed（97 tests）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-dispute-detail-presentation --enable-xctest --disable-swift-testing -j 1 --filter 'DisputeDetailScreenTests|TradeChatAffordanceTests|MegrumAppStateTests/testAppStateCreatesPreviewTradeDispute'`
+  - passed（98 tests）
+- `git diff --check`
+  - passed
+
+### セルフレビュー結果
+
+- ✅ 認証画面はメール/パスワード/パスワード再設定/ローカルfeedbackだけを値型へ移し、`MegrumAuthState.signIn`、`signUp`、`sendPasswordReset`、Apple/Google OAuth、feedback表示順、route切り替えは維持した。
+- ✅ 認証入力rowはパスワード表示/非表示トグルだけを値型へ移し、入力binding、validation、onChange callback、キーボード/ContentType、表示文言は維持した。
+- ✅ 支払い設定は保存前validationと保存成功時の編集済み解除だけを値型へ移し、`appState.savePaymentSettings` と保存順序は維持した。
+- ✅ ログイン/セキュリティ設定はパスワード再設定メール入力状態だけを値型へ移し、`authState.clearFeedback`、`authState.sendPasswordReset`、sign out導線、feedback表示順は維持した。
+- ✅ 設定画面はNavigationStack pathとサインアウト中フラグだけを値型へ移し、初期設定読み込み、各destination、サインアウト実行順序、閉じる導線、表示文言は維持した。
+- ✅ 通知センターは表示フィルターと空表示タイトルだけを値型へ移し、通知読み込み、既読化、通知リンクのroute intent、fallback tab遷移、表示文言は維持した。
+- ✅ 住所設定は入力下書き、郵便番号正規化、lookup結果反映、validation errorだけを値型へ移し、住所保存/lookupのAppState呼び出し、保存前validation、dismiss順序は維持した。
+- ✅ アカウント削除は退会理由、任意メモ、validation、最終確認表示だけを値型へ移し、退会可否読み込み、進行中取引ブロック、退会申請、最終確認dialogは維持した。
+- ✅ ブロックした人画面は解除対象とdialog表示だけを値型へ移し、`appState.loadBlockedUsers`、`appState.unblockUser`、表示文言、refreshableは維持した。
+- ✅ 推し設定はグループ下書き、候補キャッシュ、展開/sheet/notice/error/loading状態だけを値型へ移し、追加/削除/リクエスト処理、保存input、AppState保存呼び出し、表示文言は維持した。
+- ✅ 推し追加/メンバー追加リクエストシートは入力下書きとpayload生成だけを値型へ移し、送信先callback、sheet構成、close導線、表示文言は維持した。
+- ✅ 推しマスター選択シートは検索/ジャンル/複数選択中IDだけを値型へ移し、単一選択callback、複数登録callback、ロック済み選択の扱い、footer binding、表示文言は維持した。
+- ✅ 自分のプロフィール画面は編集sheet、スケジュールsheet、保存完了alert、タブ選択だけを値型へ移し、`OwnProfileEditDraft`、profile update payload、avatar upload/clear、補助データ読み込み、閉じる導線は維持した。
+- ✅ プロフィール編集フォームは生年月日ピッカー展開状態だけを値型へ移し、入力binding、DatePicker、保存payload、表示文言は維持した。
+- ✅ 公開プロフィール予定画面は表示モード、基準日、日付範囲計算だけを値型へ移し、`appState.loadProfileSchedules`、公開予定表示、戻る導線、表示文言は維持した。
+- ✅ めぐりプロフィール設定は下書き、avatar fallback、alert状態だけを値型へ移し、`appState.saveMeguriProfile`、保存成功時dismiss、ロック表示、validation責務は維持した。
+- ✅ めぐりメッセージ画面は下書きとPlus sheet表示だけを値型へ移し、`appState.sendMeguriMessage`、送信中判定、送信成功時のみ下書きclear、既読化taskは維持した。
+- ✅ スポット掲示板詳細は返信下書き、trim、送信中/空入力guard、成功時clearだけを値型へ移し、返信読み込み、返信送信payload、返信範囲判定、成功時scroll、プロフィール事前読み込みは維持した。
+- ✅ グルームアーカイブ画面は選択中グルームとPlus sheet表示だけを値型へ移し、map/thumbnail選択、story presentation、archive読み込み、Map camera、制限表示は維持した。
+- ✅ グルームアーカイブstoryは現在index、drag offset、画像offset/scale、左右タップ移動結果、上/下スワイプ結果、インサイトsheet表示状態を値型へ移し、左右タップ移動、末尾でのdismiss、上/下スワイプ挙動、sheet内容は維持した。
+- ✅ グルームviewerは返信下書き、trim、送信中/空入力guard、成功時clear、通報/ブロック確認表示だけを値型へ移し、現在index、drag dismiss、既読化、プロフィール読み込み、返信payload、いいね、通報/ブロック処理は維持した。
+- ✅ グルームstory作成はcaption/toastだけを値型へ移し、写真選択、カメラ導線、位置要求、1km圏外判定、投稿callback、成功時dismiss、写真リセットは維持した。
+- ✅ アプリdrawer overlayはclosing/tap suppressionだけを値型へ移し、drawer表示、バッジ計算、ログアウトtask、destination選択callback、閉じるanimation、通知読み込みは維持した。
+- ✅ 共通インタラクションフィードバックはripple配列とanimation progressだけを値型へ移し、SpatialTapGesture、ripple表示、720ms後の削除、reduce motion/reduce transparency時の見た目、haptics helperは維持した。
+- ✅ 共通interactive back swipeはdrag offset、tracking状態、container widthだけを値型へ移し、slide presentation配下での無効化、suppressed時のreset、reset animation、back action呼び出し順序は維持した。
+- ✅ 共通slide presentationはdismiss drag offsetとtracking状態だけを値型へ移し、leading edge capture、dismiss animation、item/id表示切り替え、interactive offsetのno-animation更新は維持した。
+- ✅ ホームpull refreshはpull offset、manual offset、refresh中フラグだけを値型へ移し、`.refreshable`、手動下方向drag refresh、二重refresh抑止、indicator表示計算は維持した。
+- ✅ ホーム交換条件カレンダーはdrag preview keyだけを値型へ移し、日付cell表示、同一行drag判定、drag selection resolver、`onFinishDragSelection` callback、保存処理は維持した。
+- ✅ ホーム交換条件設定はドラフト状態と日付選択操作だけを値型へ移し、`appState.loadExchangeSettings`、`appState.saveExchangeSettings`、AppStorage保存順序、個別募集反映日付の読み取り専用挙動は維持した。
+- ✅ ホーム交換条件の日付詳細シートは入力値と完了済み判定だけを値型へ移し、保存/削除/キャンセルcallbackと読み取り専用表示は維持した。
+- ✅ ホームWishヒット詳細シートは譲る候補の選択indexと提案開始payload生成だけを値型へ移し、Wishヒット候補抽出、相手グッズヘッダー、譲れる候補グリッド、他候補行、Wishコピー、表示文言は維持した。
+- ✅ 相手交換条件カレンダーシートは表示月、選択日キー、選択日の詳細解決だけを値型へ移し、初期表示月、初期選択日、カレンダー表示、日別メモ、fallback都道府県/メモ、表示文言は維持した。
+- ✅ 相互マッチ詳細カードは確認ポイントhelp popoverの開閉だけを値型へ移し、交換プレビュー、確認ポイント生成、popover本文、表示文言は維持した。
+- ✅ 相互マッチ詳細シートは選択pair ID、nested presentation、追加候補selectionだけを値型へ移し、相互マッチpair生成、選択pair fallback、他候補行、partner scoped payload、提案開始payload、公開プロフィールroutingは維持した。
+- ✅ ホーム候補カードは選択index、ドラッグ進捗、相対位置計算だけを値型へ移し、候補stage、条件タグ、選択変更/activation callback、横スワイプ、縦スクロール優先、reduce motion、表示文言は維持した。
+- ✅ ホーム候補ボタンは選択中グッズとタイトル生成だけを値型へ移し、検索callback、詳細sheet callback、条件タグ、候補カード、選択変更callbackは維持した。
+- ✅ ホーム詳細シートはnested presentation、追加候補selection、Wishコピーtoast/コピー中IDだけを値型へ移し、詳細内容、追加候補sheet、公開プロフィールsheet、提案開始callback、Wishコピーinput生成、`appState.createGoodsEntry` は維持した。
+- ✅ 検索フィルターシートはドラフト条件とsheet presentationだけを値型へ移し、検索条件適用、保存済みフィルター、検索結果フィルタリング、表示文言は維持した。
+- ✅ 検索フィルター内のシリーズ選択シートは検索文字列と候補絞り込みだけを値型へ移し、選択済みタグの追加/削除、候補表示順、追加後の検索欄クリア、表示文言は維持した。
+- ✅ 検索画面本体はフィルター条件の個別状態だけを既存 `SearchFilterDraft` へ集約し、初期条件、サジェスト、チップ削除、検索API引数、active filter count、検索結果フィルタリングは維持した。
+- ✅ 検索結果グリッドはsheet/profile/report対象だけを値型へ移し、検索結果grid layout、native ad挿入、ホーム詳細sheet生成、deferred delay、打診/プロフィール/通報callbackは維持した。
+- ✅ 公開プロフィール画面はタブ/打診target/sheet/moderation targetだけを値型へ移し、公開プロフィール読み込み、交換条件読み込み、予定sheet、通報/ブロック実行、打診作成導線は維持した。
+- ✅ 公開プロフィール通報シートは理由と補足メモだけを値型へ移し、通報送信callback、AppState側のメモ正規化、dismiss、表示文言は維持した。
+- ✅ 個別募集エディタは画面進行、選択フィルター、選択肢レビュー、toast、保存エラーだけを値型へ移し、`IndividualListingDraft`、保存payload、create/update呼び出し、ローカル編集反映は維持した。
+- ✅ 個別募集エディタ下部ロジックセグメントは最小個数picker表示状態と候補生成だけを値型へ移し、`.atLeast` 選択時のpopover、選択値Binding更新、picker dismiss、表示文言は維持した。
+- ✅ 個別募集条件タブはメンバーpickerとシリーズ追加sheetの開閉だけを値型へ移し、メンバー候補絞り込み、シリーズ候補生成、追加上限/重複判定、数量入力、表示文言は維持した。
+- ✅ 個別募集の求めるものパネルは選択肢内訳sheet表示だけを値型へ移し、選択肢3件以上の折りたたみ判定、内訳sheet内容、追加導線、譲るもの表示は維持した。
+- ✅ 個別募集一覧はeditor route、ローカル更新snapshot、初回editor消費、削除確認、Plus誘導だけを値型へ移し、一覧読み込み、archive処理、editor保存、AppStorage交換条件初期値は維持した。
+- ✅ 個別募集表示カードは選択中listing IDと一覧変更時の先頭fallbackだけを値型へ移し、ConditionStrip、個別募集カード、編集/追加/交換条件/削除callback、プロフィール内の個別募集タップ導線、表示文言は維持した。
+- ✅ 個別募集交換条件の日程入力はモード、選択日、日程文字列変換だけを値型へ移し、segmented picker、graphical DatePicker、`localSchedule` bindingへの保存文字列、表示文言は維持した。
+- ✅ Wish画面は選択中セクションと外部要求消費だけを値型へ移し、Wish/個別募集のTabView、segmented picker、Wish一覧、個別募集一覧、表示文言は維持した。
+- ✅ グッズ一括シリーズ設定シートは入力下書きと候補選択だけを値型へ移し、画像候補検索、trim済みタグ適用、dismiss、表示文言は維持した。
+- ✅ シリーズ候補プレビューはプレビュー中候補名と選択上限判定だけを値型へ移し、1回目タップでプレビュー、2回目タップでtoggle、画像popover、選択済みチップ表示、表示文言は維持した。
+- ✅ グッズ一括登録のメタfooterはメンバー登録dialog表示と保存ボタン文言だけを値型へ移し、メンバー割り当て、シリーズ登録、戻る/保存callback、button disabled条件は維持した。
+- ✅ グッズリモート画像placeholderはpulsing状態とopacityだけを値型へ移し、画像ロード/キャッシュ/retry、fallback表示、placeholderレイアウト、animation設定は維持した。
+- ✅ 打診作成のスケジュール背景は週/月表示モードだけを値型へ移し、予定なし表示、重複banner、5日表示、月表示grid、予定strip、表示文言は維持した。
+- ✅ 打診作成の待ち合わせ候補カレンダーは週/月表示モードとVisual QA月表示初期化だけを値型へ移し、週/月toggle、日付選択callback、週/月エディタ切り替え、候補draft編集は維持した。
+- ✅ グッズ通報シートは理由と補足メモだけを値型へ移し、通報送信callback、AppState側のメモ正規化、dismiss、表示文言は維持した。
+- ✅ グッズグリッドは詳細/通報sheet対象と未接続action alertだけを値型へ移し、各action callback、context menu、selection mode、表示文言は維持した。
+- ✅ 個人スケジュール画面は表示モード、基準日、予定追加sheet表示だけを値型へ移し、`appState.loadPersonalSchedules`、`ScheduleEditorSheet`、前後移動、表示文言は維持した。
+- ✅ 取引スケジュールシートは表示モード、基準日、予定追加sheet表示だけを値型へ移し、`appState.loadSchedules`、`ScheduleEditorSheet`、前後移動、表示文言は維持した。
+- ✅ スケジュール作成シートはフォーム下書きと日時補正だけを値型へ移し、`appState.createSchedule`、dismiss、保存inputの値渡し、共有/表示文言は維持した。
+- ✅ 再打診シートは下書き状態とタグ整列だけを値型へ移し、`proposal.counterProposalInput`、`appState.createProposal`、dismiss、取引状態遷移は変更していない。
+- ✅ 評価シートは星数と任意コメントだけを値型へ移し、評価送信のcallback、送信中状態、評価プロンプト表示条件は変更していない。
+- ✅ 通報シートは申告理由と本文下書きだけを値型へ移し、通報送信callback、AppState側のvalidation、送信中表示、表示文言は維持した。
+- ✅ 異議詳細画面は追加申請sheet種別と取り下げ確認表示だけを値型へ移し、`DisputeDetailStore`、返信下書き、取り下げ処理、追加申請送信、表示文言は維持した。
+- ✅ 取引一覧はステージ選択、pending選択、詳細snapshot、settlement判定だけを値型へ移し、一覧ソート、取り下げ可否、`appState.rejectProposal`、詳細route animation、badge算出は維持した。
+- ✅ 打診作成は初期化フラグ、フィルタ、金額・支払い選択のローカル状態だけを分離し、送信payload、取引状態、待ち合わせ候補、住所導線、完了導線は変更していない。
+- ✅ 旧打診作成シートは下書き入力と待ち合わせ入力補正だけを値型へ移し、`appState.createProposal`、住所読み込み、現在地取得、dismiss、送信payloadは維持した。
+- ✅ 取引詳細は写真入力とroute presentation stateだけを分離し、証跡写真、チャット写真、服装写真のアップロード処理、取引状態、メッセージ状態、評価/通報/再打診導線は変更していない。
+- ✅ 取引詳細のinteraction stateは下書き、現在地共有待ち、評価送信済み、トースト、フォーカスだけを値型へ移し、メッセージ送信、現在地送信、評価prompt判定、トースト表示タイミングは維持した。
+- ✅ 取引メッセージ入力バーはcomposer focusとquick action表示判定だけを値型へ移し、action policy、overflow action、TextField binding、送信ボタンdisabled、focus callback、写真/カメラ/現在地/再打診/通報callbackは維持した。
+- ✅ 写真切り取りシートは切り取り枠、選択中枠、message、適用可否だけを値型へ移し、画像クロップ処理、適用callback、canvas/preview binding、toolbar、表示文言は維持した。
+- ✅ 写真切り取りcanvasはdrag開始点とdraft rectだけを値型へ移し、28pt未満の枠を無視する挙動、座標clamp/正規化、枠追加後の選択更新は維持した。
+- ✅ 取引詳細固定サマリーは詳細sheet routeと応答カード選択だけを値型へ移し、応答/拒否/再打診callback、取引状態判定、固定サマリー表示は変更していない。
+- ✅ 取引合意CTAは交換方法選択だけを値型へ移し、合意/見送り/条件相談callback、Picker表示、取引状態判定は変更していない。
+- ✅ 取引グッズカルーセルは選択indexとドラッグ進捗だけを値型へ移し、横スワイプ、縦スクロール優先、stage tap、reduce motion、accessibility adjustable action、カウント表示は維持した。
+- ✅ 取引証跡一覧は削除確認、全画面表示、ローカル即時非表示だけを値型へ移し、写真追加、削除callback、承認footer、表示文言は変更していない。
+- ✅ 全画面リモート画像ビューは表示/ズーム/ドラッグ/dismiss offsetだけを値型へ移し、ローカル/リモート画像読み込み、tap dismiss、double tap reset、pinch zoom、下方向drag dismiss、削除callbackは維持した。
+- ✅ 子Viewへ渡す値は従来通り必要なBindingとcallbackに限定し、親モデル全体を追加で渡していない。
+- ✅ ユーザー表示文言、UIレイアウト、ナビゲーション、DB/API境界、通知、認証、課金には触れていない。
+
+---
 
 ## イテレーション1226.168：近距離公開境界
 

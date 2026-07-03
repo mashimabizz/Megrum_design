@@ -45,6 +45,9 @@ struct GroomPostInsertPayload: Encodable, Sendable {
     var originLat: Double?
     var originLng: Double?
     var placeHint: String
+    var groupId: UUID?
+    var characterId: UUID?
+    var seriesName: String?
     var status = "published"
     var stickers: [String] = []
     var textOverlays: [String] = []
@@ -57,8 +60,15 @@ struct GroomPostInsertPayload: Encodable, Sendable {
         self.originLat = input.latitude
         self.originLng = input.longitude
         self.placeHint = input.placeHint.map(SupabaseTextNormalizer.trimmed) ?? "今日の現場付近"
+        self.groupId = input.groupID
+        self.characterId = input.characterID
+        self.seriesName = SupabaseTextNormalizer.optional(input.seriesName)
         self.userId = input.authorID
     }
+}
+
+struct GroomPostDeletePayload: Encodable, Sendable {
+    var status = "hidden"
 }
 
 struct GroomImageTransformPayload: Encodable, Sendable {
@@ -142,11 +152,17 @@ struct GroomReplyMeguriMessagePayload: Encodable, Sendable {
     var recipientID: UUID
     var senderID: UUID
     var sourceGroomReplyID: UUID
+    var sourceGroomPostID: UUID
+    var sourceGroomOwnerID: UUID
+    var sourceGroomImageURL: String?
 
     init(reply: GroomReply) {
         self.body = reply.body.trimmingCharacters(in: .whitespacesAndNewlines)
         self.recipientID = reply.recipientID
         self.senderID = reply.senderID
         self.sourceGroomReplyID = reply.id
+        self.sourceGroomPostID = reply.groomPostID
+        self.sourceGroomOwnerID = reply.recipientID
+        self.sourceGroomImageURL = reply.groomImageURL?.absoluteString
     }
 }

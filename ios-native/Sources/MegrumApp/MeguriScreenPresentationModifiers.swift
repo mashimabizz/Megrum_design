@@ -7,7 +7,6 @@ import SwiftUI
 struct MeguriScreenPresentationModifier: ViewModifier {
     @ObservedObject var appState: MegrumAppState
     @ObservedObject var locationState: MegrumLocationState
-    @Binding var selectedThread: BoardThread?
     @Binding var isShowingThreadComposer: Bool
     @Binding var threadCreationCoordinate: MegrumLocationCoordinate?
     @Binding var isShowingPrefecturePicker: Bool
@@ -21,6 +20,7 @@ struct MeguriScreenPresentationModifier: ViewModifier {
     @Binding var isShowingGroomCamera: Bool
     @Binding var isShowingGroomArchive: Bool
     @Binding var selectedGroom: GroomPost?
+    @Binding var selectedGroomSourceAnchor: UnitPoint
     @Binding var activeMap: MeguriMapKind?
     var selectedPrefecture: String?
     var boardScope: BoardThread.Audience
@@ -32,21 +32,12 @@ struct MeguriScreenPresentationModifier: ViewModifier {
     var onOpenGroomCamera: () -> Void
     var onPrepareCapturedGroomPhoto: (Data) -> Void
     var onShowToast: (String) -> Void
-    var onPublishGroomPhoto: (Data, String, String?, MegrumLocationCoordinate) async -> Bool
+    var onPublishGroomPhoto: (Data, String, String?, MegrumLocationCoordinate, MeguriContentMetadataDraft) async -> Bool
     var onResetGroomDraft: () -> Void
+    var onOpenMeguriUserProfile: (UUID) -> Void
 
     func body(content: Content) -> some View {
         content
-            .sheet(item: $selectedThread) { thread in
-                NavigationStack {
-                    BoardThreadDetailScreen(
-                        appState: appState,
-                        thread: thread,
-                        selectedPrefecture: selectedPrefecture,
-                        coordinate: locationState.coordinate
-                    )
-                }
-            }
             .sheet(
                 isPresented: $isShowingThreadComposer,
                 onDismiss: onThreadComposerDismiss
@@ -102,8 +93,10 @@ struct MeguriScreenPresentationModifier: ViewModifier {
             .modifier(
                 GroomViewerPresentationModifier(
                     selectedGroom: $selectedGroom,
+                    sourceAnchor: selectedGroomSourceAnchor,
                     grooms: appState.grooms,
-                    appState: appState
+                    appState: appState,
+                    onOpenMeguriUserProfile: onOpenMeguriUserProfile
                 )
             )
             .modifier(

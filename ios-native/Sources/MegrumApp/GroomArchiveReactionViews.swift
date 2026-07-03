@@ -31,29 +31,42 @@ struct GroomArchiveReactionSection<Content: View>: View {
 
 struct GroomArchiveUserReactionRow: View {
     var userID: UUID
-    var profile: UserProfile?
+    var identity: MeguriProfileIdentity
     var subtitle: String
     var commentBody: String?
+    var onOpenProfile: (() -> Void)?
+    var onMessage: (() -> Void)?
 
     private var displayName: String {
-        profile?.displayName.nilIfBlank
-            ?? profile?.handle.nilIfBlank
-            ?? "ユーザー"
+        identity.displayName
     }
 
     private var handleText: String? {
-        profile?.handle.nilIfBlank.map { "@\($0)" }
+        identity.handle?.nilIfBlank.map { "@\($0)" }
     }
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            GroomArchiveUserAvatar(profile: profile, fallback: displayName)
+            Button(action: { onOpenProfile?() }) {
+                GroomArchiveUserAvatar(
+                    avatarID: identity.avatarID,
+                    avatarURL: identity.avatarURL,
+                    fallback: displayName
+                )
+            }
+            .buttonStyle(.plain)
+            .disabled(onOpenProfile == nil)
+            .accessibilityLabel("\(displayName)のプロフィールを開く")
 
             VStack(alignment: .leading, spacing: 5) {
                 HStack(spacing: 7) {
-                    Text(displayName)
-                        .font(.system(size: 14, weight: .black, design: .rounded))
-                        .foregroundStyle(MegrumTheme.ink)
+                    Button(action: { onOpenProfile?() }) {
+                        Text(displayName)
+                            .font(.system(size: 14, weight: .black, design: .rounded))
+                            .foregroundStyle(MegrumTheme.ink)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(onOpenProfile == nil)
                     if let handleText {
                         Text(handleText)
                             .font(.system(size: 12, weight: .bold, design: .rounded))
@@ -73,6 +86,18 @@ struct GroomArchiveUserReactionRow: View {
             }
 
             Spacer(minLength: 0)
+
+            if let onMessage {
+                Button(action: onMessage) {
+                    Image(systemName: "message.fill")
+                        .font(.system(size: 16, weight: .heavy))
+                        .foregroundStyle(MegrumTheme.lavender)
+                        .frame(width: 44, height: 44)
+                        .background(MegrumTheme.lavender.opacity(0.10), in: Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("\(displayName)にメッセージを送る")
+            }
         }
         .padding(14)
         .background(.white, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
@@ -84,24 +109,16 @@ struct GroomArchiveUserReactionRow: View {
 }
 
 struct GroomArchiveUserAvatar: View {
-    var profile: UserProfile?
+    var avatarID: String?
+    var avatarURL: URL?
     var fallback: String
 
     var body: some View {
-        AsyncImage(url: profile?.avatarURL) { phase in
-            switch phase {
-            case .success(let image):
-                image
-                    .resizable()
-                    .scaledToFill()
-            default:
-                Text(String(fallback.prefix(1)))
-                    .font(.system(size: 16, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
-            }
-        }
-        .frame(width: 42, height: 42)
-        .background(MegrumTheme.lavender, in: Circle())
-        .clipShape(Circle())
+        MeguriProfileAvatarView(
+            avatarID: avatarID,
+            avatarURL: avatarURL,
+            fallback: fallback,
+            size: 42
+        )
     }
 }

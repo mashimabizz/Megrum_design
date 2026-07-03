@@ -141,7 +141,7 @@ order by schemaname, tablename, policyname;
 | `avatars` | プロフィール画像。migration上public bucketで、`SupabaseProfilePhotoStorage` が公開URLを生成 | 公開プロフィールに使う画像だけ入ること。削除/更新時の古いobject残存、外部共有、キャッシュを確認 |
 | `chat-photos` | 取引チャット/服装写真/証跡。private bucket、proposal参加者限定policy | 現行コードではsigned URLが365日。URL再共有、削除時無効化、証跡保持、相手保存をPrivacy/FAQと合わせて確認 |
 | `meguri-message-media` | めぐりメッセージ画像。private bucket、送受信者限定policy | block/削除/退会時の表示、signed URL期限、通報時保持を確認 |
-| `meguri-board-media` | スポット掲示板画像。private bucketだがStorage policyはauthenticated user全体select | アプリ側は表示可能thread/replyのpathだけsigned URL化する設計。path推測、一覧、RLS/policy、公開範囲、削除、通報時保持を提出前No-Goで確認 |
+| `meguri-board-media` | スポット掲示板画像。private bucket。iter1226.266 migrationでStorage selectを表示可能thread/replyに紐づくobjectへ縮小 | 本番適用後に `pg_policies` でauthenticated-wide selectが消えていること、近距離scopeの許容範囲、削除、通報時保持を確認 |
 | `groom-posts` | グルーム画像。後続migrationでprivate化し、`can_view_groom_object()` 経由の閲覧制御 | 投稿期限切れ、非表示、block、通報、signed URLキャッシュ、削除時のobject残存を確認 |
 
 No-Go:
@@ -149,7 +149,7 @@ No-Go:
 - bucket一覧やpath規則から他人の画像を推測できる。
 - 削除済みアカウントの画像が不要に残る。
 - signed URLの有効期限が長すぎ、再共有リスクを説明できない。
-- `meguri-board-media` のauthenticated selectが、掲示板の閲覧範囲、block、非表示、削除、通報対応と矛盾する。
+- `meguri-board-media` のStorage selectが、掲示板の閲覧範囲、block、非表示、削除、通報対応と矛盾する。
 - 公開画像bucketに、住所、顔、チケット、注文履歴、バーコード、QR、EXIF/GPS等を含む画像が入り得るのに、アプリ内注意、Privacy、FAQ、削除手順がない。
 
 ## 6. Edge Function / APNs監査

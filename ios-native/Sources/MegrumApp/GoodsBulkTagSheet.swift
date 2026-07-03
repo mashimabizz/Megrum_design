@@ -18,34 +18,25 @@ struct GoodsBulkTagSheet: View {
     var textFieldPlaceholder = "例：会場限定"
     var footerText: String?
     var confirmationTitle = "追加"
-    var imageSuggestionNames: [String] = []
-    var isSuggestingFromImage = false
-    var imageSuggestionError: String?
-    var canSuggestFromImage = true
-    var onSuggestFromImage: (() -> Void)?
+    var googleLensItems: [GoodsGoogleLensSearchItem] = []
+    var isOpeningGoogleLens = false
+    var googleLensErrorMessage: String?
+    var onOpenGoogleLens: ((GoodsGoogleLensSearchItem.ID) -> Void)?
     var onApply: (String) -> Void
 
     @Environment(\.dismiss) private var dismiss
-    @State private var tagDraft = ""
-    @State private var selectedCandidateNames: [String] = []
-
-    private var trimmedTag: String {
-        tagDraft.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    private var combinedCandidateNames: [String] {
-        TagNameNormalizer.uniquePreservingOrder(candidateNames + imageSuggestionNames, limit: 18)
-    }
+    @State private var sheetState = GoodsBulkTagSheetState()
+    @State private var isShowingGoogleLensPicker = false
 
     var body: some View {
         NavigationStack {
             Form {
-                if !combinedCandidateNames.isEmpty {
+                if !candidateNames.isEmpty {
                     Section {
                         TagCandidatePreviewSelector(
-                            candidateNames: combinedCandidateNames,
+                            candidateNames: candidateNames,
                             previewItemsByTag: previewItemsByTag,
-                            selectedNames: $selectedCandidateNames,
+                            selectedNames: $sheetState.selectedCandidateNames,
                             maxSelection: 1,
                             emptyMessage: "このグループに紐づくシリーズ候補はまだありません",
                             onToggle: toggleCandidateTag
@@ -57,42 +48,42 @@ struct GoodsBulkTagSheet: View {
                     }
                 }
 
-                if onSuggestFromImage != nil {
+                if onOpenGoogleLens != nil {
                     Section {
                         Button {
                             MegrumHaptics.performSelectionChanged {
-                                onSuggestFromImage?()
+                                isShowingGoogleLensPicker = true
                             }
                         } label: {
                             HStack(spacing: 10) {
-                                if isSuggestingFromImage {
+                                if isOpeningGoogleLens {
                                     ProgressView()
                                 } else {
-                                    Image(systemName: "sparkles")
+                                    Image(systemName: "camera.viewfinder")
                                 }
-                                Text("画像からシリーズ名称の候補を出す")
+                                Text("GoogleLensで探す")
                                     .fontWeight(.semibold)
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
                         }
-                        .disabled(isSuggestingFromImage || !canSuggestFromImage)
+                        .disabled(isOpeningGoogleLens || googleLensItems.isEmpty)
 
-                        if let imageSuggestionError, !imageSuggestionError.isEmpty {
-                            Text(imageSuggestionError)
+                        if let googleLensErrorMessage, !googleLensErrorMessage.isEmpty {
+                            Text(googleLensErrorMessage)
                                 .font(.footnote.weight(.semibold))
                                 .foregroundStyle(.red)
                         }
                     } footer: {
-                        if canSuggestFromImage {
-                            Text("登録した画像と選択中のグループ情報を使って候補を検索します。")
+                        if googleLensItems.isEmpty {
+                            Text("画像を選択すると、Google Lensで検索できます。")
                         } else {
-                            Text("画像を登録すると、画像からシリーズ候補を検索できます。")
+                            Text("選択中のグッズから、画像検索に使う画像を選べます。")
                         }
                     }
                 }
 
                 Section {
-                    TextField(textFieldPlaceholder, text: $tagDraft)
+                    TextField(textFieldPlaceholder, text: $sheetState.tagDraft)
                 } header: {
                     Text("追加するシリーズ")
                 } footer: {
@@ -110,25 +101,27 @@ struct GoodsBulkTagSheet: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button(confirmationTitle) {
                         MegrumHaptics.performSelectionChanged {
-                            onApply(trimmedTag)
+                            onApply(sheetState.trimmedTag)
                             dismiss()
                         }
                     }
-                    .disabled(trimmedTag.isEmpty)
+                    .disabled(!sheetState.canApply)
                 }
+            }
+            .sheet(isPresented: $isShowingGoogleLensPicker) {
+                GoodsGoogleLensPickerSheet(items: googleLensItems) { itemID in
+                    isShowingGoogleLensPicker = false
+                    MegrumHaptics.performSelectionChanged {
+                        onOpenGoogleLens?(itemID)
+                    }
+                }
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
             }
         }
     }
 
     private func toggleCandidateTag(_ name: String) {
-        if selectedCandidateNames.contains(where: { $0.caseInsensitiveCompare(name) == .orderedSame }) {
-            selectedCandidateNames = []
-            if trimmedTag.caseInsensitiveCompare(name) == .orderedSame {
-                tagDraft = ""
-            }
-        } else {
-            selectedCandidateNames = [name]
-            tagDraft = name
-        }
+        sheetState.toggleCandidateTag(name)
     }
 }

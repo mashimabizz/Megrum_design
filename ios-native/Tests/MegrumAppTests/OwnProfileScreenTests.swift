@@ -159,6 +159,24 @@ final class OwnProfileScreenTests: XCTestCase {
         XCTAssertNil(normalized.validationError)
     }
 
+    func testOwnProfileEditProfileFieldsPresentationStateTracksBirthDatePicker() throws {
+        var state = OwnProfileEditProfileFieldsPresentationState()
+
+        XCTAssertFalse(state.isBirthDatePickerExpanded)
+        XCTAssertEqual(state.birthDateChevronDegrees, 0)
+        XCTAssertEqual(state.birthDateText(for: nil), "未設定")
+        XCTAssertLessThanOrEqual(state.birthDateSelectionFallback, Date())
+
+        state.toggleBirthDatePicker()
+
+        XCTAssertTrue(state.isBirthDatePickerExpanded)
+        XCTAssertEqual(state.birthDateChevronDegrees, 90)
+        XCTAssertNotEqual(
+            state.birthDateText(for: try XCTUnwrap(ProfileBirthDateCodec.date(from: "2002-04-12"))),
+            "未設定"
+        )
+    }
+
     func testProfileDraftTogglesPaymentMethods() {
         var draft = OwnProfileEditDraft(
             handle: "michi",
@@ -220,6 +238,56 @@ final class OwnProfileScreenTests: XCTestCase {
         )
 
         XCTAssertEqual(ownProfileAvatarUploadError(for: upload), "アイコン画像は10MB以下にしてください")
+    }
+
+    func testOwnProfilePresentationStateOpensEditorFromSummary() throws {
+        var state = OwnProfilePresentationState()
+        let birthDate = try XCTUnwrap(ProfileBirthDateCodec.date(from: "2001-01-02"))
+        let summary = OwnProfileSummary(
+            viewer: UserProfile(
+                id: UUID(uuidString: "20000000-0000-0000-0000-000000000501")!,
+                handle: "michi",
+                displayName: "みち",
+                bio: "交換よろしくお願いします",
+                gender: .female,
+                prefecture: "東京都",
+                birthDate: birthDate,
+                paymentMethods: [.paypay]
+            ),
+            inventoryCount: 2,
+            wishCount: 3,
+            proposals: []
+        )
+
+        state.openProfileEditor(summary: try XCTUnwrap(summary))
+
+        XCTAssertTrue(state.isProfileEditorPresented)
+        XCTAssertEqual(state.editDraft.handle, "michi")
+        XCTAssertEqual(state.editDraft.displayName, "みち")
+        XCTAssertEqual(state.editDraft.bio, "交換よろしくお願いします")
+        XCTAssertEqual(state.editDraft.prefecture, "東京都")
+        XCTAssertEqual(ProfileBirthDateCodec.string(from: state.editDraft.birthDate), "2001-01-02")
+        XCTAssertEqual(state.editDraft.paymentMethods, [.paypay])
+    }
+
+    func testOwnProfilePresentationStateTracksScheduleAndSaveCompletion() {
+        var state = OwnProfilePresentationState()
+        state.localDraft = OwnProfileEditDraft(
+            handle: "local",
+            displayName: "ローカル",
+            prefecture: "東京都",
+            gender: nil
+        )
+
+        state.openSchedule()
+        XCTAssertTrue(state.isSchedulePresented)
+
+        state.closeSchedule()
+        XCTAssertFalse(state.isSchedulePresented)
+
+        state.markProfileSaved()
+        XCTAssertNil(state.localDraft)
+        XCTAssertTrue(state.showsProfileCompletion)
     }
 
     func testPreviewRepositoryChangesAvatarURLAfterProfileUpload() async throws {

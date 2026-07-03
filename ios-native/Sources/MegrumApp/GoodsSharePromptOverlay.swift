@@ -16,10 +16,10 @@ struct GoodsSharePromptOverlay: View {
             VStack(spacing: 18) {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("登録できました")
+                        Text(context.promptTitle)
                             .font(.title3.weight(.black))
                             .foregroundStyle(MegrumTheme.ink)
-                        Text("登録した譲れるグッズをXで周知できます。")
+                        Text(context.promptDescription)
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(MegrumTheme.muted)
                     }
@@ -45,7 +45,7 @@ struct GoodsSharePromptOverlay: View {
                         } else {
                             Image(systemName: "square.and.arrow.up")
                         }
-                        Text("Xで作成したマイグッズをポストする")
+                        Text(context.shareButtonTitle)
                             .lineLimit(2)
                             .multilineTextAlignment(.center)
                     }

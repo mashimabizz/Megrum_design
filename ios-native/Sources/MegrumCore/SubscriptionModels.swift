@@ -13,7 +13,7 @@ public enum SubscriptionPlanType: String, Codable, Sendable, CaseIterable, Ident
     public var displayName: String {
         switch self {
         case .megrumPlusMonthly:
-            "メグルムプラス 月額"
+            "\(SubscriptionCatalog.currentPremiumDisplayName) 月額"
         case .premiumMonthly:
             "Premium 月額"
         case .premiumYearly:
@@ -61,7 +61,7 @@ public enum UserEntitlementKey: String, Codable, Sendable, CaseIterable, Identif
     public var displayName: String {
         switch self {
         case .megrumPlus:
-            "メグルムプラス"
+            SubscriptionCatalog.currentPremiumDisplayName
         case .premium:
             "Premium 会員"
         case .meguriPlus:
@@ -186,6 +186,14 @@ public struct UserSubscriptionState: Codable, Hashable, Sendable {
         hasActiveEntitlement(.meguriPlus)
     }
 
+    public var hasMeguriMessageAccess: Bool {
+        isMegrumPlusActive || hasMeguriPlus || isPremiumActive
+    }
+
+    public var hasMeguriBoardExtendedAccess: Bool {
+        isMegrumPlusActive || hasMeguriPlus || isPremiumActive
+    }
+
     public var hasUnlimitedIndividualListings: Bool {
         isMegrumPlusActive
     }
@@ -215,6 +223,7 @@ public enum MonetizationFeature: String, Codable, Sendable, CaseIterable, Identi
     case profileBadge = "profile_badge"
     case savedSearchSlots = "saved_search_slots"
     case meguriMessageExpansion = "meguri_message_expansion"
+    case meguriBoardExtendedAccess = "meguri_board_extended_access"
 
     public var id: String { rawValue }
 
@@ -241,7 +250,9 @@ public enum MonetizationFeature: String, Codable, Sendable, CaseIterable, Identi
         case .savedSearchSlots:
             "保存検索枠拡張"
         case .meguriMessageExpansion:
-            "めぐり送信枠拡張"
+            "めぐり内でメッセージのやり取りが可能"
+        case .meguriBoardExtendedAccess:
+            "県外の掲示板も閲覧可能"
         }
     }
 }
@@ -277,6 +288,7 @@ public struct SubscriptionPlanDefinition: Identifiable, Codable, Hashable, Senda
 }
 
 public enum SubscriptionCatalog {
+    public static let currentPremiumDisplayName = "Megrumプレミアム"
     public static let megrumPlusMonthlyProductID = "megrum.plus.monthly"
     public static let premiumMonthlyProductID = "megrum.premium.monthly"
     public static let premiumYearlyProductID = "megrum.premium.yearly"
@@ -286,7 +298,7 @@ public enum SubscriptionCatalog {
         SubscriptionPlanDefinition(
             planType: .megrumPlusMonthly,
             productID: megrumPlusMonthlyProductID,
-            displayName: "メグルムプラス",
+            displayName: currentPremiumDisplayName,
             priceLabel: "月 ¥500",
             featureIDs: megrumPlusFeatures,
             entitlementKey: .megrumPlus,
@@ -327,7 +339,9 @@ public enum SubscriptionCatalog {
     public static let megrumPlusFeatures: [MonetizationFeature] = [
         .unlimitedIndividualListings,
         .priorityMatchDisplay,
-        .unlimitedGroomArchive
+        .unlimitedGroomArchive,
+        .meguriMessageExpansion,
+        .meguriBoardExtendedAccess
     ]
 
     public static let premiumFeatures: [MonetizationFeature] = [

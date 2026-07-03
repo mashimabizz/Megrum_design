@@ -1,20 +1,38 @@
 import Foundation
 import MegrumCore
 
-public struct MeguriMessageThread: Identifiable, Hashable, Sendable {
+public struct MeguriMessageConversationKey: Hashable, Sendable {
     public var peerID: UUID
+    public var sourceGroomPostID: UUID?
+
+    public init(peerID: UUID, sourceGroomPostID: UUID? = nil) {
+        self.peerID = peerID
+        self.sourceGroomPostID = sourceGroomPostID
+    }
+}
+
+public struct MeguriMessageThread: Identifiable, Hashable, Sendable {
+    public var conversationKey: MeguriMessageConversationKey
+    public var peerID: UUID
+    public var sourceGroomPostID: UUID?
+    public var sourceGroomOwnerID: UUID?
+    public var sourceGroomImageURL: URL?
     public var displayName: String
     public var handle: String?
     public var avatarURL: URL?
     public var avatarID: String?
+    public var usesPublicProfile: Bool
     public var lastMessage: MeguriMessage
     public var unreadCount: Int
 
-    public var id: UUID { peerID }
+    public var id: String {
+        let sourceID = sourceGroomPostID?.uuidString.lowercased() ?? "direct"
+        return "\(peerID.uuidString.lowercased()):\(sourceID)"
+    }
 
     public var lastMessagePreview: String {
         if lastMessage.locked {
-            return "Megrum プレミアムで表示できます"
+            return "\(SubscriptionCatalog.currentPremiumDisplayName)で表示できます"
         }
         if let body = lastMessage.body?.trimmingCharacters(in: .whitespacesAndNewlines), !body.isEmpty {
             return body
@@ -23,57 +41,85 @@ public struct MeguriMessageThread: Identifiable, Hashable, Sendable {
     }
 
     public init(
+        conversationKey: MeguriMessageConversationKey,
         peerID: UUID,
+        sourceGroomPostID: UUID? = nil,
+        sourceGroomOwnerID: UUID? = nil,
+        sourceGroomImageURL: URL? = nil,
         displayName: String,
         handle: String? = nil,
         avatarURL: URL? = nil,
         avatarID: String? = nil,
+        usesPublicProfile: Bool = false,
         lastMessage: MeguriMessage,
         unreadCount: Int = 0
     ) {
+        self.conversationKey = conversationKey
         self.peerID = peerID
+        self.sourceGroomPostID = sourceGroomPostID
+        self.sourceGroomOwnerID = sourceGroomOwnerID
+        self.sourceGroomImageURL = sourceGroomImageURL
         self.displayName = displayName
         self.handle = handle
         self.avatarURL = avatarURL
         self.avatarID = avatarID
+        self.usesPublicProfile = usesPublicProfile
         self.lastMessage = lastMessage
         self.unreadCount = unreadCount
     }
 }
 
 public enum MeguriMessageReadStateReducer {
+    public static func visibleMessages(
+        _ messages: [MeguriMessage],
+        viewerID: UUID,
+        blockedUserIDs: Set<UUID>
+    ) -> [MeguriMessage] {
+        messages.filter { message in
+            let peerID = message.senderID == viewerID ? message.recipientID : message.senderID
+            return !blockedUserIDs.contains(peerID)
+        }
+    }
+
     public static func conversationThreads(
         from messages: [MeguriMessage],
         viewerID: UUID,
         publicProfilesByUserID: [UUID: PublicUserProfile] = [:],
         meguriProfilesByUserID: [UUID: MeguriProfile] = [:]
     ) -> [MeguriMessageThread] {
-        let grouped = Dictionary(grouping: messages) { message in
-            message.senderID == viewerID ? message.recipientID : message.senderID
-        }
+        let grouped = Dictionary(grouping: messages) { conversationKey(for: $0, viewerID: viewerID) }
 
-        return grouped.compactMap { peerID, messages in
+        return grouped.compactMap { conversationKey, messages in
+            let peerID = conversationKey.peerID
             guard let lastMessage = messages.max(by: { $0.createdAt < $1.createdAt }) else {
                 return nil
             }
             let unreadCount = messages.filter { message in
-                isUnreadIncoming(message, peerID: peerID, viewerID: viewerID)
+                isUnreadIncoming(
+                    message,
+                    conversationKey: conversationKey,
+                    viewerID: viewerID
+                )
             }.count
+            let identity = MeguriProfileIdentityResolver.identity(
+                for: peerID,
+                meguriProfile: meguriProfilesByUserID[peerID],
+                publicProfile: publicProfilesByUserID[peerID],
+                fallbackName: displayName(for: peerID, in: messages),
+                fallbackHandle: handle(for: peerID, in: messages),
+                fallbackAvatarURL: publicProfilesByUserID[peerID]?.profile.avatarURL
+            )
             return MeguriMessageThread(
+                conversationKey: conversationKey,
                 peerID: peerID,
-                displayName: displayName(
-                    for: peerID,
-                    in: messages,
-                    publicProfilesByUserID: publicProfilesByUserID,
-                    meguriProfilesByUserID: meguriProfilesByUserID
-                ),
-                handle: handle(
-                    for: peerID,
-                    in: messages,
-                    publicProfilesByUserID: publicProfilesByUserID
-                ),
-                avatarURL: publicProfilesByUserID[peerID]?.profile.avatarURL,
-                avatarID: meguriProfilesByUserID[peerID]?.avatarID,
+                sourceGroomPostID: conversationKey.sourceGroomPostID,
+                sourceGroomOwnerID: lastMessage.sourceGroomOwnerID,
+                sourceGroomImageURL: lastMessage.sourceGroomImageURL,
+                displayName: identity.displayName,
+                handle: identity.handle,
+                avatarURL: identity.avatarURL,
+                avatarID: identity.avatarID,
+                usesPublicProfile: identity.usesPublicProfile,
                 lastMessage: lastMessage,
                 unreadCount: unreadCount
             )
@@ -98,9 +144,7 @@ public enum MeguriMessageReadStateReducer {
     }
 
     public static func pendingReplyThreadCount(_ messages: [MeguriMessage], viewerID: UUID) -> Int {
-        let grouped = Dictionary(grouping: messages) { message in
-            message.senderID == viewerID ? message.recipientID : message.senderID
-        }
+        let grouped = Dictionary(grouping: messages) { conversationKey(for: $0, viewerID: viewerID) }
 
         return grouped.values.reduce(0) { count, messages in
             guard let lastMessage = messages.max(by: { $0.createdAt < $1.createdAt }) else {
@@ -120,22 +164,30 @@ public enum MeguriMessageReadStateReducer {
 
     public static func hasUnreadIncomingMessages(
         _ messages: [MeguriMessage],
-        peerID: UUID,
+        conversationKey: MeguriMessageConversationKey,
         viewerID: UUID
     ) -> Bool {
         messages.contains { message in
-            isUnreadIncoming(message, peerID: peerID, viewerID: viewerID)
+            isUnreadIncoming(
+                message,
+                conversationKey: conversationKey,
+                viewerID: viewerID
+            )
         }
     }
 
     public static func markIncomingMessagesRead(
         _ messages: [MeguriMessage],
-        peerID: UUID,
+        conversationKey: MeguriMessageConversationKey,
         viewerID: UUID,
         readAt: Date
     ) -> [MeguriMessage] {
         messages.map { message in
-            guard isUnreadIncoming(message, peerID: peerID, viewerID: viewerID) else {
+            guard isUnreadIncoming(
+                message,
+                conversationKey: conversationKey,
+                viewerID: viewerID
+            ) else {
                 return message
             }
 
@@ -159,26 +211,29 @@ public enum MeguriMessageReadStateReducer {
 
     private static func isUnreadIncoming(
         _ message: MeguriMessage,
-        peerID: UUID,
+        conversationKey: MeguriMessageConversationKey,
         viewerID: UUID
     ) -> Bool {
-        message.senderID == peerID
+        message.senderID == conversationKey.peerID
             && message.recipientID == viewerID
+            && message.sourceGroomPostID == conversationKey.sourceGroomPostID
             && message.readAt == nil
+    }
+
+    private static func conversationKey(
+        for message: MeguriMessage,
+        viewerID: UUID
+    ) -> MeguriMessageConversationKey {
+        MeguriMessageConversationKey(
+            peerID: message.senderID == viewerID ? message.recipientID : message.senderID,
+            sourceGroomPostID: message.sourceGroomPostID
+        )
     }
 
     private static func displayName(
         for peerID: UUID,
-        in messages: [MeguriMessage],
-        publicProfilesByUserID: [UUID: PublicUserProfile],
-        meguriProfilesByUserID: [UUID: MeguriProfile]
+        in messages: [MeguriMessage]
     ) -> String {
-        if let name = meguriProfilesByUserID[peerID]?.displayName.nilIfBlank {
-            return name
-        }
-        if let name = publicProfilesByUserID[peerID]?.profile.displayName.nilIfBlank {
-            return name
-        }
         for message in messages {
             if message.senderID == peerID, let name = message.senderDisplayName?.nilIfBlank {
                 return name
@@ -192,12 +247,8 @@ public enum MeguriMessageReadStateReducer {
 
     private static func handle(
         for peerID: UUID,
-        in messages: [MeguriMessage],
-        publicProfilesByUserID: [UUID: PublicUserProfile]
+        in messages: [MeguriMessage]
     ) -> String? {
-        if let handle = publicProfilesByUserID[peerID]?.profile.handle.nilIfBlank {
-            return handle
-        }
         for message in messages {
             if message.senderID == peerID, let handle = message.senderHandle?.nilIfBlank {
                 return handle

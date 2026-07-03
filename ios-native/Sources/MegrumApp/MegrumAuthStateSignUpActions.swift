@@ -50,7 +50,7 @@ extension MegrumAuthState {
                 successMessage = "確認メールを送信しました。メール内のリンクで認証を完了してからログインしてください"
                 return
             }
-            errorMessage = normalizedMessage(from: error)
+            errorMessage = normalizedMessage(from: error, context: .signUp)
         }
     }
 
@@ -82,7 +82,7 @@ extension MegrumAuthState {
             successMessage = passwordResetMessage
             return true
         } catch {
-            errorMessage = normalizedMessage(from: error)
+            errorMessage = normalizedMessage(from: error, context: .passwordReset)
             return false
         }
     }

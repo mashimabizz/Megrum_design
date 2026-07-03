@@ -42,7 +42,7 @@
 - 初回提出では、代表者情報の公開リスクと独自EULAの最低条項照合漏れを避けるため、App StoreのLicense AgreementはApple標準EULAを使う方針を推奨する。独自EULAを選ぶ場合は、AppleのMinimum Terms、利用規約、弁護士レビュー、公開URL、App Store Connect入力値を照合してから提出する。
 - 初回配信地域はJapanのみ候補とし、All Countries or Regions又はEU 27 territoriesを含める場合は、EU DSA trader status、App Store商品ページに表示されるProvider/Seller/contact情報、代表者情報非公表方針との差分、英語/現地語サポート可否をオーナー確認済みにする。DSA用の住所、電話番号、本人確認情報などの実値はリポジトリへ書かない。
 - AdMob等の広告を表示する場合は、不適切又は年齢に合わない広告をユーザーが報告できる導線、報告受付後の広告枠/表示日時/スクリーンショット確認手順、広告配信事業者への報告手順を実ビルドと公開FAQで説明する。
-- 現行読み取りでは `MEGRUM_ADS_ENABLED=YES`、AdMob app id、`MEGRUM_ADMOB_TEST_ADS_ENABLED=YES`、検索結果native広告unit id、やりとり一覧上部banner unit id、SKAdNetworkItemsが存在し、`NSUserTrackingUsageDescription`、ATT要求、UMP同意管理、非パーソナライズ広告指定は未確認。公開提出前に、テスト広告を一般公開しないこと、Google公式データ開示、App Privacy、Privacy Manifest、ATT/Tracking回答、SKAdNetworkItems、広告通報導線を実ビルドと一致させる。
+- 2026-07-03時点のチェックイン既定では `MEGRUM_ADS_ENABLED=NO`、AdMob app id/unit id/test unit id空、Releaseの `MEGRUM_ADMOB_TEST_ADS_ENABLED=NO` を確認済み。Google Mobile Ads SDK linkとSKAdNetworkItemsは残るため、広告を出さない提出でもSDK初期化/広告リクエストなしを実ビルドで確認する。広告を有効化する場合は、テスト広告を一般公開しないこと、Google公式データ開示、App Privacy、Privacy Manifest、ATT/Tracking回答、SKAdNetworkItems、広告通報導線を実ビルドと一致させる。
 - この文書は提出素材であり、アプリコード、Supabaseスキーマ、ビルド設定は変更しない。
 
 ## 1. App Store Connect 入力下書き
@@ -52,7 +52,7 @@
 App Store Connectへ実際に入力した値の最終差分照合は `notes/71_app_store_connect_final_input_reconciliation.md` を使う。
 承認後に公開へ進めるかの最終読み合わせは `notes/72_app_store_approval_release_control_runbook.md` を使う。
 
-有料機能を初回提出に含める場合は、IAP商品設定を `notes/33_iap_product_setup_worksheet.md` で先に固定する。価格固定文言、App Store Connect価格、特商法、FAQ、Review Notes、Server API/Notifications、返金/取消/期限切れ/請求失敗同期、手動有料権限上書きの理由/期限/監査ログ/非保証説明が揃うまでは有料導線を隠す。
+有料機能を初回提出に含める場合は、IAP商品設定を `notes/33_iap_product_setup_worksheet.md` で先に固定する。価格固定文言、App Store Connect価格、特商法、FAQ、Review Notes、Server API/Notifications、返金/取消/期限切れ/請求失敗同期、手動有料権限上書きの理由/期限/監査ログ/非保証説明が揃うまでは有料導線を隠す。2026-07-03時点のチェックイン既定は `MEGRUM_PLUS_IAP_ENABLED=NO` で、購入/復元ボタン、StoreKit商品情報照会、購入、復元actionを停止するため、有効化する場合はlocal/CI設定で明示する。
 デモアカウントと審査用データは `notes/35_demo_account_review_data_plan.md` を使う。
 
 ### アプリ名
