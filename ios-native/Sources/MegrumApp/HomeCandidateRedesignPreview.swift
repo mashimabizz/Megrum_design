@@ -3,27 +3,30 @@ import SwiftUI
 
 /// ホーム候補カード「案2」（結論一文＋強タグ1個）の検討用モックアップ。
 /// 実ホームのヘッダー・セクション構成をなぞり、候補は扇状カード＋強タグ＋
-/// 結論一文の横並び行で見せる。「推し×シリーズでマッチ」は画像左、
-/// 「推しでマッチ」は右寄せのミラー配置。実ホームには影響しない比較専用
-/// 画面で、VisualQA の `home-card-redesign` で起動する。
+/// 結論一文の横並び行で見せる。各セクションは成立しやすい候補を多く含む
+/// 塊が上に来る想定の並びで上位3件まで表示し、見出し横の「すべて見る」で
+/// 全件一覧へ飛ぶ想定。「推しでマッチ」は見出しごと右寄せのミラー配置。
+/// 実ホームには影響しない比較専用画面（VisualQA `home-card-redesign`）。
 struct HomeCandidateRedesignPreview: View {
     var body: some View {
         ZStack(alignment: .top) {
             ScrollView {
-                VStack(alignment: .leading, spacing: 26) {
-                    sectionHeader("推し×シリーズでマッチ", alignment: .leading)
+                VStack(alignment: .leading, spacing: 20) {
+                    sectionHeader("推し×シリーズでマッチ", mirrored: false)
 
                     ForEach(HomeCandidateRedesignRow.memberSeriesRows) { row in
                         HomeCandidateRedesignRowView(row: row, mirrored: false)
                     }
 
-                    sectionHeader("推しでマッチ", alignment: .trailing)
+                    sectionHeader("推しでマッチ", mirrored: true)
+                        .padding(.top, 6)
 
                     ForEach(HomeCandidateRedesignRow.memberRows) { row in
                         HomeCandidateRedesignRowView(row: row, mirrored: true)
                     }
 
                     havesRail
+                        .padding(.top, 6)
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 82)
@@ -35,11 +38,35 @@ struct HomeCandidateRedesignPreview: View {
         .background(MegrumTheme.canvas.ignoresSafeArea())
     }
 
-    private func sectionHeader(_ title: String, alignment: Alignment) -> some View {
+    /// 見出し＋「すべて見る」。ミラー時は左右が入れ替わる。
+    private func sectionHeader(_ title: String, mirrored: Bool) -> some View {
+        HStack(alignment: .firstTextBaseline) {
+            if mirrored {
+                seeAllButton
+                Spacer()
+                headerTitle(title)
+            } else {
+                headerTitle(title)
+                Spacer()
+                seeAllButton
+            }
+        }
+    }
+
+    private func headerTitle(_ title: String) -> some View {
         Text(title)
             .font(.system(size: 18, weight: .heavy))
             .foregroundStyle(MegrumTheme.ink)
-            .frame(maxWidth: .infinity, alignment: alignment)
+    }
+
+    private var seeAllButton: some View {
+        HStack(spacing: 3) {
+            Text("すべて見る")
+                .font(.system(size: 12.5, weight: .heavy))
+            Image(systemName: "chevron.right")
+                .font(.system(size: 11, weight: .black))
+        }
+        .foregroundStyle(MegrumTheme.lavender)
     }
 
     private var pinnedHeader: some View {
@@ -112,53 +139,65 @@ struct HomeCandidateRedesignPreview: View {
     }
 }
 
-/// 1候補分の行。画像（扇状ロータリーカード）と「強タグ＋結論一文」を
-/// 横並びにする。`mirrored` で左右反転（推しでマッチ用）。
+private enum HomeCandidateRedesignRowMetrics {
+    static let rotaryWidth: CGFloat = 142
+    static let rotaryHeight: CGFloat = 112
+}
+
+/// 1候補分の行。「ラベル（画像上の中央）＋扇状カード」と「強タグ＋結論一文」
+/// を横並びにする。`mirrored` で左右反転（推しでマッチ用）。ミラー時は
+/// 強タグと文を画像側（右）へ寄せる。
 private struct HomeCandidateRedesignRowView: View {
     var row: HomeCandidateRedesignRow
     var mirrored: Bool
 
     var body: some View {
-        VStack(alignment: mirrored ? .trailing : .leading, spacing: 2) {
-            Text(row.subtitle)
-                .font(.system(size: 12.5, weight: .regular))
-                .foregroundStyle(MegrumTheme.ink.opacity(0.82))
-                .padding(mirrored ? .trailing : .leading, 8)
-
-            HStack(alignment: .center, spacing: 4) {
-                if mirrored {
-                    infoColumn
-                    rotaryCard
-                } else {
-                    rotaryCard
-                    infoColumn
-                }
+        HStack(alignment: .center, spacing: 10) {
+            if mirrored {
+                infoColumn
+                labeledRotaryCard
+            } else {
+                labeledRotaryCard
+                infoColumn
             }
         }
     }
 
-    private var rotaryCard: some View {
-        HomeDiscoveryRotaryCard(
-            goods: row.goods,
-            goodsCondition: row.conditionTags.goods,
-            exchangeCondition: row.conditionTags.exchange,
-            paymentCondition: row.conditionTags.payment,
-            showsConditionOverlay: false
-        )
-        .frame(width: 176, height: 148)
+    private var labeledRotaryCard: some View {
+        VStack(spacing: 4) {
+            Text(row.subtitle)
+                .font(.system(size: 12, weight: .regular))
+                .foregroundStyle(MegrumTheme.ink.opacity(0.82))
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+
+            HomeDiscoveryRotaryCard(
+                goods: row.goods,
+                goodsCondition: row.conditionTags.goods,
+                exchangeCondition: row.conditionTags.exchange,
+                paymentCondition: row.conditionTags.payment,
+                showsConditionOverlay: false
+            )
+            .frame(
+                width: HomeCandidateRedesignRowMetrics.rotaryWidth,
+                height: HomeCandidateRedesignRowMetrics.rotaryHeight
+            )
+        }
+        .frame(width: HomeCandidateRedesignRowMetrics.rotaryWidth + 24)
     }
 
     private var infoColumn: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: mirrored ? .trailing : .leading, spacing: 7) {
             HomeCandidateRedesignBadge(title: row.badgeTitle, tone: row.badgeTone)
             Text(row.summaryText)
                 .font(.system(size: 13, weight: .bold, design: .rounded))
                 .foregroundStyle(MegrumTheme.ink.opacity(0.8))
+                .multilineTextAlignment(mirrored ? .trailing : .leading)
                 .lineLimit(3)
                 .minimumScaleFactor(0.88)
                 .fixedSize(horizontal: false, vertical: true)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: mirrored ? .trailing : .leading)
     }
 }
 
@@ -227,6 +266,8 @@ private struct HomeCandidateRedesignRow: Identifiable {
     var badgeTone: HomeCandidateRedesignBadge.Tone
     var summaryText: String
 
+    /// 上位3件。塊（推し×シリーズ）内に成立しやすいグッズを多く含むものが
+    /// 上に来る並びを想定した順。
     static let memberSeriesRows: [HomeCandidateRedesignRow] = [
         HomeCandidateRedesignRow(
             subtitle: "サナ × トレカ",
@@ -286,6 +327,17 @@ private struct HomeCandidateRedesignRow: Identifiable {
             badgeTitle: "wish一致",
             badgeTone: .possible,
             summaryText: "あなたのウィッシュと一致・郵送OK"
+        ),
+        HomeCandidateRedesignRow(
+            subtitle: "ダヒョン",
+            goods: [
+                HomeDiscoveryFixtures.plush,
+                HomeDiscoveryFixtures.sanaKeychain
+            ],
+            conditionTags: HomeConditionTagSet(goods: .none, exchange: .warning, payment: .unknown),
+            badgeTitle: "要相談",
+            badgeTone: .discuss,
+            summaryText: "場所は相談（相手: 福岡）"
         )
     ]
 }
