@@ -1,102 +1,164 @@
 import MegrumDesign
 import SwiftUI
 
-/// ホーム候補カードの見せ方「案2（結論一文＋強タグ1個）」の検討用モックアップ。
-/// 実際のホーム画面には影響しない比較専用画面。VisualQA の
-/// `home-card-redesign` で直接起動する。左＝現行（3タグ）、右＝案2。
+/// ホーム候補カード「案2」（結論一文＋強タグ1個）の検討用モックアップ。
+/// 実ホームのヘッダー・セクション構成をなぞり、候補は扇状カード＋強タグ＋
+/// 結論一文の横並び行で見せる。「推し×シリーズでマッチ」は画像左、
+/// 「推しでマッチ」は右寄せのミラー配置。実ホームには影響しない比較専用
+/// 画面で、VisualQA の `home-card-redesign` で起動する。
 struct HomeCandidateRedesignPreview: View {
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 28) {
-                header
+        ZStack(alignment: .top) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 26) {
+                    sectionHeader("推し×シリーズでマッチ", alignment: .leading)
 
-                ForEach(HomeCandidateRedesignState.allCases) { state in
-                    stateSection(state)
+                    ForEach(HomeCandidateRedesignRow.memberSeriesRows) { row in
+                        HomeCandidateRedesignRowView(row: row, mirrored: false)
+                    }
+
+                    sectionHeader("推しでマッチ", alignment: .trailing)
+
+                    ForEach(HomeCandidateRedesignRow.memberRows) { row in
+                        HomeCandidateRedesignRowView(row: row, mirrored: true)
+                    }
+
+                    havesRail
                 }
+                .padding(.horizontal, 20)
+                .padding(.top, 82)
+                .padding(.bottom, 60)
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 16)
-            .padding(.bottom, 60)
+
+            pinnedHeader
         }
         .background(MegrumTheme.canvas.ignoresSafeArea())
     }
 
-    private var header: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("ホーム候補カード 案2 モック")
-                .font(.system(size: 24, weight: .heavy, design: .rounded))
-                .foregroundStyle(MegrumTheme.ink)
-            Text("左＝現行（グッズ/交換/支払の3タグ）、右＝案2（強タグ1個＋結論一文）。文言・階層の検討用。")
-                .font(.system(size: 12.5, weight: .bold, design: .rounded))
-                .foregroundStyle(MegrumTheme.muted)
-        }
-    }
-
-    private func stateSection(_ state: HomeCandidateRedesignState) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(state.sectionTitle)
-                    .font(.system(size: 16, weight: .heavy, design: .rounded))
-                    .foregroundStyle(MegrumTheme.ink)
-                Text(state.sectionCaption)
-                    .font(.system(size: 11.5, weight: .bold, design: .rounded))
-                    .foregroundStyle(MegrumTheme.muted)
-            }
-
-            HStack(alignment: .top, spacing: 14) {
-                currentStyleCard(state)
-                    .frame(maxWidth: .infinity)
-                redesignCard(state)
-                    .frame(maxWidth: .infinity)
-            }
-        }
-    }
-
-    private func currentStyleCard(_ state: HomeCandidateRedesignState) -> some View {
-        VStack(spacing: 0) {
-            cardTitle(state)
-            rotaryCard(state)
-            HomeDiscoveryCandidateConditionTags(conditionTags: state.conditionTags)
-                .padding(.top, 2)
-        }
-    }
-
-    private func redesignCard(_ state: HomeCandidateRedesignState) -> some View {
-        VStack(spacing: 0) {
-            cardTitle(state)
-            rotaryCard(state)
-            HomeCandidateRedesignBadge(title: state.badgeTitle, tone: state.badgeTone)
-                .padding(.top, 4)
-            Text(state.summaryText)
-                .font(.system(size: 12.2, weight: .bold, design: .rounded))
-                .foregroundStyle(MegrumTheme.ink.opacity(0.76))
-                .multilineTextAlignment(.center)
-                .lineLimit(2)
-                .minimumScaleFactor(0.82)
-                .frame(maxWidth: .infinity)
-                .padding(.top, 5)
-        }
-    }
-
-    private func cardTitle(_ state: HomeCandidateRedesignState) -> some View {
-        Text(state.cardTitle)
-            .font(.system(size: 14.5, weight: .regular))
+    private func sectionHeader(_ title: String, alignment: Alignment) -> some View {
+        Text(title)
+            .font(.system(size: 18, weight: .heavy))
             .foregroundStyle(MegrumTheme.ink)
-            .lineLimit(1)
-            .minimumScaleFactor(0.68)
-            .frame(maxWidth: .infinity, alignment: .center)
-            .padding(.bottom, 10)
+            .frame(maxWidth: .infinity, alignment: alignment)
     }
 
-    private func rotaryCard(_ state: HomeCandidateRedesignState) -> some View {
+    private var pinnedHeader: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Circle()
+                    .fill(MegrumTheme.lavender.opacity(0.18))
+                    .frame(width: 44, height: 44)
+                    .overlay {
+                        Text("m")
+                            .font(.system(size: 18, weight: .heavy, design: .rounded))
+                            .foregroundStyle(MegrumTheme.lavender)
+                    }
+
+                Spacer()
+                MegrumWordmark(width: 116)
+                Spacer()
+
+                HStack(spacing: 6) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 22, weight: .bold))
+                        .foregroundStyle(MegrumTheme.lavender)
+                        .frame(width: 44, height: 44)
+                    Image(systemName: "questionmark.circle.fill")
+                        .font(.system(size: 24, weight: .bold))
+                        .foregroundStyle(MegrumTheme.lavender)
+                        .frame(width: 44, height: 44)
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.bottom, 8)
+        }
+        .padding(.top, 10)
+        .frame(maxWidth: .infinity)
+        .background {
+            Rectangle()
+                .fill(.ultraThinMaterial)
+                .opacity(0.72)
+                .ignoresSafeArea(edges: .top)
+        }
+    }
+
+    private var havesRail: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("求められているグッズ")
+                .font(.system(size: 20, weight: .heavy))
+                .foregroundStyle(MegrumTheme.ink)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 14) {
+                    ForEach(HomeDiscoveryFixtures.havesRailGoods, id: \.id) { goods in
+                        VStack(spacing: 6) {
+                            HomeGoodsArtwork(goods: goods)
+                                .frame(width: 94, height: 94)
+                                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+
+                            Text("3件")
+                                .font(.system(size: 12, weight: .heavy, design: .rounded))
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 3)
+                                .background(MegrumTheme.lavender, in: Capsule())
+                        }
+                        .frame(width: 94)
+                    }
+                }
+                .padding(.trailing, 20)
+            }
+        }
+    }
+}
+
+/// 1候補分の行。画像（扇状ロータリーカード）と「強タグ＋結論一文」を
+/// 横並びにする。`mirrored` で左右反転（推しでマッチ用）。
+private struct HomeCandidateRedesignRowView: View {
+    var row: HomeCandidateRedesignRow
+    var mirrored: Bool
+
+    var body: some View {
+        VStack(alignment: mirrored ? .trailing : .leading, spacing: 2) {
+            Text(row.subtitle)
+                .font(.system(size: 12.5, weight: .regular))
+                .foregroundStyle(MegrumTheme.ink.opacity(0.82))
+                .padding(mirrored ? .trailing : .leading, 8)
+
+            HStack(alignment: .center, spacing: 4) {
+                if mirrored {
+                    infoColumn
+                    rotaryCard
+                } else {
+                    rotaryCard
+                    infoColumn
+                }
+            }
+        }
+    }
+
+    private var rotaryCard: some View {
         HomeDiscoveryRotaryCard(
-            goods: state.goods,
-            goodsCondition: state.conditionTags.goods,
-            exchangeCondition: state.conditionTags.exchange,
-            paymentCondition: state.conditionTags.payment,
+            goods: row.goods,
+            goodsCondition: row.conditionTags.goods,
+            exchangeCondition: row.conditionTags.exchange,
+            paymentCondition: row.conditionTags.payment,
             showsConditionOverlay: false
         )
-        .frame(height: 150)
+        .frame(width: 176, height: 148)
+    }
+
+    private var infoColumn: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HomeCandidateRedesignBadge(title: row.badgeTitle, tone: row.badgeTone)
+            Text(row.summaryText)
+                .font(.system(size: 13, weight: .bold, design: .rounded))
+                .foregroundStyle(MegrumTheme.ink.opacity(0.8))
+                .lineLimit(3)
+                .minimumScaleFactor(0.88)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
@@ -156,105 +218,80 @@ private struct HomeCandidateRedesignBadge: View {
     }
 }
 
-private enum HomeCandidateRedesignState: String, CaseIterable, Identifiable {
-    case perfect
-    case designated
-    case meetable
-    case wishMatch
-    case discuss
+private struct HomeCandidateRedesignRow: Identifiable {
+    var id: String { subtitle + summaryText }
+    var subtitle: String
+    var goods: [HomeMockGoods]
+    var conditionTags: HomeConditionTagSet
+    var badgeTitle: String
+    var badgeTone: HomeCandidateRedesignBadge.Tone
+    var summaryText: String
 
-    var id: String { rawValue }
+    static let memberSeriesRows: [HomeCandidateRedesignRow] = [
+        HomeCandidateRedesignRow(
+            subtitle: "サナ × トレカ",
+            goods: [
+                HomeDiscoveryFixtures.sanaLavender,
+                HomeDiscoveryFixtures.sanaBadge,
+                HomeDiscoveryFixtures.sanaStand
+            ],
+            conditionTags: HomeConditionTagSet(goods: .direct, exchange: .exact, payment: .exact),
+            badgeTitle: "ぴったり",
+            badgeTone: .exact,
+            summaryText: "あなたのグッズを指名中・大阪で7/12に会えそう"
+        ),
+        HomeCandidateRedesignRow(
+            subtitle: "サナ × アクスタ",
+            goods: [
+                HomeDiscoveryFixtures.sanaStand,
+                HomeDiscoveryFixtures.sanaLavender
+            ],
+            conditionTags: HomeConditionTagSet(goods: .wish, exchange: .exact, payment: .compatible),
+            badgeTitle: "会えそう",
+            badgeTone: .possible,
+            summaryText: "横浜アリーナで7/2に交換できそう"
+        ),
+        HomeCandidateRedesignRow(
+            subtitle: "サナ × キーホルダー",
+            goods: [
+                HomeDiscoveryFixtures.sanaKeychain,
+                HomeDiscoveryFixtures.plush
+            ],
+            conditionTags: HomeConditionTagSet(goods: .none, exchange: .warning, payment: .unknown),
+            badgeTitle: "要相談",
+            badgeTone: .discuss,
+            summaryText: "日程は相談（相手: 週末なら可）"
+        )
+    ]
 
-    var sectionTitle: String {
-        switch self {
-        case .perfect: "① ぴったり（全条件一致）"
-        case .designated: "② 指名あり（グッズ◎・交換は要相談）"
-        case .meetable: "③ 会えそう（現地条件が一致）"
-        case .wishMatch: "④ wish一致（郵送OK）"
-        case .discuss: "⑤ 要相談（従来の▲/?相当）"
-        }
-    }
+    static let memberRows: [HomeCandidateRedesignRow] = [
+        HomeCandidateRedesignRow(
+            subtitle: "モモ",
+            goods: [
+                HomeDiscoveryFixtures.momoFanmi,
+                HomeDiscoveryFixtures.momoFanmiAlt
+            ],
+            conditionTags: HomeConditionTagSet(goods: .direct, exchange: .warning, payment: .compatible),
+            badgeTitle: "指名あり",
+            badgeTone: .exact,
+            summaryText: "あなたのグッズを指名中・場所は相談（相手: 東京）"
+        ),
+        HomeCandidateRedesignRow(
+            subtitle: "モモ",
+            goods: [
+                HomeDiscoveryFixtures.momoFanmiAlt,
+                HomeDiscoveryFixtures.momoFanmiStand
+            ],
+            conditionTags: HomeConditionTagSet(goods: .wish, exchange: .possible, payment: .unknown),
+            badgeTitle: "wish一致",
+            badgeTone: .possible,
+            summaryText: "あなたのウィッシュと一致・郵送OK"
+        )
+    ]
+}
 
-    var sectionCaption: String {
-        switch self {
-        case .perfect: "現行: グッズ◎ 交換◎ 支払◎"
-        case .designated: "現行: グッズ◎ 交換▲ 支払○"
-        case .meetable: "現行: グッズ○ 交換◎ 支払○"
-        case .wishMatch: "現行: グッズ○ 交換○ 支払?"
-        case .discuss: "現行: グッズ▲ 交換▲ 支払? — 相手の実値を見せて判断を委ねる"
-        }
-    }
-
-    var cardTitle: String {
-        switch self {
-        case .perfect: "サナ × トレカ"
-        case .designated: "モモ × 缶バッジ"
-        case .meetable: "サナ × アクスタ"
-        case .wishMatch: "モモ × トレカ"
-        case .discuss: "サナ × キーホルダー"
-        }
-    }
-
-    var goods: [HomeMockGoods] {
-        switch self {
-        case .perfect:
-            [HomeDiscoveryFixtures.sanaLavender, HomeDiscoveryFixtures.sanaBadge, HomeDiscoveryFixtures.sanaStand]
-        case .designated:
-            [HomeDiscoveryFixtures.momoFanmi, HomeDiscoveryFixtures.momoFanmiAlt]
-        case .meetable:
-            [HomeDiscoveryFixtures.sanaStand, HomeDiscoveryFixtures.sanaLavender]
-        case .wishMatch:
-            [HomeDiscoveryFixtures.momoFanmiAlt, HomeDiscoveryFixtures.momoFanmiStand]
-        case .discuss:
-            [HomeDiscoveryFixtures.sanaKeychain, HomeDiscoveryFixtures.plush]
-        }
-    }
-
-    var conditionTags: HomeConditionTagSet {
-        switch self {
-        case .perfect:
-            HomeConditionTagSet(goods: .direct, exchange: .exact, payment: .exact)
-        case .designated:
-            HomeConditionTagSet(goods: .direct, exchange: .warning, payment: .compatible)
-        case .meetable:
-            HomeConditionTagSet(goods: .wish, exchange: .exact, payment: .compatible)
-        case .wishMatch:
-            HomeConditionTagSet(goods: .wish, exchange: .possible, payment: .unknown)
-        case .discuss:
-            HomeConditionTagSet(goods: .none, exchange: .warning, payment: .unknown)
-        }
-    }
-
-    var badgeTitle: String {
-        switch self {
-        case .perfect: "ぴったり"
-        case .designated: "指名あり"
-        case .meetable: "会えそう"
-        case .wishMatch: "wish一致"
-        case .discuss: "要相談"
-        }
-    }
-
-    var badgeTone: HomeCandidateRedesignBadge.Tone {
-        switch self {
-        case .perfect, .designated: .exact
-        case .meetable, .wishMatch: .possible
-        case .discuss: .discuss
-        }
-    }
-
-    var summaryText: String {
-        switch self {
-        case .perfect:
-            "あなたのグッズを指名中・大阪で7/12に会えそう"
-        case .designated:
-            "あなたのグッズを指名中・場所は相談（相手: 東京）"
-        case .meetable:
-            "横浜アリーナで7/2に交換できそう"
-        case .wishMatch:
-            "あなたのウィッシュと一致・郵送OK"
-        case .discuss:
-            "日程は相談（相手: 週末なら可）"
-        }
+extension HomeDiscoveryFixtures {
+    fileprivate static var havesRailGoods: [HomeMockGoods] {
+        [sanaLavender, sanaBadge, momoFanmi, momoFanmiAlt]
     }
 }
