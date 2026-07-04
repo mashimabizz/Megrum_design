@@ -3,11 +3,14 @@ import MegrumCore
 
 extension HomeDiscoveryExperience {
     func openInitialSheetIfNeeded() {
-        guard opensInitialHavesLookup, !didOpenInitialSheet else {
+        guard opensInitialHavesLookup,
+              !didOpenInitialSheet,
+              let sheet = havesCandidates.first?.sheet
+        else {
             return
         }
         didOpenInitialSheet = true
-        selectedSheet = havesCandidates.first?.sheet
+        selectedSheet = sheet
     }
 
     func openIndividualListingCreation() {

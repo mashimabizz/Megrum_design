@@ -16,9 +16,10 @@ struct HomeHavesLookupSheet: View {
 
             if payload.shouldShowTagMatches {
                 HomeDiscoverySection(
-                    title: "メンバー×シリーズでマッチ",
-                    candidates: payload.tagMatchedCandidates,
-                    layout: .grid,
+                    title: "推し×シリーズでマッチ",
+                    candidates: HomeCandidateSummaryPolicy.sortedCandidates(payload.tagMatchedCandidates),
+                    layout: .summaryRows(mirrored: false),
+                    cardTitleStyle: .memberTag,
                     showsGridHeaderTitle: true,
                     showsSeeAllButton: false,
                     onSelect: onOpenNestedSheet
@@ -27,9 +28,10 @@ struct HomeHavesLookupSheet: View {
 
             if !payload.memberMatchedCandidates.isEmpty {
                 HomeDiscoverySection(
-                    title: "メンバーでマッチ",
-                    candidates: payload.memberMatchedCandidates,
-                    layout: .grid,
+                    title: "推しでマッチ",
+                    candidates: HomeCandidateSummaryPolicy.sortedCandidates(payload.memberMatchedCandidates),
+                    layout: .summaryRows(mirrored: true),
+                    cardTitleStyle: .member,
                     showsGridHeaderTitle: true,
                     showsSeeAllButton: false,
                     onSelect: onOpenNestedSheet

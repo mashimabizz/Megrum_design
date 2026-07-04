@@ -211,6 +211,9 @@ struct HomeDiscoveryExperience: View {
         .task {
             openInitialSheetIfNeeded()
         }
+        .onChange(of: havesCandidates.map(\.id)) { _, _ in
+            openInitialSheetIfNeeded()
+        }
         #if os(iOS)
         .sheet(item: $shareActivityPayload, content: GoodsShareActivitySheet.init)
         #endif
