@@ -16,9 +16,11 @@ public enum MegrumNotificationKind: String, Codable, Sendable, CaseIterable, Ide
     case expiresSoon = "expires_soon"
     case groomLiked = "groom_liked"
     case groomReply = "groom_reply"
+    case groomPosted = "groom_posted"
     case meguriMessage = "meguri_message"
     case meguriBoardReply = "meguri_board_reply"
     case meguriBoardMention = "meguri_board_mention"
+    case meguriBoardPosted = "meguri_board_posted"
     case adminAnnouncement = "admin_announcement"
     case unknown
 
@@ -29,15 +31,51 @@ public struct UserNotificationSettings: Codable, Equatable, Sendable {
     public var pushEnabled: Bool
     public var groomActivityPushEnabled: Bool
     public var chatroomActivityPushEnabled: Bool
+    /// 推し（グループ/メンバー）一致のグルーム新着投稿を通知するか。
+    public var groomOshiPushEnabled: Bool
+    /// 圏内（約3km）のグルーム新着投稿を通知するか。
+    public var groomNearbyPushEnabled: Bool
+    /// 推し一致のチャットルーム新規スレッドを通知するか。
+    public var chatroomOshiPushEnabled: Bool
+    /// 圏内のチャットルーム新規スレッドを通知するか。
+    public var chatroomNearbyPushEnabled: Bool
 
     public init(
         pushEnabled: Bool = true,
         groomActivityPushEnabled: Bool = true,
-        chatroomActivityPushEnabled: Bool = true
+        chatroomActivityPushEnabled: Bool = true,
+        groomOshiPushEnabled: Bool = false,
+        groomNearbyPushEnabled: Bool = false,
+        chatroomOshiPushEnabled: Bool = false,
+        chatroomNearbyPushEnabled: Bool = false
     ) {
         self.pushEnabled = pushEnabled
         self.groomActivityPushEnabled = groomActivityPushEnabled
         self.chatroomActivityPushEnabled = chatroomActivityPushEnabled
+        self.groomOshiPushEnabled = groomOshiPushEnabled
+        self.groomNearbyPushEnabled = groomNearbyPushEnabled
+        self.chatroomOshiPushEnabled = chatroomOshiPushEnabled
+        self.chatroomNearbyPushEnabled = chatroomNearbyPushEnabled
+    }
+}
+
+/// グルーム/チャットルームの新着投稿の購読通知設定（めぐり地図の通知アイコンから変更）。
+public struct MeguriSubscriptionPushSettingsInput: Equatable, Sendable {
+    public var groomOshiPushEnabled: Bool
+    public var groomNearbyPushEnabled: Bool
+    public var chatroomOshiPushEnabled: Bool
+    public var chatroomNearbyPushEnabled: Bool
+
+    public init(
+        groomOshiPushEnabled: Bool,
+        groomNearbyPushEnabled: Bool,
+        chatroomOshiPushEnabled: Bool,
+        chatroomNearbyPushEnabled: Bool
+    ) {
+        self.groomOshiPushEnabled = groomOshiPushEnabled
+        self.groomNearbyPushEnabled = groomNearbyPushEnabled
+        self.chatroomOshiPushEnabled = chatroomOshiPushEnabled
+        self.chatroomNearbyPushEnabled = chatroomNearbyPushEnabled
     }
 }
 

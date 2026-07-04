@@ -101,7 +101,7 @@ struct MegrumAuthenticatedTabContentView: View {
                 item: $meguriBoardThreadRoute,
                 backSwipeInteractionScope: .fullScreen
             ) { route, dismiss in
-                MegrumDeferredContent {
+                MegrumDeferredContent(delayNanoseconds: MegrumDeferredContentDelay.slidePresentation) {
                     NavigationStack {
                         BoardThreadDetailScreen(
                             appState: appState,
@@ -119,7 +119,7 @@ struct MegrumAuthenticatedTabContentView: View {
                 isPresented: $isShowingMeguriMessageInbox,
                 backSwipeInteractionScope: .fullScreen
             ) { dismiss in
-                MegrumDeferredContent {
+                MegrumDeferredContent(delayNanoseconds: MegrumDeferredContentDelay.slidePresentation) {
                     MeguriMessageInboxScreen(
                         appState: appState,
                         visualQAInitialScreen: visualQAInitialScreen,
@@ -134,7 +134,7 @@ struct MegrumAuthenticatedTabContentView: View {
                 item: $meguriMessageDetailRoute,
                 backSwipeInteractionScope: .fullScreen
             ) { route, dismiss in
-                MegrumDeferredContent {
+                MegrumDeferredContent(delayNanoseconds: MegrumDeferredContentDelay.slidePresentation) {
                     NavigationStack {
                         MeguriMessagesScreen(
                             appState: appState,
@@ -151,7 +151,7 @@ struct MegrumAuthenticatedTabContentView: View {
                 item: $meguriUserProfileRoute,
                 backSwipeInteractionScope: .fullScreen
             ) { route, dismiss in
-                MegrumDeferredContent {
+                MegrumDeferredContent(delayNanoseconds: MegrumDeferredContentDelay.slidePresentation) {
                     NavigationStack {
                         MeguriUserProfileRouteScreen(
                             appState: appState,
@@ -199,12 +199,6 @@ struct MegrumAuthenticatedTabContentView: View {
                 onOpenMeguriUserProfile: openMeguriUserProfileFromGroomViewer
             )
         }
-        .background {
-            if meguriGroomViewerPost != nil {
-                Color.black.ignoresSafeArea(.container, edges: .top)
-            }
-        }
-        .ignoresSafeArea(.container, edges: meguriGroomViewerPost == nil ? [] : .top)
     }
 
     private var tabs: some View {
@@ -220,7 +214,6 @@ struct MegrumAuthenticatedTabContentView: View {
             requestInterstitialIfPrepared(for: selectedTab)
         }
         #if os(iOS)
-        .toolbar(meguriGroomViewerPost == nil ? .visible : .hidden, for: .tabBar)
         .toolbarBackground(tabBarBackgroundVisibility, for: .tabBar)
         .ignoresSafeArea(.container, edges: selectedTab == .meguri ? .bottom : [])
         #endif
@@ -504,7 +497,8 @@ struct MegrumAuthenticatedTabContentView: View {
             proposals: appState.proposals,
             messagesByProposalID: appState.messagesByProposalID,
             viewerReadAtByProposalID: appState.viewerReadAtByProposalID,
-            viewerID: appState.viewer?.id
+            viewerID: appState.viewer?.id,
+            evaluatedProposalIDs: appState.viewerEvaluatedProposalIDs
         )
     }
 

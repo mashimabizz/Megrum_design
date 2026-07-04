@@ -14,6 +14,9 @@ public final class MegrumAppState: ObservableObject {
     @Published public internal(set) var listings: [IndividualListing] = []
     @Published public internal(set) var proposals: [TradeProposal] = []
     @Published public internal(set) var messagesByProposalID: [UUID: [TradeMessage]] = [:]
+    /// 自分が評価済みの proposal ID（サーバー基準）。チャット未読込でも
+    /// 「評価待ち」タグ・バッジをサーバーの評価状態で判定するために持つ。
+    @Published public internal(set) var viewerEvaluatedProposalIDs: Set<UUID> = []
     @Published public internal(set) var evidencePhotosByProposalID: [UUID: [TradeEvidencePhoto]] = [:]
     @Published public internal(set) var viewerReadAtByProposalID: [UUID: Date] = [:]
     @Published public internal(set) var partnerReadAtByProposalID: [UUID: Date] = [:]
@@ -54,6 +57,10 @@ public final class MegrumAppState: ObservableObject {
     @Published public internal(set) var pushNotificationsEnabled = true
     @Published public internal(set) var groomActivityPushNotificationsEnabled = true
     @Published public internal(set) var chatroomActivityPushNotificationsEnabled = true
+    @Published public internal(set) var groomOshiPushNotificationsEnabled = false
+    @Published public internal(set) var groomNearbyPushNotificationsEnabled = false
+    @Published public internal(set) var chatroomOshiPushNotificationsEnabled = false
+    @Published public internal(set) var chatroomNearbyPushNotificationsEnabled = false
     @Published public internal(set) var isLoading = false
     @Published public internal(set) var isLoadingOshiGroups = false
     @Published public internal(set) var isLoadingOshiCharacters = false
@@ -155,7 +162,8 @@ public final class MegrumAppState: ObservableObject {
             proposals: proposals,
             messagesByProposalID: messagesByProposalID,
             viewerReadAtByProposalID: viewerReadAtByProposalID,
-            viewerID: viewer?.id
+            viewerID: viewer?.id,
+            evaluatedProposalIDs: viewerEvaluatedProposalIDs
         )
         return unreadNotificationCount + tradeAttention.total + meguriPendingReplyCount
     }
@@ -166,7 +174,8 @@ public final class MegrumAppState: ObservableObject {
         }
         return MeguriMessageReadStateReducer.unreadIncomingCount(
             visibleMeguriMessages(for: viewer.id),
-            viewerID: viewer.id
+            viewerID: viewer.id,
+            hiddenThreadEntries: hiddenMeguriThreadEntries
         )
     }
 
@@ -176,7 +185,8 @@ public final class MegrumAppState: ObservableObject {
         }
         return MeguriMessageReadStateReducer.pendingReplyThreadCount(
             visibleMeguriMessages(for: viewer.id),
-            viewerID: viewer.id
+            viewerID: viewer.id,
+            hiddenThreadEntries: hiddenMeguriThreadEntries
         )
     }
 
@@ -333,6 +343,8 @@ public final class MegrumAppState: ObservableObject {
             await loadSubscriptionState(reportsFailure: false)
             await loadMeguriProfile(reportsFailure: false)
             await loadMeguriMessages(reportsFailure: false)
+            await loadViewerEvaluatedProposalIDs()
+            await preloadTradeMessages()
         } catch {
             errorMessage = "データを読み込めませんでした"
         }
@@ -354,6 +366,8 @@ public final class MegrumAppState: ObservableObject {
             await loadSubscriptionState(reportsFailure: false)
             await loadMeguriProfile(reportsFailure: false)
             await loadMeguriMessages(reportsFailure: false)
+            await loadViewerEvaluatedProposalIDs()
+            await preloadTradeMessages()
         } catch {
             errorMessage = "ホームを更新できませんでした"
         }

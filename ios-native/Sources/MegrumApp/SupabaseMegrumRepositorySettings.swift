@@ -112,6 +112,18 @@ public extension SupabaseMegrumRepository {
         try await notificationClient.setChatroomActivityPushNotificationsEnabled(userID: viewerID, enabled: enabled)
     }
 
+    func setMeguriSubscriptionPushSettings(_ input: MeguriSubscriptionPushSettingsInput) async throws -> UserNotificationSettings {
+        try await notificationClient.setMeguriSubscriptionPushSettings(userID: viewerID, input: input)
+    }
+
+    func updatePushNotificationLocation(latitude: Double, longitude: Double) async throws {
+        try await notificationClient.updatePushNotificationLocation(
+            userID: viewerID,
+            latitude: latitude,
+            longitude: longitude
+        )
+    }
+
     func registerNativePushDeviceToken(_ token: String, appVersion: String?) async throws {
         _ = try await notificationClient.registerNativePushDevice(
             userID: viewerID,

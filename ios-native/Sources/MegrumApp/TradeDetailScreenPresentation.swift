@@ -92,6 +92,7 @@ extension TradeDetailScreen {
                     viewerID: appState.viewer?.id,
                     messages: messages,
                     localSubmission: interactionState.didSubmitEvaluation
+                        || appState.viewerEvaluatedProposalIDs.contains(currentProposal.id)
                 ) {
                     TradeEvaluationNextStepFooter(
                         isSubmitting: appState.submittingEvaluationProposalID == currentProposal.id,

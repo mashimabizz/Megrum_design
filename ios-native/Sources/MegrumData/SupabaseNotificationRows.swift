@@ -26,16 +26,26 @@ struct NotificationRow: Decodable, Sendable {
 }
 
 struct NotificationSettingRow: Decodable, Sendable {
-    static let select = "push_enabled,groom_activity_push_enabled,chatroom_activity_push_enabled"
+    static let select = "push_enabled,groom_activity_push_enabled,chatroom_activity_push_enabled,"
+        + "groom_oshi_push_enabled,groom_nearby_push_enabled,"
+        + "chatroom_oshi_push_enabled,chatroom_nearby_push_enabled"
     var pushEnabled: Bool
     var groomActivityPushEnabled: Bool?
     var chatroomActivityPushEnabled: Bool?
+    var groomOshiPushEnabled: Bool?
+    var groomNearbyPushEnabled: Bool?
+    var chatroomOshiPushEnabled: Bool?
+    var chatroomNearbyPushEnabled: Bool?
 
     var settings: UserNotificationSettings {
         UserNotificationSettings(
             pushEnabled: pushEnabled,
             groomActivityPushEnabled: groomActivityPushEnabled ?? true,
-            chatroomActivityPushEnabled: chatroomActivityPushEnabled ?? true
+            chatroomActivityPushEnabled: chatroomActivityPushEnabled ?? true,
+            groomOshiPushEnabled: groomOshiPushEnabled ?? false,
+            groomNearbyPushEnabled: groomNearbyPushEnabled ?? false,
+            chatroomOshiPushEnabled: chatroomOshiPushEnabled ?? false,
+            chatroomNearbyPushEnabled: chatroomNearbyPushEnabled ?? false
         )
     }
 }

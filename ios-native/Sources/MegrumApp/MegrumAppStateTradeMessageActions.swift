@@ -32,6 +32,33 @@ extension MegrumAppState {
         await markProposalRead(proposalID: proposalID, messages: messagesByProposalID[proposalID] ?? [])
     }
 
+    /// やりとり一覧の先読み：全proposalのチャットと自分の既読状態をまとめて取得し、
+    /// 詳細を開いた時にローディングなしで表示できる状態にしておく。
+    /// 既にローカルに読み込み済みのチャットは上書きしない。失敗しても致命扱いにしない。
+    public func preloadTradeMessages() async {
+        let proposalIDs = proposals.map(\.id)
+        guard !proposalIDs.isEmpty else {
+            return
+        }
+        do {
+            async let bulkMessagesTask = repository.loadTradeMessagesBulk(proposalIDs: proposalIDs)
+            async let readStatesTask = repository.loadViewerProposalReadStates(proposalIDs: proposalIDs)
+            let (bulkMessages, readStates) = try await (bulkMessagesTask, readStatesTask)
+            for (proposalID, messages) in bulkMessages where messagesByProposalID[proposalID] == nil {
+                messagesByProposalID = TradeMessageStateReducer.replacingMessages(
+                    in: messagesByProposalID,
+                    proposalID: proposalID,
+                    messages: messages
+                )
+            }
+            viewerReadAtByProposalID.merge(readStates) { current, _ in current }
+        } catch {
+            #if DEBUG
+            MegrumAppLogger.general.debug("Megrum trade message preload failed: \(String(describing: error), privacy: .public)")
+            #endif
+        }
+    }
+
     public func sendMessage(proposalID: UUID, body: String) async -> Bool {
         let trimmed = MegrumAppStateInputNormalizer.trimmedText(body)
         guard !trimmed.isEmpty else {

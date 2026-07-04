@@ -411,15 +411,18 @@ struct GroomViewerScreen: View {
     }
 }
 
+@MainActor
 enum GroomViewerChromeLayout {
-    static let minimumTopObstructionHeight: CGFloat = 76
     static let chromeGapBelowObstruction: CGFloat = 10
 
     static func topPadding(safeAreaTop: CGFloat) -> CGFloat {
         topObstructionHeight(safeAreaTop: safeAreaTop) + chromeGapBelowObstruction
     }
 
+    /// ステータスバー領域だけを黒帯にして、コンテンツはその直下まで表示する。
+    /// `ignoresSafeArea` 済みの階層では GeometryReader の safeAreaTop が 0 に
+    /// なるため、ウィンドウ実測値でフォールバックする。
     static func topObstructionHeight(safeAreaTop: CGFloat) -> CGFloat {
-        max(minimumTopObstructionHeight, safeAreaTop)
+        max(safeAreaTop, MegrumWindowInsets.top)
     }
 }

@@ -28,6 +28,13 @@ extension MegrumAppState {
             return
         }
 
+        if let latitude, let longitude {
+            // 圏内通知が有効な場合だけ、基準位置を最新のめぐり閲覧地点に更新する。
+            Task {
+                await updatePushNotificationLocationIfNeeded(latitude: latitude, longitude: longitude)
+            }
+        }
+
         let shouldShowLoading = !hasCachedContent
         isMeguriFeedRequestInFlight = true
         if shouldShowLoading {

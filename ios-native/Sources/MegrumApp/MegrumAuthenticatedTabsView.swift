@@ -34,9 +34,10 @@ struct MegrumAuthenticatedTabsView: View {
         ) {
             tabContent
         }
-        .background(SystemTabBarVisibilityHost(isHidden: isGroomViewerPresented))
         #if os(iOS)
-        .toolbar(isGroomViewerPresented ? .hidden : .visible, for: .tabBar)
+        // タブバーはグルーム表示オーバーレイが上から覆うため隠さない。
+        // UIKit直叩き（isHidden）やtoolbar切替はiOS 27で復帰に失敗し、
+        // タブバーが消えたままになる不具合の原因だった。
         .statusBarHidden(isGroomViewerPresented)
         #endif
     }

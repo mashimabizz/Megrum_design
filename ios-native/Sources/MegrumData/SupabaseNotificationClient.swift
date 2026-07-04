@@ -99,6 +99,55 @@ public final class SupabaseNotificationClient: @unchecked Sendable {
     }
 
     @discardableResult
+    public func setMeguriSubscriptionPushSettings(
+        userID: UUID,
+        input: MeguriSubscriptionPushSettingsInput
+    ) async throws -> UserNotificationSettings {
+        let rows: [NotificationSettingRow] = try await client.upsertRows(
+            into: "user_notification_settings",
+            values: [
+                MeguriSubscriptionNotificationSettingPayload(
+                    userID: userID,
+                    groomOshiPushEnabled: input.groomOshiPushEnabled,
+                    groomNearbyPushEnabled: input.groomNearbyPushEnabled,
+                    chatroomOshiPushEnabled: input.chatroomOshiPushEnabled,
+                    chatroomNearbyPushEnabled: input.chatroomNearbyPushEnabled
+                )
+            ],
+            select: NotificationSettingRow.select,
+            onConflict: "user_id"
+        )
+        return rows.first?.settings ?? UserNotificationSettings(
+            groomOshiPushEnabled: input.groomOshiPushEnabled,
+            groomNearbyPushEnabled: input.groomNearbyPushEnabled,
+            chatroomOshiPushEnabled: input.chatroomOshiPushEnabled,
+            chatroomNearbyPushEnabled: input.chatroomNearbyPushEnabled
+        )
+    }
+
+    /// 圏内通知の基準位置を更新する（圏内通知オプトイン時のみ呼ぶ）。
+    public func updatePushNotificationLocation(
+        userID: UUID,
+        latitude: Double,
+        longitude: Double,
+        updatedAt: Date = .now
+    ) async throws {
+        let _: [NotificationSettingRow] = try await client.upsertRows(
+            into: "user_notification_settings",
+            values: [
+                PushNotificationLocationPayload(
+                    userID: userID,
+                    pushLocationLat: latitude,
+                    pushLocationLng: longitude,
+                    pushLocationUpdatedAt: notificationISOTimestamp(updatedAt)
+                )
+            ],
+            select: NotificationSettingRow.select,
+            onConflict: "user_id"
+        )
+    }
+
+    @discardableResult
     public func registerNativePushDevice(
         userID: UUID,
         deviceToken: String,

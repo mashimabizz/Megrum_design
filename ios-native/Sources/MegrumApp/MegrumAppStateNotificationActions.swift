@@ -204,9 +204,64 @@ extension MegrumAppState {
         }
     }
 
+    /// めぐりの通知アイコンから変更する購読通知設定（推し一致・圏内の新着投稿）を保存する。
+    @discardableResult
+    public func setMeguriSubscriptionPushSettings(_ input: MeguriSubscriptionPushSettingsInput) async -> Bool {
+        guard !isSavingPushNotificationSetting else {
+            return false
+        }
+
+        let previous = MeguriSubscriptionPushSettingsInput(
+            groomOshiPushEnabled: groomOshiPushNotificationsEnabled,
+            groomNearbyPushEnabled: groomNearbyPushNotificationsEnabled,
+            chatroomOshiPushEnabled: chatroomOshiPushNotificationsEnabled,
+            chatroomNearbyPushEnabled: chatroomNearbyPushNotificationsEnabled
+        )
+        applyMeguriSubscriptionSettings(input)
+        isSavingPushNotificationSetting = true
+        errorMessage = nil
+        do {
+            let settings = try await repository.setMeguriSubscriptionPushSettings(input)
+            applyMeguriSubscriptionSettings(
+                MeguriSubscriptionPushSettingsInput(
+                    groomOshiPushEnabled: settings.groomOshiPushEnabled,
+                    groomNearbyPushEnabled: settings.groomNearbyPushEnabled,
+                    chatroomOshiPushEnabled: settings.chatroomOshiPushEnabled,
+                    chatroomNearbyPushEnabled: settings.chatroomNearbyPushEnabled
+                )
+            )
+            isSavingPushNotificationSetting = false
+            return true
+        } catch {
+            applyMeguriSubscriptionSettings(previous)
+            errorMessage = "通知設定を保存できませんでした"
+            isSavingPushNotificationSetting = false
+            return false
+        }
+    }
+
+    /// 圏内通知の基準位置を更新する。圏内通知が無効なら何もしない。
+    public func updatePushNotificationLocationIfNeeded(latitude: Double, longitude: Double) async {
+        guard groomNearbyPushNotificationsEnabled || chatroomNearbyPushNotificationsEnabled else {
+            return
+        }
+        try? await repository.updatePushNotificationLocation(latitude: latitude, longitude: longitude)
+    }
+
+    private func applyMeguriSubscriptionSettings(_ input: MeguriSubscriptionPushSettingsInput) {
+        groomOshiPushNotificationsEnabled = input.groomOshiPushEnabled
+        groomNearbyPushNotificationsEnabled = input.groomNearbyPushEnabled
+        chatroomOshiPushNotificationsEnabled = input.chatroomOshiPushEnabled
+        chatroomNearbyPushNotificationsEnabled = input.chatroomNearbyPushEnabled
+    }
+
     private func applyNotificationSettings(_ settings: UserNotificationSettings) {
         pushNotificationsEnabled = settings.pushEnabled
         groomActivityPushNotificationsEnabled = settings.groomActivityPushEnabled
         chatroomActivityPushNotificationsEnabled = settings.chatroomActivityPushEnabled
+        groomOshiPushNotificationsEnabled = settings.groomOshiPushEnabled
+        groomNearbyPushNotificationsEnabled = settings.groomNearbyPushEnabled
+        chatroomOshiPushNotificationsEnabled = settings.chatroomOshiPushEnabled
+        chatroomNearbyPushNotificationsEnabled = settings.chatroomNearbyPushEnabled
     }
 }

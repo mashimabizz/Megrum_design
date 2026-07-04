@@ -40,6 +40,27 @@ public final class SupabaseProposalClient: @unchecked Sendable {
         return rows.compactMap(\.proposal)
     }
 
+    /// 自分（rater）が評価済みの proposal ID 一覧。
+    /// やりとり一覧の「評価待ち」判定を、チャット未読込でもサーバー基準で行うために使う。
+    public func loadEvaluatedProposalIDs(raterID: UUID) async throws -> Set<UUID> {
+        struct EvaluatedProposalRow: Decodable, Sendable {
+            let proposalID: UUID?
+
+            enum CodingKeys: String, CodingKey {
+                case proposalID = "proposal_id"
+            }
+        }
+
+        let rows: [EvaluatedProposalRow] = try await client.fetchRows(
+            from: "user_evaluations",
+            select: "proposal_id",
+            queryItems: [
+                URLQueryItem(name: "rater_id", value: "eq.\(raterID.uuidString.lowercased())")
+            ]
+        )
+        return Set(rows.compactMap(\.proposalID))
+    }
+
     public func createProposal(senderID: UUID, input: ProposalCreateInput, now: Date = .now) async throws -> TradeProposal {
         let rows: [ProposalRow] = try await client.upsertRows(
             into: "proposals",

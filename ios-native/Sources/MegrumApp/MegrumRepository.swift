@@ -169,8 +169,11 @@ public protocol MegrumRepository: Sendable {
     func deleteTradeEvidencePhoto(proposalID: UUID, photoID: UUID) async throws -> TradeProposal
     func approveTradeEvidence(proposalID: UUID, photoID: UUID?) async throws -> TradeProposal
     func submitTradeEvaluation(_ input: TradeEvaluationCreateInput) async throws -> UserEvaluation
+    func loadViewerEvaluatedProposalIDs() async throws -> Set<UUID>
     func fileTradeDispute(_ input: TradeDisputeCreateInput) async throws -> TradeDisputeTicket
     func loadMessages(proposalID: UUID, limit: Int) async throws -> [TradeMessage]
+    func loadTradeMessagesBulk(proposalIDs: [UUID]) async throws -> [UUID: [TradeMessage]]
+    func loadViewerProposalReadStates(proposalIDs: [UUID]) async throws -> [UUID: Date]
     func loadProposalReadState(proposalID: UUID, userID: UUID) async throws -> ProposalReadState?
     func markProposalMessagesRead(proposalID: UUID, userID: UUID, lastReadAt: Date) async throws -> ProposalReadState?
     func sendMessage(_ input: TradeMessageCreateInput) async throws -> TradeMessage
@@ -231,6 +234,8 @@ public protocol MegrumRepository: Sendable {
     func setPushNotificationsEnabled(_ enabled: Bool) async throws -> Bool
     func setGroomActivityPushNotificationsEnabled(_ enabled: Bool) async throws -> UserNotificationSettings
     func setChatroomActivityPushNotificationsEnabled(_ enabled: Bool) async throws -> UserNotificationSettings
+    func setMeguriSubscriptionPushSettings(_ input: MeguriSubscriptionPushSettingsInput) async throws -> UserNotificationSettings
+    func updatePushNotificationLocation(latitude: Double, longitude: Double) async throws
     func registerNativePushDeviceToken(_ token: String, appVersion: String?) async throws
     func revokeNativePushDeviceToken(_ token: String, revokedAt: Date) async throws
     func updateOwnProfile(_ input: OwnProfileUpdateInput) async throws -> UserProfile

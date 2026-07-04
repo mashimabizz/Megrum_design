@@ -4,6 +4,63 @@
 
 ---
 
+## イテレーション1226.275：実機フィードバック一括対応（評価待ち・グルーム表示・遷移カクつき・通知購読設定）
+
+### 背景・問題意識
+
+iPhone実機での確認で、(1)自分が評価済みでも「評価待ち」タグが残る、(2)グルームを開くとタブバーが消えたままになる／開閉がカクつく・閉じるとダーク→ライトのちらつき、(3)メッセージ・やりとり詳細への右スライド遷移のカクつきと開いた後のローディング、(4)グルーム追加時のアルバムが35枚までしか出ない、(5)グルーム/アーカイブのコンテンツ上端位置の不揃い、(6)めぐりメッセージのローカル削除がバッジに反映されない、の指摘。加えて(7)グルーム/チャットルームの新着投稿を「推し一致」「圏内」で購読できる通知設定の新設要望。
+
+### 変更内容
+
+#### 評価待ちタグ（サーバー基準化）
+- `SupabaseProposalClient.loadEvaluatedProposalIDs`（新規）：`user_evaluations` から自分が評価済みの proposal ID を取得。
+- `MegrumAppState.viewerEvaluatedProposalIDs`（新規）を起動/更新時に読込み、`TradeCardPresentation` / `TradeStageAttentionCounts` / `TradeListOrdering` / 取引詳細の評価判定に `localSubmission` として伝播。チャット未読込でも評価済みならタグ・バッジが出ない。
+
+#### グルーム表示（タブバー・ちらつき・カクつき）
+- タブバーの強制非表示（UIKit `tabBar.isHidden` / `.toolbar(.hidden)`）を全廃。オーバーレイが全画面を覆うため不要で、iOS 27 では復帰失敗の原因だった（`SystemTabBarVisibilityHost` は未使用化）。
+- `preferredColorScheme(.dark)` を `.environment(\.colorScheme, .dark)`（ビューアのサブツリー限定）へ変更し、閉じた時のシーン全体のダーク→ライト切替ちらつきを解消。
+- 表示中だけタブコンテンツ全体へ条件付き `ignoresSafeArea`/黒背景を当てていた分岐を削除（提示時のレイアウト全体再計算＝カクつき要因）。
+
+#### グルーム/アーカイブの上端位置統一
+- `GroomViewerChromeLayout`：黒帯の最低高76ptを廃し、ステータスバー実測高（`MegrumWindowInsets.top` 新規）に。コンテンツがステータスバー直下まで表示される。
+- `GroomArchiveStoryViews`：同じ黒帯＋開始位置を導入し、ステータスバーへの被りを解消して通常グルームと同位置に統一。
+
+#### アルバム全件表示
+- `GroomPhotoLibraryAsset.fetchRecent` の35枚上限を撤廃（`fetchLimit` 無指定＝全件、サムネイルは LazyVGrid 遅延読込）。
+
+#### 右スライド遷移のカクつきとチャット先読み
+- `MegrumDeferredContent` に遅延指定を追加し、スライド提示（やりとり詳細・めぐりメッセージ一覧/スレッド/プロフィール/掲示板詳細）はアニメーション完了後（0.34s）に本コンテンツを構築。遷移中に重いビュー構築が走らない。
+- `loadMessagesBulk` / `loadReadStates`（新規・in句一括取得）で、起動/更新時に全取引のチャットと自分の既読状態を先読み（`preloadTradeMessages`）。詳細を開いた時点で内容が表示済みになり、一覧の未読数・評価待ちも初期表示から正確になる。
+
+#### めぐりバッジのローカル削除反映
+- `MeguriMessageReadStateReducer.unreadIncomingCount` / `pendingReplyThreadCount` に `hiddenThreadEntries` を追加し、一覧と同じ基準（非表示後の新着で復活）でバッジから除外。
+
+#### 通知購読設定（新機能）
+- migration `20260704120000_add_meguri_subscription_push_settings.sql`（適用済み）：
+  - `user_notification_settings` に `groom_oshi/groom_nearby/chatroom_oshi/chatroom_nearby_push_enabled` と `push_location_lat/lng/updated_at` を追加。
+  - notifications kind に `groom_posted` / `meguri_board_posted` と `groom_post_id` 列を追加。
+  - `groom_posts` / `meguri_board_threads` insert 時のファンアウトトリガー（推し一致＝`user_oshi` の group/character 一致、圏内＝push_location 7日以内・3km、1投稿最大500通知、既存APNsパイプラインに乗る）。
+- iOS：めぐり地図のフィルターアイコン直下に通知アイコン（bell）を新設 → `MeguriNotificationSettingsSheet`（グルーム/チャットルーム各セクションに反応通知・推しの新着・圏内の新着トグル）。圏内トグルON時と、圏内有効中のめぐりフィード読込時に基準位置を更新。
+
+### 影響範囲
+
+- やりとり一覧/詳細、グルーム閲覧/アーカイブ/作成、めぐり地図/メッセージ、通知設定・通知ファンアウト（DB）。
+
+### 確認方法
+
+- シミュレータ（michilion実セッション）：めぐり地図で bell アイコンがフィルター直下に表示されることをスクリーンショット確認。
+- `swift test`（対象245件）passed。migration は `supabase db push` 適用済み。
+- グルーム開閉のカクつき・ちらつき・タブバー復帰は iPhone 実機での目視確認が必要。
+
+### セルフレビュー結果
+
+- ✅ 評価待ちは自分の評価済みのみ抑制（相手未評価の状態は変えない）
+- ✅ 位置情報の保存は圏内通知オプトイン時のみ・通知設定行に限定
+- ✅ 先読みは既読状態も同時取得し未読数の誤カウントを回避、ローカル読込済みは上書きしない
+- ⚠️ groom_posted / meguri_board_posted のファンアウトは実運用データでの発火確認が未了（次の実投稿で確認）
+
+---
+
 ## イテレーション1226.274：チャット範囲外表示をプレミアム化
 
 ### 背景・問題意識

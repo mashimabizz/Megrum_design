@@ -11,6 +11,7 @@ struct TradeStagePage: View {
     var goodsByID: [UUID: GoodsItem]
     var messagesByProposalID: [UUID: [TradeMessage]]
     var viewerReadAtByProposalID: [UUID: Date]
+    var evaluatedProposalIDs: Set<UUID> = []
     var isSelectingPendingProposals: Bool
     var selectedPendingProposalIDs: Set<UUID>
     var adDisplayContext: AdDisplayContext
@@ -60,6 +61,7 @@ struct TradeStagePage: View {
                     messagesByProposalID: messagesByProposalID
                 ),
                 viewerLastReadAt: viewerReadAtByProposalID[proposal.id],
+                viewerHasSubmittedEvaluation: evaluatedProposalIDs.contains(proposal.id),
                 isSelectionMode: isSelectionMode,
                 isSelected: selectedPendingProposalIDs.contains(proposal.id),
                 isSelectionEnabled: isWithdrawable,

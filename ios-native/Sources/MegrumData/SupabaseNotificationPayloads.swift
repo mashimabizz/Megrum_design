@@ -19,6 +19,21 @@ struct ChatroomActivityNotificationSettingPayload: Encodable, Sendable {
     var chatroomActivityPushEnabled: Bool
 }
 
+struct MeguriSubscriptionNotificationSettingPayload: Encodable, Sendable {
+    var userID: UUID
+    var groomOshiPushEnabled: Bool
+    var groomNearbyPushEnabled: Bool
+    var chatroomOshiPushEnabled: Bool
+    var chatroomNearbyPushEnabled: Bool
+}
+
+struct PushNotificationLocationPayload: Encodable, Sendable {
+    var userID: UUID
+    var pushLocationLat: Double
+    var pushLocationLng: Double
+    var pushLocationUpdatedAt: String
+}
+
 struct RevokeNativePushDevicePayload: Encodable, Sendable {
     var revokedAt: String
 }

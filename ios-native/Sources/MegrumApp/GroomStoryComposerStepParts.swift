@@ -92,7 +92,7 @@ struct GroomStoryPhotoActionGrid: View {
         switch status {
         case .authorized, .limited:
             authorizationStatus = .authorized
-            recentAssets = GroomPhotoLibraryAsset.fetchRecent(limit: 35)
+            recentAssets = GroomPhotoLibraryAsset.fetchRecent()
         case .notDetermined:
             authorizationStatus = .unknown
             let requested = await withCheckedContinuation { continuation in
@@ -102,7 +102,7 @@ struct GroomStoryPhotoActionGrid: View {
             }
             if requested == .authorized || requested == .limited {
                 authorizationStatus = .authorized
-                recentAssets = GroomPhotoLibraryAsset.fetchRecent(limit: 35)
+                recentAssets = GroomPhotoLibraryAsset.fetchRecent()
             } else {
                 authorizationStatus = .denied
                 recentAssets = []

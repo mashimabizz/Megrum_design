@@ -30,6 +30,7 @@ struct MeguriHomeContent: View {
     var onNoticeAction: () -> Void
     var onOpenGroomArchive: () -> Void
     var onOpenMeguriProfile: () -> Void
+    var onOpenNotificationSettings: () -> Void = {}
 
     var body: some View {
         GeometryReader { proxy in
@@ -53,11 +54,14 @@ struct MeguriHomeContent: View {
                 .ignoresSafeArea()
 
                 VStack(spacing: 0) {
-                    HStack(spacing: 10) {
-                        MeguriHomeFilterButton(
-                            isActive: isContentFilterActive,
-                            action: onOpenContentFilter
-                        )
+                    HStack(alignment: .top, spacing: 10) {
+                        VStack(spacing: 10) {
+                            MeguriHomeFilterButton(
+                                isActive: isContentFilterActive,
+                                action: onOpenContentFilter
+                            )
+                            MeguriHomeNotificationSettingsButton(action: onOpenNotificationSettings)
+                        }
                         MeguriHomeMapKindCycleButton(selectedKind: $selectedMapKind)
                         Spacer()
                     }
@@ -127,6 +131,30 @@ private struct MeguriHomeFilterButton: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("めぐりの表示をフィルター")
+    }
+}
+
+private struct MeguriHomeNotificationSettingsButton: View {
+    var action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "bell.badge.fill")
+                .font(.system(size: 20, weight: .heavy))
+                .foregroundStyle(MegrumTheme.lavender)
+                .frame(width: 48, height: 48)
+                .background {
+                    Circle()
+                        .fill(.regularMaterial)
+                }
+                .overlay {
+                    Circle()
+                        .stroke(.white.opacity(0.66), lineWidth: 1)
+                }
+                .shadow(color: MegrumTheme.ink.opacity(0.12), radius: 12, y: 6)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("グルームとチャットルームの通知設定")
     }
 }
 

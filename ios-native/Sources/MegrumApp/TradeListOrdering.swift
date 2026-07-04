@@ -24,7 +24,8 @@ enum TradeListOrdering {
         _ proposals: [TradeProposal],
         viewerID: UUID?,
         messagesByProposalID: [UUID: [TradeMessage]],
-        viewerReadAtByProposalID: [UUID: Date] = [:]
+        viewerReadAtByProposalID: [UUID: Date] = [:],
+        evaluatedProposalIDs: Set<UUID> = []
     ) -> [TradeProposal] {
         proposals.sorted {
             isOrderedBefore(
@@ -32,7 +33,8 @@ enum TradeListOrdering {
                 rhs: $1,
                 viewerID: viewerID,
                 messagesByProposalID: messagesByProposalID,
-                viewerReadAtByProposalID: viewerReadAtByProposalID
+                viewerReadAtByProposalID: viewerReadAtByProposalID,
+                evaluatedProposalIDs: evaluatedProposalIDs
             )
         }
     }
@@ -52,7 +54,8 @@ enum TradeListOrdering {
         rhs: TradeProposal,
         viewerID: UUID?,
         messagesByProposalID: [UUID: [TradeMessage]],
-        viewerReadAtByProposalID: [UUID: Date]
+        viewerReadAtByProposalID: [UUID: Date],
+        evaluatedProposalIDs: Set<UUID> = []
     ) -> Bool {
         let lhsActivityAt = lastActivityAt(for: lhs, messagesByProposalID: messagesByProposalID)
         let rhsActivityAt = lastActivityAt(for: rhs, messagesByProposalID: messagesByProposalID)
@@ -61,14 +64,16 @@ enum TradeListOrdering {
             viewerID: viewerID,
             messages: messagesByProposalID[lhs.id] ?? [],
             lastActivityAt: lhsActivityAt,
-            viewerLastReadAt: viewerReadAtByProposalID[lhs.id]
+            viewerLastReadAt: viewerReadAtByProposalID[lhs.id],
+            viewerHasSubmittedEvaluation: evaluatedProposalIDs.contains(lhs.id)
         )
         let rhsReadPriority = readPriority(
             for: rhs,
             viewerID: viewerID,
             messages: messagesByProposalID[rhs.id] ?? [],
             lastActivityAt: rhsActivityAt,
-            viewerLastReadAt: viewerReadAtByProposalID[rhs.id]
+            viewerLastReadAt: viewerReadAtByProposalID[rhs.id],
+            viewerHasSubmittedEvaluation: evaluatedProposalIDs.contains(rhs.id)
         )
         if lhsReadPriority != rhsReadPriority {
             return lhsReadPriority < rhsReadPriority
@@ -86,12 +91,14 @@ enum TradeListOrdering {
         viewerID: UUID?,
         messages: [TradeMessage],
         lastActivityAt: Date,
-        viewerLastReadAt: Date?
+        viewerLastReadAt: Date?,
+        viewerHasSubmittedEvaluation: Bool = false
     ) -> Int {
         if TradeEvaluationAttentionPolicy.needsViewerEvaluation(
             proposal: proposal,
             viewerID: viewerID,
-            messages: messages
+            messages: messages,
+            localSubmission: viewerHasSubmittedEvaluation
         ) {
             return 0
         }

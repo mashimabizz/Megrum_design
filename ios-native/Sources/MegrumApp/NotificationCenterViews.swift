@@ -119,8 +119,12 @@ extension MegrumNotificationKind {
             "heart"
         case .groomReply, .meguriMessage:
             "message"
+        case .groomPosted:
+            "sparkles"
         case .meguriBoardReply, .meguriBoardMention:
             "text.bubble"
+        case .meguriBoardPosted:
+            "text.bubble.badge.clock"
         case .adminAnnouncement:
             "megaphone"
         case .unknown:
@@ -152,7 +156,8 @@ extension MegrumNotificationKind {
              .disputeReceived, .disputeResponded, .disputeClosed, .cancelRequested,
              .expiresSoon:
             true
-        case .groomLiked, .groomReply, .meguriMessage, .meguriBoardReply, .meguriBoardMention,
+        case .groomLiked, .groomReply, .groomPosted, .meguriMessage,
+             .meguriBoardReply, .meguriBoardMention, .meguriBoardPosted,
              .adminAnnouncement, .unknown:
             false
         }

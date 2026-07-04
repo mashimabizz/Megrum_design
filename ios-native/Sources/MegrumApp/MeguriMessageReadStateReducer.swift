@@ -26,8 +26,7 @@ public struct MeguriMessageThread: Identifiable, Hashable, Sendable {
     public var unreadCount: Int
 
     public var id: String {
-        let sourceID = sourceGroomPostID?.uuidString.lowercased() ?? "direct"
-        return "\(peerID.uuidString.lowercased()):\(sourceID)"
+        MeguriMessageReadStateReducer.threadID(for: conversationKey)
     }
 
     public var lastMessagePreview: String {
@@ -135,23 +134,64 @@ public enum MeguriMessageReadStateReducer {
         }
     }
 
-    public static func unreadIncomingCount(_ messages: [MeguriMessage], viewerID: UUID) -> Int {
-        messages.filter { message in
-            message.recipientID == viewerID
-                && message.senderID != viewerID
-                && message.readAt == nil
-        }.count
+    public static func threadID(for key: MeguriMessageConversationKey) -> String {
+        let sourceID = key.sourceGroomPostID?.uuidString.lowercased() ?? "direct"
+        return "\(key.peerID.uuidString.lowercased()):\(sourceID)"
     }
 
-    public static func pendingReplyThreadCount(_ messages: [MeguriMessage], viewerID: UUID) -> Int {
-        let grouped = Dictionary(grouping: messages) { conversationKey(for: $0, viewerID: viewerID) }
+    /// バッジ用の未読数。一覧でローカル非表示（削除）にしたスレッドは、
+    /// 一覧の表示と同じ基準（非表示後の新着があれば復活）で除外する。
+    public static func unreadIncomingCount(
+        _ messages: [MeguriMessage],
+        viewerID: UUID,
+        hiddenThreadEntries: [String: Date] = [:]
+    ) -> Int {
+        countableThreadMessages(
+            messages,
+            viewerID: viewerID,
+            hiddenThreadEntries: hiddenThreadEntries
+        ).reduce(0) { count, group in
+            count + group.messages.filter { message in
+                message.recipientID == viewerID
+                    && message.senderID != viewerID
+                    && message.readAt == nil
+            }.count
+        }
+    }
 
-        return grouped.values.reduce(0) { count, messages in
-            guard let lastMessage = messages.max(by: { $0.createdAt < $1.createdAt }) else {
-                return count
-            }
-            let needsReply = lastMessage.recipientID == viewerID && lastMessage.senderID != viewerID
+    public static func pendingReplyThreadCount(
+        _ messages: [MeguriMessage],
+        viewerID: UUID,
+        hiddenThreadEntries: [String: Date] = [:]
+    ) -> Int {
+        countableThreadMessages(
+            messages,
+            viewerID: viewerID,
+            hiddenThreadEntries: hiddenThreadEntries
+        ).reduce(0) { count, group in
+            let needsReply = group.lastMessage.recipientID == viewerID
+                && group.lastMessage.senderID != viewerID
             return needsReply ? count + 1 : count
+        }
+    }
+
+    private static func countableThreadMessages(
+        _ messages: [MeguriMessage],
+        viewerID: UUID,
+        hiddenThreadEntries: [String: Date]
+    ) -> [(lastMessage: MeguriMessage, messages: [MeguriMessage])] {
+        let grouped = Dictionary(grouping: messages) { conversationKey(for: $0, viewerID: viewerID) }
+        return grouped.compactMap { key, messages in
+            guard let lastMessage = messages.max(by: { $0.createdAt < $1.createdAt }) else {
+                return nil
+            }
+            guard !MeguriHiddenThreadStore.isHidden(
+                lastMessageAt: lastMessage.createdAt,
+                hiddenAt: hiddenThreadEntries[threadID(for: key)]
+            ) else {
+                return nil
+            }
+            return (lastMessage, messages)
         }
     }
 

@@ -43,12 +43,24 @@ public extension MegrumRepository {
         throw MegrumRepositoryError.unsupportedMutation
     }
 
+    func loadViewerEvaluatedProposalIDs() async throws -> Set<UUID> {
+        []
+    }
+
     func fileTradeDispute(_ input: TradeDisputeCreateInput) async throws -> TradeDisputeTicket {
         throw MegrumRepositoryError.unsupportedMutation
     }
 
     func loadMessages(proposalID: UUID, limit: Int) async throws -> [TradeMessage] {
         []
+    }
+
+    func loadTradeMessagesBulk(proposalIDs: [UUID]) async throws -> [UUID: [TradeMessage]] {
+        [:]
+    }
+
+    func loadViewerProposalReadStates(proposalIDs: [UUID]) async throws -> [UUID: Date] {
+        [:]
     }
 
     func loadProposalReadState(proposalID: UUID, userID: UUID) async throws -> ProposalReadState? {

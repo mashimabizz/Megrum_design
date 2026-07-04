@@ -69,6 +69,11 @@ struct GroomArchiveStoryScreen: View {
                     .onTapGesture { move(by: 1) }
             }
 
+            Color.black
+                .frame(height: GroomViewerChromeLayout.topObstructionHeight(safeAreaTop: 0))
+                .frame(maxHeight: .infinity, alignment: .top)
+                .allowsHitTesting(false)
+
             VStack(spacing: 0) {
                 HStack(spacing: 6) {
                     ForEach(grooms.indices, id: \.self) { index in
@@ -78,7 +83,6 @@ struct GroomArchiveStoryScreen: View {
                     }
                 }
                 .padding(.horizontal, 14)
-                .padding(.top, 14)
 
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
@@ -127,6 +131,7 @@ struct GroomArchiveStoryScreen: View {
                 .padding(.horizontal, 18)
                 .padding(.bottom, 28)
             }
+            .padding(.top, GroomViewerChromeLayout.topPadding(safeAreaTop: 0))
         }
         .gesture(
             DragGesture(minimumDistance: 12)

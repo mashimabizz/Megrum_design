@@ -35,7 +35,8 @@ struct TradesScreen: View {
             proposals.filter { stage.contains($0.status) },
             viewerID: appState.viewer?.id,
             messagesByProposalID: messagesByProposalID,
-            viewerReadAtByProposalID: viewerReadAtByProposalID
+            viewerReadAtByProposalID: viewerReadAtByProposalID,
+            evaluatedProposalIDs: appState.viewerEvaluatedProposalIDs
         )
     }
 
@@ -58,7 +59,8 @@ struct TradesScreen: View {
             proposals: proposals,
             messagesByProposalID: messagesByProposalID,
             viewerReadAtByProposalID: viewerReadAtByProposalID,
-            viewerID: appState.viewer?.id
+            viewerID: appState.viewer?.id,
+            evaluatedProposalIDs: appState.viewerEvaluatedProposalIDs
         )
     }
 
@@ -75,6 +77,7 @@ struct TradesScreen: View {
                             goodsByID: goodsByID,
                             messagesByProposalID: messagesByProposalID,
                             viewerReadAtByProposalID: viewerReadAtByProposalID,
+                            evaluatedProposalIDs: appState.viewerEvaluatedProposalIDs,
                             isSelectingPendingProposals: isSelectingPendingProposals,
                             selectedPendingProposalIDs: presentationState.selectedPendingProposalIDs,
                             adDisplayContext: adDisplayContext,

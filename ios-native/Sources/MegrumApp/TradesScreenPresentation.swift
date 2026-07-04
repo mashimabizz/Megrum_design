@@ -14,7 +14,8 @@ struct TradeStageAttentionCounts: Equatable {
         proposals: [TradeProposal],
         messagesByProposalID: [UUID: [TradeMessage]],
         viewerReadAtByProposalID: [UUID: Date],
-        viewerID: UUID?
+        viewerID: UUID?,
+        evaluatedProposalIDs: Set<UUID> = []
     ) {
         guard let viewerID else {
             pendingNeedsResponse = 0
@@ -50,7 +51,8 @@ struct TradeStageAttentionCounts: Equatable {
             TradeEvaluationAttentionPolicy.needsViewerEvaluation(
                 proposal: proposal,
                 viewerID: viewerID,
-                messages: messagesByProposalID[proposal.id] ?? []
+                messages: messagesByProposalID[proposal.id] ?? [],
+                localSubmission: evaluatedProposalIDs.contains(proposal.id)
             )
         }.count
     }

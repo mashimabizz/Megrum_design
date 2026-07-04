@@ -57,6 +57,7 @@ extension TradeDetailScreen {
             viewerID: viewerID,
             messages: messages,
             localSubmission: interactionState.didSubmitEvaluation
+                || appState.viewerEvaluatedProposalIDs.contains(currentProposal.id)
         )
     }
 

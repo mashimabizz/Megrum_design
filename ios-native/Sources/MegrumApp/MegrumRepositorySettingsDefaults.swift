@@ -68,6 +68,17 @@ public extension MegrumRepository {
         UserNotificationSettings(chatroomActivityPushEnabled: enabled)
     }
 
+    func setMeguriSubscriptionPushSettings(_ input: MeguriSubscriptionPushSettingsInput) async throws -> UserNotificationSettings {
+        UserNotificationSettings(
+            groomOshiPushEnabled: input.groomOshiPushEnabled,
+            groomNearbyPushEnabled: input.groomNearbyPushEnabled,
+            chatroomOshiPushEnabled: input.chatroomOshiPushEnabled,
+            chatroomNearbyPushEnabled: input.chatroomNearbyPushEnabled
+        )
+    }
+
+    func updatePushNotificationLocation(latitude: Double, longitude: Double) async throws {}
+
     func registerNativePushDeviceToken(_ token: String, appVersion: String?) async throws {}
 
     func revokeNativePushDeviceToken(_ token: String, revokedAt: Date) async throws {}

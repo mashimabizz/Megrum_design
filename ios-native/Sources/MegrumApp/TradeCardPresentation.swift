@@ -20,6 +20,7 @@ struct TradeCardPresentation: Equatable {
         messages: [TradeMessage] = [],
         lastActivityAt: Date? = nil,
         viewerLastReadAt: Date? = nil,
+        viewerHasSubmittedEvaluation: Bool = false,
         now: Date = .now
     ) {
         let partnerID = viewerID.flatMap { proposal.partnerID(for: $0) }
@@ -51,7 +52,8 @@ struct TradeCardPresentation: Equatable {
         self.needsEvaluationAttention = TradeEvaluationAttentionPolicy.needsViewerEvaluation(
             proposal: proposal,
             viewerID: viewerID,
-            messages: messages
+            messages: messages,
+            localSubmission: viewerHasSubmittedEvaluation
         )
         let conditionSummary = TradeExchangeConditionSummary.make(for: proposal)
         self.meetupSummaryText = conditionSummary.text

@@ -43,12 +43,24 @@ public extension SupabaseMegrumRepository {
         try await proposalClient.submitEvaluation(userID: viewerID, input: input)
     }
 
+    func loadViewerEvaluatedProposalIDs() async throws -> Set<UUID> {
+        try await proposalClient.loadEvaluatedProposalIDs(raterID: viewerID)
+    }
+
     func fileTradeDispute(_ input: TradeDisputeCreateInput) async throws -> TradeDisputeTicket {
         try await disputeClient.createDispute(userID: viewerID, input: input)
     }
 
     func loadMessages(proposalID: UUID, limit: Int) async throws -> [TradeMessage] {
         try await messageClient.loadMessages(proposalID: proposalID, limit: limit)
+    }
+
+    func loadTradeMessagesBulk(proposalIDs: [UUID]) async throws -> [UUID: [TradeMessage]] {
+        try await messageClient.loadMessagesBulk(proposalIDs: proposalIDs)
+    }
+
+    func loadViewerProposalReadStates(proposalIDs: [UUID]) async throws -> [UUID: Date] {
+        try await messageClient.loadReadStates(proposalIDs: proposalIDs, userID: viewerID)
     }
 
     func loadProposalReadState(proposalID: UUID, userID: UUID) async throws -> ProposalReadState? {

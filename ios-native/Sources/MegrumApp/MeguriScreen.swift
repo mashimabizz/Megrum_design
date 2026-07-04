@@ -43,6 +43,7 @@ struct MeguriScreen: View {
     @State var toastID = UUID()
     @State var contentFilter = MeguriContentFilterState()
     @State var isShowingContentFilter = false
+    @State var isShowingNotificationSettings = false
     @State var outOfRangeAlertMessage = ""
     @State var isShowingOutOfRangeAlert = false
     @State var boardSheetDetent: MeguriBoardSheetDetent = .compact
@@ -106,7 +107,8 @@ struct MeguriScreen: View {
             onCancelPendingCreationCoordinate: dismissPendingMapCreationCoordinate,
             onNoticeAction: handleLocationNoticeAction,
             onOpenGroomArchive: { isShowingGroomArchive = true },
-            onOpenMeguriProfile: { isShowingMeguriProfileSettings = true }
+            onOpenMeguriProfile: { isShowingMeguriProfileSettings = true },
+            onOpenNotificationSettings: { isShowingNotificationSettings = true }
         )
         .allowsHitTesting(!isShowingGroomArchive)
         .ignoresSafeArea(.container, edges: .bottom)
@@ -159,6 +161,16 @@ struct MeguriScreen: View {
         .sheet(isPresented: $isShowingMeguriProfileSettings) {
             NavigationStack {
                 MeguriProfileSettingsSheet(appState: appState)
+            }
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $isShowingNotificationSettings) {
+            NavigationStack {
+                MeguriNotificationSettingsSheet(
+                    appState: appState,
+                    currentCoordinate: locationState.coordinate
+                )
             }
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)

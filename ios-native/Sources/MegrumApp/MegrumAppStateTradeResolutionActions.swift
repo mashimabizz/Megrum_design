@@ -25,12 +25,25 @@ extension MegrumAppState {
                 )
             )
             submittingEvaluationProposalID = nil
+            viewerEvaluatedProposalIDs.insert(proposalID)
             appendLocalEvaluationNoticeIfNeeded(proposalID: proposalID, body: body, evaluation: evaluation)
             return true
         } catch {
             errorMessage = "評価を送信できませんでした"
             submittingEvaluationProposalID = nil
             return false
+        }
+    }
+
+    /// 自分の評価済み proposal ID をサーバーから取得する。
+    /// 失敗時は現状維持（メッセージ由来の判定にフォールバック）。
+    public func loadViewerEvaluatedProposalIDs() async {
+        do {
+            viewerEvaluatedProposalIDs = try await repository.loadViewerEvaluatedProposalIDs()
+        } catch {
+            #if DEBUG
+            MegrumAppLogger.general.debug("Megrum evaluated proposal ids load failed: \(String(describing: error), privacy: .public)")
+            #endif
         }
     }
 

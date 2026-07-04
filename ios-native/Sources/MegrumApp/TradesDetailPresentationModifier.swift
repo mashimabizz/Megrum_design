@@ -70,7 +70,7 @@ struct TradeDetailSlidePresentationOverlay: View {
 
     @ViewBuilder
     private func detailView(for route: TradeDetailRoute) -> some View {
-        MegrumDeferredContent {
+        MegrumDeferredContent(delayNanoseconds: MegrumDeferredContentDelay.slidePresentation) {
             NavigationStack {
                 if let proposal = proposals.first(where: { $0.id == route.proposalID }) {
                     TradeDetailScreen(appState: appState, proposal: proposal)

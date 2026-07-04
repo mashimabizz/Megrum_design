@@ -15,6 +15,7 @@ struct TradeCard: View {
     var messages: [TradeMessage] = []
     var lastActivityAt: Date?
     var viewerLastReadAt: Date?
+    var viewerHasSubmittedEvaluation = false
     var isSelectionMode = false
     var isSelected = false
     var isSelectionEnabled = false
@@ -28,7 +29,8 @@ struct TradeCard: View {
             profilesByUserID: profilesByUserID,
             messages: messages,
             lastActivityAt: lastActivityAt,
-            viewerLastReadAt: viewerLastReadAt
+            viewerLastReadAt: viewerLastReadAt,
+            viewerHasSubmittedEvaluation: viewerHasSubmittedEvaluation
         )
     }
 

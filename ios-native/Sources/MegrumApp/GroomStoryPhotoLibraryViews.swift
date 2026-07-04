@@ -29,9 +29,13 @@ struct GroomPhotoLibraryAsset: Identifiable, Equatable {
         PHAsset.fetchAssets(withLocalIdentifiers: [id], options: nil).firstObject
     }
 
-    static func fetchRecent(limit: Int) -> [GroomPhotoLibraryAsset] {
+    /// `limit <= 0` で全件取得。サムネイルは LazyVGrid で遅延読込されるため、
+    /// 識別子の全件列挙だけなら大規模ライブラリでも軽い。
+    static func fetchRecent(limit: Int = 0) -> [GroomPhotoLibraryAsset] {
         let options = PHFetchOptions()
-        options.fetchLimit = limit
+        if limit > 0 {
+            options.fetchLimit = limit
+        }
         options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
         options.predicate = NSPredicate(format: "mediaType == %d", PHAssetMediaType.image.rawValue)
         let result = PHAsset.fetchAssets(with: .image, options: options)

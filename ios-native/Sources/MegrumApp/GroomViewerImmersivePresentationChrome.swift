@@ -45,12 +45,14 @@ extension View {
     @ViewBuilder
     func megrumGroomViewerImmersivePresentationChrome() -> some View {
         #if os(iOS)
+        // preferredColorScheme(.dark) はシーン全体をダーク化して
+        // 閉じた時にライトへ戻るちらつきを生むため、環境値でビューア
+        // サブツリーだけをダーク扱いにする。
         self
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color.black.ignoresSafeArea(.container, edges: .top))
             .ignoresSafeArea(.container, edges: .top)
-            .presentationBackground(.black)
-            .preferredColorScheme(.dark)
+            .environment(\.colorScheme, .dark)
         #else
         self
             .frame(maxWidth: .infinity, maxHeight: .infinity)
