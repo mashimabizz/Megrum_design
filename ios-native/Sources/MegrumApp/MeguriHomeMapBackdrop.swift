@@ -229,7 +229,7 @@ struct MeguriHomeMapBackdrop: View {
                             case .cluster(let cluster):
                                 Annotation("", coordinate: coordinate) {
                                     Button {
-                                        zoomToSplit(cluster)
+                                        zoomToSplit(cluster, containerSize: geometry.size)
                                     } label: {
                                         MeguriPinConditionalPopIn(popsIn: displayed.popsIn) {
                                             MeguriFloatingMotion(seed: cluster.id.hashValue) {
@@ -346,11 +346,19 @@ private extension MeguriHomeMapBackdrop {
     }
 
     /// クラスタタップ：数個程度に分解されるスパンまで、中間地点中心に拡大する。
-    func zoomToSplit(_ cluster: MeguriMapClusterBuilder.Cluster) {
+    func zoomToSplit(_ cluster: MeguriMapClusterBuilder.Cluster, containerSize: CGSize) {
+        // 分解しきい値は表示後の latitudeDelta で決まる。縦長画面で
+        // region を指定すると「全体が収まるように」広がり、実際の
+        // latitudeDelta は longitudeDelta × (縦/横) まで拡大されるため、
+        // 目標値がそのまま維持されるように longitudeDelta 側を縮めて
+        // 指定する（+ わずかな安全マージン）。
         let targetSpan = MeguriMapClusterBuilder.splitSpan(
             for: cluster,
             currentSpanLatitudeDelta: visibleSpanLatitudeDelta
-        )
+        ) * 0.9
+        let aspect = containerSize.width > 0 && containerSize.height > 0
+            ? max(containerSize.height / containerSize.width, 1)
+            : 2.2
         withAnimation(.smooth(duration: 0.34)) {
             cameraPosition = .region(
                 MKCoordinateRegion(
@@ -358,10 +366,17 @@ private extension MeguriHomeMapBackdrop {
                         latitude: cluster.latitude,
                         longitude: cluster.longitude
                     ),
-                    span: MKCoordinateSpan(latitudeDelta: targetSpan, longitudeDelta: targetSpan)
+                    span: MKCoordinateSpan(
+                        latitudeDelta: targetSpan,
+                        longitudeDelta: targetSpan / aspect
+                    )
                 )
             )
         }
+        // カメラの settle を待たずに分解を始める（onMapCameraChange(.onEnd)
+        // が発火しないケースの保険にもなる）。
+        visibleSpanLatitudeDelta = targetSpan
+        recomputeDisplayElements()
     }
 
     func isAnnotationTap(at location: CGPoint, in proxy: MapProxy) -> Bool {
