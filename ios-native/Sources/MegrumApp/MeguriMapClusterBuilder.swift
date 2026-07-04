@@ -184,20 +184,36 @@ enum MeguriMapClusterBuilder {
     /// 分解される最初のスパンを返す。分解されたマーカーが視界に収まるよう、
     /// クラスタ内の広がりよりは狭くしない。
     static func splitSpan(for cluster: Cluster, currentSpanLatitudeDelta: Double) -> Double {
+        func splitCount(at span: Double) -> Int {
+            elements(items: cluster.items, spanLatitudeDelta: span).count
+        }
+
+        // 最低でも1段は分解されるスパンまで必ず狭める。
+        // （全メンバーが同一座標の場合だけは分解不能なので下限で打ち切る）
         var span = max(currentSpanLatitudeDelta, minimumSplitSpan)
-        for _ in 0..<10 {
+        var splittingSpan: Double?
+        for _ in 0..<28 {
             span /= 2
-            if span <= minimumSplitSpan {
-                return minimumSplitSpan
+            if splitCount(at: span) >= desiredSplitRange.lowerBound {
+                splittingSpan = span
+                break
             }
-            let split = elements(items: cluster.items, spanLatitudeDelta: span)
-            if split.count >= desiredSplitRange.lowerBound {
-                // 分解後のマーカーの広がり（緯度・経度差）が視界に収まるように調整。
-                let spread = coordinateSpread(of: cluster)
-                return max(span, spread * 1.6, minimumSplitSpan)
+            if span < minimumSplitSpan / 1_000 {
+                break
             }
         }
-        return max(span, minimumSplitSpan)
+        guard let splittingSpan else {
+            return minimumSplitSpan
+        }
+
+        // 分解後のマーカーの広がりが視界に収まるよう少し引いて見せたいが、
+        // 引いた結果また統合されてしまうなら分解を優先する。
+        let spread = coordinateSpread(of: cluster)
+        let widened = max(splittingSpan, spread * 1.6, minimumSplitSpan)
+        if widened > splittingSpan, splitCount(at: widened) >= desiredSplitRange.lowerBound {
+            return widened
+        }
+        return splittingSpan
     }
 
     private static func coordinateSpread(of cluster: Cluster) -> Double {

@@ -129,4 +129,20 @@ final class MeguriMapClusterBuilderTests: XCTestCase {
         XCTAssertEqual(farCluster.count, 3)
         XCTAssertTrue(Set(midCluster?.items.map(\.id) ?? []).isSubset(of: Set(farCluster.items.map(\.id))))
     }
+
+    func testSplitSpanAlwaysSplitsTightClusters() {
+        // 非常に近い（約30m）2件でも、タップ後のスパンで必ず分解される。
+        let grooms = [
+            makeGroom(idSuffix: "001", latitude: 35.00000, longitude: 139.00000),
+            makeGroom(idSuffix: "002", latitude: 35.00030, longitude: 139.00030)
+        ]
+        let merged = MeguriMapClusterBuilder.elements(grooms: grooms, threads: [], spanLatitudeDelta: 0.05)
+        guard case .cluster(let cluster) = merged.first else {
+            XCTFail("expected cluster")
+            return
+        }
+        let span = MeguriMapClusterBuilder.splitSpan(for: cluster, currentSpanLatitudeDelta: 0.05)
+        let after = MeguriMapClusterBuilder.elements(items: cluster.items, spanLatitudeDelta: span)
+        XCTAssertGreaterThanOrEqual(after.count, 2, "タップ後のスパンでは最低1段分解される")
+    }
 }
