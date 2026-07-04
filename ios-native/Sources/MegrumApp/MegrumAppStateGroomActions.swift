@@ -50,6 +50,56 @@ extension MegrumAppState {
         }
     }
 
+    /// めぐり地図のビューポート追加読み込み。表示範囲＋αのグルームとスレッドを
+    /// 取得し、既存のピンへマージする（置き換えない）。読み込み中も地図操作は
+    /// 止めない。失敗しても表示中の内容は変えない。
+    public func loadMeguriMapViewport(
+        latitude: Double,
+        longitude: Double,
+        radiusMeters: Int,
+        prefecture: String?,
+        scope: BoardThread.Audience
+    ) async {
+        guard !isLoadingMeguriViewport else {
+            return
+        }
+        isLoadingMeguriViewport = true
+        defer {
+            isLoadingMeguriViewport = false
+        }
+        async let groomsTask = try? repository.loadGroomMapPosts(
+            latitude: latitude,
+            longitude: longitude,
+            radiusMeters: radiusMeters
+        )
+        async let threadsTask = try? repository.loadBoardThreads(
+            latitude: latitude,
+            longitude: longitude,
+            prefecture: prefecture,
+            scope: scope,
+            allowsExtendedBoardAccess: subscriptionState.hasMeguriBoardExtendedAccess
+        )
+        let (loadedGrooms, loadedThreads) = await (groomsTask, threadsTask)
+
+        if let loadedGrooms {
+            groomMapPosts = Self.mergingByID(existing: groomMapPosts, incoming: loadedGrooms)
+            await loadMeguriProfiles(userIDs: Set(loadedGrooms.map(\.authorID)), reportsFailure: false)
+        }
+        if let loadedThreads {
+            threads = Self.mergingByID(existing: threads, incoming: loadedThreads)
+        }
+    }
+
+    private static func mergingByID<Item: Identifiable>(existing: [Item], incoming: [Item]) -> [Item] {
+        var merged = incoming
+        var seen = Set(incoming.map(\.id))
+        for item in existing where !seen.contains(item.id) {
+            seen.insert(item.id)
+            merged.append(item)
+        }
+        return merged
+    }
+
     public func loadGroomArchive(limit: Int = MegrumPlusLimits.defaultGroomArchivePageLimit) async {
         guard !isLoadingGroomArchive else {
             return

@@ -7,11 +7,16 @@ extension MeguriScreen {
         guard !VisualQAPreviewMode.isEnabled(environment: ProcessInfo.processInfo.environment) else {
             return
         }
-        if let coordinate = locationState.coordinate {
-            shouldCenterHomeMapWhenLocationArrives = false
-            centerHomeMap(on: coordinate, animated: false)
-        } else {
-            shouldCenterHomeMapWhenLocationArrives = true
+        // センタリングは起動後の初回表示だけ。タブを離れて戻った時は
+        // 直前に見ていた位置・ズームを維持する。
+        if !didAutoCenterHomeMap {
+            if let coordinate = locationState.coordinate {
+                didAutoCenterHomeMap = true
+                shouldCenterHomeMapWhenLocationArrives = false
+                centerHomeMap(on: coordinate, animated: false)
+            } else {
+                shouldCenterHomeMapWhenLocationArrives = true
+            }
         }
         locationState.startUpdatingCurrentLocation()
     }
@@ -19,6 +24,7 @@ extension MeguriScreen {
     func handleCoordinateChange(_ coordinate: MegrumLocationCoordinate) {
         if shouldCenterHomeMapWhenLocationArrives {
             shouldCenterHomeMapWhenLocationArrives = false
+            didAutoCenterHomeMap = true
             centerHomeMap(on: coordinate, animated: true)
         }
 
@@ -121,6 +127,43 @@ extension MeguriScreen {
                 coordinate: locationState.coordinate
             )
         )
+    }
+
+    /// 地図の表示範囲が変わった時のビューポート読み込み。
+    /// 直前の取得範囲でおおむねカバーされている場合は再取得しない。
+    func handleViewportChange(_ region: MKCoordinateRegion) {
+        let center = MegrumLocationCoordinate(
+            latitude: region.center.latitude,
+            longitude: region.center.longitude
+        )
+        let halfHeightMeters = region.span.latitudeDelta * 111_000 / 2
+        let halfWidthMeters = region.span.longitudeDelta * 111_000
+            * cos(region.center.latitude * .pi / 180) / 2
+        let viewportRadius = (halfHeightMeters * halfHeightMeters + halfWidthMeters * halfWidthMeters)
+            .squareRoot()
+        let fetchRadius = min(max(viewportRadius * 1.4, 1_000), 100_000)
+
+        if let lastCenter = lastViewportFetchCenter {
+            let moved = CLLocation(latitude: lastCenter.latitude, longitude: lastCenter.longitude)
+                .distance(from: CLLocation(latitude: center.latitude, longitude: center.longitude))
+            let isCovered = moved < lastViewportFetchRadiusMeters * 0.35
+                && fetchRadius <= lastViewportFetchRadiusMeters * 1.25
+            if isCovered {
+                return
+            }
+        }
+        lastViewportFetchCenter = center
+        lastViewportFetchRadiusMeters = fetchRadius
+
+        Task {
+            await appState.loadMeguriMapViewport(
+                latitude: center.latitude,
+                longitude: center.longitude,
+                radiusMeters: Int(fetchRadius),
+                prefecture: selectedBoardPrefecture,
+                scope: selectedBoardScope
+            )
+        }
     }
 
     func centerHomeMapOnCurrentLocation() {

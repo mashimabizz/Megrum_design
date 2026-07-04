@@ -18,6 +18,22 @@ struct MeguriHomeMapBackdrop: View {
     var onCreateGroomAtPendingCoordinate: () -> Void
     var onCreateThreadAtPendingCoordinate: () -> Void
     var onCancelPendingCreationCoordinate: () -> Void
+    var onViewportChange: (MKCoordinateRegion) -> Void = { _ in }
+
+    /// 表示中スパン（クラスタリング粒度に使用）。カメラ操作の終了時に更新。
+    @State private var visibleSpanLatitudeDelta = MeguriHomeMapCamera.focusedSpan.latitudeDelta
+
+    private var displayElements: [MeguriMapClusterBuilder.Element] {
+        let visibleGrooms = (selectedKind == .all || selectedKind == .grooms) ? grooms : []
+        let visibleThreads = (selectedKind == .all || selectedKind == .boards)
+            ? threads.filter { $0.latitude != nil && $0.longitude != nil }
+            : []
+        return MeguriMapClusterBuilder.elements(
+            grooms: visibleGrooms,
+            threads: visibleThreads,
+            spanLatitudeDelta: visibleSpanLatitudeDelta
+        )
+    }
 
     var body: some View {
         GeometryReader { geometry in
@@ -37,8 +53,9 @@ struct MeguriHomeMapBackdrop: View {
                             }
                         }
 
-                        if selectedKind == .all || selectedKind == .grooms {
-                            ForEach(grooms) { groom in
+                        ForEach(displayElements) { element in
+                            switch element {
+                            case .single(.groom(let groom)):
                                 Annotation("", coordinate: groom.coordinate) {
                                     Button {
                                         onSelectGroom(
@@ -46,35 +63,59 @@ struct MeguriHomeMapBackdrop: View {
                                             sourceAnchor(for: groom, in: proxy, containerSize: geometry.size)
                                         )
                                     } label: {
-                                        GroomMapPin(
-                                            groom: groom,
-                                            isOutOfRange: !MeguriAccessPolicy.canOpenGroom(
-                                                groom,
-                                                currentCoordinate: currentCoordinate,
-                                                viewerID: viewerID
+                                        MeguriFloatingMotion(seed: groom.id.hashValue) {
+                                            GroomMapPin(
+                                                groom: groom,
+                                                isOutOfRange: !MeguriAccessPolicy.canOpenGroom(
+                                                    groom,
+                                                    currentCoordinate: currentCoordinate,
+                                                    viewerID: viewerID
+                                                )
                                             )
-                                        )
+                                        }
                                     }
                                     .buttonStyle(.plain)
                                 }
-                            }
-                        }
 
-                        if selectedKind == .all || selectedKind == .boards {
-                            ForEach(threads.compactMap(BoardMapAnnotation.init(thread:))) { annotation in
-                                Annotation(annotation.thread.title, coordinate: annotation.coordinate) {
+                            case .single(.thread(let thread)):
+                                if let annotation = BoardMapAnnotation(thread: thread) {
+                                    Annotation(thread.title, coordinate: annotation.coordinate) {
+                                        Button {
+                                            onSelectThread(thread)
+                                        } label: {
+                                            MeguriFloatingMotion(seed: thread.id.hashValue) {
+                                                BoardMapPin(
+                                                    thread: thread,
+                                                    isOutOfRange: !MeguriAccessPolicy.canOpenBoard(
+                                                        thread,
+                                                        currentCoordinate: currentCoordinate,
+                                                        viewerID: viewerID,
+                                                        subscriptionState: subscriptionState
+                                                    )
+                                                )
+                                            }
+                                        }
+                                        .buttonStyle(.plain)
+                                    }
+                                }
+
+                            case .cluster(let cluster):
+                                Annotation(
+                                    "",
+                                    coordinate: CLLocationCoordinate2D(
+                                        latitude: cluster.latitude,
+                                        longitude: cluster.longitude
+                                    )
+                                ) {
                                     Button {
-                                        onSelectThread(annotation.thread)
+                                        zoomToSplit(cluster)
                                     } label: {
-                                        BoardMapPin(
-                                            thread: annotation.thread,
-                                            isOutOfRange: !MeguriAccessPolicy.canOpenBoard(
-                                                annotation.thread,
-                                                currentCoordinate: currentCoordinate,
-                                                viewerID: viewerID,
-                                                subscriptionState: subscriptionState
+                                        MeguriFloatingMotion(seed: cluster.id.hashValue) {
+                                            GroomClusterMapPin(
+                                                count: cluster.count,
+                                                accessibilityText: "\(cluster.count)件のグルーム・チャットルーム"
                                             )
-                                        )
+                                        }
                                     }
                                     .buttonStyle(.plain)
                                 }
@@ -83,6 +124,10 @@ struct MeguriHomeMapBackdrop: View {
 
                     }
                     .mapStyle(.standard(elevation: .flat, emphasis: .muted))
+                    .onMapCameraChange(frequency: .onEnd) { context in
+                        visibleSpanLatitudeDelta = context.region.span.latitudeDelta
+                        onViewportChange(context.region)
+                    }
                     .simultaneousGesture(
                         SpatialTapGesture()
                             .onEnded { value in
@@ -174,29 +219,57 @@ private extension MeguriHomeMapBackdrop {
         )
     }
 
+    /// クラスタタップ：数個程度に分解されるスパンまで、中間地点中心に拡大する。
+    func zoomToSplit(_ cluster: MeguriMapClusterBuilder.Cluster) {
+        let targetSpan = MeguriMapClusterBuilder.splitSpan(
+            for: cluster,
+            currentSpanLatitudeDelta: visibleSpanLatitudeDelta
+        )
+        withAnimation(.smooth(duration: 0.34)) {
+            cameraPosition = .region(
+                MKCoordinateRegion(
+                    center: CLLocationCoordinate2D(
+                        latitude: cluster.latitude,
+                        longitude: cluster.longitude
+                    ),
+                    span: MKCoordinateSpan(latitudeDelta: targetSpan, longitudeDelta: targetSpan)
+                )
+            )
+        }
+    }
+
     func isAnnotationTap(at location: CGPoint, in proxy: MapProxy) -> Bool {
-        if selectedKind == .all || selectedKind == .grooms {
-            for groom in grooms {
-                guard let point = proxy.convert(groom.coordinate, to: .local) else {
+        for element in displayElements {
+            let coordinate: CLLocationCoordinate2D
+            let hitWidth: CGFloat
+            let hitHeight: CGFloat
+            switch element {
+            case .single(.groom(let groom)):
+                coordinate = groom.coordinate
+                hitWidth = 54
+                hitHeight = 64
+            case .single(.thread(let thread)):
+                guard let annotation = BoardMapAnnotation(thread: thread) else {
                     continue
                 }
-                if abs(location.x - point.x) <= 54, abs(location.y - point.y) <= 64 {
-                    return true
-                }
+                coordinate = annotation.coordinate
+                hitWidth = 116
+                hitHeight = 78
+            case .cluster(let cluster):
+                coordinate = CLLocationCoordinate2D(
+                    latitude: cluster.latitude,
+                    longitude: cluster.longitude
+                )
+                hitWidth = 58
+                hitHeight = 62
+            }
+            guard let point = proxy.convert(coordinate, to: .local) else {
+                continue
+            }
+            if abs(location.x - point.x) <= hitWidth, abs(location.y - point.y) <= hitHeight {
+                return true
             }
         }
-
-        if selectedKind == .all || selectedKind == .boards {
-            for annotation in threads.compactMap(BoardMapAnnotation.init(thread:)) {
-                guard let point = proxy.convert(annotation.coordinate, to: .local) else {
-                    continue
-                }
-                if abs(location.x - point.x) <= 116, abs(location.y - point.y) <= 78 {
-                    return true
-                }
-            }
-        }
-
         return false
     }
 }

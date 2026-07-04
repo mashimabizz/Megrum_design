@@ -295,7 +295,7 @@ final class GoodsGridLayoutTests: XCTestCase {
     }
 
     func testSelectionFooterUsesFixedGlassActionMetrics() {
-        XCTAssertEqual(GoodsSelectionFooterMetrics.bottomPadding, 24)
+        XCTAssertEqual(GoodsSelectionFooterMetrics.bottomPadding, 106)
         XCTAssertEqual(GoodsSelectionFooterMetrics.horizontalPadding, 18)
         XCTAssertEqual(GoodsSelectionFooterMetrics.cornerRadius, 28)
         XCTAssertEqual(GoodsSelectionFooterMetrics.actionHeight, 52)

@@ -185,9 +185,11 @@ final class SupabaseRequestParityTests: XCTestCase {
             "expires_soon",
             "groom_liked",
             "groom_reply",
+            "groom_posted",
             "meguri_message",
             "meguri_board_reply",
             "meguri_board_mention",
+            "meguri_board_posted",
             "admin_announcement"
         ]
         let requestKinds = Set(

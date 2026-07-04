@@ -48,6 +48,10 @@ struct MeguriScreen: View {
     @State var isShowingOutOfRangeAlert = false
     @State var boardSheetDetent: MeguriBoardSheetDetent = .compact
     @State var shouldCenterHomeMapWhenLocationArrives = false
+    /// 起動後にめぐりを最初に開いた時だけ現在地センタリングする（タブ復帰では維持）。
+    @State var didAutoCenterHomeMap = false
+    @State var lastViewportFetchCenter: MegrumLocationCoordinate?
+    @State var lastViewportFetchRadiusMeters: Double = 0
     @State var homeCameraPosition = MapCameraPosition.region(
         MKCoordinateRegion(
             center: CLLocationCoordinate2D(latitude: 35.7056, longitude: 139.7519),
@@ -108,7 +112,9 @@ struct MeguriScreen: View {
             onNoticeAction: handleLocationNoticeAction,
             onOpenGroomArchive: { isShowingGroomArchive = true },
             onOpenMeguriProfile: { isShowingMeguriProfileSettings = true },
-            onOpenNotificationSettings: { isShowingNotificationSettings = true }
+            onOpenNotificationSettings: { isShowingNotificationSettings = true },
+            isLoadingViewport: appState.isLoadingMeguriViewport,
+            onViewportChange: handleViewportChange
         )
         .allowsHitTesting(!isShowingGroomArchive)
         .ignoresSafeArea(.container, edges: .bottom)

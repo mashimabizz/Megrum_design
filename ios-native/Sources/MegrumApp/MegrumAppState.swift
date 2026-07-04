@@ -80,6 +80,8 @@ public final class MegrumAppState: ObservableObject {
     @Published public internal(set) var isRegisteringNativePushDevice = false
     @Published public internal(set) var isRevokingNativePushDevice = false
     @Published public internal(set) var isLoadingMeguri = false
+    /// めぐり地図のビューポート追加読み込み中（地図中央下の「読み込み中…」表示用）。
+    @Published public internal(set) var isLoadingMeguriViewport = false
     @Published public internal(set) var isLoadingMeguriProfile = false
     @Published public internal(set) var isSavingMeguriProfile = false
     @Published public internal(set) var isLoadingGroomMap = false

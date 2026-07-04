@@ -3,34 +3,62 @@ import MegrumCore
 import MegrumDesign
 import SwiftUI
 
+/// マーカーを不規則な周期でふわふわ上下させる共通ラッパー。
+/// 周期・振幅・開始タイミングは seed から決めるため、マーカーごとにズレる。
+struct MeguriFloatingMotion<Content: View>: View {
+    var seed: Int
+    @ViewBuilder var content: Content
+
+    @State private var isFloating = false
+
+    private var amplitude: CGFloat {
+        2.4 + CGFloat(abs(seed) % 4) * 0.7
+    }
+
+    private var duration: Double {
+        1.9 + Double(abs(seed) % 9) * 0.22
+    }
+
+    private var delay: Double {
+        Double(abs(seed) % 13) * 0.145
+    }
+
+    var body: some View {
+        content
+            .offset(y: isFloating ? -amplitude : amplitude)
+            .onAppear {
+                withAnimation(
+                    .easeInOut(duration: duration)
+                    .repeatForever(autoreverses: true)
+                    .delay(delay)
+                ) {
+                    isFloating = true
+                }
+            }
+    }
+}
+
 struct GroomMapPin: View {
     var groom: GroomPost
     var isOutOfRange: Bool
 
     var body: some View {
-        VStack(spacing: 0) {
-            GroomThumbnailCircle(url: groom.imageURL, size: 58)
-                .overlay(Circle().stroke(.white, lineWidth: 3))
-                .overlay(alignment: .bottomTrailing) {
-                    if isOutOfRange {
-                        Image(systemName: "lock.fill")
-                            .font(.system(size: 10, weight: .heavy))
-                            .foregroundStyle(MegrumTheme.ink)
-                            .frame(width: 21, height: 21)
-                            .background(.regularMaterial, in: Circle())
-                            .offset(x: 3, y: 3)
-                    }
+        GroomThumbnailCircle(url: groom.imageURL, size: 58)
+            .overlay(Circle().stroke(.white, lineWidth: 3))
+            .overlay(alignment: .bottomTrailing) {
+                if isOutOfRange {
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: 10, weight: .heavy))
+                        .foregroundStyle(MegrumTheme.ink)
+                        .frame(width: 21, height: 21)
+                        .background(.regularMaterial, in: Circle())
+                        .offset(x: 3, y: 3)
                 }
-                .shadow(color: MegrumTheme.ink.opacity(0.22), radius: 12, y: 8)
-                .saturation(isOutOfRange ? 0.25 : 1)
-                .opacity(isOutOfRange ? 0.68 : 1)
-
-            Triangle()
-                .fill(.white)
-                .frame(width: 14, height: 8)
-                .offset(y: -1)
-        }
-        .accessibilityLabel(isOutOfRange ? "1km圏外のグルーム" : "グルーム")
+            }
+            .shadow(color: MegrumTheme.ink.opacity(0.22), radius: 12, y: 8)
+            .saturation(isOutOfRange ? 0.25 : 1)
+            .opacity(isOutOfRange ? 0.68 : 1)
+            .accessibilityLabel(isOutOfRange ? "1km圏外のグルーム" : "グルーム")
     }
 }
 
@@ -68,11 +96,6 @@ struct BoardMapPin: View {
                         .offset(x: 5, y: -7)
                 }
             }
-
-            Triangle()
-                .fill(pinBackground)
-                .frame(width: 16, height: 9)
-                .offset(y: -1)
         }
         .shadow(color: MegrumTheme.ink.opacity(0.22), radius: 14, y: 8)
         .saturation(isOutOfRange ? 0.35 : 1)
@@ -154,43 +177,37 @@ private struct BoardMapPinThumbnail: View {
 
 struct GroomClusterMapPin: View {
     var count: Int
+    var accessibilityText: String?
 
     var body: some View {
-        VStack(spacing: 0) {
-            ZStack(alignment: .topTrailing) {
-                Text("Mg")
-                    .font(.system(size: 16, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
-                    .frame(width: 58, height: 48)
-                    .background(
-                        LinearGradient(
-                            colors: [MegrumTheme.lavender, MegrumTheme.pink],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        in: RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    )
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 18, style: .continuous)
-                            .stroke(.white, lineWidth: 3)
-                    }
+        ZStack(alignment: .topTrailing) {
+            Text("Mg")
+                .font(.system(size: 16, weight: .black, design: .rounded))
+                .foregroundStyle(.white)
+                .frame(width: 58, height: 48)
+                .background(
+                    LinearGradient(
+                        colors: [MegrumTheme.lavender, MegrumTheme.pink],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+                )
+                .overlay {
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .stroke(.white, lineWidth: 3)
+                }
 
-                Text("\(count)")
-                    .font(.system(size: 11, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
-                    .frame(minWidth: 22, minHeight: 22)
-                    .background(MegrumTheme.pink, in: Circle())
-                    .overlay(Circle().stroke(.white, lineWidth: 2))
-                    .offset(x: 8, y: -8)
-            }
-            .shadow(color: MegrumTheme.ink.opacity(0.22), radius: 12, y: 8)
-
-            Triangle()
-                .fill(.white)
-                .frame(width: 14, height: 8)
-                .offset(y: -1)
+            Text("\(count)")
+                .font(.system(size: 11, weight: .black, design: .rounded))
+                .foregroundStyle(.white)
+                .frame(minWidth: 22, minHeight: 22)
+                .background(Color.blue, in: Circle())
+                .overlay(Circle().stroke(.white, lineWidth: 2))
+                .offset(x: 8, y: -8)
         }
-        .accessibilityLabel("\(count)件のグルーム")
+        .shadow(color: MegrumTheme.ink.opacity(0.22), radius: 12, y: 8)
+        .accessibilityLabel(accessibilityText ?? "\(count)件のグルーム")
     }
 }
 
@@ -243,13 +260,3 @@ struct GroomMapCluster: Identifiable {
     }
 }
 
-private struct Triangle: Shape {
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        path.move(to: CGPoint(x: rect.midX, y: rect.maxY))
-        path.addLine(to: CGPoint(x: rect.minX, y: rect.minY))
-        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
-        path.closeSubpath()
-        return path
-    }
-}

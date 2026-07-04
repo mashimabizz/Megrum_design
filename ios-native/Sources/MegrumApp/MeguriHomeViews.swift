@@ -31,6 +31,8 @@ struct MeguriHomeContent: View {
     var onOpenGroomArchive: () -> Void
     var onOpenMeguriProfile: () -> Void
     var onOpenNotificationSettings: () -> Void = {}
+    var isLoadingViewport = false
+    var onViewportChange: (MKCoordinateRegion) -> Void = { _ in }
 
     var body: some View {
         GeometryReader { proxy in
@@ -49,9 +51,17 @@ struct MeguriHomeContent: View {
                     pendingCreationCoordinate: pendingCreationCoordinate,
                     onCreateGroomAtPendingCoordinate: onCreateGroomAtPendingCoordinate,
                     onCreateThreadAtPendingCoordinate: onCreateThreadAtPendingCoordinate,
-                    onCancelPendingCreationCoordinate: onCancelPendingCreationCoordinate
+                    onCancelPendingCreationCoordinate: onCancelPendingCreationCoordinate,
+                    onViewportChange: onViewportChange
                 )
                 .ignoresSafeArea()
+
+                if isLoadingViewport {
+                    MeguriToastView(message: "読み込み中…")
+                        .position(x: proxy.size.width / 2, y: proxy.size.height / 2 + 46)
+                        .allowsHitTesting(false)
+                        .transition(.opacity)
+                }
 
                 VStack(spacing: 0) {
                     HStack(alignment: .top, spacing: 10) {

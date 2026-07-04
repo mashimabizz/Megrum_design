@@ -56,10 +56,12 @@ final class GroomViewerPresentationTests: XCTestCase {
         )
     }
 
+    @MainActor
     func testGroomViewerChromeLayoutKeepsChromeBelowTopObstruction() {
-        XCTAssertEqual(GroomViewerChromeLayout.topPadding(safeAreaTop: 0), 86, accuracy: 0.0001)
-        XCTAssertEqual(GroomViewerChromeLayout.topPadding(safeAreaTop: 64), 86, accuracy: 0.0001)
+        // 黒帯はステータスバー実測高（テスト環境ではウィンドウなし=0）と
+        // 渡された safeAreaTop の大きい方。クロームはその 10pt 下から始まる。
+        XCTAssertEqual(GroomViewerChromeLayout.topObstructionHeight(safeAreaTop: 64), 64, accuracy: 0.0001)
+        XCTAssertEqual(GroomViewerChromeLayout.topPadding(safeAreaTop: 64), 74, accuracy: 0.0001)
         XCTAssertEqual(GroomViewerChromeLayout.topPadding(safeAreaTop: 88), 98, accuracy: 0.0001)
-        XCTAssertEqual(GroomViewerChromeLayout.topObstructionHeight(safeAreaTop: 64), 76, accuracy: 0.0001)
     }
 }

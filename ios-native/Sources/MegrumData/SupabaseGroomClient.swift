@@ -10,7 +10,9 @@ public final class SupabaseGroomClient: @unchecked Sendable {
     static let groomBucket = "groom-posts"
     static let maxUploadBytes = Int(9.5 * 1_024 * 1_024)
     static let maxFeedRadiusMeters = 1_000
-    static let maxMapRadiusMeters = 3_000
+    /// 地図のビューポート読み込み上限。サーバー側の list_groom_feed_nearby も
+    /// 100km で頭打ちにしている（20260704150000 migration）。
+    static let maxMapRadiusMeters = 100_000
     static let minRadiusMeters = 100
     let client: SupabaseRESTClient
     let signedURLCache = SupabaseGroomSignedURLCache()

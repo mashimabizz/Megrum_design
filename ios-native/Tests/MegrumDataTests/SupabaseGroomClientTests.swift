@@ -67,7 +67,7 @@ final class SupabaseGroomClientTests: XCTestCase {
         let body = try XCTUnwrap(request.httpBody)
         let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
 
-        XCTAssertEqual(json["p_radius_m"] as? Int, 3_000)
+        XCTAssertEqual(json["p_radius_m"] as? Int, 12_000)
     }
 
     func testBuildsDeleteGroomPostRequestAsHiddenStatusPatch() throws {
