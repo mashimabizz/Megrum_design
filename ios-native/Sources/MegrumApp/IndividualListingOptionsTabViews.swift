@@ -54,7 +54,7 @@ struct IndividualListingWishTab: View {
         VStack(alignment: .leading, spacing: 14) {
             IndividualListingSelectionSearchAndFilterBar(
                 filter: $filter,
-                searchPlaceholder: "Wishを検索",
+                searchPlaceholder: "ほしいものを検索",
                 groups: availableGroups,
                 goodsTypes: availableGoodsTypes,
                 tagNames: availableTagNames

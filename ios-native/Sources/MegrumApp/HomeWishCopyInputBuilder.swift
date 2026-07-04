@@ -2,8 +2,8 @@ import Foundation
 import MegrumCore
 
 enum HomeWishCopyInputBuilder {
-    static let successToastMessage = "Wishに登録しました"
-    static let failureToastMessage = "Wishに登録できませんでした"
+    static let successToastMessage = "ほしいものに登録しました"
+    static let failureToastMessage = "ほしいものに登録できませんでした"
 
     static func input(
         from goods: HomeMockGoods,

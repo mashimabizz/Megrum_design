@@ -230,7 +230,7 @@ struct GoodsEditorSheet: View {
                     previewItemsByTag: editorTagPreviewItemsByTag,
                     navigationTitle: "シリーズを登録",
                     textFieldPlaceholder: "例：会場限定",
-                    footerText: "このWishにシリーズを追加します。",
+                    footerText: "このほしいものにシリーズを追加します。",
                     confirmationTitle: "追加",
                     googleLensItems: draftGoogleLensItems,
                     isOpeningGoogleLens: isOpeningGoogleLensSearch,

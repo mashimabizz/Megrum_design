@@ -13,8 +13,8 @@ struct AccountDeletionWarningContent: View {
             )
             AccountDeletionWarningRow(
                 systemImage: "shippingbox.circle",
-                title: "グッズ・Wishの情報を確認できなくなります",
-                detail: "登録したグッズ、Wish、交換条件、通知設定などは通常画面から参照できなくなります。"
+                title: "グッズ・ほしいものの情報を確認できなくなります",
+                detail: "登録したグッズ、ほしいもの、交換条件、通知設定などは通常画面から参照できなくなります。"
             )
             AccountDeletionWarningRow(
                 systemImage: "checkmark.shield",

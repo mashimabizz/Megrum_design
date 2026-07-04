@@ -31,7 +31,7 @@ enum GoodsSharePostKind {
         case .inventory:
             "Xで作成したマイグッズをポストする"
         case .wish:
-            "Xで作成したウィッシュをポストする"
+            "Xで作成したほしいものをポストする"
         case .individualListing:
             "Xで個別募集をポストする"
         }

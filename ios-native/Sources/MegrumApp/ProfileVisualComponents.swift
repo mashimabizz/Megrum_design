@@ -5,7 +5,7 @@ import SwiftUI
 enum ProfileVisualTab: String, CaseIterable, Identifiable {
     case goods = "譲"
     case listings = "個別募集"
-    case wish = "Wish"
+    case wish = "ほしいもの"
 
     var id: String { rawValue }
 

@@ -187,17 +187,21 @@ struct ListingWishOptionPayload: Encodable, Sendable {
     var wishGoodsTypeId: UUID?
 
     init(listingID: UUID, position: Int, input: IndividualListingCreateInput) {
+        self.init(listingID: listingID, position: position, option: input.primaryOption)
+    }
+
+    init(listingID: UUID, position: Int, option: IndividualListingOptionInput) {
         self.listingId = listingID
         self.position = max(1, min(position, 5))
-        self.wishIds = input.wishItems.map(\.itemID)
-        self.wishQtys = input.wishItems.map { max(1, min($0.quantity, 99)) }
-        self.logic = input.wishLogic.rawValue
-        self.minCount = input.wishMinimumCount
-        self.exchangeType = input.exchangeType.rawValue
-        self.isCashOffer = input.isCashOffer
-        self.cashAmount = input.cashAmount
-        self.wishGroupId = input.wishGroupID
-        self.wishGoodsTypeId = input.wishGoodsTypeID
+        self.wishIds = option.wishItems.map(\.itemID)
+        self.wishQtys = option.wishItems.map { max(1, min($0.quantity, 99)) }
+        self.logic = option.wishLogic.rawValue
+        self.minCount = option.wishMinimumCount
+        self.exchangeType = option.exchangeType.rawValue
+        self.isCashOffer = option.isCashOffer
+        self.cashAmount = option.cashAmount
+        self.wishGroupId = option.wishGroupID
+        self.wishGoodsTypeId = option.wishGoodsTypeID
     }
 }
 

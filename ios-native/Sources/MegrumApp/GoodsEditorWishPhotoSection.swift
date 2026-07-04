@@ -26,7 +26,7 @@ struct GoodsEditorWishPhotoSection: View {
                         .shadow(color: MegrumTheme.ink.opacity(0.08), radius: 12, y: 6)
 
                     VStack(alignment: .leading, spacing: 8) {
-                        Text(titlePreview.isEmpty ? "Wish画像" : titlePreview)
+                        Text(titlePreview.isEmpty ? "ほしいもの画像" : titlePreview)
                             .font(.subheadline.weight(.black))
                             .foregroundStyle(MegrumTheme.ink)
                             .lineLimit(1)

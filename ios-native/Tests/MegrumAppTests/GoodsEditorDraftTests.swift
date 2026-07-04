@@ -14,11 +14,11 @@ final class GoodsEditorDraftTests: XCTestCase {
         )
         XCTAssertEqual(
             GoodsEditorPresentationText.navigationTitle(mode: .create, entryKind: .wish),
-            "Wishを追加"
+            "ほしいものを追加"
         )
         XCTAssertEqual(
             GoodsEditorPresentationText.navigationTitle(mode: .edit, entryKind: .wish),
-            "Wishを編集"
+            "ほしいものを編集"
         )
         XCTAssertEqual(GoodsEditorMode.edit.badgeTitle, "更新")
         XCTAssertEqual(
@@ -41,7 +41,7 @@ final class GoodsEditorDraftTests: XCTestCase {
                 isMutatingCurrentItem: false,
                 isCreatingGoodsEntry: false
             ),
-            "Wishを登録"
+            "ほしいものを登録"
         )
         XCTAssertEqual(
             GoodsEditorPresentationText.photoActionTitle(entryKind: .inventory, hasDisplayPhoto: true),

@@ -515,7 +515,7 @@ final class SearchScreenTests: XCTestCase {
         )
 
         XCTAssertTrue(sections.contains { $0.title == "推しから探す" })
-        XCTAssertTrue(sections.contains { $0.title == "Wishから探す" })
+        XCTAssertTrue(sections.contains { $0.title == "ほしいものから探す" })
         XCTAssertTrue(sections.contains { $0.title == "シリーズから探す" })
         XCTAssertFalse(sections.contains { $0.title == "よく使う条件" })
         let items = sections.flatMap { $0.items }

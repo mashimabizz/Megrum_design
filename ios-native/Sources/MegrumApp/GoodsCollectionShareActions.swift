@@ -131,7 +131,7 @@ extension GoodsCollectionScreen {
         case .inventory:
             "選択したマイグッズを画像と文面にしてXで周知できます。"
         case .wish:
-            "選択したウィッシュを画像と文面にしてXで周知できます。"
+            "選択したほしいものを画像と文面にしてXで周知できます。"
         }
     }
 

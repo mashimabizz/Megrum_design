@@ -112,7 +112,7 @@ enum IndividualListingOptionKind: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .wish:
-            "Wishから選ぶ"
+            "ほしいものから選ぶ"
         case .condition:
             "条件から選ぶ"
         case .cash:

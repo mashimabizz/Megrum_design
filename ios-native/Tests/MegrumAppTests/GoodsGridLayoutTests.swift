@@ -247,11 +247,11 @@ final class GoodsGridLayoutTests: XCTestCase {
         XCTAssertEqual(remotePolicy.destination(for: .report), .showReport)
         XCTAssertEqual(
             unavailablePolicy.destination(for: .edit),
-            .showActionMessage("「サナ トレカ」の編集は、自分のマイグッズ/Wishでのみ使えます。")
+            .showActionMessage("「サナ トレカ」の編集は、自分のマイグッズ/ほしいものでのみ使えます。")
         )
         XCTAssertEqual(
             unavailablePolicy.destination(for: .delete),
-            .showActionMessage("「サナ トレカ」を削除する処理は、自分のマイグッズ/Wishでのみ使えます。")
+            .showActionMessage("「サナ トレカ」を削除する処理は、自分のマイグッズ/ほしいものでのみ使えます。")
         )
     }
 
@@ -387,7 +387,7 @@ final class GoodsGridLayoutTests: XCTestCase {
         XCTAssertTrue(state.applyRequestedSection(.listings))
         XCTAssertEqual(state.selectedSection, .listings)
         XCTAssertTrue(state.applyRequestedSection(.wishes))
-        XCTAssertEqual(state.selectedSection.navigationTitle, "ウィッシュ")
+        XCTAssertEqual(state.selectedSection.navigationTitle, "ほしいもの")
     }
 
     func testGridContextLabelsFollowEntryKind() {

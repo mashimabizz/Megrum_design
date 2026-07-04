@@ -59,7 +59,7 @@ struct HomeSheetScaffold<Content: View>: View {
                         }
                         .buttonStyle(.plain)
                         .disabled(wishCopyButtonDisabled)
-                        .accessibilityLabel("Wishに追加")
+                        .accessibilityLabel("ほしいものに追加")
                     }
                 }
                 .padding(.top, 18)

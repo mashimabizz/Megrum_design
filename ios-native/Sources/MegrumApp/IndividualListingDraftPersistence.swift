@@ -2,7 +2,53 @@ import Foundation
 import MegrumCore
 
 extension IndividualListingDraft {
-    func validationMessage(inventory: [GoodsItem], wishes: [WishItem]) -> String? {
+    /// 現在編集中タブの選択内容を選択肢1件として取り出す。
+    /// Wishタブで未選択・条件タブで未設定なら「未入力」として nil を返す
+    /// （追加済みの選択肢だけで先へ進める）。定価タブは選択中とみなす。
+    func currentOptionInput(wishes: [WishItem]) -> IndividualListingOptionInput? {
+        switch optionKind {
+        case .wish:
+            let items = selectedWishItems(from: wishes)
+            guard !items.isEmpty else {
+                return nil
+            }
+            return IndividualListingOptionInput(
+                wishItems: items.map { item in
+                    ListingItemQuantity(itemID: item.id, quantity: wishQuantity(for: item.id))
+                },
+                wishLogic: wishLogic,
+                wishMinimumCount: wishLogic == .atLeast ? resolvedWishMinimumCount : 1,
+                exchangeType: exchangeType,
+                wishGroupID: items.first?.groupID,
+                wishGoodsTypeID: items.first?.goodsTypeID
+            )
+        case .condition:
+            guard let conditionGroupID, let conditionGoodsTypeID else {
+                return nil
+            }
+            return IndividualListingOptionInput(
+                wishLogic: wishLogic,
+                wishMinimumCount: wishLogic == .atLeast ? resolvedWishMinimumCount : 1,
+                exchangeType: exchangeType,
+                wishGroupID: conditionGroupID,
+                wishGoodsTypeID: conditionGoodsTypeID
+            )
+        case .cash:
+            return IndividualListingOptionInput(
+                wishLogic: wishLogic,
+                wishMinimumCount: 1,
+                exchangeType: exchangeType,
+                isCashOffer: true,
+                cashAmount: cashPricingMode == .specifiedAmount ? cashAmount : nil
+            )
+        }
+    }
+
+    func validationMessage(
+        inventory: [GoodsItem],
+        wishes: [WishItem],
+        stagedOptions: [IndividualListingOptionInput] = []
+    ) -> String? {
         let selectedHaveItems = selectedInventoryItems(from: inventory)
         switch haveOfferKind {
         case .goods:
@@ -27,38 +73,51 @@ extension IndividualListingDraft {
             }
         }
 
+        // 編集中の選択肢に入力があれば、その内容だけを検証する。
         switch optionKind {
         case .wish:
-            if selectedWishIDs.isEmpty {
-                return "求めるものを選択してください"
-            }
-            let selectedWishItems = selectedWishItems(from: wishes)
-            if selectedWishItems.count != selectedWishIDs.count {
-                return "選択したWishを読み込めませんでした"
-            }
-            if wishLogic == .atLeast, selectedWishIDs.count < 2 {
-                return "「何個以上」は2件以上選んだ時に設定できます"
-            }
-            if haveLogic == .one, wishLogic == .one, selectedHaveIDs.count > 1, selectedWishIDs.count > 1 {
-                return "両方を「どれか1つだけ」にする場合は、片方を1件にしてください"
+            if !selectedWishIDs.isEmpty {
+                let selectedWishItems = selectedWishItems(from: wishes)
+                if selectedWishItems.count != selectedWishIDs.count {
+                    return "選択したほしいものを読み込めませんでした"
+                }
+                if wishLogic == .atLeast, selectedWishIDs.count < 2 {
+                    return "「何個以上」は2件以上選んだ時に設定できます"
+                }
+                if haveLogic == .one, wishLogic == .one, selectedHaveIDs.count > 1, selectedWishIDs.count > 1 {
+                    return "両方を「どれか1つだけ」にする場合は、片方を1件にしてください"
+                }
             }
         case .condition:
-            if conditionGroupID == nil || conditionGoodsTypeID == nil {
-                return "グループとグッズ種別を選択してください"
-            }
+            break
         case .cash:
             if cashPricingMode == .specifiedAmount, cashAmount <= 0 {
                 return "金額を入力してください"
             }
         }
+
+        // 追加済み＋編集中で選択肢が1件もなければ進めない。
+        if stagedOptions.isEmpty, currentOptionInput(wishes: wishes) == nil {
+            return "求めるものを選択してください"
+        }
         return nil
     }
 
-    func createInput(inventory: [GoodsItem], wishes: [WishItem]) -> IndividualListingCreateInput? {
-        guard validationMessage(inventory: inventory, wishes: wishes) == nil else {
+    func createInput(
+        inventory: [GoodsItem],
+        wishes: [WishItem],
+        stagedOptions: [IndividualListingOptionInput] = []
+    ) -> IndividualListingCreateInput? {
+        guard validationMessage(inventory: inventory, wishes: wishes, stagedOptions: stagedOptions) == nil else {
             return nil
         }
-        let selectedWishItems = optionKind == .wish ? selectedWishItems(from: wishes) : []
+        var options = stagedOptions
+        if let current = currentOptionInput(wishes: wishes) {
+            options.append(current)
+        }
+        guard let primary = options.first else {
+            return nil
+        }
         return IndividualListingCreateInput(
             haveItems: haveOfferKind == .cash ? [] : selectedInventoryItems(from: inventory).map { item in
                 ListingItemQuantity(
@@ -70,46 +129,47 @@ extension IndividualListingDraft {
             haveMinimumCount: haveLogic == .atLeast ? resolvedHaveMinimumCount : 1,
             haveIsCashOffer: haveOfferKind == .cash,
             haveCashAmount: haveOfferKind == .cash && haveCashPricingMode == .specifiedAmount ? haveCashAmount : nil,
-            wishItems: selectedWishItems.map { item in
-                ListingItemQuantity(itemID: item.id, quantity: wishQuantity(for: item.id))
-            },
-            wishLogic: wishLogic,
-            wishMinimumCount: wishLogic == .atLeast ? resolvedWishMinimumCount : 1,
-            exchangeType: exchangeType,
-            isCashOffer: optionKind == .cash,
-            cashAmount: optionKind == .cash && cashPricingMode == .specifiedAmount ? cashAmount : nil,
-            wishGroupID: optionWishGroupID(selectedWishItems: selectedWishItems),
-            wishGoodsTypeID: optionWishGoodsTypeID(selectedWishItems: selectedWishItems),
+            wishItems: primary.wishItems,
+            wishLogic: primary.wishLogic,
+            wishMinimumCount: primary.wishMinimumCount,
+            exchangeType: primary.exchangeType,
+            isCashOffer: primary.isCashOffer,
+            cashAmount: primary.cashAmount,
+            wishGroupID: primary.wishGroupID,
+            wishGoodsTypeID: primary.wishGoodsTypeID,
+            additionalOptions: Array(options.dropFirst()),
             note: trimmedNoteWithListingMetadata
         )
     }
 
-    func updatedListing(from original: IndividualListing, inventory: [GoodsItem], wishes: [WishItem]) -> IndividualListing? {
-        guard let input = createInput(inventory: inventory, wishes: wishes) else {
+    func updatedListing(
+        from original: IndividualListing,
+        inventory: [GoodsItem],
+        wishes: [WishItem],
+        stagedOptions: [IndividualListingOptionInput] = []
+    ) -> IndividualListing? {
+        guard let input = createInput(inventory: inventory, wishes: wishes, stagedOptions: stagedOptions) else {
             return nil
         }
         let selectedHaveItems = selectedInventoryItems(from: inventory)
-        var options = original.options.sorted { $0.position < $1.position }
-        let existingOption = options.first
-        let updatedOption = IndividualListingWishOption(
-            id: existingOption?.id ?? UUID(),
-            listingID: original.id,
-            position: existingOption?.position ?? 1,
-            wishes: input.wishItems,
-            logic: input.wishLogic,
-            minimumCount: input.wishMinimumCount,
-            exchangeType: input.exchangeType,
-            isCashOffer: input.isCashOffer,
-            cashAmount: input.cashAmount,
-            wishGroupID: input.wishGroupID,
-            wishGoodsTypeID: input.wishGoodsTypeID,
-            createdAt: existingOption?.createdAt,
-            updatedAt: Date()
-        )
-        if options.isEmpty {
-            options = [updatedOption]
-        } else {
-            options[0] = updatedOption
+        let existingOptions = original.options.sorted { $0.position < $1.position }
+        let allOptionInputs = [input.primaryOption] + input.additionalOptions
+        let options = allOptionInputs.enumerated().map { index, option in
+            IndividualListingWishOption(
+                id: index == 0 ? (existingOptions.first?.id ?? UUID()) : UUID(),
+                listingID: original.id,
+                position: index + 1,
+                wishes: option.wishItems,
+                logic: option.wishLogic,
+                minimumCount: option.wishMinimumCount,
+                exchangeType: option.exchangeType,
+                isCashOffer: option.isCashOffer,
+                cashAmount: option.cashAmount,
+                wishGroupID: option.wishGroupID,
+                wishGoodsTypeID: option.wishGoodsTypeID,
+                createdAt: index == 0 ? existingOptions.first?.createdAt : nil,
+                updatedAt: Date()
+            )
         }
         return IndividualListing(
             id: original.id,

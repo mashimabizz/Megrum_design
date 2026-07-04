@@ -7,7 +7,7 @@ struct SearchConditionMatchFilterSection: View {
     var body: some View {
         Section {
             SearchConditionMatchToggleRow(
-                title: "Wishに合う",
+                title: "ほしいものに合う",
                 subtitle: "グッズ○",
                 isOn: $filters.matchesWish
             )

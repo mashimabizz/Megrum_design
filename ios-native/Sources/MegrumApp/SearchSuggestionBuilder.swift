@@ -55,7 +55,7 @@ enum SearchSuggestionBuilder {
             ),
             SearchSuggestionSection(
                 id: "wish",
-                title: "Wishから探す",
+                title: "ほしいものから探す",
                 systemImageName: "heart.fill",
                 tintRole: .pink,
                 items: wishItems(wishes: wishes)

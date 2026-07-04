@@ -1292,4 +1292,76 @@ final class IndividualListingDraftTests: XCTestCase {
         XCTAssertEqual(updated.options.first?.wishes, [ListingItemQuantity(itemID: wish.id, quantity: 3)])
         XCTAssertEqual(updated.options.first?.exchangeType, .sameKind)
     }
+
+    // MARK: - 複数選択肢（追加済み＋編集中）
+
+    func testValidationAllowsEmptyCurrentSelectionWhenStagedOptionsExist() {
+        let groupID = UUID()
+        let goodsTypeID = UUID()
+        let have = GoodsItem(
+            id: UUID(),
+            ownerID: UUID(),
+            groupID: groupID,
+            goodsTypeID: goodsTypeID,
+            title: "譲るトレカ",
+            quantity: 1
+        )
+        var draft = IndividualListingDraft(mode: .create(preselectedWishID: nil))
+        draft.toggleHave(have.id, maxQuantity: have.quantity)
+
+        let stagedCash = IndividualListingOptionInput(isCashOffer: true, cashAmount: nil)
+
+        // 追加済みが無ければ従来どおりエラー。
+        XCTAssertEqual(
+            draft.validationMessage(inventory: [have], wishes: []),
+            "求めるものを選択してください"
+        )
+        // 追加済みが1件あれば、編集中が未選択でも先へ進める。
+        XCTAssertNil(
+            draft.validationMessage(inventory: [have], wishes: [], stagedOptions: [stagedCash])
+        )
+    }
+
+    func testCreateInputAppendsCurrentSelectionAfterStagedOptions() throws {
+        let groupID = UUID()
+        let goodsTypeID = UUID()
+        let have = GoodsItem(
+            id: UUID(),
+            ownerID: UUID(),
+            groupID: groupID,
+            goodsTypeID: goodsTypeID,
+            title: "譲るトレカ",
+            quantity: 1
+        )
+        let wish = WishItem(
+            id: UUID(),
+            ownerID: UUID(),
+            groupID: groupID,
+            goodsTypeID: goodsTypeID,
+            title: "ほしいトレカ"
+        )
+        var draft = IndividualListingDraft(mode: .create(preselectedWishID: wish.id))
+        draft.toggleHave(have.id, maxQuantity: have.quantity)
+
+        // 既に「定価」の選択肢を追加済みの状態で、ほしいものを選ぶ。
+        let stagedCash = IndividualListingOptionInput(isCashOffer: true, cashAmount: 500)
+        let input = try XCTUnwrap(
+            draft.createInput(inventory: [have], wishes: [wish], stagedOptions: [stagedCash])
+        )
+
+        // 1件目は追加済みの定価のまま（上書きされない）。
+        XCTAssertTrue(input.isCashOffer)
+        XCTAssertEqual(input.cashAmount, 500)
+        // 新しく選んだほしいものは2件目として追加される。
+        XCTAssertEqual(input.additionalOptions.count, 1)
+        XCTAssertEqual(input.additionalOptions.first?.wishItems.map(\.itemID), [wish.id])
+        XCTAssertFalse(input.additionalOptions.first?.isCashOffer ?? true)
+    }
+
+    func testResetCurrentOptionSelectionReturnsToWishTab() {
+        var draft = IndividualListingDraft(mode: .create(preselectedWishID: nil))
+        draft.setOptionKind(.cash)
+        draft.resetCurrentOptionSelection()
+        XCTAssertEqual(draft.optionKind, .wish)
+    }
 }

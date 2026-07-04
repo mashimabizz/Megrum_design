@@ -53,14 +53,32 @@ struct IndividualListingEditorSheet: View {
         self.onLocalEditSaved = onLocalEditSaved
         self.onSaved = onSaved
         self.onCreatedListing = nil
-        let draft = IndividualListingDraft(mode: .edit(listing))
-        _draft = State(initialValue: draft)
-        _presentationState = State(
-            initialValue: IndividualListingEditorPresentationState(
-                initialStep: initialStep,
-                draft: draft
-            )
+        var draft = IndividualListingDraft(mode: .edit(listing))
+        var presentationState = IndividualListingEditorPresentationState(
+            initialStep: initialStep,
+            draft: draft
         )
+        // 既存の選択肢は全て「追加済み」として読み込み、編集中の選択肢は
+        // 空から始める。こうすると新しく選んだものは末尾に追加され、
+        // 既存の選択肢（定価など）を上書きしない。
+        let existingOptions = listing.options.sorted { $0.position < $1.position }
+        for (index, option) in existingOptions.enumerated() {
+            presentationState.appendStagedOption(
+                IndividualListingOptionReviewItemFactory.make(
+                    from: option,
+                    title: "選択肢\(index + 1)",
+                    wishes: appState.wishes,
+                    groups: appState.oshiGroups,
+                    goodsTypes: appState.goodsTypes
+                )
+            )
+        }
+        if !existingOptions.isEmpty {
+            draft.resetCurrentOptionSelection()
+            draft.setOptionKind(.wish)
+        }
+        _draft = State(initialValue: draft)
+        _presentationState = State(initialValue: presentationState)
     }
 
     var body: some View {

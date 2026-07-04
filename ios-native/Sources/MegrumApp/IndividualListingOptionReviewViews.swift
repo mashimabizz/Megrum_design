@@ -1,4 +1,5 @@
 import Foundation
+import MegrumCore
 import MegrumDesign
 import SwiftUI
 
@@ -8,6 +9,8 @@ struct IndividualListingOptionReviewItem: Identifiable, Equatable {
     var kind: String
     var detail: String
     var source: IndividualListingOptionReviewSource = .staged
+    /// 保存時に選択肢として書き込む実データ。表示専用アイテムでは nil。
+    var payload: IndividualListingOptionInput?
 
     var addedToastMessage: String {
         "\(title)（\(kind)：\(detail)）を追加しました"

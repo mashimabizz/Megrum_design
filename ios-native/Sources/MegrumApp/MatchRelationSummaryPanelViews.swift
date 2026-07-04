@@ -36,7 +36,7 @@ struct MatchRelationSimplePanel: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("譲る候補とWishのマッチ")
+            Text("譲る候補とほしいもののマッチ")
                 .font(.system(size: 18, weight: .heavy, design: .rounded))
                 .foregroundStyle(MegrumTheme.ink)
             HStack(spacing: 12) {

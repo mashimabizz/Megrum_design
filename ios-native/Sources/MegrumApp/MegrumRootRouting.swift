@@ -31,7 +31,7 @@ public enum MegrumTab: String, CaseIterable, Identifiable, Sendable {
         case .inventory:
             "マイグッズ"
         case .wish:
-            "ウィッシュ"
+            "ほしいもの"
         case .trades:
             "やりとり"
         case .meguri:

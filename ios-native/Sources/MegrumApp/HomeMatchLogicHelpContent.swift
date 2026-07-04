@@ -68,7 +68,7 @@ struct HomeMatchLogicHelpContent: View {
                 HomeMatchLogicHelpRow(mark: "シリーズ", title: "シリーズは落とさず注意表示にします", body: "シリーズが合わない場合も候補には残し、カードに「シリーズ不一致？」と表示します。")
             ],
             actions: [
-                HomeMatchLogicHelpAction(title: "Wishも設定", systemImage: "heart.fill", action: onOpenWish)
+                HomeMatchLogicHelpAction(title: "ほしいものも設定", systemImage: "heart.fill", action: onOpenWish)
             ]
         )
     }

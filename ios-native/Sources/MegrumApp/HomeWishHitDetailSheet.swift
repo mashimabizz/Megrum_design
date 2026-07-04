@@ -43,7 +43,7 @@ struct HomeWishHitDetailSheet: View {
 
             HomeSheetSectionTitle(
                 systemName: "gift",
-                title: "あなたが譲れる相手のWish"
+                title: "あなたが譲れる相手のほしいもの"
             )
 
             if offerGoods.isEmpty {

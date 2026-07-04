@@ -169,7 +169,7 @@ extension GoodsCollectionScreen {
 
     /// Inset that keeps scroll content starting below pinned translucent
     /// chrome: this screen's own chrome when it pins one, otherwise the value
-    /// published by an enclosing screen (e.g. ウィッシュ).
+    /// published by an enclosing screen (e.g. ほしいもの).
     var pageTopContentInset: CGFloat {
         max(
             pinnedTopChromeInset,

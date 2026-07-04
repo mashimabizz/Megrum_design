@@ -85,7 +85,7 @@ final class HomeCandidateSummaryPolicyTests: XCTestCase {
         let signals = makeSignals(wishHit: true, postal: true)
         XCTAssertEqual(
             HomeCandidateSummaryPolicy.summaryText(for: signals),
-            "あなたのウィッシュと一致・郵送OK"
+            "あなたのほしいものと一致・郵送OK"
         )
     }
 
@@ -143,7 +143,7 @@ final class HomeCandidateSummaryPolicyTests: XCTestCase {
         )
         XCTAssertEqual(
             HomeCandidateSummaryPolicy.summaryText(for: signals),
-            "あなたのウィッシュと一致・郵送OK"
+            "あなたのほしいものと一致・郵送OK"
         )
     }
 

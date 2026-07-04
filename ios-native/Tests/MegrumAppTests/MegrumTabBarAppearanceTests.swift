@@ -19,6 +19,6 @@ final class MegrumTabBarAppearanceTests: XCTestCase {
     func testTradesTabUsesSingleMessageIconAndWishUsesJapaneseTitle() {
         XCTAssertEqual(MegrumTab.trades.symbolName, "message")
         XCTAssertEqual(MegrumTab.inventory.symbolName, "rectangle.on.rectangle")
-        XCTAssertEqual(MegrumTab.wish.title, "ウィッシュ")
+        XCTAssertEqual(MegrumTab.wish.title, "ほしいもの")
     }
 }

@@ -217,7 +217,7 @@ struct EmptyListingView: View {
             Text("個別募集はまだありません")
                 .font(.headline.weight(.black))
                 .foregroundStyle(MegrumTheme.ink)
-            Text("マイグッズとWishを選んで、ピンポイントの交換条件を作れます。")
+            Text("マイグッズとほしいものを選んで、ピンポイントの交換条件を作れます。")
                 .font(.subheadline.weight(.bold))
                 .foregroundStyle(MegrumTheme.muted)
                 .multilineTextAlignment(.center)

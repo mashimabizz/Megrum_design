@@ -3,7 +3,7 @@ import MegrumDesign
 import SwiftUI
 
 enum WishCollectionSection: String, CaseIterable, Identifiable {
-    case wishes = "Wish"
+    case wishes = "ほしいもの"
     case listings = "個別募集"
 
     var id: String { rawValue }
@@ -11,7 +11,7 @@ enum WishCollectionSection: String, CaseIterable, Identifiable {
     var navigationTitle: String {
         switch self {
         case .wishes:
-            "ウィッシュ"
+            "ほしいもの"
         case .listings:
             "個別募集"
         }
@@ -201,7 +201,7 @@ struct WishCollectionScreen: View {
                 }
             }
             .pickerStyle(.segmented)
-            .accessibilityLabel("Wishの表示切り替え")
+            .accessibilityLabel("ほしいものの表示切り替え")
             .frame(maxWidth: .infinity)
         )
     }

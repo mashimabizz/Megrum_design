@@ -31,7 +31,11 @@ extension IndividualListingEditorSheet {
 
     func save() async {
         presentationState.clearSaveError()
-        guard let input = draft.createInput(inventory: appState.inventory, wishes: appState.wishes) else {
+        guard let input = draft.createInput(
+            inventory: appState.inventory,
+            wishes: appState.wishes,
+            stagedOptions: stagedOptionInputs
+        ) else {
             presentationState.setSaveError(
                 stepValidationMessage
                 ?? IndividualListingEditorSaveFailurePresentation.fallbackMessage
@@ -150,7 +154,13 @@ extension IndividualListingEditorSheet {
            let firstHave = appState.inventory.first(where: { draft.maxHaveQuantity(for: $0) > 0 }) {
             draft.toggleHave(firstHave.id, maxQuantity: draft.maxHaveQuantity(for: firstHave))
         }
-        if presentationState.step == .exchange, draft.optionKind == .wish, draft.selectedWishIDs.isEmpty, let firstWish = appState.wishes.first {
+        // 追加済みの選択肢があるなら、編集中の選択肢を勝手に補完しない
+        // （意図しない選択肢が増えるのを防ぐ）。
+        if presentationState.step == .exchange,
+           draft.optionKind == .wish,
+           draft.selectedWishIDs.isEmpty,
+           presentationState.stagedOptionSummaries.isEmpty,
+           let firstWish = appState.wishes.first {
             draft.toggleWish(firstWish.id)
         }
     }

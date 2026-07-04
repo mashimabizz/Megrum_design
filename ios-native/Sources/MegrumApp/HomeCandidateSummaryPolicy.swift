@@ -161,7 +161,7 @@ enum HomeCandidateSummaryPolicy {
         case .direct:
             "あなたのグッズを指名中"
         case .wish:
-            "あなたのウィッシュと一致"
+            "あなたのほしいものと一致"
         case .none:
             nil
         }

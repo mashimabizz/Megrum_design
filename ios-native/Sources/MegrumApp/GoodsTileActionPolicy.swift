@@ -103,17 +103,17 @@ struct GoodsGridTileActionPolicy: Equatable {
             if canCreateIndividualListing {
                 return .createIndividualListing
             }
-            return .showActionMessage("「\(itemTitle)」から個別募集を作成する処理は、Wish画面で使えます。")
+            return .showActionMessage("「\(itemTitle)」から個別募集を作成する処理は、ほしいもの画面で使えます。")
         case .edit:
             if itemOwnerID == viewerID, canEdit {
                 return .edit
             }
-            return .showActionMessage("「\(itemTitle)」の編集は、自分のマイグッズ/Wishでのみ使えます。")
+            return .showActionMessage("「\(itemTitle)」の編集は、自分のマイグッズ/ほしいものでのみ使えます。")
         case .hide:
             if itemOwnerID == viewerID, canHide {
                 return .hide
             }
-            return .showActionMessage("「\(itemTitle)」を非表示にする処理は、自分のマイグッズ/Wishでのみ使えます。")
+            return .showActionMessage("「\(itemTitle)」を非表示にする処理は、自分のマイグッズ/ほしいものでのみ使えます。")
         case .report:
             if Optional(itemOwnerID) != viewerID, canReport {
                 return .showReport
@@ -123,7 +123,7 @@ struct GoodsGridTileActionPolicy: Equatable {
             if itemOwnerID == viewerID, canDelete {
                 return .delete
             }
-            return .showActionMessage("「\(itemTitle)」を削除する処理は、自分のマイグッズ/Wishでのみ使えます。")
+            return .showActionMessage("「\(itemTitle)」を削除する処理は、自分のマイグッズ/ほしいものでのみ使えます。")
         }
     }
 }

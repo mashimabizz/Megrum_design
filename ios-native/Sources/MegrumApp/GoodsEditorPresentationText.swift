@@ -3,9 +3,9 @@ import MegrumCore
 enum GoodsEditorPresentationText {
     static func navigationTitle(mode: GoodsEditorMode, entryKind: GoodsEntryKind) -> String {
         if mode == .edit {
-            return entryKind == .inventory ? "マイグッズを編集" : "Wishを編集"
+            return entryKind == .inventory ? "マイグッズを編集" : "ほしいものを編集"
         }
-        return entryKind == .inventory ? "マイグッズに追加" : "Wishを追加"
+        return entryKind == .inventory ? "マイグッズに追加" : "ほしいものを追加"
     }
 
     static func headerDescription(usesInventoryCreateFlow: Bool, entryKind: GoodsEntryKind) -> String {
@@ -28,12 +28,12 @@ enum GoodsEditorPresentationText {
             if isMutatingCurrentItem {
                 return "更新しています"
             }
-            return entryKind == .wish ? "ウィッシュを更新" : "変更を保存"
+            return entryKind == .wish ? "ほしいものを更新" : "変更を保存"
         }
         if isCreatingGoodsEntry {
             return "保存しています"
         }
-        return entryKind == .inventory ? "マイグッズを登録" : "Wishを登録"
+        return entryKind == .inventory ? "マイグッズを登録" : "ほしいものを登録"
     }
 
     static func photoActionTitle(entryKind: GoodsEntryKind, hasDisplayPhoto: Bool) -> String {

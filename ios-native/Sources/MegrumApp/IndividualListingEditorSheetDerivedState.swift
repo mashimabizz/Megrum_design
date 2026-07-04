@@ -1,12 +1,18 @@
+import MegrumCore
 import SwiftUI
 
 extension IndividualListingEditorSheet {
+    var stagedOptionInputs: [IndividualListingOptionInput] {
+        presentationState.stagedOptionSummaries.compactMap(\.payload)
+    }
+
     var stepValidationMessage: String? {
         IndividualListingEditorStepValidationPolicy.message(
             for: presentationState.step,
             draft: draft,
             inventory: appState.inventory,
-            wishes: appState.wishes
+            wishes: appState.wishes,
+            stagedOptions: stagedOptionInputs
         )
     }
 

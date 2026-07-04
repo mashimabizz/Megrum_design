@@ -129,9 +129,15 @@ public final class SupabaseListingClient: @unchecked Sendable {
             throw SupabaseRESTError.unexpectedStatus(-1)
         }
 
+        var optionPayloads = [ListingWishOptionPayload(listingID: listingRow.id, position: 1, input: input)]
+        for (index, option) in input.additionalOptions.prefix(4).enumerated() {
+            optionPayloads.append(
+                ListingWishOptionPayload(listingID: listingRow.id, position: index + 2, option: option)
+            )
+        }
         let optionRows: [ListingWishOptionRow] = try await client.insertRows(
             into: "listing_wish_options",
-            values: [ListingWishOptionPayload(listingID: listingRow.id, position: 1, input: input)],
+            values: optionPayloads,
             select: ListingWishOptionRow.select
         )
         return listingRow.listing(options: optionRows.map(\.option))
@@ -179,7 +185,7 @@ public final class SupabaseListingClient: @unchecked Sendable {
             clearsWishConditionIDs: input.wishGroupID == nil && input.wishGoodsTypeID == nil
         )
 
-        let optionRows: [ListingWishOptionRow]
+        var optionRows: [ListingWishOptionRow]
         if let primaryOptionID {
             optionRows = try await client.updateRows(
                 in: "listing_wish_options",
@@ -193,6 +199,29 @@ public final class SupabaseListingClient: @unchecked Sendable {
                 values: [ListingWishOptionPayload(listingID: listingID, position: 1, input: input)],
                 select: ListingWishOptionRow.select
             )
+        }
+
+        // 編集後の選択肢一覧で全置換する：先頭以外の既存選択肢を消し、
+        // additionalOptions を position 2〜 で入れ直す。
+        if let primaryRowID = optionRows.first?.id {
+            try await client.deleteRows(
+                from: "listing_wish_options",
+                queryItems: [
+                    URLQueryItem(name: "listing_id", value: "eq.\(listingID.uuidString.lowercased())"),
+                    URLQueryItem(name: "id", value: "neq.\(primaryRowID.uuidString.lowercased())")
+                ]
+            )
+        }
+        if !input.additionalOptions.isEmpty {
+            let additionalPayloads = input.additionalOptions.prefix(4).enumerated().map { index, option in
+                ListingWishOptionPayload(listingID: listingID, position: index + 2, option: option)
+            }
+            let additionalRows: [ListingWishOptionRow] = try await client.insertRows(
+                into: "listing_wish_options",
+                values: Array(additionalPayloads),
+                select: ListingWishOptionRow.select
+            )
+            optionRows.append(contentsOf: additionalRows)
         }
 
         return listingRow.listing(options: optionRows.map(\.option))

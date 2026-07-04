@@ -43,5 +43,8 @@ extension IndividualListingDraft {
                 wishMinimumCount = 1
             }
         }
+        // 定価・条件タブは「タブにいる＝選択中」とみなすため、追加後は
+        // ほしいものタブへ戻して二重カウントを防ぐ。
+        optionKind = .wish
     }
 }

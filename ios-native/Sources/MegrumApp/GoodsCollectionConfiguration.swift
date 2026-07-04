@@ -169,7 +169,7 @@ struct GoodsCollectionEmptyStatePresentation {
         if screenTitle == "個別募集" {
             return GoodsCollectionEmptyStatePresentation(
                 title: "個別募集はまだありません",
-                detail: "条件を指定した募集は、Wishから作成できます。",
+                detail: "条件を指定した募集は、ほしいものから作成できます。",
                 systemImage: "rectangle.stack.badge.plus"
             )
         }
@@ -179,7 +179,7 @@ struct GoodsCollectionEmptyStatePresentation {
             return inventoryPresentation(for: inventoryStatus)
         case .wish:
             return GoodsCollectionEmptyStatePresentation(
-                title: "Wishはまだありません",
+                title: "ほしいものはまだありません",
                 detail: "探したいグッズを登録すると、候補探しに使えるようになります。",
                 systemImage: "heart"
             )

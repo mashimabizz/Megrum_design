@@ -79,7 +79,7 @@ struct HomeOtherExchangeRows<LeadingContent: View>: View {
 
                 if !wishHitPayloads.isEmpty {
                     imageSection(
-                        title: "WishでHit",
+                        title: "ほしいものでHit",
                         color: MegrumTheme.sky,
                         payloads: wishHitPayloads
                     )
