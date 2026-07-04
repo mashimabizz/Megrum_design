@@ -7,13 +7,15 @@ struct MeguriFeedCacheKey: Equatable {
     var radiusMeters: Int
     var prefectureKey: String?
     var scope: BoardThread.Audience?
+    var allowsExtendedBoardAccess: Bool
 
     init(
         latitude: Double?,
         longitude: Double?,
         radiusMeters: Int,
         prefecture: String? = nil,
-        scope: BoardThread.Audience? = nil
+        scope: BoardThread.Audience? = nil,
+        allowsExtendedBoardAccess: Bool = false
     ) {
         self.latitudeBucket = Self.coordinateBucket(latitude)
         self.longitudeBucket = Self.coordinateBucket(longitude)
@@ -23,6 +25,7 @@ struct MeguriFeedCacheKey: Equatable {
             .lowercased()
             .nilIfBlank
         self.scope = scope
+        self.allowsExtendedBoardAccess = allowsExtendedBoardAccess
     }
 
     private static func coordinateBucket(_ coordinate: Double?) -> Int? {

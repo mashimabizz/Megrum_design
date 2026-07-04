@@ -1123,6 +1123,26 @@ final class TradeChatAffordanceTests: XCTestCase {
                 messages: [evaluationNotice]
             )
         )
+        let serverEvaluationNotice = TradeMessage(
+            id: UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaa0320")!,
+            proposalID: settledCompleted.id,
+            senderID: partnerID,
+            messageType: .system,
+            body: "評価が完了しました",
+            meta: [
+                "action": TradeEvaluationSystemMessage.action,
+                "rater_id": viewerID.uuidString.lowercased(),
+                "stars": "5",
+            ],
+            createdAt: base.addingTimeInterval(90)
+        )
+        XCTAssertFalse(
+            TradeEvaluationAttentionPolicy.needsViewerEvaluation(
+                proposal: settledCompleted,
+                viewerID: viewerID,
+                messages: [serverEvaluationNotice]
+            )
+        )
         XCTAssertFalse(
             TradeEvaluationAttentionPolicy.needsViewerEvaluation(
                 proposal: completedWithoutSettlement,

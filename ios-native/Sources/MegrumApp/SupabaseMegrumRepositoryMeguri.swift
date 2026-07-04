@@ -116,13 +116,15 @@ public extension SupabaseMegrumRepository {
         latitude: Double?,
         longitude: Double?,
         prefecture: String?,
-        scope: BoardThread.Audience
+        scope: BoardThread.Audience,
+        allowsExtendedBoardAccess: Bool
     ) async throws -> [BoardThread] {
         try await boardClient.loadThreads(
             latitude: latitude,
             longitude: longitude,
             prefecture: prefecture,
-            scope: scope
+            scope: scope,
+            allowsExtendedBoardAccess: allowsExtendedBoardAccess
         )
     }
 

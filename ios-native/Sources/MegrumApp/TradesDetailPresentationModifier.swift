@@ -70,25 +70,27 @@ struct TradeDetailSlidePresentationOverlay: View {
 
     @ViewBuilder
     private func detailView(for route: TradeDetailRoute) -> some View {
-        NavigationStack {
-            if let proposal = proposals.first(where: { $0.id == route.proposalID }) {
-                TradeDetailScreen(appState: appState, proposal: proposal)
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button(action: dismissDetail) {
-                                Image(systemName: "chevron.left")
-                                    .font(.system(size: 18, weight: .heavy))
+        MegrumDeferredContent {
+            NavigationStack {
+                if let proposal = proposals.first(where: { $0.id == route.proposalID }) {
+                    TradeDetailScreen(appState: appState, proposal: proposal)
+                        .toolbar {
+                            ToolbarItem(placement: .cancellationAction) {
+                                Button(action: dismissDetail) {
+                                    Image(systemName: "chevron.left")
+                                        .font(.system(size: 18, weight: .heavy))
+                                }
+                                .accessibilityLabel("やりとり一覧に戻る")
                             }
-                            .accessibilityLabel("やりとり一覧に戻る")
                         }
-                    }
-            } else {
-                TradeDetailUnavailableScreen()
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button("閉じる", action: dismissDetail)
+                } else {
+                    TradeDetailUnavailableScreen()
+                        .toolbar {
+                            ToolbarItem(placement: .cancellationAction) {
+                                Button("閉じる", action: dismissDetail)
+                            }
                         }
-                    }
+                }
             }
         }
     }

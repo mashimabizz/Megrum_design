@@ -73,7 +73,13 @@ public extension MegrumRepository {
         []
     }
 
-    func loadBoardThreads(latitude: Double?, longitude: Double?, prefecture: String?, scope: BoardThread.Audience) async throws -> [BoardThread] {
+    func loadBoardThreads(
+        latitude: Double?,
+        longitude: Double?,
+        prefecture: String?,
+        scope: BoardThread.Audience,
+        allowsExtendedBoardAccess: Bool
+    ) async throws -> [BoardThread] {
         []
     }
 

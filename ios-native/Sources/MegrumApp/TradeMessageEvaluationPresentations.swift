@@ -24,10 +24,10 @@ struct TradeEvaluationPromptState: Equatable, Sendable {
 
         let evaluationMessages = messages.filter { TradeEvaluationSystemMessage.isEvaluationNotice($0) }
         self.hasSubmittedEvaluation = localSubmission || evaluationMessages.contains { message in
-            message.senderID == viewerID
+            TradeEvaluationSystemMessage.raterID(for: message) == viewerID
         }
         self.hasPartnerSubmittedEvaluation = evaluationMessages.contains { message in
-            message.senderID != viewerID
+            TradeEvaluationSystemMessage.raterID(for: message) != viewerID
         }
         self.revealedEvaluations = messages
             .compactMap { TradeEvaluationSystemMessage.evaluation(from: $0, viewerID: viewerID) }

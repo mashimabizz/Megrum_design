@@ -222,6 +222,18 @@ final class SupabaseBoardClientTests: XCTestCase {
         XCTAssertEqual(threads.map(\.title), ["近いスレッド"])
         XCTAssertEqual(threads.first?.anonymousDisplayName, "まくはり民")
         XCTAssertEqual(threads.first?.anonymousAvatarID, "avatar_3")
+
+        let premiumThreads = try waitForBoardAsyncResult {
+            try await client.loadThreads(
+                latitude: 35.681236,
+                longitude: 139.767125,
+                prefecture: "東京都",
+                scope: .nearby3km,
+                allowsExtendedBoardAccess: true
+            )
+        }
+
+        XCTAssertEqual(premiumThreads.map(\.title), ["近いスレッド", "遠いスレッド"])
     }
 
     func testBuildsBoardThreadCreateRequest() throws {

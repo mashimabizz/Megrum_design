@@ -11,12 +11,14 @@ extension MegrumAppState {
         force: Bool = false
     ) async {
         let selectedPrefecture = boardPrefecture(explicitPrefecture: prefecture)
+        let allowsExtendedBoardAccess = subscriptionState.hasMeguriBoardExtendedAccess
         let cacheKey = MeguriFeedCacheKey(
             latitude: latitude,
             longitude: longitude,
             radiusMeters: 1_000,
             prefecture: selectedPrefecture,
-            scope: scope
+            scope: scope,
+            allowsExtendedBoardAccess: allowsExtendedBoardAccess
         )
         let hasCachedContent = !grooms.isEmpty || !threads.isEmpty
         guard force || meguriFeedCacheKey != cacheKey || !hasCachedContent else {
@@ -48,7 +50,8 @@ extension MegrumAppState {
                 latitude: latitude,
                 longitude: longitude,
                 prefecture: selectedPrefecture,
-                scope: scope
+                scope: scope,
+                allowsExtendedBoardAccess: allowsExtendedBoardAccess
             )
             let nextGrooms = try await loadedGrooms
             let nextThreads = try await loadedThreads

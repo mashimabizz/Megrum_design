@@ -5,7 +5,8 @@ import UIKit
 #endif
 
 enum MegrumTabBarLayoutMetrics {
-    static let titleVerticalAdjustment: CGFloat = -4
+    static let titleVerticalAdjustment: CGFloat = -8
+    static let imageVerticalInset: CGFloat = 3
     static let hidesSystemBackground = true
 }
 
@@ -38,6 +39,12 @@ enum MegrumTabBarAppearance {
         UITabBarItem.appearance().titlePositionAdjustment = UIOffset(
             horizontal: 0,
             vertical: MegrumTabBarLayoutMetrics.titleVerticalAdjustment
+        )
+        UITabBarItem.appearance().imageInsets = UIEdgeInsets(
+            top: MegrumTabBarLayoutMetrics.imageVerticalInset,
+            left: 0,
+            bottom: -MegrumTabBarLayoutMetrics.imageVerticalInset,
+            right: 0
         )
         #endif
     }

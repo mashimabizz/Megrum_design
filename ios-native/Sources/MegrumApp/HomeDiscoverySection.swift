@@ -1,9 +1,12 @@
 import MegrumDesign
 import SwiftUI
 
-enum HomeDiscoverySectionLayout {
+enum HomeDiscoverySectionLayout: Equatable {
     case grid
     case rail
+    /// 案2：1カラムの「扇状カード＋強タグ＋結論一文」行。
+    /// `mirrored` で画像とテキストを左右反転する（推しでマッチ用）。
+    case summaryRows(mirrored: Bool)
 }
 
 struct HomeDiscoverySection: View {
@@ -13,24 +16,28 @@ struct HomeDiscoverySection: View {
     var cardTitleStyle: HomeDiscoveryCardTitleStyle = .plain
     var showsGridHeaderTitle = true
     var showsSeeAllButton = false
+    /// summaryRows で表示する最大行数（超過分は「すべて見る」で開く想定）。
+    var displayLimit: Int? = nil
     var onSelect: (HomeDiscoverySheet) -> Void
     var onSearchCandidate: (HomeDiscoveryCandidate, HomeMockGoods?) -> Void = { _, _ in }
+    /// 「すべて見る」タップ時の遷移。未指定時は従来どおり先頭候補のシートを開く。
+    var onSeeAll: (() -> Void)? = nil
 
     var body: some View {
-        VStack(alignment: .leading, spacing: layout == .grid ? 8 : 10) {
+        VStack(alignment: .leading, spacing: sectionSpacing) {
             HomeDiscoverySectionHeader(
                 title: title,
                 layout: layout,
                 showsGridHeaderTitle: showsGridHeaderTitle,
                 showsSeeAllButton: showsSeeAllButton,
                 isSeeAllDisabled: candidates.isEmpty,
-                onSeeAll: openFirstCandidate
+                onSeeAll: onSeeAll ?? openFirstCandidate
             )
 
             switch layout {
             case .grid:
                 LazyVGrid(columns: [GridItem(.flexible(), spacing: 22), GridItem(.flexible(), spacing: 22)], spacing: 14) {
-                    ForEach(candidates) { candidate in
+                    ForEach(displayedCandidates) { candidate in
                         HomeDiscoveryCandidateButton(
                             candidate: candidate,
                             titleStyle: cardTitleStyle,
@@ -43,7 +50,7 @@ struct HomeDiscoverySection: View {
             case .rail:
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 14) {
-                        ForEach(candidates) { candidate in
+                        ForEach(displayedCandidates) { candidate in
                             HomeHavesCandidateButton(
                                 candidate: candidate,
                                 onSelect: onSelect
@@ -53,9 +60,36 @@ struct HomeDiscoverySection: View {
                     }
                     .padding(.trailing, 20)
                 }
+            case .summaryRows(let mirrored):
+                VStack(spacing: 14) {
+                    ForEach(displayedCandidates) { candidate in
+                        HomeDiscoveryCandidateSummaryRow(
+                            candidate: candidate,
+                            titleStyle: cardTitleStyle,
+                            mirrored: mirrored,
+                            onSelect: onSelect,
+                            onSearch: onSearchCandidate
+                        )
+                    }
+                }
             }
         }
-        .padding(.bottom, layout == .grid ? 8 : 6)
+        .padding(.bottom, layout == .rail ? 6 : 8)
+    }
+
+    private var displayedCandidates: [HomeDiscoveryCandidate] {
+        guard let displayLimit else {
+            return candidates
+        }
+        return Array(candidates.prefix(displayLimit))
+    }
+
+    private var sectionSpacing: CGFloat {
+        switch layout {
+        case .grid: 8
+        case .rail: 10
+        case .summaryRows: 10
+        }
     }
 
     private func openFirstCandidate() {
@@ -89,9 +123,9 @@ private struct HomeDiscoverySectionHeader: View {
                 Button(action: onSeeAll) {
                     HStack(spacing: 4) {
                         Text("すべて見る")
-                            .font(.system(size: 14, weight: .heavy))
+                            .font(.system(size: seeAllFontSize, weight: .heavy))
                         Image(systemName: "chevron.right")
-                            .font(.system(size: 14, weight: .black))
+                            .font(.system(size: seeAllFontSize, weight: .black))
                     }
                     .foregroundStyle(MegrumTheme.lavender)
                 }
@@ -99,6 +133,13 @@ private struct HomeDiscoverySectionHeader: View {
                 .disabled(isSeeAllDisabled)
             }
         }
-        .frame(minHeight: layout == .grid ? 18 : 24)
+        .frame(minHeight: layout == .rail ? 24 : 18)
+    }
+
+    private var seeAllFontSize: CGFloat {
+        if case .summaryRows = layout {
+            return 12.5
+        }
+        return 14
     }
 }

@@ -284,8 +284,9 @@ public struct MegrumRootView: View {
             MegrumAppStateFactory.repository(authSession: authState.session)
         )
         // アプリアイコンのバッジ（未読通知数）を起動直後から反映できるよう、
-        // ドロワーを開く前に通知を読み込んでおく。
-        await appState.loadNotifications()
+        // ドロワーを開く前に通知を読み込んでおく。バッジ用途なので失敗しても
+        // アプリ全体のエラー表示にはしない（起動を壊さない）。
+        await appState.loadNotifications(reportsFailure: false)
     }
 
     private func applyProposalCompletionRoute(_ action: ProposalCompletionAction) {

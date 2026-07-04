@@ -48,6 +48,8 @@ struct GroomViewerScreen: View {
     @State private var dragState = GroomViewerDragPresentationState()
     @State private var interactionState = GroomViewerInteractionState()
     @State private var isShowingOwnInsights = false
+    @State private var isShowingComments = false
+    @State private var isShowingLikes = false
     @State private var isShowingDeleteConfirmation = false
     @State private var storyProgress = 0.0
 
@@ -131,16 +133,15 @@ struct GroomViewerScreen: View {
     var body: some View {
         ZStack {
             Color.black
-                .ignoresSafeArea()
+                .ignoresSafeArea(.container, edges: .top)
 
             viewerSurface
                 .offset(y: viewerVerticalOffset)
                 .scaleEffect(viewerScale)
                 .clipShape(RoundedRectangle(cornerRadius: viewerCornerRadius, style: .continuous))
-                .ignoresSafeArea()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.black.ignoresSafeArea())
+        .background(Color.black.ignoresSafeArea(.container, edges: .top))
         .ignoresSafeArea()
         .task(id: currentGroom.id) {
             await appState.markGroomViewed(currentGroom.id)
@@ -190,6 +191,28 @@ struct GroomViewerScreen: View {
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
         }
+        .sheet(isPresented: $isShowingComments) {
+            GroomViewerCommentsSheet(
+                groom: currentGroom,
+                appState: appState,
+                canReply: canReplyToCurrentGroom,
+                isSendingReply: isSendingReply,
+                replyDraft: $interactionState.replyDraft,
+                onSubmitReply: submitGroomReply,
+                onOpenProfile: onOpenMeguriUserProfile
+            )
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $isShowingLikes) {
+            GroomViewerLikesSheet(
+                groom: currentGroom,
+                appState: appState,
+                onOpenProfile: onOpenMeguriUserProfile
+            )
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+        }
         .gesture(
             DragGesture(minimumDistance: 12)
                 .onChanged { value in
@@ -205,15 +228,12 @@ struct GroomViewerScreen: View {
                     }
                 }
         )
-        #if os(iOS)
-        .statusBarHidden(true)
-        #endif
     }
 
     private var viewerSurface: some View {
         GeometryReader { proxy in
             ZStack {
-                Color.black.ignoresSafeArea()
+                Color.black.ignoresSafeArea(.container, edges: .top)
 
                 AsyncImage(url: currentGroom.imageURL) { phase in
                     switch phase {
@@ -281,6 +301,8 @@ struct GroomViewerScreen: View {
                                 commentCount: currentGroomCommentCount,
                                 isDeleting: appState.deletingGroomPostID == currentGroom.id,
                                 onOpenInsights: { isShowingOwnInsights = true },
+                                onOpenComments: { isShowingComments = true },
+                                onOpenLikes: { isShowingLikes = true },
                                 onDelete: { isShowingDeleteConfirmation = true }
                             )
                         }
@@ -294,9 +316,9 @@ struct GroomViewerScreen: View {
                             isLiked: isCurrentGroomLiked,
                             likeCount: currentGroomLikeCount,
                             commentCount: currentGroomCommentCount,
-                            onSubmitReply: submitGroomReply,
                             onToggleLike: toggleCurrentGroomLike,
-                            replyDraft: $interactionState.replyDraft
+                            onOpenComments: { isShowingComments = true },
+                            onOpenLikes: { isShowingLikes = true }
                         )
                     }
                 }
@@ -304,7 +326,7 @@ struct GroomViewerScreen: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.black.ignoresSafeArea())
+        .background(Color.black.ignoresSafeArea(.container, edges: .top))
     }
 
     private func move(by delta: Int) {

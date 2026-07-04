@@ -100,12 +100,10 @@ extension GoodsCollectionScreen {
         quickActionItem = nil
 
         switch action {
-        case .edit:
-            editorRoute = .edit(item, entryKind)
-        case .moveToKeep:
-            moveItem(item, to: item.status == .keep ? .active : .keep)
         case .tag:
             bulkTagRoute = GoodsBulkTagRoute(itemIDs: [item.id])
+        case .share:
+            presentSharePrompt(for: [item])
         case .delete:
             requestSingleDelete(item)
         }

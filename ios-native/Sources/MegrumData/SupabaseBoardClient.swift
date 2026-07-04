@@ -8,7 +8,7 @@ public enum SupabaseBoardClientError: Error, Equatable, Sendable {
 
 public final class SupabaseBoardClient: @unchecked Sendable {
     private static let threadSelect = "id,author_id,title,body,audience_scope,origin_lat,origin_lng,prefecture,image_paths,group_id,character_id,series_name,status,reply_count,latest_activity_at,expires_at,created_at,anonymous_display_name,anonymous_avatar_id"
-    private static let nearbyRadiusMeters = 3_000.0
+    private static let nearbyRadiusMeters = 1_000.0
     private static let boardMediaBucket = "meguri-board-media"
     private static let maxUploadBytes = Int(9.5 * 1_024 * 1_024)
 
@@ -26,7 +26,8 @@ public final class SupabaseBoardClient: @unchecked Sendable {
         latitude: Double?,
         longitude: Double?,
         prefecture: String?,
-        scope: BoardThread.Audience
+        scope: BoardThread.Audience,
+        allowsExtendedBoardAccess: Bool = false
     ) async throws -> [BoardThread] {
         let rows: [BoardThreadRow] = try await client.rpcRows(
             function: "list_meguri_board_threads_for_viewer",
@@ -44,7 +45,8 @@ public final class SupabaseBoardClient: @unchecked Sendable {
                 longitude: longitude,
                 prefecture: prefecture,
                 scope: scope,
-                radiusMeters: Self.nearbyRadiusMeters
+                radiusMeters: Self.nearbyRadiusMeters,
+                allowsExtendedBoardAccess: allowsExtendedBoardAccess
             ) else {
                 return nil
             }

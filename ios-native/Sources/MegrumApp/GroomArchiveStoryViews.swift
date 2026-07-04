@@ -10,6 +10,9 @@ struct GroomArchiveStoryScreen: View {
     @Environment(\.dismiss) private var dismiss
     @State private var presentationState: GroomArchiveStoryPresentationState
     @State private var isShowingDeleteConfirmation = false
+    @State private var isShowingComments = false
+    @State private var isShowingLikes = false
+    @State private var replyDraft = ""
 
     init(
         grooms: [GroomPost],
@@ -35,7 +38,7 @@ struct GroomArchiveStoryScreen: View {
 
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            Color.black.ignoresSafeArea(.container, edges: .top)
 
             AsyncImage(url: currentGroom.imageURL) { phase in
                 switch phase {
@@ -116,6 +119,8 @@ struct GroomArchiveStoryScreen: View {
                         commentCount: appState.groomReplies(for: currentGroom.id).count,
                         isDeleting: appState.deletingGroomPostID == currentGroom.id,
                         onOpenInsights: { presentationState.showInsights() },
+                        onOpenComments: { isShowingComments = true },
+                        onOpenLikes: { isShowingLikes = true },
                         onDelete: { isShowingDeleteConfirmation = true }
                     )
                 }
@@ -147,6 +152,28 @@ struct GroomArchiveStoryScreen: View {
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
         }
+        .sheet(isPresented: $isShowingComments) {
+            GroomViewerCommentsSheet(
+                groom: currentGroom,
+                appState: appState,
+                canReply: false,
+                isSendingReply: false,
+                replyDraft: $replyDraft,
+                onSubmitReply: {},
+                onOpenProfile: { _ in }
+            )
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $isShowingLikes) {
+            GroomViewerLikesSheet(
+                groom: currentGroom,
+                appState: appState,
+                onOpenProfile: { _ in }
+            )
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+        }
         .confirmationDialog("このグルームを削除しますか？", isPresented: $isShowingDeleteConfirmation, titleVisibility: .visible) {
             Button("削除する", role: .destructive) {
                 deleteCurrentGroom()
@@ -155,9 +182,6 @@ struct GroomArchiveStoryScreen: View {
         } message: {
             Text("削除すると、めぐりホームとグルームアーカイブから表示されなくなります。")
         }
-        #if os(iOS)
-        .statusBarHidden(true)
-        #endif
     }
 
     private func move(by delta: Int) {

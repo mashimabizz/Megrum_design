@@ -46,6 +46,10 @@ extension GoodsCollectionScreen {
 
     func presentSelectedSharePrompt() {
         let targetItems = selectedItems.filter(isOwnedItem)
+        presentSharePrompt(for: targetItems)
+    }
+
+    func presentSharePrompt(for targetItems: [GoodsItem]) {
         guard !targetItems.isEmpty else {
             return
         }

@@ -528,6 +528,25 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertFalse(state.isLoadingMeguri)
     }
 
+    #if DEBUG
+    func testAppStateRefreshesCachedMeguriFeedWhenBoardAccessChanges() async {
+        let repository = CountingMeguriRepository()
+        let state = MegrumAppState(repository: repository)
+
+        await state.loadMeguriFeed(latitude: 35.681236, longitude: 139.767125, scope: .nearby3km)
+
+        state.debugToggleMegrumPremiumEntitlement(now: Date(timeIntervalSince1970: 1_800_000_000))
+        await state.loadMeguriFeed(latitude: 35.681240, longitude: 139.767129, scope: .nearby3km)
+
+        let groomLoadCount = await repository.groomLoadCount()
+        let boardLoadCount = await repository.boardLoadCount()
+        let receivedAccessFlags = await repository.receivedExtendedBoardAccessFlags()
+        XCTAssertEqual(groomLoadCount, 2)
+        XCTAssertEqual(boardLoadCount, 2)
+        XCTAssertEqual(receivedAccessFlags, [false, true])
+    }
+    #endif
+
     func testAppStateLoadsAndSendsPreviewBoardReplies() async {
         let state = MegrumAppState(repository: PreviewMegrumRepository())
         let threadID = UUID(uuidString: "00000000-0000-0000-0000-000000000601")!
@@ -2425,6 +2444,7 @@ private actor CountingMeguriRepository: MegrumRepository {
     private let viewerID = UUID(uuidString: "44444444-4444-4444-4444-444444444441")!
     private var groomLoads = 0
     private var boardLoads = 0
+    private var extendedBoardAccessFlags: [Bool] = []
 
     func loadInitialSnapshot() async throws -> MegrumAppSnapshot {
         MegrumAppSnapshot(
@@ -2458,9 +2478,11 @@ private actor CountingMeguriRepository: MegrumRepository {
         latitude: Double?,
         longitude: Double?,
         prefecture: String?,
-        scope: BoardThread.Audience
+        scope: BoardThread.Audience,
+        allowsExtendedBoardAccess: Bool
     ) async throws -> [BoardThread] {
         boardLoads += 1
+        extendedBoardAccessFlags.append(allowsExtendedBoardAccess)
         return [
             BoardThread(
                 id: UUID(uuidString: "44444444-4444-4444-4444-444444444461")!,
@@ -2481,6 +2503,10 @@ private actor CountingMeguriRepository: MegrumRepository {
 
     func boardLoadCount() -> Int {
         boardLoads
+    }
+
+    func receivedExtendedBoardAccessFlags() -> [Bool] {
+        extendedBoardAccessFlags
     }
 }
 

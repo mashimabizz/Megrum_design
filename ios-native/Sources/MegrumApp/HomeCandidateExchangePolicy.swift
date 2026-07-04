@@ -69,6 +69,43 @@ enum HomeCandidateExchangePolicy {
         })
     }
 
+    /// 自分と相手のAWが重なっている組のうち、最初に見つかった会場名。
+    /// 相手側の会場名を優先し、無ければ自分側を使う。
+    static func matchedVenue(
+        viewerWindows: [SupabaseHomeActivityWindowRow],
+        partnerWindows: [SupabaseHomeActivityWindowRow]
+    ) -> String? {
+        for viewerWindow in viewerWindows {
+            for partnerWindow in partnerWindows where windowsOverlap(viewerWindow, partnerWindow) {
+                if let venue = trimmed(partnerWindow.venue ?? "") ?? trimmed(viewerWindow.venue ?? "") {
+                    return venue
+                }
+            }
+        }
+        return nil
+    }
+
+    /// 自分と相手の両方が現地予定を持つ日付キー（結論一文の日付表示用）。
+    static func matchedLocalDateKeys(
+        viewerWindows: [SupabaseHomeActivityWindowRow],
+        partnerWindows: [SupabaseHomeActivityWindowRow]
+    ) -> Set<String> {
+        localDateKeys(from: viewerWindows).intersection(localDateKeys(from: partnerWindows))
+    }
+
+    /// 都道府県名の表示用短縮（東京都→東京、大阪府→大阪、神奈川県→神奈川。
+    /// 北海道はそのまま）。
+    static func shortPrefectureName(_ name: String) -> String {
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmedName != "北海道", trimmedName.count > 1 else {
+            return trimmedName
+        }
+        if let last = trimmedName.last, ["都", "府", "県"].contains(String(last)) {
+            return String(trimmedName.dropLast())
+        }
+        return trimmedName
+    }
+
     static func prefecturesMatch(_ lhs: String?, _ rhs: String?) -> Bool {
         guard let lhs = normalizedArea(lhs),
               let rhs = normalizedArea(rhs)

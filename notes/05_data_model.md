@@ -3,13 +3,14 @@
 > **目的**：Megrum の全エンティティのDBスキーマ設計と、状態・マッチング・取引のデータフロー定義。
 > 実装の正解集。`09_state_machines.md` と完全に整合させ、`10_glossary.md` の用語を使う。
 
-最終更新: 2026-07-01
-ステータス: Draft v2.63（iter1226.258 めぐりプロフィール変更ロックを表示名に限定）
+最終更新: 2026-07-03
+ステータス: Draft v2.64（iter1226.273 profile-photos Storage bucket を追加）
 
 ## 最新化履歴
 
 | Rev | 日付 | 変更 |
 |---|---|---|
+| **v2.64** | **2026-07-03** | **iter1226.273 反映（`profile-photos` Storage bucket を追加し、めぐりプロフィール/グッズ交換プロフィールのカスタムアイコンURL保存で使う公開プロフィール画像アップロード先をDB側に用意）** |
 | **v2.63** | **2026-07-01** | **iter1226.258 反映（`meguri_profiles.last_changed_at` と保存RPCの1ヶ月ロック対象を表示名変更に限定し、アイコン変更・`uses_public_profile` 切り替えは保存できるようにした）** |
 | **v2.62** | **2026-06-30** | **iter1226.231 反映（`groom_posts` / `meguri_board_threads` に任意の `group_id` / `character_id` / `series_name` を追加し、めぐりホームで推し・シリーズによる表示フィルターに使えるようにした）** |
 | **v2.61** | **2026-06-29** | **iter1226.187 反映（`listings.have_is_cash_offer` / `have_cash_amount` を追加し、譲る側を定価/金額指定にした個別募集でも `have_ids=[]` / `have_qtys=[]` を正規に保存できるようにした）** |
@@ -587,7 +588,7 @@ iter1225 以降、いいね操作は `set_groom_like_for_viewer(p_post_id,p_is_l
 | `display_name` | text | めぐり内表示名。1〜24文字 |
 | `display_name_key` | text | 空白を除去して小文字化した匿名モード用の一意判定キー |
 | `avatar_id` | text | `avatar_1`〜`avatar_6` |
-| `avatar_url` | text nullable | めぐり専用のカスタムアイコンURL。未設定時は `avatar_id` を使う |
+| `avatar_url` | text nullable | めぐり専用のカスタムアイコンURL。ユーザー画像は公開Storage `profile-photos/{user_id}/{timestamp}_{uuid}.{ext}` に保存する。未設定時は `avatar_id` を使う |
 | `uses_public_profile` | boolean | true の時は、めぐり内の表示名・アイコンを `users` 側のグッズ交換プロフィールに連携して表示する |
 | `last_changed_at` | timestamptz | 最後にめぐり内表示名を変更した時刻。アイコン変更や `uses_public_profile` 切り替えでは更新しない |
 | `created_at` / `updated_at` | timestamptz | |
@@ -620,7 +621,7 @@ iter1226.177 以降、グルームへの返信から始まる/反応一覧から
 
 ### `meguri_board_threads`（スポット掲示板スレッド / iter168.73）
 
-めぐり配下で使う、現地の情報共有・雑談向けのスレッド。交換成立のための打診・取引とは切り離し、現地の温度感や列状況、導線、ゆるい雑談を残す。iter168.89 以降、スレッド作成時の位置を `origin_lat/origin_lng` に保存し、閲覧は `nearby_3km`（作成地点から3km圏内）または `same_prefecture`（都道府県単位）に絞る。
+めぐり配下で使う、現地の情報共有・雑談向けのスレッド。交換成立のための打診・取引とは切り離し、現地の温度感や列状況、導線、ゆるい雑談を残す。iter168.89 以降、スレッド作成時の位置を `origin_lat/origin_lng` に保存する。`nearby_3km` は互換維持のraw値だが、現在仕様では無料ユーザーの閲覧は作成地点から1km圏内、有料権限を持つユーザーはチャットルームに限り1km圏外も表示可能。`same_prefecture` は都道府県単位で閲覧する。
 
 | カラム | 型 | 説明 |
 |---|---|---|
@@ -651,7 +652,7 @@ iter1226.177 以降、グルームへの返信から始まる/反応一覧から
 | `expires_at` | timestamptz | iter1225 追加。最後の書き込みから7日後。期限切れは `archived` 化して通常表示から外す |
 | `created_at` / `updated_at` | timestamptz | |
 
-> **公開範囲方針**：`nearby_3km` は現在地と `origin_lat/origin_lng` の距離でRPC判定する。`same_prefecture` はスレッド作成時の都道府県と閲覧者側の都道府県で判定する。正確な緯度経度は画面に表示しない。
+> **公開範囲方針**：`nearby_3km` は現在地と `origin_lat/origin_lng` の距離でRPC判定する。無料ユーザーは1km以内、有料権限（`megrum_plus` / `meguri_plus` / `premium`）を持つユーザーはチャットルームに限り1km圏外も表示できる。`same_prefecture` はスレッド作成時の都道府県と閲覧者側の都道府県で判定する。正確な緯度経度は画面に表示しない。
 
 > **画像添付方針（iter176）**：スレッド画像は `meguri-board-media` private Storage に保存し、DBには path のみを持つ。アプリは `list_meguri_board_threads_for_viewer()` で閲覧可能なスレッドを取得した後に署名URLを発行して表示する。
 

@@ -70,7 +70,9 @@ extension GoodsCollectionScreen {
                     GoodsEditorSheet(
                         appState: appState,
                         route: route,
-                        onCreatedInventoryItems: presentSharePrompt
+                        onCreatedInventoryItems: { createdItems in
+                            presentSharePrompt(createdItems)
+                        }
                     )
                 }
             }

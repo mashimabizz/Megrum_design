@@ -32,6 +32,10 @@ public struct HomeExchangeConditionSignals: Equatable, Sendable {
     public var localRouteDateNeedsDiscussion: Bool
     public var partnerLocalPrefectures: Set<String>
     public var partnerLocalDateKeys: Set<String>
+    /// 自分と相手のAWが重なった時の会場名（結論一文の「〈会場〉で」表示用）。
+    public var matchedVenue: String?
+    /// 自分と相手の現地日程が重なった日付キー（結論一文の「〈M/D〉に」表示用）。
+    public var matchedLocalDateKeys: Set<String>
 
     public init(
         postalAcceptedByBoth: Bool,
@@ -53,7 +57,9 @@ public struct HomeExchangeConditionSignals: Equatable, Sendable {
         localRoutePrefectureUnset: Bool? = nil,
         localRouteDateNeedsDiscussion: Bool? = nil,
         partnerLocalPrefectures: Set<String> = [],
-        partnerLocalDateKeys: Set<String> = []
+        partnerLocalDateKeys: Set<String> = [],
+        matchedVenue: String? = nil,
+        matchedLocalDateKeys: Set<String> = []
     ) {
         self.postalAcceptedByBoth = postalAcceptedByBoth
         self.localExchangeSelected = localExchangeSelected
@@ -75,6 +81,11 @@ public struct HomeExchangeConditionSignals: Equatable, Sendable {
         self.localRouteDateNeedsDiscussion = localRouteDateNeedsDiscussion ?? dateNeedsDiscussion
         self.partnerLocalPrefectures = Set(partnerLocalPrefectures.compactMap(Self.normalizedSettingText))
         self.partnerLocalDateKeys = Set(partnerLocalDateKeys)
+        self.matchedVenue = matchedVenue.flatMap {
+            let trimmed = $0.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.isEmpty ? nil : trimmed
+        }
+        self.matchedLocalDateKeys = matchedLocalDateKeys
     }
 
     private static func normalizedSettingText(_ value: String) -> String? {

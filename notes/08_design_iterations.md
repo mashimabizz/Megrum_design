@@ -4,6 +4,200 @@
 
 ---
 
+## イテレーション1226.274：チャット範囲外表示をプレミアム化
+
+### 背景・問題意識
+
+過去仕様の「3km外は表示しない」前提が残り、別アカウントが作成したグルームやチャットルームがめぐり上に見えないケースがあった。最新版の仕様は、グルーム/チャットルームの作成は現在地から1km圏内、チャットルームの表示は無料ユーザーが1km圏内、プレミアム系権限ユーザーは1km圏外も可能。グルーム通常閲覧は1km圏内を維持する。
+
+### 変更内容
+
+#### `supabase/migrations/20260704003000_update_meguri_board_radius_policy.sql`
+- `can_view_meguri_board_thread_with_context()` の `nearby_3km` 判定を、無料ユーザーは1km以内、有料権限（`megrum_plus` / `meguri_plus` / `premium`）ありならチャットルームの1km圏外表示も許可するよう更新。
+- `nearby_3km` はDB互換のraw値として残し、距離仕様だけを現行仕様へ合わせた。
+
+#### `ios-native/Sources/MegrumApp/MegrumAppStateMeguriActions.swift` / `MeguriFeedCacheKey.swift`
+- `subscriptionState.hasMeguriBoardExtendedAccess` をチャットルーム取得に渡し、無料/有料の表示条件が変わった時に同じ位置キャッシュを使い回さないようにした。
+
+#### `ios-native/Sources/MegrumApp/MegrumRepository.swift` / `SupabaseMegrumRepositoryMeguri.swift` / `PreviewMegrumRepositoryMeguri.swift`
+- `loadBoardThreads` にチャット範囲外表示権限フラグを追加。
+
+#### `ios-native/Sources/MegrumData/SupabaseBoardClient.swift` / `SupabaseBoardRows.swift`
+- クライアント側の二重フィルタを1kmへ変更。
+- 有料権限フラグがある場合はRPCが返したチャットルームを1km外でも落とさないようにした。
+
+#### `ios-native/Sources/MegrumApp/MeguriMapScreenDerivedState.swift`
+- プレミアム権限がある場合の地図ステータス文言を、チャットルームは範囲外表示できる前提に変更。
+
+#### `ios-native/Sources/MegrumApp/MegrumTabBarAppearance.swift` / `ios-native/Tests/MegrumAppTests/GoodsGridLayoutTests.swift`
+- 対象テストのコンパイルを通すため、既存テストが期待していたタブバー指標定数を復元。
+- 前回の長押しメニュー3項目仕様に合わせ、古い「編集/キープ」期待のテストを「シリーズ設定/Xで投稿/削除」へ更新。
+
+#### `notes/05_data_model.md` / `notes/09_state_machines.md` / `notes/13_api_spec.md`
+- `nearby_3km` は互換raw値として残すが、現在仕様は無料1km、有料チャット範囲外表示可であることを明記。
+
+### 影響範囲
+
+- めぐりホーム/マップのチャットルーム一覧・詳細遷移。
+- Supabase RPC `can_view_meguri_board_thread_with_context()`。
+- グルーム通常閲覧、グルーム作成、チャットルーム作成の1km制限は維持。
+- チャットルームのDB scope名や既存データは変更なし。
+
+### 確認方法
+
+- `git diff --check`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1 --filter 'MegrumAppStateTests/testAppState(ReusesCachedMeguriFeedForSameLocationBucket|RefreshesCachedMeguriFeedWhenBoardAccessChanges)|SupabaseBoardClientTests/testLoadThreadsFiltersUnexpectedFarNearbyRowsClientSide|MeguriAccessPolicyTests/testBoardAccessAllowsNearbyAndBlocksOutsideOneKilometer|MegrumTabBarAppearanceTests/testTabBarKeepsLabelsRaisedAboveBottomGlass|GoodsGridLayoutTests/testInventoryQuickActionsMatchOwnerMenuOrder'`
+  - passed（フィルタの都合でMeguriAccessPolicyは下記で単独実行）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1 --filter 'MeguriAccessPolicyTests/testBoardAccessAllowsNearbyAndBlocksOutsideOneKilometer'`
+  - passed
+- `supabase db push --linked`
+  - passed（`20260704003000_update_meguri_board_radius_policy.sql` をremoteへ適用）
+- `supabase db query --linked "select pg_get_functiondef(...) like ..."`
+  - passed（remote関数が `<= 1000` と `has_active_entitlement(... 'megrum_plus')` を含むことを確認）
+
+### セルフレビュー結果
+
+- ✅ 3km上限をチャットルーム表示仕様から外し、無料1km/有料範囲外可へ整理した。
+- ✅ 作成位置制限は既存の1km判定を維持し、1km外からグルーム/チャットを作れるようにはしていない。
+- ✅ グルーム通常閲覧は有料権限で広げていない。
+- ✅ `nearby_3km` は既存DB互換のraw値として残し、既存データ移行を発生させていない。
+
+---
+
+## イテレーション1226.273：profile-photos Storage追加
+
+### 背景・問題意識
+
+めぐりプロフィールで自分の画像をアイコンとして選んで保存すると「めぐりプロフィールを保存できませんでした」と表示される。Swift Native側は `SupabaseProfilePhotoStorage` 経由で `profile-photos` bucket へ画像をアップロードしてから `meguri_profiles.avatar_url` を保存する実装だが、Supabase migrations に `profile-photos` bucket とStorage RLS policyを作成する定義がなかった。
+
+### 変更内容
+
+#### `supabase/migrations/20260703150000_setup_profile_photos_storage.sql`
+- `profile-photos` bucket を public / 10MB / `image/jpeg`, `image/png`, `image/webp`, `image/gif` 許可で作成。
+- 既にbucketがある環境でも設定が揃うよう `on conflict (id) do update` にした。
+- Storage object policyを追加し、認証ユーザーは自分の `user_id` フォルダ配下だけ upload/update/delete でき、表示は public bucket として誰でも読めるようにした。
+
+#### `notes/05_data_model.md`
+- `profile-photos` bucket をデータモデル履歴と `meguri_profiles.avatar_url` の保存先として記録。
+
+### 影響範囲
+
+- Supabase Storage `profile-photos`
+- Swift Nativeのグッズ交換プロフィール画像・めぐりプロフィールのカスタムアイコン画像アップロード経路
+- `meguri_profiles` テーブル、保存RPC、画面UI、状態遷移、既存のプリセットアイコン選択は変更なし。
+
+### 確認方法
+
+- `rg -n "profile-photos|storage\\.buckets|storage\\.objects" supabase/migrations/20260703150000_setup_profile_photos_storage.sql ios-native/Sources/MegrumApp/SupabaseProfilePhotoStorage.swift notes/05_data_model.md`
+
+### セルフレビュー結果
+
+- ✅ アプリ側の既存アップロードbucket名 `profile-photos` とmigrationのbucket名を一致させた。
+- ✅ Storage path先頭を `auth.uid()` に限定し、他ユーザーのフォルダへ書き込めないようにした。
+- ✅ 既存の `meguri_profiles.avatar_url` 保存契約は維持し、画像アップロード前提のDB/Storage不足だけを補った。
+
+---
+
+## イテレーション1226.272：グルーム反応UIと表示状態補正
+
+### 背景・問題意識
+
+実機確認で、やりとり一覧の「評価待ち」表示、マイグッズ/ウィッシュの長押しメニュー、グルーム表示時のタブバー・ステータスバー位置・反応UI、アルバム画像の見切れ、チャット/メッセージ詳細遷移のカクつきについてまとめて改善要望があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/TradeMessageSystemPresentations.swift` / `TradeMessageEvaluationPresentations.swift` / `TradeMessageStateReducer.swift` / `MegrumAppStateTradeResolutionActions.swift`
+- 評価済み判定で `senderID` だけに依存せず、サーバー由来の評価通知に含まれる `rater_id` を優先して評価者を判定するように変更。
+- ローカル追加する評価通知メタにも `rater_id` を入れ、自分の評価がサーバー反映された後も「評価待ち」が残らないようにした。
+
+#### `ios-native/Sources/MegrumApp/GoodsGridPresentation.swift` / `GoodsSelectionFooter.swift` / `GoodsCollectionItemMutationActions.swift` / `GoodsCollectionShareActions.swift`
+- マイグッズ/ウィッシュの長押しアクションを「シリーズ設定」「Xで投稿」「削除」の3つに整理。
+- フッター表示の文言・フォント調整で「シリーズ設定」が途中で切れないようにした。
+
+#### `ios-native/Sources/MegrumApp/GroomViewerScreen.swift` / `GroomViewerChromeViews.swift` / `GroomViewerImmersivePresentationChrome.swift` / `GroomArchiveStoryViews.swift`
+- グルーム表示時にタブバーを強制非表示にしない構造へ変更。
+- 通常のグルームとアーカイブで、ステータスバー領域は黒のまま、コンテンツ開始位置を揃えるように調整。
+- いいね/コメントは縦並び（ハート、数、コメント、数）に変更し、いいね時は既存のバースト演出を維持。
+- コメントは下から出るシートで一覧・投稿欄を表示し、いいねアイコン長押しでいいねした人の一覧を表示するようにした。
+
+#### `ios-native/Sources/MegrumApp/GroomStoryPhotoLibraryViews.swift` / `GroomStoryComposerStepParts.swift`
+- グルーム追加時のアルバム画像とプレビューを `aspectFit` 表示にして、縦横比の都合で途中までしか見えない状態を避けた。
+
+#### `ios-native/Sources/MegrumApp/MegrumAuthenticatedTabContentView.swift` / `TradesDetailPresentationModifier.swift`
+- 右横からスライドする詳細画面の重い初期化を `MegrumDeferredContent` で遅延し、遷移アニメーション中の負荷を下げた。
+
+#### `ios-native/Tests/MegrumAppTests/TradeMessageStateReducerTests.swift` / `TradeChatAffordanceTests.swift`
+- `rater_id` が自分を指すサーバー評価通知を、自分の評価済みとして扱う回帰テストを追加。
+
+### 影響範囲
+
+- Swift Native iOS のやりとり一覧、マイグッズ/ウィッシュ、グルーム閲覧/アーカイブ/追加、めぐり/やりとり詳細遷移。
+- DBスキーマ、Supabase API、通知、取引状態遷移そのものは変更なし。
+
+### 確認方法
+
+- `git diff --check`
+  - passed
+- `swift build --package-path ios-native`
+  - failed: `.build/build.db: disk I/O error`
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-build`
+  - blocked: 既存の未追跡ファイル `ios-native/Sources/MegrumApp/BoardThreadDetailScreen (1).swift` が `BoardThreadDetailScreen` を重複定義しており、ビルドがそこで停止
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1 --filter 'TradeMessageStateReducerTests|TradeChatAffordanceTests'`
+  - blocked: 同じ未追跡ファイルの重複定義でテスト実行前のコンパイルが停止
+
+### セルフレビュー結果
+
+- ✅ 「評価待ち」は自分の評価済み判定だけを補正し、相手未評価時に相手側の状態まで評価済みに見せる変更はしていない。
+- ✅ グルームのいいね/コメントは既存の `setGroomLiked` / `sendGroomReply` 経路を再利用し、保存・同期の経路は増やしていない。
+- ✅ タブバー/ステータスバー調整はグルーム表示層に限定し、既存タブ構成やナビゲーションルートは維持。
+- ⚠️ 未追跡の重複Swiftファイルを触らない方針のため、Swiftビルドとテストの完走は未確認。
+
+---
+
+## イテレーション1226.272：ホーム候補カード案2の本実装（強タグ・結論一文・塊ソート・すべて見る）
+
+### 背景・問題意識
+
+モックで固めた案2をホーム本体へ実装する。事前にオーナーと確定したロジック仕様：①郵送のみで交換exactのタグは「郵送OK」を6語彙目として新設 ②県名は短縮表示（東京都→東京、北海道はそのまま）③支払unknownは結論一文に出さない（詳細画面送り）。
+
+### 変更内容
+
+#### `HomeCandidateSummaryPolicy.swift`（新規・純ロジック）
+- ランク（4=ぴったり/3=指名あり/2=会えそう・郵送OK/1=wish一致/0=要相談）、強タグ決定、塊ソート（ランク2以上のグッズ数→最大ランク→従来順）、代表グッズ選定（ランク最大を扇の先頭へ）、結論一文生成（節A=グッズ軸・節B=交換軸、要相談は最軽ポイント1個＋相手の実値、38字超で括弧を落とす）を実装。
+- `HomeCandidateSummaryPolicyTests`（18件）で全パス確認。
+
+#### signals拡張（`HomeCandidateConditionSignals` / `HomeCandidateExchangePolicy` / ビルダー）
+- `matchedVenue`（重なったAWの会場名）と `matchedLocalDateKeys`（自分∩相手の日付キー）を追加し、「〈会場/県〉で〈M/D〉に会えそう」の具体表示を可能にした。
+- `shortPrefectureName`（都/府/県サフィックス除去、北海道除く）。
+
+#### UI（`HomeDiscoveryCandidateSummaryRow.swift` 新規、`HomeDiscoverySection` / `HomeDiscoveryExperience` / `HomeDiscoverySeeAllSheet.swift` 新規）
+- セクションレイアウトに `summaryRows(mirrored:)` を追加。行＝塊ラベル（画像上中央・検索ボタン）＋扇状カード＋強タグ＋結論一文。ロータリー回転でタグ・一文も選択グッズに追従。
+- セクション名を「推し×シリーズでマッチ」「推しでマッチ」（ミラー行）へ変更。上位3件表示＋4件以上で「すべて見る」→全件一覧シート（選択時はシートを閉じてから遷移）。
+- 派生状態のprefixを廃し、塊ソート済みの全件を保持。
+
+#### 起動安定化（`MegrumAppStateNotificationActions` / `MegrumRootView`）
+- 起動時のバッジ用通知読み込みを `reportsFailure: false` に。失敗時にアプリ全体が「読み込めませんでした」画面になる回帰（サインイン完了前のレースで発生）を修正。
+
+### 影響範囲
+
+- ホームのマッチ2セクションの見た目・並び・遷移。検索結果などのグリッド表示は従来のまま
+- 旧3条件タグはホーム候補行からは廃止（タップ後の関係画面・詳細は従来通り）
+
+### 確認方法
+
+- `swift test --filter HomeCandidateSummaryPolicyTests`（18件）
+- シミュレータ＋ライブアカウントで、新セクション名・ミラー行・郵送OKタグ・結論一文・すべて見るリンク・ソート（郵送OK塊×2が「ぴったり」1個持ち塊より上＝件数優先の仕様どおり）を確認
+
+### セルフレビュー結果
+
+- ✅ 用語集（notes/10）に「推し×シリーズでマッチ／推しでマッチ／強タグ／結論一文」を追加、旧称を併記
+- ✅ 配色・部品は既存を踏襲（MegrumTheme／RotaryCard再利用）
+- ⚠️ ソートは仕様どおり「件数優先」のため、グッズ1個の「ぴったり」塊が郵送OK複数持ち塊の下に来ることがある。違和感があれば「最大ランク優先」への切替を検討
+- ⚠️ VisualQAモック（home-card-redesign）は本実装と重複するため、次の整理で削除候補
+
+---
+
 ## イテレーション1226.271：案2モック微調整（見出し行のミラー解除）
 
 ### 背景・問題意識

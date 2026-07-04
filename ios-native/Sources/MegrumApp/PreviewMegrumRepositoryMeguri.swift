@@ -133,7 +133,13 @@ public extension PreviewMegrumRepository {
         }
     }
 
-    func loadBoardThreads(latitude: Double?, longitude: Double?, prefecture: String?, scope: BoardThread.Audience) async throws -> [BoardThread] {
+    func loadBoardThreads(
+        latitude: Double?,
+        longitude: Double?,
+        prefecture: String?,
+        scope: BoardThread.Audience,
+        allowsExtendedBoardAccess: Bool
+    ) async throws -> [BoardThread] {
         NativePreviewData.threads.filter { thread in
             switch scope {
             case .nearby3km:

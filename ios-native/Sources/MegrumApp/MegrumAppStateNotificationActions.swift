@@ -2,17 +2,21 @@ import Foundation
 import MegrumCore
 
 extension MegrumAppState {
-    public func loadNotifications() async {
+    public func loadNotifications(reportsFailure: Bool = true) async {
         guard !isLoadingNotifications else {
             return
         }
 
         isLoadingNotifications = true
-        errorMessage = nil
+        if reportsFailure {
+            errorMessage = nil
+        }
         do {
             notifications = try await repository.loadNotifications(limit: 100)
         } catch {
-            errorMessage = "通知を読み込めませんでした"
+            if reportsFailure {
+                errorMessage = "通知を読み込めませんでした"
+            }
         }
         isLoadingNotifications = false
     }

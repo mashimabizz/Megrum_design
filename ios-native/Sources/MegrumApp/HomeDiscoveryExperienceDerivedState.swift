@@ -17,7 +17,9 @@ extension HomeDiscoveryExperience {
             goodsTypes: goodsTypes,
             conditionSignalsByItemID: displayConditionSignalsByItemID
         )
-        return Array(candidates.prefix(4))
+        // 塊内に成立しやすいグッズを多く含むものが上（iter1226.272）。
+        // 上位3件をセクション表示し、全件は「すべて見る」から。
+        return HomeCandidateSummaryPolicy.sortedCandidates(candidates)
     }
 
     var userCandidates: [HomeDiscoveryCandidate] {
@@ -35,7 +37,7 @@ extension HomeDiscoveryExperience {
             goodsTypes: goodsTypes,
             conditionSignalsByItemID: displayConditionSignalsByItemID
         )
-        return Array(candidates.prefix(HomeDiscoveryCandidateFactory.memberCandidateDisplayLimit))
+        return HomeCandidateSummaryPolicy.sortedCandidates(candidates)
     }
 
     var viewerOfferGoods: [HomeMockGoods] {

@@ -38,7 +38,8 @@ public enum TradeMessageStateReducer {
             return remoteMessages
         }
         let remoteHasViewerEvaluation = remoteMessages.contains { message in
-            message.senderID == viewerID && TradeEvaluationSystemMessage.isEvaluationNotice(message)
+            TradeEvaluationSystemMessage.isEvaluationNotice(message)
+                && TradeEvaluationSystemMessage.raterID(for: message) == viewerID
         }
         guard !remoteHasViewerEvaluation else {
             return remoteMessages
@@ -46,9 +47,9 @@ public enum TradeMessageStateReducer {
 
         let remoteIDs = Set(remoteMessages.map(\.id))
         let localViewerEvaluationNotices = existingMessages.filter { message in
-            message.senderID == viewerID
+            TradeEvaluationSystemMessage.isEvaluationNotice(message)
+                && TradeEvaluationSystemMessage.raterID(for: message) == viewerID
                 && !remoteIDs.contains(message.id)
-                && TradeEvaluationSystemMessage.isEvaluationNotice(message)
         }
         guard !localViewerEvaluationNotices.isEmpty else {
             return remoteMessages

@@ -52,7 +52,15 @@ enum HomeCandidateConditionSignalsBuilder {
                 partnerExchangeMethodTitle: partnerExchangeMethodTitle,
                 partnerLocalConditionText: candidateAllowsLocal ? partnerLocalConditionText : nil,
                 partnerLocalPrefectures: partnerLocalPrefectures,
-                partnerLocalDateKeys: partnerLocalDateKeys
+                partnerLocalDateKeys: partnerLocalDateKeys,
+                matchedVenue: HomeCandidateExchangePolicy.matchedVenue(
+                    viewerWindows: viewerActivityWindows,
+                    partnerWindows: partnerActivityWindows
+                ),
+                matchedLocalDateKeys: HomeCandidateExchangePolicy.matchedLocalDateKeys(
+                    viewerWindows: viewerActivityWindows,
+                    partnerWindows: partnerActivityWindows
+                )
             ),
             payment: paymentSignals,
             linkCounts: linkCounts,

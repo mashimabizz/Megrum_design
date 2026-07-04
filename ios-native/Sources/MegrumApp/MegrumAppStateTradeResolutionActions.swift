@@ -44,7 +44,8 @@ extension MegrumAppState {
         }
         let messages = messagesByProposalID[proposalID] ?? []
         let alreadyHasViewerEvaluationNotice = messages.contains { message in
-            message.senderID == viewerID && TradeEvaluationSystemMessage.isEvaluationNotice(message)
+            TradeEvaluationSystemMessage.isEvaluationNotice(message)
+                && TradeEvaluationSystemMessage.raterID(for: message) == viewerID
         }
         guard !alreadyHasViewerEvaluationNotice else {
             return
@@ -53,6 +54,7 @@ extension MegrumAppState {
         var meta: [String: String] = [
             "action": TradeEvaluationSystemMessage.action,
             "stars": "\(evaluation.stars)",
+            "rater_id": viewerID.uuidString.lowercased(),
             "rater_display_name": evaluation.raterDisplayName,
             "rater_handle": evaluation.raterHandle
         ]

@@ -39,6 +39,7 @@ struct HomeDiscoveryExperience: View {
     @State var pendingProfileUserID: UUID?
     @State var didOpenInitialSheet = false
     @State var selectedPrimaryTab: HomeDiscoveryPrimaryTab = .candidates
+    @State var seeAllRoute: HomeDiscoverySeeAllRoute?
     @State var showsIndividualListingCreation = false
     @State var sharePromptContext: GoodsSharePostContext?
     @State var isPreparingSharePost = false
@@ -56,25 +57,31 @@ struct HomeDiscoveryExperience: View {
             ) {
                 VStack(alignment: .leading, spacing: 14) {
                     HomeDiscoverySection(
-                        title: "メンバー×シリーズでマッチ",
+                        title: "推し×シリーズでマッチ",
                         candidates: userTagCandidates,
-                        layout: .grid,
+                        layout: .summaryRows(mirrored: false),
                         cardTitleStyle: .memberTag,
+                        showsSeeAllButton: userTagCandidates.count > HomeDiscoverySummarySectionMetrics.displayLimit,
+                        displayLimit: HomeDiscoverySummarySectionMetrics.displayLimit,
                         onSelect: { selectedSheet = $0 },
                         onSearchCandidate: { candidate, selectedGoods in
                             openSearch(for: candidate, selectedGoods: selectedGoods, source: .userTag)
-                        }
+                        },
+                        onSeeAll: { seeAllRoute = .userTag }
                     )
 
                     HomeDiscoverySection(
-                        title: "メンバーでマッチ",
+                        title: "推しでマッチ",
                         candidates: userCandidates,
-                        layout: .grid,
+                        layout: .summaryRows(mirrored: true),
                         cardTitleStyle: .member,
+                        showsSeeAllButton: userCandidates.count > HomeDiscoverySummarySectionMetrics.displayLimit,
+                        displayLimit: HomeDiscoverySummarySectionMetrics.displayLimit,
                         onSelect: { selectedSheet = $0 },
                         onSearchCandidate: { candidate, selectedGoods in
                             openSearch(for: candidate, selectedGoods: selectedGoods, source: .user)
-                        }
+                        },
+                        onSeeAll: { seeAllRoute = .user }
                     )
 
                     if !havesCandidates.isEmpty {
@@ -132,6 +139,24 @@ struct HomeDiscoveryExperience: View {
             )
             .presentationDetents([.large])
             .presentationDragIndicator(.visible)
+        }
+        .sheet(item: $seeAllRoute) { route in
+            HomeDiscoverySeeAllSheet(
+                route: route,
+                candidates: route == .userTag ? userTagCandidates : userCandidates,
+                onSelect: { sheet in
+                    seeAllRoute = nil
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                        selectedSheet = sheet
+                    }
+                },
+                onSearch: { candidate, selectedGoods in
+                    seeAllRoute = nil
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                        openSearch(for: candidate, selectedGoods: selectedGoods, source: route.searchSource)
+                    }
+                }
+            )
         }
         .sheet(item: $selectedMutualMatchCandidate) { candidate in
             HomeMutualMatchDetailSheet(

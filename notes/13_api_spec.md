@@ -988,7 +988,7 @@ AW削除。
   }
   ```
 - **備考**:
-  - `nearby_3km` はスレッド作成時の `origin_lat/origin_lng` と閲覧者現在地の距離で判定する
+  - `nearby_3km` は互換維持のscope名。無料ユーザーはスレッド作成時の `origin_lat/origin_lng` と閲覧者現在地の距離が1km以内の場合に表示する。有効な `megrum_plus` / `meguri_plus` / `premium` 権限を持つユーザーは、チャットルームに限り1km圏外も表示できる
   - `same_prefecture` はスレッド作成時の `prefecture` と閲覧者側の都道府県で判定する
   - 正確な位置情報は一覧表示しない。レスポンスの座標はアプリ内部の距離判定・互換用途に限定する
   - `image_paths` は private Storage path。クライアント表示時は閲覧可能なスレッドだけ署名URLへ変換する
@@ -1016,7 +1016,7 @@ AW削除。
   }
   ```
 - **Response 201**: 作成された thread
-- **備考**: `nearby_3km` は `origin_lat` / `origin_lng` / `prefecture` 必須。基準地点はスレッドを立てた時の位置情報。`category` 未指定時は `chat`。作成者は自動でスレッド購読ONになる。画像は最大4枚まで `meguri-board-media` private Storage にアップロードしてから path を保存する
+- **備考**: `nearby_3km` は互換維持のscope名で、作成時は `origin_lat` / `origin_lng` / `prefecture` 必須。基準地点はスレッドを立てた時の位置情報で、1km圏内の作成だけを許可する。`category` 未指定時は `chat`。作成者は自動でスレッド購読ONになる。画像は最大4枚まで `meguri-board-media` private Storage にアップロードしてから path を保存する
 - **Screen**: `meguri-board`
 
 ### GET /api/v1/meguri-board/threads/:id

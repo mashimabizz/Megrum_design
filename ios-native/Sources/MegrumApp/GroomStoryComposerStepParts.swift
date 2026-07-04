@@ -195,11 +195,13 @@ struct GroomDraftPhotoPreview: View {
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
+            Color.black.opacity(0.28)
+
             #if canImport(UIKit)
             if let image = UIImage(data: photoData) {
                 Image(uiImage: image)
                     .resizable()
-                    .scaledToFill()
+                    .scaledToFit()
             } else {
                 photoFallback
             }

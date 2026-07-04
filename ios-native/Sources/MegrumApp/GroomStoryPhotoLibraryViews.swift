@@ -69,9 +69,8 @@ struct GroomPhotoLibraryThumbnail: View {
                 if let image {
                     Image(uiImage: image)
                         .resizable()
-                        .scaledToFill()
+                        .scaledToFit()
                         .frame(width: proxy.size.width, height: proxy.size.height)
-                        .clipped()
                 } else {
                     ProgressView()
                         .tint(.white)
@@ -99,7 +98,7 @@ struct GroomPhotoLibraryThumbnail: View {
         PHImageManager.default().requestImage(
             for: phAsset,
             targetSize: CGSize(width: 240, height: 240),
-            contentMode: .aspectFill,
+            contentMode: .aspectFit,
             options: options
         ) { image, _ in
             Task { @MainActor in

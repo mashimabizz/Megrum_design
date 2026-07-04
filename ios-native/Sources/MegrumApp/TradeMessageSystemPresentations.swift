@@ -141,16 +141,21 @@ enum TradeEvaluationSystemMessage {
             || normalizedBody?.hasSuffix("の評価が完了しました") == true
     }
 
+    static func raterID(for message: TradeMessage) -> UUID {
+        normalized(message.meta["rater_id"]).flatMap(UUID.init(uuidString:)) ?? message.senderID
+    }
+
     static func evaluation(from message: TradeMessage, viewerID: UUID) -> TradeCompletedEvaluationPresentation? {
         guard isEvaluationNotice(message), let starsText = message.meta["stars"], let stars = Int(starsText) else {
             return nil
         }
-        let isMine = message.senderID == viewerID
+        let raterID = raterID(for: message)
+        let isMine = raterID == viewerID
         let displayName = normalized(message.meta["rater_display_name"])
             ?? normalized(message.meta["rater_handle"]).map { "@\($0)" }
             ?? (isMine ? "あなた" : "相手")
         return TradeCompletedEvaluationPresentation(
-            raterID: message.senderID,
+            raterID: raterID,
             displayName: displayName,
             roleTag: isMine ? "あなた" : "相手",
             stars: min(max(stars, 1), 5),

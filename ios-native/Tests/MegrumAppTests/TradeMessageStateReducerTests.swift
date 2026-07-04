@@ -80,6 +80,41 @@ final class TradeMessageStateReducerTests: XCTestCase {
         XCTAssertEqual(updated[proposalID], [remoteEvaluationNotice])
     }
 
+    func testReplacingMessagesUsesRaterIDWhenServerEvaluationSenderIsSystem() {
+        let proposalID = UUID(uuidString: "00000000-0000-0000-0000-000000000321")!
+        let viewerID = UUID(uuidString: "00000000-0000-0000-0000-000000000322")!
+        let systemID = UUID(uuidString: "00000000-0000-0000-0000-000000000323")!
+        let localEvaluationNotice = makeMessage(
+            proposalID: proposalID,
+            body: "みちの評価が完了しました",
+            senderID: viewerID,
+            messageType: .system,
+            meta: ["action": "evaluation_submitted", "stars": "5"],
+            createdAt: Date(timeIntervalSince1970: 100)
+        )
+        let remoteEvaluationNotice = makeMessage(
+            proposalID: proposalID,
+            body: "評価が完了しました",
+            senderID: systemID,
+            messageType: .system,
+            meta: [
+                "action": "evaluation_submitted",
+                "rater_id": viewerID.uuidString.lowercased(),
+                "stars": "5",
+            ],
+            createdAt: Date(timeIntervalSince1970: 120)
+        )
+
+        let updated = TradeMessageStateReducer.replacingMessagesPreservingViewerEvaluationNotices(
+            in: [proposalID: [localEvaluationNotice]],
+            proposalID: proposalID,
+            messages: [remoteEvaluationNotice],
+            viewerID: viewerID
+        )
+
+        XCTAssertEqual(updated[proposalID], [remoteEvaluationNotice])
+    }
+
     func testAppendingMessageCreatesOrExtendsProposalBucket() {
         let proposalID = UUID(uuidString: "00000000-0000-0000-0000-000000000303")!
         let first = makeMessage(proposalID: proposalID, body: "最初")

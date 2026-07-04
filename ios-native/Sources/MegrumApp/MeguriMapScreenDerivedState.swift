@@ -31,6 +31,16 @@ extension MeguriMapScreen {
         if let locationErrorMessage = locationState.locationErrorMessage, kind == .grooms || boardScope == .nearby3km {
             return locationErrorMessage
         }
+        if appState.subscriptionState.hasMeguriBoardExtendedAccess {
+            if kind == .all, rangeCircle != nil {
+                return "グルームは1km圏内、チャットルームはプレミアム表示中"
+            }
+            if kind == .boards {
+                return boardScope == .samePrefecture
+                    ? "都道府県内のチャットルームをプレミアム表示中"
+                    : "チャットルームをプレミアム表示中"
+            }
+        }
         if kind == .all, rangeCircle != nil {
             return "現在地周辺のグルームとチャットルームを表示中。1km圏外は閲覧できません"
         }

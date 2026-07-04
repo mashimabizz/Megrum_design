@@ -101,14 +101,16 @@ struct MegrumAuthenticatedTabContentView: View {
                 item: $meguriBoardThreadRoute,
                 backSwipeInteractionScope: .fullScreen
             ) { route, dismiss in
-                NavigationStack {
-                    BoardThreadDetailScreen(
-                        appState: appState,
-                        thread: route.thread,
-                        selectedPrefecture: route.selectedPrefecture,
-                        coordinate: route.coordinate,
-                        onClose: dismiss
-                    )
+                MegrumDeferredContent {
+                    NavigationStack {
+                        BoardThreadDetailScreen(
+                            appState: appState,
+                            thread: route.thread,
+                            selectedPrefecture: route.selectedPrefecture,
+                            coordinate: route.coordinate,
+                            onClose: dismiss
+                        )
+                    }
                 }
             }
             .zIndex(109)
@@ -117,12 +119,14 @@ struct MegrumAuthenticatedTabContentView: View {
                 isPresented: $isShowingMeguriMessageInbox,
                 backSwipeInteractionScope: .fullScreen
             ) { dismiss in
-                MeguriMessageInboxScreen(
-                    appState: appState,
-                    visualQAInitialScreen: visualQAInitialScreen,
-                    onClose: dismiss,
-                    onOpenThread: openMeguriMessageThread
-                )
+                MegrumDeferredContent {
+                    MeguriMessageInboxScreen(
+                        appState: appState,
+                        visualQAInitialScreen: visualQAInitialScreen,
+                        onClose: dismiss,
+                        onOpenThread: openMeguriMessageThread
+                    )
+                }
             }
             .zIndex(110)
 
@@ -130,13 +134,15 @@ struct MegrumAuthenticatedTabContentView: View {
                 item: $meguriMessageDetailRoute,
                 backSwipeInteractionScope: .fullScreen
             ) { route, dismiss in
-                NavigationStack {
-                    MeguriMessagesScreen(
-                        appState: appState,
-                        route: route,
-                        onClose: dismiss,
-                        onOpenUserProfile: openMeguriUserProfile
-                    )
+                MegrumDeferredContent {
+                    NavigationStack {
+                        MeguriMessagesScreen(
+                            appState: appState,
+                            route: route,
+                            onClose: dismiss,
+                            onOpenUserProfile: openMeguriUserProfile
+                        )
+                    }
                 }
             }
             .zIndex(111)
@@ -145,17 +151,19 @@ struct MegrumAuthenticatedTabContentView: View {
                 item: $meguriUserProfileRoute,
                 backSwipeInteractionScope: .fullScreen
             ) { route, dismiss in
-                NavigationStack {
-                    MeguriUserProfileRouteScreen(
-                        appState: appState,
-                        userID: route.userID,
-                        adDisplayContext: adDisplayContext,
-                        onClose: dismiss,
-                        onOpenMessage: { userID in
-                            dismiss()
-                            openMeguriMessageThread(peerID: userID)
-                        }
-                    )
+                MegrumDeferredContent {
+                    NavigationStack {
+                        MeguriUserProfileRouteScreen(
+                            appState: appState,
+                            userID: route.userID,
+                            adDisplayContext: adDisplayContext,
+                            onClose: dismiss,
+                            onOpenMessage: { userID in
+                                dismiss()
+                                openMeguriMessageThread(peerID: userID)
+                            }
+                        )
+                    }
                 }
             }
             .zIndex(112)
@@ -191,17 +199,12 @@ struct MegrumAuthenticatedTabContentView: View {
                 onOpenMeguriUserProfile: openMeguriUserProfileFromGroomViewer
             )
         }
-        .background(SystemTabBarVisibilityHost(isHidden: meguriGroomViewerPost != nil))
         .background {
             if meguriGroomViewerPost != nil {
-                Color.black.ignoresSafeArea(.all)
+                Color.black.ignoresSafeArea(.container, edges: .top)
             }
         }
-        .ignoresSafeArea(.container, edges: meguriGroomViewerPost == nil ? [] : .all)
-        #if os(iOS)
-        .toolbar(meguriGroomViewerPost == nil ? .visible : .hidden, for: .tabBar)
-        .statusBarHidden(meguriGroomViewerPost != nil)
-        #endif
+        .ignoresSafeArea(.container, edges: meguriGroomViewerPost == nil ? [] : .top)
     }
 
     private var tabs: some View {
@@ -225,7 +228,7 @@ struct MegrumAuthenticatedTabContentView: View {
 
     #if os(iOS)
     private var tabBarBackgroundVisibility: Visibility {
-        if meguriGroomViewerPost != nil || selectedTab == .meguri {
+        if selectedTab == .meguri {
             return .hidden
         }
         if #available(iOS 26.0, *) {
@@ -358,9 +361,6 @@ struct MegrumAuthenticatedTabContentView: View {
         }
         .tag(MegrumTab.meguri)
         .ignoresSafeArea(.container, edges: .bottom)
-        #if os(iOS)
-        .toolbar(meguriGroomViewerPost == nil ? .visible : .hidden, for: .tabBar)
-        #endif
         .tabItem {
             Label {
                 Text(MegrumTab.meguri.title)

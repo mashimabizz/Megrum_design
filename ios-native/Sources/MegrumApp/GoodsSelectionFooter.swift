@@ -22,9 +22,9 @@ struct GoodsSelectionFooter: View {
                 }
 
                 HStack(spacing: GoodsSelectionFooterMetrics.actionSpacing) {
-                    GoodsSelectionFooterButton(title: "シリーズを設定", systemImage: "tag", role: nil, action: onTag)
+                    GoodsSelectionFooterButton(title: "シリーズ設定", systemImage: "tag", role: nil, action: onTag)
                     GoodsSelectionFooterButton(title: "Xで投稿", systemImage: "square.and.arrow.up", role: nil, action: onShare)
-                    GoodsSelectionFooterButton(title: "削除する", systemImage: "trash", role: .destructive, action: onDelete)
+                    GoodsSelectionFooterButton(title: "削除", systemImage: "trash", role: .destructive, action: onDelete)
                 }
             }
             .padding(14)
@@ -53,8 +53,9 @@ private struct GoodsSelectionFooterButton: View {
             MegrumHaptics.performButtonTap(action)
         } label: {
             Label(title, systemImage: systemImage)
-                .font(.system(size: 14, weight: .heavy, design: .rounded))
+                .font(.system(size: 13, weight: .heavy, design: .rounded))
                 .lineLimit(1)
+                .minimumScaleFactor(0.82)
                 .foregroundStyle(role == .destructive ? Color.red : MegrumTheme.ink)
                 .frame(maxWidth: .infinity, minHeight: GoodsSelectionFooterMetrics.actionHeight)
                 .background(Color.white.opacity(0.18), in: Capsule())

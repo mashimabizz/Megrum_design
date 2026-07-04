@@ -138,10 +138,14 @@ struct BoardThreadRow: Decodable, Sendable {
         longitude: Double?,
         prefecture: String?,
         scope: BoardThread.Audience,
-        radiusMeters: Double
+        radiusMeters: Double,
+        allowsExtendedBoardAccess: Bool
     ) -> Bool {
         switch scope {
         case .nearby3km, .sameSpot:
+            if allowsExtendedBoardAccess {
+                return true
+            }
             guard
                 let latitude,
                 let longitude,

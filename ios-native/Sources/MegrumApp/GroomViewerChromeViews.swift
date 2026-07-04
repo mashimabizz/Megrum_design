@@ -1,4 +1,5 @@
 import Foundation
+import MegrumCore
 import MegrumDesign
 import SwiftUI
 
@@ -153,42 +154,25 @@ struct GroomViewerBottomControls: View {
     let isLiked: Bool
     let likeCount: Int
     let commentCount: Int
-    let onSubmitReply: () -> Void
     let onToggleLike: () -> Void
-    @Binding var replyDraft: String
-    @FocusState private var isComposerFocused: Bool
+    let onOpenComments: () -> Void
+    let onOpenLikes: () -> Void
 
     var body: some View {
-        HStack(spacing: 10) {
-            if canReply {
-                GroomViewerReplyComposer(
-                    replyDraft: $replyDraft,
-                    isSendingReply: isSendingReply,
-                    isFocused: $isComposerFocused,
-                    onSubmitReply: onSubmitReply
-                )
-            } else {
-                Spacer()
-            }
-
-            if canLike && !isComposerFocused {
-                VStack(spacing: 8) {
-                    GroomViewerEngagementColumn(
-                        likeCount: likeCount,
-                        commentCount: commentCount
-                    )
-
-                    GroomViewerLikeButton(
-                        isLiked: isLiked,
-                        action: onToggleLike
-                    )
-                }
-                .transition(.opacity.combined(with: .scale(scale: 0.9)))
-            }
+        HStack {
+            Spacer()
+            GroomViewerEngagementColumn(
+                canLike: canLike,
+                isLiked: isLiked,
+                likeCount: likeCount,
+                commentCount: commentCount,
+                onToggleLike: onToggleLike,
+                onOpenComments: onOpenComments,
+                onOpenLikes: onOpenLikes
+            )
         }
         .padding(.horizontal, 18)
         .padding(.bottom, 24)
-        .animation(.snappy(duration: 0.22), value: isComposerFocused)
     }
 }
 
@@ -197,20 +181,27 @@ struct GroomViewerOwnerBottomControls: View {
     let commentCount: Int
     let isDeleting: Bool
     let onOpenInsights: () -> Void
+    let onOpenComments: () -> Void
+    let onOpenLikes: () -> Void
     let onDelete: () -> Void
 
     var body: some View {
         VStack(alignment: .trailing, spacing: 8) {
-            Button(action: onOpenInsights) {
-                GroomViewerEngagementColumn(
-                    likeCount: likeCount,
-                    commentCount: commentCount
-                )
-            }
-            .buttonStyle(.plain)
+            GroomViewerEngagementColumn(
+                canLike: false,
+                isLiked: false,
+                likeCount: likeCount,
+                commentCount: commentCount,
+                onToggleLike: {},
+                onOpenComments: onOpenComments,
+                onOpenLikes: onOpenLikes
+            )
             .accessibilityLabel("いいねとコメントを見る")
 
             Menu {
+                Button(action: onOpenInsights) {
+                    Label("反応を見る", systemImage: "chart.bar.doc.horizontal")
+                }
                 Button(role: .destructive, action: onDelete) {
                     Label("削除する", systemImage: "trash")
                 }
@@ -237,21 +228,39 @@ struct GroomViewerOwnerBottomControls: View {
 }
 
 struct GroomViewerEngagementColumn: View {
+    let canLike: Bool
+    let isLiked: Bool
     let likeCount: Int
     let commentCount: Int
+    let onToggleLike: () -> Void
+    let onOpenComments: () -> Void
+    let onOpenLikes: () -> Void
 
     var body: some View {
-        VStack(spacing: 6) {
-            Label("\(likeCount)", systemImage: "heart.fill")
-            Label("\(commentCount)", systemImage: "bubble.left.fill")
+        VStack(spacing: 10) {
+            GroomViewerLikeButton(
+                isLiked: isLiked,
+                isEnabled: canLike,
+                action: onToggleLike,
+                onLongPress: onOpenLikes
+            )
+            Text("\(likeCount)")
+                .font(.system(size: 13, weight: .black, design: .rounded))
+
+            Button(action: onOpenComments) {
+                Image(systemName: "bubble.left.fill")
+                    .font(.system(size: 24, weight: .heavy))
+                    .foregroundStyle(.white)
+                    .frame(width: 54, height: 54)
+                    .background(.black.opacity(0.28), in: Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("コメントを開く")
+
+            Text("\(commentCount)")
+                .font(.system(size: 13, weight: .black, design: .rounded))
         }
-        .font(.system(size: 11, weight: .black, design: .rounded))
         .foregroundStyle(.white)
-        .labelStyle(.titleAndIcon)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
-        .background(.black.opacity(0.30), in: Capsule())
-        .overlay(Capsule().stroke(.white.opacity(0.16), lineWidth: 1))
         .accessibilityLabel("いいね\(likeCount)件、コメント\(commentCount)件")
     }
 }
@@ -303,11 +312,18 @@ private struct GroomViewerReplyComposer: View {
 
 private struct GroomViewerLikeButton: View {
     let isLiked: Bool
+    let isEnabled: Bool
     let action: () -> Void
+    let onLongPress: () -> Void
     @State private var presentationState = GroomViewerLikeButtonPresentationState()
 
     var body: some View {
-        Button(action: action) {
+        Button {
+            guard isEnabled else {
+                return
+            }
+            action()
+        } label: {
             ZStack {
                 if presentationState.isBursting {
                     GroomLikeBurst(token: presentationState.burstToken)
@@ -318,12 +334,20 @@ private struct GroomViewerLikeButton: View {
                     .font(.system(size: 24, weight: .heavy))
                     .foregroundStyle(isLiked ? MegrumTheme.pink : .white)
                     .scaleEffect(presentationState.likeIconScale)
-                .frame(width: 54, height: 54)
-                .background(.black.opacity(0.28), in: Circle())
+                    .frame(width: 54, height: 54)
+                    .background(.black.opacity(0.28), in: Circle())
             }
         }
         .buttonStyle(.plain)
+        .opacity(isEnabled ? 1 : 0.82)
         .accessibilityLabel(isLiked ? "いいねを取り消す" : "いいね")
+        .simultaneousGesture(
+            LongPressGesture(minimumDuration: 0.45)
+                .onEnded { _ in
+                    MegrumHaptics.longPress()
+                    onLongPress()
+                }
+        )
         .onChange(of: isLiked) { _, next in
             guard next else { return }
             withAnimation(.spring(response: 0.24, dampingFraction: 0.52)) {
@@ -336,6 +360,201 @@ private struct GroomViewerLikeButton: View {
                 }
             }
         }
+    }
+}
+
+struct GroomViewerCommentsSheet: View {
+    var groom: GroomPost
+    @ObservedObject var appState: MegrumAppState
+    var canReply: Bool
+    var isSendingReply: Bool
+    @Binding var replyDraft: String
+    var onSubmitReply: () -> Void
+    var onOpenProfile: (UUID) -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    private var replies: [GroomReply] {
+        appState.groomReplies(for: groom.id).sorted { $0.createdAt > $1.createdAt }
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    ForEach(replies) { reply in
+                        GroomArchiveUserReactionRow(
+                            userID: reply.senderID,
+                            identity: identity(userID: reply.senderID),
+                            subtitle: reply.createdAt.formatted(date: .abbreviated, time: .shortened),
+                            commentBody: reply.body,
+                            onOpenProfile: profileAction(userID: reply.senderID),
+                            onMessage: nil
+                        )
+                    }
+
+                    if replies.isEmpty {
+                        ContentUnavailableView(
+                            "まだコメントはありません",
+                            systemImage: "bubble.left",
+                            description: Text("最初のコメントを送れます。")
+                        )
+                        .foregroundStyle(MegrumTheme.muted)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 28)
+                    }
+                }
+                .padding(18)
+            }
+            .background(MegrumTheme.canvas)
+            .navigationTitle("コメント")
+            .megrumInlineNavigationTitle()
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("閉じる") { dismiss() }
+                }
+            }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if canReply {
+                    GroomViewerSheetReplyComposer(
+                        replyDraft: $replyDraft,
+                        isSendingReply: isSendingReply,
+                        onSubmitReply: onSubmitReply
+                    )
+                }
+            }
+        }
+    }
+
+    private func profileAction(userID: UUID) -> (() -> Void)? {
+        guard userID != appState.viewer?.id else {
+            return nil
+        }
+        return {
+            dismiss()
+            onOpenProfile(userID)
+        }
+    }
+
+    private func identity(userID: UUID) -> MeguriProfileIdentity {
+        let profile = appState.publicProfilesByUserID[userID]?.profile
+        return appState.meguriIdentity(
+            for: userID,
+            fallbackName: profile?.displayName,
+            fallbackHandle: profile?.handle,
+            fallbackAvatarURL: profile?.avatarURL
+        )
+    }
+}
+
+struct GroomViewerLikesSheet: View {
+    var groom: GroomPost
+    @ObservedObject var appState: MegrumAppState
+    var onOpenProfile: (UUID) -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    private var likes: [GroomReaction] {
+        appState.groomReactions(for: groom.id).sorted { $0.createdAt > $1.createdAt }
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    ForEach(likes) { reaction in
+                        GroomArchiveUserReactionRow(
+                            userID: reaction.userID,
+                            identity: identity(userID: reaction.userID),
+                            subtitle: reaction.createdAt.formatted(date: .abbreviated, time: .shortened),
+                            commentBody: nil,
+                            onOpenProfile: profileAction(userID: reaction.userID),
+                            onMessage: nil
+                        )
+                    }
+
+                    if likes.isEmpty {
+                        ContentUnavailableView(
+                            "まだいいねはありません",
+                            systemImage: "heart",
+                            description: Text("いいねした人がここに表示されます。")
+                        )
+                        .foregroundStyle(MegrumTheme.muted)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 28)
+                    }
+                }
+                .padding(18)
+            }
+            .background(MegrumTheme.canvas)
+            .navigationTitle("いいね")
+            .megrumInlineNavigationTitle()
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("閉じる") { dismiss() }
+                }
+            }
+        }
+    }
+
+    private func profileAction(userID: UUID) -> (() -> Void)? {
+        guard userID != appState.viewer?.id else {
+            return nil
+        }
+        return {
+            dismiss()
+            onOpenProfile(userID)
+        }
+    }
+
+    private func identity(userID: UUID) -> MeguriProfileIdentity {
+        let profile = appState.publicProfilesByUserID[userID]?.profile
+        return appState.meguriIdentity(
+            for: userID,
+            fallbackName: profile?.displayName,
+            fallbackHandle: profile?.handle,
+            fallbackAvatarURL: profile?.avatarURL
+        )
+    }
+}
+
+private struct GroomViewerSheetReplyComposer: View {
+    @Binding var replyDraft: String
+    let isSendingReply: Bool
+    let onSubmitReply: () -> Void
+
+    var body: some View {
+        HStack(spacing: 10) {
+            TextField("コメントを追加", text: $replyDraft)
+                .font(.system(size: 15, weight: .bold, design: .rounded))
+                .foregroundStyle(MegrumTheme.ink)
+                .submitLabel(.send)
+                .padding(.horizontal, 14)
+                .frame(height: 46)
+                .background(.white, in: Capsule())
+                .overlay(Capsule().stroke(MegrumTheme.lavender.opacity(0.16), lineWidth: 1))
+                .onSubmit(onSubmitReply)
+
+            Button(action: onSubmitReply) {
+                Group {
+                    if isSendingReply {
+                        ProgressView()
+                            .controlSize(.small)
+                            .tint(.white)
+                    } else {
+                        Image(systemName: "arrow.up")
+                            .font(.system(size: 18, weight: .heavy))
+                    }
+                }
+                .foregroundStyle(.white)
+                .frame(width: 46, height: 46)
+                .background(MegrumTheme.lavender, in: Circle())
+            }
+            .buttonStyle(.plain)
+            .disabled(replyDraft.isBlank || isSendingReply)
+            .opacity(replyDraft.isBlank ? 0.52 : 1)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(.regularMaterial)
     }
 }
 

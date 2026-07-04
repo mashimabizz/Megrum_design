@@ -32,9 +32,6 @@ extension View {
             }
         }
         .animation(.spring(response: 0.34, dampingFraction: 0.86), value: item.wrappedValue?.id)
-        .background(SystemTabBarVisibilityHost(isHidden: item.wrappedValue != nil))
-        .toolbar(item.wrappedValue == nil ? .visible : .hidden, for: .tabBar)
-        .statusBarHidden(item.wrappedValue != nil)
         #else
         self.sheet(item: item, onDismiss: onDismiss) { presentedItem in
             content(presentedItem) {
@@ -50,13 +47,10 @@ extension View {
         #if os(iOS)
         self
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color.black.ignoresSafeArea(.all))
-            .ignoresSafeArea(.all)
+            .background(Color.black.ignoresSafeArea(.container, edges: .top))
+            .ignoresSafeArea(.container, edges: .top)
             .presentationBackground(.black)
             .preferredColorScheme(.dark)
-            .statusBarHidden(true)
-            .toolbar(.hidden, for: .tabBar)
-            .background(SystemTabBarVisibilityHost(isHidden: true))
         #else
         self
             .frame(maxWidth: .infinity, maxHeight: .infinity)

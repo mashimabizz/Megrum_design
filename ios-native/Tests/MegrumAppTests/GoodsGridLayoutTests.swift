@@ -256,15 +256,13 @@ final class GoodsGridLayoutTests: XCTestCase {
     }
 
     func testInventoryQuickActionsMatchOwnerMenuOrder() {
-        XCTAssertEqual(GoodsQuickActionKind.inventoryActions, [.edit, .moveToKeep, .tag, .delete])
-        XCTAssertEqual(GoodsQuickActionKind.wishActions, [.edit, .tag, .delete])
-        XCTAssertEqual(GoodsQuickActionKind.edit.title, "編集する")
-        XCTAssertEqual(GoodsQuickActionKind.moveToKeep.title, "自分用キープへ")
-        XCTAssertEqual(GoodsQuickActionKind.moveToKeep.title(for: .active), "自分用キープへ")
-        XCTAssertEqual(GoodsQuickActionKind.moveToKeep.title(for: .keep), "譲る候補へ")
-        XCTAssertEqual(GoodsQuickActionKind.tag.title, "シリーズを設定")
-        XCTAssertEqual(GoodsQuickActionKind.delete.title, "削除する")
-        XCTAssertNil(GoodsQuickActionKind.edit.role)
+        XCTAssertEqual(GoodsQuickActionKind.inventoryActions, [.tag, .share, .delete])
+        XCTAssertEqual(GoodsQuickActionKind.wishActions, [.tag, .share, .delete])
+        XCTAssertEqual(GoodsQuickActionKind.tag.title, "シリーズ設定")
+        XCTAssertEqual(GoodsQuickActionKind.share.title, "Xで投稿")
+        XCTAssertEqual(GoodsQuickActionKind.delete.title, "削除")
+        XCTAssertNil(GoodsQuickActionKind.tag.role)
+        XCTAssertNil(GoodsQuickActionKind.share.role)
         XCTAssertNotNil(GoodsQuickActionKind.delete.role)
     }
 
