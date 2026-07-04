@@ -3,6 +3,15 @@ import MegrumCore
 import MegrumDesign
 import SwiftUI
 
+/// マップピン枠線用のブランドグラデーション（Megrumアイコンと同系）。
+private var megrumPinBorderGradient: LinearGradient {
+    LinearGradient(
+        colors: [MegrumTheme.sky, MegrumTheme.lavender, MegrumTheme.pink],
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
+    )
+}
+
 /// マーカーを不規則な周期でふわふわ上下＋やわらかく伸び縮みさせる共通
 /// ラッパー。周期・振幅・開始タイミングは seed から決めるため、マーカー
 /// ごとにズレて有機的に見える。
@@ -85,7 +94,7 @@ struct GroomMapPin: View {
 
     var body: some View {
         GroomThumbnailCircle(url: groom.imageURL, size: 58)
-            .overlay(Circle().stroke(.white, lineWidth: 3))
+            .overlay(Circle().stroke(megrumPinBorderGradient, lineWidth: 3))
             .overlay(alignment: .bottomTrailing) {
                 if isOutOfRange {
                     Image(systemName: "lock.fill")
@@ -158,7 +167,7 @@ private struct BoardMapPinThumbnail: View {
         .clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 15, style: .continuous)
-                .strokeBorder(.white, lineWidth: 3)
+                .strokeBorder(megrumPinBorderGradient, lineWidth: 3)
         }
         .saturation(isOutOfRange ? 0.35 : 1)
         .accessibilityHidden(true)
