@@ -57,8 +57,9 @@ struct MeguriHomeContent: View {
                 .ignoresSafeArea()
 
                 if isLoadingViewport {
-                    MeguriToastView(message: "読み込み中…")
-                        .position(x: proxy.size.width / 2, y: proxy.size.height / 2 + 46)
+                    MeguriViewportLoadingToast()
+                        .padding(.bottom, MeguriHomeUtilityLayout.bottomPadding(safeAreaBottom: proxy.safeAreaInsets.bottom) + 66)
+                        .frame(maxWidth: .infinity, alignment: .center)
                         .allowsHitTesting(false)
                         .transition(.opacity)
                 }
@@ -110,6 +111,7 @@ struct MeguriHomeContent: View {
                 .padding(.horizontal, 18)
                 .padding(.bottom, MeguriHomeUtilityLayout.bottomPadding(safeAreaBottom: proxy.safeAreaInsets.bottom))
             }
+            .animation(.easeInOut(duration: 0.25), value: isLoadingViewport)
         }
     }
 }
@@ -141,6 +143,25 @@ private struct MeguriHomeFilterButton: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("めぐりの表示をフィルター")
+    }
+}
+
+/// ビューポート読み込み中のコンパクトなトースト（タブバー上・フェード表示）。
+private struct MeguriViewportLoadingToast: View {
+    var body: some View {
+        HStack(spacing: 8) {
+            ProgressView()
+                .controlSize(.mini)
+                .tint(.white)
+            Text("読み込み中…")
+                .font(.system(size: 12, weight: .black, design: .rounded))
+                .foregroundStyle(.white)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 9)
+        .background(MegrumTheme.ink.opacity(0.82), in: Capsule())
+        .shadow(color: MegrumTheme.ink.opacity(0.2), radius: 12, y: 6)
+        .accessibilityLabel("地図の内容を読み込み中")
     }
 }
 

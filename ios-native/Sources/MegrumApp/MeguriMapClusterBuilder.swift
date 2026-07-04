@@ -46,6 +46,9 @@ enum MeguriMapClusterBuilder {
         var longitude: Double
 
         var count: Int { items.count }
+
+        /// クラスタアイコンとして採用する統合前マーカー（決定的に先頭を選ぶ）。
+        var representative: Item? { items.first }
     }
 
     enum Element: Identifiable, Equatable {
@@ -69,21 +72,49 @@ enum MeguriMapClusterBuilder {
         return elements(items: items, spanLatitudeDelta: spanLatitudeDelta)
     }
 
+    /// 近接マーカーの統合。グリッド割りではなく「しきい値未満で連結した
+    /// まとまり（連結成分）」で組む。しきい値（=表示スパン比例）が大きく
+    /// なるほど成分は育つ一方で崩れないため、一度統合されたまとまりは
+    /// 地図の縮小に伴って形を保ったまま、近づいた別のマーカー/まとまりと
+    /// さらに統合されていく。
     static func elements(items: [Item], spanLatitudeDelta: Double) -> [Element] {
         let located = items.filter { $0.latitude != nil && $0.longitude != nil }
         let cell = cellDegrees(spanLatitudeDelta: spanLatitudeDelta)
-        guard cell > 0 else {
-            return located.map(Element.single)
+        guard cell > 0, located.count > 1 else {
+            return located.map(Element.single).sorted { $0.id < $1.id }
         }
 
-        let grouped = Dictionary(grouping: located) { item -> String in
-            let lat = Int(((item.latitude ?? 0) / cell).rounded(.down))
-            let lng = Int(((item.longitude ?? 0) / cell).rounded(.down))
-            return "\(lat):\(lng)"
+        // Union-Find で「距離 < cell」のペアを連結していく。
+        var parent = Array(0..<located.count)
+        func root(_ index: Int) -> Int {
+            var current = index
+            while parent[current] != current {
+                parent[current] = parent[parent[current]]
+                current = parent[current]
+            }
+            return current
+        }
+        for lhs in 0..<(located.count - 1) {
+            for rhs in (lhs + 1)..<located.count {
+                let dLat = abs((located[lhs].latitude ?? 0) - (located[rhs].latitude ?? 0))
+                let dLng = abs((located[lhs].longitude ?? 0) - (located[rhs].longitude ?? 0))
+                if max(dLat, dLng) < cell {
+                    let lhsRoot = root(lhs)
+                    let rhsRoot = root(rhs)
+                    if lhsRoot != rhsRoot {
+                        parent[rhsRoot] = lhsRoot
+                    }
+                }
+            }
         }
 
-        return grouped
-            .map { key, groupedItems -> Element in
+        var groups: [Int: [Item]] = [:]
+        for index in located.indices {
+            groups[root(index), default: []].append(located[index])
+        }
+
+        return groups.values
+            .map { groupedItems -> Element in
                 if groupedItems.count == 1, let single = groupedItems.first {
                     return .single(single)
                 }
@@ -92,7 +123,7 @@ enum MeguriMapClusterBuilder {
                 let longitude = sorted.compactMap(\.longitude).reduce(0, +) / Double(sorted.count)
                 return .cluster(
                     Cluster(
-                        id: key,
+                        id: sorted.map(\.id).joined(separator: "+"),
                         items: sorted,
                         latitude: latitude,
                         longitude: longitude

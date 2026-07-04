@@ -22,17 +22,34 @@ struct MeguriHomeMapBackdrop: View {
 
     /// 表示中スパン（クラスタリング粒度に使用）。カメラ操作の終了時に更新。
     @State private var visibleSpanLatitudeDelta = MeguriHomeMapCamera.focusedSpan.latitudeDelta
+    /// クラスタ計算はコストがあるため、入力（マーカー・種別・スパン）が
+    /// 変わった時だけ再計算してキャッシュする。ローディング表示などの
+    /// 無関係な再描画で地図が固まらないようにする。
+    @State private var displayElements: [MeguriMapClusterBuilder.Element] = []
 
-    private var displayElements: [MeguriMapClusterBuilder.Element] {
+    private var clusterInputKey: String {
+        let groomKey = (selectedKind == .all || selectedKind == .grooms)
+            ? grooms.map { $0.id.uuidString }.joined(separator: ",")
+            : ""
+        let threadKey = (selectedKind == .all || selectedKind == .boards)
+            ? threads.map { $0.id.uuidString }.joined(separator: ",")
+            : ""
+        return "\(groomKey)|\(threadKey)|\(visibleSpanLatitudeDelta)"
+    }
+
+    private func recomputeDisplayElements() {
         let visibleGrooms = (selectedKind == .all || selectedKind == .grooms) ? grooms : []
         let visibleThreads = (selectedKind == .all || selectedKind == .boards)
             ? threads.filter { $0.latitude != nil && $0.longitude != nil }
             : []
-        return MeguriMapClusterBuilder.elements(
+        let next = MeguriMapClusterBuilder.elements(
             grooms: visibleGrooms,
             threads: visibleThreads,
             spanLatitudeDelta: visibleSpanLatitudeDelta
         )
+        if next != displayElements {
+            displayElements = next
+        }
     }
 
     var body: some View {
@@ -63,15 +80,17 @@ struct MeguriHomeMapBackdrop: View {
                                             sourceAnchor(for: groom, in: proxy, containerSize: geometry.size)
                                         )
                                     } label: {
-                                        MeguriFloatingMotion(seed: groom.id.hashValue) {
-                                            GroomMapPin(
-                                                groom: groom,
-                                                isOutOfRange: !MeguriAccessPolicy.canOpenGroom(
-                                                    groom,
-                                                    currentCoordinate: currentCoordinate,
-                                                    viewerID: viewerID
+                                        MeguriPinPopIn {
+                                            MeguriFloatingMotion(seed: groom.id.hashValue) {
+                                                GroomMapPin(
+                                                    groom: groom,
+                                                    isOutOfRange: !MeguriAccessPolicy.canOpenGroom(
+                                                        groom,
+                                                        currentCoordinate: currentCoordinate,
+                                                        viewerID: viewerID
+                                                    )
                                                 )
-                                            )
+                                            }
                                         }
                                     }
                                     .buttonStyle(.plain)
@@ -83,16 +102,18 @@ struct MeguriHomeMapBackdrop: View {
                                         Button {
                                             onSelectThread(thread)
                                         } label: {
-                                            MeguriFloatingMotion(seed: thread.id.hashValue) {
-                                                BoardMapPin(
-                                                    thread: thread,
-                                                    isOutOfRange: !MeguriAccessPolicy.canOpenBoard(
-                                                        thread,
-                                                        currentCoordinate: currentCoordinate,
-                                                        viewerID: viewerID,
-                                                        subscriptionState: subscriptionState
+                                            MeguriPinPopIn {
+                                                MeguriFloatingMotion(seed: thread.id.hashValue) {
+                                                    BoardMapPin(
+                                                        thread: thread,
+                                                        isOutOfRange: !MeguriAccessPolicy.canOpenBoard(
+                                                            thread,
+                                                            currentCoordinate: currentCoordinate,
+                                                            viewerID: viewerID,
+                                                            subscriptionState: subscriptionState
+                                                        )
                                                     )
-                                                )
+                                                }
                                             }
                                         }
                                         .buttonStyle(.plain)
@@ -110,11 +131,10 @@ struct MeguriHomeMapBackdrop: View {
                                     Button {
                                         zoomToSplit(cluster)
                                     } label: {
-                                        MeguriFloatingMotion(seed: cluster.id.hashValue) {
-                                            GroomClusterMapPin(
-                                                count: cluster.count,
-                                                accessibilityText: "\(cluster.count)件のグルーム・チャットルーム"
-                                            )
+                                        MeguriPinPopIn {
+                                            MeguriFloatingMotion(seed: cluster.id.hashValue) {
+                                                MeguriClusterPin(cluster: cluster)
+                                            }
                                         }
                                     }
                                     .buttonStyle(.plain)
@@ -127,6 +147,12 @@ struct MeguriHomeMapBackdrop: View {
                     .onMapCameraChange(frequency: .onEnd) { context in
                         visibleSpanLatitudeDelta = context.region.span.latitudeDelta
                         onViewportChange(context.region)
+                    }
+                    .onAppear {
+                        recomputeDisplayElements()
+                    }
+                    .onChange(of: clusterInputKey) { _, _ in
+                        recomputeDisplayElements()
                     }
                     .simultaneousGesture(
                         SpatialTapGesture()

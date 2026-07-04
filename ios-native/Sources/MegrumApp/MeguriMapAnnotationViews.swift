@@ -3,28 +3,44 @@ import MegrumCore
 import MegrumDesign
 import SwiftUI
 
-/// マーカーを不規則な周期でふわふわ上下させる共通ラッパー。
-/// 周期・振幅・開始タイミングは seed から決めるため、マーカーごとにズレる。
+/// マーカーを不規則な周期でふわふわ上下＋やわらかく伸び縮みさせる共通
+/// ラッパー。周期・振幅・開始タイミングは seed から決めるため、マーカー
+/// ごとにズレて有機的に見える。
 struct MeguriFloatingMotion<Content: View>: View {
     var seed: Int
     @ViewBuilder var content: Content
 
     @State private var isFloating = false
+    @State private var isStretching = false
 
     private var amplitude: CGFloat {
-        2.4 + CGFloat(abs(seed) % 4) * 0.7
+        4.2 + CGFloat(abs(seed) % 5) * 0.9
     }
 
     private var duration: Double {
-        1.9 + Double(abs(seed) % 9) * 0.22
+        1.7 + Double(abs(seed) % 9) * 0.2
     }
 
     private var delay: Double {
         Double(abs(seed) % 13) * 0.145
     }
 
+    /// 伸び縮みの強さ（縦に伸びる⇄横に伸びる）。
+    private var stretch: CGFloat {
+        0.045 + CGFloat(abs(seed) % 4) * 0.012
+    }
+
+    /// 上下動と周期をずらして、単調に見えないようにする。
+    private var stretchDuration: Double {
+        1.3 + Double(abs(seed / 7) % 7) * 0.19
+    }
+
     var body: some View {
         content
+            .scaleEffect(
+                x: isStretching ? 1 - stretch : 1 + stretch,
+                y: isStretching ? 1 + stretch : 1 - stretch
+            )
             .offset(y: isFloating ? -amplitude : amplitude)
             .onAppear {
                 withAnimation(
@@ -33,6 +49,31 @@ struct MeguriFloatingMotion<Content: View>: View {
                     .delay(delay)
                 ) {
                     isFloating = true
+                }
+                withAnimation(
+                    .easeInOut(duration: stretchDuration)
+                    .repeatForever(autoreverses: true)
+                    .delay(delay * 0.6)
+                ) {
+                    isStretching = true
+                }
+            }
+    }
+}
+
+/// 統合・分解でマーカーが現れる時の、ぽよんと弾むポップイン。
+struct MeguriPinPopIn<Content: View>: View {
+    @ViewBuilder var content: Content
+
+    @State private var isShown = false
+
+    var body: some View {
+        content
+            .scaleEffect(isShown ? 1 : 0.28)
+            .opacity(isShown ? 1 : 0)
+            .onAppear {
+                withAnimation(.spring(response: 0.38, dampingFraction: 0.58)) {
+                    isShown = true
                 }
             }
     }
@@ -62,67 +103,28 @@ struct GroomMapPin: View {
     }
 }
 
+/// チャットルームのピン。グルーム（丸）との差別化として四角のアイコン。
+/// 名前は Annotation のラベル（マーカー下）で表示する。
 struct BoardMapPin: View {
     var thread: BoardThread
     var isOutOfRange: Bool = false
 
     var body: some View {
-        VStack(spacing: 0) {
-            HStack(alignment: .top, spacing: 8) {
-                BoardMapPinThumbnail(url: thread.thumbnailURL, isOutOfRange: isOutOfRange)
-
-                Text(thread.title)
-                    .font(.system(size: 12, weight: .heavy, design: .rounded))
-                    .foregroundStyle(.white)
-                    .lineLimit(3)
-                    .lineSpacing(1)
-                    .multilineTextAlignment(.leading)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .padding(8)
-            .frame(minWidth: 182, maxWidth: 182, minHeight: 76, alignment: .topLeading)
-            .background(pinBackground, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .strokeBorder(pinStroke, lineWidth: 1.2)
-            }
-            .overlay(alignment: .topTrailing) {
+        BoardMapPinThumbnail(url: thread.thumbnailURL, isOutOfRange: isOutOfRange)
+            .overlay(alignment: .bottomTrailing) {
                 if isOutOfRange {
                     Image(systemName: "lock.fill")
-                        .font(.system(size: 9, weight: .heavy))
+                        .font(.system(size: 10, weight: .heavy))
                         .foregroundStyle(MegrumTheme.ink)
-                        .frame(width: 19, height: 19)
+                        .frame(width: 21, height: 21)
                         .background(.regularMaterial, in: Circle())
-                        .offset(x: 5, y: -7)
+                        .offset(x: 4, y: 4)
                 }
             }
-        }
-        .shadow(color: MegrumTheme.ink.opacity(0.22), radius: 14, y: 8)
-        .saturation(isOutOfRange ? 0.35 : 1)
-        .opacity(isOutOfRange ? 0.72 : 1)
-        .accessibilityLabel(isOutOfRange ? "1km圏外のチャットルーム \(thread.title)" : "チャットルーム \(thread.title)")
-    }
-
-    private var pinBackground: AnyShapeStyle {
-        if isOutOfRange {
-            AnyShapeStyle(MegrumTheme.muted.opacity(0.82))
-        } else {
-            AnyShapeStyle(
-                LinearGradient(
-                    colors: [
-                        MegrumTheme.sky,
-                        MegrumTheme.lavender,
-                        MegrumTheme.pink
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            )
-        }
-    }
-
-    private var pinStroke: AnyShapeStyle {
-        AnyShapeStyle(Color.white.opacity(isOutOfRange ? 0.45 : 0.68))
+            .shadow(color: MegrumTheme.ink.opacity(0.22), radius: 12, y: 8)
+            .saturation(isOutOfRange ? 0.35 : 1)
+            .opacity(isOutOfRange ? 0.72 : 1)
+            .accessibilityLabel(isOutOfRange ? "1km圏外のチャットルーム \(thread.title)" : "チャットルーム \(thread.title)")
     }
 }
 
@@ -152,11 +154,11 @@ private struct BoardMapPinThumbnail: View {
                 placeholder
             }
         }
-        .frame(width: 50, height: 50)
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .frame(width: 54, height: 54)
+        .clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.68), lineWidth: 1.3)
+            RoundedRectangle(cornerRadius: 15, style: .continuous)
+                .strokeBorder(.white, lineWidth: 3)
         }
         .saturation(isOutOfRange ? 0.35 : 1)
         .accessibilityHidden(true)
@@ -164,13 +166,52 @@ private struct BoardMapPinThumbnail: View {
 
     private var placeholder: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color.white.opacity(0.22))
+            RoundedRectangle(cornerRadius: 15, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [MegrumTheme.sky, MegrumTheme.lavender, MegrumTheme.pink],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
 
             Image(systemName: "bubble.left.and.bubble.right.fill")
                 .font(.system(size: 20, weight: .bold))
                 .foregroundStyle(.white)
                 .shadow(color: MegrumTheme.ink.opacity(0.16), radius: 3, y: 1)
+        }
+    }
+}
+
+/// 統合クラスタのピン：統合前の任意のマーカー（先頭の代表）をそのまま
+/// アイコンに採用し、右上に青バッジで合計数を出す。
+struct MeguriClusterPin: View {
+    var cluster: MeguriMapClusterBuilder.Cluster
+
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            representativeIcon
+
+            Text("\(cluster.count)")
+                .font(.system(size: 11, weight: .black, design: .rounded))
+                .foregroundStyle(.white)
+                .frame(minWidth: 22, minHeight: 22)
+                .background(Color.blue, in: Circle())
+                .overlay(Circle().stroke(.white, lineWidth: 2))
+                .offset(x: 8, y: -8)
+        }
+        .accessibilityLabel("\(cluster.count)件のグルーム・チャットルーム")
+    }
+
+    @ViewBuilder
+    private var representativeIcon: some View {
+        switch cluster.representative {
+        case .groom(let groom):
+            GroomMapPin(groom: groom, isOutOfRange: false)
+        case .thread(let thread):
+            BoardMapPin(thread: thread)
+        case nil:
+            GroomClusterMapPin(count: cluster.count)
         }
     }
 }

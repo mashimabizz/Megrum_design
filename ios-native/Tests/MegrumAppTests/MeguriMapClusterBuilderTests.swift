@@ -101,4 +101,32 @@ final class MeguriMapClusterBuilderTests: XCTestCase {
             longitude: longitude
         )
     }
+
+    func testMergedClusterKeepsItsShapeWhileZoomingOut() {
+        // 近い2件（既に統合済み）と、少し離れた1件。
+        let grooms = [
+            makeGroom(idSuffix: "001", latitude: 35.0000, longitude: 139.0000),
+            makeGroom(idSuffix: "002", latitude: 35.0010, longitude: 139.0010),
+            makeGroom(idSuffix: "003", latitude: 35.0300, longitude: 139.0300)
+        ]
+
+        // 中間ズーム：2件が統合、1件は単体。
+        let mid = MeguriMapClusterBuilder.elements(grooms: grooms, threads: [], spanLatitudeDelta: 0.05)
+        XCTAssertEqual(mid.count, 2)
+        let midCluster = mid.compactMap { element -> MeguriMapClusterBuilder.Cluster? in
+            if case .cluster(let cluster) = element { return cluster }
+            return nil
+        }.first
+        XCTAssertEqual(midCluster?.count, 2)
+
+        // さらに縮小：既存の統合は崩れず、単体だった1件がそこへ加わり3件になる。
+        let far = MeguriMapClusterBuilder.elements(grooms: grooms, threads: [], spanLatitudeDelta: 0.5)
+        XCTAssertEqual(far.count, 1)
+        guard case .cluster(let farCluster) = far[0] else {
+            XCTFail("expected cluster")
+            return
+        }
+        XCTAssertEqual(farCluster.count, 3)
+        XCTAssertTrue(Set(midCluster?.items.map(\.id) ?? []).isSubset(of: Set(farCluster.items.map(\.id))))
+    }
 }
