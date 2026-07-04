@@ -61,6 +61,45 @@ enum MeguriMapClusterBuilder {
             case .cluster(let cluster): "cluster:\(cluster.id)"
             }
         }
+
+        var memberIDs: [String] {
+            switch self {
+            case .single(let item): [item.id]
+            case .cluster(let cluster): cluster.items.map(\.id)
+            }
+        }
+
+        var displayLatitude: Double {
+            switch self {
+            case .single(let item): item.latitude ?? 0
+            case .cluster(let cluster): cluster.latitude
+            }
+        }
+
+        var displayLongitude: Double {
+            switch self {
+            case .single(let item): item.longitude ?? 0
+            case .cluster(let cluster): cluster.longitude
+            }
+        }
+    }
+
+    /// 地図上の表示位置つきマーカー。統合/分解モーフ中は本来の座標と
+    /// 異なる位置（寄っていく先・散らばる前のクラスタ位置）を取る。
+    struct DisplayedElement: Identifiable, Equatable {
+        var element: Element
+        var latitude: Double
+        var longitude: Double
+        var popsIn: Bool
+
+        var id: String { element.id }
+
+        init(element: Element, popsIn: Bool) {
+            self.element = element
+            self.latitude = element.displayLatitude
+            self.longitude = element.displayLongitude
+            self.popsIn = popsIn
+        }
     }
 
     static func elements(
