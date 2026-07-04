@@ -65,6 +65,41 @@
 
 ---
 
+## イテレーション1226.274：案2行のミラー全廃・塊ラベルをテキストカラムへ
+
+### 背景・問題意識
+
+「ミラーになってるの見にくい？」というオーナー相談を受けてゼロベースで再検討。ホーム候補の画面の目的は「候補を比較して押す1件を選ぶ」であり、(1) 比較には全行同一構造が必須、(2) 右揃えの日本語複数行文は行頭が揃わず読みにくい、(3) 行内で「ラベル（画像上）→画像→タグ→文」と視線がジグザグする、の3点から現構造を改める。
+
+### 変更内容
+
+#### `HomeDiscoveryCandidateSummaryRow.swift`
+- `mirrored` を削除し、全行「画像左・テキスト右」に統一
+- 塊ラベル（検索ボタン）を画像上の中央からテキストカラムの先頭へ移動。カラムは「塊ラベル→強タグ→結論一文」の縦1本の流れ・左揃え
+- ラベル分の高さがなくなり行高が約20pt低くなる（密度向上）
+
+#### `HomeDiscoverySection.swift` / `HomeDiscoverySeeAllSheet.swift` / `HomeDiscoveryExperience.swift` / `HomeDiscoveryLookupSheets.swift`
+- `.summaryRows(mirrored:)` → `.summaryRows`（関連の受け渡しを全廃）
+
+#### `HomeCandidateRedesignPreview.swift`（削除）
+- 本実装に置き換わったモック画面を削除。VisualQA `home-card-redesign` ケースと MegrumRootView の分岐も撤去
+
+### 影響範囲
+
+- ホーム2セクション、すべて見るシート、求められているグッズのシート
+
+### 確認方法
+
+- ライブアカウント（michilion）でホームを表示し、全行の左端（ラベル・タグ・文）が揃うこと、推しでマッチもミラーされないことを確認
+
+### セルフレビュー結果
+
+- ✅ 全セクション同一行構造（比較最適）・テキスト左揃え
+- ✅ 既存部品（RotaryCard / StrongTagBadge / SummaryPolicy）流用、ロジック変更なし
+- ✅ モック画面（デリート候補）を今回で削除
+
+---
+
 ## イテレーション1226.273：profile-photos Storage追加
 
 ### 背景・問題意識

@@ -4,9 +4,9 @@ import SwiftUI
 enum HomeDiscoverySectionLayout: Equatable {
     case grid
     case rail
-    /// 案2：1カラムの「扇状カード＋強タグ＋結論一文」行。
-    /// `mirrored` で画像とテキストを左右反転する（推しでマッチ用）。
-    case summaryRows(mirrored: Bool)
+    /// 案2：1カラムの「扇状カード＋塊ラベル・強タグ・結論一文」行。
+    /// 全セクション同一構造（画像左・テキスト左揃え）で比較しやすさを優先。
+    case summaryRows
 }
 
 struct HomeDiscoverySection: View {
@@ -60,13 +60,12 @@ struct HomeDiscoverySection: View {
                     }
                     .padding(.trailing, 20)
                 }
-            case .summaryRows(let mirrored):
+            case .summaryRows:
                 VStack(spacing: 14) {
                     ForEach(displayedCandidates) { candidate in
                         HomeDiscoveryCandidateSummaryRow(
                             candidate: candidate,
                             titleStyle: cardTitleStyle,
-                            mirrored: mirrored,
                             onSelect: onSelect,
                             onSearch: onSearchCandidate
                         )

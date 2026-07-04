@@ -19,10 +19,6 @@ enum HomeDiscoverySeeAllRoute: String, Identifiable, Sendable {
         }
     }
 
-    var mirrored: Bool {
-        self == .user
-    }
-
     var cardTitleStyle: HomeDiscoveryCardTitleStyle {
         switch self {
         case .userTag: .memberTag
@@ -55,7 +51,6 @@ struct HomeDiscoverySeeAllSheet: View {
                         HomeDiscoveryCandidateSummaryRow(
                             candidate: candidate,
                             titleStyle: route.cardTitleStyle,
-                            mirrored: route.mirrored,
                             onSelect: onSelect,
                             onSearch: onSearch
                         )

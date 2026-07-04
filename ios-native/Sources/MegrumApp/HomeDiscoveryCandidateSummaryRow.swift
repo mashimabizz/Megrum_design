@@ -4,17 +4,15 @@ import SwiftUI
 enum HomeDiscoveryCandidateSummaryRowMetrics {
     static let rotaryWidth: CGFloat = 142
     static let rotaryHeight: CGFloat = 112
-    static let labeledColumnWidth: CGFloat = rotaryWidth + 24
 }
 
-/// ホーム候補の1行表示（案2）：塊ラベル（画像上の中央）＋扇状カードと、
-/// 強タグ1個＋結論一文を横並びにする。`mirrored` で左右反転
-/// （「推しでマッチ」用。タグと文は画像側へ寄せる）。
+/// ホーム候補の1行表示（案2）：扇状カード（画像左）と、
+/// 塊ラベル＋強タグ1個＋結論一文の縦1カラム（左揃え）を横並びにする。
+/// 全行同一構造にして比較しやすさを優先する（ミラーなし）。
 /// ロータリーを回すとタグ・一文も選択中グッズのものに切り替わる。
 struct HomeDiscoveryCandidateSummaryRow: View {
     var candidate: HomeDiscoveryCandidate
     var titleStyle: HomeDiscoveryCardTitleStyle
-    var mirrored: Bool
     var onSelect: (HomeDiscoverySheet) -> Void
     var onSearch: (HomeDiscoveryCandidate, HomeMockGoods?) -> Void
 
@@ -29,14 +27,9 @@ struct HomeDiscoveryCandidateSummaryRow: View {
     }
 
     var body: some View {
-        HStack(alignment: .center, spacing: 10) {
-            if mirrored {
-                infoColumn
-                labeledRotaryCard
-            } else {
-                labeledRotaryCard
-                infoColumn
-            }
+        HStack(alignment: .center, spacing: 14) {
+            rotaryCard
+            infoColumn
         }
         .onAppear {
             presentationState.hydrateIfNeeded(goods: orderedGoods)
@@ -46,8 +39,35 @@ struct HomeDiscoveryCandidateSummaryRow: View {
         }
     }
 
-    private var labeledRotaryCard: some View {
-        VStack(spacing: 4) {
+    private var rotaryCard: some View {
+        HomeDiscoveryRotaryCard(
+            goods: orderedGoods,
+            goodsCondition: candidate.goodsCondition,
+            exchangeCondition: candidate.exchangeCondition,
+            paymentCondition: candidate.paymentCondition,
+            conditionTagsForGoods: { goods in
+                candidate.conditionTags(for: goods)
+            },
+            showsConditionOverlay: false,
+            onSelectionChange: { goods in
+                presentationState.select(goods)
+            },
+            onActivate: { goods in
+                onSelect(candidate.sheet(selectedGoods: goods))
+            }
+        )
+        .frame(
+            width: HomeDiscoveryCandidateSummaryRowMetrics.rotaryWidth,
+            height: HomeDiscoveryCandidateSummaryRowMetrics.rotaryHeight
+        )
+    }
+
+    private var infoColumn: some View {
+        let signals = selectedSignals
+        let strongTag = HomeCandidateSummaryPolicy.strongTag(for: signals)
+        let summary = HomeCandidateSummaryPolicy.summaryText(for: signals)
+
+        return VStack(alignment: .leading, spacing: 6) {
             Button {
                 onSearch(candidate, presentationState.resolvedSelectedGoods(in: orderedGoods))
             } label: {
@@ -61,48 +81,19 @@ struct HomeDiscoveryCandidateSummaryRow: View {
             .buttonStyle(.plain)
             .accessibilityLabel("\(cardTitle)で検索")
 
-            HomeDiscoveryRotaryCard(
-                goods: orderedGoods,
-                goodsCondition: candidate.goodsCondition,
-                exchangeCondition: candidate.exchangeCondition,
-                paymentCondition: candidate.paymentCondition,
-                conditionTagsForGoods: { goods in
-                    candidate.conditionTags(for: goods)
-                },
-                showsConditionOverlay: false,
-                onSelectionChange: { goods in
-                    presentationState.select(goods)
-                },
-                onActivate: { goods in
-                    onSelect(candidate.sheet(selectedGoods: goods))
-                }
-            )
-            .frame(
-                width: HomeDiscoveryCandidateSummaryRowMetrics.rotaryWidth,
-                height: HomeDiscoveryCandidateSummaryRowMetrics.rotaryHeight
-            )
-        }
-        .frame(width: HomeDiscoveryCandidateSummaryRowMetrics.labeledColumnWidth)
-    }
-
-    private var infoColumn: some View {
-        let signals = selectedSignals
-        let strongTag = HomeCandidateSummaryPolicy.strongTag(for: signals)
-        let summary = HomeCandidateSummaryPolicy.summaryText(for: signals)
-
-        return VStack(alignment: mirrored ? .trailing : .leading, spacing: 7) {
             HomeCandidateStrongTagBadge(tag: strongTag)
+
             Text(summary)
                 .font(.system(size: 13, weight: .bold, design: .rounded))
                 .foregroundStyle(MegrumTheme.ink.opacity(0.8))
-                .multilineTextAlignment(mirrored ? .trailing : .leading)
+                .multilineTextAlignment(.leading)
                 .lineLimit(3)
                 .minimumScaleFactor(0.88)
                 .fixedSize(horizontal: false, vertical: true)
         }
-        .frame(maxWidth: .infinity, alignment: mirrored ? .trailing : .leading)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(strongTag.title)、\(summary)")
+        .accessibilityLabel("\(cardTitle)、\(strongTag.title)、\(summary)")
     }
 
     private var cardTitle: String {

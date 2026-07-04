@@ -59,7 +59,7 @@ struct HomeDiscoveryExperience: View {
                     HomeDiscoverySection(
                         title: "推し×シリーズでマッチ",
                         candidates: userTagCandidates,
-                        layout: .summaryRows(mirrored: false),
+                        layout: .summaryRows,
                         cardTitleStyle: .memberTag,
                         showsSeeAllButton: userTagCandidates.count > HomeDiscoverySummarySectionMetrics.displayLimit,
                         displayLimit: HomeDiscoverySummarySectionMetrics.displayLimit,
@@ -73,7 +73,7 @@ struct HomeDiscoveryExperience: View {
                     HomeDiscoverySection(
                         title: "推しでマッチ",
                         candidates: userCandidates,
-                        layout: .summaryRows(mirrored: true),
+                        layout: .summaryRows,
                         cardTitleStyle: .member,
                         showsSeeAllButton: userCandidates.count > HomeDiscoverySummarySectionMetrics.displayLimit,
                         displayLimit: HomeDiscoverySummarySectionMetrics.displayLimit,

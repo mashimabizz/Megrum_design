@@ -18,7 +18,7 @@ struct HomeHavesLookupSheet: View {
                 HomeDiscoverySection(
                     title: "推し×シリーズでマッチ",
                     candidates: HomeCandidateSummaryPolicy.sortedCandidates(payload.tagMatchedCandidates),
-                    layout: .summaryRows(mirrored: false),
+                    layout: .summaryRows,
                     cardTitleStyle: .memberTag,
                     showsGridHeaderTitle: true,
                     showsSeeAllButton: false,
@@ -30,7 +30,7 @@ struct HomeHavesLookupSheet: View {
                 HomeDiscoverySection(
                     title: "推しでマッチ",
                     candidates: HomeCandidateSummaryPolicy.sortedCandidates(payload.memberMatchedCandidates),
-                    layout: .summaryRows(mirrored: true),
+                    layout: .summaryRows,
                     cardTitleStyle: .member,
                     showsGridHeaderTitle: true,
                     showsSeeAllButton: false,
