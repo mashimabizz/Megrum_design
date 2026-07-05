@@ -63,7 +63,6 @@ struct IndividualListingOptionRow: View {
         if !option.wishMemberIDs.isEmpty {
             let names = characters
                 .filter { option.wishMemberIDs.contains($0.id) }
-                .prefix(3)
                 .map(\.name)
                 .joined(separator: "・")
             let memberText = names.isEmpty ? "メンバー\(option.wishMemberIDs.count)人" : names
@@ -218,7 +217,6 @@ private struct IndividualListingOptionPreviewContent: View {
                 Text(conditionText)
                     .font(.system(size: 13, weight: .bold, design: .rounded))
                     .foregroundStyle(MegrumTheme.ink.opacity(0.78))
-                    .lineLimit(3)
                     .multilineTextAlignment(.leading)
                     .fixedSize(horizontal: false, vertical: true)
             } else {

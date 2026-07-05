@@ -111,6 +111,10 @@ extension IndividualListingEditorSheet {
         guard presentationState.step == .options, stepValidationMessage == nil else {
             return
         }
+        guard presentationState.stagedOptionSummaries.count < 5 else {
+            presentationState.setSaveError("選択肢は最大5件までです")
+            return
+        }
         guard let item = makeCurrentOptionReviewItem(title: presentationState.nextOptionTitle) else {
             return
         }

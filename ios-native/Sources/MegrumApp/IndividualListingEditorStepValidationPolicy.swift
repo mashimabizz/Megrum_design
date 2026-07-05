@@ -17,6 +17,9 @@ enum IndividualListingEditorStepValidationPolicy {
                 return draft.haveCashPricingMode == .specifiedAmount && draft.haveCashAmount <= 0 ? "金額を入力してください" : nil
             }
         case .options:
+            if exceedsOptionLimit(draft: draft, wishes: wishes, stagedOptions: stagedOptions) {
+                return "選択肢は最大5件までです"
+            }
             // 追加済みの選択肢が1件以上あれば、編集中タブが未入力でも先へ進める。
             let hasStagedOptions = !stagedOptions.isEmpty
             switch draft.optionKind {
@@ -36,5 +39,15 @@ enum IndividualListingEditorStepValidationPolicy {
         case .exchange:
             return draft.validationMessage(inventory: inventory, wishes: wishes, stagedOptions: stagedOptions)
         }
+    }
+
+    /// 追加済み＋編集中の選択肢が上限（5件）を超えるか。
+    static func exceedsOptionLimit(
+        draft: IndividualListingDraft,
+        wishes: [WishItem],
+        stagedOptions: [IndividualListingOptionInput]
+    ) -> Bool {
+        let currentCount = draft.currentOptionInput(wishes: wishes) == nil ? 0 : 1
+        return stagedOptions.count + currentCount > 5
     }
 }

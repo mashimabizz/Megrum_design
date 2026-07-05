@@ -101,8 +101,13 @@ extension IndividualListingDraft {
         }
 
         // 追加済み＋編集中で選択肢が1件もなければ進めない。
-        if stagedOptions.isEmpty, currentOptionInput(wishes: wishes) == nil {
+        let currentOption = currentOptionInput(wishes: wishes)
+        if stagedOptions.isEmpty, currentOption == nil {
             return "求めるものを選択してください"
+        }
+        // 選択肢は最大5件（DB制約に合わせる）。
+        if stagedOptions.count + (currentOption == nil ? 0 : 1) > 5 {
+            return "選択肢は最大5件までです"
         }
         return nil
     }

@@ -86,7 +86,6 @@ enum IndividualListingOptionReviewItemFactory {
             if !option.wishMemberIDs.isEmpty {
                 let names = characters
                     .filter { option.wishMemberIDs.contains($0.id) }
-                    .prefix(3)
                     .map(\.name)
                     .joined(separator: "・")
                 let memberText = names.isEmpty ? "メンバー\(option.wishMemberIDs.count)人" : names

@@ -1389,4 +1389,28 @@ final class IndividualListingDraftTests: XCTestCase {
             [ListingItemQuantity(itemID: wishID, quantity: 99)]
         )
     }
+
+    func testValidationRejectsMoreThanFiveOptions() {
+        let have = GoodsItem(
+            id: UUID(),
+            ownerID: UUID(),
+            groupID: UUID(),
+            goodsTypeID: UUID(),
+            title: "譲るトレカ",
+            quantity: 1
+        )
+        var draft = IndividualListingDraft(mode: .create(preselectedWishID: nil))
+        draft.toggleHave(have.id, maxQuantity: have.quantity)
+
+        let staged = (0..<5).map { _ in IndividualListingOptionInput(isCashOffer: true) }
+        // 追加済み5件＋編集中なし → OK
+        XCTAssertNil(draft.validationMessage(inventory: [have], wishes: [], stagedOptions: staged))
+
+        // 追加済み5件＋編集中（定価タブ）→ 6件目になるためエラー
+        draft.setOptionKind(.cash)
+        XCTAssertEqual(
+            draft.validationMessage(inventory: [have], wishes: [], stagedOptions: staged),
+            "選択肢は最大5件までです"
+        )
+    }
 }
