@@ -70,7 +70,9 @@ struct TradeDetailSlidePresentationOverlay: View {
 
     @ViewBuilder
     private func detailView(for route: TradeDetailRoute) -> some View {
-        MegrumDeferredContent(delayNanoseconds: MegrumDeferredContentDelay.slidePresentation) {
+        // チャットは先読み済みメッセージを即表示したいので、スケルトンを
+        // 挟まず1フレーム遅延のみで本体を構築する（LINE的な開き心地）。
+        MegrumDeferredContent {
             NavigationStack {
                 if let proposal = proposals.first(where: { $0.id == route.proposalID }) {
                     TradeDetailScreen(appState: appState, proposal: proposal)

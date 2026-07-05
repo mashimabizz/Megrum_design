@@ -72,6 +72,11 @@ struct MeguriHomeContent: View {
                                 action: onOpenContentFilter
                             )
                             MeguriHomeNotificationSettingsButton(action: onOpenNotificationSettings)
+                            MeguriHomeSelfProfileButton(
+                                viewer: viewer,
+                                meguriProfile: meguriProfile,
+                                action: onOpenMeguriProfile
+                            )
                         }
                         MeguriHomeMapKindCycleButton(selectedKind: $selectedMapKind)
                         Spacer()
@@ -87,19 +92,6 @@ struct MeguriHomeContent: View {
 
                     Spacer()
                 }
-
-                HStack {
-                    MeguriHomeSelfProfileButton(
-                        viewer: viewer,
-                        meguriProfile: meguriProfile,
-                        action: onOpenMeguriProfile
-                    )
-                    .frame(width: 88, alignment: .center)
-                    Spacer()
-                }
-                .padding(.horizontal, 18)
-                .frame(maxHeight: .infinity, alignment: .center)
-                .offset(y: -48)
 
                 MeguriHomeBottomUtilityRow(
                     unreadMessageCount: unreadMessageCount,

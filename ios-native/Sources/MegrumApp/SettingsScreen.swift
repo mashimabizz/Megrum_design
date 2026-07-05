@@ -37,17 +37,10 @@ struct SettingsScreen: View {
             List {
                 SettingsPrimarySection(
                     appState: appState,
-                    profileStatusText: profileStatusText,
-                    notificationStatusText: notificationStatusText,
                     pushNotificationStatusText: pushNotificationStatusText,
-                    groomNotificationStatusText: groomNotificationStatusText,
-                    chatroomNotificationStatusText: chatroomNotificationStatusText,
                     addressStatusText: addressStatusText,
-                    subscriptionStatusText: subscriptionStatusText,
                     onOpenRoute: openRoute,
-                    onSetPushNotificationsEnabled: setPushNotificationsEnabled,
-                    onSetGroomActivityPushNotificationsEnabled: setGroomActivityPushNotificationsEnabled,
-                    onSetChatroomActivityPushNotificationsEnabled: setChatroomActivityPushNotificationsEnabled
+                    onSetPushNotificationsEnabled: setPushNotificationsEnabled
                 )
 
                 SettingsSupportAccountSection(
@@ -83,39 +76,12 @@ struct SettingsScreen: View {
         }
     }
 
-    private var notificationStatusText: String {
-        SettingsStatusTextResolver.notificationStatusText(
-            hasNotifications: !appState.notifications.isEmpty,
-            unreadCount: appState.unreadNotificationCount
-        )
-    }
-
     private var pushNotificationStatusText: String {
         SettingsStatusTextResolver.pushNotificationStatusText(isEnabled: appState.pushNotificationsEnabled)
     }
 
-    private var groomNotificationStatusText: String {
-        SettingsStatusTextResolver.groomNotificationStatusText(
-            isEnabled: appState.groomActivityPushNotificationsEnabled
-        )
-    }
-
-    private var chatroomNotificationStatusText: String {
-        SettingsStatusTextResolver.chatroomNotificationStatusText(
-            isEnabled: appState.chatroomActivityPushNotificationsEnabled
-        )
-    }
-
-    private var profileStatusText: String {
-        SettingsStatusTextResolver.profileStatusText(viewer: appState.viewer)
-    }
-
     private var addressStatusText: String {
         SettingsStatusTextResolver.addressStatusText(address: appState.mailingAddress)
-    }
-
-    private var subscriptionStatusText: String {
-        SettingsStatusTextResolver.subscriptionStatusText(isActive: appState.subscriptionState.isMegrumPlusActive)
     }
 
     private var accountSummary: SettingsAccountSummary {
@@ -144,18 +110,6 @@ struct SettingsScreen: View {
     private func setPushNotificationsEnabled(_ enabled: Bool) {
         Task {
             await appState.setPushNotificationsEnabled(enabled)
-        }
-    }
-
-    private func setGroomActivityPushNotificationsEnabled(_ enabled: Bool) {
-        Task {
-            await appState.setGroomActivityPushNotificationsEnabled(enabled)
-        }
-    }
-
-    private func setChatroomActivityPushNotificationsEnabled(_ enabled: Bool) {
-        Task {
-            await appState.setChatroomActivityPushNotificationsEnabled(enabled)
         }
     }
 
@@ -188,9 +142,9 @@ struct SettingsScreen: View {
         case .premium:
             SubscriptionSettingsScreen(appState: appState)
         case .blockedUsers:
-            BlockedUsersScreen(appState: appState, context: .exchange)
+            BlockedUsersTabbedScreen(appState: appState)
         case .meguriBlockedUsers:
-            BlockedUsersScreen(appState: appState, context: .meguri)
+            BlockedUsersTabbedScreen(appState: appState)
         case .privacy:
             PrivacySettingsScreen(appState: appState)
         case .loginSecurity:

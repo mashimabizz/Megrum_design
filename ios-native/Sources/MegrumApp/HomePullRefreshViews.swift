@@ -29,7 +29,10 @@ enum HomePullRefreshPresentation {
 
 struct HomePullRefreshScrollView<Content: View>: View {
     var coordinateSpaceName: String
-    var indicatorTopPadding: CGFloat
+    /// 旧・独自インジケータの位置。二重ローディング表示（システムの
+    /// refreshable スピナー＋独自）の解消のため独自側を廃止し、iOS標準の
+    /// スピナーのみにした。呼び出し互換のため引数は残している。
+    var indicatorTopPadding: CGFloat = 0
     var onRefresh: () async -> Void
     @ViewBuilder var content: () -> Content
 
@@ -48,20 +51,9 @@ struct HomePullRefreshScrollView<Content: View>: View {
                 await performRefresh()
             }
         }
-        .overlay(alignment: .top) {
-            HomePullRefreshIndicator(
-                progress: progress,
-                isRefreshing: presentationState.isRefreshing
-            )
-            .padding(.top, indicatorTopPadding)
-        }
         .onPreferenceChange(HomePullRefreshOffsetPreferenceKey.self) { value in
             presentationState.updateScrollOffset(value)
         }
-    }
-
-    private var progress: CGFloat {
-        presentationState.progress
     }
 
     @MainActor
@@ -76,29 +68,6 @@ struct HomePullRefreshScrollView<Content: View>: View {
     }
 }
 
-private struct HomePullRefreshIndicator: View {
-    var progress: CGFloat
-    var isRefreshing: Bool
-
-    var body: some View {
-        ProgressView()
-            .controlSize(.small)
-            .tint(MegrumTheme.lavender)
-            .padding(10)
-            .background(.ultraThinMaterial, in: Circle())
-            .overlay {
-                Circle()
-                    .stroke(MegrumTheme.lavender.opacity(0.18 + 0.28 * progress), lineWidth: 1)
-            }
-            .scaleEffect(HomePullRefreshPresentation.indicatorScale(progress: progress))
-            .opacity(HomePullRefreshPresentation.indicatorOpacity(progress: progress))
-            .offset(y: -18 + 18 * progress)
-            .animation(.spring(response: 0.22, dampingFraction: 0.86), value: progress)
-            .animation(.easeInOut(duration: 0.16), value: isRefreshing)
-            .allowsHitTesting(false)
-            .accessibilityHidden(true)
-    }
-}
 
 private struct HomePullRefreshOffsetReader: View {
     var coordinateSpaceName: String

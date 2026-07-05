@@ -4,63 +4,19 @@ import SwiftUI
 @MainActor
 struct SettingsPrimarySection: View {
     @ObservedObject var appState: MegrumAppState
-    var profileStatusText: String
-    var notificationStatusText: String
     var pushNotificationStatusText: String
-    var groomNotificationStatusText: String
-    var chatroomNotificationStatusText: String
     var addressStatusText: String
-    var subscriptionStatusText: String
     var onOpenRoute: (SettingsEssentialRoute) -> Void
     var onSetPushNotificationsEnabled: @MainActor @Sendable (Bool) -> Void
-    var onSetGroomActivityPushNotificationsEnabled: @MainActor @Sendable (Bool) -> Void
-    var onSetChatroomActivityPushNotificationsEnabled: @MainActor @Sendable (Bool) -> Void
 
     var body: some View {
         Section {
-            SettingsNavigationButtonRow(
-                title: "自分のプロフィール",
-                subtitle: profileStatusText,
-                systemImage: "person.crop.circle"
-            ) {
-                onOpenRoute(.profile)
-            }
-
-            SettingsNavigationButtonRow(
-                title: "通知",
-                subtitle: notificationStatusText,
-                systemImage: "bell",
-                badgeCount: appState.unreadNotificationCount
-            ) {
-                onOpenRoute(.notifications)
-            }
-
             SettingsPushNotificationRow(
                 statusText: pushNotificationStatusText,
                 isEnabled: appState.pushNotificationsEnabled,
                 isLoading: appState.isLoadingPushNotificationSetting,
                 isSaving: appState.isSavingPushNotificationSetting,
                 onToggle: onSetPushNotificationsEnabled
-            )
-
-            SettingsPushNotificationRow(
-                title: "グルーム通知",
-                statusText: groomNotificationStatusText,
-                systemImage: "heart",
-                isEnabled: appState.groomActivityPushNotificationsEnabled,
-                isLoading: appState.isLoadingPushNotificationSetting,
-                isSaving: appState.isSavingPushNotificationSetting,
-                onToggle: onSetGroomActivityPushNotificationsEnabled
-            )
-
-            SettingsPushNotificationRow(
-                title: "チャットルーム通知",
-                statusText: chatroomNotificationStatusText,
-                systemImage: "text.bubble",
-                isEnabled: appState.chatroomActivityPushNotificationsEnabled,
-                isLoading: appState.isLoadingPushNotificationSetting,
-                isSaving: appState.isSavingPushNotificationSetting,
-                onToggle: onSetChatroomActivityPushNotificationsEnabled
             )
 
             SettingsNavigationButtonRow(
@@ -72,27 +28,11 @@ struct SettingsPrimarySection: View {
             }
 
             SettingsNavigationButtonRow(
-                title: SubscriptionCatalog.currentPremiumDisplayName,
-                subtitle: subscriptionStatusText,
-                systemImage: "sparkles.rectangle.stack"
-            ) {
-                onOpenRoute(.premium)
-            }
-
-            SettingsNavigationButtonRow(
-                title: "グッズ交換でブロックした人",
-                subtitle: "一覧と解除",
+                title: "ブロックしたユーザー",
+                subtitle: "グッズ交換・めぐりの一覧と解除",
                 systemImage: "person.crop.circle.badge.xmark"
             ) {
                 onOpenRoute(.blockedUsers)
-            }
-
-            SettingsNavigationButtonRow(
-                title: "めぐりでブロックした人",
-                subtitle: "一覧と解除",
-                systemImage: "message.badge.circle"
-            ) {
-                onOpenRoute(.meguriBlockedUsers)
             }
         }
     }
@@ -113,14 +53,6 @@ struct SettingsSupportAccountSection: View {
                 systemImage: "questionmark.circle"
             ) {
                 onOpenRoute(.help)
-            }
-
-            SettingsNavigationButtonRow(
-                title: "プライバシーと安全",
-                subtitle: "ブロック・公開範囲・ポリシー",
-                systemImage: "lock.shield"
-            ) {
-                onOpenRoute(.privacy)
             }
 
             SettingsNavigationButtonRow(

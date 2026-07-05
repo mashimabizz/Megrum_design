@@ -25,6 +25,16 @@ struct TradeStagePage: View {
         isSelectingPendingProposals && stage == .pending
     }
 
+    /// タブスワイプ中に全カードを一気に構築するとカクつくため、
+    /// 最初は数件だけ描画し、スクロールで末尾に近づくたびに追加する。
+    private static let initialVisibleCount = 4
+    private static let visibleCountStep = 4
+    @State private var visibleCount = TradeStagePage.initialVisibleCount
+
+    private var visibleProposals: [TradeProposal] {
+        Array(proposals.prefix(visibleCount))
+    }
+
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 0) {
@@ -35,6 +45,14 @@ struct TradeStagePage: View {
                         .padding(.top, 8)
                 } else {
                     proposalRows
+
+                    if visibleCount < proposals.count {
+                        Color.clear
+                            .frame(height: 1)
+                            .onAppear {
+                                visibleCount += Self.visibleCountStep
+                            }
+                    }
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -48,7 +66,7 @@ struct TradeStagePage: View {
     }
 
     private var proposalRows: some View {
-        ForEach(proposals) { proposal in
+        ForEach(visibleProposals) { proposal in
             let isWithdrawable = canWithdraw(proposal)
             TradeCard(
                 proposal: proposal,

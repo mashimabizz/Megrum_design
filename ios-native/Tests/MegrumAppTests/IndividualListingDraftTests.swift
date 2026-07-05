@@ -1364,4 +1364,24 @@ final class IndividualListingDraftTests: XCTestCase {
         draft.resetCurrentOptionSelection()
         XCTAssertEqual(draft.optionKind, .wish)
     }
+
+    func testInputNormalizerPreservesAdditionalOptions() {
+        let wishID = UUID()
+        let input = IndividualListingCreateInput(
+            haveItems: [ListingItemQuantity(itemID: UUID(), quantity: 1)],
+            wishItems: [],
+            isCashOffer: true,
+            additionalOptions: [
+                IndividualListingOptionInput(
+                    wishItems: [ListingItemQuantity(itemID: wishID, quantity: 120)]
+                )
+            ]
+        )
+        let normalized = IndividualListingInputNormalizer.normalized(input)
+        XCTAssertEqual(normalized.additionalOptions.count, 1)
+        XCTAssertEqual(
+            normalized.additionalOptions.first?.wishItems,
+            [ListingItemQuantity(itemID: wishID, quantity: 99)]
+        )
+    }
 }

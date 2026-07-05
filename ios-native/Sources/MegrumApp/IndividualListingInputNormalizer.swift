@@ -17,8 +17,15 @@ enum IndividualListingInputNormalizer {
             cashAmount: input.cashAmount,
             wishGroupID: input.wishGroupID,
             wishGoodsTypeID: input.wishGoodsTypeID,
+            additionalOptions: input.additionalOptions.map(normalizedOption),
             note: input.note.nilIfBlank
         )
+    }
+
+    private static func normalizedOption(_ option: IndividualListingOptionInput) -> IndividualListingOptionInput {
+        var normalized = option
+        normalized.wishItems = option.wishItems.map(normalizedQuantity)
+        return normalized
     }
 
     private static func normalizedQuantity(_ item: ListingItemQuantity) -> ListingItemQuantity {
