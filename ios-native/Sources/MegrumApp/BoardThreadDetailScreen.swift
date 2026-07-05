@@ -1,6 +1,11 @@
+import Foundation
 import MegrumCore
 import MegrumDesign
+import PhotosUI
 import SwiftUI
+#if os(iOS)
+import UIKit
+#endif
 
 struct BoardThreadDetailScreen: View {
     @ObservedObject var appState: MegrumAppState
@@ -12,6 +17,7 @@ struct BoardThreadDetailScreen: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.megrumSlidePresentationDismiss) private var slideDismiss
     @State private var replyComposerState = BoardThreadReplyComposerState()
+    @State private var photoPresentationState = MeguriMessagePhotoPresentationState()
     @State private var isShowingReportConfirmation = false
 
     private var currentThread: BoardThread {
@@ -77,7 +83,10 @@ struct BoardThreadDetailScreen: View {
                             messages: presentation.chatMessages,
                             isLoadingReplies: appState.loadingBoardRepliesThreadID == currentThread.id,
                             missingReplyContextMessage: missingReplyContextMessage,
-                            onReact: react(to:reaction:)
+                            onReact: react(to:reaction:),
+                            onOpenImage: { url in
+                                photoPresentationState.selectRemoteImage(url)
+                            }
                         )
                         .padding(.top, 14)
 
@@ -88,15 +97,45 @@ struct BoardThreadDetailScreen: View {
                     .scrollDismissesKeyboard(.interactively)
                     .padding(.bottom, 92)
                 }
+
+                if let selectedRemoteImage = photoPresentationState.selectedRemoteImage {
+                    FullScreenRemoteImageView(
+                        url: selectedRemoteImage.url,
+                        onDismiss: {
+                            photoPresentationState.clearSelectedRemoteImage()
+                        }
+                    )
+                    .transition(.opacity.combined(with: .scale(scale: 0.94)))
+                    .zIndex(10)
+                }
             }
             .safeAreaInset(edge: .bottom) {
                 BoardReplyInput(
                     text: $replyComposerState.draftReply,
                     isSending: appState.sendingBoardReplyThreadID == currentThread.id,
-                    isDisabled: missingReplyContextMessage != nil
+                    isDisabled: missingReplyContextMessage != nil,
+                    canUseCamera: canUseCamera,
+                    onOpenCamera: openCamera,
+                    onOpenPhotoLibrary: openPhotoLibrary
                 ) {
                     sendReply(proxy: proxy)
                 }
+            }
+            .photosPicker(
+                isPresented: $photoPresentationState.isShowingPhotoLibraryPicker,
+                selection: $photoPresentationState.selectedPhotoItem,
+                matching: .images
+            )
+            #if os(iOS)
+            .sheet(isPresented: $photoPresentationState.isShowingCamera) {
+                NativeCameraCaptureView { imageData in
+                    handleCapturedImage(imageData, proxy: proxy)
+                }
+                .ignoresSafeArea()
+            }
+            #endif
+            .onChange(of: photoPresentationState.selectedPhotoItem) { _, item in
+                handleSelectedPhoto(item, proxy: proxy)
             }
             .boardThreadDetailNavigationChromeHidden()
             .confirmationDialog("このチャットルームを通報しますか？", isPresented: $isShowingReportConfirmation, titleVisibility: .visible) {
@@ -192,6 +231,76 @@ struct BoardThreadDetailScreen: View {
                 }
             }
         }
+    }
+
+    private func openCamera() {
+        guard missingReplyContextMessage == nil else {
+            return
+        }
+        photoPresentationState.isShowingCamera = true
+    }
+
+    private func openPhotoLibrary() {
+        guard missingReplyContextMessage == nil else {
+            return
+        }
+        photoPresentationState.isShowingPhotoLibraryPicker = true
+    }
+
+    private func handleSelectedPhoto(_ item: PhotosPickerItem?, proxy: ScrollViewProxy) {
+        guard let item else {
+            return
+        }
+        Task {
+            await addPhoto(from: item, proxy: proxy)
+        }
+    }
+
+    private func handleCapturedImage(_ imageData: Data, proxy: ScrollViewProxy) {
+        Task {
+            await addPhoto(data: imageData, imageContentType: "image/jpeg", proxy: proxy)
+        }
+    }
+
+    private func addPhoto(from item: PhotosPickerItem, proxy: ScrollViewProxy) async {
+        defer {
+            photoPresentationState.clearSelectedPhotoItem()
+        }
+        guard missingReplyContextMessage == nil,
+              let data = try? await item.loadTransferable(type: Data.self)
+        else {
+            return
+        }
+        let upload = normalizedChatPhotoUpload(from: data)
+        await addPhoto(data: upload.data, imageContentType: upload.contentType, proxy: proxy)
+    }
+
+    private func addPhoto(data: Data, imageContentType: String, proxy: ScrollViewProxy) async {
+        guard missingReplyContextMessage == nil else {
+            return
+        }
+        let sent = await appState.sendBoardPhotoReply(
+            threadID: currentThread.id,
+            imageData: data,
+            imageContentType: imageContentType,
+            latitude: coordinate?.latitude,
+            longitude: coordinate?.longitude,
+            prefecture: selectedPrefecture,
+            scope: replyContextScope
+        )
+        if sent {
+            await MainActor.run {
+                scrollToLatest(proxy)
+            }
+        }
+    }
+
+    private var canUseCamera: Bool {
+        #if os(iOS)
+        UIImagePickerController.isSourceTypeAvailable(.camera)
+        #else
+        false
+        #endif
     }
 
     private func scrollToLatest(_ proxy: ScrollViewProxy, animated: Bool = true) {

@@ -161,6 +161,8 @@ public struct BoardReply: Identifiable, Codable, Hashable, Sendable {
     public var threadID: UUID
     public var authorID: UUID
     public var body: String
+    public var imageURLs: [URL]?
+    public var imagePaths: [String]?
     public var status: Status
     public var createdAt: Date
     public var goodReactionCount: Int?
@@ -172,6 +174,8 @@ public struct BoardReply: Identifiable, Codable, Hashable, Sendable {
         threadID: UUID,
         authorID: UUID,
         body: String,
+        imageURLs: [URL] = [],
+        imagePaths: [String] = [],
         status: Status = .visible,
         createdAt: Date = .now,
         goodReactionCount: Int? = nil,
@@ -182,6 +186,8 @@ public struct BoardReply: Identifiable, Codable, Hashable, Sendable {
         self.threadID = threadID
         self.authorID = authorID
         self.body = body
+        self.imageURLs = imageURLs.isEmpty ? nil : imageURLs
+        self.imagePaths = imagePaths.isEmpty ? nil : imagePaths
         self.status = status
         self.createdAt = createdAt
         self.goodReactionCount = goodReactionCount
@@ -192,25 +198,34 @@ public struct BoardReply: Identifiable, Codable, Hashable, Sendable {
 
 public struct BoardReplyCreateInput: Equatable, Sendable {
     public var threadID: UUID
+    public var authorID: UUID?
     public var body: String
     public var latitude: Double?
     public var longitude: Double?
     public var prefecture: String?
     public var scope: BoardThread.Audience
+    public var imagePaths: [String]
+    public var imageUpload: GoodsPhotoUpload?
 
     public init(
         threadID: UUID,
+        authorID: UUID? = nil,
         body: String,
         latitude: Double? = nil,
         longitude: Double? = nil,
         prefecture: String? = nil,
-        scope: BoardThread.Audience = .nearby3km
+        scope: BoardThread.Audience = .nearby3km,
+        imagePaths: [String] = [],
+        imageUpload: GoodsPhotoUpload? = nil
     ) {
         self.threadID = threadID
+        self.authorID = authorID
         self.body = body
         self.latitude = latitude
         self.longitude = longitude
         self.prefecture = prefecture
         self.scope = scope
+        self.imagePaths = imagePaths
+        self.imageUpload = imageUpload
     }
 }

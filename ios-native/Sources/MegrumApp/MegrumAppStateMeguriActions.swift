@@ -126,6 +126,10 @@ extension MegrumAppState {
         guard !trimmed.isEmpty else {
             return false
         }
+        guard let viewer else {
+            errorMessage = "プロフィールを確認してから送信してください"
+            return false
+        }
         guard sendingBoardReplyThreadID != threadID else {
             return false
         }
@@ -137,6 +141,7 @@ extension MegrumAppState {
             let reply = try await repository.sendBoardReply(
                 BoardReplyCreateInput(
                     threadID: threadID,
+                    authorID: viewer.id,
                     body: trimmed,
                     latitude: latitude,
                     longitude: longitude,
@@ -153,6 +158,56 @@ extension MegrumAppState {
             return true
         } catch {
             errorMessage = "チャットルームに返信できませんでした"
+            sendingBoardReplyThreadID = nil
+            return false
+        }
+    }
+
+    public func sendBoardPhotoReply(
+        threadID: UUID,
+        imageData: Data,
+        imageContentType: String,
+        latitude: Double? = nil,
+        longitude: Double? = nil,
+        prefecture: String? = nil,
+        scope: BoardThread.Audience = .nearby3km
+    ) async -> Bool {
+        guard !imageData.isEmpty else {
+            return false
+        }
+        guard let viewer else {
+            errorMessage = "プロフィールを確認してから送信してください"
+            return false
+        }
+        guard sendingBoardReplyThreadID != threadID else {
+            return false
+        }
+
+        let selectedPrefecture = boardPrefecture(explicitPrefecture: prefecture)
+        sendingBoardReplyThreadID = threadID
+        errorMessage = nil
+        do {
+            let reply = try await repository.sendBoardReply(
+                BoardReplyCreateInput(
+                    threadID: threadID,
+                    authorID: viewer.id,
+                    body: "",
+                    latitude: latitude,
+                    longitude: longitude,
+                    prefecture: selectedPrefecture,
+                    scope: scope,
+                    imageUpload: GoodsPhotoUpload(data: imageData, contentType: imageContentType)
+                )
+            )
+            boardRepliesByThreadID = ReplyThreadStateReducer.appendingBoardReply(
+                reply,
+                to: boardRepliesByThreadID,
+                threadID: threadID
+            )
+            sendingBoardReplyThreadID = nil
+            return true
+        } catch {
+            errorMessage = "写真をチャットルームに送信できませんでした"
             sendingBoardReplyThreadID = nil
             return false
         }

@@ -208,6 +208,63 @@ final class BoardThreadDetailPresentationTests: XCTestCase {
         XCTAssertEqual(presentation.chatMessages[0].viewerReaction, .good)
     }
 
+    func testThreadThumbnailIsNotDisplayedAsOpeningChatMessageImage() {
+        let thread = BoardThread(
+            id: uuid("101"),
+            authorID: uuid("001"),
+            title: "近くにいますか？",
+            body: "入口前にいます",
+            audience: .nearby3km,
+            imageURLs: [URL(string: "https://example.com/thread.jpg")!]
+        )
+
+        let presentation = BoardThreadDetailPresentationBuilder(
+            thread: thread,
+            replies: [],
+            viewer: UserProfile(id: uuid("003"), handle: "viewer", displayName: "閲覧者"),
+            profilesByUserID: [:],
+            meguriProfilesByUserID: [:],
+            grooms: []
+        )
+        .makePresentation(now: Date(timeIntervalSince1970: 1_060))
+
+        XCTAssertEqual(presentation.chatMessages[0].body, "入口前にいます")
+        XCTAssertTrue(presentation.chatMessages[0].imageURLs.isEmpty)
+    }
+
+    func testReplyImageAppearsAsChatMessageImage() {
+        let thread = BoardThread(
+            id: uuid("101"),
+            authorID: uuid("001"),
+            title: "近くにいますか？",
+            body: "入口前にいます",
+            audience: .nearby3km
+        )
+        let imageURL = URL(string: "https://example.com/reply.jpg")!
+        let reply = BoardReply(
+            id: uuid("201"),
+            threadID: thread.id,
+            authorID: uuid("003"),
+            body: "",
+            imageURLs: [imageURL],
+            imagePaths: ["reply.jpg"]
+        )
+
+        let presentation = BoardThreadDetailPresentationBuilder(
+            thread: thread,
+            replies: [reply],
+            viewer: UserProfile(id: uuid("003"), handle: "viewer", displayName: "閲覧者"),
+            profilesByUserID: [:],
+            meguriProfilesByUserID: [:],
+            grooms: []
+        )
+        .makePresentation(now: Date(timeIntervalSince1970: 1_060))
+
+        XCTAssertEqual(presentation.chatMessages[1].target, .reply(reply.id))
+        XCTAssertEqual(presentation.chatMessages[1].imageURLs, [imageURL])
+        XCTAssertEqual(presentation.chatMessages[1].body, "")
+    }
+
     func testBoardMessageReactionOptimisticUpdateSwitchesCounts() {
         let threadID = uuid("101")
         let replyID = uuid("201")

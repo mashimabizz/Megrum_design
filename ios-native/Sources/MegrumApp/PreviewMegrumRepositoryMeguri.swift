@@ -157,11 +157,14 @@ public extension PreviewMegrumRepository {
     }
 
     func sendBoardReply(_ input: BoardReplyCreateInput) async throws -> BoardReply {
-        BoardReply(
+        let imageURL = try previewBoardReplyImageURL(from: input.imageUpload)
+        return BoardReply(
             id: UUID(),
             threadID: input.threadID,
             authorID: NativePreviewData.viewerID,
-            body: input.body.trimmingCharacters(in: .whitespacesAndNewlines)
+            body: input.body.trimmingCharacters(in: .whitespacesAndNewlines),
+            imageURLs: imageURL.map { [$0] } ?? [],
+            imagePaths: imageURL.map { [$0.lastPathComponent] } ?? []
         )
     }
 
@@ -213,6 +216,17 @@ public extension PreviewMegrumRepository {
         } catch {
             return nil
         }
+    }
+
+    private func previewBoardReplyImageURL(from upload: GoodsPhotoUpload?) throws -> URL? {
+        guard let upload else {
+            return nil
+        }
+        let fileExtension = upload.contentType.lowercased().contains("png") ? "png" : "jpg"
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("megrum-board-reply-\(UUID().uuidString).\(fileExtension)")
+        try upload.data.write(to: url, options: .atomic)
+        return url
     }
 
     private func previewMeguriProfile(userID: UUID) -> MeguriProfile? {

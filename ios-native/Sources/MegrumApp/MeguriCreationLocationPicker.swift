@@ -88,7 +88,14 @@ struct MeguriCreationLocationPicker: View {
                     }
                 }
             }
-            .mapStyle(.standard(elevation: .flat, emphasis: .muted))
+            .mapStyle(MeguriMapVisualStyle.quietStandard)
+            .overlay {
+                MeguriMapBrandToneOverlay(
+                    topWhiteOpacity: 0.46,
+                    middleWhiteOpacity: 0.14,
+                    bottomWhiteOpacity: 0.02
+                )
+            }
             .gesture(
                 SpatialTapGesture()
                     .onEnded { value in

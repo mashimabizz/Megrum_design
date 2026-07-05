@@ -91,6 +91,7 @@ enum MeguriMapClusterBuilder {
         var latitude: Double
         var longitude: Double
         var popsIn: Bool
+        var opacity: Double
 
         var id: String { element.id }
 
@@ -99,6 +100,7 @@ enum MeguriMapClusterBuilder {
             self.latitude = element.displayLatitude
             self.longitude = element.displayLongitude
             self.popsIn = popsIn
+            self.opacity = 1
         }
     }
 

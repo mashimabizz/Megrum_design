@@ -71,15 +71,20 @@ public final class SupabaseBoardClient: @unchecked Sendable {
                 scope: scope
             )
         )
-        return rows.compactMap(\.reply)
+        let signedURLs = await signedURLMap(for: rows)
+        return rows.compactMap { $0.reply(signedURLs: signedURLs) }
     }
 
     public func appendReply(_ input: BoardReplyCreateInput) async throws -> BoardReply {
+        let imagePaths = try await boardImagePaths(for: input)
+        var input = input
+        input.imagePaths = imagePaths
         let rows: [BoardReplyRow] = try await client.rpcRows(
             function: "append_meguri_board_reply_for_viewer",
             payload: BoardReplyAppendPayload(input: input)
         )
-        guard let reply = rows.first?.reply else {
+        let signedURLs = await signedURLMap(for: rows)
+        guard let reply = rows.first?.reply(signedURLs: signedURLs) else {
             throw SupabaseBoardClientError.malformedResponse
         }
         return reply
@@ -200,6 +205,39 @@ public final class SupabaseBoardClient: @unchecked Sendable {
             signedURLs[path] = try? await client.createSignedURL(bucket: Self.boardMediaBucket, path: path)
         }
         return signedURLs
+    }
+
+    private func signedURLMap(for rows: [BoardReplyRow]) async -> [String: URL] {
+        var signedURLs: [String: URL] = [:]
+        let paths = Set(rows.flatMap { $0.imagePaths ?? [] }.filter { storagePathCandidate($0) })
+        for path in paths {
+            signedURLs[path] = try? await client.createSignedURL(bucket: Self.boardMediaBucket, path: path)
+        }
+        return signedURLs
+    }
+
+    private func boardImagePaths(for input: BoardReplyCreateInput) async throws -> [String] {
+        var paths = input.imagePaths.map(SupabaseTextNormalizer.trimmed)
+            .filter { !$0.isEmpty }
+        if let upload = input.imageUpload {
+            guard upload.data.count <= Self.maxUploadBytes else {
+                throw SupabaseBoardClientError.imageTooLarge
+            }
+            guard let authorID = input.authorID else {
+                throw SupabaseBoardClientError.malformedResponse
+            }
+            let contentType = SupabaseImageContentTypeNormalizer.lenient(upload.contentType)
+            let imagePath = boardImagePath(userID: authorID, contentType: contentType)
+            try await client.uploadObject(
+                bucket: Self.boardMediaBucket,
+                path: imagePath,
+                data: upload.data,
+                contentType: contentType,
+                upsert: false
+            )
+            paths.insert(imagePath, at: 0)
+        }
+        return Array(paths.prefix(4))
     }
 
     private func storagePathCandidate(_ path: String) -> Bool {

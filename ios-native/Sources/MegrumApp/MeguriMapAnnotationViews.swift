@@ -137,6 +137,30 @@ struct BoardMapPin: View {
     }
 }
 
+struct BoardMapPinWithTitle: View {
+    var thread: BoardThread
+    var isOutOfRange: Bool = false
+
+    var body: some View {
+        VStack(spacing: 3) {
+            BoardMapPin(thread: thread, isOutOfRange: isOutOfRange)
+
+            Text(thread.title)
+                .font(.system(size: 11, weight: .black, design: .rounded))
+                .foregroundStyle(MegrumTheme.ink)
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+                .padding(.horizontal, 7)
+                .padding(.vertical, 3)
+                .background(.white.opacity(0.90), in: Capsule())
+                .shadow(color: MegrumTheme.ink.opacity(0.12), radius: 6, y: 3)
+                .frame(maxWidth: 118)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(isOutOfRange ? "1km圏外のチャットルーム \(thread.title)" : "チャットルーム \(thread.title)")
+    }
+}
+
 private struct BoardMapPinThumbnail: View {
     var url: URL?
     var isOutOfRange: Bool
@@ -309,4 +333,3 @@ struct GroomMapCluster: Identifiable {
         }
     }
 }
-

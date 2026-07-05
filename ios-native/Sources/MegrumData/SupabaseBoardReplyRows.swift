@@ -86,7 +86,7 @@ struct BoardReplyAppendPayload: Encodable, Sendable {
         self.pParentReplyId = nil
         self.pQuoteAuthorName = nil
         self.pQuoteBody = nil
-        self.pImagePaths = []
+        self.pImagePaths = input.imagePaths
     }
 
     enum CodingKeys: String, CodingKey {
@@ -139,16 +139,20 @@ struct BoardReplyRow: Decodable, Sendable {
     var reactionCount: Int?
     var goodReactionCount: Int?
     var badReactionCount: Int?
+    var imagePaths: [String]?
     var viewerReacted: Bool?
     var viewerReactionType: String?
 
-    var reply: BoardReply? {
+    func reply(signedURLs: [String: URL] = [:]) -> BoardReply? {
         let status = BoardReply.Status(rawValue: status ?? "visible") ?? .visible
+        let paths = imagePaths ?? []
         return BoardReply(
             id: id,
             threadID: threadId,
             authorID: authorId,
             body: body ?? "",
+            imageURLs: paths.compactMap { signedURLs[$0] ?? URL(string: $0) },
+            imagePaths: paths,
             status: status,
             createdAt: createdAt ?? .now,
             goodReactionCount: max(0, goodReactionCount ?? reactionCount ?? 0),

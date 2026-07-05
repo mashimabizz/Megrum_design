@@ -7,6 +7,7 @@ struct BoardThreadChatTimeline: View {
     var isLoadingReplies: Bool
     var missingReplyContextMessage: String?
     var onReact: (BoardThreadChatMessageTarget, BoardMessageReaction?) -> Void
+    var onOpenImage: (URL) -> Void = { _ in }
 
     var body: some View {
         LazyVStack(spacing: 12) {
@@ -20,7 +21,8 @@ struct BoardThreadChatTimeline: View {
                     message: message,
                     onReact: { reaction in
                         onReact(message.target, reaction)
-                    }
+                    },
+                    onOpenImage: onOpenImage
                 )
                 .id(message.id)
             }
@@ -36,6 +38,7 @@ struct BoardThreadChatTimeline: View {
 struct BoardThreadChatMessageRow: View {
     var message: BoardThreadChatMessageDisplay
     var onReact: (BoardMessageReaction?) -> Void
+    var onOpenImage: (URL) -> Void
 
     var body: some View {
         HStack(alignment: .bottom, spacing: 8) {
@@ -86,10 +89,20 @@ struct BoardThreadChatMessageRow: View {
 
     @ViewBuilder
     private var messageBubble: some View {
-        if !message.imageURLs.isEmpty {
-            richMessageBubble
-        } else {
+        if message.isDeleted || message.imageURLs.isEmpty {
             textOnlyMessageBubble
+        } else {
+            VStack(alignment: message.isMine ? .trailing : .leading, spacing: 6) {
+                ForEach(Array(message.imageURLs.prefix(4).enumerated()), id: \.offset) { _, imageURL in
+                    MeguriPhotoMessageBubble(photoURL: imageURL) { openedURL in
+                        onOpenImage(openedURL)
+                    }
+                }
+
+                if !message.body.isBlank {
+                    textOnlyMessageBubble
+                }
+            }
         }
     }
 
@@ -133,28 +146,6 @@ struct BoardThreadChatMessageRow: View {
             )
     }
 
-    private var richMessageBubble: some View {
-        VStack(alignment: message.isMine ? .trailing : .leading, spacing: 8) {
-            Text(messageText)
-                .font(.system(size: 15, weight: .bold, design: .rounded))
-                .foregroundStyle(message.isMine ? .white : MegrumTheme.ink)
-                .multilineTextAlignment(message.isMine ? .trailing : .leading)
-                .fixedSize(horizontal: false, vertical: true)
-
-            if !message.isDeleted, !message.imageURLs.isEmpty {
-                BoardThreadChatImageGrid(imageURLs: message.imageURLs)
-            }
-        }
-        .frame(maxWidth: BoardThreadChatBubbleMetrics.maxWidth, alignment: message.isMine ? .trailing : .leading)
-        .fixedSize(horizontal: false, vertical: true)
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .background(
-            message.isMine ? AnyShapeStyle(MegrumTheme.lavender) : AnyShapeStyle(.white.opacity(0.9)),
-            in: RoundedRectangle(cornerRadius: 18, style: .continuous)
-        )
-    }
-
     private var messageText: String {
         message.isDeleted ? "削除済みです" : message.body
     }
@@ -170,42 +161,6 @@ struct BoardThreadChatMessageRow: View {
 
 private enum BoardThreadChatBubbleMetrics {
     static let maxWidth: CGFloat = 270
-}
-
-private struct BoardThreadChatImageGrid: View {
-    var imageURLs: [URL]
-
-    private var columns: [GridItem] {
-        [
-            GridItem(.flexible(minimum: 82), spacing: 6),
-            GridItem(.flexible(minimum: 82), spacing: 6),
-        ]
-    }
-
-    var body: some View {
-        LazyVGrid(columns: columns, spacing: 6) {
-            ForEach(Array(imageURLs.prefix(4).enumerated()), id: \.offset) { _, url in
-                AsyncImage(url: url, transaction: Transaction(animation: .smooth(duration: 0.18))) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .scaledToFill()
-                    default:
-                        ZStack {
-                            MegrumTheme.lavender.opacity(0.12)
-                            Image(systemName: "photo")
-                                .font(.system(size: 18, weight: .bold, design: .rounded))
-                                .foregroundStyle(MegrumTheme.lavender.opacity(0.72))
-                        }
-                    }
-                }
-                .frame(width: imageURLs.count == 1 ? 180 : 86, height: imageURLs.count == 1 ? 180 : 86)
-                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-            }
-        }
-        .frame(maxWidth: imageURLs.count == 1 ? 180 : 180, alignment: .leading)
-    }
 }
 
 struct BoardMessageReactionBar: View {
@@ -245,24 +200,17 @@ struct BoardMessageReactionBar: View {
         } label: {
             HStack(spacing: 4) {
                 Image(systemName: isSelected ? selectedSystemImage : systemImage)
-                    .font(.system(size: 12.5, weight: .black, design: .rounded))
-                Text("\(max(0, count))")
                     .font(.system(size: 11.5, weight: .black, design: .rounded))
+                Text("\(max(0, count))")
+                    .font(.system(size: 10.5, weight: .black, design: .rounded))
             }
             .foregroundStyle(isSelected ? .white : MegrumTheme.muted)
-            .padding(.horizontal, 8)
-            .frame(minWidth: 44, minHeight: 30)
+            .padding(.horizontal, 6)
+            .frame(minWidth: 34, minHeight: 24)
             .background(
-                isSelected ? AnyShapeStyle(MegrumTheme.lavender) : AnyShapeStyle(.white.opacity(0.82)),
+                isSelected ? AnyShapeStyle(MegrumTheme.lavender) : AnyShapeStyle(.clear),
                 in: Capsule()
             )
-            .overlay {
-                Capsule()
-                    .strokeBorder(
-                        isSelected ? .white.opacity(0.26) : MegrumTheme.ink.opacity(0.07),
-                        lineWidth: 1
-                    )
-            }
         }
         .buttonStyle(.plain)
         .accessibilityLabel(reaction == .good ? "グッド" : "バッド")

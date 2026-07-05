@@ -53,7 +53,7 @@ struct MeguriHomeMapBackdrop: View {
     }
 
     /// 統合/分解のモーフ演出つきで表示マーカーを更新する。
-    /// - 統合: 統合される側のマーカーが統合先の中間地点へ動いてから1つになる。
+    /// - 統合: 統合される側のマーカーが統合先の中間地点へ動きながら薄くなり、最後にクラスタが出る。
     /// - 分解: 分解後のマーカーがクラスタ位置に現れて、それぞれの位置へ散らばる。
     private func applyElements(_ next: [MeguriMapClusterBuilder.Element]) {
         guard next.map(\.id) != displayedElements.map(\.id) else {
@@ -81,6 +81,7 @@ struct MeguriHomeMapBackdrop: View {
                 if !memberIDs.isEmpty, memberIDs.isSubset(of: targetMemberIDs) {
                     gathering[index].latitude = cluster.latitude
                     gathering[index].longitude = cluster.longitude
+                    gathering[index].opacity = 0.10
                     hasGatheringMove = true
                 }
             }
@@ -115,7 +116,7 @@ struct MeguriHomeMapBackdrop: View {
                     start.append(
                         MeguriMapClusterBuilder.DisplayedElement(
                             element: element,
-                            popsIn: !existed && !mergedHere
+                            popsIn: !existed || isMergeCluster(element, mergedHere: mergedHere)
                         )
                     )
                 }
@@ -144,7 +145,7 @@ struct MeguriHomeMapBackdrop: View {
         }
 
         if hasGatheringMove {
-            withAnimation(.spring(response: 0.34, dampingFraction: 0.78)) {
+            withAnimation(.easeInOut(duration: 0.30)) {
                 displayedElements = gathering
             }
             Task { @MainActor in
@@ -202,16 +203,17 @@ struct MeguriHomeMapBackdrop: View {
                                         }
                                     }
                                     .buttonStyle(.plain)
+                                    .opacity(displayed.opacity)
                                 }
 
                             case .single(.thread(let thread)):
-                                Annotation(thread.title, coordinate: coordinate) {
+                                Annotation("", coordinate: coordinate) {
                                     Button {
                                         onSelectThread(thread)
                                     } label: {
                                         MeguriPinConditionalPopIn(popsIn: displayed.popsIn) {
                                             MeguriFloatingMotion(seed: thread.id.hashValue) {
-                                                BoardMapPin(
+                                                BoardMapPinWithTitle(
                                                     thread: thread,
                                                     isOutOfRange: !MeguriAccessPolicy.canOpenBoard(
                                                         thread,
@@ -224,6 +226,7 @@ struct MeguriHomeMapBackdrop: View {
                                         }
                                     }
                                     .buttonStyle(.plain)
+                                    .opacity(displayed.opacity)
                                 }
 
                             case .cluster(let cluster):
@@ -238,12 +241,13 @@ struct MeguriHomeMapBackdrop: View {
                                         }
                                     }
                                     .buttonStyle(.plain)
+                                    .opacity(displayed.opacity)
                                 }
                             }
                         }
 
                     }
-                    .mapStyle(.standard(elevation: .flat, emphasis: .muted))
+                    .mapStyle(MeguriMapVisualStyle.quietStandard)
                     .onMapCameraChange(frequency: .onEnd) { context in
                         visibleSpanLatitudeDelta = context.region.span.latitudeDelta
                         onViewportChange(context.region)
@@ -278,12 +282,11 @@ struct MeguriHomeMapBackdrop: View {
                             }
                     )
                     .overlay {
-                        LinearGradient(
-                            colors: [.white.opacity(0.80), .white.opacity(0.28), .white.opacity(0.04)],
-                            startPoint: .top,
-                            endPoint: .center
+                        MeguriMapBrandToneOverlay(
+                            topWhiteOpacity: 0.80,
+                            middleWhiteOpacity: 0.28,
+                            bottomWhiteOpacity: 0.04
                         )
-                        .allowsHitTesting(false)
                     }
 
                     if let pendingCreationCoordinate,
@@ -293,13 +296,6 @@ struct MeguriHomeMapBackdrop: View {
                             .onTapGesture(perform: onCancelPendingCreationCoordinate)
                             .transition(.opacity)
                             .zIndex(1)
-
-                        MeguriMapCreationDropPin()
-                            .id(pendingCreationCoordinate.creationPromptID)
-                            .frame(width: 68, height: 72, alignment: .bottom)
-                            .position(x: point.x, y: point.y - 36)
-                            .transition(.opacity)
-                            .zIndex(2)
 
                         let promptPosition = MeguriMapCreationPromptLayout.position(
                             for: point,
@@ -329,6 +325,13 @@ struct MeguriHomeMapBackdrop: View {
             }
         }
     }
+}
+
+private func isMergeCluster(_ element: MeguriMapClusterBuilder.Element, mergedHere: Bool) -> Bool {
+    if case .cluster = element {
+        return mergedHere
+    }
+    return false
 }
 
 private extension MeguriHomeMapBackdrop {

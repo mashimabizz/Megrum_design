@@ -4,6 +4,145 @@
 
 ---
 
+## イテレーション1226.285：地図統合時のフェードアウトとチャット名追従
+
+### 背景・問題意識
+
+めぐり地図を縮小してマーカーが統合される時、統合直前の複数アイコンが最後まで残ったまま消えるため、統合後クラスタへの切り替わりがやや硬く見えていた。チャットルームはアイコン下のルーム名も同じタイミングで薄く消える必要がある。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MeguriMapClusterBuilder.swift`
+- 表示中マーカー `DisplayedElement` に透明度を追加し、モーフ中だけ薄くできるようにした。
+
+#### `ios-native/Sources/MegrumApp/MeguriHomeMapBackdrop.swift`
+- 統合フェーズで統合前マーカーを統合先へ寄せながら透明度を下げ、最終クラスタへ差し替えるように変更。
+- 統合で新しく現れるクラスタをポップイン対象にし、薄く消えた後に統合後アイコンが出てくる見え方へ調整。
+- チャットルームの地図ラベルをMapKit標準ラベルからピン内のSwiftUI表示へ移し、アイコンとルーム名が同じ透明度でフェードするようにした。
+
+#### `ios-native/Sources/MegrumApp/MeguriMapAnnotationViews.swift`
+- チャットルームピンとルーム名をまとめた `BoardMapPinWithTitle` を追加。
+
+### 影響範囲
+
+- めぐり地図のマーカー統合アニメーションとチャットルーム名表示のみ。クラスタ判定、タップ、分解ズーム、読み込み、作成吹き出しのロジックは不変。
+
+### 確認方法
+
+- `git diff --check`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-map-merge-fade-build`
+  - passed
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'id=C70DDDBB-2602-49E0-8F95-1F043BCCED76' -derivedDataPath /tmp/megrum-native-map-merge-fade-sim CODE_SIGNING_ALLOWED=NO build`
+  - passed
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'id=7F6C74EF-5786-5316-920A-F7F1CC3FE2A4' -derivedDataPath /tmp/megrum-native-map-merge-fade-device build`
+  - passed
+- `xcrun simctl install C70DDDBB-2602-49E0-8F95-1F043BCCED76 /tmp/megrum-native-map-merge-fade-sim/Build/Products/Debug-iphonesimulator/MegrumNative.app && xcrun simctl launch C70DDDBB-2602-49E0-8F95-1F043BCCED76 tokyo.megrum.native.preview`
+  - passed
+- `xcrun devicectl device install app --device 7F6C74EF-5786-5316-920A-F7F1CC3FE2A4 /tmp/megrum-native-map-merge-fade-device/Build/Products/Debug-iphoneos/MegrumNative.app`
+  - passed
+- `xcrun devicectl device process launch --device 7F6C74EF-5786-5316-920A-F7F1CC3FE2A4 tokyo.megrum.native.preview`
+  - failed（端末ロック中のため起動拒否。インストールは成功）
+
+### セルフレビュー結果
+
+- ✅ 既存のクラスタリングロジックには触れず、表示中マーカーの透明度とポップイン条件だけで見た目を調整。
+- ✅ チャットルーム名はピンと同じViewツリーへ入れ、フェード時に名前だけ残らないようにした。
+- ✅ 地図のタップ、クラスタタップ、現在地円、作成用吹き出しの挙動は維持。
+
+---
+
+## イテレーション1226.284：チャットルームの画像単体返信と地図作成吹き出し整理
+
+### 背景・問題意識
+
+めぐり地図で空き地点をタップした時は作成用の吹き出しだけ出ればよく、追加のピンアイコンは不要になった。またチャットルーム内の会話はめぐりメッセージに近づけ、画像を送った時は画像だけのメッセージとして扱いたい。スレッド作成時に設定した画像はチャット本文の投稿として重ねて表示しない。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MeguriHomeMapBackdrop.swift`
+- 作成候補座標の `MeguriMapCreationDropPin` 表示を外し、タップ後は作成吹き出しだけを表示するように変更。
+
+#### `ios-native/Sources/MegrumCore/MeguriBoardModels.swift` / `ios-native/Sources/MegrumData/SupabaseBoardClient.swift` / `ios-native/Sources/MegrumData/SupabaseBoardReplyRows.swift`
+- `BoardReply` に画像URL/Storage pathを追加。
+- 返信送信時に掲示板メディアStorageへ画像をアップロードし、RPCの `p_image_paths` に渡す経路を追加。
+- 返信取得/送信レスポンスの `image_paths` に署名付きURLを付与してUIへ渡すように変更。
+
+#### `ios-native/Sources/MegrumApp/BoardThreadDetailScreen.swift` / `BoardReplyInputView.swift` / `BoardThreadDetailReplyViews.swift`
+- チャットルーム返信入力へ、めぐりメッセージと同じカメラ/写真選択メニューを追加。
+- 画像選択時は本文ドラフトと混ぜず、画像だけの返信として送信。
+- 返信画像は `MeguriPhotoMessageBubble` を使い、タップで全画面表示できるようにした。
+- Good/Badボタンは枠線を外し、表示サイズを小さく調整。
+
+#### `ios-native/Sources/MegrumApp/BoardThreadDetailPresentation.swift`
+- スレッド作成時の初期画像をオープニングチャットメッセージの画像として表示しないように変更。
+- 返信の画像だけをチャットメッセージ画像として渡すように変更。
+
+#### `supabase/migrations/20260704163000_allow_meguri_board_image_only_replies.sql`
+- 画像付き返信に限り本文空を許可する制約へ更新。画像なしの空返信は引き続き禁止。
+
+### 影響範囲
+
+- めぐり地図の作成候補表示、チャットルーム詳細の返信UI/表示、掲示板返信の画像添付データ経路。
+- スレッド作成時の画像はスレッド/地図/一覧用メディアとして保持し、チャット投稿としては表示しない。
+
+### 確認方法
+
+- `git diff --check`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1 --filter 'BoardThreadDetailPresentationTests|SupabaseBoardClientTests|MegrumAppStateTests'`
+  - passed（121 tests, 0 failures）
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-board-chat-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+  - passed
+
+### セルフレビュー結果
+
+- ✅ めぐりメッセージ既存の写真バブル/全画面画像表示/写真正規化処理を再利用し、独自の別UIを増やしすぎていない。
+- ✅ テキスト返信、位置/都道府県スコープ、リアクションの既存経路は維持。
+- ✅ DB制約は画像付き返信だけ本文空を許可し、画像なし空返信は許可していない。
+
+---
+
+## イテレーション1226.283：めぐり地図のPOI非表示とブランドトーン調整
+
+### 背景・問題意識
+
+めぐり地図上でApple Maps標準の店舗・施設ラベルやアイコンが目立ち、グルーム/チャットルームのピンと視覚的に競合していた。Apple Mapsは道路や建物そのものの配色変更はできないため、標準MapKitの範囲で地図を静かにし、Megrumのピンを主役にする。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MeguriMapVisualStyle.swift`
+- めぐり地図用の共通 `MapStyle` を追加し、`pointsOfInterest: .excludingAll` でPOIを非表示にした。
+- ラベンダー/スカイ/ピンクの薄いブランドトーンと既存の上部白グラデーションを統合した `MeguriMapBrandToneOverlay` を追加。
+
+#### `ios-native/Sources/MegrumApp/MeguriHomeMapBackdrop.swift`
+- めぐりホーム地図に共通スタイルを適用し、既存の白グラデーションをブランドトーン付きオーバーレイへ置き換え。
+
+#### `ios-native/Sources/MegrumApp/MeguriMapScene.swift`
+- フルスクリーンのめぐり地図にも共通スタイルとブランドトーンを適用。
+
+#### `ios-native/Sources/MegrumApp/MeguriCreationLocationPicker.swift` / `ios-native/Sources/MegrumApp/GroomArchiveMapViews.swift`
+- めぐり作成位置ピッカーとグルームアーカイブ地図もPOI非表示の共通スタイルへ揃え、各コンテナに合わせた薄さでブランドトーンを適用。
+
+### 影響範囲
+
+- めぐり関連のMapKit表示のみ。ピン、クラスタ、範囲円、タップ、ビューポート読み込み、作成位置選択のロジックは不変。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-map-style-build`
+  - passed
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-map-style-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+  - passed
+
+### セルフレビュー結果
+
+- ✅ Apple Mapsを維持し、サードパーティ地図SDKは追加していない。
+- ✅ POI非表示と薄いブランドトーンだけに留め、道路/建物の独自スタイル化はしていない。
+- ✅ 地図上のボタン、ピン、タップ処理、現在地/範囲円表示には触れていない。
+
+---
+
 ## イテレーション1226.282：クラスタ分解ズームの実スパンずれ修正（アスペクト比補正）
 
 ### 背景・問題意識

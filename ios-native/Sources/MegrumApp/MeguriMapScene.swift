@@ -46,6 +46,10 @@ struct MeguriMapScene: View {
                 boardAnnotations
             }
         }
+        .mapStyle(MeguriMapVisualStyle.quietStandard)
+        .overlay {
+            MeguriMapBrandToneOverlay()
+        }
         .mapControls {
             if !isVisualQAPreviewEnabled {
                 MapUserLocationButton()

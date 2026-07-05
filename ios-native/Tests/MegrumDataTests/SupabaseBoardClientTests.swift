@@ -70,7 +70,8 @@ final class SupabaseBoardClientTests: XCTestCase {
                 latitude: 35.681236,
                 longitude: 139.767125,
                 prefecture: "東京都",
-                scope: .nearby3km
+                scope: .nearby3km,
+                imagePaths: ["00000000-0000-0000-0000-000000000001/reply.jpg"]
             )
         )
         let appendBody = try XCTUnwrap(appendRequest.httpBody)
@@ -83,7 +84,10 @@ final class SupabaseBoardClientTests: XCTestCase {
         XCTAssertTrue(appendJSON["p_prefecture"] is NSNull)
         XCTAssertEqual(appendJSON["p_scope"] as? String, "nearby_3km")
         XCTAssertTrue(appendJSON["p_parent_reply_id"] is NSNull)
-        XCTAssertEqual((appendJSON["p_image_paths"] as? [String]) ?? ["unexpected"], [])
+        XCTAssertEqual(
+            (appendJSON["p_image_paths"] as? [String]) ?? ["unexpected"],
+            ["00000000-0000-0000-0000-000000000001/reply.jpg"]
+        )
     }
 
     func testSamePrefectureBoardReplyRequestsUsePrefectureScopeOnly() throws {

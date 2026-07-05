@@ -35,14 +35,13 @@ struct GroomArchiveMap: View {
                 }
             }
         }
-        .mapStyle(.standard(elevation: .flat, emphasis: .muted))
+        .mapStyle(MeguriMapVisualStyle.quietStandard)
         .overlay {
-            LinearGradient(
-                colors: [.white.opacity(0.72), .white.opacity(0.16), .white.opacity(0.04)],
-                startPoint: .top,
-                endPoint: .center
+            MeguriMapBrandToneOverlay(
+                topWhiteOpacity: 0.72,
+                middleWhiteOpacity: 0.16,
+                bottomWhiteOpacity: 0.04
             )
-            .allowsHitTesting(false)
         }
     }
 }

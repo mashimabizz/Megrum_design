@@ -5,6 +5,9 @@ struct BoardReplyInput: View {
     @Binding var text: String
     var isSending: Bool
     var isDisabled = false
+    var canUseCamera = false
+    var onOpenCamera: () -> Void = {}
+    var onOpenPhotoLibrary: () -> Void = {}
     var onSend: () -> Void
 
     private var canSend: Bool {
@@ -13,6 +16,26 @@ struct BoardReplyInput: View {
 
     var body: some View {
         HStack(spacing: 10) {
+            Menu {
+                Button(action: onOpenPhotoLibrary) {
+                    Label("写真を選ぶ", systemImage: "photo.on.rectangle")
+                }
+
+                Button(action: onOpenCamera) {
+                    Label("カメラで撮る", systemImage: "camera")
+                }
+                .disabled(!canUseCamera)
+            } label: {
+                Image(systemName: "plus")
+                    .font(.system(size: 17, weight: .black, design: .rounded))
+                    .foregroundStyle(MegrumTheme.lavender)
+                    .frame(width: 38, height: 38)
+                    .background(.white.opacity(0.9), in: Circle())
+            }
+            .buttonStyle(.plain)
+            .disabled(isSending || isDisabled)
+            .opacity(isDisabled ? 0.45 : 1)
+
             TextField("メッセージ", text: $text, axis: .vertical)
                 .font(.system(size: 14, weight: .heavy, design: .rounded))
                 .lineLimit(1...3)
