@@ -4,31 +4,42 @@ import SwiftUI
 enum HomeDiscoveryCandidateSummaryRowMetrics {
     static let rotaryWidth: CGFloat = 142
     static let rotaryHeight: CGFloat = 112
+    static let partnerAvatarSize: CGFloat = 20
+    static let demandThumbnailSize: CGFloat = 22
 }
 
-/// ホーム候補の1行表示（案2）：扇状カード（画像左）と、
-/// 塊ラベル＋強タグ1個＋結論一文の縦1カラム（左揃え）を横並びにする。
-/// 全行同一構造にして比較しやすさを優先する（ミラーなし）。
-/// ロータリーを回すとタグ・一文も選択中グッズのものに切り替わる。
+/// ホーム候補の1行表示（v3 需要ファースト・iter1226.294 モック確定版）：
+/// 塊ラベルを画像上（左寄せ）に置き、右カラムは
+/// 相手ユーザー行 → 需要行（激求/求/定価/探し中/相談）→ 物流行 → 支払行（定価絡みのみ）。
+/// ロータリーを回すと右カラムも選択中グッズのものに切り替わる。
 struct HomeDiscoveryCandidateSummaryRow: View {
     var candidate: HomeDiscoveryCandidate
     var titleStyle: HomeDiscoveryCardTitleStyle
+    /// 需要行のサムネイル用：自分のグッズID→画像URL。
+    var viewerGoodsImageURLByID: [UUID: URL] = [:]
     var onSelect: (HomeDiscoverySheet) -> Void
     var onSearch: (HomeDiscoveryCandidate, HomeMockGoods?) -> Void
 
     @State private var presentationState = HomeDiscoveryCandidateButtonPresentationState()
 
     private var orderedGoods: [HomeMockGoods] {
-        HomeCandidateSummaryPolicy.orderedGoodsByRank(of: candidate)
+        HomeCandidateDemandPolicy.orderedGoodsByDemand(of: candidate)
+    }
+
+    private var selectedGoods: HomeMockGoods? {
+        presentationState.resolvedSelectedGoods(in: orderedGoods)
     }
 
     private var selectedSignals: HomeCandidateConditionSignals {
-        candidate.conditionSignals(for: presentationState.resolvedSelectedGoods(in: orderedGoods))
+        candidate.conditionSignals(for: selectedGoods)
     }
 
     var body: some View {
         HStack(alignment: .center, spacing: 14) {
-            rotaryCard
+            VStack(alignment: .leading, spacing: 6) {
+                labelButton
+                rotaryCard
+            }
             infoColumn
         }
         .onAppear {
@@ -37,6 +48,21 @@ struct HomeDiscoveryCandidateSummaryRow: View {
         .onChange(of: candidate.goods.map(\.id)) { _, _ in
             presentationState.resetSelection(goods: orderedGoods)
         }
+    }
+
+    private var labelButton: some View {
+        Button {
+            onSearch(candidate, selectedGoods)
+        } label: {
+            Text(cardTitle)
+                .font(.system(size: 12, weight: .regular))
+                .foregroundStyle(MegrumTheme.ink.opacity(0.82))
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(cardTitle)で検索")
     }
 
     private var rotaryCard: some View {
@@ -64,36 +90,53 @@ struct HomeDiscoveryCandidateSummaryRow: View {
 
     private var infoColumn: some View {
         let signals = selectedSignals
-        let strongTag = HomeCandidateSummaryPolicy.strongTag(for: signals)
-        let summary = HomeCandidateSummaryPolicy.summaryText(for: signals)
+        let demand = HomeCandidateDemandPolicy.demandLine(for: signals)
+        let logistics = HomeCandidateDemandPolicy.logisticsText(for: signals)
+        let payment = HomeCandidateDemandPolicy.paymentText(for: signals)
 
-        return VStack(alignment: .leading, spacing: 6) {
-            Button {
-                onSearch(candidate, presentationState.resolvedSelectedGoods(in: orderedGoods))
-            } label: {
-                Text(cardTitle)
-                    .font(.system(size: 12, weight: .regular))
-                    .foregroundStyle(MegrumTheme.ink.opacity(0.82))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("\(cardTitle)で検索")
+        return VStack(alignment: .leading, spacing: 5) {
+            partnerLine
 
-            HomeCandidateStrongTagBadge(tag: strongTag)
+            HomeCandidateDemandLineView(
+                demand: demand,
+                viewerGoodsImageURLByID: viewerGoodsImageURLByID
+            )
 
-            Text(summary)
-                .font(.system(size: 13, weight: .bold, design: .rounded))
-                .foregroundStyle(MegrumTheme.ink.opacity(0.8))
+            Text(logistics)
+                .font(.system(size: 12.5, weight: .bold, design: .rounded))
+                .foregroundStyle(MegrumTheme.ink.opacity(0.66))
+                .lineLimit(2)
                 .multilineTextAlignment(.leading)
-                .lineLimit(3)
-                .minimumScaleFactor(0.88)
                 .fixedSize(horizontal: false, vertical: true)
+
+            if let payment {
+                Text(payment)
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .foregroundStyle(MegrumTheme.ink.opacity(0.52))
+                    .lineLimit(1)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(cardTitle)、\(strongTag.title)、\(summary)")
+        .accessibilityLabel("\(cardTitle)、\(partnerName)、\(demandAccessibilityText(demand))、\(logistics)")
+    }
+
+    private var partnerLine: some View {
+        HStack(spacing: 6) {
+            HomeCandidatePartnerAvatar(url: selectedGoods?.ownerAvatarURL)
+
+            Text(partnerName)
+                .font(.system(size: 12.5, weight: .regular, design: .rounded))
+                .foregroundStyle(MegrumTheme.ink.opacity(0.86))
+                .lineLimit(1)
+                .minimumScaleFactor(0.82)
+        }
+    }
+
+    private var partnerName: String {
+        selectedGoods?.ownerDisplayName?.nilIfBlank
+            ?? selectedGoods?.ownerHandle?.nilIfBlank
+            ?? "ユーザー"
     }
 
     private var cardTitle: String {
@@ -103,53 +146,166 @@ struct HomeDiscoveryCandidateSummaryRow: View {
             goods: orderedGoods
         )
     }
+
+    private func demandAccessibilityText(_ demand: HomeCandidateDemandLine) -> String {
+        switch demand {
+        case .hotDemand(let ids):
+            ids.count > 1 ? "あなたのグッズ他\(ids.count - 1)点が激求" : "あなたのグッズが激求"
+        case .demand(let ids):
+            ids.count > 1 ? "あなたのグッズ他\(ids.count - 1)点が求" : "あなたのグッズが求"
+        case .cash(let amount):
+            amount.map { "定価（¥\($0.formatted())）と交換OK" } ?? "定価と交換OK"
+        case .lookingFor(let text):
+            "\(text)を探し中"
+        case .discuss:
+            "求めているものは打診で相談"
+        }
+    }
 }
 
-/// 案2の強タグ（1個だけ表示するバッジ）。トーンは従来3タグの視覚言語を
-/// 踏襲し、「要相談」だけはグレー（無効に見える）を避けて淡いスカイ系。
-struct HomeCandidateStrongTagBadge: View {
-    var tag: HomeCandidateStrongTag
+/// 需要行の表示。激求＝ピンクグラデ／求＝ラベンダー／定価＝スカイ→ラベンダーグラデ。
+struct HomeCandidateDemandLineView: View {
+    var demand: HomeCandidateDemandLine
+    var viewerGoodsImageURLByID: [UUID: URL]
 
     var body: some View {
-        switch tag.tone {
-        case .exact:
-            baseText
-                .foregroundStyle(.white)
-                .background(megrumGradient, in: Capsule())
-                .overlay {
-                    Capsule().strokeBorder(.white.opacity(0.42), lineWidth: 0.8)
-                }
-                .shadow(color: MegrumTheme.lavender.opacity(0.18), radius: 8, y: 4)
-        case .possible:
-            baseText
-                .foregroundStyle(megrumGradient)
-                .background(.white.opacity(0.96), in: Capsule())
-                .overlay {
-                    Capsule().strokeBorder(megrumGradient, lineWidth: 1.15)
-                }
+        switch demand {
+        case .hotDemand(let goodsIDs):
+            demandText(
+                goodsIDs: goodsIDs,
+                suffixBase: "が激求！",
+                suffixStyle: AnyShapeStyle(
+                    LinearGradient(
+                        colors: [MegrumTheme.pink, Color(red: 0.94, green: 0.35, blue: 0.55)],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+            )
+        case .demand(let goodsIDs):
+            demandText(
+                goodsIDs: goodsIDs,
+                suffixBase: "が求！",
+                suffixStyle: AnyShapeStyle(MegrumTheme.lavender)
+            )
+        case .cash(let amount):
+            Text(amount.map { "定価（¥\($0.formatted())）と交換OK" } ?? "定価と交換OK")
+                .font(.system(size: 14.5, weight: .heavy, design: .rounded))
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [MegrumTheme.sky, MegrumTheme.lavender],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        case .lookingFor(let text):
+            Text("\(text)を探し中")
+                .font(.system(size: 13.5, weight: .heavy, design: .rounded))
+                .foregroundStyle(MegrumTheme.ink.opacity(0.62))
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
         case .discuss:
-            baseText
-                .foregroundStyle(MegrumTheme.ink.opacity(0.68))
-                .background(MegrumTheme.sky.opacity(0.22), in: Capsule())
-                .overlay {
-                    Capsule().strokeBorder(MegrumTheme.sky.opacity(0.55), lineWidth: 1)
-                }
+            Text("求めているものは打診で相談")
+                .font(.system(size: 13.5, weight: .heavy, design: .rounded))
+                .foregroundStyle(MegrumTheme.ink.opacity(0.62))
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
         }
     }
 
-    private var baseText: some View {
-        Text(tag.title)
-            .font(.system(size: 12.6, weight: .black, design: .rounded))
-            .lineLimit(1)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 4.8)
+    private func demandText(
+        goodsIDs: [UUID],
+        suffixBase: String,
+        suffixStyle: AnyShapeStyle
+    ) -> some View {
+        let extraCount = max(0, goodsIDs.count - 1)
+        let suffix = extraCount > 0 ? "他\(extraCount)点\(suffixBase)" : suffixBase
+        return HStack(spacing: 4) {
+            Text("あなたの")
+                .font(.system(size: 14.5, weight: .heavy, design: .rounded))
+                .foregroundStyle(MegrumTheme.ink.opacity(0.88))
+
+            HomeCandidateDemandThumbnail(url: goodsIDs.first.flatMap { viewerGoodsImageURLByID[$0] })
+
+            Text(suffix)
+                .font(.system(size: 14.5, weight: .heavy, design: .rounded))
+                .foregroundStyle(suffixStyle)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        }
+    }
+}
+
+private struct HomeCandidateDemandThumbnail: View {
+    var url: URL?
+
+    var body: some View {
+        Group {
+            if let url {
+                AsyncImage(url: url) { phase in
+                    if case .success(let image) = phase {
+                        image.resizable().scaledToFill()
+                    } else {
+                        placeholder
+                    }
+                }
+            } else {
+                placeholder
+            }
+        }
+        .frame(
+            width: HomeDiscoveryCandidateSummaryRowMetrics.demandThumbnailSize,
+            height: HomeDiscoveryCandidateSummaryRowMetrics.demandThumbnailSize
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .strokeBorder(.white, lineWidth: 1.2)
+        }
+        .shadow(color: MegrumTheme.ink.opacity(0.16), radius: 3, y: 1)
     }
 
-    private var megrumGradient: LinearGradient {
-        LinearGradient(
-            colors: [MegrumTheme.sky, MegrumTheme.lavender, MegrumTheme.pink],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
+    private var placeholder: some View {
+        MegrumTheme.lavender.opacity(0.16)
+    }
+}
+
+private struct HomeCandidatePartnerAvatar: View {
+    var url: URL?
+
+    var body: some View {
+        Group {
+            if let url {
+                AsyncImage(url: url) { phase in
+                    if case .success(let image) = phase {
+                        image.resizable().scaledToFill()
+                    } else {
+                        placeholder
+                    }
+                }
+            } else {
+                placeholder
+            }
+        }
+        .frame(
+            width: HomeDiscoveryCandidateSummaryRowMetrics.partnerAvatarSize,
+            height: HomeDiscoveryCandidateSummaryRowMetrics.partnerAvatarSize
         )
+        .clipShape(Circle())
+        .overlay {
+            Circle().strokeBorder(.white, lineWidth: 1.2)
+        }
+        .shadow(color: MegrumTheme.ink.opacity(0.14), radius: 3, y: 1)
+    }
+
+    private var placeholder: some View {
+        ZStack {
+            MegrumTheme.lavender.opacity(0.18)
+            Image(systemName: "person.fill")
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(MegrumTheme.lavender.opacity(0.7))
+        }
     }
 }

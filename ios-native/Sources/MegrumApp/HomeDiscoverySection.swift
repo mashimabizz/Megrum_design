@@ -18,6 +18,8 @@ struct HomeDiscoverySection: View {
     var showsSeeAllButton = false
     /// summaryRows で表示する最大行数（超過分は「すべて見る」で開く想定）。
     var displayLimit: Int? = nil
+    /// 需要行のサムネイル用：自分のグッズID→画像URL。
+    var viewerGoodsImageURLByID: [UUID: URL] = [:]
     var onSelect: (HomeDiscoverySheet) -> Void
     var onSearchCandidate: (HomeDiscoveryCandidate, HomeMockGoods?) -> Void = { _, _ in }
     /// 「すべて見る」タップ時の遷移。未指定時は従来どおり先頭候補のシートを開く。
@@ -66,6 +68,7 @@ struct HomeDiscoverySection: View {
                         HomeDiscoveryCandidateSummaryRow(
                             candidate: candidate,
                             titleStyle: cardTitleStyle,
+                            viewerGoodsImageURLByID: viewerGoodsImageURLByID,
                             onSelect: onSelect,
                             onSearch: onSearchCandidate
                         )

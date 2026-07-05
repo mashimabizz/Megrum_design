@@ -52,9 +52,7 @@ public struct MegrumRootView: View {
 
     public var body: some View {
         Group {
-            if visualQAInitialScreen == .homeDemandFirst {
-                HomeDemandFirstPreview()
-            } else if visualQAInitialScreen == .goodsTypeSelect {
+            if visualQAInitialScreen == .goodsTypeSelect {
                 GoodsTypeSelectPreview()
             } else if AccountSetupSessionPolicy.shouldShowAuthScreen(
                 isAuthenticated: authState.isAuthenticated,

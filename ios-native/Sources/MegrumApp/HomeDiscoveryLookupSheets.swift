@@ -5,6 +5,7 @@ import SwiftUI
 
 struct HomeHavesLookupSheet: View {
     var payload: HomeHavesLookupPayload
+    var viewerGoodsImageURLByID: [UUID: URL] = [:]
     var onOpenNestedSheet: (HomeDiscoverySheet) -> Void
 
     var body: some View {
@@ -17,11 +18,12 @@ struct HomeHavesLookupSheet: View {
             if payload.shouldShowTagMatches {
                 HomeDiscoverySection(
                     title: "推し×シリーズでマッチ",
-                    candidates: HomeCandidateSummaryPolicy.sortedCandidates(payload.tagMatchedCandidates),
+                    candidates: HomeCandidateDemandPolicy.sortedCandidates(payload.tagMatchedCandidates),
                     layout: .summaryRows,
                     cardTitleStyle: .memberTag,
                     showsGridHeaderTitle: true,
                     showsSeeAllButton: false,
+                    viewerGoodsImageURLByID: viewerGoodsImageURLByID,
                     onSelect: onOpenNestedSheet
                 )
             }
@@ -29,11 +31,12 @@ struct HomeHavesLookupSheet: View {
             if !payload.memberMatchedCandidates.isEmpty {
                 HomeDiscoverySection(
                     title: "推しでマッチ",
-                    candidates: HomeCandidateSummaryPolicy.sortedCandidates(payload.memberMatchedCandidates),
+                    candidates: HomeCandidateDemandPolicy.sortedCandidates(payload.memberMatchedCandidates),
                     layout: .summaryRows,
                     cardTitleStyle: .member,
                     showsGridHeaderTitle: true,
                     showsSeeAllButton: false,
+                    viewerGoodsImageURLByID: viewerGoodsImageURLByID,
                     onSelect: onOpenNestedSheet
                 )
             }

@@ -62,6 +62,7 @@ struct HomeDiscoveryExperience: View {
                         cardTitleStyle: .memberTag,
                         showsSeeAllButton: userTagCandidates.count > HomeDiscoverySummarySectionMetrics.displayLimit,
                         displayLimit: HomeDiscoverySummarySectionMetrics.displayLimit,
+                        viewerGoodsImageURLByID: viewerGoodsImageURLByID,
                         onSelect: { selectedSheet = $0 },
                         onSearchCandidate: { candidate, selectedGoods in
                             openSearch(for: candidate, selectedGoods: selectedGoods, source: .userTag)
@@ -76,6 +77,7 @@ struct HomeDiscoveryExperience: View {
                         cardTitleStyle: .member,
                         showsSeeAllButton: userCandidates.count > HomeDiscoverySummarySectionMetrics.displayLimit,
                         displayLimit: HomeDiscoverySummarySectionMetrics.displayLimit,
+                        viewerGoodsImageURLByID: viewerGoodsImageURLByID,
                         onSelect: { selectedSheet = $0 },
                         onSearchCandidate: { candidate, selectedGoods in
                             openSearch(for: candidate, selectedGoods: selectedGoods, source: .user)
@@ -134,6 +136,7 @@ struct HomeDiscoveryExperience: View {
             HomeDiscoverySeeAllSheet(
                 route: route,
                 candidates: route == .userTag ? userTagCandidates : userCandidates,
+                viewerGoodsImageURLByID: viewerGoodsImageURLByID,
                 onSelect: { sheet in
                     seeAllRoute = nil
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {

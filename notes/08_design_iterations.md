@@ -226,6 +226,50 @@
 
 ---
 
+## イテレーション1226.295：ホーム候補行v3「需要ファースト」本実装
+
+### 背景・問題意識
+iter1226.292〜294 のモックで合意した「需要ファースト」行をホームの実データに接続して確定版とする。強タグ＋結論一文をやめ、「相手があなたの何を求めているか」を主役にする。
+
+### 変更内容
+
+#### 仕様（確定）
+- 行構成：塊ラベル（画像上・左寄せ・タップで検索）→ ロータリーカード（従来のスワイプ回転）／右カラム＝相手ユーザー行（アイコン20pt＋名前・通常ウェイト）→ 需要行 → 物流行 → 支払行（定価絡みのみ）
+- 需要行の優先順位：激求（個別募集の具体グッズ指名に合致）＞求（条件選択肢・ほしいもの一致）＞定価（定価選択肢あり）＞探し中（相手のほしいもの先頭から生成）＞相談。否定文は使わない
+- 物流行の優先順位：会場×日付＞県＞郵送＞相談（現地成立時は「・郵送OK」を後置）
+- 塊の並び順：需要ランク最大値 降順 → 需要（求以上）グッズ数 降順 → 従来順（stable）
+- ロータリー回転で右カラム（ユーザー行・需要行・物流行・支払行）が選択中グッズに追従
+
+#### 新規
+- `ios-native/Sources/MegrumApp/HomeCandidateDemandPolicy.swift` — 需要行/物流行/支払行/並び順の純粋ロジック（`HomeCandidateDemandLine` enum）
+- `ios-native/Tests/MegrumAppTests/HomeCandidateDemandPolicyTests.swift` — 優先順位・物流4段・支払行・ソートの16テスト
+
+#### シグナル拡張
+- `HomeCandidateConditionSignals.partnerLookingForText` 追加（探し中用）。`HomeCandidatePartnerDemandSummary` で相手ほしいもの先頭から「サナのトレカ」形式で生成し、builder → PartnerOfferEvaluation を通して伝搬
+- 激求＝wantedOptions の kind==.goods に matchingGoodsIDs あり／求＝kind==.condition の matching ＋ wishMatchedOfferGoodsIDs／定価＝kind==.cash（cashAmount 表示）
+
+#### View
+- `HomeDiscoveryCandidateSummaryRow` を v3 レイアウトへ全面書き換え（需要行サムネイルは `viewerGoodsImageURLByID` から解決、「他N点」表記）。強タグバッジ（HomeCandidateStrongTagBadge）は廃止
+- `HomeDiscoverySection` / `HomeDiscoverySeeAllSheet` / `HomeHavesLookupSheet` に `viewerGoodsImageURLByID` をプラミング（Experience の derived state で inventoryItems から生成）
+- 並び順を `HomeCandidateSummaryPolicy.sortedCandidates` → `HomeCandidateDemandPolicy.sortedCandidates` へ切替（ホーム2セクション＋グッズ照会シート）
+
+#### 片付け
+- `HomeDemandFirstPreview.swift`（モック）と VisualQA route `home-demand-first` を削除
+- `HomeCandidateSummaryPolicy`（強タグ・結論一文）はテストが残るためコードは温存（UI からは未参照）。次の掃除候補
+
+### 影響範囲
+- ホーム「推し×シリーズでマッチ」「推しでマッチ」、すべて見るシート、グッズ照会（havesLookup）シートの候補行
+
+### 確認方法
+- Simulator の live セッション（michilion）で激求行・物流行・ユーザー行を目視確認
+- `swift test` 1471件 0 failures
+
+### セルフレビュー結果
+- ✅ ブランドカラー直書きなし（MegrumTheme／需要行ピンクグラデの補助色1点はモック確定値）
+- ✅ 需要行の5パターン・物流4段・支払行・並び順をユニットテストでカバー
+- ✅ 用語集（notes/10 §E）に需要行・激求・求・探し中・物流行・支払行を追加、強タグ・結論一文を廃止注記
+- ⚠️ 定価・探し中・相談パターンの実データ目視は未（該当データが手元になし。ロジックはテスト済み）
+
 ## イテレーション1226.294：画像アップロード時の軽量化
 
 ### 背景・問題意識

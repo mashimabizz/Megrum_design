@@ -47,6 +47,12 @@ struct HomeDiscoverySheetContent: View {
         case .havesLookup(let payload):
             HomeHavesLookupSheet(
                 payload: payload,
+                viewerGoodsImageURLByID: Dictionary(
+                    viewerOfferGoods.compactMap { goods in
+                        goods.imageURL.map { (goods.id, $0) }
+                    },
+                    uniquingKeysWith: { first, _ in first }
+                ),
                 onOpenNestedSheet: onOpenNestedSheet
             )
         case .extraListingHit(let payload), .extraWishHit(let payload):

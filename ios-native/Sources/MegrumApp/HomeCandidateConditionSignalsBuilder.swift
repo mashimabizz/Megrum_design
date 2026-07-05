@@ -20,7 +20,8 @@ enum HomeCandidateConditionSignalsBuilder {
         individualListingSelection: HomeIndividualListingSelectionContext?,
         wishMatchedOfferGoodsIDs: [UUID],
         wishMatchedPartnerUserIDs: [UUID],
-        ownerHasMegrumPlus: Bool
+        ownerHasMegrumPlus: Bool,
+        partnerLookingForText: String? = nil
     ) -> HomeCandidateConditionSignals {
         let candidateAllowsMail = HomeCandidateExchangePolicy.allowsMail(candidate.exchangeType)
         let candidateAllowsLocal = HomeCandidateExchangePolicy.allowsLocal(candidate.exchangeType)
@@ -70,7 +71,8 @@ enum HomeCandidateConditionSignalsBuilder {
             matchesViewerWish: matchesViewerWish,
             matchesViewerWishCharacter: matchesViewerWishCharacter,
             tagMatchCount: tagMatchCount,
-            ownerHasMegrumPlus: ownerHasMegrumPlus
+            ownerHasMegrumPlus: ownerHasMegrumPlus,
+            partnerLookingForText: partnerLookingForText
         )
     }
 }

@@ -6,6 +6,8 @@ struct HomeCandidatePartnerDemandSummary {
     let listingHitCount: Int
     let wishMatchedOfferGoodsIDs: [UUID]
     let individualListingSelection: HomeIndividualListingSelectionContext?
+    /// 相手の探し物（合致なし時の需要行「〜を探し中」用）。相手のほしいもの先頭から生成。
+    let partnerLookingForText: String?
 
     private let partnerUserID: UUID
 
@@ -59,6 +61,7 @@ struct HomeCandidatePartnerDemandSummary {
                     includesCash: true
                 )
         }.count
+        partnerLookingForText = Self.lookingForText(from: partnerWishesForCandidate)
         individualListingSelection = HomeCandidateListingMatchPolicy.firstSelection(
             listings: partnerListingsForCandidate,
             optionsByListingID: context.listingOptionsByListingID,
@@ -69,5 +72,24 @@ struct HomeCandidatePartnerDemandSummary {
             candidate: candidate,
             includesCash: true
         )
+    }
+
+    /// 「サナのトレカ」のような相手の探し物の短文。メンバー＋種別 > 種別 > タイトルの順で組む。
+    private static func lookingForText(from partnerWishes: [SupabaseHomeGoodsRow]) -> String? {
+        guard let wish = partnerWishes.first else {
+            return nil
+        }
+        let member = wish.characterName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank
+        let goodsType = wish.goodsTypeName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank
+        switch (member, goodsType) {
+        case let (member?, goodsType?):
+            return "\(member)の\(goodsType)"
+        case let (member?, nil):
+            return "\(member)のグッズ"
+        case let (nil, goodsType?):
+            return goodsType
+        case (nil, nil):
+            return wish.title.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank
+        }
     }
 }

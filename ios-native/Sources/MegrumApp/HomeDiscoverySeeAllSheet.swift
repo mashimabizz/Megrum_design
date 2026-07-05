@@ -38,6 +38,7 @@ enum HomeDiscoverySeeAllRoute: String, Identifiable, Sendable {
 struct HomeDiscoverySeeAllSheet: View {
     var route: HomeDiscoverySeeAllRoute
     var candidates: [HomeDiscoveryCandidate]
+    var viewerGoodsImageURLByID: [UUID: URL] = [:]
     var onSelect: (HomeDiscoverySheet) -> Void
     var onSearch: (HomeDiscoveryCandidate, HomeMockGoods?) -> Void
 
@@ -51,6 +52,7 @@ struct HomeDiscoverySeeAllSheet: View {
                         HomeDiscoveryCandidateSummaryRow(
                             candidate: candidate,
                             titleStyle: route.cardTitleStyle,
+                            viewerGoodsImageURLByID: viewerGoodsImageURLByID,
                             onSelect: onSelect,
                             onSearch: onSearch
                         )

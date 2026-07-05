@@ -160,6 +160,8 @@ public struct HomeCandidateConditionSignals: Equatable, Sendable {
     public var matchesViewerWishCharacter: Bool
     public var tagMatchCount: Int
     public var ownerHasMegrumPlus: Bool
+    /// 相手の探し物（自分のグッズと合致しない時の需要行「〜を探し中」用）。
+    public var partnerLookingForText: String?
 
     public init(
         goods: HomeGoodsConditionSignals,
@@ -172,7 +174,8 @@ public struct HomeCandidateConditionSignals: Equatable, Sendable {
         matchesViewerWish: Bool = false,
         matchesViewerWishCharacter: Bool = false,
         tagMatchCount: Int = 0,
-        ownerHasMegrumPlus: Bool = false
+        ownerHasMegrumPlus: Bool = false,
+        partnerLookingForText: String? = nil
     ) {
         self.goods = goods
         self.exchange = exchange
@@ -185,6 +188,7 @@ public struct HomeCandidateConditionSignals: Equatable, Sendable {
         self.matchesViewerWishCharacter = matchesViewerWishCharacter
         self.tagMatchCount = max(0, tagMatchCount)
         self.ownerHasMegrumPlus = ownerHasMegrumPlus
+        self.partnerLookingForText = partnerLookingForText?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank
     }
 
     private static func orderedUnique(_ ids: [UUID]) -> [UUID] {

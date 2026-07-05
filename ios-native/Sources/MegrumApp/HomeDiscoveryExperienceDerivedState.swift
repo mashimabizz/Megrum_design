@@ -17,9 +17,9 @@ extension HomeDiscoveryExperience {
             goodsTypes: goodsTypes,
             conditionSignalsByItemID: displayConditionSignalsByItemID
         )
-        // 塊内に成立しやすいグッズを多く含むものが上（iter1226.272）。
+        // 需要基準の並び順：激求含む塊 > 求 > 定価 > 合致なし（iter1226.295）。
         // 上位3件をセクション表示し、全件は「すべて見る」から。
-        return HomeCandidateSummaryPolicy.sortedCandidates(candidates)
+        return HomeCandidateDemandPolicy.sortedCandidates(candidates)
     }
 
     var userCandidates: [HomeDiscoveryCandidate] {
@@ -37,7 +37,17 @@ extension HomeDiscoveryExperience {
             goodsTypes: goodsTypes,
             conditionSignalsByItemID: displayConditionSignalsByItemID
         )
-        return HomeCandidateSummaryPolicy.sortedCandidates(candidates)
+        return HomeCandidateDemandPolicy.sortedCandidates(candidates)
+    }
+
+    /// 需要行のサムネイル用：自分のグッズID→画像URL。
+    var viewerGoodsImageURLByID: [UUID: URL] {
+        Dictionary(
+            ownItems(from: inventoryItems).compactMap { item in
+                item.imageURL.map { (item.id, $0) }
+            },
+            uniquingKeysWith: { first, _ in first }
+        )
     }
 
     var viewerOfferGoods: [HomeMockGoods] {
