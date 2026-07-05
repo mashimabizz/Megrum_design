@@ -66,7 +66,8 @@ enum IndividualListingOptionReviewItemFactory {
         title: String,
         wishes: [WishItem],
         groups: [OshiGroup],
-        goodsTypes: [GoodsType]
+        goodsTypes: [GoodsType],
+        characters: [OshiCharacter] = []
     ) -> IndividualListingOptionReviewItem {
         let payload = IndividualListingOptionInput(option: option)
         if option.isCashOffer {
@@ -81,10 +82,26 @@ enum IndividualListingOptionReviewItemFactory {
         if option.wishes.isEmpty {
             let groupName = groups.first { $0.id == option.wishGroupID }?.name ?? "グループ未設定"
             let goodsTypeName = goodsTypes.first { $0.id == option.wishGoodsTypeID }?.name ?? "種別未設定"
+            var parts = [groupName, goodsTypeName]
+            if !option.wishMemberIDs.isEmpty {
+                let names = characters
+                    .filter { option.wishMemberIDs.contains($0.id) }
+                    .prefix(3)
+                    .map(\.name)
+                    .joined(separator: "・")
+                let memberText = names.isEmpty ? "メンバー\(option.wishMemberIDs.count)人" : names
+                parts.append(option.excludesWishMembers ? "\(memberText)以外" : memberText)
+            }
+            if !option.wishSeriesNames.isEmpty {
+                parts.append(option.wishSeriesNames.map { "#\($0)" }.joined(separator: " / "))
+            }
+            if option.wishQuantity > 1 {
+                parts.append("\(option.wishQuantity)点")
+            }
             return IndividualListingOptionReviewItem(
                 title: title,
                 kind: "条件",
-                detail: "\(groupName) / \(goodsTypeName)",
+                detail: parts.joined(separator: " / "),
                 source: .staged,
                 payload: payload
             )

@@ -1847,7 +1847,11 @@ final class HomeCandidateComposerTests: XCTestCase {
         wishGoodsTypeID: String?,
         logic: String = "or",
         isCashOffer: Bool = false,
-        cashAmount: Int? = nil
+        cashAmount: Int? = nil,
+        wishMemberIDs: [String] = [],
+        excludesWishMembers: Bool = false,
+        wishSeriesNames: [String] = [],
+        wishQuantity: Int = 1
     ) throws -> SupabaseHomeListingWishOptionRow {
         try decode(
             SupabaseHomeListingWishOptionRow.self,
@@ -1863,6 +1867,10 @@ final class HomeCandidateComposerTests: XCTestCase {
                 "cashAmount": cashAmount,
                 "wishGroupId": wishGroupID,
                 "wishGoodsTypeId": wishGoodsTypeID,
+                "wishMemberIds": wishMemberIDs,
+                "excludesWishMembers": excludesWishMembers,
+                "wishSeriesNames": wishSeriesNames,
+                "wishQuantity": wishQuantity,
                 "createdAt": nil,
                 "updatedAt": nil
             ]
@@ -1884,5 +1892,115 @@ final class HomeCandidateComposerTests: XCTestCase {
         let sanitized = payload.compactMapValues { $0 }
         let data = try JSONSerialization.data(withJSONObject: sanitized, options: [])
         return try JSONDecoder().decode(T.self, from: data)
+    }
+
+    // MARK: - 条件指定型選択肢（メンバー/シリーズ/数量）のマッチ
+
+    func testConditionOptionRespectsMemberInclusionAndExclusion() throws {
+        let groupID = "aaaaaaaa-0000-0000-0000-000000000001"
+        let typeID = "aaaaaaaa-0000-0000-0000-000000000002"
+        let memberA = "aaaaaaaa-0000-0000-0000-00000000000a"
+        let memberB = "aaaaaaaa-0000-0000-0000-00000000000b"
+
+        let itemOfA = try goodsRow(
+            id: "bbbbbbbb-0000-0000-0000-000000000001",
+            userID: "cccccccc-0000-0000-0000-000000000001",
+            groupID: groupID,
+            characterID: memberA,
+            goodsTypeID: typeID,
+            title: "Aのトレカ"
+        )
+        let itemOfB = try goodsRow(
+            id: "bbbbbbbb-0000-0000-0000-000000000002",
+            userID: "cccccccc-0000-0000-0000-000000000001",
+            groupID: groupID,
+            characterID: memberB,
+            goodsTypeID: typeID,
+            title: "Bのトレカ"
+        )
+
+        // Aを指定 → Aのグッズだけマッチ
+        let includeOption = try listingWishOptionRow(
+            id: "dddddddd-0000-0000-0000-000000000001",
+            listingID: "eeeeeeee-0000-0000-0000-000000000001",
+            wishIDs: [],
+            wishGroupID: groupID,
+            wishGoodsTypeID: typeID,
+            wishMemberIDs: [memberA]
+        )
+        XCTAssertTrue(
+            HomeMutualMatchListingEvaluator.mutualOptionWantsCounterpartGoods(
+                includeOption, counterpartItem: itemOfA, rowsByID: [:]
+            )
+        )
+        XCTAssertFalse(
+            HomeMutualMatchListingEvaluator.mutualOptionWantsCounterpartGoods(
+                includeOption, counterpartItem: itemOfB, rowsByID: [:]
+            )
+        )
+
+        // A以外を指定 → Bのグッズだけマッチ
+        let excludeOption = try listingWishOptionRow(
+            id: "dddddddd-0000-0000-0000-000000000002",
+            listingID: "eeeeeeee-0000-0000-0000-000000000001",
+            wishIDs: [],
+            wishGroupID: groupID,
+            wishGoodsTypeID: typeID,
+            wishMemberIDs: [memberA],
+            excludesWishMembers: true
+        )
+        XCTAssertFalse(
+            HomeMutualMatchListingEvaluator.mutualOptionWantsCounterpartGoods(
+                excludeOption, counterpartItem: itemOfA, rowsByID: [:]
+            )
+        )
+        XCTAssertTrue(
+            HomeMutualMatchListingEvaluator.mutualOptionWantsCounterpartGoods(
+                excludeOption, counterpartItem: itemOfB, rowsByID: [:]
+            )
+        )
+    }
+
+    func testConditionOptionRespectsSeriesNames() throws {
+        let groupID = "aaaaaaaa-0000-0000-0000-000000000001"
+        let typeID = "aaaaaaaa-0000-0000-0000-000000000002"
+        let itemID = "bbbbbbbb-0000-0000-0000-000000000001"
+        let item = try goodsRow(
+            id: itemID,
+            userID: "cccccccc-0000-0000-0000-000000000001",
+            groupID: groupID,
+            goodsTypeID: typeID,
+            title: "トレカ"
+        )
+        let option = try listingWishOptionRow(
+            id: "dddddddd-0000-0000-0000-000000000001",
+            listingID: "eeeeeeee-0000-0000-0000-000000000001",
+            wishIDs: [],
+            wishGroupID: groupID,
+            wishGoodsTypeID: typeID,
+            wishSeriesNames: ["MAP OF THE SOUL"]
+        )
+        let matchingTag = try inventoryTagRow(
+            inventoryID: itemID,
+            tagID: "ffffffff-0000-0000-0000-000000000001",
+            label: "#map of the soul"
+        )
+
+        XCTAssertTrue(
+            HomeMutualMatchListingEvaluator.mutualOptionWantsCounterpartGoods(
+                option,
+                counterpartItem: item,
+                rowsByID: [:],
+                tagsByInventoryID: [item.id: [matchingTag]]
+            )
+        )
+        XCTAssertFalse(
+            HomeMutualMatchListingEvaluator.mutualOptionWantsCounterpartGoods(
+                option,
+                counterpartItem: item,
+                rowsByID: [:],
+                tagsByInventoryID: [:]
+            )
+        )
     }
 }

@@ -28,4 +28,11 @@ enum HomeCandidateTagMatcher {
                 }
         })
     }
+
+    /// シリーズ名の文字列（タグ由来でない指定）を正規化する。
+    static func normalizedName(_ value: String) -> String? {
+        let withoutHash = value.hasPrefix("#") ? String(value.dropFirst()) : value
+        let normalized = withoutHash.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return normalized.isEmpty ? nil : normalized
+    }
 }

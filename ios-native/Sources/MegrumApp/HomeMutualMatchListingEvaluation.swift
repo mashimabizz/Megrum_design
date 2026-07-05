@@ -125,7 +125,8 @@ enum HomeMutualMatchListingEvaluator {
             mutualOptionWantsCounterpartGoods(
                 option,
                 counterpartItem: offer,
-                rowsByID: rowsByID
+                rowsByID: rowsByID,
+                tagsByInventoryID: tagsByInventoryID
             )
         }
         guard !matchedGoods.isEmpty else {
@@ -134,6 +135,14 @@ enum HomeMutualMatchListingEvaluator {
         if ListingLogic(rawValue: option.logic ?? "") == .atLeast,
            matchedGoods.count < max(1, option.minCount ?? 1) {
             return .unsatisfied
+        }
+        // 条件指定型（ほしいもの未指定）の選択肢は、求める数量を満たす
+        // 在庫がある相手だけをマッチとする。
+        if option.wishIds.isEmpty, option.wishQuantity > 1 {
+            let availableQuantity = matchedGoods.reduce(0) { $0 + max(1, $1.quantity ?? 1) }
+            if availableQuantity < option.wishQuantity {
+                return .unsatisfied
+            }
         }
 
         let wantedRows = option.wishIds.compactMap { rowsByID[$0] }
@@ -231,10 +240,11 @@ enum HomeMutualMatchListingEvaluator {
         return result
     }
 
-    private static func mutualOptionWantsCounterpartGoods(
+    static func mutualOptionWantsCounterpartGoods(
         _ option: SupabaseHomeListingWishOptionRow,
         counterpartItem: SupabaseHomeGoodsRow,
-        rowsByID: [UUID: SupabaseHomeGoodsRow]
+        rowsByID: [UUID: SupabaseHomeGoodsRow],
+        tagsByInventoryID: [UUID: [SupabaseHomeInventoryTagRow]] = [:]
     ) -> Bool {
         guard option.isCashOffer != true else {
             return false
@@ -253,7 +263,33 @@ enum HomeMutualMatchListingEvaluator {
         guard option.wishGroupId != nil || option.wishGoodsTypeId != nil else {
             return false
         }
-        return HomeCandidateGoodsMatchPolicy.fieldMatches(option.wishGroupId, counterpartItem.groupId)
-            && HomeCandidateGoodsMatchPolicy.fieldMatches(option.wishGoodsTypeId, counterpartItem.goodsTypeId)
+        guard HomeCandidateGoodsMatchPolicy.fieldMatches(option.wishGroupId, counterpartItem.groupId),
+              HomeCandidateGoodsMatchPolicy.fieldMatches(option.wishGoodsTypeId, counterpartItem.goodsTypeId)
+        else {
+            return false
+        }
+
+        // メンバー指定：指定ありなら一致必須、除外なら指定メンバーは対象外。
+        if !option.wishMemberIds.isEmpty {
+            let matchesMember = counterpartItem.characterId.map(option.wishMemberIds.contains) ?? false
+            if option.excludesWishMembers {
+                if matchesMember {
+                    return false
+                }
+            } else if !matchesMember {
+                return false
+            }
+        }
+
+        // シリーズ指定：相手グッズのタグに指定シリーズが1つでも含まれること。
+        if !option.wishSeriesNames.isEmpty {
+            let wantedSeries = Set(option.wishSeriesNames.compactMap(HomeCandidateTagMatcher.normalizedName))
+            let itemTags = HomeCandidateTagMatcher.normalizedSet(tagsByInventoryID[counterpartItem.id] ?? [])
+            if !wantedSeries.isEmpty, wantedSeries.isDisjoint(with: itemTags) {
+                return false
+            }
+        }
+
+        return true
     }
 }

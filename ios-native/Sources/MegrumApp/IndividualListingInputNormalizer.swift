@@ -17,6 +17,10 @@ enum IndividualListingInputNormalizer {
             cashAmount: input.cashAmount,
             wishGroupID: input.wishGroupID,
             wishGoodsTypeID: input.wishGoodsTypeID,
+            wishMemberIDs: input.wishMemberIDs,
+            excludesWishMembers: input.excludesWishMembers,
+            wishSeriesNames: input.wishSeriesNames,
+            wishQuantity: input.wishQuantity,
             additionalOptions: input.additionalOptions.map(normalizedOption),
             note: input.note.nilIfBlank
         )

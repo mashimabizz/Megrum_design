@@ -41,7 +41,7 @@ final class SupabaseListingClientTests: XCTestCase {
         let url = try XCTUnwrap(request.url?.absoluteString)
 
         XCTAssertEqual(request.httpMethod, "GET")
-        XCTAssertTrue(url.hasPrefix("https://example.supabase.co/rest/v1/listing_wish_options?select=id,listing_id,position,wish_ids,wish_qtys,logic,min_count,exchange_type,is_cash_offer,cash_amount,wish_group_id,wish_goods_type_id,created_at,updated_at"))
+        XCTAssertTrue(url.hasPrefix("https://example.supabase.co/rest/v1/listing_wish_options?select=id,listing_id,position,wish_ids,wish_qtys,logic,min_count,exchange_type,is_cash_offer,cash_amount,wish_group_id,wish_goods_type_id,wish_member_ids,excludes_wish_members,wish_series_names,wish_quantity,created_at,updated_at"))
         XCTAssertTrue(url.contains("listing_id=in.(22222222-2222-2222-2222-222222222222,33333333-3333-3333-3333-333333333333)"))
         XCTAssertTrue(url.contains("order=position.asc,created_at.asc"))
     }
@@ -252,7 +252,7 @@ final class SupabaseListingClientTests: XCTestCase {
 
         XCTAssertEqual(request.httpMethod, "PATCH")
         XCTAssertEqual(request.value(forHTTPHeaderField: "Prefer"), "return=representation")
-        XCTAssertTrue(url.hasPrefix("https://example.supabase.co/rest/v1/listing_wish_options?select=id,listing_id,position,wish_ids,wish_qtys,logic,min_count,exchange_type,is_cash_offer,cash_amount,wish_group_id,wish_goods_type_id,created_at,updated_at"))
+        XCTAssertTrue(url.hasPrefix("https://example.supabase.co/rest/v1/listing_wish_options?select=id,listing_id,position,wish_ids,wish_qtys,logic,min_count,exchange_type,is_cash_offer,cash_amount,wish_group_id,wish_goods_type_id,wish_member_ids,excludes_wish_members,wish_series_names,wish_quantity,created_at,updated_at"))
         XCTAssertTrue(url.contains("id=eq.55555555-5555-5555-5555-555555555555"))
         XCTAssertTrue(url.contains("listing_id=eq.44444444-4444-4444-4444-444444444444"))
         XCTAssertEqual(json["wish_ids"] as? [String], ["33333333-3333-3333-3333-333333333333"])

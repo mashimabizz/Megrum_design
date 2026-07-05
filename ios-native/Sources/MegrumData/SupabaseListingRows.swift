@@ -36,7 +36,7 @@ struct ListingRow: Decodable, Sendable {
 }
 
 struct ListingWishOptionRow: Decodable, Sendable {
-    static let select = "id,listing_id,position,wish_ids,wish_qtys,logic,min_count,exchange_type,is_cash_offer,cash_amount,wish_group_id,wish_goods_type_id,created_at,updated_at"
+    static let select = "id,listing_id,position,wish_ids,wish_qtys,logic,min_count,exchange_type,is_cash_offer,cash_amount,wish_group_id,wish_goods_type_id,wish_member_ids,excludes_wish_members,wish_series_names,wish_quantity,created_at,updated_at"
 
     var id: UUID
     var listingId: UUID
@@ -50,6 +50,10 @@ struct ListingWishOptionRow: Decodable, Sendable {
     var cashAmount: Int?
     var wishGroupId: UUID?
     var wishGoodsTypeId: UUID?
+    var wishMemberIds: [UUID]?
+    var excludesWishMembers: Bool?
+    var wishSeriesNames: [String]?
+    var wishQuantity: Int?
     var createdAt: Date?
     var updatedAt: Date?
 
@@ -66,6 +70,10 @@ struct ListingWishOptionRow: Decodable, Sendable {
             cashAmount: cashAmount,
             wishGroupID: wishGroupId,
             wishGoodsTypeID: wishGoodsTypeId,
+            wishMemberIDs: wishMemberIds ?? [],
+            excludesWishMembers: excludesWishMembers ?? false,
+            wishSeriesNames: wishSeriesNames ?? [],
+            wishQuantity: wishQuantity ?? 1,
             createdAt: createdAt,
             updatedAt: updatedAt
         )
@@ -185,6 +193,10 @@ struct ListingWishOptionPayload: Encodable, Sendable {
     var cashAmount: Int?
     var wishGroupId: UUID?
     var wishGoodsTypeId: UUID?
+    var wishMemberIds: [UUID]
+    var excludesWishMembers: Bool
+    var wishSeriesNames: [String]
+    var wishQuantity: Int
 
     init(listingID: UUID, position: Int, input: IndividualListingCreateInput) {
         self.init(listingID: listingID, position: position, option: input.primaryOption)
@@ -202,6 +214,10 @@ struct ListingWishOptionPayload: Encodable, Sendable {
         self.cashAmount = option.cashAmount
         self.wishGroupId = option.wishGroupID
         self.wishGoodsTypeId = option.wishGoodsTypeID
+        self.wishMemberIds = option.wishMemberIDs
+        self.excludesWishMembers = option.excludesWishMembers
+        self.wishSeriesNames = option.wishSeriesNames
+        self.wishQuantity = max(1, min(option.wishQuantity, 99))
     }
 }
 
@@ -215,6 +231,10 @@ struct ListingWishOptionUpdatePayload: Encodable, Sendable {
     private var cashAmount: Int??
     private var wishGroupId: UUID??
     private var wishGoodsTypeId: UUID??
+    private var wishMemberIds: [UUID]?
+    private var excludesWishMembers: Bool?
+    private var wishSeriesNames: [String]?
+    private var wishQuantity: Int?
 
     init(input: SupabaseListingWishOptionUpdateInput) throws {
         if let wishItems = input.wishItems {
@@ -240,8 +260,12 @@ struct ListingWishOptionUpdatePayload: Encodable, Sendable {
         } else if input.clearsWishConditionIDs {
             self.wishGoodsTypeId = .some(nil)
         }
+        self.wishMemberIds = input.wishMemberIDs
+        self.excludesWishMembers = input.excludesWishMembers
+        self.wishSeriesNames = input.wishSeriesNames
+        self.wishQuantity = input.wishQuantity.map { max(1, min($0, 99)) }
 
-        guard wishIds != nil || logic != nil || minCount != nil || exchangeType != nil || isCashOffer != nil || cashAmount != nil || wishGroupId != nil || wishGoodsTypeId != nil else {
+        guard wishIds != nil || logic != nil || minCount != nil || exchangeType != nil || isCashOffer != nil || cashAmount != nil || wishGroupId != nil || wishGoodsTypeId != nil || wishMemberIds != nil || excludesWishMembers != nil || wishSeriesNames != nil || wishQuantity != nil else {
             throw SupabaseListingClientError.emptyUpdate
         }
     }
@@ -256,6 +280,10 @@ struct ListingWishOptionUpdatePayload: Encodable, Sendable {
         case cashAmount
         case wishGroupId
         case wishGoodsTypeId
+        case wishMemberIds
+        case excludesWishMembers
+        case wishSeriesNames
+        case wishQuantity
     }
 
     func encode(to encoder: Encoder) throws {
@@ -290,6 +318,10 @@ struct ListingWishOptionUpdatePayload: Encodable, Sendable {
                 try container.encodeNil(forKey: .wishGoodsTypeId)
             }
         }
+        try container.encodeIfPresent(wishMemberIds, forKey: .wishMemberIds)
+        try container.encodeIfPresent(excludesWishMembers, forKey: .excludesWishMembers)
+        try container.encodeIfPresent(wishSeriesNames, forKey: .wishSeriesNames)
+        try container.encodeIfPresent(wishQuantity, forKey: .wishQuantity)
     }
 }
 

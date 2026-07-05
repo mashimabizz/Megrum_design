@@ -96,6 +96,14 @@ public struct IndividualListingWishOption: Identifiable, Codable, Hashable, Send
     public var cashAmount: Int?
     public var wishGroupID: UUID?
     public var wishGoodsTypeID: UUID?
+    /// 条件指定型：対象メンバー（空なら全メンバー）。
+    public var wishMemberIDs: [UUID]
+    /// true の場合、wishMemberIDs は「これらのメンバー以外」を意味する。
+    public var excludesWishMembers: Bool
+    /// 条件指定型：対象シリーズ名（タグ）。
+    public var wishSeriesNames: [String]
+    /// 条件指定型：求める数量。
+    public var wishQuantity: Int
     public var createdAt: Date?
     public var updatedAt: Date?
 
@@ -111,6 +119,10 @@ public struct IndividualListingWishOption: Identifiable, Codable, Hashable, Send
         cashAmount: Int? = nil,
         wishGroupID: UUID? = nil,
         wishGoodsTypeID: UUID? = nil,
+        wishMemberIDs: [UUID] = [],
+        excludesWishMembers: Bool = false,
+        wishSeriesNames: [String] = [],
+        wishQuantity: Int = 1,
         createdAt: Date? = nil,
         updatedAt: Date? = nil
     ) {
@@ -125,6 +137,10 @@ public struct IndividualListingWishOption: Identifiable, Codable, Hashable, Send
         self.cashAmount = cashAmount
         self.wishGroupID = wishGroupID
         self.wishGoodsTypeID = wishGoodsTypeID
+        self.wishMemberIDs = wishMemberIDs
+        self.excludesWishMembers = excludesWishMembers
+        self.wishSeriesNames = wishSeriesNames
+        self.wishQuantity = max(1, wishQuantity)
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }
@@ -185,6 +201,10 @@ public struct IndividualListingOptionInput: Equatable, Sendable {
     public var cashAmount: Int?
     public var wishGroupID: UUID?
     public var wishGoodsTypeID: UUID?
+    public var wishMemberIDs: [UUID]
+    public var excludesWishMembers: Bool
+    public var wishSeriesNames: [String]
+    public var wishQuantity: Int
 
     public init(
         wishItems: [ListingItemQuantity] = [],
@@ -194,7 +214,11 @@ public struct IndividualListingOptionInput: Equatable, Sendable {
         isCashOffer: Bool = false,
         cashAmount: Int? = nil,
         wishGroupID: UUID? = nil,
-        wishGoodsTypeID: UUID? = nil
+        wishGoodsTypeID: UUID? = nil,
+        wishMemberIDs: [UUID] = [],
+        excludesWishMembers: Bool = false,
+        wishSeriesNames: [String] = [],
+        wishQuantity: Int = 1
     ) {
         self.wishItems = wishItems
         self.wishLogic = wishLogic
@@ -204,6 +228,10 @@ public struct IndividualListingOptionInput: Equatable, Sendable {
         self.cashAmount = cashAmount.map { max(0, $0) }
         self.wishGroupID = wishGroupID
         self.wishGoodsTypeID = wishGoodsTypeID
+        self.wishMemberIDs = wishMemberIDs
+        self.excludesWishMembers = excludesWishMembers
+        self.wishSeriesNames = wishSeriesNames
+        self.wishQuantity = max(1, wishQuantity)
     }
 
     public init(option: IndividualListingWishOption) {
@@ -215,7 +243,11 @@ public struct IndividualListingOptionInput: Equatable, Sendable {
             isCashOffer: option.isCashOffer,
             cashAmount: option.cashAmount,
             wishGroupID: option.wishGroupID,
-            wishGoodsTypeID: option.wishGoodsTypeID
+            wishGoodsTypeID: option.wishGoodsTypeID,
+            wishMemberIDs: option.wishMemberIDs,
+            excludesWishMembers: option.excludesWishMembers,
+            wishSeriesNames: option.wishSeriesNames,
+            wishQuantity: option.wishQuantity
         )
     }
 }
@@ -234,6 +266,10 @@ public struct IndividualListingCreateInput: Equatable, Sendable {
     public var cashAmount: Int?
     public var wishGroupID: UUID?
     public var wishGoodsTypeID: UUID?
+    public var wishMemberIDs: [UUID]
+    public var excludesWishMembers: Bool
+    public var wishSeriesNames: [String]
+    public var wishQuantity: Int
     /// 2件目以降の選択肢（先頭は上の従来フィールド）。
     public var additionalOptions: [IndividualListingOptionInput]
     public var note: String?
@@ -252,6 +288,10 @@ public struct IndividualListingCreateInput: Equatable, Sendable {
         cashAmount: Int? = nil,
         wishGroupID: UUID? = nil,
         wishGoodsTypeID: UUID? = nil,
+        wishMemberIDs: [UUID] = [],
+        excludesWishMembers: Bool = false,
+        wishSeriesNames: [String] = [],
+        wishQuantity: Int = 1,
         additionalOptions: [IndividualListingOptionInput] = [],
         note: String? = nil
     ) {
@@ -268,6 +308,10 @@ public struct IndividualListingCreateInput: Equatable, Sendable {
         self.cashAmount = cashAmount.map { max(0, $0) }
         self.wishGroupID = wishGroupID
         self.wishGoodsTypeID = wishGoodsTypeID
+        self.wishMemberIDs = wishMemberIDs
+        self.excludesWishMembers = excludesWishMembers
+        self.wishSeriesNames = wishSeriesNames
+        self.wishQuantity = max(1, wishQuantity)
         self.additionalOptions = additionalOptions
         self.note = note
     }
@@ -282,7 +326,11 @@ public struct IndividualListingCreateInput: Equatable, Sendable {
             isCashOffer: isCashOffer,
             cashAmount: cashAmount,
             wishGroupID: wishGroupID,
-            wishGoodsTypeID: wishGoodsTypeID
+            wishGoodsTypeID: wishGoodsTypeID,
+            wishMemberIDs: wishMemberIDs,
+            excludesWishMembers: excludesWishMembers,
+            wishSeriesNames: wishSeriesNames,
+            wishQuantity: wishQuantity
         )
     }
 }

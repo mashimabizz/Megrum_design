@@ -31,7 +31,11 @@ extension IndividualListingDraft {
                 wishMinimumCount: wishLogic == .atLeast ? resolvedWishMinimumCount : 1,
                 exchangeType: exchangeType,
                 wishGroupID: conditionGroupID,
-                wishGoodsTypeID: conditionGoodsTypeID
+                wishGoodsTypeID: conditionGoodsTypeID,
+                wishMemberIDs: Array(conditionMemberIDs).sorted { $0.uuidString < $1.uuidString },
+                excludesWishMembers: excludesSelectedConditionMembers,
+                wishSeriesNames: conditionTagNames,
+                wishQuantity: conditionQuantity
             )
         case .cash:
             return IndividualListingOptionInput(
@@ -137,6 +141,10 @@ extension IndividualListingDraft {
             cashAmount: primary.cashAmount,
             wishGroupID: primary.wishGroupID,
             wishGoodsTypeID: primary.wishGoodsTypeID,
+            wishMemberIDs: primary.wishMemberIDs,
+            excludesWishMembers: primary.excludesWishMembers,
+            wishSeriesNames: primary.wishSeriesNames,
+            wishQuantity: primary.wishQuantity,
             additionalOptions: Array(options.dropFirst()),
             note: trimmedNoteWithListingMetadata
         )
@@ -167,6 +175,10 @@ extension IndividualListingDraft {
                 cashAmount: option.cashAmount,
                 wishGroupID: option.wishGroupID,
                 wishGoodsTypeID: option.wishGoodsTypeID,
+                wishMemberIDs: option.wishMemberIDs,
+                excludesWishMembers: option.excludesWishMembers,
+                wishSeriesNames: option.wishSeriesNames,
+                wishQuantity: option.wishQuantity,
                 createdAt: index == 0 ? existingOptions.first?.createdAt : nil,
                 updatedAt: Date()
             )

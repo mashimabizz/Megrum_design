@@ -69,7 +69,8 @@ struct IndividualListingEditorSheet: View {
                     title: "選択肢\(index + 1)",
                     wishes: appState.wishes,
                     groups: appState.oshiGroups,
-                    goodsTypes: appState.goodsTypes
+                    goodsTypes: appState.goodsTypes,
+                    characters: appState.oshiCharacters
                 )
             )
         }

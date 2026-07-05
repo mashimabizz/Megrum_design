@@ -51,6 +51,10 @@ public struct SupabaseListingWishOptionUpdateInput: Equatable, Sendable {
     public var wishGroupID: UUID?
     public var wishGoodsTypeID: UUID?
     public var clearsWishConditionIDs: Bool
+    public var wishMemberIDs: [UUID]?
+    public var excludesWishMembers: Bool?
+    public var wishSeriesNames: [String]?
+    public var wishQuantity: Int?
 
     public init(
         wishItems: [ListingItemQuantity]? = nil,
@@ -62,7 +66,11 @@ public struct SupabaseListingWishOptionUpdateInput: Equatable, Sendable {
         clearsCashAmount: Bool = false,
         wishGroupID: UUID? = nil,
         wishGoodsTypeID: UUID? = nil,
-        clearsWishConditionIDs: Bool = false
+        clearsWishConditionIDs: Bool = false,
+        wishMemberIDs: [UUID]? = nil,
+        excludesWishMembers: Bool? = nil,
+        wishSeriesNames: [String]? = nil,
+        wishQuantity: Int? = nil
     ) {
         self.wishItems = wishItems
         self.logic = logic
@@ -74,6 +82,10 @@ public struct SupabaseListingWishOptionUpdateInput: Equatable, Sendable {
         self.wishGroupID = wishGroupID
         self.wishGoodsTypeID = wishGoodsTypeID
         self.clearsWishConditionIDs = clearsWishConditionIDs
+        self.wishMemberIDs = wishMemberIDs
+        self.excludesWishMembers = excludesWishMembers
+        self.wishSeriesNames = wishSeriesNames
+        self.wishQuantity = wishQuantity
     }
 }
 
@@ -182,7 +194,11 @@ public final class SupabaseListingClient: @unchecked Sendable {
             clearsCashAmount: input.cashAmount == nil,
             wishGroupID: input.wishGroupID,
             wishGoodsTypeID: input.wishGoodsTypeID,
-            clearsWishConditionIDs: input.wishGroupID == nil && input.wishGoodsTypeID == nil
+            clearsWishConditionIDs: input.wishGroupID == nil && input.wishGoodsTypeID == nil,
+            wishMemberIDs: input.wishMemberIDs,
+            excludesWishMembers: input.excludesWishMembers,
+            wishSeriesNames: input.wishSeriesNames,
+            wishQuantity: input.wishQuantity
         )
 
         var optionRows: [ListingWishOptionRow]

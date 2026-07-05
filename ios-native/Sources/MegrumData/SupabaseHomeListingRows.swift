@@ -59,6 +59,10 @@ public struct SupabaseHomeListingWishOptionRow: Decodable, Equatable, Sendable, 
     public var cashAmount: Int?
     public var wishGroupId: UUID?
     public var wishGoodsTypeId: UUID?
+    public var wishMemberIds: [UUID]
+    public var excludesWishMembers: Bool
+    public var wishSeriesNames: [String]
+    public var wishQuantity: Int
     public var createdAt: Date?
     public var updatedAt: Date?
 
@@ -75,6 +79,10 @@ public struct SupabaseHomeListingWishOptionRow: Decodable, Equatable, Sendable, 
         case cashAmount
         case wishGroupId
         case wishGoodsTypeId
+        case wishMemberIds
+        case excludesWishMembers
+        case wishSeriesNames
+        case wishQuantity
         case createdAt
         case updatedAt
     }
@@ -93,6 +101,10 @@ public struct SupabaseHomeListingWishOptionRow: Decodable, Equatable, Sendable, 
         self.cashAmount = try container.decodeIfPresent(Int.self, forKey: .cashAmount)
         self.wishGroupId = try container.decodeIfPresent(UUID.self, forKey: .wishGroupId)
         self.wishGoodsTypeId = try container.decodeIfPresent(UUID.self, forKey: .wishGoodsTypeId)
+        self.wishMemberIds = try container.decodeIfPresent([UUID].self, forKey: .wishMemberIds) ?? []
+        self.excludesWishMembers = try container.decodeIfPresent(Bool.self, forKey: .excludesWishMembers) ?? false
+        self.wishSeriesNames = try container.decodeIfPresent([String].self, forKey: .wishSeriesNames) ?? []
+        self.wishQuantity = try container.decodeIfPresent(Int.self, forKey: .wishQuantity) ?? 1
         self.createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt)
         self.updatedAt = try container.decodeIfPresent(Date.self, forKey: .updatedAt)
     }
@@ -103,5 +115,5 @@ extension SupabaseHomeListingRow {
 }
 
 extension SupabaseHomeListingWishOptionRow {
-    static let select = "id,listing_id,position,wish_ids,wish_qtys,logic,min_count,exchange_type,is_cash_offer,cash_amount,wish_group_id,wish_goods_type_id,created_at,updated_at"
+    static let select = "id,listing_id,position,wish_ids,wish_qtys,logic,min_count,exchange_type,is_cash_offer,cash_amount,wish_group_id,wish_goods_type_id,wish_member_ids,excludes_wish_members,wish_series_names,wish_quantity,created_at,updated_at"
 }
