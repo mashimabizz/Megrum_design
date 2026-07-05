@@ -18,6 +18,7 @@ enum GoodsInventoryAvailabilityQueryMode {
 extension SupabaseGoodsInventoryClient {
     func goodsTypeQueryItems(limit: Int) -> [URLQueryItem] {
         [
+            URLQueryItem(name: "is_active", value: "eq.true"),
             URLQueryItem(name: "order", value: "display_order.asc,name.asc"),
             URLQueryItem(name: "limit", value: "\(boundedLimit(limit))")
         ]

@@ -18,7 +18,7 @@ public final class SupabaseGoodsInventoryClient: @unchecked Sendable {
         self.encoder = Self.makeEncoder()
     }
 
-    public func loadGoodsTypes(limit: Int = 40) async throws -> [GoodsType] {
+    public func loadGoodsTypes(limit: Int = 100) async throws -> [GoodsType] {
         let rows: [GoodsTypeRow] = try await client.fetchRows(
             from: "goods_types_master",
             select: GoodsTypeRow.select,

@@ -54,6 +54,8 @@ public struct MegrumRootView: View {
         Group {
             if visualQAInitialScreen == .homeDemandFirst {
                 HomeDemandFirstPreview()
+            } else if visualQAInitialScreen == .goodsTypeSelect {
+                GoodsTypeSelectPreview()
             } else if AccountSetupSessionPolicy.shouldShowAuthScreen(
                 isAuthenticated: authState.isAuthenticated,
                 isReturningStoredIncompleteAccountToLogin: isReturningStoredIncompleteAccountToLogin

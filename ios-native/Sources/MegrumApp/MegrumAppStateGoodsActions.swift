@@ -11,7 +11,7 @@ extension MegrumAppState {
         isLoadingGoodsTypes = true
         errorMessage = nil
         do {
-            goodsTypes = try await repository.loadGoodsTypes(limit: 40)
+            goodsTypes = try await repository.loadGoodsTypes(limit: 100)
         } catch {
             errorMessage = "グッズ種別を読み込めませんでした"
         }

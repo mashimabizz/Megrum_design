@@ -11,7 +11,7 @@ final class SupabaseGoodsInventoryClientTests: XCTestCase {
 
         let request = try client.makeLoadGoodsTypesRequest(limit: 30)
 
-        XCTAssertEqual(request.url?.absoluteString, "https://example.supabase.co/rest/v1/goods_types_master?select=id,name,category,display_order&order=display_order.asc,name.asc&limit=30")
+        XCTAssertEqual(request.url?.absoluteString, "https://example.supabase.co/rest/v1/goods_types_master?select=id,name,category,display_order&is_active=eq.true&order=display_order.asc,name.asc&limit=30")
         XCTAssertEqual(request.httpMethod, "GET")
         XCTAssertEqual(request.value(forHTTPHeaderField: "apikey"), "sb_publishable_test")
     }

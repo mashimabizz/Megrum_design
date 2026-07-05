@@ -332,6 +332,49 @@
 
 ---
 
+## イテレーション1226.293：グッズ種別マスタ66種化＋検索付き選択シート
+
+### 背景・問題意識
+オーナー指示。グッズ種別マスタを指定の66種（トレカ〜その他）へ更新し、マイグッズ/ほしいもの登録時のグッズ種別選択を、推し設定「推しを追加」と同じ構造の共通モジュール（検索可能な一覧シート）へ変更。種類が増えたため自由入力検索が必要。カテゴリ分け・追加リクエスト機能は不要。
+
+### 変更内容
+
+#### `supabase/migrations/20260706010000_update_goods_types_master.sql`（push済み）
+- `goods_types_master` に `is_active boolean not null default true` を追加
+- 新66種を name conflict upsert（display_order 1..66、category は card/pin/photo/figure/other にマップ）
+- 新リストに無い旧種別（生写真・缶バッジ・アクスタ・スマホリング・ぬいぐるみ・シール・定価）は行を残して `is_active=false` ＋ display_order を 900+ に退避（既存在庫の名前解決を維持しつつ、is_active を知らない旧クライアントでも新リストが先頭に来る）
+- 「定価」行は listing_wish_options.is_cash に置き換え済みで未参照のため非表示化
+
+#### `ios-native/Sources/MegrumData/`
+- `goodsTypeQueryItems` に `is_active=eq.true` フィルタ追加
+- `loadGoodsTypes` / `makeLoadGoodsTypesRequest` のデフォルト limit 40→100（66種に対応）
+
+#### `ios-native/Sources/MegrumApp/GoodsTypeSelectSheet.swift`（新規・共通モジュール）
+- 推し追加と同構造：ヘッダー（タイトル＋閉じる）／WrappingTagFlow＋OshiMasterCandidateTag の一覧／下部固定の検索フィールド
+- `GoodsTypeSelectFilter`：空白トリム＋localizedCaseInsensitiveContains で部分一致
+- VisualQA route `goods-type-select`（`GoodsTypeSelectPreview`、66種ハードコード）
+
+#### `ios-native/Sources/MegrumApp/GoodsEditorChoiceSections.swift`
+- `GoodsEditorGoodsTypeSelectionSection` をチップ全並べ→「グッズ種別 / 選択 >」のピッカー行＋シート起動へ変更（推しピッカー行と同スタイル）。マイグッズ・ほしいもの両方の登録/編集に効く（呼び出し2箇所は API 不変のため無変更）
+
+#### `ios-native/Sources/MegrumApp/MegrumAppStateGoodsActions.swift`
+- `loadGoodsTypes` の limit 40→100
+
+### 影響範囲
+- マイグッズ／ほしいもの登録・編集のグッズ種別選択 UI
+- グッズ種別マスタ全体（検索フィルタ・個別募集の条件選択にも新66種が流れる）
+
+### 確認方法
+- Simulator: `SIMCTL_CHILD_MEGRUM_VISUAL_QA_PREVIEW_AUTH=1 SIMCTL_CHILD_MEGRUM_VISUAL_QA_INITIAL_SCREEN=goods-type-select`
+- prod REST で active 66件・inactive 7件を確認済み
+
+### セルフレビュー結果
+- ✅ 推し追加の既存コンポーネント（WrappingTagFlow / OshiMasterCandidateTag / 検索フィールド様式）を使い回し
+- ✅ ブランドカラー直書きなし（MegrumTheme 経由）
+- ✅ swift test 1455件 0 failures（検索フィルタの単体テスト追加）
+- ✅ migration push 済み・prod で is_active 状態を実データ確認
+- ⚠️ 検索フィルタ画面・個別募集の種別 Picker は従来 UI のまま（66種でも動作するが、必要ならシート化は次 iter）
+
 ## イテレーション1226.292：ホーム候補行v3「需要ファースト」モックアップ
 
 ### 背景・問題意識

@@ -46,7 +46,7 @@ extension SupabaseGoodsInventoryClient {
         )
     }
 
-    public func makeLoadGoodsTypesRequest(limit: Int = 40) throws -> URLRequest {
+    public func makeLoadGoodsTypesRequest(limit: Int = 100) throws -> URLRequest {
         try client.makeRequest(
             path: "/rest/v1/goods_types_master",
             queryItems: [
