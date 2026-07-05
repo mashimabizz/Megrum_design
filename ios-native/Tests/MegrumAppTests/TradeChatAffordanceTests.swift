@@ -2381,4 +2381,29 @@ final class TradeChatAffordanceTests: XCTestCase {
             createdAt: createdAt
         )
     }
+
+    func testCompletedStageShowsOnlyPostAgreementTrades() {
+        func proposal(_ status: ProposalStatus, agreed: Bool) -> TradeProposal {
+            TradeProposal(
+                id: UUID(),
+                senderID: UUID(),
+                receiverID: UUID(),
+                status: status,
+                exchangeMethod: .hand,
+                senderGoodsIDs: [],
+                receiverGoodsIDs: [],
+                agreedBySender: agreed,
+                agreedByReceiver: agreed
+            )
+        }
+
+        // 完了した取引は表示。
+        XCTAssertTrue(TradeStage.completed.containsForDisplay(proposal(.completed, agreed: true)))
+        // 成立後キャンセルは表示。
+        XCTAssertTrue(TradeStage.completed.containsForDisplay(proposal(.cancelled, agreed: true)))
+        // 成立前の取り下げ・拒否・期限切れは表示しない。
+        XCTAssertFalse(TradeStage.completed.containsForDisplay(proposal(.cancelled, agreed: false)))
+        XCTAssertFalse(TradeStage.completed.containsForDisplay(proposal(.rejected, agreed: false)))
+        XCTAssertFalse(TradeStage.completed.containsForDisplay(proposal(.expired, agreed: false)))
+    }
 }

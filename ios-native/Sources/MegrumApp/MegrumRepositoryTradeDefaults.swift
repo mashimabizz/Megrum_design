@@ -43,6 +43,10 @@ public extension MegrumRepository {
         throw MegrumRepositoryError.unsupportedMutation
     }
 
+    func withdrawProposalBeforeAgreement(proposalID: UUID) async throws {
+        throw MegrumRepositoryError.unsupportedMutation
+    }
+
     func loadViewerEvaluatedProposalIDs() async throws -> Set<UUID> {
         []
     }

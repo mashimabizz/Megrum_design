@@ -1,5 +1,6 @@
 import Foundation
 import MegrumCore
+import MegrumData
 
 extension MegrumAppState {
     public func createProposal(_ input: ProposalCreateInput) async -> Bool {
@@ -85,6 +86,22 @@ extension MegrumAppState {
         } catch {
             errorMessage = "打診を承諾できませんでした"
             respondingProposalID = nil
+            return false
+        }
+    }
+
+    /// 成立前の打診を取り下げる（サーバーから物理削除し、ローカルからも消す）。
+    public func withdrawProposal(proposalID: UUID) async -> Bool {
+        errorMessage = nil
+        do {
+            try await repository.withdrawProposalBeforeAgreement(proposalID: proposalID)
+            proposals.removeAll { $0.id == proposalID }
+            messagesByProposalID[proposalID] = nil
+            viewerReadAtByProposalID[proposalID] = nil
+            partnerReadAtByProposalID[proposalID] = nil
+            return true
+        } catch {
+            errorMessage = (error as? SupabaseRESTError)?.serverMessage ?? "打診を取り下げられませんでした"
             return false
         }
     }

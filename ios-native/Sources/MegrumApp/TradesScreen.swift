@@ -32,7 +32,7 @@ struct TradesScreen: View {
 
     private func visibleProposals(for stage: TradeStage) -> [TradeProposal] {
         TradeListOrdering.sorted(
-            proposals.filter { stage.contains($0.status) },
+            proposals.filter { stage.containsForDisplay($0) },
             viewerID: appState.viewer?.id,
             messagesByProposalID: messagesByProposalID,
             viewerReadAtByProposalID: viewerReadAtByProposalID,
@@ -264,7 +264,7 @@ struct TradesScreen: View {
         }
         Task {
             for proposalID in proposalIDs {
-                _ = await appState.rejectProposal(proposalID: proposalID)
+                _ = await appState.withdrawProposal(proposalID: proposalID)
             }
             presentationState.clearPendingSelection()
         }

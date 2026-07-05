@@ -23,6 +23,10 @@ public extension SupabaseMegrumRepository {
         try await proposalClient.rejectProposal(userID: viewerID, proposalID: proposalID)
     }
 
+    func withdrawProposalBeforeAgreement(proposalID: UUID) async throws {
+        try await proposalClient.withdrawProposalBeforeAgreement(proposalID: proposalID)
+    }
+
     func addTradeEvidence(_ input: TradeEvidenceCreateInput) async throws -> TradeProposal {
         try await proposalClient.addEvidencePhoto(userID: viewerID, input: input)
     }

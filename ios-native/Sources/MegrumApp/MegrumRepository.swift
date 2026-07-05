@@ -163,6 +163,7 @@ public protocol MegrumRepository: Sendable {
     func reviseProposal(proposalID: UUID, input: ProposalCreateInput) async throws -> TradeProposal
     func agreeProposal(proposalID: UUID, acceptedExchangeMethod: ExchangeMethod?) async throws -> TradeProposal
     func rejectProposal(proposalID: UUID) async throws -> TradeProposal
+    func withdrawProposalBeforeAgreement(proposalID: UUID) async throws
     func approveTradeCancel(proposalID: UUID) async throws -> (proposal: TradeProposal, message: TradeMessage)
     func addTradeEvidence(_ input: TradeEvidenceCreateInput) async throws -> TradeProposal
     func loadTradeEvidencePhotos(proposalID: UUID) async throws -> [TradeEvidencePhoto]

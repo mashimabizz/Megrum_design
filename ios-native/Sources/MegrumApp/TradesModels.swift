@@ -41,6 +41,21 @@ enum TradeStage: String, CaseIterable, Identifiable {
         }
     }
 
+    /// 一覧に表示する取引か。完了済みステージは「取引成立後」のものだけ
+    /// 表示する（成立前の拒否・期限切れ・キャンセルは表示しない）。
+    func containsForDisplay(_ proposal: TradeProposal) -> Bool {
+        switch self {
+        case .pending, .inProgress:
+            return contains(proposal.status)
+        case .completed:
+            if proposal.status == .completed {
+                return true
+            }
+            let wasAgreed = proposal.agreedBySender && proposal.agreedByReceiver
+            return wasAgreed && [.cancelled, .rejected, .expired].contains(proposal.status)
+        }
+    }
+
     var next: TradeStage {
         switch self {
         case .pending:

@@ -4,6 +4,36 @@
 
 ---
 
+## イテレーション1226.291：完了済み一覧は成立後のみ・打診取り下げは物理削除
+
+### 背景・問題意識
+
+完了済みタブに成立前の取り下げ/拒否/期限切れが並んでいた。表示するのは取引成立後のもののみとし、成立前に取り下げた打診はデータとしても残さない。
+
+### 変更内容
+
+#### migration `20260705040000_allow_withdraw_pre_agreement_proposals.sql`（適用済み）
+- RPC `withdraw_proposal_before_agreement`：送信者本人かつ成立前（draft/sent/negotiating/agreement_one_side）の打診のみ物理削除。messages/read_states/evidence 等は FK cascade で連鎖削除。成立後はエラー。冪等（既に無い場合は成功）。
+
+#### iOS
+- `MegrumAppState.withdrawProposal`（新規）：RPC 呼び出し＋ローカルの proposal/チャット/既読状態を除去。やりとり一覧の一括取り下げは rejectProposal からこれへ変更（拒否＝受信者の操作はこれまでどおり status 更新）。
+- `TradeStage.containsForDisplay(proposal:)`：完了済みタブは「status == completed」または「両者合意済みの cancelled/rejected/expired」のみ表示。成立前の終了は一覧から除外（回帰テスト追加）。
+
+### 影響範囲
+
+- やりとり一覧（完了済みタブ・打診の取り下げ）
+
+### 確認方法
+
+- `swift test` 1449件 0 failures、migration 適用済み
+
+### セルフレビュー結果
+
+- ✅ 受信者の「拒否」は従来どおり記録される（削除するのは送信者自身の取り下げのみ）
+- ✅ 表示除外は成立フラグ（agreedBySender && agreedByReceiver）基準で、成立後キャンセルは完了済みに残る
+
+---
+
 ## イテレーション1226.290：選択肢の上限5件をUIで強制＋メンバー名の全表示
 
 ### 背景・問題意識

@@ -61,6 +61,17 @@ public final class SupabaseProposalClient: @unchecked Sendable {
         return Set(rows.compactMap(\.proposalID))
     }
 
+    /// 成立前の打診を物理削除で取り下げる（成立後はサーバー側で拒否）。
+    public func withdrawProposalBeforeAgreement(proposalID: UUID) async throws {
+        struct WithdrawPayload: Encodable, Sendable {
+            let pProposalId: UUID
+        }
+        try await client.rpcVoid(
+            function: "withdraw_proposal_before_agreement",
+            payload: WithdrawPayload(pProposalId: proposalID)
+        )
+    }
+
     public func createProposal(senderID: UUID, input: ProposalCreateInput, now: Date = .now) async throws -> TradeProposal {
         let rows: [ProposalRow] = try await client.upsertRows(
             into: "proposals",
