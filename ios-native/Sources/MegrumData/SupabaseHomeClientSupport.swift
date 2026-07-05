@@ -47,7 +47,7 @@ extension SupabaseHomeClient {
                 select: SupabaseHomeGoodsRow.select,
                 queryItems: queryItems
             )
-        } catch let error as SupabaseRESTError where error == .unexpectedStatus(400) {
+        } catch let error as SupabaseRESTError where error.statusCode == 400 {
             return try await client.fetchRows(
                 from: "goods_inventory",
                 select: SupabaseHomeGoodsRow.legacySelect,
@@ -91,7 +91,7 @@ extension SupabaseHomeClient {
                 select: SupabaseHomeUserRow.select,
                 queryItems: queryItems
             )
-        } catch let error as SupabaseRESTError where error == .unexpectedStatus(400) {
+        } catch let error as SupabaseRESTError where error.statusCode == 400 {
             return try await client.fetchRows(
                 from: "users",
                 select: SupabaseHomeUserRow.legacySelect,
@@ -101,6 +101,6 @@ extension SupabaseHomeClient {
     }
 
     static func isOptionalRPCFallbackError(_ error: SupabaseRESTError) -> Bool {
-        error == .unexpectedStatus(400) || error == .unexpectedStatus(404)
+        error.statusCode == 400 || error.statusCode == 404
     }
 }

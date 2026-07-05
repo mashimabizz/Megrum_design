@@ -69,11 +69,6 @@ extension SupabaseMessageClient {
     }
 
     static func isOptionalReadStateError(_ error: SupabaseRESTError) -> Bool {
-        switch error {
-        case .unexpectedStatus(400), .unexpectedStatus(404):
-            true
-        case .invalidURL, .unexpectedStatus:
-            false
-        }
+        error.statusCode == 400 || error.statusCode == 404
     }
 }

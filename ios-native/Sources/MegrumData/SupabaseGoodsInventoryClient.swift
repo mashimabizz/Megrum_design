@@ -60,7 +60,7 @@ public final class SupabaseGoodsInventoryClient: @unchecked Sendable {
                 select: GoodsInventoryRow.select,
                 queryItems: searchQueryItems(viewerID: viewerID, input: input, availability: .marketAvailableQuantity)
             )
-        } catch let error as SupabaseRESTError where error == .unexpectedStatus(400) {
+        } catch let error as SupabaseRESTError where error.statusCode == 400 {
             rows = try await client.fetchRows(
                 from: "goods_inventory",
                 select: GoodsInventoryRow.legacySelect,
@@ -83,7 +83,7 @@ public final class SupabaseGoodsInventoryClient: @unchecked Sendable {
                     availability: .marketAvailableQuantity
                 )
             )
-        } catch let error as SupabaseRESTError where error == .unexpectedStatus(400) {
+        } catch let error as SupabaseRESTError where error.statusCode == 400 {
             rows = try await client.fetchRows(
                 from: "goods_inventory",
                 select: GoodsInventoryRow.legacySelect,

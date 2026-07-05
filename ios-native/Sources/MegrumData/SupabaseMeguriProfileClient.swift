@@ -55,9 +55,9 @@ public final class SupabaseMeguriProfileClient: @unchecked Sendable {
                 throw SupabaseMeguriProfileClientError.malformedResponse
             }
             return profile
-        } catch let error as SupabaseRESTError where error == .unexpectedStatus(409) {
+        } catch let error as SupabaseRESTError where error.statusCode == 409 {
             throw SupabaseMeguriProfileClientError.duplicatedDisplayName
-        } catch let error as SupabaseRESTError where error == .unexpectedStatus(400) {
+        } catch let error as SupabaseRESTError where error.statusCode == 400 {
             throw SupabaseMeguriProfileClientError.changeLocked
         }
     }
@@ -88,9 +88,9 @@ public final class SupabaseMeguriProfileClient: @unchecked Sendable {
                 throw SupabaseMeguriProfileClientError.malformedResponse
             }
             return profile
-        } catch let error as SupabaseRESTError where error == .unexpectedStatus(409) {
+        } catch let error as SupabaseRESTError where error.statusCode == 409 {
             throw SupabaseMeguriProfileClientError.duplicatedDisplayName
-        } catch let error as SupabaseRESTError where error == .unexpectedStatus(400) {
+        } catch let error as SupabaseRESTError where error.statusCode == 400 {
             throw SupabaseMeguriProfileClientError.changeLocked
         }
     }

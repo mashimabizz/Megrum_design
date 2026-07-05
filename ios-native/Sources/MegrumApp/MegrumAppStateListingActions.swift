@@ -1,5 +1,6 @@
 import Foundation
 import MegrumCore
+import MegrumData
 
 @MainActor
 extension MegrumAppState {
@@ -51,7 +52,7 @@ extension MegrumAppState {
             return created
         } catch {
             MegrumAppLogger.general.error("Individual listing create failed: \(String(describing: error), privacy: .public)")
-            errorMessage = "個別募集を作成できませんでした"
+            errorMessage = (error as? SupabaseRESTError)?.serverMessage ?? "個別募集を作成できませんでした"
             isCreatingIndividualListing = false
             return nil
         }
@@ -88,7 +89,7 @@ extension MegrumAppState {
             return updated
         } catch {
             MegrumAppLogger.general.error("Individual listing update failed: \(String(describing: error), privacy: .public)")
-            errorMessage = "個別募集を更新できませんでした"
+            errorMessage = (error as? SupabaseRESTError)?.serverMessage ?? "個別募集を更新できませんでした"
             updatingIndividualListingID = nil
             return nil
         }

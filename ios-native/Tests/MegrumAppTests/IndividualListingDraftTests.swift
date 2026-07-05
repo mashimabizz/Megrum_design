@@ -215,8 +215,13 @@ final class IndividualListingDraftTests: XCTestCase {
         XCTAssertEqual(IndividualListingListPresentation.handoffMethodTitle(for: .local), "現地交換")
         XCTAssertEqual(IndividualListingListPresentation.handoffMethodTitle(for: .mail), "郵送交換")
         XCTAssertEqual(IndividualListingListPresentation.handoffMethodTitle(for: .both), "現地交換・郵送OK")
+        // 選択肢は最大5件まで常に個別表示（一覧側でまとめない）。
         XCTAssertFalse(IndividualListingListPresentation.usesCollapsedOptionSummary(optionCount: 2))
-        XCTAssertTrue(IndividualListingListPresentation.usesCollapsedOptionSummary(optionCount: 3))
+        XCTAssertFalse(IndividualListingListPresentation.usesCollapsedOptionSummary(optionCount: 3))
+        XCTAssertFalse(IndividualListingListPresentation.usesCollapsedOptionSummary(optionCount: 5))
+        // 選択肢内のグッズは3枚以上でまとめ表示。
+        XCTAssertFalse(IndividualListingListPresentation.usesCollapsedGoodsSummary(goodsCount: 2))
+        XCTAssertTrue(IndividualListingListPresentation.usesCollapsedGoodsSummary(goodsCount: 3))
 
         let listingID = UUID()
         let singleGoodsOption = IndividualListingWishOption(

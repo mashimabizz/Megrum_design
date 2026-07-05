@@ -72,7 +72,7 @@ extension SupabaseProposalClient {
                 select: EvidencePhotoRow.select,
                 queryItems: queryItems
             )
-        } catch let error as SupabaseRESTError where error == .unexpectedStatus(400) {
+        } catch let error as SupabaseRESTError where error.statusCode == 400 {
             rows = try await client.fetchRows(
                 from: "proposal_evidence_photos",
                 select: EvidencePhotoRow.legacySelect,
@@ -161,7 +161,7 @@ extension SupabaseProposalClient {
                 ],
                 select: "id"
             )
-        } catch let error as SupabaseRESTError where error == .unexpectedStatus(400) {
+        } catch let error as SupabaseRESTError where error.statusCode == 400 {
             let _: [EvidencePhotoAckRow] = try await client.insertRows(
                 into: "proposal_evidence_photos",
                 values: [
@@ -212,7 +212,7 @@ extension SupabaseProposalClient {
                 throw SupabaseProposalClientError.malformedResponse
             }
             return updated
-        } catch let error as SupabaseRESTError where error == .unexpectedStatus(400) {
+        } catch let error as SupabaseRESTError where error.statusCode == 400 {
             var fallback = proposal
             if fallback.evidencePhotoURL == nil {
                 fallback.evidencePhotoURL = signedURL

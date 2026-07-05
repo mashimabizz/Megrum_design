@@ -34,7 +34,7 @@ public final class SupabaseRESTClient: @unchecked Sendable {
             throw SupabaseRESTError.unexpectedStatus(-1)
         }
         guard (200..<300).contains(httpResponse.statusCode) else {
-            throw SupabaseRESTError.unexpectedStatus(httpResponse.statusCode)
+            throw SupabaseRESTError.from(status: httpResponse.statusCode, data: data)
         }
         return try decoder.decode([Row].self, from: data)
     }
@@ -57,7 +57,7 @@ public final class SupabaseRESTClient: @unchecked Sendable {
             throw SupabaseRESTError.unexpectedStatus(-1)
         }
         guard (200..<300).contains(httpResponse.statusCode) else {
-            throw SupabaseRESTError.unexpectedStatus(httpResponse.statusCode)
+            throw SupabaseRESTError.from(status: httpResponse.statusCode, data: data)
         }
         return try decoder.decode([Row].self, from: data)
     }
@@ -73,7 +73,7 @@ public final class SupabaseRESTClient: @unchecked Sendable {
             throw SupabaseRESTError.unexpectedStatus(-1)
         }
         guard (200..<300).contains(httpResponse.statusCode) else {
-            throw SupabaseRESTError.unexpectedStatus(httpResponse.statusCode)
+            throw SupabaseRESTError.from(status: httpResponse.statusCode, data: data)
         }
         return try decoder.decode([Row].self, from: data)
     }
@@ -96,7 +96,7 @@ public final class SupabaseRESTClient: @unchecked Sendable {
             throw SupabaseRESTError.unexpectedStatus(-1)
         }
         guard (200..<300).contains(httpResponse.statusCode) else {
-            throw SupabaseRESTError.unexpectedStatus(httpResponse.statusCode)
+            throw SupabaseRESTError.from(status: httpResponse.statusCode, data: data)
         }
         return try decoder.decode([Row].self, from: data)
     }
@@ -111,7 +111,7 @@ public final class SupabaseRESTClient: @unchecked Sendable {
             throw SupabaseRESTError.unexpectedStatus(-1)
         }
         guard (200..<300).contains(httpResponse.statusCode) else {
-            throw SupabaseRESTError.unexpectedStatus(httpResponse.statusCode)
+            throw SupabaseRESTError.from(status: httpResponse.statusCode, data: data)
         }
         return try decoder.decode([Row].self, from: data)
     }
@@ -126,7 +126,7 @@ public final class SupabaseRESTClient: @unchecked Sendable {
             throw SupabaseRESTError.unexpectedStatus(-1)
         }
         guard (200..<300).contains(httpResponse.statusCode) else {
-            throw SupabaseRESTError.unexpectedStatus(httpResponse.statusCode)
+            throw SupabaseRESTError.from(status: httpResponse.statusCode, data: data)
         }
         return try decoder.decode(Value.self, from: data)
     }
@@ -136,12 +136,12 @@ public final class SupabaseRESTClient: @unchecked Sendable {
         payload: Payload
     ) async throws {
         let request = try makeRPCRequest(function: name, payload: payload)
-        let (_, response) = try await session.data(for: request)
+        let (data, response) = try await session.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse else {
             throw SupabaseRESTError.unexpectedStatus(-1)
         }
         guard (200..<300).contains(httpResponse.statusCode) else {
-            throw SupabaseRESTError.unexpectedStatus(httpResponse.statusCode)
+            throw SupabaseRESTError.from(status: httpResponse.statusCode, data: data)
         }
     }
 
@@ -155,7 +155,7 @@ public final class SupabaseRESTClient: @unchecked Sendable {
             throw SupabaseRESTError.unexpectedStatus(-1)
         }
         guard (200..<300).contains(httpResponse.statusCode) else {
-            throw SupabaseRESTError.unexpectedStatus(httpResponse.statusCode)
+            throw SupabaseRESTError.from(status: httpResponse.statusCode, data: data)
         }
         return try decoder.decode(Value.self, from: data)
     }
@@ -171,12 +171,12 @@ public final class SupabaseRESTClient: @unchecked Sendable {
             body: nil,
             prefer: "return=minimal"
         )
-        let (_, response) = try await session.data(for: request)
+        let (data, response) = try await session.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse else {
             throw SupabaseRESTError.unexpectedStatus(-1)
         }
         guard (200..<300).contains(httpResponse.statusCode) else {
-            throw SupabaseRESTError.unexpectedStatus(httpResponse.statusCode)
+            throw SupabaseRESTError.from(status: httpResponse.statusCode, data: data)
         }
     }
 
@@ -196,12 +196,12 @@ public final class SupabaseRESTClient: @unchecked Sendable {
             cacheControl: cacheControl,
             upsert: upsert
         )
-        let (_, response) = try await session.data(for: request)
+        let (data, response) = try await session.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse else {
             throw SupabaseRESTError.unexpectedStatus(-1)
         }
         guard (200..<300).contains(httpResponse.statusCode) else {
-            throw SupabaseRESTError.unexpectedStatus(httpResponse.statusCode)
+            throw SupabaseRESTError.from(status: httpResponse.statusCode, data: data)
         }
     }
 
@@ -212,7 +212,7 @@ public final class SupabaseRESTClient: @unchecked Sendable {
             throw SupabaseRESTError.unexpectedStatus(-1)
         }
         guard (200..<300).contains(httpResponse.statusCode) else {
-            throw SupabaseRESTError.unexpectedStatus(httpResponse.statusCode)
+            throw SupabaseRESTError.from(status: httpResponse.statusCode, data: data)
         }
 
         let signed = try decoder.decode(StorageSignedURLResponse.self, from: data).signedURL
