@@ -154,23 +154,24 @@ private struct HomeDemandFirstRow: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: 14) {
-            HomeDiscoveryRotaryCard(
-                goods: cardGoods,
-                goodsCondition: .direct,
-                exchangeCondition: .exact,
-                paymentCondition: .exact,
-                showsConditionOverlay: false
-            )
-            .frame(width: 142, height: 112)
-
-            VStack(alignment: .leading, spacing: 5) {
+            VStack(alignment: .leading, spacing: 6) {
                 Text(label)
                     .font(.system(size: 12, weight: .regular))
                     .foregroundStyle(MegrumTheme.ink.opacity(0.82))
                     .lineLimit(1)
 
+                HomeDiscoveryRotaryCard(
+                    goods: cardGoods,
+                    goodsCondition: .direct,
+                    exchangeCondition: .exact,
+                    paymentCondition: .exact,
+                    showsConditionOverlay: false
+                )
+                .frame(width: 142, height: 112)
+            }
+
+            VStack(alignment: .leading, spacing: 5) {
                 partnerLine
-                    .padding(.top, 3)
 
                 demandLine
 
@@ -201,7 +202,7 @@ private struct HomeDemandFirstRow: View {
                 .shadow(color: MegrumTheme.ink.opacity(0.14), radius: 3, y: 1)
 
             Text(partnerName)
-                .font(.system(size: 12.5, weight: .heavy, design: .rounded))
+                .font(.system(size: 12.5, weight: .regular, design: .rounded))
                 .foregroundStyle(MegrumTheme.ink.opacity(0.86))
                 .lineLimit(1)
         }
