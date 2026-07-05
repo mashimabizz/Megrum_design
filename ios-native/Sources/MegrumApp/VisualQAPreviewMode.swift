@@ -35,6 +35,7 @@ enum VisualQAInitialScreen: String, Equatable {
     case publicProfile = "public-profile"
     case inventory
     case wish
+    case homeDemandFirst = "home-demand-first"
 
     var isAuthRoute: Bool {
         switch self {

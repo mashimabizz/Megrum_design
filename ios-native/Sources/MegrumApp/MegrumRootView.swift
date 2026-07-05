@@ -52,7 +52,9 @@ public struct MegrumRootView: View {
 
     public var body: some View {
         Group {
-            if AccountSetupSessionPolicy.shouldShowAuthScreen(
+            if visualQAInitialScreen == .homeDemandFirst {
+                HomeDemandFirstPreview()
+            } else if AccountSetupSessionPolicy.shouldShowAuthScreen(
                 isAuthenticated: authState.isAuthenticated,
                 isReturningStoredIncompleteAccountToLogin: isReturningStoredIncompleteAccountToLogin
             ) {
