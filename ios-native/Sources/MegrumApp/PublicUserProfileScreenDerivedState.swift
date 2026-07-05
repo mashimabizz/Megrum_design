@@ -68,7 +68,7 @@ extension PublicUserProfileScreen {
 
     func publicProfileOshiTags(_ publicProfile: PublicUserProfile) -> [ProfileVisualTagItem] {
         publicProfile.oshiTags.map { tag in
-            ProfileVisualTagItem(title: tag.title, colorKey: tag.colorKey)
+            ProfileVisualTagItem(title: tag.title, colorKey: tag.colorKey, kind: tag.characterID == nil ? .group : .member)
         }
     }
 

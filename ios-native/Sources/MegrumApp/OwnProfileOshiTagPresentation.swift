@@ -17,7 +17,8 @@ enum OwnProfileOshiTagPresentation {
         return tags.map { tag in
             ProfileVisualTagItem(
                 title: tag.title,
-                colorKey: tag.colorKey
+                colorKey: tag.colorKey,
+                kind: tag.characterID == nil ? .group : .member
             )
         }
     }

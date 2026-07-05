@@ -63,9 +63,17 @@ struct ProfileVisualGridItem: Identifiable, Hashable {
     }
 }
 
+/// 推しタグの階層。L1（グループ/作品）＝指名ありトーン、L2（メンバー/キャラ）＝wish一致トーン。
+enum ProfileVisualTagKind: Hashable {
+    case plain
+    case group
+    case member
+}
+
 struct ProfileVisualTagItem: Identifiable, Hashable {
     var title: String
     var colorKey: String
+    var kind: ProfileVisualTagKind = .plain
 
     var id: String {
         "\(colorKey):\(title)"

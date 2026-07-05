@@ -48,7 +48,7 @@ struct IndividualListingWishTab: View {
     var goodsTypes: [GoodsType]
     var onToggle: (WishItem) -> Void
 
-    private let columns = Array(repeating: GridItem(.flexible(), spacing: 12), count: 3)
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: 10), count: 4)
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {

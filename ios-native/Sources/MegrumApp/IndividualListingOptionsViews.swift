@@ -11,6 +11,7 @@ struct IndividualListingOptionsStep: View {
     @Binding var wishFilter: IndividualListingSelectionFilter
     var genres: [OshiGenre]
     var groups: [OshiGroup]
+    var myOshiGroupIDs: Set<UUID> = []
     var characters: [OshiCharacter]
     var goodsTypes: [GoodsType]
     @Binding var selectedConditionGroupID: UUID?
@@ -74,6 +75,7 @@ struct IndividualListingOptionsStep: View {
                 groups: groups,
                 selectedGroupIDs: selectedConditionGroupID.map { Set([$0]) } ?? [],
                 charactersByGroupID: selectedConditionGroupID.map { [$0: characters] } ?? [:],
+                myOshiGroupIDs: myOshiGroupIDs,
                 onClose: { showsOshiMasterSheet = false },
                 onRequest: { query in
                     showsOshiMasterSheet = false

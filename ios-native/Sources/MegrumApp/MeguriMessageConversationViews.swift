@@ -45,9 +45,11 @@ struct MeguriMessageList: View {
                 .padding(.top, 18)
                 .padding(.bottom, 8)
                 .frame(maxWidth: .infinity)
+                // メッセージが少ないうちは1通目が一番上に来るよう常に上寄せ。
+                // 画面を超える量になったら onChange の scrollTo で最新が見える。
                 .frame(
                     minHeight: proxy.size.height,
-                    alignment: messages.isEmpty || isLoading ? .top : .bottom
+                    alignment: .top
                 )
             }
         }

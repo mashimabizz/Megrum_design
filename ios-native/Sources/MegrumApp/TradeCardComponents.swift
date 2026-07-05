@@ -49,7 +49,11 @@ struct TradeCardHeader: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: 6) {
-            TradePartnerAvatar(initial: presentation.partnerInitial, readState: presentation.readState)
+            TradePartnerAvatar(
+                initial: presentation.partnerInitial,
+                avatarURL: presentation.partnerAvatarURL,
+                readState: presentation.readState
+            )
 
             Text("@\(presentation.partnerHandle)")
                 .font(.system(size: 12.5, weight: presentation.readState.handleWeight, design: .rounded))
@@ -121,18 +125,36 @@ private struct TradeUnreadBadge: View {
 
 struct TradePartnerAvatar: View {
     var initial: String
+    var avatarURL: URL? = nil
     var readState: TradeCardReadState
 
     var body: some View {
+        Group {
+            if let avatarURL {
+                AsyncImage(url: avatarURL) { phase in
+                    if case .success(let image) = phase {
+                        image.resizable().scaledToFill()
+                    } else {
+                        placeholder
+                    }
+                }
+            } else {
+                placeholder
+            }
+        }
+        .frame(width: 22, height: 22)
+        .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+        .accessibilityHidden(true)
+    }
+
+    private var placeholder: some View {
         RoundedRectangle(cornerRadius: 9, style: .continuous)
             .fill(MegrumTheme.lavender.opacity(readState == .unopened ? 0.14 : 0.09))
-            .frame(width: 22, height: 22)
             .overlay {
                 Text(initial)
                     .font(.system(size: 10.5, weight: .black, design: .rounded))
                     .foregroundStyle(MegrumTheme.lavender.opacity(readState == .waitingForReply ? 0.62 : 0.92))
             }
-            .accessibilityHidden(true)
     }
 }
 

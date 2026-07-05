@@ -11,6 +11,7 @@ struct IndividualListingEditorSheet: View {
     @Environment(\.dismiss) var dismiss
     @State var draft: IndividualListingDraft
     @State var presentationState: IndividualListingEditorPresentationState
+    @State var showsAddOptionPrompt = false
 
     init(
         appState: MegrumAppState,
@@ -92,6 +93,7 @@ struct IndividualListingEditorSheet: View {
             inventory: appState.inventory,
             wishes: appState.wishes,
             genres: appState.oshiGenres,
+            myOshiGroupIDs: Set(appState.userOshiSelections.compactMap(\.groupID)),
             groups: appState.oshiGroups,
             characters: appState.oshiCharacters,
             goodsTypes: appState.goodsTypes,
@@ -130,6 +132,19 @@ struct IndividualListingEditorSheet: View {
                 onAddOption: addCurrentOption,
                 onPrimary: primaryAction
             )
+        }
+        .alert("選択肢に追加しますか？", isPresented: $showsAddOptionPrompt) {
+            Button("追加して進む") {
+                addCurrentOption()
+                proceedToExchangeStep()
+            }
+            Button("追加せずに進む", role: .destructive) {
+                clearCurrentOption()
+                proceedToExchangeStep()
+            }
+            Button("キャンセル", role: .cancel) {}
+        } message: {
+            Text("いま選択中のほしいものを、この募集の選択肢として追加できます。")
         }
         .overlay(alignment: .bottom) {
             if let optionToastMessage = presentationState.optionToastMessage {

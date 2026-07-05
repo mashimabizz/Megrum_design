@@ -138,6 +138,11 @@ struct WishCollectionScreen: View {
                     showsHeader: false,
                     onScrollContentTopChange: { contentTop in
                         handleSectionScrollContentTop(contentTop, section: .listings)
+                    },
+                    onSwipeBackFromFirst: {
+                        withAnimation(.smooth(duration: 0.24)) {
+                            presentationState.selectedSection = .wishes
+                        }
                     }
                 )
             } else {

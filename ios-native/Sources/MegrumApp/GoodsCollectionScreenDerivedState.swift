@@ -3,7 +3,12 @@ import SwiftUI
 
 extension GoodsCollectionScreen {
     var activeFilter: GoodsCollectionFilter {
-        GoodsCollectionFilter(groupID: selectedGroupID, goodsTypeID: selectedGoodsTypeID, tagNames: selectedTagNames)
+        GoodsCollectionFilter(
+            groupID: selectedGroupID,
+            memberID: selectedMemberID,
+            goodsTypeID: selectedGoodsTypeID,
+            tagNames: selectedTagNames
+        )
     }
 
     func statusFilteredItems(for inventoryStatus: GoodsEntryStatus? = nil) -> [GoodsItem] {

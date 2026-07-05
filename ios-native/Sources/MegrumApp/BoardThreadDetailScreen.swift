@@ -19,6 +19,8 @@ struct BoardThreadDetailScreen: View {
     @State private var replyComposerState = BoardThreadReplyComposerState()
     @State private var photoPresentationState = MeguriMessagePhotoPresentationState()
     @State private var isShowingReportConfirmation = false
+    @State private var showsJoinIdentitySheet = false
+    @State private var pendingReplyAfterJoin: (() -> Void)?
 
     private var currentThread: BoardThread {
         appState.threads.first { $0.id == thread.id } ?? thread
@@ -55,7 +57,6 @@ struct BoardThreadDetailScreen: View {
             replies: replies,
             viewer: appState.viewer,
             profilesByUserID: appState.publicProfilesByUserID,
-            meguriProfilesByUserID: appState.meguriProfilesByUserID,
             grooms: appState.grooms
         )
         .makePresentation()
@@ -137,6 +138,28 @@ struct BoardThreadDetailScreen: View {
             .onChange(of: photoPresentationState.selectedPhotoItem) { _, item in
                 handleSelectedPhoto(item, proxy: proxy)
             }
+            .sheet(isPresented: $showsJoinIdentitySheet) {
+                BoardRoomJoinIdentitySheet(
+                    onConfirm: { name, avatarID in
+                        if let viewerID = appState.viewer?.id {
+                            MeguriRoomIdentityStore.save(
+                                MeguriRoomIdentityStore.Identity(displayName: name, avatarID: avatarID),
+                                threadID: currentThread.id,
+                                userID: viewerID
+                            )
+                        }
+                        showsJoinIdentitySheet = false
+                        pendingReplyAfterJoin?()
+                        pendingReplyAfterJoin = nil
+                    },
+                    onCancel: {
+                        showsJoinIdentitySheet = false
+                        pendingReplyAfterJoin = nil
+                    }
+                )
+                .presentationDetents([.medium])
+                .presentationDragIndicator(.visible)
+            }
             .boardThreadDetailNavigationChromeHidden()
             .confirmationDialog("このチャットルームを通報しますか？", isPresented: $isShowingReportConfirmation, titleVisibility: .visible) {
                 Button("通報する", role: .destructive) {
@@ -162,7 +185,6 @@ struct BoardThreadDetailScreen: View {
                     scope: replyContextScope
                 )
                 await preloadParticipantProfiles()
-                await preloadParticipantMeguriProfiles()
                 await MainActor.run {
                     scrollToLatest(proxy, animated: false)
                 }
@@ -201,11 +223,29 @@ struct BoardThreadDetailScreen: View {
         }
     }
 
-    private func preloadParticipantMeguriProfiles() async {
-        await appState.loadMeguriProfiles(
-            userIDs: Set(([currentThread.authorID] + replies.map(\.authorID))),
-            reportsFailure: false
-        )
+    /// この部屋での自分の名前・アイコン。nil = 未参加（参加シートで決めてもらう）。
+    private func resolvedRoomIdentity() -> (name: String?, avatarID: String?)? {
+        guard let viewerID = appState.viewer?.id else {
+            return (nil, nil)
+        }
+        if currentThread.authorID == viewerID {
+            // 作成者はスレッド作成時に決めた名前・アイコンをそのまま使う
+            return (nil, nil)
+        }
+        if let stored = MeguriRoomIdentityStore.load(threadID: currentThread.id, userID: viewerID) {
+            return (stored.displayName, stored.avatarID)
+        }
+        if let ownIdentityReply = replies.last(where: { reply in
+            reply.authorID == viewerID
+                && (reply.anonymousDisplayName?.nilIfBlank != nil || reply.anonymousAvatarID?.nilIfBlank != nil)
+        }) {
+            return (ownIdentityReply.anonymousDisplayName, ownIdentityReply.anonymousAvatarID)
+        }
+        if replies.contains(where: { $0.authorID == viewerID }) {
+            // 過去に名前なしで参加済み（旧データ）はそのまま
+            return (nil, nil)
+        }
+        return nil
     }
 
     private func sendReply(proxy: ScrollViewProxy) {
@@ -215,6 +255,22 @@ struct BoardThreadDetailScreen: View {
             return
         }
 
+        guard let identity = resolvedRoomIdentity() else {
+            pendingReplyAfterJoin = {
+                performSendReply(body: replyBody, proxy: proxy)
+            }
+            showsJoinIdentitySheet = true
+            return
+        }
+        performSendReply(body: replyBody, identity: identity, proxy: proxy)
+    }
+
+    private func performSendReply(
+        body replyBody: String,
+        identity: (name: String?, avatarID: String?)? = nil,
+        proxy: ScrollViewProxy
+    ) {
+        let identity = identity ?? resolvedRoomIdentity() ?? (nil, nil)
         Task {
             let sent = await appState.sendBoardReply(
                 threadID: currentThread.id,
@@ -222,7 +278,9 @@ struct BoardThreadDetailScreen: View {
                 latitude: coordinate?.latitude,
                 longitude: coordinate?.longitude,
                 prefecture: selectedPrefecture,
-                scope: replyContextScope
+                scope: replyContextScope,
+                anonymousDisplayName: identity.name,
+                anonymousAvatarID: identity.avatarID
             )
             if sent {
                 await MainActor.run {
@@ -279,6 +337,27 @@ struct BoardThreadDetailScreen: View {
         guard missingReplyContextMessage == nil else {
             return
         }
+        guard let identity = resolvedRoomIdentity() else {
+            await MainActor.run {
+                pendingReplyAfterJoin = {
+                    Task {
+                        await performSendPhotoReply(data: data, imageContentType: imageContentType, proxy: proxy)
+                    }
+                }
+                showsJoinIdentitySheet = true
+            }
+            return
+        }
+        await performSendPhotoReply(data: data, imageContentType: imageContentType, identity: identity, proxy: proxy)
+    }
+
+    private func performSendPhotoReply(
+        data: Data,
+        imageContentType: String,
+        identity: (name: String?, avatarID: String?)? = nil,
+        proxy: ScrollViewProxy
+    ) async {
+        let identity = identity ?? resolvedRoomIdentity() ?? (nil, nil)
         let sent = await appState.sendBoardPhotoReply(
             threadID: currentThread.id,
             imageData: data,
@@ -286,7 +365,9 @@ struct BoardThreadDetailScreen: View {
             latitude: coordinate?.latitude,
             longitude: coordinate?.longitude,
             prefecture: selectedPrefecture,
-            scope: replyContextScope
+            scope: replyContextScope,
+            anonymousDisplayName: identity.name,
+            anonymousAvatarID: identity.avatarID
         )
         if sent {
             await MainActor.run {

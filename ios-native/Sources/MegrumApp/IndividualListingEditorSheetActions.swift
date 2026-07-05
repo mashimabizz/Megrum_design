@@ -96,14 +96,23 @@ extension IndividualListingEditorSheet {
                 presentationState.selectStep(.options)
             }
         case .options:
-            withAnimation(.smooth(duration: 0.2)) {
-                presentationState.selectStep(.exchange)
+            // ほしいものタブで未追加の選択があるまま進む場合は、選択肢への追加を確認する
+            if draft.optionKind == .wish, !draft.selectedWishIDs.isEmpty {
+                showsAddOptionPrompt = true
+                return
             }
+            proceedToExchangeStep()
         case .exchange:
             draft.includesExchangeConditionSummary = true
             Task {
                 await save()
             }
+        }
+    }
+
+    func proceedToExchangeStep() {
+        withAnimation(.smooth(duration: 0.2)) {
+            presentationState.selectStep(.exchange)
         }
     }
 

@@ -25,6 +25,8 @@ struct IndividualListingsContent: View {
     var onBeginSelection: (IndividualListing) -> Void
     var onToggleSelection: (IndividualListing) -> Void
     var onScrollContentTopChange: ((CGFloat) -> Void)? = nil
+    /// 1つ目の募集表示中に右スワイプした時の遷移（ほしいものタブへ戻る等）。
+    var onSwipeBackFromFirst: (() -> Void)? = nil
     @State private var selectionState = IndividualListingActiveSelectionState()
     @Environment(\.megrumPinnedTopChromeInset) private var pinnedTopChromeInset
 
@@ -75,6 +77,20 @@ struct IndividualListingsContent: View {
                             onDelete(activeListing)
                         }
                     )
+                    #if canImport(UIKit)
+                    .overlay {
+                        // 横スワイプで前後の募集に切替（1つ目からの右スワイプはほしいものタブへ）。
+                        // 縦スクロールを妨げない水平パンだけを拾う。
+                        ScrollFriendlyHorizontalPanView(
+                            isPanEnabled: listings.count > 1 || onSwipeBackFromFirst != nil,
+                            onTap: nil,
+                            onChanged: { _ in },
+                            onEnded: { _, projectedWidth in
+                                handleListingSwipe(projectedWidth: projectedWidth)
+                            }
+                        )
+                    }
+                    #endif
                 }
             }
             .padding(.horizontal, 18)
@@ -95,6 +111,28 @@ struct IndividualListingsContent: View {
             selectionState.reconcile(with: ids)
         }
     }
+
+    private func handleListingSwipe(projectedWidth: CGFloat) {
+        let threshold: CGFloat = 72
+        let currentIndex = selectionState.activeListingIndex(in: listings)
+        if projectedWidth <= -threshold {
+            guard currentIndex + 1 < listings.count else {
+                return
+            }
+            withAnimation(.smooth(duration: 0.22)) {
+                selectionState.activeListingID = listings[currentIndex + 1].id
+            }
+        } else if projectedWidth >= threshold {
+            if currentIndex > 0 {
+                withAnimation(.smooth(duration: 0.22)) {
+                    selectionState.activeListingID = listings[currentIndex - 1].id
+                }
+            } else {
+                onSwipeBackFromFirst?()
+            }
+        }
+    }
+
 }
 
 struct IndividualListingDesignCard: View {

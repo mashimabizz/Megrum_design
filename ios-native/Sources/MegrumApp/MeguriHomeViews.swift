@@ -72,11 +72,6 @@ struct MeguriHomeContent: View {
                                 action: onOpenContentFilter
                             )
                             MeguriHomeNotificationSettingsButton(action: onOpenNotificationSettings)
-                            MeguriHomeSelfProfileButton(
-                                viewer: viewer,
-                                meguriProfile: meguriProfile,
-                                action: onOpenMeguriProfile
-                            )
                         }
                         MeguriHomeMapKindCycleButton(selectedKind: $selectedMapKind)
                         Spacer()

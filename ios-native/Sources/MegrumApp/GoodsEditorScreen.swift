@@ -210,6 +210,7 @@ struct GoodsEditorSheet: View {
                     groups: appState.oshiGroups,
                     selectedGroupIDs: draft.groupID.map { Set([$0]) } ?? [],
                     charactersByGroupID: [:],
+                    myOshiGroupIDs: Set(appState.userOshiSelections.compactMap(\.groupID)),
                     onClose: { showsCreateOshiMasterSheet = false },
                     onRequest: { query in
                         showsCreateOshiMasterSheet = false

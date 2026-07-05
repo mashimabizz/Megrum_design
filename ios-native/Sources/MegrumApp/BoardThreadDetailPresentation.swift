@@ -18,8 +18,29 @@ struct BoardThreadDetailPresentationBuilder {
     var replies: [BoardReply]
     var viewer: UserProfile?
     var profilesByUserID: [UUID: PublicUserProfile]
-    var meguriProfilesByUserID: [UUID: MeguriProfile]
     var grooms: [GroomPost]
+
+    /// 部屋ごとの参加者アイデンティティ（返信の anonymous_* の最新値）。
+    private var roomIdentityByUserID: [UUID: (name: String?, avatarID: String?)] {
+        var result: [UUID: (name: String?, avatarID: String?)] = [:]
+        for reply in replies.sorted(by: { $0.createdAt < $1.createdAt }) {
+            let name = reply.anonymousDisplayName?.nilIfBlank
+            let avatarID = reply.anonymousAvatarID?.nilIfBlank
+            if name != nil || avatarID != nil {
+                let existing = result[reply.authorID]
+                result[reply.authorID] = (name ?? existing?.name, avatarID ?? existing?.avatarID)
+            }
+        }
+        return result
+    }
+
+    private func roomIdentityName(for userID: UUID) -> String? {
+        roomIdentityByUserID[userID]?.name
+    }
+
+    private func roomIdentityAvatarID(for userID: UUID) -> String? {
+        roomIdentityByUserID[userID]?.avatarID
+    }
 
     func makePresentation(now: Date = Date()) -> BoardThreadDetailPresentation {
         BoardThreadDetailPresentation(
@@ -39,7 +60,7 @@ struct BoardThreadDetailPresentationBuilder {
         if let anonymousName = thread.anonymousDisplayName, !anonymousName.isBlank {
             return anonymousName
         }
-        if let name = meguriProfilesByUserID[thread.authorID]?.displayName.nilIfBlank {
+        if let name = roomIdentityName(for: thread.authorID) {
             return name
         }
         if isThreadAuthorAnonymous {
@@ -55,14 +76,14 @@ struct BoardThreadDetailPresentationBuilder {
         if isThreadAuthorAnonymous {
             return nil
         }
-        if let meguriProfile = meguriProfilesByUserID[thread.authorID] {
-            return meguriProfile.avatarURL
+        if roomIdentityAvatarID(for: thread.authorID) != nil {
+            return nil
         }
         return profile(for: thread.authorID)?.avatarURL ?? fallbackGroomURL(index: 0)
     }
 
     private var authorAvatarID: String? {
-        thread.anonymousAvatarID?.nilIfBlank ?? meguriProfilesByUserID[thread.authorID]?.avatarID
+        thread.anonymousAvatarID?.nilIfBlank ?? roomIdentityAvatarID(for: thread.authorID)
     }
 
     private var authorInitial: String {
@@ -80,14 +101,14 @@ struct BoardThreadDetailPresentationBuilder {
             let displayName = participantDisplayName(for: id, fallbackIndex: index)
             return BoardParticipantAvatar(
                 id: id,
-                avatarID: isAuthor ? authorAvatarID : meguriProfilesByUserID[id]?.avatarID,
+                avatarID: isAuthor ? authorAvatarID : roomIdentityAvatarID(for: id),
                 avatarURL: isAuthor
                     ? avatarURL(
                         for: id,
                         fallbackIndex: index,
                         isThreadAuthorAnonymous: isThreadAuthorAnonymous
                     )
-                    : meguriProfilesByUserID[id]?.avatarURL,
+                    : nil,
                 initial: isAuthor ? authorInitial : isMine ? "あ" : displayName.first.map(String.init) ?? "話"
             )
         }
@@ -102,16 +123,17 @@ struct BoardThreadDetailPresentationBuilder {
         replies.enumerated().map { index, reply in
             let isMine = reply.authorID == viewer?.id
             let displayName = participantDisplayName(for: reply.authorID, fallbackIndex: index + 1)
+            let replyAvatarID = reply.anonymousAvatarID?.nilIfBlank ?? roomIdentityAvatarID(for: reply.authorID)
             let showsPublicAuthorAvatar = reply.authorID == thread.authorID
                 && !isThreadAuthorAnonymous
-                && meguriProfilesByUserID[reply.authorID] == nil
+                && replyAvatarID == nil
             return BoardReplyDisplay(
                 reply: reply,
                 displayName: displayName,
-                avatarID: meguriProfilesByUserID[reply.authorID]?.avatarID,
+                avatarID: replyAvatarID,
                 avatarURL: showsPublicAuthorAvatar
                     ? profile(for: reply.authorID)?.avatarURL ?? fallbackGroomURL(index: index + 1)
-                    : meguriProfilesByUserID[reply.authorID]?.avatarURL,
+                    : nil,
                 initial: displayName.first.map(String.init) ?? "話",
                 isMine: isMine,
                 relativeTime: relativeTime(from: reply.createdAt, now: now),
@@ -164,11 +186,11 @@ struct BoardThreadDetailPresentationBuilder {
         if userID == thread.authorID {
             return authorDisplayName
         }
+        if let name = roomIdentityName(for: userID) {
+            return name
+        }
         if userID == viewer?.id {
             return "あなた"
-        }
-        if let name = meguriProfilesByUserID[userID]?.displayName.nilIfBlank {
-            return name
         }
         return anonymousParticipantName(for: userID, fallbackIndex: fallbackIndex)
     }
@@ -193,8 +215,8 @@ struct BoardThreadDetailPresentationBuilder {
         if isThreadAuthorAnonymous {
             return nil
         }
-        if let meguriProfile = meguriProfilesByUserID[userID] {
-            return meguriProfile.avatarURL
+        if roomIdentityAvatarID(for: userID) != nil {
+            return nil
         }
         return profile(for: userID)?.avatarURL ?? fallbackGroomURL(index: fallbackIndex)
     }

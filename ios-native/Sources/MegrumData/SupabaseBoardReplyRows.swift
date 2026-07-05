@@ -69,6 +69,8 @@ struct BoardReplyAppendPayload: Encodable, Sendable {
     var pQuoteAuthorName: String?
     var pQuoteBody: String?
     var pImagePaths: [String]
+    var pAnonymousDisplayName: String?
+    var pAnonymousAvatarId: String?
 
     init(input: BoardReplyCreateInput) {
         let context = BoardScopeQueryContext(
@@ -87,6 +89,8 @@ struct BoardReplyAppendPayload: Encodable, Sendable {
         self.pQuoteAuthorName = nil
         self.pQuoteBody = nil
         self.pImagePaths = input.imagePaths
+        self.pAnonymousDisplayName = input.anonymousDisplayName
+        self.pAnonymousAvatarId = input.anonymousAvatarID
     }
 
     enum CodingKeys: String, CodingKey {
@@ -99,6 +103,8 @@ struct BoardReplyAppendPayload: Encodable, Sendable {
         case pParentReplyId
         case pQuoteAuthorName
         case pQuoteBody
+        case pAnonymousDisplayName
+        case pAnonymousAvatarId
         case pImagePaths
     }
 
@@ -126,6 +132,8 @@ struct BoardReplyAppendPayload: Encodable, Sendable {
         try container.encodeNil(forKey: .pQuoteAuthorName)
         try container.encodeNil(forKey: .pQuoteBody)
         try container.encode(pImagePaths, forKey: .pImagePaths)
+        try container.encode(pAnonymousDisplayName, forKey: .pAnonymousDisplayName)
+        try container.encode(pAnonymousAvatarId, forKey: .pAnonymousAvatarId)
     }
 }
 
@@ -142,6 +150,8 @@ struct BoardReplyRow: Decodable, Sendable {
     var imagePaths: [String]?
     var viewerReacted: Bool?
     var viewerReactionType: String?
+    var anonymousDisplayName: String?
+    var anonymousAvatarId: String?
 
     func reply(signedURLs: [String: URL] = [:]) -> BoardReply? {
         let status = BoardReply.Status(rawValue: status ?? "visible") ?? .visible
@@ -158,7 +168,9 @@ struct BoardReplyRow: Decodable, Sendable {
             goodReactionCount: max(0, goodReactionCount ?? reactionCount ?? 0),
             badReactionCount: max(0, badReactionCount ?? 0),
             viewerReaction: BoardMessageReaction(rawValue: viewerReactionType ?? "")
-                ?? ((viewerReacted ?? false) ? .good : nil)
+                ?? ((viewerReacted ?? false) ? .good : nil),
+            anonymousDisplayName: anonymousDisplayName,
+            anonymousAvatarID: anonymousAvatarId
         )
     }
 }

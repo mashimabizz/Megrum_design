@@ -26,6 +26,7 @@ struct OwnProfileContent: View {
     var onClose: () -> Void
     var onEdit: () -> Void
     var onOpenSchedule: () -> Void
+    var onOpenEvaluations: (() -> Void)? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: OwnProfileLayoutMetrics.contentSpacing) {
@@ -47,7 +48,8 @@ struct OwnProfileContent: View {
                     actionTitle: "プロフィールを編集",
                     showsScheduleAction: false,
                     onAction: onEdit,
-                    onScheduleAction: onOpenSchedule
+                    onScheduleAction: onOpenSchedule,
+                    onRatingTap: onOpenEvaluations
                 )
 
                 ProfileVisualTabs(selection: $selectedProfileTab)

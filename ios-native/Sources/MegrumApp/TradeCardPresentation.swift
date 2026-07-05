@@ -4,6 +4,7 @@ import MegrumCore
 struct TradeCardPresentation: Equatable {
     var partnerHandle: String
     var partnerInitial: String
+    var partnerAvatarURL: URL?
     var partnerRatingText: String?
     var partnerDemographicText: String?
     var updatedText: String
@@ -30,6 +31,7 @@ struct TradeCardPresentation: Equatable {
             ?? Self.fallbackHandle(for: partnerID)
         self.partnerHandle = handle
         self.partnerInitial = String(handle.prefix(1)).uppercased()
+        self.partnerAvatarURL = partnerProfile?.profile.avatarURL
         self.partnerRatingText = Self.ratingText(for: partnerProfile)
         self.partnerDemographicText = Self.demographicText(for: partnerProfile?.profile)
         let activityAt = lastActivityAt ?? proposal.updatedAt ?? proposal.createdAt
@@ -69,7 +71,7 @@ struct TradeCardPresentation: Equatable {
             return nil
         }
         guard let averageStars = profile.averageStars else {
-            return profile.evaluationCount > 0 ? "評価\(profile.evaluationCount)件" : "評価なし"
+            return "★ -（\(profile.evaluationCount)件）"
         }
         return String(format: "★ %.1f（%d件）", averageStars, profile.evaluationCount)
     }

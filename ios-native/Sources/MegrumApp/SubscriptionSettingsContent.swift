@@ -2,6 +2,8 @@ import MegrumCore
 import MegrumDesign
 import SwiftUI
 
+/// Megrumプレミアム案内（iter1226.296 リッチ化）。
+/// グラデヒーロー＋無料プランとの○×比較表＋期間プラン選択（1/2/3/6/12ヶ月）。
 struct SubscriptionSettingsContent: View {
     var state: UserSubscriptionState
     var isLoading: Bool
@@ -11,73 +13,139 @@ struct SubscriptionSettingsContent: View {
     var purchaseMessage: String?
     var purchaseErrorMessage: String?
     var isPurchaseEnabled: Bool
+    @Binding var selectedPlanID: String
     var onPurchase: () -> Void
     var onRestore: () -> Void
     var onReload: () -> Void
     var onToggleDebugPlan: (() -> Void)? = nil
 
+    private var selectedPlan: SubscriptionPremiumPlan {
+        SubscriptionPremiumPlanCatalog.plan(for: selectedPlanID)
+    }
+
     var body: some View {
-        List {
-            Section {
-                MegrumPlusHeroRow(
-                    isActive: state.isMegrumPlusActive,
-                    priceText: offer.priceText,
-                    isLoadingOffer: isLoadingOffer
+        ScrollView {
+            VStack(alignment: .leading, spacing: 22) {
+                SubscriptionPremiumHero(isActive: state.isMegrumPlusActive)
+
+                SubscriptionComparisonTable()
+
+                SubscriptionPlanPicker(
+                    selectedPlanID: $selectedPlanID,
+                    monthlyOfferPriceText: isLoadingOffer ? nil : offer.priceText,
+                    isPurchaseEnabled: isPurchaseEnabled
                 )
+
+                statusAndMessages
+
+                purchaseButtons
+
+                debugPlanSection
             }
+            .padding(.horizontal, 20)
+            .padding(.top, 14)
+            .padding(.bottom, 40)
+        }
+        .background(MegrumTheme.canvas.ignoresSafeArea())
+    }
 
-            debugPlanSection
-
-            Section {
-                ForEach(MegrumPlusBenefitItem.defaultItems) { item in
-                    MegrumPlusBenefitRow(item: item)
-                }
-            } header: {
-                Text("できること")
-            } footer: {
-                Text("無料プランでは個別募集は3件まで、グルームアーカイブは10件まで保存表示できます。めぐり内でのメッセージのやり取りと県外掲示板の閲覧には\(SubscriptionCatalog.currentPremiumDisplayName)が必要です。")
-            }
-
-            Section {
-                SubscriptionStatusRow(state: state, isLoading: isLoading)
-                if let purchaseMessage {
-                    Label(purchaseMessage, systemImage: "checkmark.circle.fill")
-                        .foregroundStyle(MegrumTheme.ok)
-                }
-                if let purchaseErrorMessage {
-                    Label(purchaseErrorMessage, systemImage: "exclamationmark.triangle.fill")
-                        .foregroundStyle(MegrumTheme.conditionPossible)
-                }
-            } header: {
-                Text("現在の状態")
-            }
-
-            Section {
-                if isPurchaseEnabled {
-                    Button(action: onPurchase) {
-                        Label(primaryButtonTitle, systemImage: "sparkles")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .disabled(state.isMegrumPlusActive || isPurchasing)
-                    #if os(iOS)
-                    .buttonStyle(.borderedProminent)
-                    #endif
-
-                    Button(action: onRestore) {
-                        Label("購入を復元", systemImage: "arrow.clockwise")
-                    }
-                    .disabled(isPurchasing)
+    private var statusAndMessages: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Label(
+                    state.isMegrumPlusActive ? SubscriptionCatalog.currentPremiumDisplayName : "現在は無料プラン",
+                    systemImage: state.isMegrumPlusActive ? "checkmark.seal.fill" : "person.crop.circle"
+                )
+                .font(.system(size: 14, weight: .heavy, design: .rounded))
+                .foregroundStyle(MegrumTheme.ink)
+                Spacer()
+                if isLoading {
+                    ProgressView()
+                        .controlSize(.small)
                 } else {
-                    Label("購入機能は公開準備中です", systemImage: "lock.fill")
-                        .foregroundStyle(MegrumTheme.muted)
+                    Text(state.isMegrumPlusActive ? "有効" : "未加入")
+                        .font(.system(size: 12, weight: .black, design: .rounded))
+                        .foregroundStyle(state.isMegrumPlusActive ? MegrumTheme.ok : MegrumTheme.muted)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(
+                            (state.isMegrumPlusActive ? MegrumTheme.ok : MegrumTheme.muted).opacity(0.12),
+                            in: Capsule()
+                        )
                 }
+            }
+
+            if let purchaseMessage {
+                Label(purchaseMessage, systemImage: "checkmark.circle.fill")
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .foregroundStyle(MegrumTheme.ok)
+            }
+            if let purchaseErrorMessage {
+                Label(purchaseErrorMessage, systemImage: "exclamationmark.triangle.fill")
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .foregroundStyle(MegrumTheme.conditionPossible)
+            }
+        }
+        .padding(14)
+        .background(.white.opacity(0.9), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+
+    private var purchaseButtons: some View {
+        VStack(spacing: 12) {
+            if isPurchaseEnabled {
+                Button(action: onPurchase) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 16, weight: .black))
+                        Text(primaryButtonTitle)
+                            .font(.system(size: 17, weight: .black, design: .rounded))
+                    }
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 56)
+                    .background(
+                        LinearGradient(
+                            colors: [MegrumTheme.sky, MegrumTheme.lavender, MegrumTheme.pink],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    )
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .strokeBorder(.white.opacity(0.4), lineWidth: 1)
+                    }
+                    .shadow(color: MegrumTheme.lavender.opacity(0.3), radius: 14, y: 7)
+                }
+                .buttonStyle(.plain)
+                .disabled(state.isMegrumPlusActive || isPurchasing)
+                .opacity(state.isMegrumPlusActive || isPurchasing ? 0.6 : 1)
+
+                HStack(spacing: 18) {
+                    Button("購入を復元", action: onRestore)
+                        .disabled(isPurchasing)
+                    Button("状態を更新", action: onReload)
+                        .disabled(isLoading || isPurchasing)
+                }
+                .font(.system(size: 13.5, weight: .heavy, design: .rounded))
+                .foregroundStyle(MegrumTheme.lavender)
+                .frame(maxWidth: .infinity)
+            } else {
+                Label("購入機能は公開準備中です", systemImage: "lock.fill")
+                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .foregroundStyle(MegrumTheme.muted)
+                    .frame(maxWidth: .infinity)
 
                 Button("状態を更新", action: onReload)
+                    .font(.system(size: 13.5, weight: .heavy, design: .rounded))
+                    .foregroundStyle(MegrumTheme.lavender)
                     .disabled(isLoading || isPurchasing)
-            } footer: {
-                Text(purchaseFooterText)
             }
 
+            Text(purchaseFooterText)
+                .font(.system(size: 11.5, weight: .semibold, design: .rounded))
+                .foregroundStyle(MegrumTheme.muted)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
@@ -85,19 +153,11 @@ struct SubscriptionSettingsContent: View {
     private var debugPlanSection: some View {
         #if DEBUG
         if let onToggleDebugPlan {
-            Section {
-                DebugPlanToggleButton(
-                    title: debugPlanButtonTitle,
-                    isActive: state.isMegrumPlusActive,
-                    action: onToggleDebugPlan
-                )
-                .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
-                .listRowBackground(Color.clear)
-            } header: {
-                Text("開発用")
-            } footer: {
-                Text("DEBUGビルドだけに表示される確認用の切り替えです。")
-            }
+            DebugPlanToggleButton(
+                title: debugPlanButtonTitle,
+                isActive: state.isMegrumPlusActive,
+                action: onToggleDebugPlan
+            )
         }
         #endif
     }
@@ -106,18 +166,15 @@ struct SubscriptionSettingsContent: View {
         if state.isMegrumPlusActive {
             return "利用中"
         }
-        if !isPurchaseEnabled {
-            return "準備中"
-        }
         if isPurchasing {
             return "確認中"
         }
-        return "\(offer.priceText)で始める"
+        return "\(selectedPlan.title)プランで始める"
     }
 
     private var purchaseFooterText: String {
         if isPurchaseEnabled {
-            return "価格は月額500円です。App Storeのサブスクリプションとして更新・解約できます。"
+            return "App Storeのサブスクリプションとして自動更新されます。いつでも解約できます。"
         }
         return "購入と復元は、公開準備が整うまで停止しています。"
     }
@@ -129,136 +186,221 @@ struct SubscriptionSettingsContent: View {
     }
 }
 
-private struct MegrumPlusHeroRow: View {
+/// ヒーロー：ブランドグラデの案内カード。
+private struct SubscriptionPremiumHero: View {
     var isActive: Bool
-    var priceText: String
-    var isLoadingOffer: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .top, spacing: 12) {
-                Image(systemName: "sparkles.rectangle.stack.fill")
-                    .font(.system(size: 34, weight: .bold))
-                    .foregroundStyle(MegrumTheme.lavender)
-                    .frame(width: 52, height: 52)
-                    .background(MegrumTheme.lavender.opacity(0.13), in: RoundedRectangle(cornerRadius: 16))
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 10) {
+                Image(systemName: "crown.fill")
+                    .font(.system(size: 26, weight: .black))
+                    .foregroundStyle(.white)
+                    .frame(width: 50, height: 50)
+                    .background(.white.opacity(0.22), in: RoundedRectangle(cornerRadius: 15, style: .continuous))
 
-                VStack(alignment: .leading, spacing: 5) {
+                VStack(alignment: .leading, spacing: 2) {
                     Text(SubscriptionCatalog.currentPremiumDisplayName)
-                        .font(.title3.bold())
-                        .foregroundStyle(MegrumTheme.ink)
-                    Text("交換相手に見つけてもらいやすく、めぐりの会話と保存を広げます。")
-                        .font(.subheadline)
-                        .foregroundStyle(MegrumTheme.muted)
+                        .font(.system(size: 22, weight: .black, design: .rounded))
+                        .foregroundStyle(.white)
+                    Text("推し活の交換を、もっと速く・もっと広く")
+                        .font(.system(size: 13, weight: .heavy, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.9))
                 }
             }
 
-            HStack {
-                Text(isLoadingOffer ? "価格確認中" : priceText)
-                    .font(.headline.bold())
-                    .foregroundStyle(MegrumTheme.lavender)
+            HStack(spacing: 6) {
+                ForEach(["上位表示", "募集無制限", "めぐり解放"], id: \.self) { chip in
+                    Text(chip)
+                        .font(.system(size: 11.5, weight: .black, design: .rounded))
+                        .foregroundStyle(MegrumTheme.lavender)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(.white.opacity(0.94), in: Capsule())
+                }
                 Spacer()
-                Text(isActive ? "有効" : "未加入")
-                    .font(.caption.bold())
-                    .foregroundStyle(isActive ? MegrumTheme.ok : MegrumTheme.muted)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background((isActive ? MegrumTheme.ok : MegrumTheme.muted).opacity(0.12), in: Capsule())
+                if isActive {
+                    Label("利用中", systemImage: "checkmark.seal.fill")
+                        .font(.system(size: 12, weight: .black, design: .rounded))
+                        .foregroundStyle(.white)
+                }
             }
         }
-        .padding(.vertical, 6)
-        .accessibilityElement(children: .combine)
-    }
-}
-
-private struct MegrumPlusBenefitItem: Identifiable, Equatable {
-    var id: MonetizationFeature
-    var title: String
-    var subtitle: String
-    var systemImage: String
-
-    static let defaultItems: [MegrumPlusBenefitItem] = [
-        MegrumPlusBenefitItem(
-            id: .unlimitedIndividualListings,
-            title: "個別募集が無制限",
-            subtitle: "無料プランの3件上限を外して、条件別に募集を作れます。",
-            systemImage: "rectangle.stack.badge.plus"
-        ),
-        MegrumPlusBenefitItem(
-            id: .priorityMatchDisplay,
-            title: "ホーム・検索で上位表示",
-            subtitle: "あなたの譲るグッズを見つけてもらいやすくします。",
-            systemImage: "arrow.up.forward.circle.fill"
-        ),
-        MegrumPlusBenefitItem(
-            id: .unlimitedGroomArchive,
-            title: "グルームアーカイブ無制限",
-            subtitle: "無料プランの10件上限を外して、過去のグルームを残せます。",
-            systemImage: "archivebox.fill"
-        ),
-        MegrumPlusBenefitItem(
-            id: .meguriMessageExpansion,
-            title: "めぐり内でメッセージのやり取りが可能",
-            subtitle: "届いた本文を読んで、そのまま相手とやり取りできます。",
-            systemImage: "message.fill"
-        ),
-        MegrumPlusBenefitItem(
-            id: .meguriBoardExtendedAccess,
-            title: "県外の掲示板も閲覧可能",
-            subtitle: "無料プランでは見られない県外のチャットルームも開けます。",
-            systemImage: "map.fill"
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            LinearGradient(
+                colors: [MegrumTheme.sky, MegrumTheme.lavender, MegrumTheme.pink],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
+            in: RoundedRectangle(cornerRadius: 24, style: .continuous)
         )
-    ]
-}
-
-private struct MegrumPlusBenefitRow: View {
-    var item: MegrumPlusBenefitItem
-
-    var body: some View {
-        Label {
-            VStack(alignment: .leading, spacing: 3) {
-                Text(item.title)
-                    .font(.body.bold())
-                    .foregroundStyle(MegrumTheme.ink)
-                Text(item.subtitle)
-                    .font(.subheadline)
-                    .foregroundStyle(MegrumTheme.muted)
-            }
-        } icon: {
-            Image(systemName: item.systemImage)
-                .foregroundStyle(MegrumTheme.lavender)
+        .overlay {
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .strokeBorder(.white.opacity(0.42), lineWidth: 1)
         }
-        .padding(.vertical, 4)
+        .shadow(color: MegrumTheme.lavender.opacity(0.28), radius: 18, y: 9)
     }
 }
 
-private struct SubscriptionStatusRow: View {
-    var state: UserSubscriptionState
-    var isLoading: Bool
-
+/// 無料プランとの○×比較表。
+private struct SubscriptionComparisonTable: View {
     var body: some View {
-        HStack {
-            Label(statusTitle, systemImage: statusImage)
-                .font(.body.bold())
-                .foregroundStyle(MegrumTheme.ink)
-            Spacer()
-            if isLoading {
-                ProgressView()
+        VStack(spacing: 0) {
+            HStack(spacing: 0) {
+                Text("できること")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Text("無料")
+                    .frame(width: 74)
+                Text("プレミアム")
+                    .frame(width: 84)
+                    .foregroundStyle(MegrumTheme.lavender)
+            }
+            .font(.system(size: 12, weight: .black, design: .rounded))
+            .foregroundStyle(MegrumTheme.muted)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(MegrumTheme.lavender.opacity(0.07))
+
+            ForEach(Array(SubscriptionComparisonRow.rows.enumerated()), id: \.element.id) { index, row in
+                HStack(spacing: 8) {
+                    Image(systemName: row.systemImage)
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(MegrumTheme.lavender)
+                        .frame(width: 20)
+                    Text(row.title)
+                        .font(.system(size: 13, weight: .heavy, design: .rounded))
+                        .foregroundStyle(MegrumTheme.ink)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.82)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                    comparisonCell(text: row.freeText, isAvailable: row.freeIsAvailable, isPremiumColumn: false)
+                        .frame(width: 74)
+                    comparisonCell(text: row.premiumText, isAvailable: true, isPremiumColumn: true)
+                        .frame(width: 84)
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 11)
+                .background(index.isMultiple(of: 2) ? Color.white.opacity(0.9) : MegrumTheme.canvas)
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(MegrumTheme.lavender.opacity(0.16), lineWidth: 1)
+        }
+    }
+
+    private func comparisonCell(text: String, isAvailable: Bool, isPremiumColumn: Bool) -> some View {
+        Group {
+            if text == "○" {
+                Image(systemName: "circle")
+                    .font(.system(size: 13, weight: .black))
+            } else if text == "×" {
+                Image(systemName: "xmark")
+                    .font(.system(size: 12, weight: .black))
             } else {
-                Text(state.isMegrumPlusActive ? "有効" : "無料")
-                    .font(.caption.bold())
-                    .foregroundStyle(state.isMegrumPlusActive ? MegrumTheme.ok : MegrumTheme.muted)
+                Text(text)
+                    .font(.system(size: 11.5, weight: .black, design: .rounded))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
             }
         }
-        .accessibilityElement(children: .combine)
+        .foregroundStyle(
+            isPremiumColumn
+                ? MegrumTheme.lavender
+                : (isAvailable ? MegrumTheme.ink.opacity(0.68) : MegrumTheme.muted.opacity(0.55))
+        )
+    }
+}
+
+/// 期間プランの選択（1ヶ月・2ヶ月・3ヶ月・半年・1年）。
+private struct SubscriptionPlanPicker: View {
+    @Binding var selectedPlanID: String
+    var monthlyOfferPriceText: String?
+    var isPurchaseEnabled: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("プランを選ぶ")
+                .font(.system(size: 16, weight: .black, design: .rounded))
+                .foregroundStyle(MegrumTheme.ink)
+
+            ForEach(SubscriptionPremiumPlanCatalog.plans) { plan in
+                planCard(plan)
+            }
+        }
     }
 
-    private var statusTitle: String {
-        state.isMegrumPlusActive ? SubscriptionCatalog.currentPremiumDisplayName : "無料プラン"
+    private func planCard(_ plan: SubscriptionPremiumPlan) -> some View {
+        let isSelected = plan.productID == selectedPlanID
+        return Button {
+            MegrumHaptics.performSelectionChanged {
+                selectedPlanID = plan.productID
+            }
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 21, weight: .bold))
+                    .foregroundStyle(isSelected ? MegrumTheme.lavender : MegrumTheme.muted.opacity(0.5))
+
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 8) {
+                        Text("\(plan.title)プラン")
+                            .font(.system(size: 15.5, weight: .black, design: .rounded))
+                            .foregroundStyle(MegrumTheme.ink)
+                        if let badge = plan.badge {
+                            Text(badge)
+                                .font(.system(size: 10.5, weight: .black, design: .rounded))
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 3)
+                                .background(
+                                    LinearGradient(
+                                        colors: [MegrumTheme.pink, Color(red: 0.94, green: 0.35, blue: 0.55)],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    ),
+                                    in: Capsule()
+                                )
+                        }
+                    }
+                    Text(plan.perMonthText)
+                        .font(.system(size: 11.5, weight: .bold, design: .rounded))
+                        .foregroundStyle(MegrumTheme.muted)
+                }
+
+                Spacer(minLength: 8)
+
+                Text(displayPrice(for: plan))
+                    .font(.system(size: 17, weight: .black, design: .rounded))
+                    .foregroundStyle(isSelected ? MegrumTheme.lavender : MegrumTheme.ink.opacity(0.8))
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 13)
+            .background(.white.opacity(isSelected ? 0.98 : 0.82), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .strokeBorder(
+                        isSelected ? MegrumTheme.lavender : MegrumTheme.ink.opacity(0.08),
+                        lineWidth: isSelected ? 1.8 : 1
+                    )
+            }
+            .shadow(color: isSelected ? MegrumTheme.lavender.opacity(0.16) : .clear, radius: 10, y: 5)
+            .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(plan.title)プラン \(displayPrice(for: plan))")
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
-    private var statusImage: String {
-        state.isMegrumPlusActive ? "checkmark.seal.fill" : "person.crop.circle"
+    private func displayPrice(for plan: SubscriptionPremiumPlan) -> String {
+        if plan.months == 1, let monthlyOfferPriceText, isPurchaseEnabled {
+            return monthlyOfferPriceText
+        }
+        return plan.fallbackPriceText
     }
 }
 

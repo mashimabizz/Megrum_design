@@ -168,6 +168,9 @@ public struct BoardReply: Identifiable, Codable, Hashable, Sendable {
     public var goodReactionCount: Int?
     public var badReactionCount: Int?
     public var viewerReaction: BoardMessageReaction?
+    /// 部屋ごとの表示名／アイコン（参加時に決めたもの）。
+    public var anonymousDisplayName: String?
+    public var anonymousAvatarID: String?
 
     public init(
         id: UUID,
@@ -180,7 +183,9 @@ public struct BoardReply: Identifiable, Codable, Hashable, Sendable {
         createdAt: Date = .now,
         goodReactionCount: Int? = nil,
         badReactionCount: Int? = nil,
-        viewerReaction: BoardMessageReaction? = nil
+        viewerReaction: BoardMessageReaction? = nil,
+        anonymousDisplayName: String? = nil,
+        anonymousAvatarID: String? = nil
     ) {
         self.id = id
         self.threadID = threadID
@@ -193,6 +198,8 @@ public struct BoardReply: Identifiable, Codable, Hashable, Sendable {
         self.goodReactionCount = goodReactionCount
         self.badReactionCount = badReactionCount
         self.viewerReaction = viewerReaction
+        self.anonymousDisplayName = anonymousDisplayName
+        self.anonymousAvatarID = anonymousAvatarID
     }
 }
 
@@ -206,6 +213,8 @@ public struct BoardReplyCreateInput: Equatable, Sendable {
     public var scope: BoardThread.Audience
     public var imagePaths: [String]
     public var imageUpload: GoodsPhotoUpload?
+    public var anonymousDisplayName: String?
+    public var anonymousAvatarID: String?
 
     public init(
         threadID: UUID,
@@ -216,7 +225,9 @@ public struct BoardReplyCreateInput: Equatable, Sendable {
         prefecture: String? = nil,
         scope: BoardThread.Audience = .nearby3km,
         imagePaths: [String] = [],
-        imageUpload: GoodsPhotoUpload? = nil
+        imageUpload: GoodsPhotoUpload? = nil,
+        anonymousDisplayName: String? = nil,
+        anonymousAvatarID: String? = nil
     ) {
         self.threadID = threadID
         self.authorID = authorID
@@ -227,5 +238,7 @@ public struct BoardReplyCreateInput: Equatable, Sendable {
         self.scope = scope
         self.imagePaths = imagePaths
         self.imageUpload = imageUpload
+        self.anonymousDisplayName = anonymousDisplayName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank
+        self.anonymousAvatarID = anonymousAvatarID?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank
     }
 }

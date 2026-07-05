@@ -120,7 +120,9 @@ extension MegrumAppState {
         latitude: Double? = nil,
         longitude: Double? = nil,
         prefecture: String? = nil,
-        scope: BoardThread.Audience = .nearby3km
+        scope: BoardThread.Audience = .nearby3km,
+        anonymousDisplayName: String? = nil,
+        anonymousAvatarID: String? = nil
     ) async -> Bool {
         let trimmed = MegrumAppStateInputNormalizer.trimmedText(body)
         guard !trimmed.isEmpty else {
@@ -146,7 +148,9 @@ extension MegrumAppState {
                     latitude: latitude,
                     longitude: longitude,
                     prefecture: selectedPrefecture,
-                    scope: scope
+                    scope: scope,
+                    anonymousDisplayName: anonymousDisplayName,
+                    anonymousAvatarID: anonymousAvatarID
                 )
             )
             boardRepliesByThreadID = ReplyThreadStateReducer.appendingBoardReply(
@@ -170,7 +174,9 @@ extension MegrumAppState {
         latitude: Double? = nil,
         longitude: Double? = nil,
         prefecture: String? = nil,
-        scope: BoardThread.Audience = .nearby3km
+        scope: BoardThread.Audience = .nearby3km,
+        anonymousDisplayName: String? = nil,
+        anonymousAvatarID: String? = nil
     ) async -> Bool {
         guard !imageData.isEmpty else {
             return false
@@ -196,7 +202,9 @@ extension MegrumAppState {
                     longitude: longitude,
                     prefecture: selectedPrefecture,
                     scope: scope,
-                    imageUpload: GoodsPhotoUpload(data: imageData, contentType: imageContentType)
+                    imageUpload: GoodsPhotoUpload(data: imageData, contentType: imageContentType),
+                    anonymousDisplayName: anonymousDisplayName,
+                    anonymousAvatarID: anonymousAvatarID
                 )
             )
             boardRepliesByThreadID = ReplyThreadStateReducer.appendingBoardReply(

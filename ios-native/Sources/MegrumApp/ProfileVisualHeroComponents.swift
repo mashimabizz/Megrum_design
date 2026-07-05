@@ -5,13 +5,23 @@ struct ProfileVisualStatCluster: View {
     var tradeCount: String
     var ratingText: String
     var density: ProfileVisualHeroDensity
+    var onRatingTap: (() -> Void)? = nil
 
     var body: some View {
         HStack(spacing: max(6, density.statRowSpacing * 0.55)) {
             ProfileVisualStat(title: "取引", value: tradeCount, accent: false, density: density)
             Divider()
                 .frame(height: density.statDividerHeight)
-            ProfileVisualStat(title: "評価", value: ratingText, accent: true, density: density)
+            if let onRatingTap {
+                Button(action: onRatingTap) {
+                    ProfileVisualStat(title: "評価", value: ratingText, accent: true, density: density)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("評価一覧を表示")
+            } else {
+                ProfileVisualStat(title: "評価", value: ratingText, accent: true, density: density)
+            }
         }
         .padding(.horizontal, statPadding)
         .padding(.vertical, verticalPadding)
@@ -114,6 +124,72 @@ struct ProfileVisualConditionButton: View {
             34
         case .compact:
             28
+        }
+    }
+}
+
+/// 推しタグ専用チップ。L1（group）＝ホーム「指名あり」のグラデ塗り、
+/// L2（member）＝「wish一致」の白地＋グラデ枠線トーン。
+struct ProfileVisualOshiTagChip: View {
+    var title: String
+    var kind: ProfileVisualTagKind
+    var size: ProfileVisualTagSize
+
+    var body: some View {
+        switch kind {
+        case .group:
+            baseText
+                .foregroundStyle(.white)
+                .background(megrumGradient, in: Capsule())
+                .overlay {
+                    Capsule().strokeBorder(.white.opacity(0.42), lineWidth: 0.8)
+                }
+                .shadow(color: MegrumTheme.lavender.opacity(0.18), radius: 8, y: 4)
+        case .member, .plain:
+            baseText
+                .foregroundStyle(megrumGradient)
+                .background(.white.opacity(0.96), in: Capsule())
+                .overlay {
+                    Capsule().strokeBorder(megrumGradient, lineWidth: 1.15)
+                }
+        }
+    }
+
+    private var baseText: some View {
+        Text(title)
+            .font(.system(size: fontSize, weight: .black, design: .rounded))
+            .lineLimit(1)
+            .minimumScaleFactor(0.78)
+            .padding(.horizontal, horizontalPadding)
+            .frame(height: height)
+    }
+
+    private var megrumGradient: LinearGradient {
+        LinearGradient(
+            colors: [MegrumTheme.sky, MegrumTheme.lavender, MegrumTheme.pink],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+
+    private var fontSize: CGFloat {
+        switch size {
+        case .regular: 14.5
+        case .compact: 12.5
+        }
+    }
+
+    private var horizontalPadding: CGFloat {
+        switch size {
+        case .regular: 16
+        case .compact: 10
+        }
+    }
+
+    private var height: CGFloat {
+        switch size {
+        case .regular: 34
+        case .compact: 27
         }
     }
 }

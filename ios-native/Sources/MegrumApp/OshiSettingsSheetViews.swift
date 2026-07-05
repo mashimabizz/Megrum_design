@@ -8,6 +8,8 @@ struct OshiMasterSelectSheet: View {
     var groups: [OshiGroup]
     var selectedGroupIDs: Set<UUID>
     var charactersByGroupID: [UUID: [OshiCharacter]]
+    /// 自分が設定済みの推し（L1）のグループID。空でなければ「自分の推し」カテゴリを先頭に出し、既定にする。
+    var myOshiGroupIDs: Set<UUID> = []
     var allowsMultipleSelection = false
     var onClose: () -> Void
     var onRequest: (String?) -> Void
@@ -16,12 +18,22 @@ struct OshiMasterSelectSheet: View {
 
     @State private var sheetState = OshiMasterSelectSheetState()
 
+    private var showsMyOshiCategory: Bool {
+        groups.contains { myOshiGroupIDs.contains($0.id) }
+    }
+
     private var categoryOptions: [OshiCategoryOption] {
-        [OshiCategoryOption(id: nil, title: "すべて")] + genres.map { OshiCategoryOption(id: $0.id, title: $0.name) }
+        var options: [OshiCategoryOption] = []
+        if showsMyOshiCategory {
+            options.append(OshiCategoryOption(id: OshiMasterSelectSheetState.myOshiCategoryID, title: "自分の推し"))
+        }
+        options.append(OshiCategoryOption(id: nil, title: "すべて"))
+        options += genres.map { OshiCategoryOption(id: $0.id, title: $0.name) }
+        return options
     }
 
     private var filteredGroups: [OshiGroup] {
-        sheetState.filteredGroups(from: groups)
+        sheetState.filteredGroups(from: groups, myOshiGroupIDs: myOshiGroupIDs)
     }
 
     private var pendingSelectedGroups: [OshiGroup] {
@@ -61,7 +73,12 @@ struct OshiMasterSelectSheet: View {
                 onRegister: registerPendingSelection
             )
         }
-        .onAppear(perform: resetPendingSelection)
+        .onAppear {
+            resetPendingSelection()
+            if showsMyOshiCategory, sheetState.selectedGenreID == nil {
+                sheetState.selectedGenreID = OshiMasterSelectSheetState.myOshiCategoryID
+            }
+        }
         .onChange(of: selectedGroupIDs) { _, _ in
             sheetState.removeLockedPendingSelection(selectedGroupIDs: selectedGroupIDs)
         }

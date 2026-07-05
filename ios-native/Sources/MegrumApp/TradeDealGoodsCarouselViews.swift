@@ -26,12 +26,14 @@ struct TradeGoodsCarouselColumn: View {
 
                 Spacer(minLength: 0)
 
-                Text(countText)
-                    .font(.system(size: 9.5, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 3)
-                    .background(accentColor, in: Capsule())
+                if displayItems.count > 1 {
+                    Text(countText)
+                        .font(.system(size: 9.5, weight: .black, design: .rounded))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 3)
+                        .background(accentColor, in: Capsule())
+                }
             }
 
             if displayItems.isEmpty {

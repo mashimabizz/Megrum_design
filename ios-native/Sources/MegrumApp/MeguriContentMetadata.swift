@@ -1,7 +1,7 @@
 import Foundation
 import MegrumCore
 
-struct MeguriContentMetadataDraft: Equatable, Sendable {
+struct MeguriContentMetadataDraft: Equatable, Sendable, Codable {
     var groupID: UUID?
     var characterID: UUID?
     var seriesName = ""

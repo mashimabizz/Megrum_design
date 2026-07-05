@@ -110,16 +110,6 @@ extension GoodsCollectionScreen {
     func collectionPageScroll(status: GoodsEntryStatus?) -> some View {
         ScrollView(.vertical) {
             VStack(alignment: .leading, spacing: CollectionScreenLayoutMetrics.mainStackSpacing) {
-                if let appState {
-                    CollectionFilterBar(
-                        appState: appState,
-                        selectedGroupID: $selectedGroupID,
-                        selectedGoodsTypeID: $selectedGoodsTypeID,
-                        selectedTagNames: $selectedTagNames,
-                        items: filterBaseItems,
-                        availableTagNames: availableTagNames
-                    )
-                }
                 GoodsCollectionResultsArea(
                     isShowingLoadingState: isShowingLoadingState,
                     filteredItems: filteredItems(for: status),

@@ -57,7 +57,8 @@ struct TradeStagePage: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.top, topContentInset + 8)
-            .padding(.bottom, 132)
+            // ステージフッター＋タブバーに最後のパネルが隠れないよう余白を確保
+            .padding(.bottom, 176)
             .megrumSuppressesEnclosingScrollEdgeEffects()
         }
         .megrumHiddenBottomScrollEdgeEffect()

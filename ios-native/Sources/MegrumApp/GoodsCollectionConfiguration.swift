@@ -3,16 +3,18 @@ import SwiftUI
 
 struct GoodsCollectionFilter: Equatable {
     var groupID: UUID?
+    var memberID: UUID?
     var goodsTypeID: UUID?
     var tagNames: Set<String> = []
 
     var isActive: Bool {
-        groupID != nil || goodsTypeID != nil || !tagNames.isEmpty
+        groupID != nil || memberID != nil || goodsTypeID != nil || !tagNames.isEmpty
     }
 
     var activeCount: Int {
         var count = 0
         if groupID != nil { count += 1 }
+        if memberID != nil { count += 1 }
         if goodsTypeID != nil { count += 1 }
         count += tagNames.count
         return count
@@ -20,6 +22,9 @@ struct GoodsCollectionFilter: Equatable {
 
     func matches(_ item: GoodsItem) -> Bool {
         if let groupID, item.groupID != groupID {
+            return false
+        }
+        if let memberID, item.memberID != memberID {
             return false
         }
         if let goodsTypeID, item.goodsTypeID != goodsTypeID {

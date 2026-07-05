@@ -24,6 +24,9 @@ struct ProfileVisualHero: View {
     var onAction: () -> Void
     var onScheduleAction: (() -> Void)?
     var onConditionAction: (() -> Void)?
+    var onRatingTap: (() -> Void)? = nil
+
+    @State private var isBioExpanded = false
 
     var body: some View {
         VStack(spacing: density.verticalSpacing) {
@@ -50,7 +53,14 @@ struct ProfileVisualHero: View {
                                 Text(profileBio)
                                     .font(.system(size: density.bioFontSize, weight: .semibold, design: .rounded))
                                     .foregroundStyle(MegrumTheme.ink.opacity(0.78))
-                                    .lineLimit(3)
+                                    .lineLimit(isBioExpanded ? nil : 3)
+                                    .contentShape(Rectangle())
+                                    .onTapGesture {
+                                        withAnimation(.smooth(duration: 0.2)) {
+                                            isBioExpanded.toggle()
+                                        }
+                                    }
+                                    .accessibilityHint(isBioExpanded ? "タップで折りたたむ" : "タップで全文表示")
                             }
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -61,7 +71,8 @@ struct ProfileVisualHero: View {
                                 ProfileVisualStatCluster(
                                     tradeCount: tradeCount,
                                     ratingText: ratingText,
-                                    density: density
+                                    density: density,
+                                    onRatingTap: onRatingTap
                                 )
 
                                 if let conditionActionTitle, let onConditionAction {
@@ -91,11 +102,19 @@ struct ProfileVisualHero: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: tagSpacing) {
                         ForEach(Array(resolvedTags.prefix(8).enumerated()), id: \.offset) { index, tag in
-                            ProfileVisualTagChip(
-                                title: tag.title,
-                                color: chipColor(for: tag, index: index),
-                                size: tagSize
-                            )
+                            if tag.kind == .plain {
+                                ProfileVisualTagChip(
+                                    title: tag.title,
+                                    color: chipColor(for: tag, index: index),
+                                    size: tagSize
+                                )
+                            } else {
+                                ProfileVisualOshiTagChip(
+                                    title: tag.title,
+                                    kind: tag.kind,
+                                    size: tagSize
+                                )
+                            }
                         }
                     }
                 }

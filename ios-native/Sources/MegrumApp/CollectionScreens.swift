@@ -21,8 +21,10 @@ struct GoodsCollectionScreen: View {
     @State var isShowingUnavailableAlert = false
     @State var listingSeedWish: GoodsItem?
     @State var selectedGroupID: UUID?
+    @State var selectedMemberID: UUID?
     @State var selectedGoodsTypeID: UUID?
     @State var selectedTagNames: Set<String> = []
+    @State var isShowingFilterSheet = false
     @State var selectedInventoryStatus: GoodsEntryStatus = .active
     @State var quickActionItem: GoodsItem?
     @State var selectedItemIDs: Set<UUID> = []

@@ -48,7 +48,7 @@ struct TradeCard: View {
             presentation.readState.title,
             proposal.exchangeMethod.displayName,
             "ゆずるグッズ \(offeredGoodsIDs.count)件",
-            "求めるグッズ \(requestedGoodsIDs.count)件"
+            "うけとるグッズ \(requestedGoodsIDs.count)件"
         ]
         if presentation.unreadBadgeCount > 0 {
             parts.insert("未読\(presentation.unreadBadgeCount)件", at: 2)

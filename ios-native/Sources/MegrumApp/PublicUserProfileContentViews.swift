@@ -31,6 +31,7 @@ struct PublicUserProfileContent: View {
     var onPrimaryAction: () -> Void
     var onOpenSchedule: () -> Void
     var onOpenExchangeConditions: () -> Void
+    var onOpenEvaluations: (() -> Void)? = nil
     var onSelectGridItem: (ProfileVisualGridItem) -> Void
     var onSelectListing: (UUID) -> Void
 
@@ -56,7 +57,8 @@ struct PublicUserProfileContent: View {
                     conditionActionTitle: "交換条件",
                     onAction: onPrimaryAction,
                     onScheduleAction: onOpenSchedule,
-                    onConditionAction: onOpenExchangeConditions
+                    onConditionAction: onOpenExchangeConditions,
+                    onRatingTap: onOpenEvaluations
                 )
 
                 ProfileVisualTabs(selection: $selectedVisualTab)

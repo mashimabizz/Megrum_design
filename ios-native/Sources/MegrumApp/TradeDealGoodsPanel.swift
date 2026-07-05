@@ -27,9 +27,9 @@ struct TradeDealGoodsPanel: View {
         offeredBadgeTitle: String? = nil,
         requestedBadgeTitle: String? = nil,
         offeredTitle: String = "譲るグッズ",
-        requestedTitle: String = "求めるグッズ",
+        requestedTitle: String = "うけとるグッズ",
         offeredEmptyTitle: String = "譲るグッズ未選択",
-        requestedEmptyTitle: String = "求めるグッズ未選択",
+        requestedEmptyTitle: String = "うけとるグッズ未選択",
         onCarouselTap: (() -> Void)? = nil
     ) {
         self.offeredItems = offeredItems
@@ -75,7 +75,6 @@ struct TradeDealGoodsPanel: View {
         }
         .padding(.horizontal, 1)
         .padding(.vertical, 2)
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 }
 

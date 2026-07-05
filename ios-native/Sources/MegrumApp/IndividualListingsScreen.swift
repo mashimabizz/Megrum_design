@@ -15,6 +15,7 @@ struct IndividualListingsScreen: View {
     var headerAccessory: AnyView?
     var showsHeader = true
     var onScrollContentTopChange: ((CGFloat) -> Void)? = nil
+    var onSwipeBackFromFirst: (() -> Void)? = nil
     var initialEditorOptionKind: IndividualListingOptionKind? = nil
     var initialEditorStep: IndividualListingEditorStep = .haves
     var initiallyPresentsEditor = false
@@ -59,7 +60,8 @@ struct IndividualListingsScreen: View {
                 },
                 onBeginSelection: beginListingSelection,
                 onToggleSelection: toggleListingSelection,
-                onScrollContentTopChange: onScrollContentTopChange
+                onScrollContentTopChange: onScrollContentTopChange,
+                onSwipeBackFromFirst: onSwipeBackFromFirst
             )
             .refreshable {
                 presentationState.clearLocalEdits()

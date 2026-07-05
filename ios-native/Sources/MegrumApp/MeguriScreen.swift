@@ -42,6 +42,7 @@ struct MeguriScreen: View {
     @State var toastPlacement: MeguriToastPlacement = .bottom
     @State var toastID = UUID()
     @State var contentFilter = MeguriContentFilterState()
+    @State var didRestoreHomePreferences = false
     @State var isShowingContentFilter = false
     @State var isShowingNotificationSettings = false
     @State var outOfRangeAlertMessage = ""
@@ -69,6 +70,19 @@ struct MeguriScreen: View {
             return stored
         }
         return (appState.viewer?.prefecture).nilIfBlank
+    }
+
+    func restoreHomePreferencesIfNeeded() {
+        guard !didRestoreHomePreferences, let viewerID = appState.viewer?.id else {
+            return
+        }
+        didRestoreHomePreferences = true
+        if let storedKind = MeguriHomePreferenceStore.loadMapKind(userID: viewerID) {
+            homeMapKind = storedKind
+        }
+        if let storedDraft = MeguriHomePreferenceStore.loadFilterDraft(userID: viewerID) {
+            contentFilter.draft = storedDraft
+        }
     }
 
     var visibleGrooms: [GroomPost] {
@@ -135,6 +149,21 @@ struct MeguriScreen: View {
         .onAppear {
             openVisualQASheetsIfNeeded()
             handlePendingNotificationRouteIntent(pendingNotificationRouteIntent)
+        }
+        .task(id: appState.viewer?.id) {
+            restoreHomePreferencesIfNeeded()
+        }
+        .onChange(of: homeMapKind) { _, newValue in
+            guard didRestoreHomePreferences, let viewerID = appState.viewer?.id else {
+                return
+            }
+            MeguriHomePreferenceStore.saveMapKind(newValue, userID: viewerID)
+        }
+        .onChange(of: contentFilter) { _, newValue in
+            guard didRestoreHomePreferences, let viewerID = appState.viewer?.id else {
+                return
+            }
+            MeguriHomePreferenceStore.saveFilterDraft(newValue.draft, userID: viewerID)
         }
         .task(id: appState.grooms.map(\.authorID)) {
             await preloadGroomAuthorProfiles()

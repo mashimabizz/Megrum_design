@@ -204,7 +204,9 @@ final class MeguriMessageReadStateReducerTests: XCTestCase {
         XCTAssertTrue(thread.usesPublicProfile)
     }
 
-    func testConversationThreadHidesHandleWhenMeguriProfileIsAnonymous() throws {
+    /// iter1226.296: めぐりプロフィール廃止。匿名めぐりプロフィールがあっても
+    /// グッズ交換側（公開）プロフィールで表示する。
+    func testConversationThreadUsesPublicProfileEvenWhenMeguriProfileIsAnonymous() throws {
         let viewerID = UUID(uuidString: "00000000-0000-0000-0000-000000000273")!
         let peerID = UUID(uuidString: "00000000-0000-0000-0000-000000000274")!
         let messages = [
@@ -232,11 +234,11 @@ final class MeguriMessageReadStateReducerTests: XCTestCase {
             meguriProfilesByUserID: [peerID: meguriProfile]
         ).first)
 
-        XCTAssertEqual(thread.displayName, "匿名名")
-        XCTAssertNil(thread.handle)
-        XCTAssertEqual(thread.avatarID, "avatar_5")
-        XCTAssertNil(thread.avatarURL)
-        XCTAssertFalse(thread.usesPublicProfile)
+        XCTAssertEqual(thread.displayName, "公開名")
+        XCTAssertEqual(thread.handle, "public")
+        XCTAssertNil(thread.avatarID)
+        XCTAssertEqual(thread.avatarURL, URL(string: "https://example.com/public-avatar.jpg"))
+        XCTAssertTrue(thread.usesPublicProfile)
     }
 
     func testPendingReplyThreadCountCountsThreadsWhereLatestMessageIsIncoming() {

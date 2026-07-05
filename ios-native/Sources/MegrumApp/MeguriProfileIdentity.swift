@@ -19,6 +19,29 @@ enum MeguriProfileIdentityResolver {
         fallbackHandle: String? = nil,
         fallbackAvatarURL: URL? = nil
     ) -> MeguriProfileIdentity {
+        // iter1226.296: めぐりプロフィール（カスタム名/アイコン）は廃止。
+        // グルーム・めぐりメッセージは常にグッズ交換側のプロフィールを使う。
+        return MeguriProfileIdentity(
+            userID: userID,
+            displayName: publicProfile?.profile.displayName.nilIfBlank
+                ?? fallbackName?.nilIfBlank
+                ?? meguriProfile?.displayName.nilIfBlank
+                ?? "ユーザー",
+            handle: publicProfile?.profile.handle.nilIfBlank ?? fallbackHandle?.nilIfBlank,
+            avatarID: nil,
+            avatarURL: publicProfile?.profile.avatarURL ?? fallbackAvatarURL ?? meguriProfile?.avatarURL,
+            usesPublicProfile: true
+        )
+    }
+
+    private static func legacyIdentity(
+        for userID: UUID,
+        meguriProfile: MeguriProfile?,
+        publicProfile: PublicUserProfile?,
+        fallbackName: String? = nil,
+        fallbackHandle: String? = nil,
+        fallbackAvatarURL: URL? = nil
+    ) -> MeguriProfileIdentity {
         if meguriProfile?.usesPublicProfile == true {
             return MeguriProfileIdentity(
                 userID: userID,

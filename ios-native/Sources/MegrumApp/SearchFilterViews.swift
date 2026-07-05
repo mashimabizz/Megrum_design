@@ -59,6 +59,7 @@ struct SearchFilterSheet: View {
                 groups: appState.oshiGroups,
                 characters: hasSelectedGroup ? appState.oshiCharacters : [],
                 goodsTypes: appState.goodsTypes,
+                myOshiGroupIDs: Set(appState.userOshiSelections.compactMap(\.groupID)),
                 selectedTagSummary: selectedTagSummary,
                 selectedGroupID: $sheetState.draft.selectedGroupID,
                 selectedMemberID: $sheetState.draft.selectedMemberID,

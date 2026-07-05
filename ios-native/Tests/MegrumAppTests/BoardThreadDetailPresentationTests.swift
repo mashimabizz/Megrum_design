@@ -77,7 +77,6 @@ final class BoardThreadDetailPresentationTests: XCTestCase {
             replies: replies,
             viewer: UserProfile(id: viewerID, handle: "viewer", displayName: "閲覧者"),
             profilesByUserID: [replyAuthorID: publicProfile],
-            meguriProfilesByUserID: [:],
             grooms: []
         )
         .makePresentation(now: Date(timeIntervalSince1970: 1_400))
@@ -122,7 +121,6 @@ final class BoardThreadDetailPresentationTests: XCTestCase {
             replies: [],
             viewer: UserProfile(id: uuid("003"), handle: "viewer", displayName: "閲覧者"),
             profilesByUserID: [authorID: publicProfile],
-            meguriProfilesByUserID: [:],
             grooms: []
         )
         .makePresentation(now: Date(timeIntervalSince1970: 1_400))
@@ -132,8 +130,9 @@ final class BoardThreadDetailPresentationTests: XCTestCase {
         XCTAssertNotEqual(presentation.authorName, "公開名")
     }
 
-    func testMeguriProfileIsUsedBeforePublicProfile() {
+    func testReplyRoomIdentityIsUsedForParticipantDisplay() {
         let authorID = uuid("001")
+        let replyAuthorID = uuid("002")
         let thread = BoardThread(
             id: uuid("101"),
             authorID: authorID,
@@ -147,32 +146,47 @@ final class BoardThreadDetailPresentationTests: XCTestCase {
         )
         let publicProfile = PublicUserProfile(
             profile: UserProfile(
-                id: authorID,
+                id: replyAuthorID,
                 handle: "real_author",
                 displayName: "公開名",
                 avatarURL: URL(string: "https://example.com/author.jpg")
             )
         )
-        let meguriProfile = MeguriProfile(
-            userID: authorID,
-            displayName: "めぐり名",
-            avatarID: "avatar_4",
-            lastChangedAt: Date(timeIntervalSince1970: 900)
-        )
+        let replies = [
+            BoardReply(
+                id: uuid("201"),
+                threadID: thread.id,
+                authorID: replyAuthorID,
+                body: "います",
+                createdAt: Date(timeIntervalSince1970: 1_100),
+                anonymousDisplayName: "ルーム名A",
+                anonymousAvatarID: "avatar_4"
+            ),
+            BoardReply(
+                id: uuid("202"),
+                threadID: thread.id,
+                authorID: replyAuthorID,
+                body: "まだいます",
+                createdAt: Date(timeIntervalSince1970: 1_200)
+            )
+        ]
 
         let presentation = BoardThreadDetailPresentationBuilder(
             thread: thread,
-            replies: [],
+            replies: replies,
             viewer: UserProfile(id: uuid("003"), handle: "viewer", displayName: "閲覧者"),
-            profilesByUserID: [authorID: publicProfile],
-            meguriProfilesByUserID: [authorID: meguriProfile],
+            profilesByUserID: [replyAuthorID: publicProfile],
             grooms: []
         )
         .makePresentation(now: Date(timeIntervalSince1970: 1_400))
 
-        XCTAssertEqual(presentation.authorName, "めぐり名")
-        XCTAssertEqual(presentation.authorAvatarID, "avatar_4")
-        XCTAssertNil(presentation.authorAvatarURL)
+        // 部屋で決めた名前・アイコンが全返信に使われ、公開名は出ない
+        XCTAssertEqual(presentation.replies[0].displayName, "ルーム名A")
+        XCTAssertEqual(presentation.replies[1].displayName, "ルーム名A")
+        XCTAssertEqual(presentation.replies[0].avatarID, "avatar_4")
+        XCTAssertEqual(presentation.replies[1].avatarID, "avatar_4")
+        XCTAssertNil(presentation.replies[0].avatarURL)
+        XCTAssertNotEqual(presentation.replies[0].displayName, "公開名")
     }
 
     func testThreadBodyAppearsAsOpeningChatMessageWithReactions() {
@@ -195,7 +209,6 @@ final class BoardThreadDetailPresentationTests: XCTestCase {
             replies: [],
             viewer: UserProfile(id: viewerID, handle: "viewer", displayName: "閲覧者"),
             profilesByUserID: [:],
-            meguriProfilesByUserID: [:],
             grooms: []
         )
         .makePresentation(now: Date(timeIntervalSince1970: 1_060))
@@ -223,7 +236,6 @@ final class BoardThreadDetailPresentationTests: XCTestCase {
             replies: [],
             viewer: UserProfile(id: uuid("003"), handle: "viewer", displayName: "閲覧者"),
             profilesByUserID: [:],
-            meguriProfilesByUserID: [:],
             grooms: []
         )
         .makePresentation(now: Date(timeIntervalSince1970: 1_060))
@@ -255,7 +267,6 @@ final class BoardThreadDetailPresentationTests: XCTestCase {
             replies: [reply],
             viewer: UserProfile(id: uuid("003"), handle: "viewer", displayName: "閲覧者"),
             profilesByUserID: [:],
-            meguriProfilesByUserID: [:],
             grooms: []
         )
         .makePresentation(now: Date(timeIntervalSince1970: 1_060))

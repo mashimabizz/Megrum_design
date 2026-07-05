@@ -7,6 +7,7 @@ struct OwnProfileScreen: View {
     @ObservedObject var appState: MegrumAppState
     var onClose: (() -> Void)?
     @State private var presentationState = OwnProfilePresentationState()
+    @State private var isEvaluationListPresented = false
     @Environment(\.dismiss) private var dismiss
     @Environment(\.megrumSlidePresentationDismiss) private var slidePresentationDismiss
 
@@ -38,7 +39,8 @@ struct OwnProfileScreen: View {
                 goodsTypes: appState.goodsTypes,
                 onClose: closePage,
                 onEdit: openCurrentProfileEditor,
-                onOpenSchedule: openSchedule
+                onOpenSchedule: openSchedule,
+                onOpenEvaluations: openEvaluationList
             )
         }
         .background(MegrumTheme.canvas.ignoresSafeArea())
@@ -52,6 +54,14 @@ struct OwnProfileScreen: View {
                     onSave: saveProfileDraft
                 )
             }
+        }
+        .sheet(isPresented: $isEvaluationListPresented) {
+            UserEvaluationListSheet(
+                evaluations: appState.viewer.map { appState.userEvaluationsByUserID[$0.id] ?? [] } ?? [],
+                isLoading: appState.loadingEvaluationsUserID != nil
+            )
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: $presentationState.isSchedulePresented) {
             NavigationStack {
@@ -70,6 +80,15 @@ struct OwnProfileScreen: View {
         }
         .task {
             await loadSupplementalProfileDataIfNeeded()
+        }
+    }
+
+    private func openEvaluationList() {
+        isEvaluationListPresented = true
+        if let viewerID = appState.viewer?.id {
+            Task {
+                await appState.loadUserEvaluations(userID: viewerID)
+            }
         }
     }
 

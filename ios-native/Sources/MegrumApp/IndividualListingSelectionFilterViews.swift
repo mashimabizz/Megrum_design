@@ -11,10 +11,6 @@ struct IndividualListingSelectionSearchAndFilterBar: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            IndividualListingSelectionSearchField(
-                searchText: $filter.searchText,
-                placeholder: searchPlaceholder
-            )
             IndividualListingSelectionFilterRows(
                 filter: $filter,
                 groups: groups,
@@ -39,36 +35,6 @@ struct IndividualListingSelectionSearchAndFilterBar: View {
             availableGoodsTypeIDs: Set(goodsTypes.map(\.id)),
             availableTagNames: Set(tagNames)
         )
-    }
-}
-
-private struct IndividualListingSelectionSearchField: View {
-    @Binding var searchText: String
-    var placeholder: String
-
-    var body: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(MegrumTheme.muted.opacity(0.72))
-            TextField(placeholder, text: $searchText)
-                .font(.system(size: 16, weight: .semibold, design: .rounded))
-                .disableAutocorrection(true)
-            if !searchText.isEmpty {
-                Button {
-                    searchText = ""
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(MegrumTheme.muted.opacity(0.62))
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("検索語をクリア")
-            }
-        }
-        .padding(.horizontal, 15)
-        .frame(height: 50)
-        .background(MegrumTheme.ink.opacity(0.045), in: RoundedRectangle(cornerRadius: 13, style: .continuous))
     }
 }
 

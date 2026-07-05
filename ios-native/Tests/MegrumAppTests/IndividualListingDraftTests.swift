@@ -1179,7 +1179,8 @@ final class IndividualListingDraftTests: XCTestCase {
 
         XCTAssertEqual(builder.candidateNames(), ["会場限定", "終演後OK", "ファンミ"])
         XCTAssertEqual(builder.previewItemsByTag()["会場限定"]?.count, 2)
-        XCTAssertNil(builder.previewItemsByTag()["別シリーズ"])
+        // iter1226.296: 他グループの画像も後ろに残す（同グループを優先表示するだけで除外しない）
+        XCTAssertEqual(builder.previewItemsByTag()["別シリーズ"]?.count, 1)
     }
 
     func testIndividualListingSelectionFilterMatchesGoodsAndWishes() {

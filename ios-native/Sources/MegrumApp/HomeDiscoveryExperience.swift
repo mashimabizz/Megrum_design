@@ -55,35 +55,39 @@ struct HomeDiscoveryExperience: View {
                 onRefresh: onRefresh
             ) {
                 VStack(alignment: .leading, spacing: 14) {
-                    HomeDiscoverySection(
-                        title: "推し×シリーズでマッチ",
-                        candidates: userTagCandidates,
-                        layout: .summaryRows,
-                        cardTitleStyle: .memberTag,
-                        showsSeeAllButton: userTagCandidates.count > HomeDiscoverySummarySectionMetrics.displayLimit,
-                        displayLimit: HomeDiscoverySummarySectionMetrics.displayLimit,
-                        viewerGoodsImageURLByID: viewerGoodsImageURLByID,
-                        onSelect: { selectedSheet = $0 },
-                        onSearchCandidate: { candidate, selectedGoods in
-                            openSearch(for: candidate, selectedGoods: selectedGoods, source: .userTag)
-                        },
-                        onSeeAll: { seeAllRoute = .userTag }
-                    )
+                    if !userTagCandidates.isEmpty {
+                        HomeDiscoverySection(
+                            title: "推し×シリーズでマッチ",
+                            candidates: userTagCandidates,
+                            layout: .summaryRows,
+                            cardTitleStyle: .memberTag,
+                            showsSeeAllButton: userTagCandidates.count > HomeDiscoverySummarySectionMetrics.displayLimit,
+                            displayLimit: HomeDiscoverySummarySectionMetrics.displayLimit,
+                            viewerGoodsImageURLByID: viewerGoodsImageURLByID,
+                            onSelect: { selectedSheet = $0 },
+                            onSearchCandidate: { candidate, selectedGoods in
+                                openSearch(for: candidate, selectedGoods: selectedGoods, source: .userTag)
+                            },
+                            onSeeAll: { seeAllRoute = .userTag }
+                        )
+                    }
 
-                    HomeDiscoverySection(
-                        title: "推しでマッチ",
-                        candidates: userCandidates,
-                        layout: .summaryRows,
-                        cardTitleStyle: .member,
-                        showsSeeAllButton: userCandidates.count > HomeDiscoverySummarySectionMetrics.displayLimit,
-                        displayLimit: HomeDiscoverySummarySectionMetrics.displayLimit,
-                        viewerGoodsImageURLByID: viewerGoodsImageURLByID,
-                        onSelect: { selectedSheet = $0 },
-                        onSearchCandidate: { candidate, selectedGoods in
-                            openSearch(for: candidate, selectedGoods: selectedGoods, source: .user)
-                        },
-                        onSeeAll: { seeAllRoute = .user }
-                    )
+                    if !userCandidates.isEmpty {
+                        HomeDiscoverySection(
+                            title: "推しでマッチ",
+                            candidates: userCandidates,
+                            layout: .summaryRows,
+                            cardTitleStyle: .member,
+                            showsSeeAllButton: userCandidates.count > HomeDiscoverySummarySectionMetrics.displayLimit,
+                            displayLimit: HomeDiscoverySummarySectionMetrics.displayLimit,
+                            viewerGoodsImageURLByID: viewerGoodsImageURLByID,
+                            onSelect: { selectedSheet = $0 },
+                            onSearchCandidate: { candidate, selectedGoods in
+                                openSearch(for: candidate, selectedGoods: selectedGoods, source: .user)
+                            },
+                            onSeeAll: { seeAllRoute = .user }
+                        )
+                    }
 
                     if !havesCandidates.isEmpty {
                         HomeDiscoverySection(

@@ -184,6 +184,84 @@
 
 ---
 
+## イテレーション1226.296：UI/UX改善17項目バッチ
+
+### 背景・問題意識
+オーナー指示の17項目バッチ。一覧フィルタのシート化、めぐりプロフィール廃止、打診確認の改善、プロフィール改善、プレミアム画面リッチ化など。
+
+### 変更内容
+
+#### 1. マイグッズ/ほしいもの一覧の絞り込みシート化
+- インラインのグループ/グッズ種別/シリーズ行を廃止し、右下のフィルタアイコン（バッジ付き）→検索フィルター風シートに（`GoodsCollectionFilterSheet` 新規、項目はグループ・メンバー・グッズ種別・シリーズの4つ）
+- `GoodsCollectionFilter` にメンバー条件を追加。旧 `CollectionFilterBar` は削除
+
+#### 2. ホームの空セクション非表示
+- 推し×シリーズ/推しでマッチも0件ならヘッダーごと非表示（求められているグッズは従来から対応済み）
+
+#### 3. シリーズプレビューの推し優先
+- `IndividualListingConditionTagBuilder.previewItemsByTag` を「同グループを先頭・他グループは後ろ」に変更（先頭3件表示のため同推し優先になる）
+
+#### 4. めぐりプロフィール廃止
+- `MeguriProfileIdentityResolver` は常にグッズ交換側（公開）プロフィールを返す（グルーム・めぐりメッセージ）
+- チャットルームは作成時（既存）に加え**参加時**にも部屋ごとの名前・アイコンを決める方式に：
+  - migration `20260706100000_meguri_board_reply_identity.sql`（push済み）— `meguri_board_replies.anonymous_display_name/avatar_id` 追加、append/list RPC 更新
+  - `BoardReply`/`BoardReplyCreateInput`/rows/payload に identity 追加
+  - 初回返信時に `BoardRoomJoinIdentitySheet`（名前＋アバター6種）を表示、`MeguriRoomIdentityStore` でスレッド×ユーザー単位にローカル保存
+  - `BoardThreadDetailPresentation` は返信の anonymous_* の最新値で参加者を表示（meguriProfilesByUserID 依存を削除）
+- めぐりホーム左上のめぐりプロフィールアイコンを削除
+
+#### 5. 打診確認：複数グッズの一覧表示
+- `ProposalExchangePreviewRow` をタップ（複数時のみ・右上に「一覧」チップ）→ `ProposalExchangeItemListSheet` で受け取るもの/私が出すものの全件＋定価を表示
+
+#### 6. 郵送打診の住所項目
+- 確認画面に `ProposalConfirmAddressCard` を追加（登録済み住所の表示 or 「住所を登録する」ボタン＋警告枠）。未登録時の送信不可は既存の submit ガードを継続
+
+#### 7. めぐりホームの設定永続化
+- `MeguriHomePreferenceStore`（UserDefaults・ユーザーID付きキー）で表示種別（すべて/グルーム/チャット）とフィルタ内容を保存・復元
+
+#### 8. めぐりメッセージの上寄せ
+- メッセージリストを常に上寄せ（少数時は1通目が一番上）。画面超過時は従来の scrollTo で最新表示
+
+#### 9-11. プロフィール
+- 自己紹介はタップで全文展開（再タップで折りたたみ）
+- 推しタグ：L1=「指名あり」トーン（グラデ塗り）、L2=「wish一致」トーン（枠線）— `ProfileVisualOshiTagChip` 新設、`ProfileVisualTagItem.kind` 追加
+- 評価タップで `UserEvaluationListSheet`（星＋コメント＋日付の一覧）。自分/相手プロフィール両対応
+
+#### 12. 個別募集一覧の横スワイプ
+- `ScrollFriendlyHorizontalPanView` をカードに重ね、左スワイプ=次の募集/右スワイプ=前の募集、1つ目からの右スワイプはほしいものタブへ
+
+#### 13. Megrumプレミアム案内のリッチ化
+- グラデヒーロー＋無料との○×比較表＋期間プラン選択（1/2/3/6/12ヶ月、`SubscriptionPremiumPlanCatalog`）＋グラデCTA
+- 価格: ¥500/¥950/¥1,350/¥2,400/¥4,200（〜30%おトク表記）。1ヶ月は既存 App Store 商品、他は `megrum.premium.2m/3m/6m/12m`（**App Store Connect に商品登録が必要**）
+
+#### 14. 個別募集ピッカー
+- 自由入力検索欄を削除、画像一覧を4列に
+- ほしいもの選択中に「交換条件へ進む」→「選択肢に追加しますか？」（追加して進む/追加せずに進む/キャンセル）
+
+#### 15-16. やりとり一覧
+- 相手アバターを実画像表示（`TradeCardPresentation.partnerAvatarURL`）
+- 「求めるグッズ」→「うけとるグッズ」、パネルの clipShape 除去（「求」の左上切れ解消）
+- 下部余白 132→176 でフッターと重ならず最後まで見える
+- 評価なしは「★ -（0件）」、うけとる/譲るが1件なら右上の 1/2 タグ非表示
+
+#### 17. 推しを追加の既定「自分の推し」
+- 推し設定（左ドロワー）以外の呼び出し（グッズ登録・個別募集・検索フィルタ・一覧絞り込み）では「自分の推し」カテゴリを先頭＋既定に
+
+### 影響範囲
+広範（ホーム/一覧/めぐり/打診/プロフィール/やりとり/個別募集/プレミアム）
+
+### 確認方法
+- Simulator VisualQA: `subscription-settings`（プレミアム）、`inventory`（フィルタボタン）目視済み
+- `swift test` 1471件 0 failures
+- migration push 済み
+
+### セルフレビュー結果
+- ✅ ブランドカラー直書きなし（MegrumTheme／既存モック確定値のピンクグラデ1点のみ）
+- ✅ 用語集更新（めぐりプロフィール→J廃止用語、うけとるグッズ表記）
+- ✅ 既存テストの仕様変更分を更新（tag builder / meguri identity / board presentation）
+- ⚠️ プレミアムの2ヶ月以降のプランは App Store Connect への商品登録（megrum.premium.2m 等）が必要。登録まで購入は1ヶ月のみ実動
+- ⚠️ チャットルーム参加時の名前は返信送信時に確定（閲覧のみでは不要）
+
 ## イテレーション1226.295：マイグッズ・ほしいもの画像の起動時先読み
 
 ### 背景・問題意識

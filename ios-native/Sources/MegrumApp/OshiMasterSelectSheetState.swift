@@ -2,6 +2,9 @@ import Foundation
 import MegrumCore
 
 struct OshiMasterSelectSheetState: Equatable {
+    /// 「自分の推し」カテゴリの sentinel ID（ジャンルIDと衝突しない固定値）。
+    static let myOshiCategoryID = UUID(uuidString: "00000000-0000-0000-0000-0000000A1510")!
+
     var searchText = ""
     var selectedGenreID: UUID?
     var pendingSelectedGroupIDs: Set<UUID> = []
@@ -18,10 +21,14 @@ struct OshiMasterSelectSheetState: Equatable {
         !pendingSelectedGroupIDs.isEmpty
     }
 
-    func filteredGroups(from groups: [OshiGroup]) -> [OshiGroup] {
+    func filteredGroups(from groups: [OshiGroup], myOshiGroupIDs: Set<UUID> = []) -> [OshiGroup] {
         let normalized = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         return groups.filter { group in
-            if let selectedGenreID, group.genreID != selectedGenreID {
+            if selectedGenreID == Self.myOshiCategoryID {
+                if !myOshiGroupIDs.contains(group.id) {
+                    return false
+                }
+            } else if let selectedGenreID, group.genreID != selectedGenreID {
                 return false
             }
             guard !normalized.isEmpty else {

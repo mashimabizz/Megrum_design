@@ -39,6 +39,9 @@ struct PublicUserProfileScreen: View {
                 onOpenExchangeConditions: {
                     presentationState.openExchangeConditions()
                 },
+                onOpenEvaluations: {
+                    presentationState.isEvaluationListPresented = true
+                },
                 onSelectGridItem: selectProfileGridItem,
                 onSelectListing: selectProfileListing
             )
@@ -92,6 +95,14 @@ struct PublicUserProfileScreen: View {
             if appState.goodsTypes.isEmpty {
                 await appState.loadGoodsTypes()
             }
+        }
+        .sheet(isPresented: $presentationState.isEvaluationListPresented) {
+            UserEvaluationListSheet(
+                evaluations: evaluations,
+                isLoading: appState.loadingEvaluationsUserID == userID
+            )
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: $presentationState.isExchangeConditionsPresented) {
             NavigationStack {

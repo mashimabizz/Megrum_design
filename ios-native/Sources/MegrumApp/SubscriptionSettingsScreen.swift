@@ -11,6 +11,7 @@ struct SubscriptionSettingsScreen: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var presentationState = SubscriptionSettingsPresentationState()
+    @State private var selectedPlanID = SubscriptionCatalog.megrumPlusMonthlyProductID
 
     private var state: UserSubscriptionState {
         appState.subscriptionState
@@ -26,6 +27,7 @@ struct SubscriptionSettingsScreen: View {
             purchaseMessage: presentationState.purchaseMessage,
             purchaseErrorMessage: presentationState.purchaseErrorMessage,
             isPurchaseEnabled: runtimeConfiguration.isIAPEnabled,
+            selectedPlanID: $selectedPlanID,
             onPurchase: purchase,
             onRestore: restore,
             onReload: reloadSubscriptionState,
@@ -77,9 +79,10 @@ struct SubscriptionSettingsScreen: View {
     }
 
     private func purchase() {
+        let productID = selectedPlanID
         Task {
             await runPurchaseAction {
-                try await purchaseClient.purchase(productID: SubscriptionCatalog.megrumPlusMonthlyProductID)
+                try await purchaseClient.purchase(productID: productID)
             }
         }
     }

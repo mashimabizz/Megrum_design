@@ -10,6 +10,7 @@ struct IndividualListingEditorContent: View {
     var inventory: [GoodsItem]
     var wishes: [WishItem]
     var genres: [OshiGenre]
+    var myOshiGroupIDs: Set<UUID> = []
     var groups: [OshiGroup]
     var characters: [OshiCharacter]
     var goodsTypes: [GoodsType]
@@ -84,6 +85,7 @@ struct IndividualListingEditorContent: View {
                 wishFilter: $wishSelectionFilter,
                 genres: genres,
                 groups: groups,
+                myOshiGroupIDs: myOshiGroupIDs,
                 characters: characters,
                 goodsTypes: goodsTypes,
                 selectedConditionGroupID: Binding(

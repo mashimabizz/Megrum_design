@@ -13,6 +13,8 @@ struct IndividualListingConditionTagBuilder {
         )
     }
 
+    /// タグごとのプレビュー画像。選択中の推し（グループ）に紐づくものを先頭に積み、
+    /// 他グループのものは後ろに回す（プレビューは先頭3件表示のため同グループ優先になる）。
     func previewItemsByTag() -> [String: [TagPreviewItem]] {
         var result: [String: [TagPreviewItem]] = [:]
         for item in matchingInventory {
@@ -20,6 +22,14 @@ struct IndividualListingConditionTagBuilder {
         }
         for item in matchingWishes {
             appendPreview(itemID: item.id, title: item.title, imageURL: item.imageURL, tags: item.tags, to: &result)
+        }
+        if selectedGroupID != nil {
+            for item in inventory where !matchesSelectedGroup(item) {
+                appendPreview(itemID: item.id, title: item.title, imageURL: item.imageURL, tags: item.tags, to: &result)
+            }
+            for item in wishes where !matchesSelectedGroup(item) {
+                appendPreview(itemID: item.id, title: item.title, imageURL: item.imageURL, tags: item.tags, to: &result)
+            }
         }
         return result
     }

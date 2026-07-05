@@ -8,6 +8,7 @@ struct SearchOfferedGoodsFilterSection: View {
     var groups: [OshiGroup]
     var characters: [OshiCharacter]
     var goodsTypes: [GoodsType]
+    var myOshiGroupIDs: Set<UUID> = []
     var selectedTagSummary: String
     @Binding var selectedGroupID: UUID?
     @Binding var selectedMemberID: UUID?
@@ -18,6 +19,8 @@ struct SearchOfferedGoodsFilterSection: View {
     var onSelectGroup: (OshiGroup) -> Void
     var onClearGroup: () -> Void
     var onOpenTagPicker: () -> Void
+    var headerTitle = "相手が譲るグッズ"
+    var headerSystemImage = "shippingbox"
 
     private var selectedGroupName: String {
         guard let selectedGroupID,
@@ -34,6 +37,7 @@ struct SearchOfferedGoodsFilterSection: View {
                 SearchFilterOshiGroupPickerDestination(
                     genres: genres,
                     groups: groups,
+                    myOshiGroupIDs: myOshiGroupIDs,
                     selectedGroupIDs: selectedGroupID.map { Set([$0]) } ?? [],
                     onSelectGroup: onSelectGroup
                 )
@@ -100,7 +104,7 @@ struct SearchOfferedGoodsFilterSection: View {
             }
             .buttonStyle(.plain)
         } header: {
-            Label("相手が譲るグッズ", systemImage: "shippingbox")
+            Label(headerTitle, systemImage: headerSystemImage)
         }
     }
 }
@@ -108,6 +112,7 @@ struct SearchOfferedGoodsFilterSection: View {
 private struct SearchFilterOshiGroupPickerDestination: View {
     var genres: [OshiGenre]
     var groups: [OshiGroup]
+    var myOshiGroupIDs: Set<UUID> = []
     var selectedGroupIDs: Set<UUID>
     var onSelectGroup: (OshiGroup) -> Void
 
@@ -119,6 +124,7 @@ private struct SearchFilterOshiGroupPickerDestination: View {
             groups: groups,
             selectedGroupIDs: selectedGroupIDs,
             charactersByGroupID: [:],
+            myOshiGroupIDs: myOshiGroupIDs,
             allowsMultipleSelection: false,
             onClose: { dismiss() },
             onRequest: { _ in dismiss() },

@@ -124,7 +124,7 @@ private struct MeguriUserProfileSummaryScreen: View {
         }
         let tags = appState.publicProfilesByUserID[userID]?.oshiTags ?? []
         return tags.map { tag in
-            ProfileVisualTagItem(title: tag.title, colorKey: tag.colorKey)
+            ProfileVisualTagItem(title: tag.title, colorKey: tag.colorKey, kind: tag.characterID == nil ? .group : .member)
         }
     }
 }

@@ -7,6 +7,7 @@ struct PublicUserProfilePresentationState {
     var listingProposalTarget: ListingProposalTarget?
     var isSchedulePresented = false
     var isExchangeConditionsPresented = false
+    var isEvaluationListPresented = false
     var reportTarget: PublicProfileModerationTarget?
     var blockTarget: PublicProfileModerationTarget?
 

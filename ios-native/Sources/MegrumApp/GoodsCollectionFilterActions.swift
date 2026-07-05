@@ -17,6 +17,7 @@ extension GoodsCollectionScreen {
            appState?.isLoadingOshiGroups != true,
            !availableGroups.contains(where: { $0.id == selectedGroupID }) {
             self.selectedGroupID = nil
+            self.selectedMemberID = nil
         }
         if let selectedGoodsTypeID,
            appState?.isLoadingGoodsTypes != true,
