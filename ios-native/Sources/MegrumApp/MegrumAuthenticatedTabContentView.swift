@@ -237,7 +237,6 @@ struct MegrumAuthenticatedTabContentView: View {
                 viewer: appState.viewer,
                 matchedItems: appState.homeMatchedItems,
                 possibleItems: appState.homePossibleItems,
-                isLoading: appState.isLoading,
                 adDisplayContext: adDisplayContext,
                 showsSearch: $showsSearch,
                 onRefresh: appState.refresh,

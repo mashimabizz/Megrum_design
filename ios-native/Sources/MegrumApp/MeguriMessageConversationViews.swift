@@ -16,33 +16,40 @@ struct MeguriMessageList: View {
     var onOpenImage: (URL) -> Void = { _ in }
 
     var body: some View {
-        ScrollView {
-            LazyVStack(spacing: 12) {
-                if isLoading {
-                    MeguriMessageLoadingRow()
-                } else if messages.isEmpty {
-                    MeguriMessageEmptyState()
-                } else {
-                    ForEach(messages) { message in
-                        MeguriMessageBubble(
-                            message: message,
-                            viewerID: viewerID,
-                            isMine: message.senderID == viewerID,
-                            canReadIncomingMessages: canReadIncomingMessages,
-                            peerAvatarID: peerAvatarID,
-                            peerAvatarURL: peerAvatarURL,
-                            peerFallback: peerFallback,
-                            onOpenPremium: onOpenPremium,
-                            onOpenPeerProfile: onOpenPeerProfile,
-                            onOpenImage: onOpenImage
-                        )
-                        .id(message.id)
+        GeometryReader { proxy in
+            ScrollView {
+                LazyVStack(spacing: 12) {
+                    if isLoading {
+                        MeguriMessageLoadingRow()
+                    } else if messages.isEmpty {
+                        MeguriMessageEmptyState()
+                    } else {
+                        ForEach(messages) { message in
+                            MeguriMessageBubble(
+                                message: message,
+                                viewerID: viewerID,
+                                isMine: message.senderID == viewerID,
+                                canReadIncomingMessages: canReadIncomingMessages,
+                                peerAvatarID: peerAvatarID,
+                                peerAvatarURL: peerAvatarURL,
+                                peerFallback: peerFallback,
+                                onOpenPremium: onOpenPremium,
+                                onOpenPeerProfile: onOpenPeerProfile,
+                                onOpenImage: onOpenImage
+                            )
+                            .id(message.id)
+                        }
                     }
                 }
+                .padding(.horizontal, 18)
+                .padding(.top, 18)
+                .padding(.bottom, 8)
+                .frame(maxWidth: .infinity)
+                .frame(
+                    minHeight: proxy.size.height,
+                    alignment: messages.isEmpty || isLoading ? .top : .bottom
+                )
             }
-            .padding(.horizontal, 18)
-            .padding(.top, 18)
-            .padding(.bottom, 18)
         }
         .scrollDismissesKeyboard(.interactively)
     }

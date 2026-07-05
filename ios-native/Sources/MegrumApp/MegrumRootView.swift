@@ -94,7 +94,7 @@ public struct MegrumRootView: View {
                 return
             }
             Task {
-                await syncRepositoryWithAuthSession()
+                await syncRepositoryWithAuthSession(reloadsInitialData: false)
             }
         }
         .onChange(of: authState.sessionSource) { _, source in
@@ -116,7 +116,9 @@ public struct MegrumRootView: View {
             drawerPageDestination: drawerPageDestination,
             adDisplayContext: adDisplayContext,
             sessionSource: authState.sessionSource,
-            onRetryLoading: syncRepositoryWithAuthSession,
+            onRetryLoading: {
+                await syncRepositoryWithAuthSession()
+            },
             onSignOutFromLoadingFailure: {
                 await authState.signOut()
                 Task {
@@ -278,10 +280,11 @@ public struct MegrumRootView: View {
         )
     }
 
-    private func syncRepositoryWithAuthSession() async {
+    private func syncRepositoryWithAuthSession(reloadsInitialData: Bool = true) async {
         await authState.refreshSessionIfNeeded()
         await appState.replaceRepository(
-            MegrumAppStateFactory.repository(authSession: authState.session)
+            MegrumAppStateFactory.repository(authSession: authState.session),
+            reloadsInitialData: reloadsInitialData
         )
         // アプリアイコンのバッジ（未読通知数）を起動直後から反映できるよう、
         // ドロワーを開く前に通知を読み込んでおく。バッジ用途なので失敗しても

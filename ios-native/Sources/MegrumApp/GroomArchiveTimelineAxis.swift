@@ -22,25 +22,6 @@ struct GroomArchiveTimelineAxis: View {
                 let layout = GroomArchiveTimelineAxisLayout(size: proxy.size, itemCount: chronologicalGrooms.count)
 
                 ZStack(alignment: .topTrailing) {
-                    Capsule()
-                        .fill(.regularMaterial)
-                        .frame(width: 34)
-                        .overlay {
-                            Capsule()
-                                .stroke(.white.opacity(0.72), lineWidth: 1)
-                        }
-                        .shadow(color: MegrumTheme.ink.opacity(0.16), radius: 18, y: 10)
-                        .frame(maxHeight: .infinity, alignment: .center)
-                        .position(x: layout.axisX, y: proxy.size.height / 2)
-                        .allowsHitTesting(false)
-
-                    Capsule()
-                        .fill(MegrumTheme.ink.opacity(0.28))
-                        .frame(width: 4)
-                        .frame(maxHeight: max(40, proxy.size.height - layout.verticalInset * 2))
-                        .position(x: layout.axisX, y: proxy.size.height / 2)
-                        .allowsHitTesting(false)
-
                     ForEach(Array(chronologicalGrooms.enumerated()), id: \.element.id) { index, groom in
                         let y = layout.yPosition(for: index)
                         let isFocused = groom.id == focusedGroomID
@@ -70,13 +51,6 @@ struct GroomArchiveTimelineAxis: View {
                             .allowsHitTesting(false)
                     }
                 }
-                .contentShape(Rectangle())
-                .gesture(
-                    DragGesture(minimumDistance: 0)
-                        .onChanged { value in
-                            focusNearest(to: value.location.y, layout: layout)
-                        }
-                )
                 .animation(.spring(response: 0.24, dampingFraction: 0.86), value: focusedGroomID)
             }
             .frame(width: 150)
@@ -103,13 +77,6 @@ struct GroomArchiveTimelineAxis: View {
         return nil
     }
 
-    private func focusNearest(to yPosition: CGFloat, layout: GroomArchiveTimelineAxisLayout) {
-        let index = layout.nearestIndex(to: yPosition)
-        guard chronologicalGrooms.indices.contains(index) else {
-            return
-        }
-        onFocus(chronologicalGrooms[index])
-    }
 }
 
 private struct GroomArchiveTimelineAxisLayout {
@@ -136,14 +103,6 @@ private struct GroomArchiveTimelineAxisLayout {
         return verticalInset + availableHeight * CGFloat(index) / CGFloat(itemCount - 1)
     }
 
-    func nearestIndex(to yPosition: CGFloat) -> Int {
-        guard itemCount > 1 else {
-            return 0
-        }
-        let availableHeight = max(size.height - verticalInset * 2, 1)
-        let normalized = min(max((yPosition - verticalInset) / availableHeight, 0), 1)
-        return min(max(Int((normalized * CGFloat(itemCount - 1)).rounded()), 0), itemCount - 1)
-    }
 }
 
 private struct GroomArchiveTimelineTick: View {

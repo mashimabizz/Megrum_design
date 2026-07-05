@@ -142,6 +142,7 @@ public final class MegrumAppState: ObservableObject {
     var groomMapCacheKey: MeguriFeedCacheKey?
     var isMeguriFeedRequestInFlight = false
     var isGroomMapRequestInFlight = false
+    var ownedGoodsImagePreloadTask: Task<Void, Never>?
     private static weak var activeInstanceStorage: MegrumAppState?
 
     static var activeInstance: MegrumAppState? {
@@ -151,6 +152,10 @@ public final class MegrumAppState: ObservableObject {
     public init(repository: any MegrumRepository = PreviewMegrumRepository()) {
         self.repository = repository
         Self.activeInstanceStorage = self
+    }
+
+    deinit {
+        ownedGoodsImagePreloadTask?.cancel()
     }
 
     public var unreadNotificationCount: Int {
@@ -340,6 +345,7 @@ public final class MegrumAppState: ObservableObject {
         do {
             let snapshot = try await repository.loadInitialSnapshot()
             apply(snapshot)
+            preloadOwnedGoodsImages(inventory: snapshot.inventory, wishes: snapshot.wishes)
             await loadBlockedContentUserIDs(reportsFailure: false)
             await loadHomeCandidates(fallbackInventory: snapshot.inventory)
             await loadSubscriptionState(reportsFailure: false)
@@ -363,6 +369,7 @@ public final class MegrumAppState: ObservableObject {
         do {
             let snapshot = try await repository.loadInitialSnapshot()
             apply(snapshot)
+            preloadOwnedGoodsImages(inventory: snapshot.inventory, wishes: snapshot.wishes)
             await loadBlockedContentUserIDs(reportsFailure: false)
             await loadHomeCandidates(fallbackInventory: snapshot.inventory)
             await loadSubscriptionState(reportsFailure: false)
@@ -401,8 +408,14 @@ public final class MegrumAppState: ObservableObject {
         }
     }
 
-    public func replaceRepository(_ repository: any MegrumRepository) async {
+    public func replaceRepository(
+        _ repository: any MegrumRepository,
+        reloadsInitialData: Bool = true
+    ) async {
         self.repository = repository
+        guard reloadsInitialData else {
+            return
+        }
         await loadInitialData()
     }
 
@@ -434,6 +447,26 @@ public final class MegrumAppState: ObservableObject {
         homePossibleItems = resolved.possibleItems
         homeCandidateConditionSignals = resolved.conditionSignalsByItemID
         homeMutualMatchCandidates = resolved.mutualMatchCandidates
+    }
+
+    private func preloadOwnedGoodsImages(inventory: [GoodsItem], wishes: [WishItem]) {
+        guard !(repository is PreviewMegrumRepository) else {
+            ownedGoodsImagePreloadTask?.cancel()
+            ownedGoodsImagePreloadTask = nil
+            return
+        }
+
+        let urls = OwnedGoodsImagePreloadPolicy.urls(inventory: inventory, wishes: wishes)
+        guard !urls.isEmpty else {
+            ownedGoodsImagePreloadTask?.cancel()
+            ownedGoodsImagePreloadTask = nil
+            return
+        }
+
+        ownedGoodsImagePreloadTask?.cancel()
+        ownedGoodsImagePreloadTask = Task(priority: .utility) {
+            await GoodsRemoteImageDataLoader.preload(urls: urls)
+        }
     }
 
 }

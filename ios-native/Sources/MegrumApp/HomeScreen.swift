@@ -7,7 +7,6 @@ struct HomeScreen: View {
     var viewer: UserProfile?
     var matchedItems: [GoodsItem]
     var possibleItems: [GoodsItem]
-    var isLoading: Bool
     var adDisplayContext: AdDisplayContext = AdDisplayContext()
     @Binding var showsSearch: Bool
     var onRefresh: () async -> Void
@@ -51,7 +50,6 @@ struct HomeScreen: View {
             goodsTypes: appState?.goodsTypes ?? [],
             conditionSignalsByItemID: appState?.homeCandidateConditionSignals ?? [:],
             mutualMatchCandidateData: appState?.homeMutualMatchCandidates ?? [],
-            isLoading: isLoading,
             adDisplayContext: adDisplayContext,
             opensInitialHavesLookup: visualQAInitialScreen == .homeHavesLookup,
             onOpenSettings: onOpenSettings,

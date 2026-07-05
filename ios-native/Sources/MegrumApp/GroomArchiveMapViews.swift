@@ -50,34 +50,23 @@ private struct GroomArchiveMapPin: View {
     var groom: GroomPost
 
     var body: some View {
-        VStack(spacing: 0) {
-            GroomThumbnailCircle(url: groom.imageURL, size: 62)
-                .overlay {
-                    Circle()
-                        .stroke(
-                            LinearGradient(
-                                colors: [MegrumTheme.lavender, MegrumTheme.pink],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ),
-                            lineWidth: 4
-                        )
-                }
-                .overlay(alignment: .bottomTrailing) {
-                    Image(systemName: "clock.fill")
-                        .font(.system(size: 10, weight: .heavy))
-                        .foregroundStyle(.white)
-                        .frame(width: 22, height: 22)
-                        .background(MegrumTheme.ink, in: Circle())
-                        .offset(x: 4, y: 4)
-                }
-                .shadow(color: MegrumTheme.ink.opacity(0.22), radius: 12, y: 8)
+        MeguriPinPopIn {
+            MeguriFloatingMotion(seed: groom.id.hashValue) {
+                VStack(spacing: 4) {
+                    GroomMapPin(groom: groom, isOutOfRange: false)
 
-            GroomArchiveTriangle()
-                .fill(MegrumTheme.lavender)
-                .frame(width: 14, height: 8)
-                .offset(y: -1)
+                    Text(groom.createdAt.formatted(.dateTime.month().day()))
+                        .font(.system(size: 11, weight: .black, design: .rounded))
+                        .foregroundStyle(MegrumTheme.ink)
+                        .lineLimit(1)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(.white.opacity(0.92), in: Capsule())
+                        .shadow(color: MegrumTheme.ink.opacity(0.12), radius: 6, y: 3)
+                }
+            }
         }
+        .accessibilityElement(children: .combine)
         .accessibilityLabel("過去のグルーム")
     }
 }
@@ -136,16 +125,5 @@ enum GroomArchiveMapRegion {
             width: radiusMapPoints * 2,
             height: radiusMapPoints * 2
         )
-    }
-}
-
-private struct GroomArchiveTriangle: Shape {
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        path.move(to: CGPoint(x: rect.midX, y: rect.maxY))
-        path.addLine(to: CGPoint(x: rect.minX, y: rect.minY))
-        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
-        path.closeSubpath()
-        return path
     }
 }

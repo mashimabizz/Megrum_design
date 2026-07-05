@@ -92,7 +92,7 @@ private struct NativeCameraPickerController: UIViewControllerRepresentable {
                 finishWithFailure("撮影した写真を読み込めませんでした")
                 return
             }
-            guard let data = image.jpegData(compressionQuality: 0.88) else {
+            guard let data = normalizedCameraPhotoData(from: image) else {
                 finishWithFailure("撮影した写真を保存できませんでした")
                 return
             }

@@ -11,7 +11,6 @@ struct HomeDiscoveryExperience: View {
     var goodsTypes: [GoodsType] = []
     var conditionSignalsByItemID: [UUID: HomeCandidateConditionSignals] = [:]
     var mutualMatchCandidateData: [HomeMutualMatchCandidateData] = []
-    var isLoading: Bool
     var adDisplayContext: AdDisplayContext = AdDisplayContext()
     var opensInitialHavesLookup: Bool = false
     var onOpenSettings: () -> Void
@@ -105,25 +104,16 @@ struct HomeDiscoveryExperience: View {
             pinnedHeader(isCollapsed: isCollapsed)
         }
         .overlay {
-            ZStack {
-                if isLoading {
-                    ProgressView()
-                        .tint(MegrumTheme.lavender)
-                        .padding(18)
-                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-                }
-
-                if let sharePromptContext {
-                    GoodsSharePromptOverlay(
-                        context: sharePromptContext,
-                        isPreparing: isPreparingSharePost,
-                        errorMessage: sharePostErrorMessage,
-                        onDismiss: dismissSharePrompt,
-                        onShare: startGoodsSharePost
-                    )
-                    .transition(.opacity.combined(with: .scale(scale: 0.97)))
-                    .zIndex(20)
-                }
+            if let sharePromptContext {
+                GoodsSharePromptOverlay(
+                    context: sharePromptContext,
+                    isPreparing: isPreparingSharePost,
+                    errorMessage: sharePostErrorMessage,
+                    onDismiss: dismissSharePrompt,
+                    onShare: startGoodsSharePost
+                )
+                .transition(.opacity.combined(with: .scale(scale: 0.97)))
+                .zIndex(20)
             }
         }
         .sheet(

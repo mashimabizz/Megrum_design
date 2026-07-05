@@ -6,16 +6,9 @@ enum GroomArchiveStoryMoveOutcome: Equatable {
     case dismiss
 }
 
-enum GroomArchiveStoryDragOutcome: Equatable {
-    case none
-    case showInsights
-    case dismiss
-}
-
 struct GroomArchiveStoryPresentationState: Equatable {
     var currentIndex: Int
     var dragOffset: CGSize = .zero
-    var showsInsights = false
 
     init(initialIndex: Int = 0) {
         currentIndex = max(0, initialIndex)
@@ -42,25 +35,11 @@ struct GroomArchiveStoryPresentationState: Equatable {
         dragOffset = translation
     }
 
-    func dragOutcome(for translation: CGSize) -> GroomArchiveStoryDragOutcome {
-        if translation.height < -76 {
-            return .showInsights
-        }
-        if translation.height > 110 {
-            return .dismiss
-        }
-        return .none
+    func shouldDismiss(for translation: CGSize) -> Bool {
+        translation.height > 110
     }
 
     mutating func resetDrag() {
         dragOffset = .zero
-    }
-
-    mutating func showInsights() {
-        showsInsights = true
-    }
-
-    mutating func dismissInsights() {
-        showsInsights = false
     }
 }

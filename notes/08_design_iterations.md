@@ -4,6 +4,334 @@
 
 ---
 
+## イテレーション1226.299：グルーム写真の縦向き維持
+
+### 背景・問題意識
+
+グルームで縦撮り写真を使った時、初期表示が横向きになったり、撮影画像が横長に潰れて見えることがあった。カメラ画像はEXIFの向き情報を持ったまま横長のraw pixelで渡る場合があるため、アップロード前に見た目の向きと縦横比を保ったJPEGへ正規化する必要がある。また、グルーム編集画面の閉じるボタンは現状より上に置き、アイコンだけを小さくする。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ImageUploadNormalization.swift`
+- `UIImage` の向き情報を反映したpixel sizeでリサイズ判定するようにした。
+- `.right` / `.left` などの縦向き撮影画像を、アップロード前に縦横比を保った `.up` のJPEGとして描き直すようにした。
+
+#### `ios-native/Sources/MegrumApp/GroomStoryEditorView.swift`
+- グルーム編集画面の閉じるボタンを上へ移動した。
+- タップ領域は44ptを保ったまま、×アイコンの表示サイズを約半分にした。
+
+#### `ios-native/Tests/MegrumAppTests/ImageUploadContentTypeTests.swift`
+- 横長raw pixelに縦向きorientationが付いたカメラ画像を、縦長JPEGとして正規化する回帰テストを追加した。
+
+### 影響範囲
+
+- グルームを含む写真アップロード正規化経路。
+- グルーム編集画面の上部閉じるボタン表示。
+
+### 確認方法
+- `git diff --check`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1 --filter ImageUploadContentTypeTests`
+  - passed（macOS SwiftPMで実行可能なContent-Type系テスト）
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+  - passed
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'platform=iOS Simulator,id=C70DDDBB-2602-49E0-8F95-1F043BCCED76' -derivedDataPath /tmp/megrum-native-xcodebuild CODE_SIGNING_ALLOWED=NO test -only-testing:MegrumAppTests/ImageUploadContentTypeTests`
+  - not run（`MegrumNative` scheme がtest action未設定）
+
+### セルフレビュー結果
+- ✅ グルーム表示側の `scaledToFit` 表示と編集キャンバスの前景 `scaledToFit` は維持。
+- ✅ 背景ぼかし、テキストオーバーレイ、投稿フロー、Storage/APIの契約は変更していない。
+- ✅ 閉じるボタンの視覚サイズは小さくしつつ、操作しやすい44ptの当たり判定は維持。
+- ✅ 状態遷移、用語、データモデル変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` は更新不要。
+
+---
+
+## イテレーション1226.298：めぐり圏外作成トーストの上部退避
+
+### 背景・問題意識
+
+めぐり地図で1km圏外をタップした時の「1km圏外にグルーム・チャットは作成できません」トーストが、上部のフィルターアイコン行に重なって見えることがあった。圏外作成時の注意は操作アイコンを隠さず、フィルターアイコン行の上に表示する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MeguriScreen.swift`
+- 上部配置の `MeguriToastView` の上余白を小さくし、フィルターアイコン行と重ならない位置に出るようにした。
+- 下部配置の通常トースト余白は維持した。
+
+### 影響範囲
+
+- めぐり地図で1km圏外をタップした時の上部トースト表示位置。
+
+### 確認方法
+- `git diff --check`
+  - passed
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+  - passed
+
+### セルフレビュー結果
+- ✅ 圏外作成時の文言と表示時間は維持。
+- ✅ フィルター、通知、プロフィール、地図種別ボタンのレイアウトと当たり判定は変更していない。
+- ✅ 状態遷移、用語、データモデル変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` は更新不要。
+
+---
+
+## イテレーション1226.297：法務リンクとGoogle Lensのアプリ内表示
+
+### 背景・問題意識
+
+設定一覧の利用規約・プライバシーポリシーはMegrum.jpの公開ページを直接確認できる必要がある。また、シリーズ登録のGoogle Lens検索もSafariアプリへ離脱せず、Megrum内のブラウザで開きたい。Google Lens検索前の説明文と確認ポップアップは、操作の流れを止めるため削除する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/SettingsLegalViews.swift`
+- `LegalDocumentKind` にMegrum.jp公開URLを追加し、利用規約・プライバシーポリシー・特定商取引法表記のURLを一元管理した。
+
+#### `ios-native/Sources/MegrumApp/SettingsScreen.swift`
+- 設定一覧から利用規約・プライバシーポリシーを開く時、iOSでは既存の `MegrumInAppSafariView` を使ってアプリ内ブラウザで表示するようにした。
+- iOS以外では従来どおり `openURL` にフォールバックする。
+
+#### `ios-native/Sources/MegrumApp/SettingsScreenSections.swift`
+- 設定一覧の利用規約・プライバシーポリシーの補足文言を、Megrum.jp表示であることが分かる表示へ変更した。
+
+#### `ios-native/Sources/MegrumApp/GoodsEditorScreen.swift`
+#### `ios-native/Sources/MegrumApp/IndividualListingConditionTab.swift`
+#### `ios-native/Sources/MegrumApp/GoodsEditorSheetGoogleLensActions.swift`
+- シリーズ登録・個別条件登録のGoogle Lens検索を、iOSではアプリ内ブラウザで開くようにした。
+- Google Lens URLの組み立てや画像アップロード前提の挙動は維持した。
+
+#### `ios-native/Sources/MegrumApp/GoodsGoogleLensPickerSheet.swift`
+#### `ios-native/Sources/MegrumApp/GoodsGoogleLensSearchModels.swift`
+- Google Lens検索前の説明セクション、フッター説明、確認ポップアップを削除した。
+- 候補をタップしたら、そのまま選択して検索へ進むようにした。
+
+#### `ios-native/Tests/MegrumAppTests/SettingsScreenTests.swift`
+#### `ios-native/Tests/MegrumAppTests/GoodsEditorDraftTests.swift`
+- 法務ページURLがMegrum.jpの公開URLを指すテストを追加した。
+- 削除したGoogle Lens説明文に対する旧テストを削除した。
+
+### 影響範囲
+
+- 設定一覧の利用規約・プライバシーポリシー導線。
+- シリーズ登録・個別条件登録のGoogle Lens検索導線。
+- Google Lens候補選択シートの説明表示と確認表示。
+
+### 確認方法
+- `rg -n "GoodsGoogleLensSearchDisclosure|選んだ画像または画像URL|画像検索を開く前|Google Lensで画像検索しますか|公開前確認用の要約|取り扱う情報の要点" ios-native/Sources/MegrumApp ios-native/Tests`
+  - no matches
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1 --filter SettingsScreenTests/testLegalDocumentKindPublicURLsPointToMegrumLegalPages`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1 --filter GoodsEditorDraftTests/testGoogleLensSearchURLBuilderEncodesImageURL`
+  - passed
+- `git diff --check`
+  - passed
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+  - passed
+
+### セルフレビュー結果
+- ✅ Safariアプリへの離脱ではなく、iOSではMegrum内の `SFSafariViewController` 表示に寄せた。
+- ✅ 特定商取引法表記など、既存の内部法務画面導線は壊さず残した。
+- ✅ Google Lens URL生成・画像URLエンコードの既存挙動は維持した。
+- ✅ 状態遷移、用語、データモデル変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` は更新不要。
+
+---
+
+## イテレーション1226.296：ホーム復帰時ローディング抑制
+
+### 背景・問題意識
+
+ホームをしばらく開かずに戻った時や、アプリをバックグラウンドから開き直した時、復帰処理で初期データロードが走り、ホーム中央にローディングが出て操作が止まる体感があった。ホームの更新ローディングは、ユーザーが明示的に上スワイプ更新した時だけにする。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MegrumRootView.swift`
+- scenePhase が `.active` に戻った時は、Auth session の更新と repository の差し替えだけ行い、初期データロードを再実行しないようにした。
+- 初回表示、ログインユーザー切り替え、読み込み失敗リトライでは従来どおり初期データロードを行う。
+
+#### `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- `replaceRepository` に `reloadsInitialData` を追加し、同じ画面状態を維持したまま repository だけ差し替えられるようにした。
+
+#### `ios-native/Sources/MegrumApp/HomeScreen.swift`
+#### `ios-native/Sources/MegrumApp/HomeDiscoveryExperience.swift`
+#### `ios-native/Sources/MegrumApp/MegrumAuthenticatedTabContentView.swift`
+- ホームに渡していたグローバル `isLoading` と中央 `ProgressView` overlay を削除。
+- ホーム更新時の表示は、既存の `HomePullRefreshScrollView` / iOS標準 `refreshable` に限定した。
+
+#### `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- repository 差し替え時に初期データを再読み込みしないケースを検証する回帰テストを追加。
+- 明示的なホーム更新では従来どおり snapshot と候補が再読み込みされる既存テストを維持。
+
+### 影響範囲
+
+- ホームタブのバックグラウンド復帰時表示。
+- Auth session 更新後の repository 差し替え。
+- ホームの上スワイプ更新表示。
+
+### 確認方法
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1 --filter MegrumAppStateTests/testAppStateCanReplaceRepositoryWithoutReloadingHomeSnapshot`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1 --filter MegrumAppStateTests/testAppStateRefreshHomeDiscoveryReloadsSnapshotAndHomeCandidates`
+  - passed
+- `git diff --check`
+  - passed
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+  - passed
+
+### セルフレビュー結果
+- ✅ 初回起動・ログイン直後・読み込み失敗リトライの初期ロードは維持。
+- ✅ 上スワイプ更新では従来どおりホーム snapshot と候補を再取得する。
+- ✅ 復帰時は画面状態を維持し、ローディング overlay でホーム操作を止めない。
+- ✅ 状態遷移、用語、データモデル変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` は更新不要。
+
+---
+
+## イテレーション1226.295：マイグッズ・ほしいもの画像の起動時先読み
+
+### 背景・問題意識
+
+マイグッズ/ほしいものタブを初めて開いた時、グリッド内の画像読み込みが一斉に始まり、タブ切り替え直後に少し止まる体感があった。初期スナップショットではグッズ行自体を起動時に取得済みなので、画像データも起動後に裏で先読みしておく。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/GoodsRemoteImageLoading.swift`
+- 画像Dataローダーに `preload(urls:maxConcurrentRequests:)` を追加。
+- URL重複を除外し、最大4本ずつ並列に既存の `GoodsRemoteImageDataCache` / `URLCache` へ読み込むようにした。
+- テスト用にDataキャッシュの `removeAll()` を追加。
+
+#### `ios-native/Sources/MegrumApp/OwnedGoodsImagePreloadPolicy.swift`
+- マイグッズ先頭60件、ほしいもの先頭60件の画像URLを安定順で抽出し、重複URLを1回にまとめるポリシーを追加。
+
+#### `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- `loadInitialData()` / `refreshHomeDiscovery()` で初期スナップショットを適用した直後、ライブリポジトリの場合だけマイグッズ/ほしいもの画像のプリロードをバックグラウンドで開始するようにした。
+- 起動表示自体を遅くしないよう、先読みタスクはawaitせず、次回ロード時やdeinit時にキャンセルする。
+
+#### `ios-native/Tests/MegrumAppTests/GoodsGridLayoutTests.swift`
+- 先読み並列数、ファイルURLのプリロードキャッシュ投入、マイグッズ/ほしいものURL抽出の重複排除を検証。
+
+### 影響範囲
+
+- ライブリポジトリで起動/ホーム更新した後の、マイグッズ・ほしいものグリッド画像読み込み。
+- Previewリポジトリでは外部画像アクセスを避けるため先読みしない。
+
+### 確認方法
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1 --filter GoodsGridLayoutTests`
+  - passed（37 tests）
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+  - passed
+
+### セルフレビュー結果
+- ✅ グッズ/ほしいもののDB取得、保存、編集、削除、フィルター、タブ構成は変更していない。
+- ✅ 先読みは非ブロッキングで、アプリ起動の初期表示完了を待たせない。
+- ✅ 状態遷移、用語、データモデル変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` は更新不要。
+- ⚠️ 先頭60件を超えた画像は従来どおり表示時に読み込む。
+
+---
+
+## イテレーション1226.294：画像アップロード時の軽量化
+
+### 背景・問題意識
+
+写真ライブラリから選んだ画像が、対応形式かつサイズ上限内なら元データのままアップロードされていた。高解像度画像は10MB未満でも表示時の読み込みが重くなり得るため、アップロード前に共通でリサイズとJPEG再エンコードを行う。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ImageUploadNormalization.swift`
+- `normalizedPhotoUpload` / `normalizedChatPhotoUpload` でUIKit上の実画像をデコードできる場合、JPEGへ再エンコードし、通常画像は最大辺2048px、チャット系画像は最大辺1600pxへ縮小するようにした。
+- 通常画像は約2.5MB、チャット系画像は約1.8MBを目標に品質を段階調整し、元データより小さい場合や縮小が必要な場合は軽量化後のJPEGを採用するようにした。
+- 壊れた画像やUIKitでデコードできないデータは従来どおりcontent-type判定のフォールバックへ流す。
+- カメラ撮影画像用の `normalizedCameraPhotoData` を追加し、撮影直後の画像も同じ軽量化方針へ寄せた。
+
+#### `ios-native/Sources/MegrumApp/NativeCameraCaptureView.swift`
+- カメラ撮影時の単純な `jpegData(compressionQuality: 0.88)` をやめ、共通のアップロード軽量化処理を使うようにした。
+
+#### `ios-native/Tests/MegrumAppTests/ImageUploadContentTypeTests.swift`
+- UIKitが使える環境向けに、通常アップロードは最大辺2048px、チャットアップロードは最大辺1600pxへ縮小される回帰テストを追加した。
+
+### 影響範囲
+
+- グッズ、プロフィール、めぐり/取引チャット、掲示板、証跡、グルーム投稿など、既存の共通画像正規化を通るアップロード。
+- カメラ撮影画像のアップロードデータ。
+
+### 確認方法
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1 --filter ImageUploadContentTypeTests`
+  - passed（macOS SwiftPM環境ではUIKit分岐外の4 tests）
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+  - passed
+
+### セルフレビュー結果
+- ✅ Storageの保存先、DB/API、画像URLの扱いは変更していない。
+- ✅ 画像選択・撮影・送信/保存の画面遷移は変更していない。
+- ✅ 状態遷移、用語、データモデル変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` は更新不要。
+
+---
+
+## イテレーション1226.293：グルーム自投稿操作とアーカイブ地図整理
+
+### 背景・問題意識
+
+グルームで自分の投稿を表示している時、右下メニューに「反応を見る」が混ざり、アーカイブStoryでは上スワイプで反応を見る導線と案内文が残っていた。アーカイブ地図もホーム地図のグルームピン表現と差があり、右側タイムラインの背景と広い当たり判定が操作ノイズになっていた。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/GroomViewerScreen.swift`
+- 自分の投稿Viewerから反応インサイトsheetの保持状態と表示を削除。
+
+#### `ios-native/Sources/MegrumApp/GroomViewerChromeViews.swift`
+- 自分の投稿用の右下 `...` メニューを「削除する」のみに整理。
+
+#### `ios-native/Sources/MegrumApp/GroomArchiveStoryViews.swift`
+- 左上の「上にスワイプで反応を見る」表示を削除。
+- 上スワイプで反応インサイトを開く挙動を削除し、下スワイプの閉じる挙動だけ維持。
+
+#### `ios-native/Sources/MegrumApp/GroomArchiveMapViews.swift`
+- アーカイブ地図ピンを、めぐりホーム地図と同じ `GroomMapPin` + `MeguriFloatingMotion` のぷかぷか表示へ変更。
+- ピン下に投稿日付ラベルを追加。
+
+#### `ios-native/Sources/MegrumApp/GroomArchiveTimelineAxis.swift`
+- 右側タイムラインのグレー背景と全体ドラッグ判定を削除。
+- 丸い日付ポイントだけをタップ可能にし、横の日付バッジは表示のみのまま維持。
+
+#### `ios-native/Tests/MegrumAppTests/MeguriAccessPolicyTests.swift`
+- アーカイブStoryのドラッグ仕様変更に合わせ、上スワイプ反応表示ではなく下スワイプ閉じる判定を検証。
+
+### 影響範囲
+
+- グルーム自投稿Viewer
+- グルームアーカイブStory
+- グルームアーカイブ地図と右側タイムライン
+
+### 確認方法
+- `git diff --check`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1 --filter MeguriAccessPolicyTests`
+  - passed（30 tests）
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-build`
+  - passed
+
+### セルフレビュー結果
+- ✅ 投稿削除処理、コメント/いいね一覧表示、左右タップでのStory移動、下スワイプで閉じる挙動は維持。
+- ✅ 地図表示は既存の `MeguriMapVisualStyle.quietStandard` と `MeguriMapBrandToneOverlay` を維持。
+- ✅ 状態遷移、用語、データモデル変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` は更新不要。
+
+---
+
+## イテレーション1226.293：需要ファーストモック改訂（ロータリーカード＋相手ユーザー行）
+
+### 背景・問題意識
+
+モックのグッズ画像を本番同様のスワイプ回転（HomeDiscoveryRotaryCard）にし、行構成を「塊ラベル →（間）→ 相手アイコン＋ユーザー名 → 需要行 → 物流・支払」に変更するオーナー指示。
+
+### 変更内容
+
+#### `HomeDemandFirstPreview.swift`
+- 静的な扇カードを本番の `HomeDiscoveryRotaryCard`（スワイプで回転・タグオーバーレイなし）へ差し替え。モック用グッズは fixture 画像から生成。
+- テキスト列に相手ユーザー行（アバター20pt＋ユーザー名）を追加。順序＝塊ラベル→相手→需要行→物流→支払。
+
+### 確認方法
+
+- `SIMCTL_CHILD_MEGRUM_VISUAL_QA_PREVIEW_AUTH=1 SIMCTL_CHILD_MEGRUM_VISUAL_QA_INITIAL_SCREEN=home-demand-first`
+
+---
+
 ## イテレーション1226.292：ホーム候補行v3「需要ファースト」モックアップ
 
 ### 背景・問題意識

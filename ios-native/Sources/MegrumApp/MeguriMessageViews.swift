@@ -483,42 +483,49 @@ struct MeguriMessagesScreen: View {
     }
 
     private var content: some View {
-        VStack(spacing: 0) {
-            ScrollViewReader { proxy in
-                MeguriMessageList(
-                    messages: messages,
-                    viewerID: appState.viewer?.id,
-                    isLoading: appState.isLoadingMeguriMessages,
-                    canReadIncomingMessages: canUseMeguriMessages,
-                    peerAvatarID: peerAvatarID,
-                    peerAvatarURL: peerAvatarURL,
-                    peerFallback: peerTitle,
-                    onOpenPremium: openMegrumPlus,
-                    onOpenPeerProfile: { onOpenUserProfile(route.peerID) },
-                    onOpenImage: { url in
-                        photoPresentationState.selectRemoteImage(url)
-                    }
-                )
-                .onChange(of: messages.count) { _, _ in
-                    guard let lastID = messages.last?.id else {
-                        return
-                    }
-                    withAnimation(.snappy(duration: 0.24)) {
-                        proxy.scrollTo(lastID, anchor: .bottom)
-                    }
+        ScrollViewReader { proxy in
+            MeguriMessageList(
+                messages: messages,
+                viewerID: appState.viewer?.id,
+                isLoading: appState.isLoadingMeguriMessages,
+                canReadIncomingMessages: canUseMeguriMessages,
+                peerAvatarID: peerAvatarID,
+                peerAvatarURL: peerAvatarURL,
+                peerFallback: peerTitle,
+                onOpenPremium: openMegrumPlus,
+                onOpenPeerProfile: { onOpenUserProfile(route.peerID) },
+                onOpenImage: { url in
+                    photoPresentationState.selectRemoteImage(url)
+                }
+            )
+            .onChange(of: messages.count) { _, _ in
+                guard let lastID = messages.last?.id else {
+                    return
+                }
+                withAnimation(.snappy(duration: 0.24)) {
+                    proxy.scrollTo(lastID, anchor: .bottom)
                 }
             }
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            messageInputBar
+        }
+    }
 
-            MeguriMessageInput(
-                text: $presentationState.draft,
-                isSending: appState.sendingMeguriMessageRecipientID == route.peerID,
-                canUseCamera: canUseCamera,
-                onOpenCamera: openCamera,
-                onOpenPhotoLibrary: openPhotoLibrary
-            ) { sendMessage() }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-            .background(.regularMaterial)
+    private var messageInputBar: some View {
+        MeguriMessageInput(
+            text: $presentationState.draft,
+            isSending: appState.sendingMeguriMessageRecipientID == route.peerID,
+            canUseCamera: canUseCamera,
+            onOpenCamera: openCamera,
+            onOpenPhotoLibrary: openPhotoLibrary
+        ) { sendMessage() }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background {
+            Rectangle()
+                .fill(.regularMaterial)
+                .ignoresSafeArea(edges: .bottom)
         }
     }
 

@@ -136,15 +136,6 @@ final class GoodsEditorDraftTests: XCTestCase {
         XCTAssertEqual(components.queryItems?.first(where: { $0.name == "url" })?.value, imageURL.absoluteString)
     }
 
-    func testGoogleLensSearchDisclosureMentionsExternalImageHandling() {
-        XCTAssertEqual(GoodsGoogleLensSearchDisclosure.title, "Google Lensで画像検索しますか？")
-        XCTAssertEqual(GoodsGoogleLensSearchDisclosure.confirmButtonTitle, "Google Lensで開く")
-        XCTAssertTrue(GoodsGoogleLensSearchDisclosure.message.contains("Google Lens"))
-        XCTAssertTrue(GoodsGoogleLensSearchDisclosure.message.contains("画像または画像URL"))
-        XCTAssertTrue(GoodsGoogleLensSearchDisclosure.message.contains("プライバシーポリシー"))
-        XCTAssertTrue(GoodsGoogleLensSearchDisclosure.message.contains("MegrumのURL"))
-    }
-
     func testGoodsGoogleLensSearchItemFactoryBuildsItemsFromSelectedPhotos() {
         let groupID = UUID()
         let memberID = UUID()

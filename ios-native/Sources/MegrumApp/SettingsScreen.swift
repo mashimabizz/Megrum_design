@@ -11,8 +11,10 @@ struct SettingsScreen: View {
     var onAccountDeletionCompleted: () -> Void = {}
     var onSignOut: () async -> Void = {}
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.openURL) private var openURL
     @StateObject private var securityAuthState: MegrumAuthState
     @State private var presentationState = SettingsPresentationState()
+    @State private var legalBrowserRoute: MegrumInAppBrowserRoute?
 
     init(
         appState: MegrumAppState,
@@ -71,6 +73,12 @@ struct SettingsScreen: View {
                 }
             }
         }
+        #if os(iOS)
+        .sheet(item: $legalBrowserRoute) { browserRoute in
+            MegrumInAppSafariView(url: browserRoute.url)
+                .ignoresSafeArea()
+        }
+        #endif
         .task {
             await loadInitialSettingsData()
         }
@@ -114,7 +122,29 @@ struct SettingsScreen: View {
     }
 
     private func openRoute(_ route: SettingsEssentialRoute) {
+        switch route {
+        case .terms:
+            openLegalDocument(.terms)
+            return
+        case .privacyPolicy:
+            openLegalDocument(.privacy)
+            return
+        default:
+            break
+        }
         presentationState.openRoute(route)
+    }
+
+    private func openLegalDocument(_ kind: LegalDocumentKind) {
+        guard let url = kind.publicURL else {
+            presentationState.openRoute(kind == .privacy ? .privacyPolicy : .terms)
+            return
+        }
+        #if os(iOS)
+        legalBrowserRoute = MegrumInAppBrowserRoute(url: url)
+        #else
+        openURL(url)
+        #endif
     }
 
     @ViewBuilder

@@ -14,14 +14,18 @@ struct HomeDemandFirstPreview: View {
 
                 HomeDemandFirstRow(
                     label: "ニンニン × #ネイル",
-                    cardImages: ["aespa_ningning", "aespa_ningning_2"],
+                    cardGoods: DemandFirstMockGoods.list("d01", ["aespa_ningning", "aespa_ningning_2", "twice_penlight"]),
+                    partnerName: "yuu_aespa交換",
+                    partnerAvatar: "aespa_ningning",
                     demand: .hotDemand(ownImage: "twice_sana_1", extraCount: 0),
                     logistics: "新宿で3/3に会えそう・郵送OK",
                     payment: nil
                 )
                 HomeDemandFirstRow(
                     label: "サナ × #キャンディボン",
-                    cardImages: ["twice_sana_1", "twice_penlight"],
+                    cardGoods: DemandFirstMockGoods.list("d02", ["twice_sana_1", "twice_penlight", "twice_dahyun_1"]),
+                    partnerName: "mina_once",
+                    partnerAvatar: "twice_sana_1",
                     demand: .demand(ownImage: "twice_momo_1", extraCount: 2),
                     logistics: "東京で会えそう",
                     payment: nil
@@ -31,28 +35,36 @@ struct HomeDemandFirstPreview: View {
 
                 HomeDemandFirstRow(
                     label: "ジミン",
-                    cardImages: ["bts_jimin", "bts_v"],
+                    cardGoods: DemandFirstMockGoods.list("d03", ["bts_jimin", "bts_v"]),
+                    partnerName: "hana_army",
+                    partnerAvatar: "bts_jimin",
                     demand: .cash(amount: 1_100),
                     logistics: "郵送OK・送料は相談",
                     payment: "PayPay・現金OK"
                 )
                 HomeDemandFirstRow(
                     label: "ジョングク",
-                    cardImages: ["bts_jungkook"],
+                    cardGoods: DemandFirstMockGoods.list("d04", ["bts_jungkook"]),
+                    partnerName: "jk_love",
+                    partnerAvatar: "bts_jungkook",
                     demand: .lookingFor(text: "サナのトレカを探し中"),
                     logistics: "郵送OK・送料込み",
                     payment: nil
                 )
                 HomeDemandFirstRow(
                     label: "ミンギュ",
-                    cardImages: ["svt_mingyu", "svt_joshua"],
+                    cardGoods: DemandFirstMockGoods.list("d05", ["svt_mingyu", "svt_joshua", "svt_scoups"]),
+                    partnerName: "carat_m",
+                    partnerAvatar: "svt_mingyu",
                     demand: .discuss,
                     logistics: "交換手段は相談",
                     payment: nil
                 )
                 HomeDemandFirstRow(
                     label: "モモ × #ラブリーズ",
-                    cardImages: ["twice_momo_1", "twice_momo_2"],
+                    cardGoods: DemandFirstMockGoods.list("d06", ["twice_momo_1", "twice_momo_2"]),
+                    partnerName: "momoring",
+                    partnerAvatar: "twice_momo_1",
                     demand: .cash(amount: nil),
                     logistics: "大阪で会えそう",
                     payment: "支払方法は要相談"
@@ -94,6 +106,29 @@ struct HomeDemandFirstPreview: View {
     }
 }
 
+
+/// モック用のグッズ生成（画像だけ差し替えたHomeMockGoods）。
+private enum DemandFirstMockGoods {
+    static func list(_ prefix: String, _ images: [String]) -> [HomeMockGoods] {
+        images.enumerated().map { index, name in
+            HomeMockGoods.make(
+                "0000000000\(prefix.suffix(2))\(index)".suffix(12).description,
+                title: "グッズ",
+                subtitle: "",
+                shape: .portrait,
+                palette: [
+                    MegrumTheme.lavender.opacity(0.42),
+                    MegrumTheme.pink.opacity(0.30),
+                    MegrumTheme.sky.opacity(0.24)
+                ],
+                symbol: "M",
+                imageURL: HomeDiscoveryFixtures.imageURL(name)
+                    ?? HomeDiscoveryFixtures.imageURL(name, fileExtension: "jpg")
+            )
+        }
+    }
+}
+
 /// 需要行の種別（仕様の優先順位どおり）。
 enum HomeDemandFirstDemand {
     /// 相手があなたの具体グッズを指名
@@ -110,20 +145,32 @@ enum HomeDemandFirstDemand {
 
 private struct HomeDemandFirstRow: View {
     var label: String
-    var cardImages: [String]
+    var cardGoods: [HomeMockGoods]
+    var partnerName: String
+    var partnerAvatar: String
     var demand: HomeDemandFirstDemand
     var logistics: String
     var payment: String?
 
     var body: some View {
         HStack(alignment: .center, spacing: 14) {
-            fannedCard
+            HomeDiscoveryRotaryCard(
+                goods: cardGoods,
+                goodsCondition: .direct,
+                exchangeCondition: .exact,
+                paymentCondition: .exact,
+                showsConditionOverlay: false
+            )
+            .frame(width: 142, height: 112)
 
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 5) {
                 Text(label)
                     .font(.system(size: 12, weight: .regular))
                     .foregroundStyle(MegrumTheme.ink.opacity(0.82))
                     .lineLimit(1)
+
+                partnerLine
+                    .padding(.top, 3)
 
                 demandLine
 
@@ -143,29 +190,21 @@ private struct HomeDemandFirstRow: View {
         }
     }
 
-    private var fannedCard: some View {
-        ZStack {
-            ForEach(Array(cardImages.prefix(3).enumerated().reversed()), id: \.offset) { index, name in
-                fixtureImage(name)
-                    .frame(width: 92, height: 112)
-                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .strokeBorder(
-                                LinearGradient(
-                                    colors: [MegrumTheme.sky, MegrumTheme.lavender, MegrumTheme.pink],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                ),
-                                lineWidth: 2
-                            )
-                    }
-                    .rotationEffect(.degrees(Double(index) * 7 - 3))
-                    .offset(x: CGFloat(index) * 18)
-                    .shadow(color: MegrumTheme.ink.opacity(0.10), radius: 8, y: 4)
-            }
+    private var partnerLine: some View {
+        HStack(spacing: 6) {
+            fixtureImage(partnerAvatar)
+                .frame(width: 20, height: 20)
+                .clipShape(Circle())
+                .overlay {
+                    Circle().strokeBorder(.white, lineWidth: 1.2)
+                }
+                .shadow(color: MegrumTheme.ink.opacity(0.14), radius: 3, y: 1)
+
+            Text(partnerName)
+                .font(.system(size: 12.5, weight: .heavy, design: .rounded))
+                .foregroundStyle(MegrumTheme.ink.opacity(0.86))
+                .lineLimit(1)
         }
-        .frame(width: 142, height: 112, alignment: .leading)
     }
 
     @ViewBuilder

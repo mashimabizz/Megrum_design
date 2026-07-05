@@ -55,6 +55,7 @@ struct GoodsEditorSheet: View {
     @State var isConfirmingInventoryCreateWithoutTags = false
     @State var isOpeningGoogleLensSearch = false
     @State var googleLensSearchErrorMessage: String?
+    @State var googleLensBrowserRoute: MegrumInAppBrowserRoute?
     @FocusState var isTagFieldFocused: Bool
     #if canImport(PhotosUI)
     @State var selectedPhotoItem: PhotosPickerItem?
@@ -194,6 +195,12 @@ struct GoodsEditorSheet: View {
                         applyFaceTaggingCorrections(drafts, target: context.target)
                     }
                 )
+                #if os(iOS)
+                .sheet(item: $googleLensBrowserRoute) { browserRoute in
+                    MegrumInAppSafariView(url: browserRoute.url)
+                        .ignoresSafeArea()
+                }
+                #endif
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
             }
@@ -256,6 +263,12 @@ struct GoodsEditorSheet: View {
                     onOpenGoogleLens: openSelectedCreateMetaGoogleLensSearch,
                     onApply: applyCreateBulkTag
                 )
+                #if os(iOS)
+                .sheet(item: $googleLensBrowserRoute) { browserRoute in
+                    MegrumInAppSafariView(url: browserRoute.url)
+                        .ignoresSafeArea()
+                }
+                #endif
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
             }

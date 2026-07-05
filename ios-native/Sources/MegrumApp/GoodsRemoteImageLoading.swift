@@ -2,6 +2,7 @@ import Foundation
 
 enum GoodsRemoteImageLoadingPolicy {
     static let requestTimeout: TimeInterval = 12
+    static let preloadMaxConcurrentRequests = 4
     static let retryDelaysNanoseconds: [UInt64] = [
         0,
         450_000_000,
@@ -31,6 +32,10 @@ actor GoodsRemoteImageDataCache {
     func insert(_ data: Data, for url: URL) {
         dataByURL[url] = data
     }
+
+    func removeAll() {
+        dataByURL.removeAll()
+    }
 }
 
 enum GoodsRemoteImageDataLoader {
@@ -59,6 +64,46 @@ enum GoodsRemoteImageDataLoader {
             }
         }
         throw lastError ?? GoodsRemoteImageLoadError.emptyData
+    }
+
+    static func preload(urls: [URL], maxConcurrentRequests: Int = GoodsRemoteImageLoadingPolicy.preloadMaxConcurrentRequests) async {
+        let uniqueURLs = stableUniqueURLs(urls)
+        guard !uniqueURLs.isEmpty else {
+            return
+        }
+
+        let requestCount = min(max(1, maxConcurrentRequests), uniqueURLs.count)
+        var iterator = uniqueURLs.makeIterator()
+        await withTaskGroup(of: Void.self) { group in
+            for _ in 0..<requestCount {
+                guard let url = iterator.next() else {
+                    return
+                }
+                group.addTask {
+                    _ = try? await loadData(from: url)
+                }
+            }
+
+            while await group.next() != nil {
+                guard let url = iterator.next() else {
+                    continue
+                }
+                group.addTask {
+                    _ = try? await loadData(from: url)
+                }
+            }
+        }
+    }
+
+    private static func stableUniqueURLs(_ urls: [URL]) -> [URL] {
+        var seen = Set<URL>()
+        return urls.filter { url in
+            guard !seen.contains(url) else {
+                return false
+            }
+            seen.insert(url)
+            return true
+        }
     }
 
     private static func fetchData(from url: URL, session: URLSession, ignoresCache: Bool) async throws -> Data {

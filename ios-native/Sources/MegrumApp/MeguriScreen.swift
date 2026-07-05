@@ -159,7 +159,7 @@ struct MeguriScreen: View {
         .overlay(alignment: toastPlacement.alignment) {
             if let toastMessage {
                 MeguriToastView(message: toastMessage)
-                    .padding(.top, toastPlacement == .top ? 92 : 0)
+                    .padding(.top, toastPlacement == .top ? 8 : 0)
                     .padding(.bottom, toastPlacement == .bottom ? 104 : 0)
                     .transition(toastPlacement.transition)
             }

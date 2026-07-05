@@ -53,6 +53,12 @@ final class SettingsScreenTests: XCTestCase {
         )
     }
 
+    func testLegalDocumentKindPublicURLsPointToMegrumLegalPages() {
+        XCTAssertEqual(LegalDocumentKind.terms.publicURL?.absoluteString, "https://megrum.jp/legal/terms")
+        XCTAssertEqual(LegalDocumentKind.privacy.publicURL?.absoluteString, "https://megrum.jp/legal/privacy")
+        XCTAssertEqual(LegalDocumentKind.commerce.publicURL?.absoluteString, "https://megrum.jp/legal/commerce")
+    }
+
     func testSettingsPresentationStateTracksNavigationAndSignOutLifecycle() {
         var state = SettingsPresentationState()
 

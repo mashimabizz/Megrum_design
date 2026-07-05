@@ -88,9 +88,6 @@ struct GroomArchiveStoryScreen: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(currentGroom.createdAt.formatted(date: .abbreviated, time: .shortened))
                             .font(.system(size: 13, weight: .heavy, design: .rounded))
-                        Text("上にスワイプで反応を見る")
-                            .font(.system(size: 11, weight: .bold, design: .rounded))
-                            .opacity(0.72)
                     }
                     .foregroundStyle(.white)
                     .padding(.horizontal, 14)
@@ -122,7 +119,6 @@ struct GroomArchiveStoryScreen: View {
                         likeCount: appState.groomReactions(for: currentGroom.id).count,
                         commentCount: appState.groomReplies(for: currentGroom.id).count,
                         isDeleting: appState.deletingGroomPostID == currentGroom.id,
-                        onOpenInsights: { presentationState.showInsights() },
                         onOpenComments: { isShowingComments = true },
                         onOpenLikes: { isShowingLikes = true },
                         onDelete: { isShowingDeleteConfirmation = true }
@@ -139,24 +135,14 @@ struct GroomArchiveStoryScreen: View {
                     presentationState.updateDrag(value.translation)
                 }
                 .onEnded { value in
-                    switch presentationState.dragOutcome(for: value.translation) {
-                    case .showInsights:
-                        presentationState.showInsights()
-                    case .dismiss:
+                    if presentationState.shouldDismiss(for: value.translation) {
                         dismissStory()
-                    case .none:
-                        break
                     }
                     withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
                         presentationState.resetDrag()
                     }
                 }
         )
-        .sheet(isPresented: $presentationState.showsInsights) {
-            GroomArchiveInsightsSheet(groom: currentGroom, appState: appState)
-                .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
-        }
         .sheet(isPresented: $isShowingComments) {
             GroomViewerCommentsSheet(
                 groom: currentGroom,

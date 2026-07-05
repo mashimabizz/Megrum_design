@@ -65,7 +65,7 @@ struct SettingsSupportAccountSection: View {
 
             SettingsNavigationButtonRow(
                 title: "利用規約",
-                subtitle: "公開前確認用の要約",
+                subtitle: "Megrum.jpで表示",
                 systemImage: "doc.text"
             ) {
                 onOpenRoute(.terms)
@@ -73,7 +73,7 @@ struct SettingsSupportAccountSection: View {
 
             SettingsNavigationButtonRow(
                 title: "プライバシーポリシー",
-                subtitle: "取り扱う情報の要点",
+                subtitle: "Megrum.jpで表示",
                 systemImage: "hand.raised"
             ) {
                 onOpenRoute(.privacyPolicy)

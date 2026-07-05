@@ -401,12 +401,12 @@ private struct GroomStoryEditorTopChrome: View {
                 accessibilityLabel: "閉じる",
                 action: onClose
             )
-            .position(x: safeAreaInsets.leading + 32, y: topButtonY)
+            .position(x: safeAreaInsets.leading + 28, y: topButtonY)
         }
     }
 
     private var topButtonY: CGFloat {
-        safeAreaInsets.top + 30
+        safeAreaInsets.top + 16
     }
 }
 
@@ -418,9 +418,9 @@ private struct GroomStoryCircleButton: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: systemImage)
-                .font(.system(size: 24, weight: .semibold))
+                .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(.white)
-                .frame(width: 58, height: 58)
+                .frame(width: 44, height: 44)
                 .background(.black.opacity(0.44), in: Circle())
         }
         .buttonStyle(.plain)

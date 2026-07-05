@@ -60,7 +60,11 @@ extension GoodsEditorSheet {
                 guard let lensURL = GoogleLensSearchURLBuilder.url(forImageURL: imageURL) else {
                     throw URLError(.badURL)
                 }
+                #if os(iOS)
+                googleLensBrowserRoute = MegrumInAppBrowserRoute(url: lensURL)
+                #else
                 openURL(lensURL)
+                #endif
             } catch {
                 googleLensSearchErrorMessage = "Google Lensを開けませんでした。時間をおいて再度お試しください。"
             }

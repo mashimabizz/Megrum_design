@@ -20,6 +20,7 @@ struct IndividualListingConditionTab: View {
 
     @State private var presentationState = IndividualListingConditionPresentationState()
     @State private var googleLensErrorMessage: String?
+    @State private var googleLensBrowserRoute: MegrumInAppBrowserRoute?
     @Environment(\.openURL) private var openURL
 
     private var selectedGroup: OshiGroup? {
@@ -109,6 +110,12 @@ struct IndividualListingConditionTab: View {
             ) { tagName in
                 addConditionTag(tagName)
             }
+            #if os(iOS)
+            .sheet(item: $googleLensBrowserRoute) { browserRoute in
+                MegrumInAppSafariView(url: browserRoute.url)
+                    .ignoresSafeArea()
+            }
+            #endif
         }
     }
 
@@ -165,6 +172,10 @@ struct IndividualListingConditionTab: View {
             return
         }
         googleLensErrorMessage = nil
+        #if os(iOS)
+        googleLensBrowserRoute = MegrumInAppBrowserRoute(url: lensURL)
+        #else
         openURL(lensURL)
+        #endif
     }
 }

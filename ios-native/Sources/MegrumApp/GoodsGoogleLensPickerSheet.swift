@@ -6,23 +6,13 @@ struct GoodsGoogleLensPickerSheet: View {
     var onSelect: (GoodsGoogleLensSearchItem.ID) -> Void
 
     @Environment(\.dismiss) private var dismiss
-    @State private var pendingExternalSearchItemID: GoodsGoogleLensSearchItem.ID?
 
     var body: some View {
         NavigationStack {
             List {
-                Section {
-                    Text(GoodsGoogleLensSearchDisclosure.message)
-                        .font(.footnote.weight(.semibold))
-                        .foregroundStyle(MegrumTheme.muted)
-                        .fixedSize(horizontal: false, vertical: true)
-                } footer: {
-                    Text(GoodsGoogleLensSearchDisclosure.footer)
-                }
-
                 ForEach(items) { item in
                     Button {
-                        pendingExternalSearchItemID = item.id
+                        onSelect(item.id)
                     } label: {
                         HStack(spacing: 12) {
                             preview(for: item)
@@ -58,33 +48,6 @@ struct GoodsGoogleLensPickerSheet: View {
                         dismiss()
                     }
                 }
-            }
-            .alert(
-                GoodsGoogleLensSearchDisclosure.title,
-                isPresented: isShowingExternalSearchDisclosure
-            ) {
-                Button("キャンセル", role: .cancel) {
-                    pendingExternalSearchItemID = nil
-                }
-                Button(GoodsGoogleLensSearchDisclosure.confirmButtonTitle) {
-                    guard let pendingExternalSearchItemID else {
-                        return
-                    }
-                    onSelect(pendingExternalSearchItemID)
-                    self.pendingExternalSearchItemID = nil
-                }
-            } message: {
-                Text(GoodsGoogleLensSearchDisclosure.message)
-            }
-        }
-    }
-
-    private var isShowingExternalSearchDisclosure: Binding<Bool> {
-        Binding {
-            pendingExternalSearchItemID != nil
-        } set: { isPresented in
-            if !isPresented {
-                pendingExternalSearchItemID = nil
             }
         }
     }

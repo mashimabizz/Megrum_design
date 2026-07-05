@@ -2026,6 +2026,25 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertEqual(counts.homeCandidateLoads, 2)
     }
 
+    func testAppStateCanReplaceRepositoryWithoutReloadingHomeSnapshot() async {
+        let repository = HomeDiscoveryRefreshRepository()
+        let state = MegrumAppState(repository: repository)
+
+        await state.loadInitialData()
+        XCTAssertEqual(state.viewer?.displayName, "初回ユーザー")
+        XCTAssertEqual(state.homeMatchedItems.map(\.title), ["初回候補"])
+
+        await state.replaceRepository(repository, reloadsInitialData: false)
+
+        XCTAssertEqual(state.viewer?.displayName, "初回ユーザー")
+        XCTAssertEqual(state.homeMatchedItems.map(\.title), ["初回候補"])
+        XCTAssertFalse(state.isLoading)
+
+        let counts = await repository.countsSnapshot()
+        XCTAssertEqual(counts.snapshotLoads, 1)
+        XCTAssertEqual(counts.homeCandidateLoads, 1)
+    }
+
     private static func nativeInfoPlist() throws -> [String: Any] {
         let data = try Data(contentsOf: iosNativeRoot.appendingPathComponent("App/Info.plist"))
         let plist = try PropertyListSerialization.propertyList(from: data, options: [], format: nil)

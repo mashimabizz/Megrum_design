@@ -474,20 +474,6 @@ final class MeguriAccessPolicyTests: XCTestCase {
         XCTAssertLessThanOrEqual(plusMetrics.thumbnailSize, freeMetrics.thumbnailSize)
     }
 
-    func testGroomArchiveStoryPresentationStateTracksInsightsSheet() {
-        var state = GroomArchiveStoryPresentationState()
-
-        XCTAssertFalse(state.showsInsights)
-
-        state.showInsights()
-
-        XCTAssertTrue(state.showsInsights)
-
-        state.dismissInsights()
-
-        XCTAssertFalse(state.showsInsights)
-    }
-
     func testGroomArchiveStoryPresentationStateMovesWithinBoundsAndDismissesAfterLast() {
         var state = GroomArchiveStoryPresentationState(initialIndex: 1)
 
@@ -512,9 +498,9 @@ final class MeguriAccessPolicyTests: XCTestCase {
         XCTAssertEqual(state.dragOffset, CGSize(width: 12, height: 180))
         XCTAssertEqual(state.imageYOffset, 36, accuracy: 0.001)
         XCTAssertEqual(state.imageScale, 0.92, accuracy: 0.001)
-        XCTAssertEqual(state.dragOutcome(for: CGSize(width: 0, height: -90)), .showInsights)
-        XCTAssertEqual(state.dragOutcome(for: CGSize(width: 0, height: 124)), .dismiss)
-        XCTAssertEqual(state.dragOutcome(for: CGSize(width: 0, height: 20)), .none)
+        XCTAssertFalse(state.shouldDismiss(for: CGSize(width: 0, height: -90)))
+        XCTAssertTrue(state.shouldDismiss(for: CGSize(width: 0, height: 124)))
+        XCTAssertFalse(state.shouldDismiss(for: CGSize(width: 0, height: 20)))
 
         state.resetDrag()
 

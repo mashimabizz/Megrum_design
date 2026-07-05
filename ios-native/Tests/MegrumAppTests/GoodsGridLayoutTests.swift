@@ -60,6 +60,7 @@ final class GoodsGridLayoutTests: XCTestCase {
         XCTAssertEqual(GoodsRemoteImageLoadingPolicy.maximumAttempts, 4)
         XCTAssertEqual(GoodsRemoteImageLoadingPolicy.retryDelaysNanoseconds.first, 0)
         XCTAssertGreaterThanOrEqual(GoodsRemoteImageLoadingPolicy.requestTimeout, 10)
+        XCTAssertEqual(GoodsRemoteImageLoadingPolicy.preloadMaxConcurrentRequests, 4)
     }
 
     func testGoodsImageSkeletonPresentationStateTracksPulsingOpacity() {
@@ -86,6 +87,43 @@ final class GoodsGridLayoutTests: XCTestCase {
 
         XCTAssertEqual(firstLoad, data)
         XCTAssertEqual(cachedLoad, data)
+    }
+
+    func testRemoteGoodsImageDataLoaderPreloadsFileData() async throws {
+        await GoodsRemoteImageDataCache.shared.removeAll()
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("megrum-goods-preload-\(UUID().uuidString).bin")
+        let data = Data("megrum-preload-image".utf8)
+        try data.write(to: url)
+        defer {
+            try? FileManager.default.removeItem(at: url)
+        }
+
+        await GoodsRemoteImageDataLoader.preload(urls: [url, url], maxConcurrentRequests: 2)
+
+        let cached = await GoodsRemoteImageDataCache.shared.data(for: url)
+        XCTAssertEqual(cached, data)
+    }
+
+    func testOwnedGoodsImagePreloadPolicyUsesInventoryAndWishURLsWithoutDuplicates() throws {
+        let sharedURL = try XCTUnwrap(URL(string: "https://example.com/shared.jpg"))
+        let inventoryOnlyURL = try XCTUnwrap(URL(string: "https://example.com/inventory.jpg"))
+        let wishOnlyURL = try XCTUnwrap(URL(string: "https://example.com/wish.jpg"))
+        let ownerID = UUID()
+
+        let urls = OwnedGoodsImagePreloadPolicy.urls(
+            inventory: [
+                GoodsItem(id: UUID(), ownerID: ownerID, title: "マイグッズ1", imageURL: sharedURL),
+                GoodsItem(id: UUID(), ownerID: ownerID, title: "マイグッズ2", imageURL: inventoryOnlyURL)
+            ],
+            wishes: [
+                WishItem(id: UUID(), ownerID: ownerID, title: "ほしいもの1", imageURL: sharedURL),
+                WishItem(id: UUID(), ownerID: ownerID, title: "ほしいもの2", imageURL: wishOnlyURL)
+            ],
+            limitPerCollection: 2
+        )
+
+        XCTAssertEqual(urls, [sharedURL, inventoryOnlyURL, wishOnlyURL])
     }
 
     func testRemoteGoodsImageDataLoaderRejectsEmptyFileData() async throws {

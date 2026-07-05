@@ -47,7 +47,6 @@ struct GroomViewerScreen: View {
     @State private var currentIndex: Int
     @State private var dragState = GroomViewerDragPresentationState()
     @State private var interactionState = GroomViewerInteractionState()
-    @State private var isShowingOwnInsights = false
     @State private var isShowingComments = false
     @State private var isShowingLikes = false
     @State private var isShowingDeleteConfirmation = false
@@ -186,11 +185,6 @@ struct GroomViewerScreen: View {
         } message: {
             Text("削除すると、めぐりホームとグルームアーカイブから表示されなくなります。")
         }
-        .sheet(isPresented: $isShowingOwnInsights) {
-            GroomArchiveInsightsSheet(groom: currentGroom, appState: appState)
-                .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
-        }
         .sheet(isPresented: $isShowingComments) {
             GroomViewerCommentsSheet(
                 groom: currentGroom,
@@ -300,7 +294,6 @@ struct GroomViewerScreen: View {
                                 likeCount: currentGroomLikeCount,
                                 commentCount: currentGroomCommentCount,
                                 isDeleting: appState.deletingGroomPostID == currentGroom.id,
-                                onOpenInsights: { isShowingOwnInsights = true },
                                 onOpenComments: { isShowingComments = true },
                                 onOpenLikes: { isShowingLikes = true },
                                 onDelete: { isShowingDeleteConfirmation = true }

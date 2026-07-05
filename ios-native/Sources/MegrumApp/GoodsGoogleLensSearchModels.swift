@@ -27,13 +27,6 @@ struct GoodsGoogleLensSearchItem: Identifiable, Equatable {
     var source: GoodsGoogleLensSearchSource
 }
 
-enum GoodsGoogleLensSearchDisclosure {
-    static let title = "Google Lensで画像検索しますか？"
-    static let message = "選んだ画像または画像URLがGoogle Lensに送られ、Google側の利用条件とプライバシーポリシーに従って処理されます。端末内の画像は、検索用にMegrumのURLへアップロードしてから開く場合があります。"
-    static let confirmButtonTitle = "Google Lensで開く"
-    static let footer = "画像検索を開く前に、送信先と扱いを確認できます。"
-}
-
 enum GoodsGoogleLensSearchItemFactory {
     private static let draftSearchItemID = UUID(uuidString: "00000000-0000-0000-0000-00000000c001")!
 

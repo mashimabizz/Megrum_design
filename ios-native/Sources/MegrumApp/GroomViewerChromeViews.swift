@@ -180,7 +180,6 @@ struct GroomViewerOwnerBottomControls: View {
     let likeCount: Int
     let commentCount: Int
     let isDeleting: Bool
-    let onOpenInsights: () -> Void
     let onOpenComments: () -> Void
     let onOpenLikes: () -> Void
     let onDelete: () -> Void
@@ -199,9 +198,6 @@ struct GroomViewerOwnerBottomControls: View {
             .accessibilityLabel("いいねとコメントを見る")
 
             Menu {
-                Button(action: onOpenInsights) {
-                    Label("反応を見る", systemImage: "chart.bar.doc.horizontal")
-                }
                 Button(role: .destructive, action: onDelete) {
                     Label("削除する", systemImage: "trash")
                 }

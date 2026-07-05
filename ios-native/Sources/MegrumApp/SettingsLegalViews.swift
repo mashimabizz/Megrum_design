@@ -1,3 +1,4 @@
+import Foundation
 import MegrumCore
 import MegrumDesign
 import SwiftUI
@@ -25,6 +26,17 @@ enum LegalDocumentKind {
             "プライバシーポリシー"
         case .commerce:
             "特定商取引法に基づく表記"
+        }
+    }
+
+    var publicURL: URL? {
+        switch self {
+        case .terms:
+            URL(string: "https://megrum.jp/legal/terms")
+        case .privacy:
+            URL(string: "https://megrum.jp/legal/privacy")
+        case .commerce:
+            URL(string: "https://megrum.jp/legal/commerce")
         }
     }
 
