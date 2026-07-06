@@ -30,8 +30,11 @@ struct GroomFeedRow: Decodable, Sendable {
     var characterId: UUID?
     var seriesName: String?
     var likeCount: Int?
+    var viewerHasLiked: Bool?
+    /// アーカイブ取得（テーブル直読み）用の埋め込みリアクション。
+    var groomReactions: [GroomReactionLiteRow]?
 
-    func post(signedURLs: [String: URL] = [:]) -> GroomPost? {
+    func post(signedURLs: [String: URL] = [:], viewerID: UUID? = nil) -> GroomPost? {
         guard
             let url = resolvedImageURL(signedURLs: signedURLs),
             let latitude = originLat,
@@ -51,8 +54,23 @@ struct GroomFeedRow: Decodable, Sendable {
             seriesName: SupabaseTextNormalizer.optional(seriesName),
             createdAt: publishedAt ?? createdAt ?? .now,
             expiresAt: expiresAt,
-            likeCount: max(0, likeCount ?? 0)
+            likeCount: max(0, likeCount ?? embeddedLikeReactions?.count ?? 0),
+            liked: resolvedViewerHasLiked(viewerID: viewerID)
         )
+    }
+
+    private var embeddedLikeReactions: [GroomReactionLiteRow]? {
+        groomReactions?.filter { $0.reactionType == "like" }
+    }
+
+    private func resolvedViewerHasLiked(viewerID: UUID?) -> Bool {
+        if let viewerHasLiked {
+            return viewerHasLiked
+        }
+        guard let viewerID, let embeddedLikeReactions else {
+            return false
+        }
+        return embeddedLikeReactions.contains { $0.userId == viewerID }
     }
 
     private func resolvedImageURL(signedURLs: [String: URL]) -> URL? {
@@ -265,4 +283,9 @@ private func haversineMeters(
     let a = sin(deltaLat / 2) * sin(deltaLat / 2)
         + cos(fromLat) * cos(toLat) * sin(deltaLng / 2) * sin(deltaLng / 2)
     return earthRadius * 2 * atan2(sqrt(a), sqrt(1 - a))
+}
+
+struct GroomReactionLiteRow: Decodable, Sendable {
+    var userId: UUID
+    var reactionType: String
 }

@@ -176,9 +176,6 @@
 | 画面ID | 名称 | 関連JSX関数 | 関連iter | 関連docs |
 |---|---|---|---|---|
 | `HOM-main` | ホーム — 4タブ（完全マッチ／私の譲が欲しい人／私が欲しい譲を持つ人／探索）・推し色適用 ／ **📢 Tier 1 Native ad（マッチカード5枚毎）** | `home-v2.jsx::HomeV2Screen` | iter25, 26, 45 | 10 §E match types, 16 §広告 |
-| `HOM-mode-pill` | 広域 / 現地 モード切替 pill（ヘッダー） | iter63 で実装 | iter63 | 18 §B-3, 09 §10 |
-| `HOM-local-setup` | 現地モード設定パネル（AW 選択 + 携帯選択 + wish 選択 + 一括リセット）| iter63 で実装 | iter63 | 18 §B-3, 09 §10 |
-| `HOM-local-summary` | 現地モード ON 時のサマリ表示（AW 名 + 持参 N 件 + wish N 件） | iter63 で実装 | iter63 | 18 §A-4 |
 | `HOM-card-tag` | マッチカードに「同種 / 異種 / どちらでも」chip 表示（タグのみ）| iter62 で実装 | iter62 | 18 §A-1 |
 
 ### C-2. プロフィール
@@ -201,11 +198,11 @@
 
 | 画面ID | 名称 | 関連JSX関数 | 関連iter | 関連docs |
 |---|---|---|---|---|
-| `WSH-list` | ウィッシュ一覧 — 優先度＋flexibility＋マッチ件数＋AW近隣 ／ **📢 Tier 1 Native ad（アフィリエイトリンク優先）** | `hub-screens.jsx::WishListScreen` | iter19.5, 45 | 05 §3 user_wants, 09 §6, 16 §広告 |
+| `WSH-list` | ウィッシュ一覧 — flexibility＋マッチ件数＋AW近隣 ／ **📢 Tier 1 Native ad（アフィリエイトリンク優先）** | `hub-screens.jsx::WishListScreen` | iter19.5, 45 | 05 §3 user_wants, 09 §6, 16 §広告 |
 | `WSH-empty` | ウィッシュ空状態 — 3ステップ説明＋初回CTA | `hub-screens.jsx::WishEmptyScreen` | iter19.5 | — |
 | `WSH-edit` | ウィッシュ編集 — flexibility 3択＋通知1トグル＋プレビュー | `hub-screens.jsx::WishEditScreen` | iter19.5 | 05 §3 flexibility |
 | `WSH-exchange-tag` | wish 編集に「同種 / 異種 / どちらでも」chip 追加 | iter62 で実装 | iter62 | 18 §A-1, 05 §3 user_wants.exchange_type |
-| `LST-create` | 個別募集作成 — 既存 wish 選択 + 譲選択 + 比率 + 優先度 + タグ | iter64 で実装（モックアップ未） | iter64 | 18 §B-2, 05 §3 listings, 09 §8 |
+| `LST-create` | 個別募集作成 — 既存 wish 選択 + 譲選択 + 比率 + タグ | iter64 で実装（モックアップ未） | iter64 | 18 §B-2, 05 §3 listings, 09 §8 |
 | `LST-list` | 個別募集一覧 — 自分の active な listing | iter64 で実装 | iter64 | 18 §B-2 |
 
 ### C-4. 在庫管理

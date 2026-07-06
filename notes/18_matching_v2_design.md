@@ -73,8 +73,6 @@
 - L2 = メンバー / キャラクター。
 - L2 マスターに値がある場合、Wish の L2 無指定は禁止する。
 - L2 マスターに値がない場合だけ、L1 そのものを Wish 対象として選択できる。
-- Wish に優先度・妥協度は持たせない。
-
 ### 構造化カラムと note
 
 マッチングに使う値は note ではなく構造化カラムとして保存する。note は補足メモだけに使う。
@@ -128,8 +126,7 @@ Swift Native 実装では `goods_inventory.locked_qty` を保存し、`goods_inv
 
 ## 0. 元メモ（原文）
 
-> ホーム画面ではデフォルトでは、時空間の制限なしのマッチング結果が表示されるようにする。
-> 「現地交換に切り替え」のようなボタンを押すと、交換可能な範囲や、交換可能時間、そして持参しているグッズを選択、あとは特に欲しいグッズをウィッシュリストから選ぶようにしたい。
+> ホーム画面ではマッチング結果が表示されるようにする。
 > ウィッシュリストについては、譲るグッズの異種交換か、同種交換か、または双方を選べるようにしたい。
 >
 > んーやっぱり求めるものの特定がむずいな。グループ名とキャラ名で絞ってもらい、画像で表示してもらったものに対して「異種交換」「同種交換」という感じで Option をつけることで、一発でわかるようにしたいな。
@@ -139,11 +136,9 @@ Swift Native 実装では `goods_inventory.locked_qty` を保存し、`goods_inv
 > あとは、比率の問題か。この譲キャラに対しては、これとこれとこれのキャラなら、1体3で交換するよ、みたいな感じか。
 >
 > つまり、一番簡単なパターンとしては、譲とウィッシュリストを登録するだけ。
-> 現地交換モードに切り替える場合は、交換場所と時間と持参しているグッズを選択、またウィッシュリストを選択または指定すること。
 > また、特定の募集をかけることもできるようにする。
 > 特定の譲るアイテムを選ぶ（必ずそのグッズのグループ名とグッズ種別は同じものを選ぶ）。
 > そしてそのグッズ一つに対して、求めるものとして特定のキャラ、グッズ種別を選び、同種／異種／どちらでもを指定可能、また、比率を設定可能。
-> そして優先度の設定も可能。というふうにしたい。
 >
 > 打診をする際には、ほしいものと私が譲るものを指定するだけでなく、自身のカレンダーを公開するか選択できるようにして、交換方法の検討できる材料を増やしてほしい。
 
@@ -176,7 +171,7 @@ Swift Native 実装では `goods_inventory.locked_qty` を保存し、`goods_inv
 **意味するところ**:
 - wish が先に存在する前提
 - 個別募集の作成画面では、自分の wish 一覧から「この wish を個別募集として育てる」流れ
-- データ構造としては、個別募集は **譲アイテム × wish のセット** + 比率 + 優先度
+- データ構造としては、個別募集は **譲アイテム × wish のセット** + 比率
 - listing_targets テーブルは、関連する wish への参照（または wish の subset 指定）として再設計
 
 **§3-2 のスキーマ提案を更新**: §B-2 参照。
@@ -186,11 +181,11 @@ Swift Native 実装では `goods_inventory.locked_qty` を保存し、`goods_inv
 **確定**:
 - 基本的に設定は記憶
 - ただし **位置情報だけは現在地で毎回更新**
-- **持参グッズと求めるグッズの一括リセット**機能を提供
+- **求めるグッズの一括リセット**機能を提供
 
 **意味するところ**:
 - AW（場所）はその時の GPS で center_lat/lng を上書き
-- 半径・時間・選択 wish・選択携帯グッズは前回の値を保持
+- 半径・時間・選択 wish は前回の値を保持
 - 「全部 OFF にして選び直す」ボタンが必要
 
 ### A-5. カレンダー公開のスコープ
@@ -244,7 +239,6 @@ Swift Native 実装では `goods_inventory.locked_qty` を保存し、`goods_inv
 | `exchange_type` | text | `same_kind` / `cross_kind` / `any`（タグ） |
 | `ratio_give` | int | 譲の個数（1〜10） |
 | `ratio_receive` | int | 受の個数（1〜10） |
-| `priority` | int | 1（高）〜 5（低） |
 | `status` | text | `active` / `paused` / `matched` / `closed` |
 | `note` | text nullable | 自由メモ |
 | `created_at` / `updated_at` | timestamptz | |
@@ -262,25 +256,7 @@ Swift Native 実装では `goods_inventory.locked_qty` を保存し、`goods_inv
 
 → wish レベルでもタグ付け（個別募集化していない wish にも付けられる）。
 
-### B-3. 現地交換モードの状態管理
-
-#### `user_local_mode_settings`（新規・1ユーザー1行）
-
-| 列 | 型 | 説明 |
-|---|---|---|
-| `user_id` | uuid PK | → users |
-| `enabled` | bool | 現地モード ON/OFF |
-| `aw_id` | uuid nullable | 使う AW |
-| `radius_m` | int | 半径（前回値の記憶） |
-| `selected_carrying_ids` | uuid[] | 選択中の携帯グッズ ID 配列 |
-| `selected_wish_ids` | uuid[] | 選択中の wish ID 配列 |
-| `last_lat` / `last_lng` | numeric | 最終 GPS 位置（毎回 ON 時に更新） |
-| `updated_at` | timestamptz | |
-
-→ シンプルな key-value 的な「現地モード設定」。
-   位置はモード ON にした瞬間に上書き。
-
-### B-4. カレンダー overlay UI
+### B-3. カレンダー overlay UI
 
 打診画面 / 取引中の view に追加するパーツ。
 
@@ -302,8 +278,6 @@ MVP 範囲外。`notes/02_system_requirements.md` の現行通知制御もその
 
 | 用語 | 確定表記 | 廃語 |
 |---|---|---|
-| **広域マッチ** | global match | （新規） |
-| **現地マッチ** | local match | （新規） |
 | **個別募集** | pinpoint listing（DB のみ） | "listing" は UI に出さない |
 | **同種交換** | same-kind swap | — |
 | **異種交換** | cross-kind swap | — |
@@ -316,30 +290,20 @@ MVP 範囲外。`notes/02_system_requirements.md` の現行通知制御もその
 
 ## 1. 大方針（要点）
 
-オーナーが提案している交換のあり方は、3 つのレイヤーに整理できる。
+オーナーが提案している交換のあり方は、ベース登録と個別募集に整理できる。
 
-### Layer A — ベース登録（必須・常時）
+### ベース登録（必須・常時）
 - **譲**（goods_inventory, kind=for_trade）
 - **wish**（user_wants）
 
-これだけで「広域マッチング」が動く。**時空間の制限なし** ＝ 全国どこでも全時間帯で、譲 × wish の交差を探す。
+これだけで譲 × wish の交差を探す。
 
-### Layer B — 現地交換モード（任意・切替式）
-ホームの「現地交換に切り替え」ボタンで明示的に切替。
-- AW（場所・時間・半径）を設定
-- **携帯グッズ**（carrying=true な譲アイテム）を絞り込み
-- **アクティブ wish** を選び直す
-
-切替後は **時空交差** した相手のみが表示される。
-
-### Layer C — 個別募集（任意・拡張）
+### 個別募集（任意・拡張）
 1 つの譲アイテムに対して、より細かい条件をピンポイント設定する仕組み。
 - **特定キャラ**を求める
 - **特定の goods 種別**を求める
 - **同種 / 異種 / どちらでも**を指定
 - **比率**（1:1, 1:3, 2:1 など）を指定
-- **優先度**を指定
-
 これにより「LUMENA スア のトレカに対して、LUMENA ヒナの缶バッジ 1:1 でしか交換しない」などのピンポイント募集が可能になる。
 
 ---
@@ -350,8 +314,6 @@ MVP 範囲外。`notes/02_system_requirements.md` の現行通知制御もその
 
 | 用語 | 別名 | 定義 | カテゴリ |
 |---|---|---|---|
-| **広域マッチ** | global match / 時空無制限マッチ | 譲 × wish のみで全国マッチ。AW 不要 | E. マッチング |
-| **現地マッチ** | local match / 時空マッチ | AW + 携帯グッズ + 選択 wish で絞った当日マッチ | E. マッチング |
 | **同種交換** | same-kind swap | 同じ `goods_type_id` 同士の交換（例: トレカ ↔ トレカ） | C. グッズ |
 | **異種交換** | cross-kind swap | 異なる `goods_type_id` 同士の交換（例: トレカ ↔ 缶バッジ） | C. グッズ |
 | **混合交換** / **どちらでも** | mixed / any | 同種・異種を問わない | C. グッズ |
@@ -393,7 +355,6 @@ wish と独立して存在し、優先的にマッチング候補を出す。
 | `exchange_type` | text | `same_kind` / `cross_kind` / `any` |
 | `ratio_give` | int | 自分の譲の個数（default 1） |
 | `ratio_receive` | int | 相手から受け取る個数（default 1） |
-| `priority` | int | 1（高）〜 5（低） |
 | `status` | text | `active` / `paused` / `matched` / `closed` |
 | `note` | text nullable | 自由メモ |
 | `created_at` / `updated_at` | timestamptz | |
@@ -421,52 +382,21 @@ wish と独立して存在し、優先的にマッチング候補を出す。
 
 ### 3-4. 既存マッチングロジックへの影響
 
-- 広域マッチ（AW を見ない）= 既存の譲 × wish 交差ロジックそのまま
-- 現地マッチ = 上記 + AW 時空交差フィルタ
+- 基本マッチ = 既存の譲 × wish 交差ロジック
 - listing 経由マッチ = listing.exchange_type と listing_targets を満たす相手の wish/譲を探す
 
 ---
 
 ## 4. 画面・動線への影響
 
-### 4-1. ホーム画面（home-v2.jsx 系の更新）
-
-```
-[ホーム]
- ├─ ヘッダー
- │   ├─ タイトル「マッチング」
- │   └─ モード切替トグル / Pill ボタン
- │       ├─ 「広域」（デフォルト・全国 / 全時間）
- │       └─ 「現地交換」（AW 連動）
- │
- ├─ モード = 広域 のとき
- │   ├─ タブ: [完全マッチ] [私を求めてる人] [私が求めてる人] [探索]
- │   └─ カードリスト（既存 home-v2.jsx の構造）
- │
- └─ モード = 現地交換 のとき
-     ├─ 上部に「現地交換セットアップ」サマリ
-     │   ├─ AW: 「LUMENA WORLD TOUR — 横浜アリーナ 17:30〜18:30 半径 500m」
-     │   ├─ 持参中: 12 件中 5 件選択
-     │   └─ wish: 8 件中 3 件選択
-     │   └─ [編集] ボタン
-     └─ カードリスト（時空交差結果のみ）
-```
-
-**初回切替時の設定パネル**:
-1. AW 選択（既存 AW から / 新規作成）
-2. 持参グッズ（carrying=true から多選択）
-3. アクティブ wish（多選択）
-
-→ 設定済みなら 1〜3 はサマリ表示のみで切替が即時。
-
-### 4-2. wish 画面（hub-screens.jsx の wish タブ更新）
+### 4-1. wish 画面（hub-screens.jsx の wish タブ更新）
 
 各 wish カードに **「交換タイプ」** chip を追加:
 - 同種 / 異種 / どちらでも
 
 新規 wish 追加時 / 編集時に選択。
 
-### 4-3. 在庫一覧 → 個別募集アクション（B-Inventory 拡張）
+### 4-2. 在庫一覧 → 個別募集アクション（B-Inventory 拡張）
 
 譲アイテムの「キープに / 譲渡履歴へ / 編集する」メニューに追加:
 - **「個別募集を作成」**
@@ -479,17 +409,16 @@ wish と独立して存在し、優先的にマッチング候補を出す。
    - グッズ種別（multi-select）
    - 「+ ターゲット追加」で複数行
 4. 交換比率: `[N] 個 ↔ [M] 個`
-5. 優先度: 1〜5
-6. 自由メモ
+5. 自由メモ
 
-### 4-4. 打診画面（propose-select.jsx の C-0 拡張）
+### 4-3. 打診画面（propose-select.jsx の C-0 拡張）
 
 下部に追加:
 - **「カレンダーを公開する」** トグル（default OFF）
   - サブテキスト: 「相手はあなたの今後の AW 予定を見られます」
   - 公開時のプレビュー（次の 1〜2 件のみ）
 
-### 4-5. 個別募集の閲覧
+### 4-4. 個別募集の閲覧
 
 - 自分の listing 一覧（プロフィール / 在庫タブのサブビュー）
 - 他者の listing は **譲アイテムの詳細ページ**で「○○用の個別募集あり」と表示
@@ -502,22 +431,12 @@ wish と独立して存在し、優先的にマッチング候補を出す。
 ```
 [マッチ判定の擬似コード]
 
-if mode == "global":
-    # 広域マッチ（時空無視）
-    matches = find_perfect_matches(my_haves, my_wishes, ALL_users)
+matches = find_perfect_matches(my_haves, my_wishes, ALL_users)
     + find_one_way_matches(my_haves, ALL_user_wishes)
     + find_one_way_matches(my_wishes, ALL_user_haves)
 
-elif mode == "local":
-    # 現地マッチ
-    overlapping_aws = find_aw_overlaps(my_aw, ALL_user_aws)
-    overlapping_users = unique_users_from(overlapping_aws)
-    matches = find_perfect_matches(my_carrying, my_active_wishes, overlapping_users)
-    + ...
-
-# Listing は別軸で常時マッチ
 listing_matches = find_listings_for_my_inventory(my_haves)
-+ find_my_listings_targets_in(other_user_haves)
+    + find_my_listings_targets_in(other_user_haves)
 ```
 
 ---
@@ -526,12 +445,12 @@ listing_matches = find_listings_for_my_inventory(my_haves)
 
 | 領域 | 既存 | v2 提案 | 影響度 |
 |---|---|---|---|
-| ホーム画面 | 4 タブ固定 | モード切替＋4 タブ | **大**（home-v2.jsx 大改修） |
-| wish 属性 | flexibility, priority | + exchange_type | 小（DB 列追加） |
-| 譲属性 | carrying（持参） | 維持。listing で拡張 | 中 |
+| ホーム画面 | 4 タブ固定 | ホーム候補棚 + 個別募集 | **大** |
+| wish 属性 | flexibility | + exchange_type | 小（DB 列追加） |
+| 譲属性 | `kind` / `status` / 数量 | listing で拡張 | 中 |
 | 個別募集 | 存在しない | 新テーブル `listings` | **大**（新規実装） |
 | 打診 | テンプレ＋編集 | + calendar 公開フラグ | 中 |
-| マッチング | 完全/片方向 2 軸 | global / local / listing 3 軸 | 中（ロジック追加） |
+| マッチング | 完全/片方向 2 軸 | 通常マッチ + listing | 中（ロジック追加） |
 
 ---
 
@@ -542,24 +461,14 @@ listing_matches = find_listings_for_my_inventory(my_haves)
 - wish 編集画面で chip 選択
 - マッチング結果カードにタグ chip 表示（**判定はしない**）
 
-### Phase B — ホームモード切替 + 現地モード
-- `user_local_mode_settings` テーブル追加（モード設定の永続化）
-- ホームに「広域 / 現地」切替 pill
-- 現地モード ON 時:
-  - 位置情報を即時更新（GPS）
-  - 持参グッズ・wish 選択（前回値を記憶）
-  - **一括リセット**ボタン
-  - サマリ表示
-- マッチングロジックに AW 時空交差フィルタ追加
-
-### Phase C — 個別募集（listings）
+### Phase B — 個別募集（listings）
 - migration: `listings`（**wish_id 必須**）
 - 個別募集作成画面: 既存 wish 一覧から選んで「これで募集する」
-- 譲アイテム選択 → wish 選択 → 比率 1:1〜10:1 → 優先度 → タグ
-- マッチングロジック: listing 一致を最優先（priority sort）
+- 譲アイテム選択 → wish 選択 → 比率 1:1〜10:1 → タグ
+- マッチングロジック: listing 一致を通常マッチより前に表示
 - UI 表記は **「個別募集」**で統一（"listing" は出さない）
 
-### Phase D — 打診のカレンダー公開（重ね見 UI）
+### Phase C — 打診のカレンダー公開（重ね見 UI）
 - migration: `proposals.expose_calendar boolean default false`
 - 打診画面にトグル追加
 - 取引画面に **calendar overlay** コンポーネント実装
@@ -576,10 +485,8 @@ listing_matches = find_listings_for_my_inventory(my_haves)
 1. **「同種交換」の判定軸**: → 自動判定なし、タグ表示のみ（§A-1）
 2. **「比率」の上限**: → 1:10〜10:1（§A-2）
 3. **listing と wish の関係**: → wish ベース、wish_id 必須（§A-3）
-4. **モード切替の永続化**: → 記憶 + 位置のみ毎回更新 + 一括リセット（§A-4）
-5. **カレンダー公開の範囲**: → 重ね見、取引終了で自動非公開（§A-5）
-6. **広域モードの通知頻度**: → MVP 外（§A-6）
-7. **「listing」用語**: → UI では「個別募集」で統一（§A-7）
+4. **カレンダー公開の範囲**: → 重ね見、取引終了で自動非公開（§A-5）
+5. **「listing」用語**: → UI では「個別募集」で統一（§A-7）
 
 ---
 
@@ -591,27 +498,24 @@ listing_matches = find_listings_for_my_inventory(my_haves)
      - `user_wants.exchange_type`
      - `listings`（wish_id 必須版）
      - `proposals.expose_calendar`
-     - `user_local_mode_settings`
    - `notes/09_state_machines.md` に追加:
      - 個別募集ライフサイクル（active / paused / matched / closed）
      - calendar disclosure の有効期間
    - `notes/10_glossary.md` の §C / §D / §E / §F に §B-6 の新用語追加
    - `notes/11_screen_inventory.md` に新画面追加:
-     - ホーム広域/現地モード切替
      - 個別募集作成画面
      - カレンダー overlay コンポーネント
 
 2. **iter62 以降の実装計画（順序）**:
    - **iter62**: Phase A（user_wants.exchange_type + chip 表示）
-   - **iter63**: Phase B（ホームモード切替 + 現地設定 + 一括リセット）
-   - **iter64**: Phase C（個別募集 = listings）
-   - **iter65**: Phase D（打診カレンダー公開 + overlay UI）
+   - **iter64**: Phase B（個別募集 = listings）
+   - **iter65**: Phase C（打診カレンダー公開 + overlay UI）
    - iter62 当初予定の「検索＋フィルタ」は iter66 へ後送り
 
 3. **再確認したい曖昧点**（実装中に出る可能性）:
    - 「カレンダー overlay」の対象 AW 範囲（今後 7 日 / 14 日 / 全件）→ 実装時に提案して決める
    - 個別募集の重複制限（同じ譲 + wish の組み合わせを複数回作れる？）→ 仕様提案して決める
-   - 一括リセットは「持参グッズ」「wish 選択」を別々にリセットできる？両方一括？→ 実装時に決める
+   - 一括リセットは wish 選択の全解除として扱う
 
 ---
 
@@ -631,47 +535,25 @@ for my_inv in my_inventories(kind=for_trade):
         for listing in listings:
             for partner_inv in partners_inventories:
                 if any(matches(partner_inv, wish) for wish in listing.wishes):
-                    score += listing.priority_weight  # priority 廃止だが将来的にスコアに使う可能
                     record_match(my_inv, partner_inv, listing.exchange_type)
     else:
         # 個別募集なし：通常の wish×譲 マッチに委譲
-        run_global_match(my_inv, my_wishes, partners)
+        run_match(my_inv, my_wishes, partners)
 ```
 
 → 譲 A に **個別募集を作っただけで他の wish との通常マッチを抑制したい** ユースケースが基本想定（オーナー意図）。
    ただし「個別募集に登録した譲は、通常 wish マッチからも除外する」かは要確認（iter66 で確認）。
 
-### wish からは「タグ・優先度・許容範囲」を排除
+### wish からは「タグ・許容範囲」を排除
 
 - `goods_inventory.exchange_type` は `kind='wanted'` 行では使わない（常に `any` で保存）
-- `goods_inventory.priority` / `flex_level` も同様（UI 廃止）
+- `goods_inventory.flex_level` も同様（UI 廃止）
 - 個別募集（listings）作成時に必要なら `exchange_type` を設定する
-
-### 持参グッズ管理は **ホームの現地交換モード経由のみ**
-
-- `/inventory` の在庫一覧から carrying トグル・外出モードバナー・一括 carrying を全削除
-- ホーム → 現地交換モード → 「グッズを選ぶ」 → `/inventory/select-carrying` 画面で選択
-- 戻ると自動的にホーム + 現地モードシートが開く
-
-### 現地モードのマッチ範囲
-
-- `LocalModeSheet` から半径スライダーを削除
-- AW 自身の `radius_m` を採用（AW 設定時に決定済みなので二重設定しない）
-
-### AW 未設定時のフロー
-
-- LocalModeSheet 内の「AW を追加 →」リンクに `?return=local-mode`
-- AW チューザー / location-led / event-led で `searchParams.get("return")` を読んで保存後の遷移先を `/?openLocalMode=1` に変更
-- ホーム `page.tsx` で `?openLocalMode=1` を検知すると HomeView に `autoOpenLocalSheet=true` を渡し、シートが自動的にスライドアップ
-- URL クエリは history.replaceState で除去（戻るボタンで再開しないように）
-
----
 
 ## 10. 整理結果のまとめ（1 行で）
 
-- **Layer A**（譲 + wish）→ 広域マッチ
-- **Layer B**（AW + 携帯 + 選択 wish）→ 現地マッチ
-- **Layer C**（個別募集 = 譲 + wish + 比率 + 優先度 + タグ）→ ピンポイント募集
+- **ベース登録**（譲 + wish）→ 通常マッチ
+- **個別募集**（譲 + wish + 比率 + タグ）→ ピンポイント募集
 - 打診時に **カレンダー公開**（重ね見）をオプションで付与
 - **同種/異種は自己申告タグのみ。システムは判定しない**
 - **通知設計は MVP 外**

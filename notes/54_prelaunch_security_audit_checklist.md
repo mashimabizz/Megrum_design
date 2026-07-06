@@ -32,7 +32,7 @@ App Store初回提出前に、MegrumのDB、Storage、Edge Function、秘密鍵�
 | APNs Edge Function | `send-apns-notification` が `SUPABASE_SERVICE_ROLE_KEY`, APNs秘密鍵、dispatch secret等を使う | secret登録、認証header、ログ、環境切替を確認 |
 | Web server | `SUPABASE_SECRET_KEY` をserver側で使う箇所がある | server-onlyであること、クライアントbundleや公開ログへ出ないことを確認 |
 | Web管理画面 | `admin_roles`、`admin_audit_logs`、ユーザー一覧、通報/異議申し立て、推し追加リクエスト、有料権限、サブスクリプション、運営通知をservice role経由で扱う。有料権限は `entitlements.manage` 権限で `plan_overrides` と `user_entitlements.source='manual_override'` を作成し、理由、期限、変更前後、作成者を監査ログ化する。運営通知は `notifications.send` 権限で、全有効ユーザー又は指定ユーザーへ `admin_announcement` を作成し、title/body/link_pathを通知行及び直近通知表示に残す | 管理者MFA、最小権限、owner冗長性、監査ログ、IP/User-Agent保存、secretのserver-only、有料権限の対象ユーザー確認、理由、期限、変更前後、手動上書きの非保証説明、運営通知の送信理由、対象件数、本文プレビュー、全体送信確認、退会後保持を確認 |
-| Swift Native | Supabase URL/key、Storage URL、APNs device token、Apple/Google認証、位置情報、カメラ/写真を扱う | publishable keyのみ、Privacy/App Privacyと一致することを確認。位置情報は現在地共有、待ち合わせ候補、現地交換モード、グルーム/掲示板の作成座標、閲覧者座標、1km/3km距離判定まで棚卸しする |
+| Swift Native | Supabase URL/key、Storage URL、APNs device token、Apple/Google認証、位置情報、カメラ/写真を扱う | publishable keyのみ、Privacy/App Privacyと一致することを確認。位置情報は現在地共有、待ち合わせ候補、グルーム/掲示板の作成座標、閲覧者座標、1km/3km距離判定まで棚卸しする |
 | Swift Native / 会員間支払い | `user_payment_settings` に支払い方法、銀行名、支店名、口座種別、口座番号、口座名義、任意メモを保存し、金額指定取引の合意時に `proposals.sender_payment_settings` / `receiver_payment_settings` へスナップショット化して当事者へ表示する経路がある | RLS、proposal参加者限定表示、管理者最小権限、ログ/通知/サポート証跡への口座情報・送金リンク・送金用QR・外部サービスID混入防止、設定変更/削除後も成立後スナップショットが残る説明を確認 |
 | Swift Native / Auth Links | `CFBundleURLSchemes=$(MEGRUM_URL_SCHEME)`、`MegrumAuthEmailRedirectURL`、`MegrumAuthOAuthAuthorizeURL`、`ASWebAuthenticationSession`、`onOpenURL`、認証callback parserが存在 | callback token、redirect allowlist、URL scheme、外部ブラウザ/メールアプリ、deep linkのログ/共有リスクを確認 |
 | Swift Native / DEBUG logs | `MegrumAppLogger.general` と `NativePush` loggerがあり、DEBUG時に `privacy: .public` でerror descriptionを出す箇所がある | error objectにtoken、署名URL、画像URL、個人情報が混ざらないか、公開証跡へ貼らない運用を確認 |
@@ -66,7 +66,7 @@ App Store初回提出前に、MegrumのDB、Storage、Edge Function、秘密鍵�
 | SEC-015 | データ削除 | アカウント削除時にDB/Storage/通知token/外部サービスの扱いを説明できる | `notes/45`, `notes/52` | 削除請求後も不要なdevice tokenや画像が残る |
 | SEC-016 | Incident readiness | 漏えい疑い時の担当、受付番号、証跡保存、本人通知/PPC報告判断が準備済み | `notes/49` | 事故疑いがあるのに提出判断を進める |
 | SEC-017 | Member payment data | 支払い設定と成立後支払い情報スナップショットが本人又は取引当事者に限定され、管理者閲覧は最小権限・理由・監査ログ付きで、通知/ログ/証跡/サポート返信へ不要に出ない | `user_payment_settings` RLS、proposal snapshot参照範囲、管理画面権限、ログサンプル、Supportテンプレ | 銀行口座、口座名義、送金リンク、送金用QR、外部サービスIDが当事者以外へ見える。Megrumが口座名義、本人性、支払能力、残高、外部ID、送金リンク、QRを確認済みのように扱う |
-| SEC-018 | Location data and proximity scope | 現在地共有、待ち合わせ候補、現地交換モード、グルーム/掲示板の作成座標、閲覧者座標、距離判定、公開範囲が、RLS、RPC、ログ、通知、サポート証跡、App Privacy、Privacy、FAQと一致し、必要最小限の表示/保持になっている | `messages` RLS、`user_local_mode_settings` RLS、`activity_windows`、`groom_posts.origin_lat/lng`、`meguri_board_threads.origin_lat/lng`、RPC範囲、ログサンプル、Review Notes | 精密座標、作成位置、閲覧者位置、半径、距離、公開範囲が不要な相手、公開ログ、通知本文、管理者以外のサポート証跡に出る。1km/3kmを匿名化、安全確認、本人確認又は推測防止として扱う |
+| SEC-018 | Location data and proximity scope | 現在地共有、待ち合わせ候補、グルーム/掲示板の作成座標、閲覧者座標、距離判定、公開範囲が、RLS、RPC、ログ、通知、サポート証跡、App Privacy、Privacy、FAQと一致し、必要最小限の表示/保持になっている | `messages` RLS、`activity_windows`、`groom_posts.origin_lat/lng`、`meguri_board_threads.origin_lat/lng`、RPC範囲、ログサンプル、Review Notes | 精密座標、作成位置、閲覧者位置、半径、距離、公開範囲が不要な相手、公開ログ、通知本文、管理者以外のサポート証跡に出る。1km/3kmを匿名化、安全確認、本人確認又は推測防止として扱う |
 
 ## 4. Supabase RLS監査
 
@@ -112,7 +112,7 @@ No-Go:
 - 運営通知の本文又はリンク先に、正確な現在地、住所、銀行口座、認証コード、本人確認書類、通報又は異議申し立て詳細本文、secret、内部ID、相手会員の不要な個人情報を含める。
 - 通知本文、運営通知、Function logs、Swift DEBUG OSLog、管理者監査JSON、App Review証跡、公開レビュー返信又はサポート返信に、銀行口座番号、口座名義、送金リンク、送金用QR、外部サービスID、相手方の支払い情報スナップショットを不要に含める。
 - 通知本文、運営通知、Function logs、Swift DEBUG OSLog、管理者監査JSON、App Review証跡、公開レビュー返信又はサポート返信に、精密座標、作成位置、閲覧者位置、活動ウィンドウ中心座標、宿泊先、座席番号、未成年者の居場所を不要に含める。
-- 現地交換モード、グルーム、掲示板、待ち合わせ候補のRLS/RPC/Storage/ログ確認なしに、近距離公開を匿名、安全確認済み、本人確認済み、所在確認済み又は推測防止済みとして公開説明する。
+- グルーム、掲示板、待ち合わせ候補のRLS/RPC/Storage/ログ確認なしに、近距離公開を匿名、安全確認済み、本人確認済み、所在確認済み又は推測防止済みとして公開説明する。
 - 通報者情報、削除申出本文、会員間支払い情報、成立後支払い情報スナップショット、郵送先情報、監査ログをサポート外の担当者が見られる。
 
 ### 4.3 SQL確認案

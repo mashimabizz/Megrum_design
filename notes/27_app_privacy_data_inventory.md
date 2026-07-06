@@ -41,9 +41,7 @@ App Store Connectへ転記する回答は `notes/43_app_privacy_connect_answer_s
   - 現行設定上、検索結果native広告、やりとり一覧上部banner、preview viewer向けhome banner fallbackが主な広告リクエスト候補。インタースティシャルはplaceholder以外のGoogle SDKロード未接続かつunit id空
 - 位置情報 / MapKit / CoreLocation
   - `MegrumLocationState` は `CLLocationManager` を使い、`desiredAccuracy=kCLLocationAccuracyNearestTenMeters`、`distanceFilter=10`、`CLGeocoder.reverseGeocodeLocation` により場所名へ変換する。
-  - `HomeLocalCoordinateStorageCodec` は緯度経度を小数8桁で保持できる。
   - `TradeDetailScreenActions.sendLocationMessage` は取引チャットの現在地共有として緯度経度を送信する。
-  - `SupabaseHomeLocalModePersistence` は現地交換モードのON/OFF、活動ウィンドウ中心座標、最終/設定座標、半径、有効時間、持参グッズIDを保存する経路がある。
   - `ProposalCreatePayload` は待ち合わせ候補の開始/終了、場所名、緯度経度を最大3件送信する。下書きUI上は候補を最大5件扱うが送信時に有効候補へ丸める。
   - `MegrumAppStateMeguriActions`、`BoardThreadDetailScreen`、`SupabaseGroomPayloads`、`BoardScopeQueryContext` は近くのグルーム、スポット掲示板の閲覧、作成、返信範囲判定へ緯度経度を送信する経路がある。`groom_posts.origin_lat/lng`、`meguri_board_threads.origin_lat/lng`、閲覧者lat/lng、公開範囲、1km/3km系判定はPrecise Location候補として扱う。
 - 認証リダイレクト / URL scheme / ディープリンク
@@ -66,7 +64,7 @@ App Store Connectへ転記する回答は `notes/43_app_privacy_connect_answer_s
   - 初回設定・プロフィール編集で性別と活動エリアを扱う経路あり。公開プロフィール、ホーム候補、交換条件等で、性別、活動エリア、評価、完了取引数、支払い方法要約等が表示され得る
   - これらは自己入力又は利用状況に基づく表示であり、公的本人確認、法的性別確認、年齢認証、安全確認、支払能力確認ではない
 - ホーム候補 / 検索 / レコメンド
-  - `HomeCandidateComposer` / `SupabaseHomeClient` は、閲覧者と相手会員の在庫、wish、個別募集、listing wish options、推し、inventory tags、活動予定、local mode settings、支払い方法要約、評価、完了取引数、未読通知、メグルムプラス有効ユーザー、ブロック関係、テストアカウント除外等を用いてホーム候補を構成する
+  - `HomeCandidateComposer` / `SupabaseHomeClient` は、閲覧者と相手会員の在庫、wish、個別募集、listing wish options、推し、inventory tags、活動予定、支払い方法要約、評価、完了取引数、未読通知、メグルムプラス有効ユーザー、ブロック関係、テストアカウント除外等を用いてホーム候補を構成する
   - `HomeDiscoveryCandidateSorter` は、メグルムプラス優先、タグ一致数、グッズ条件、交換条件、支払い条件、リンク数、タイトル等で表示順を調整する
   - `HomeDiscoveryMatchPolicy` / `HomeMutualMatchConditionReviewPolicy` は、wish一致、個別募集一致、郵送交換可否、現地交換の都道府県/日程一致、支払い方法互換性等から「全一致」「確認が必要」等の参考ラベルを作る
   - `SearchResultFilterPolicy` は、メンバー、グッズ種別、タグ、支払い方法、交換方法、都道府県、wish一致、個別募集一致、閲覧者条件で検索結果を絞り込み、`newest` / `title` の表示順でもメグルムプラス優先表示を行う
@@ -158,7 +156,7 @@ App Store Connectへ転記する回答は `notes/43_app_privacy_connect_answer_s
 | Search History | 検索語、検索条件、検索結果件数、検索時刻、`normalized_term`、`result_count`、人気検索集計 | 検索ログ又は人気検索を有効にするならあり。DB/RPC基盤はあるがSwift呼び出しは未確認 | はい又は集計後は非識別 | App Functionality, Product Personalization, Analytics | いいえ |
 | User Content / Photos or Videos | グッズ写真、証跡写真、取引チャット写真、服装写真、グルーム写真、スポット掲示板画像、めぐりメッセージ画像、プロフィール画像、共有用生成画像、写真ライブラリ由来の元画像又は再圧縮画像、画像メタデータ | あり | はい | App Functionality, Safety, Customer Support | いいえ |
 | User Content / Other User Content | プロフィール文、推し情報、投稿、返信、取引チャット、通知本文、評価コメント、通報本文、通報補足、異議申し立て本文、削除申出本文、問い合わせ本文、広告通報本文、運営返信本文 | あり | はい | App Functionality, Safety, Customer Support | いいえ |
-| Location / Precise Location | 現在地共有、位置情報メッセージ、待ち合わせ候補の緯度経度、現地交換モードの最終/設定座標、活動ウィンドウ中心座標、近くのグルーム/スポット掲示板表示、グルーム/掲示板の作成座標、閲覧者座標、掲示板作成/返信範囲判定、1km/3km等の距離判定、地図表示、逆ジオコーディング | あり | はい | App Functionality, Safety | いいえ |
+| Location / Precise Location | 現在地共有、位置情報メッセージ、待ち合わせ候補の緯度経度、活動ウィンドウ中心座標、近くのグルーム/スポット掲示板表示、グルーム/掲示板の作成座標、閲覧者座標、掲示板作成/返信範囲判定、1km/3km等の距離判定、地図表示、逆ジオコーディング | あり | はい | App Functionality, Safety | いいえ |
 | Location / Coarse Location | 都道府県、スポット、活動エリア | あり | はい | App Functionality, Personalization | いいえ |
 | Identifiers / User ID | Supabase user id、プロフィールID | あり | はい | App Functionality, Safety, Analytics | いいえ |
 | Identifiers / Device ID | APNs device token、push provider、端末通知登録状態等。過去又は別環境でExpo Pushを使う場合はExpo push tokenも別途確認 | 通知を出すならあり | はい | App Functionality | いいえ |
@@ -266,7 +264,7 @@ legacy `mobile/ios/MegrumPreview/PrivacyInfo.xcprivacy` は削除済み旧実装
 | 評価 | Supabase DB | 当事者、プロフィール閲覧者、運営確認 | 評価者公開情報、星、コメント、評価日がプロフィール評価一覧等へ表示され得る。信用、安全、本人確認、支払能力又は商品品質を保証しない |
 | 通報 / 異議 / 削除申出 / モデレーション | Supabase DB / Storage / サポートツール | 通報者、申出者、対象者、関係当事者、運営確認、必要に応じた外部機関 | 通報理由、補足、削除申出本文、送信防止措置希望、証跡URL、status、運営対応情報を安全・監査・法令対応・虚偽通報対策のため保存可能。通報者/申出者の直接表示は避けるが、文脈、発信者確認又は法令対応で推測又は開示される場合がある |
 | ブロック関係 | Supabase DB | 非公開、表示/通知制御、運営確認 | 検索、候補、プロフィール、めぐり、掲示板、通知等の抑制に使う。過去の取引、チャット、証跡、評価、通報、異議、監査記録を当然には削除しない |
-| 現在地 / 精密座標 | Supabase DB、RPC、端末内、MapKit/CoreLocation/CLGeocoder | 任意共有時の取引相手、近くのグルーム/掲示板の範囲判定、近距離公開の閲覧対象者、運営確認 | 現行コードは取引チャットの現在地共有、待ち合わせ候補、現地交換モードの最終/設定座標と活動ウィンドウ中心座標、グルーム/掲示板の作成座標、閲覧者座標、作成/返信範囲判定で緯度経度を送信し得る。1km/3km、近く、同じスポット等は表示/投稿/返信フィルタであり、匿名化、安全確認、所在確認、推測防止を保証しない。現行コードでは30日後の自動削除/非表示ジョブ未確認のため、即時削除、完全削除、自動削除完了は保証しない |
+| 現在地 / 精密座標 | Supabase DB、RPC、端末内、MapKit/CoreLocation/CLGeocoder | 任意共有時の取引相手、近くのグルーム/掲示板の範囲判定、近距離公開の閲覧対象者、運営確認 | 現行コードは取引チャットの現在地共有、待ち合わせ候補、活動ウィンドウ中心座標、グルーム/掲示板の作成座標、閲覧者座標、作成/返信範囲判定で緯度経度を送信し得る。1km/3km、近く、同じスポット等は表示/投稿/返信フィルタであり、匿名化、安全確認、所在確認、推測防止を保証しない。現行コードでは30日後の自動削除/非表示ジョブ未確認のため、即時削除、完全削除、自動削除完了は保証しない |
 | 郵送先情報 | Supabase DB / proposals snapshot / ZipCloud | 合意後の当事者、運営確認 | 郵送交換、配送、紛争対応のため保存可能 |
 | 支払い情報 / 口座情報 | Supabase DB / proposals snapshot | 合意後の当事者、運営確認 | 会員間支払い、紛争対応、監査のため保存可能。運営者が決済、送金、収納代行、返金、口座名義確認、支払能力確認又はエスクローをするものではない |
 | 顔候補付けデータ | 端末内処理 / Supabase DB / Storage / 将来Core ML又は外部API | 原則本人、運営確認、候補付けに必要な範囲。ただし `member_face_profiles` はauthenticated read設計のため提出前確認 | 顔特徴量はSensitive Info候補。本人確認やFace IDではないこと、外部送信、同意、削除/非表示、`shouldAddTrainingData` 既定true、embedding/source image URL読み取り範囲を確認 |
@@ -296,7 +294,7 @@ legacy `mobile/ios/MegrumPreview/PrivacyInfo.xcprivacy` は削除済み旧実装
 - [ ] 郵送交換、住所登録、電話番号入力、郵便番号検索、合意後の郵送先表示を初回提出で出すか
 - [ ] 支払い方法設定、銀行振込、口座番号入力、金額指定、合意後の支払い情報表示を初回提出で出すか
 - [ ] PhotosPicker利用時に写真ライブラリ権限文言が必要な実装か
-- [ ] 近くのグルーム/スポット掲示板、現在地共有、待ち合わせ候補、現地交換モード、地図表示、逆ジオコーディングを出す場合、Precise Location、MapKit/CoreLocation/CLGeocoder、精密座標のサーバー送信/保存、作成位置、閲覧者位置、半径、距離、公開範囲、地図・距離・場所名の非保証、1km/3kmが匿名化又は安全保証ではないことをPrivacy/FAQ/Review Notesへ反映するか
+- [ ] 近くのグルーム/スポット掲示板、現在地共有、待ち合わせ候補、地図表示、逆ジオコーディングを出す場合、Precise Location、MapKit/CoreLocation/CLGeocoder、精密座標のサーバー送信/保存、作成位置、閲覧者位置、半径、距離、公開範囲、地図・距離・場所名の非保証、1km/3kmが匿名化又は安全保証ではないことをPrivacy/FAQ/Review Notesへ反映するか
 - [ ] App Privacyの`Analytics`目的を選ぶほどの行動分析をしているか
 - [ ] App Store ConnectのカテゴリをInfo.plistのSocial Networkingに合わせるか、ライフスタイルへ変更するか
 
@@ -307,7 +305,7 @@ legacy `mobile/ios/MegrumPreview/PrivacyInfo.xcprivacy` は削除済み旧実装
 - 支払い設定、銀行振込、口座番号、金額指定取引、成立後支払い情報スナップショットを出す場合、Financial Info / Payment Infoを回答する。隠す場合でも支払い設定、口座入力、合意後の支払い情報表示へ到達できないことを実機で確認する。
 - 銀行振込、PayPay、現金交換その他外部サービスへの対応可否を出す場合、Megrumが決済代行、資金移動、収納代行、返金、エスクロー、本人確認、口座名義確認、支払能力確認、外部アカウント/リンク/QRコード/外部ID/残高/送金可否/受領可否の確認を行うようにApp Privacy、FAQ、Review Notesで説明しない。
 - 性別、活動エリア、年齢、評価、完了取引数、支払い方法要約がプロフィール、ホーム候補、交換条件等に表示される場合、公開範囲、自己申告性、非保証をプライバシーポリシー、FAQ、Review Notesと一致させる。
-- 現在地共有、待ち合わせ候補、現地交換モード、近くのグルーム/スポット掲示板、グルーム/掲示板の作成座標、掲示板作成/返信範囲判定、地図表示、逆ジオコーディングを出す場合、Precise Locationを「任意利用又は機能利用時」「App Functionality / Safety」「Linked to user」「Not tracking」で回答する。現行実装のように精密座標をサーバーへ送る導線がある場合、Coarse Locationだけ又は端末内処理だけとして回答しない。
+- 現在地共有、待ち合わせ候補、近くのグルーム/スポット掲示板、グルーム/掲示板の作成座標、掲示板作成/返信範囲判定、地図表示、逆ジオコーディングを出す場合、Precise Locationを「任意利用又は機能利用時」「App Functionality / Safety」「Linked to user」「Not tracking」で回答する。現行実装のように精密座標をサーバーへ送る導線がある場合、Coarse Locationだけ又は端末内処理だけとして回答しない。
 - 取引チャット、投稿、画像、評価コメント、通報補足、異議申し立て本文はUser Contentとして広めに回答する。
 - ブロック関係、通報status、モデレーション優先度、運営対応ログはOther Data Types又はCustomer Supportのどちらで回答するか、App Store Connectの実UIで過少申告にならない側へ寄せる。
 - APNs token、push provider、端末通知登録状態やユーザーIDはIdentifiersとして回答する。過去又は別環境でExpo Pushを使う場合は、Expo push tokenも別途回答対象として再確認する。

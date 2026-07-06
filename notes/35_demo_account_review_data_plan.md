@@ -98,11 +98,11 @@ Starlume中心にトレカと小物を集めています。
 
 ### 5.2 メインユーザーのwish
 
-| ID | グループ | メンバー | グッズ | 優先度 | 役割 |
-|---|---|---|---|---|---|
-| WSH-01 | Starlume | Sora | ランダムトレカ B | 高 | マッチ用 |
-| WSH-02 | Starlume | Haru | フォトカード Arena | 中 | 検索用 |
-| WSH-03 | MiraPop | Yui | 缶バッジ Cafe | 低 | Wish一覧用 |
+| ID | グループ | メンバー | グッズ | 役割 |
+|---|---|---|---|---|
+| WSH-01 | Starlume | Sora | ランダムトレカ B | マッチ用 |
+| WSH-02 | Starlume | Haru | フォトカード Arena | 検索用 |
+| WSH-03 | MiraPop | Yui | 缶バッジ Cafe | Wish一覧用 |
 
 ### 5.3 交換相手の在庫
 

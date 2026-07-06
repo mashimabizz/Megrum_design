@@ -184,9 +184,8 @@ Phase 0 完了が前提。Phase 1 と Phase 6 は並行可能（チームサイ�
 - F1-1 在庫登録（写真撮影→切り抜き→メタ入力）
 - F1-2 在庫の譲/自分用キープ分類（iter19.5）
 - F1-3 在庫の数量管理（1行=1個 + UI集約、iter29）
-- F1-4 在庫の携帯モード（is_carrying）
-- F1-5 ウィッシュ登録・編集
-- F1-6 ウィッシュの flexibility / priority
+- F1-4 ウィッシュ登録・編集
+- F1-5 ウィッシュの flexibility
 - F2-1 AW作成（イベント主導 or 位置主導）
 - F2-2 AW一時停止・再開・削除
 - F2-3 AW一覧表示
@@ -205,7 +204,7 @@ Phase 0 完了が前提。Phase 1 と Phase 6 は並行可能（チームサイ�
 
 | カテゴリ | エンドポイント |
 |---|---|
-| Items | CRUD + bulk + image upload + carrying toggle = 9件 |
+| Items | CRUD + bulk + image upload = 8件 |
 | Wishes | CRUD + matches = 6件 |
 | AWs | CRUD + pause/resume + intersect = 8件 |
 | Masters | `events` GET/POST = 2件 |
@@ -217,7 +216,7 @@ Phase 0 完了が前提。Phase 1 と Phase 6 は並行可能（チームサイ�
 - [ ] 在庫を写真からまとめて登録できる（B-2① 撮影 → ② 切り抜き → ③ メタ入力）
 - [ ] 在庫の `kind` を for_trade ⇄ keep で切り替えできる
 - [ ] 在庫×数量Nを N行INSERTで保存できる
-- [ ] ウィッシュをCRUDできる、flexibility/priority が設定できる
+- [ ] ウィッシュをCRUDできる、flexibility が設定できる
 - [ ] AW を新規作成・編集・一時停止・削除できる
 - [ ] イベントタグをマスタから選択 or 新規作成できる
 - [ ] 自分のAW一覧が表示できる

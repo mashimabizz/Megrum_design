@@ -4,6 +4,144 @@
 
 ---
 
+## イテレーション1226.320：優先度仕様メモの削除
+
+### 背景・問題意識
+
+オーナーから、ほしいもの/個別募集における「優先度」の考えも現在のプロダクト仕様にないため、仕様メモ側から削除したいという指摘があった。サポート対応やロードマップ判断など運用上の優先度とは分け、ユーザーがwishや個別募集へ優先度を設定する前提だけを外す。
+
+### 変更内容
+
+#### `notes/02_system_requirements.md`
+- 求めるグッズ登録から「最優先/2番手/妥協OK」の優先度表現を削除した。
+- 個別募集の構成から優先度を削除し、優先度順表示の記述を削除した。
+
+#### `notes/05_data_model.md`
+- `user_wants.priority` 行を削除した。
+- Wishに優先度を持たせないという否定メモも削除し、概念自体を現行仕様説明から外した。
+
+#### `notes/07_mvp_handoff.md`
+- ウィッシュ登録、F3、既存テーブル説明、画面一覧から優先度を削除した。
+
+#### `notes/09_state_machines.md`
+- Wish Lifecycleから優先度/`priority` を使わないという説明を削除した。
+- Listing Lifecycleの個別募集説明から優先度を削除した。
+
+#### `notes/13_api_spec.md`
+- Wishes APIのquery/request例から `priority` を削除した。
+
+#### その他仕様メモ
+- `notes/01_user_needs.md` / `notes/04_prototype_status.md` / `notes/11_screen_inventory.md` / `notes/14_implementation_phases.md` / `notes/18_matching_v2_design.md` / `notes/35_demo_account_review_data_plan.md` / `notes/legal/02_privacy_policy_draft.md` から、wish/個別募集の優先度前提を削除した。
+
+### 影響範囲
+
+- ほしいもの、個別募集、マッチング、デモデータ、API仕様、データモデル、画面棚卸し、プライバシーポリシー補助文言。
+- 推し設定の並び順、サポート対応、リリース判断、ロードマップ等の運用上の優先度は別概念のため維持。
+
+### 確認方法
+- `rg -n -C 1 'user_wants\\.priority|wishes.*priority|priority.*wishes|wish.*priority|priority.*wish|優先度.*wish|wish.*優先度|個別募集.*優先度|listing.*priority|priority.*listing|最優先|2番手|妥協OK|求.*優先度' notes ios-native/README.md -g '!notes/08_design_iterations.md'`
+  - wish/個別募集の優先度仕様としての残存なし（運用/リリース説明文言のみ残存）
+- `git diff --check`
+  - passed
+
+### セルフレビュー結果
+- ✅ wish/個別募集/API/データモデルからユーザー設定としての優先度を削除した。
+- ✅ 否定文としての「優先度は使わない」も残さず、現行仕様から概念を外した。
+- ✅ 推し並び順や運用優先度など別概念は変更していない。
+
+---
+
+## イテレーション1226.319：現地持参グッズ仕様メモの削除
+
+### 背景・問題意識
+
+オーナーから、「今日持っている/現地持参グッズ」は現在のプロダクト仕様にないため、仕様メモ側に残っている記述を削除したいという指摘があった。現地交換モード自体は残しつつ、在庫を「今日持参」「携帯グッズ」として別管理する前提を仕様から外す。
+
+### 変更内容
+
+#### `notes/01_user_needs.md`
+- ペイン、理想シナリオ、設計判断、マッチング表、残確認事項から携帯グッズ/持参在庫/`is_carrying` 前提を削除した。
+
+#### `notes/02_system_requirements.md`
+- `F2. 携帯グッズ` セクションを削除し、現地マッチは「AW + 選択 wish + 交換可能な譲」で説明するよう更新した。
+
+#### `notes/05_data_model.md`
+- `user_haves.is_carrying` / `carry_event_id` と `user_local_mode_settings.selected_carrying_ids` を削除した。
+
+#### `notes/07_mvp_handoff.md`
+- ユーザージャーニー、在庫管理、マッチング表、既存テーブル変更、画面一覧、Claude Design 用プロンプトから携帯グッズ切替を削除した。
+
+#### `notes/09_state_machines.md`
+- 現地モードの状態定義とリセット対象から携帯/`selected_carrying_ids` を削除した。
+
+#### `notes/10_glossary.md`
+- 現地マッチ/現地交換モードの定義から携帯グッズ/持参グッズ設定を削除した。
+
+#### `notes/13_api_spec.md`
+- items作成Requestから `is_carrying?` / `carry_event_id?` を削除し、`toggle-carrying` API節を削除した。
+
+#### その他仕様・法務補助メモ
+- `notes/03_strategy.md` / `notes/04_prototype_status.md` / `notes/14_implementation_phases.md` / `notes/18_matching_v2_design.md` / `notes/22_swift_native_migration.md` から携帯グッズ前提を削除した。
+- `notes/17_legal_alignment.md` / `notes/27_app_privacy_data_inventory.md` / `notes/43_app_privacy_connect_answer_sheet.md` / `notes/52_data_retention_deletion_matrix.md` / `notes/legal/02_privacy_policy_draft.md` から持参グッズIDの保存・取扱い記述を削除した。
+
+### 影響範囲
+
+- 仕様メモ、データモデルメモ、API仕様メモ、状態遷移メモ、用語集、App Privacy/Privacy補助メモ。
+- 現地交換モード、AW、位置情報、待ち合わせ候補、近距離公開の注意文言は維持。
+
+### 確認方法
+- `rg -n -C 1 '今日持|現地持参|持参グッズ|携帯グッズ|is_carrying|carrying=true|carry_event_id|selected_carrying|持参在庫|my_carrying' notes ios-native/README.md -g '!notes/08_design_iterations.md'`
+  - no matches
+- `git diff --check`
+  - passed
+
+### セルフレビュー結果
+- ✅ 現地交換モード自体は削除せず、持参グッズ/携帯グッズの別管理前提だけを削除した。
+- ✅ `is_carrying` 系のDB/API/状態遷移記述を仕様メモから削除した。
+- ✅ プライバシー補助メモから持参グッズIDの取扱い説明を削除しつつ、位置情報・AW・待ち合わせ候補の注意は維持した。
+
+---
+
+## イテレーション1226.319：グルームいいねの永続復元＋地図ピンのハート湧き演出
+
+### 背景・問題意識
+オーナーFB 2件：いいねしたグルームがアプリ再起動後に「いいね済み」表示に戻らない。いいね1件以上のグルームは地図アイコンから小さなハートがずっと湧く仕様のはずだが出ていない。
+
+### 変更内容
+
+#### 1. いいね状態の永続復元
+- 原因：viewerのいいね状態（likedGroomIDs）はタップ時のメモリ更新のみで、フィードRPC `list_groom_feed_nearby` が「自分がいいね済みか」を返していなかった
+- `supabase/migrations/20260706210000_groom_feed_viewer_has_liked.sql`：RPCに `viewer_has_liked boolean`（groom_reactions の exists）を追加。**push済み・authed RESTで返却値を確認済み**
+- `MegrumData/SupabaseGroomRows.swift`：`viewerHasLiked` をデコードし `GroomPost.liked` へマッピング。アーカイブ（テーブル直読み）は `groom_reactions(user_id,reaction_type)` を埋め込み、viewerID と突き合わせて liked / likeCount を解決
+- `MegrumAppStateGroomActions/MeguriActions`：feed / 地図 / ビューポート / アーカイブの各ロードで `syncLikedGroomIDs(with:)` を呼び、サーバーの liked を likedGroomIDs へ反映（取得分は上書き）
+
+#### 2. 地図ピンのハート湧き演出（`MeguriMapAnnotationViews.swift`）
+- `GroomPinAmbientHearts`：likeCount≥1（かつ圏内）のグルームピンから、小さなピンクのハートが途切れず湧き上がる。ハート数は 4＋likeCount/2（最大9）
+- 各ハートは決定的シード（グルームID）で開始位置・横ドリフト・サイズ・周期・開始遅延が変わり、easeIn で「ピン近くを漂ってからスッと昇って消える」を repeatForever でループ
+- クラスタ代表アイコンがグルームの場合も同じ演出が出る（MeguriClusterPin は GroomMapPin を再利用しているため）
+- reduceMotion 時は非表示
+
+### 影響範囲
+- グルームビューア（いいねアイコン初期状態）、めぐりホーム地図・全画面地図のグルームピン
+
+### 確認方法
+- RPC: authed REST で `viewer_has_liked` が正しく返ることを確認（いいね済み投稿=true）
+- シミュレータ（位置を大阪の実データ地点に設定）でピン上にハートが湧き上がるフレームをピクセル解析で確認
+- swift test 1486件 0失敗
+
+### セルフレビュー結果
+- ✅ migration push 済み（[[supabase-migration-push-required]] 遵守）
+- ✅ ブランドカラー直書きなし（MegrumTheme.pink）
+- ✅ 検証用に付けた実DBへのテストいいね2件は revert 済み
+- ⚠️ ハートはブランドピンクが淡いため、地図の背景によっては控えめに見える（白ふちどり影で補強済み）
+
+### 関連ファイル
+- `supabase/migrations/20260706210000_groom_feed_viewer_has_liked.sql`
+- `ios-native/Sources/MegrumData/SupabaseGroomRows.swift`
+- `ios-native/Sources/MegrumApp/MeguriMapAnnotationViews.swift`
+
+---
+
 ## イテレーション1226.318：シリーズ登録モジュール統一・チャットルーム透過ヘッダー・地図吹き出し作り直し
 
 ### 背景・問題意識
@@ -39,6 +177,47 @@
 ### 関連ファイル
 - `ios-native/Sources/MegrumApp/BoardThreadMessagePopBubbles.swift`
 - `ios-native/Sources/MegrumApp/BoardThreadDetailScreen.swift`
+
+---
+
+## イテレーション1226.318：状態タグ仕様メモの削除
+
+### 背景・問題意識
+
+オーナーから、グッズの状態タグは現在のプロダクト仕様にないため、仕様メモ側に残っている記述を削除したいという指摘があった。打診の交換条件タグとは別物として、在庫・グッズ状態タグの記述だけを現行仕様から外す。
+
+### 変更内容
+
+#### `notes/02_system_requirements.md`
+- 在庫登録要件から「状態タグ（美品／コーティング有／シリアル付き等）の標準化」を削除した。
+
+#### `notes/07_mvp_handoff.md`
+- 在庫管理の入力項目から「状態タグ」を削除した。
+
+#### `notes/15_non_functional.md`
+- 取り扱う個人情報の「在庫・ウィッシュ」内容から「状態タグ」を削除した。
+
+#### `notes/05_data_model.md`
+- 旧 `user_haves` の項目一覧から、グッズ状態タグとしての `condition_tags` 行を削除した。
+
+#### `notes/13_api_spec.md`
+- 在庫新規登録APIのRequest例から `condition_tags?` を削除した。
+
+### 影響範囲
+
+- 現行仕様メモ、データモデルメモ、API仕様メモ上の在庫登録説明。
+- 打診の「交換条件シリーズ」や既存の交換条件タグの履歴記述は別概念のため維持。
+
+### 確認方法
+- `rg -n "状態タグ|美品 / コーティング有 / シリアル付き|condition_tags\\?|グッズ写真、説明、状態タグ|グッズ種別.*状態タグ" notes ios-native/README.md -g '!notes/08_design_iterations.md'`
+  - no matches
+- `git diff --check`
+  - passed
+
+### セルフレビュー結果
+- ✅ 現行仕様としての在庫状態タグだけを削除し、打診条件タグや過去の設計履歴は変更していない。
+- ✅ 状態遷移の追加・削除・改名はないため `notes/09_state_machines.md` は更新不要。
+- ✅ 新用語追加はなく、廃止語として管理するほどのユーザー向け用語でもないため `notes/10_glossary.md` は更新不要。
 
 ---
 

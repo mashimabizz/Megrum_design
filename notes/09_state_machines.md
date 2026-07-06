@@ -420,7 +420,6 @@ stateDiagram-v2
 ### ビジネスルール
 
 - **L1 / L2 選択（iter582）**: L1 はグループ / 作品、L2 はメンバー / キャラクター。L2 マスターに値がある場合、Wish の L2 無指定は禁止する。L2 マスターに値がない場合だけ、L1 そのものを Wish 対象として選択できる。
-- **優先度・妥協度は使わない（iter582）**: Wish に優先度・妥協度は持たせない。既存スキーマ上の `priority` / `flex_level` 系カラムが残る場合も、現行UIとマッチング判定では使わない。
 - **コレクション表示**: wish ベースで影絵→入手済の図鑑（iter19.7-9）
 - **コンプリート目標は否定**: 「全種コンプ」を強制しない設計（ユーザー判断）
 
@@ -497,7 +496,7 @@ stateDiagram-v2
 ## 8. Listing Lifecycle
 
 個別募集（pinpoint listing / UI 表記は **「個別募集」**）。
-譲 1 件と wish 1 件を紐付けて、比率・優先度・タグを設定するピンポイント募集。
+譲 1 件と wish 1 件を紐付けて、比率・タグを設定するピンポイント募集。
 iter64 で導入予定（notes/18 §B-2）。
 
 ### 状態図
@@ -570,46 +569,6 @@ stateDiagram-v2
 - ただし、関連する `deals` のステータスが `completed` / `disputed_resolved` などの terminal になったら、RLS で閲覧を遮断する
 - 閲覧側は **スケジュール重ね見 UI**（自分と相手の `schedules` を時系列で重ね描画）で候補時間を確認
 - iter168.97 以降、スケジュールには任意の `place_name` を持たせ、重ね見画面や待ち合わせ候補登録時の背景表示に使う
-
----
-
-## 10. Local Mode
-
-ホーム画面の「現地交換に切り替え」モードの状態管理。
-iter63（Phase B）で導入。`user_local_mode_settings` テーブルで永続化。
-
-### 状態図
-
-```mermaid
-stateDiagram-v2
-    [*] --> global: ユーザー初回（default）
-    global --> local: 「現地交換に切り替え」を押す
-    local --> global: 「広域に戻す」を押す
-    local --> local: 設定変更（AW / 半径 / 携帯 / wish 選択）
-    local --> local_reset: 一括リセット
-    local_reset --> local: 再選択
-```
-
-### 状態定義
-
-| 状態 | 説明 |
-|---|---|
-| `global` | 広域マッチ表示（時空無制限） |
-| `local` | 現地マッチ表示（AW + 携帯 + 選択 wish） |
-| `local_reset` | 携帯グッズ・wish 選択をすべてクリアした直後の状態（local の sub-state） |
-
-### 主要トリガー
-
-- モード ON 時: `last_lat` / `last_lng` を **GPS から毎回上書き**
-- モード ON 時: `aw_id` / `radius_m` / `selected_carrying_ids` / `selected_wish_ids` は前回値を保持
-- 一括リセット: `selected_carrying_ids = '{}'` / `selected_wish_ids = '{}'`
-
-### ビジネスルール
-
-- 1 ユーザー 1 モード設定（複数同時保持しない）
-- 位置情報の取得失敗時は前回値で代替（フォールバック）
-- AW 削除時: 該当 `aw_id` を null に戻す
-- 現地交換モード ON 中に現地交換を含む打診を作成する場合、待ち合わせ候補に現在時刻から30分の枠と現在地を初期候補として自動追加する
 
 ---
 

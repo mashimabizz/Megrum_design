@@ -3,6 +3,16 @@ import MegrumCore
 
 @MainActor
 extension MegrumAppState {
+    /// サーバーが返した「自分がいいね済みか」を likedGroomIDs へ反映する。
+    /// 再起動後もいいね状態が復元されるように、取得した投稿分は上書きする。
+    func syncLikedGroomIDs(with posts: [GroomPost]) {
+        guard !posts.isEmpty else {
+            return
+        }
+        likedGroomIDs.subtract(Set(posts.map(\.id)))
+        likedGroomIDs.formUnion(GroomInteractionStateReducer.likedIDs(from: posts))
+    }
+
     public func loadGroomMapPosts(
         latitude: Double? = nil,
         longitude: Double? = nil,
@@ -41,6 +51,7 @@ extension MegrumAppState {
                 radiusMeters: radiusMeters
             )
             groomMapPosts = posts
+            syncLikedGroomIDs(with: posts)
             groomMapCacheKey = cacheKey
             await loadMeguriProfiles(userIDs: Set(posts.map(\.authorID)), reportsFailure: false)
         } catch {
@@ -83,6 +94,7 @@ extension MegrumAppState {
 
         if let loadedGrooms {
             groomMapPosts = Self.mergingByID(existing: groomMapPosts, incoming: loadedGrooms)
+            syncLikedGroomIDs(with: loadedGrooms)
             await loadMeguriProfiles(userIDs: Set(loadedGrooms.map(\.authorID)), reportsFailure: false)
         }
         if let loadedThreads {
@@ -122,6 +134,7 @@ extension MegrumAppState {
             async let replies = repository.loadGroomReplies(postIDs: postIDs)
 
             ownGroomArchive = GroomArchiveOrdering.sorted(archivedGrooms)
+            syncLikedGroomIDs(with: archivedGrooms)
             groomReactionsByPostID = Dictionary(grouping: try await reactions, by: \.groomPostID)
             groomRepliesByPostID = ReplyThreadStateReducer.mergingGroomReplies(
                 try await replies,

@@ -31,7 +31,7 @@
 
 - 現行Swift Nativeでは、`MegrumLocationState` が `CLLocationManager` を `kCLLocationAccuracyNearestTenMeters`、`distanceFilter = 10` で使い、`CLGeocoder.reverseGeocodeLocation` で座標を場所名へ変換する。
 - 取引チャットでは `messages.message_type = 'location'` が `location_lat`、`location_lng`、`location_label` を保存し、`TradeLocationPreviewBubble` は地図プレビューと緯度/経度表示を出す。服装写真は `outfit_photo`、到着状況は `arrival_status` として追記型メッセージに保存され、参加者だけが読めるRLSだが、相手保存、通知、署名URL、端末キャッシュ、スクリーンショットを完全防止できない。
-- 打診作成では待ち合わせ候補が `startAt`、`endAt`、`placeName`、`lat`、`lng` を持ち、UI下書きは最大5件、送信payloadは有効候補を最大3件に丸める。現地交換モードは `user_local_mode_settings.last_lat/lng` と `activity_windows.center_lat/lng`、半径、有効時間、持参グッズIDを保存する。
+- 打診作成では待ち合わせ候補が `startAt`、`endAt`、`placeName`、`lat`、`lng` を持ち、UI下書きは最大5件、送信payloadは有効候補を最大3件に丸める。現地交換モードは `user_local_mode_settings.last_lat/lng` と `activity_windows.center_lat/lng`、半径、有効時間を保存する。
 - めぐりでは `groom_posts.origin_lat/lng` と `meguri_board_threads.origin_lat/lng`、閲覧者lat/lng、公開範囲を用いて近距離表示、閲覧、返信可否を判定する。Swift側は詳細閲覧/作成で1km制限を使う一方、RPC/一覧には3km系の互換判定が残るため、法務文言は「1km/3kmは安全・匿名保証ではない」と整理する。
 - 利用規約第15条へ、近距離公開、1km、3km、同じ都道府県、同じスポット等が匿名化、秘匿化、安全確認、本人確認、所在確認、ストーカー防止又は推測防止を保証しないこと、自宅、学校、勤務先、宿泊先、座席番号、未成年者の居場所等を入力、投稿又は共有しないことを追加した。
 - プライバシーポリシー第2.5条、第2.6条及び第13条へ、グルーム/掲示板の作成座標、閲覧者座標、距離、公開範囲、現地交換モード最終座標、活動ウィンドウ中心座標、保持/削除例外を追加した。
@@ -470,10 +470,10 @@
 ## 2026-06-29 追記：UserDefaults・AppStorage・URLCacheの端末内保存をPrivacyへ追加
 
 - `ios-native/App/PrivacyInfo.xcprivacy` は `NSPrivacyAccessedAPICategoryUserDefaults` / `CA92.1` を申告している。AppleのRequired Reason API説明上、UserDefaultsはPrivacy Manifestで利用理由を示す対象であり、App Privacy回答や公開Privacyのデータ説明とは役割が異なる。
-- 現行Swift Nativeでは、`@AppStorage` により、交換方法の希望、同一都道府県条件、日程重複条件、活動都道府県、選択日、郵送条件、近くモードの有効状態、活動場所名、緯度経度、開始時刻、継続時間、半径、持参グッズID、掲示板の都道府県又は閲覧範囲等が端末内UserDefaults系保存領域に残り得る。
+- 現行Swift Nativeでは、`@AppStorage` により、交換方法の希望、同一都道府県条件、日程重複条件、活動都道府県、選択日、郵送条件、近くモードの有効状態、活動場所名、緯度経度、開始時刻、継続時間、半径、掲示板の都道府県又は閲覧範囲等が端末内UserDefaults系保存領域に残り得る。
 - `HomeLocalCoordinateStorageCodec` は緯度経度を小数8桁の文字列として保存・復元できる。`MegrumRemoteImageCache` は `URLCache` のdisk cacheとして `MegrumRemoteImages` を利用し、リモート画像を端末内キャッシュする。
 - プライバシーポリシーへ、UserDefaults、AppStorage、URLCacheその他端末内の保存領域又はキャッシュに、交換条件、日程条件、活動場所、緯度経度、掲示板の表示範囲、画像キャッシュ等を保存する場合があること、端末、OS、バックアップ、復元、アプリ削除、再インストール、キャッシュ削除又は空き容量管理により保存・消去・復元の挙動が異なることを追記した。
-- 公開前No-Goとして、Privacy ManifestにUserDefaults Required Reasonがあるだけで、App Privacyや公開Privacyでローカル保存データの説明が不要と判断しない。反対に、UserDefaults/AppStorageへ近くモードの緯度経度、活動場所、日程条件、持参グッズID等が残り得るのに、「端末内に個人情報や位置情報は保存しない」と説明しない。
+- 公開前No-Goとして、Privacy ManifestにUserDefaults Required Reasonがあるだけで、App Privacyや公開Privacyでローカル保存データの説明が不要と判断しない。反対に、UserDefaults/AppStorageへ近くモードの緯度経度、活動場所、日程条件等が残り得るのに、「端末内に個人情報や位置情報は保存しない」と説明しない。
 
 参照:
 - Apple Describing use of required reason API: https://developer.apple.com/documentation/bundleresources/describing-use-of-required-reason-api

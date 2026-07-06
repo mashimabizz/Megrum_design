@@ -31,14 +31,14 @@ App Store審査前に公開が必要なサポートURL、法務URL、問い合�
 
 この文書は公開ページの原稿であり、2026-06-29時点の現行Web実装そのものではない。
 
-コード読み取りでは、現行Web実装は `/terms`、`/privacy`、`/support` の3ページが中心で、Terms/Privacyのページ内更新日は `2026年6月26日` だった。現行 `/terms` と `/privacy` は短縮版であり、2026-06-29版ドラフトで追加したKeychain/session保存、access token、refresh token、認証callback fragment、通知linkPath、精密位置、近距離公開、作成位置、閲覧者位置、現地交換モード、待ち合わせ候補、1km/3km非保証、写真メタデータ、共有シート、外部AI/web_search、AdMob/ATT/test ads、ホーム候補/検索/レコメンド、郵送交換、会員間支払い情報、成立後支払い情報スナップショット、銀行口座番号表示、外部決済サービス非関与、送金リンク/QRコード注意、UGC・App Review 1.2、App Store評価・公開レビュー返信、漏えい等初動・事故疑い、広告宣伝メール・販促通知、公式連絡・フィッシング、削除申出・送信防止措置、サポートSLA・専門助言非保証、責任上限・存続条項等を網羅していない。`web/src/app/privacy/page.tsx` には、現地交換の現在地共有及び服装写真を「原則として取引終了後30日を目安に削除又は非表示化します」と読める短縮文言が残っている。一方、2026-06-29版のプライバシーポリシードラフトでは、現行コード上30日後の自動削除又は非表示ジョブが未確認であり、`chat-photos` の署名URLが長期になり得るため、「30日を目安にした運用目標」であって即時削除、完全削除、自動削除完了は保証しない整理にしている。上表の `/legal/terms`、`/legal/privacy`、`/support/account-deletion`、`/support/privacy-request`、`/support/report`、`/support/ai`、`/support/faq`、`/support/ads` は、公開前に実装、リダイレクト、アンカー、又はApp Store入力値の変更で整合させる必要がある。
+コード読み取りでは、現行Web実装は `/terms`、`/privacy`、`/support` の3ページが中心で、Terms/Privacyのページ内更新日は `2026年6月26日` だった。現行 `/terms` と `/privacy` は短縮版であり、2026-06-29版ドラフトで追加したKeychain/session保存、access token、refresh token、認証callback fragment、通知linkPath、精密位置、近距離公開、作成位置、閲覧者位置、待ち合わせ候補、1km/3km非保証、写真メタデータ、共有シート、外部AI/web_search、AdMob/ATT/test ads、ホーム候補/検索/レコメンド、郵送交換、会員間支払い情報、成立後支払い情報スナップショット、銀行口座番号表示、外部決済サービス非関与、送金リンク/QRコード注意、UGC・App Review 1.2、App Store評価・公開レビュー返信、漏えい等初動・事故疑い、広告宣伝メール・販促通知、公式連絡・フィッシング、削除申出・送信防止措置、サポートSLA・専門助言非保証、責任上限・存続条項等を網羅していない。`web/src/app/privacy/page.tsx` には、現地交換の現在地共有及び服装写真を「原則として取引終了後30日を目安に削除又は非表示化します」と読める短縮文言が残っている。一方、2026-06-29版のプライバシーポリシードラフトでは、現行コード上30日後の自動削除又は非表示ジョブが未確認であり、`chat-photos` の署名URLが長期になり得るため、「30日を目安にした運用目標」であって即時削除、完全削除、自動削除完了は保証しない整理にしている。上表の `/legal/terms`、`/legal/privacy`、`/support/account-deletion`、`/support/privacy-request`、`/support/report`、`/support/ai`、`/support/faq`、`/support/ads` は、公開前に実装、リダイレクト、アンカー、又はApp Store入力値の変更で整合させる必要がある。
 
 登録同意画面のリンクは現行コード上 `https://megrum.jp/terms` と `https://megrum.jp/privacy` を指し、現行Supportページの関連リンクも `/privacy` と `/terms` を指す。公開正URLを `/legal/*` にする場合は、完成ビルドのリンク更新又は公開Web側のリダイレクト方針を必ず確認する。
 
 No-Go:
 - この原稿だけを更新し、現行Webの短縮Terms/Privacyを古いままPrivacy Policy URL又は利用規約URLとして提出する。
 - 2026-06-29版で追加したUGC・App Review 1.2、App Store評価・公開レビュー返信、漏えい等初動・事故疑い、広告宣伝メール・販促通知、公式連絡・フィッシング、削除申出・送信防止措置、サポートSLA・専門助言非保証、責任上限・存続条項がない短縮Terms/Privacyを、App Store提出時の正式本文として扱う。
-- Keychain/session保存、access token、refresh token、認証callback、通知linkPath、精密位置、作成位置、閲覧者位置、現地交換モード、1km/3km非保証、写真メタデータ、外部AI/web_search、AdMob/ATT等がない短縮Privacyを、App Store ConnectのPrivacy Policy URLとして提出する。
+- Keychain/session保存、access token、refresh token、認証callback、通知linkPath、精密位置、作成位置、閲覧者位置、1km/3km非保証、写真メタデータ、外部AI/web_search、AdMob/ATT等がない短縮Privacyを、App Store ConnectのPrivacy Policy URLとして提出する。
 - 現行Webの短縮Privacyに残る30日削除/非表示の強い表現を、最新Privacyの「運用目標・反映遅延あり・保証なし」へ同期しないままPrivacy Policy URLとして提出する。
 - Terms/Privacyの公開ページ日付を `2026年6月26日` のまま残し、App Store Connect、Review Notes、公開サポート、アプリ内同意では2026-06-29版ドラフトを提出済みのように扱う。
 - 支払い設定、銀行振込、口座番号入力、口座名義、金額指定取引又は成立後支払い情報スナップショットが見えるのに、公開Terms/Privacy、FAQ、App Privacy、サポート文面で、Payment Info回答、合意後表示、保持、目的外利用禁止、外部決済サービス非関与、送金/収納代行/回収/返金/チャージバック/決済代行/エスクロー/本人確認/口座名義確認/支払能力確認/外部ID・送金リンク・QR真正性確認の非保証を説明しない。
@@ -47,7 +47,7 @@ No-Go:
 - アプリ内の法務要約だけで、正式な公開利用規約又はプライバシーポリシーを公開した扱いにする。
 - Support、FAQ、サポート返信、Review Notes又は公開レビュー返信で、Megrum公式がパスワード、認証コード、認証リンク、金融機関ログイン情報、暗証番号、クレジットカード番号、送金用QRコード、送金リンク、外部決済サービスIDを求めるように読める文面を公開する。
 - 実在のアーティスト、グループ、メンバー、作品、キャラクター、商品名、商標等が見えるのに、Megrumが公式、公認、提携、代理又は権利者承認済みサービスではない説明を公開FAQ、Review Notes、メタデータ、アプリ内コピーで揃えない。
-- 近くのグルーム、スポット掲示板、現在地共有、位置情報メッセージ、待ち合わせ候補、現地交換モード、地図表示又は逆ジオコーディングが見えるのに、精密な緯度経度、作成位置、閲覧者位置、半径、距離、公開範囲、MapKit/CoreLocation/CLGeocoder等のOS・地図関連処理、場所名/距離の誤差、保持/削除例外、1km/3kmが匿名化又は安全保証ではないことをFAQ、Privacy、Review Notesで説明しない。
+- 近くのグルーム、スポット掲示板、現在地共有、位置情報メッセージ、待ち合わせ候補、地図表示又は逆ジオコーディングが見えるのに、精密な緯度経度、作成位置、閲覧者位置、半径、距離、公開範囲、MapKit/CoreLocation/CLGeocoder等のOS・地図関連処理、場所名/距離の誤差、保持/削除例外、1km/3kmが匿名化又は安全保証ではないことをFAQ、Privacy、Review Notesで説明しない。
 
 ## 1. サポートトップ文面
 

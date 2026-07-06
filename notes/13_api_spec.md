@@ -544,7 +544,7 @@ AW削除。
 在庫新規登録。
 
 - **Auth**: 必須
-- **Request**: `{ genre_tag_id, character_id, goods_type_id, title, description?, kind, is_carrying?, carry_event_id? }`
+- **Request**: `{ genre_tag_id, character_id, goods_type_id, title, description?, kind }`
 - **Response 201**: `{ id, status: "available", ... }`
 - **備考**: 数量×N の場合は N 件 INSERT（iter29、1行=1個）
 - **Screen**: `INV-meta`（B-2③）
@@ -598,16 +598,6 @@ AW削除。
 - **Response 201**: `[{ id, ... }, ...]`
 - **Screen**: `INV-shoot` → `INV-crop` → `INV-meta`
 
-### POST /api/v1/items/:id/toggle-carrying
-
-携帯モード切替。
-
-- **Auth**: 必須
-- **Request**: `{ is_carrying: true/false, carry_event_id? }`
-- **Response 200**: 更新後
-
----
-
 ## 8. Wishes（ウィッシュ）
 
 `notes/05_data_model.md` §3 user_wants。
@@ -617,7 +607,7 @@ AW削除。
 自分のウィッシュ一覧。
 
 - **Auth**: 必須
-- **Query**: `?status=active|matched|in_negotiation|achieved&priority=...`
+- **Query**: `?status=active|matched|in_negotiation|achieved`
 - **Response 200**: `{ data: [wishes], meta: {...} }`
 - **Screen**: `WSH-list`
 
@@ -626,7 +616,7 @@ AW削除。
 ウィッシュ新規登録。
 
 - **Auth**: 必須
-- **Request**: `{ genre_tag_id, character_id?, goods_type_id?, title, description?, flexibility, priority }`
+- **Request**: `{ genre_tag_id, character_id?, goods_type_id?, title, description?, flexibility }`
 - **Response 201**: `{ id, status: "active", ... }`
 - **Screen**: `WSH-edit`
 

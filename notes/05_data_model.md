@@ -29,7 +29,7 @@
 | **v2.0** | **2026-05-01** | **iter24/29/33/34 反映（meetup, outfit, location_share, 状態名統一、deals リネーム）** |
 | **v2.1** | **2026-05-03** | **iter67 反映（schedules 新設、proposals.message_tone 追加、meetup_scheduled_aw_id 廃止、expose_calendar の対象を AW → schedules に変更）** |
 | **v2.2** | **2026-05-03** | **iter67.1 反映（待ち合わせを「時間帯+地図座標」型に統一：meetup_type/meetup_now_minutes/meetup_scheduled_custom 廃止、meetup_start_at/end_at/place_name/lat/lng 追加）** |
-| **v2.3** | **2026-05-03** | **iter67.3 反映（listings を N×M × AND/OR マトリクス化：have_ids[]/have_qtys[]/have_logic + wish_qtys[]/wish_logic 追加、inventory_id/ratio_*/priority/exchange_type 廃止。wish 側の exchange_type は goods_inventory に既存・UI で必須化）** |
+| **v2.3** | **2026-05-03** | **iter67.3 反映（listings を N×M × AND/OR マトリクス化：have_ids[]/have_qtys[]/have_logic + wish_qtys[]/wish_logic 追加。wish 側の exchange_type は goods_inventory に既存・UI で必須化）** |
 | **v2.4** | **2026-05-03** | **iter67.4 反映（求側を「複数選択肢」モデルへ再設計：listing_wish_options 新規、listings から wish_*/wish_logic 廃止、have_group_id/have_goods_type_id 追加で同一性検証、定価交換選択肢サポート）** |
 | **v2.5** | **2026-05-03** | **iter67.7 反映（proposals に cash_offer / cash_amount 列追加：定価交換打診サポート。receiver_have_ids 空時の CHECK 緩和）** |
 | **v2.6** | **2026-05-03** | **iter68-A 反映（messages テーブル新規：proposal_id × sender_id × type ('text'/'photo'/'outfit_photo'/'location'/'arrival_status'/'system') のチャット追記型）** |
@@ -770,8 +770,6 @@ iter29 で 1行=1個 の方針確定。UI で集約表示し、選択時は N �
 >
 > **iter756 マスター表示の正規化**：`goods_inventory.title` は旧UIの自由入力表示名としてdeprecated扱いにする。ホーム候補、Wish、マイグッズ、個別募集の表示・判定は `groups_master` / `characters_master` / `goods_types_master` / `tags_master` を正とし、`title` の先頭語をL1/L2名として解析しない。`character_id` が入る場合は同じ行の `group_id` と所属関係が一致することをDB triggerで検証し、`group_id` 未指定なら `characters_master.group_id` で補完する。`goods_type_id` は既存FKで `goods_types_master(id)` 外の値を拒否する。
 
-| `is_carrying` | boolean | 「今日持参する」フラグ（F2 携帯モード） |
-| `carry_event_id` | uuid nullable | → events |
 | `created_at` / `updated_at` | timestamptz | |
 
 ⚠️ 要確認：
@@ -803,7 +801,6 @@ iter62（Phase A）で `exchange_type` 追加。
 | `title` | text | |
 | `description` | text nullable | |
 | `flexibility` | int | 1（厳格）〜 5（緩い）。character/goods_type の照合スキップ条件 |
-| `priority` | int | 1（高）〜 5（低）。マッチング表示順に使用 |
 | `exchange_type` | text default `any` | iter62、`same_kind` / `cross_kind` / `any`。**自己申告シリーズ**、システム判定なし（カードに chip 表示のみ） |
 | `status` | text | `active`（探し中）/ `matched`（マッチあり）/ `in_negotiation`（打診中）/ `achieved`（達成）（09 Wish Lifecycleと整合） |
 | `created_at` / `updated_at` | timestamptz | |
@@ -878,26 +875,6 @@ iter67.4 で求側を **「複数選択肢」モデル** に再設計。listings
 RLS：
 - listing 所有者は自身の listing 経由オプションを CRUD
 - listing.status='active' の listing 経由オプションは誰でも SELECT 可（マッチング用）
-
-### `user_local_mode_settings`（現地モード設定）— 新規（iter63 / Phase B）
-
-ユーザーの「現地交換モード」永続化用。1 ユーザー 1 行。
-
-| カラム | 型 | 説明 |
-|---|---|---|
-| `user_id` | uuid PK | → users |
-| `enabled` | bool default false | 現地モード ON/OFF |
-| `aw_id` | uuid nullable | → availability_windows（使う AW） |
-| `radius_m` | int default 500 | 半径（前回値） |
-| `selected_carrying_ids` | uuid[] | 選択中の携帯グッズの goods_inventory.id 配列 |
-| `selected_wish_ids` | uuid[] | 選択中の wish の user_wants.id 配列 |
-| `last_lat` / `last_lng` | numeric(9,6) | 最終 GPS 位置（モード ON 時に上書き） |
-| `updated_at` | timestamptz | |
-
-→ 位置情報のみ「ON にした瞬間に GPS で上書き」、その他は前回値を保持。
-   一括リセットボタンは `selected_carrying_ids = '{}'` / `selected_wish_ids = '{}'` で実装。
-
----
 
 ## 4. 活動予定（AW）・イベント
 
@@ -1629,8 +1606,6 @@ RLS:
 - L2 = メンバー / キャラクター。
 - L2 マスターに値がある場合、Wish の L2 無指定は禁止。
 - L2 マスターに値がない場合だけ、L1 そのものを Wish 対象として保存できる。
-- Wish に優先度・妥協度は持たせない。
-
 #### 市場残数
 
 ホーム、検索、打診作成、個別募集作成では、実在庫 `quantity` ではなく `market_available_qty = quantity - locked_qty` を使う。`market_available_qty <= 0` の譲候補は候補から除外し、履歴保持のため物理削除ではなく論理削除・非表示・closed/archived 相当で扱う。`locked_qty` は `proposals.status='agreed'` の `sender_have_ids` / `receiver_have_ids` と数量配列から再計算し、`agreed` へ遷移する直前には `quantity - locked_qty >= proposal qty` を満たすことをRPCで検証する。

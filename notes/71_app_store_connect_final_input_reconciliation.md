@@ -143,7 +143,7 @@ Review NotesのNo-Go:
 | ASC-PI-007 | DSA / Territory | 初回配信地域、DSA status、商品ページ表示連絡先、代表者情報非公表方針、IAP Availabilityと一致 | TODO | `notes/68` |
 | ASC-PI-008 | Sensitive Info / 顔候補付け | 顔候補付け露出、App Privacy、Privacy Policy、Review Notesが一致 | TODO | `notes/27`, `notes/43`, `notes/52` |
 | ASC-PI-008.5 | Push通知 | APNs/Expo token、push provider、app version、last seen、revoked状態、通知本文、通知ID、linkPath、sound、未読バッジ、ロック画面/通知センター/連携端末表示、Push任意性、販促Push同意/停止手段、Identifiers/User Content/Usage Data回答が一致 | TODO | `notes/27`, `notes/43`, `notes/48`, `notes/52`, `notes/56` |
-| ASC-PI-008.6 | Location / MapKit | 近くのグルーム、スポット掲示板、現在地共有、待ち合わせ候補、現地交換モード、作成位置、閲覧者位置、地図表示、逆ジオコーディング、場所名又は距離表示と、Precise Location、MapKit/CoreLocation/CLGeocoder、精密座標の送信/保存、作成位置、閲覧者位置、保持/削除例外、地図/距離/場所名の非保証、1km/3km非保証が一致 | TODO | `notes/27`, `notes/43`, `notes/48`, `notes/55`, `notes/56` |
+| ASC-PI-008.6 | Location / MapKit | 近くのグルーム、スポット掲示板、現在地共有、待ち合わせ候補、作成位置、閲覧者位置、地図表示、逆ジオコーディング、場所名又は距離表示と、Precise Location、MapKit/CoreLocation/CLGeocoder、精密座標の送信/保存、作成位置、閲覧者位置、保持/削除例外、地図/距離/場所名の非保証、1km/3km非保証が一致 | TODO | `notes/27`, `notes/43`, `notes/48`, `notes/55`, `notes/56` |
 | ASC-PI-008.7 | 生年月日 / 年齢表示 | Other Data Types候補、Age Assuranceなし、Parental Controlsなし、自己申告年齢説明が一致 | TODO | `notes/25`, `notes/43`, `notes/46`, `notes/55` |
 | ASC-PI-008.8 | 評価 / 通報 / ブロック / モデレーション | Customer Support / Other User Content / Other Data Types / Product Interaction候補、通報者秘匿の限界、緊急時外部連絡、保持/削除説明が一致 | TODO | `notes/25`, `notes/26`, `notes/43`, `notes/52`, `notes/55`, `notes/56` |
 | ASC-PI-008.9 | Prohibited trades / 古物・チケット | 売買マーケット、古物商、オークション、買取、販売代理、チケット譲渡、決済代行ではない説明と、チケット/盗品/反復継続販売禁止が一致 | TODO | `notes/legal/01`, `notes/24`, `notes/40`, `notes/50`, `notes/55`, `notes/56` |
@@ -162,7 +162,7 @@ No-Go:
 - App Store説明文、FAQ、スクショ、Review Notes又はアプリ内コピーで、Megrumが売買マーケット、古物商、古物市場、古物競りあっせん、オークション、買取、販売代理、チケット譲渡、入場資格保証、決済代行、資金移動、収納代行、回収代行、返金窓口、チャージバック窓口、エスクロー又は正規/公式流通確認サービスであるように見える。
 - Privacy Policy URLが実在しても、本文が旧短縮版で、App Privacy回答に必要な郵送先、支払い情報、成立後支払い情報スナップショット、通知、広告、評価/通報、削除申出、顔候補付け等を説明していない。
 - 支払い設定、銀行口座、口座名義、PayPay対応可否、現金交換、金額指定又は成立後支払い情報スナップショットが見えるのに、Payment Info、合意後表示、保持、相手保存リスク、金融/決済サービス非関与、送金/収納代行/回収/返金/チャージバック/エスクロー/本人確認/口座名義確認/支払能力確認/外部ID・送金リンク・QR非保証がApp Privacy、Privacy、FAQ、Review Notesで一致していない。
-- 近くのグルーム、スポット掲示板、現在地共有、待ち合わせ候補、現地交換モード、作成位置、閲覧者位置、地図表示、逆ジオコーディング、場所名又は距離表示が見えるのに、Precise Location、MapKit/CoreLocation/CLGeocoder、精密座標の送信/保存、作成位置、閲覧者位置、保持/削除例外、地図/距離/場所名の非保証、1km/3km非保証がApp Privacy、Privacy、FAQ、Review Notesで一致していない。
+- 近くのグルーム、スポット掲示板、現在地共有、待ち合わせ候補、作成位置、閲覧者位置、地図表示、逆ジオコーディング、場所名又は距離表示が見えるのに、Precise Location、MapKit/CoreLocation/CLGeocoder、精密座標の送信/保存、作成位置、閲覧者位置、保持/削除例外、地図/距離/場所名の非保証、1km/3km非保証がApp Privacy、Privacy、FAQ、Review Notesで一致していない。
 - Push通知が見えるのに、通知本文、未読バッジ、ロック画面表示、APNs/Expo token、App Privacy回答、Review Notesが一致していない。
 - Push通知を許可しないと登録又は主要機能を使えない、正確な現在地、住所、銀行口座、認証コード、本人確認書類、通報/異議申し立て詳細本文をPush本文へ出す、又は販促Pushに同意・停止手段がない。
 - 生年月日又は年齢表示が見えるのに、App Privacy、Age Rating、FAQ、Review Notesで自己申告年齢として一致していない。

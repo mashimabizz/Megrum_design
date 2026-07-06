@@ -202,7 +202,7 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 - iter370で、取引チャット入力欄上に到着ステータス、現在地共有、服装写真共有のNative affordanceを追加した。到着ステータスは既存text message境界で送信し、typed location / arrival messageのAppState接続は後続で実装する。
 - iter371で、検索結果/相手プロフィールからの打診作成を専用 `ProposalCreateFlow` に置き換え、「私が出す」「受け取る」「待ち合わせ」「確認」の段階で複数提示物と現地/郵送/どちらもOKを扱えるようにした。
 - iter371で、取引チャットの現在地共有と到着ステータスをAppState/repositoryへ接続し、`messages.location_lat/location_lng/location_label` と `meta.status` を使うtyped messageとして送れるようにした。
-- iter372で、ホームに現地交換モードカードと編集sheetを追加し、会場/現在地、時間枠、半径、持参グッズ概要を表示できるようにした。現時点では端末内保存で、Supabase AW接続は後続対象。
+- iter372で、ホームに現地交換モードカードと編集sheetを追加し、会場/現在地、時間枠、半径の概要を表示できるようにした。現時点では端末内保存で、Supabase AW接続は後続対象。
 - iter372で、在庫/WishのNative編集画面を追加し、タイトル、種別、グループ、メンバー、グッズ種別、数量、ステータス、シリーズ、写真選択入口をまとめた。保存境界未接続の項目は保存前に明示して、黙って欠落させない。
 - iter372で、打診送信後に完了画面を表示し、送信後に入力ステップへ戻りにくい構造へ寄せた。
 - iter372で、遅刻/キャンセルの連絡を異議申告ではなく取引チャットのsystem messageとして送る境界へ整理した。
@@ -322,9 +322,8 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 ### P0
 
 1. Home / Local Mode / Current Location
-   - iter372で、ホームに現地交換モード、会場/現在地、半径、時間枠、持参グッズ概要、LIVE/OFF/終了表示のNative入口を追加した。
+   - iter372で、ホームに現地交換モード、会場/現在地、半径、時間枠、LIVE/OFF/終了表示のNative入口を追加した。
    - iter375で、`activity_windows` と `user_local_mode_settings` のData境界を追加した。
-   - iter377で、現地交換モードの持参候補は自分の在庫を優先して表示するようにした。
    - iter380で、現地交換モードON時の現在地座標を取得し、内部のActivity Window centerとlocal mode last locationへ保存/復元するUI/AppState/repository境界を接続した。
    - iter382で、ホーム実データのマッチ候補compositionを `SupabaseHomeClient` / `HomeCandidateComposer` / AppStateへ接続した。
    - iter392で、ユーザー向け表示を現地交換モード/現在地の更新に寄せ、現在地座標は建物名または住所へ解決して表示するようにした。

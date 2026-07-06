@@ -73,11 +73,11 @@ public final class SupabaseGroomClient: @unchecked Sendable {
     public func loadOwnGroomArchive(userID: UUID, limit: Int = 120) async throws -> [GroomPost] {
         let rows: [GroomFeedRow] = try await client.fetchRows(
             from: "groom_posts",
-            select: GroomFeedRow.select,
+            select: GroomFeedRow.select + ",groom_reactions(user_id,reaction_type)",
             queryItems: ownGroomArchiveQueryItems(userID: userID, limit: limit)
         )
         let signedURLs = await signedURLMap(for: rows)
-        return rows.compactMap { $0.post(signedURLs: signedURLs) }
+        return rows.compactMap { $0.post(signedURLs: signedURLs, viewerID: userID) }
     }
 
     public func loadReactions(postIDs: [UUID]) async throws -> [GroomReaction] {

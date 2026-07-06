@@ -63,6 +63,7 @@ extension MegrumAppState {
             let nextGrooms = try await loadedGrooms
             let nextThreads = try await loadedThreads
             grooms = nextGrooms
+            syncLikedGroomIDs(with: nextGrooms)
             threads = nextThreads
             meguriFeedCacheKey = cacheKey
             await loadMeguriProfiles(

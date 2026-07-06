@@ -105,10 +105,97 @@ struct GroomMapPin: View {
                         .offset(x: 3, y: 3)
                 }
             }
+            .overlay(alignment: .top) {
+                // いいねが1件以上ついたグルームは、アイコンから小さなハートが
+                // 途切れず湧き上がり続ける。
+                if !isOutOfRange, groom.likeCount >= 1 {
+                    GroomPinAmbientHearts(
+                        seed: groom.id.hashValue,
+                        likeCount: groom.likeCount
+                    )
+                }
+            }
             .shadow(color: MegrumTheme.ink.opacity(0.22), radius: 12, y: 8)
             .saturation(isOutOfRange ? 0.25 : 1)
             .opacity(isOutOfRange ? 0.68 : 1)
             .accessibilityLabel(isOutOfRange ? "1km圏外のグルーム" : "グルーム")
+    }
+}
+
+/// いいね付きグルームのピンから小さなハートが湧き続けるアンビエント演出。
+/// いいね数が多いほどハートが少し増える。決定的シードで配置（再描画で揺れない）。
+struct GroomPinAmbientHearts: View {
+    var seed: Int
+    var likeCount: Int
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private var heartCount: Int {
+        min(4 + likeCount / 2, 9)
+    }
+
+    var body: some View {
+        if reduceMotion {
+            EmptyView()
+        } else {
+            ZStack {
+                ForEach(0..<heartCount, id: \.self) { index in
+                    GroomPinAmbientHeart(seed: seed &+ index &* 7919)
+                }
+            }
+            .frame(width: 58, height: 10)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+        }
+    }
+}
+
+private struct GroomPinAmbientHeart: View {
+    var seed: Int
+
+    @State private var isRising = false
+
+    private var unit: (CGFloat, CGFloat, CGFloat, CGFloat, CGFloat) {
+        // seed から 0..<1 の擬似乱数を複数取り出す（決定的）。
+        func value(_ salt: UInt64) -> CGFloat {
+            var state = UInt64(bitPattern: Int64(seed)) &+ salt &* 0x9E3779B97F4A7C15
+            state ^= state >> 30
+            state = state &* 0xBF58476D1CE4E5B9
+            state ^= state >> 27
+            return CGFloat(state % 1000) / 1000
+        }
+        return (value(1), value(2), value(3), value(4), value(5))
+    }
+
+    var body: some View {
+        let (u1, u2, u3, u4, u5) = unit
+        let startX = -20 + u1 * 40
+        let drift = -8 + u2 * 16
+        let size = 9 + u3 * 4
+        let duration = 1.8 + Double(u4) * 1.2
+        let delay = Double(u5) * 1.6
+
+        Image(systemName: "heart.fill")
+            .font(.system(size: size, weight: .bold))
+            .foregroundStyle(MegrumTheme.pink)
+            .shadow(color: .white.opacity(0.8), radius: 1)
+            .scaleEffect(isRising ? 1.15 : 0.5)
+            // easeIn：ピンの近くでゆっくり漂ってから昇るので、
+            // 濃い状態が長く続き視認しやすい。
+            .opacity(isRising ? 0 : 1)
+            .offset(
+                x: startX + (isRising ? drift : 0),
+                y: isRising ? -48 : -4
+            )
+            .onAppear {
+                withAnimation(
+                    .easeIn(duration: duration)
+                    .repeatForever(autoreverses: false)
+                    .delay(delay)
+                ) {
+                    isRising = true
+                }
+            }
     }
 }
 
