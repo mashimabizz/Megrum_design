@@ -29,13 +29,10 @@ extension HomeDiscoveryExperience {
         return havesCandidates
     }
 
-    /// ツアーのサンプル「求められているグッズ」：需要シグナル（求/激求）が付くものを優先し、
-    /// 足りなければ先頭から補完して rail に4〜6件並べる。タップはツアー中無効なので payload は不要。
+    /// ツアーのサンプル「求められているグッズ」：あなたのグッズ（ツアー中は差し替え済みの
+    /// サンプル在庫）を rail に並べ、求められ件数バッジを見せる。タップはツアー中無効。
     private var tutorialSampleHavesCandidates: [HomeDiscoveryCandidate] {
-        var seenIDs = Set<UUID>()
-        let pool = (matchedItems + possibleItems).filter { seenIDs.insert($0.id).inserted }
-        let wanted = pool.filter { havesWishHitCount(for: $0) > 0 }
-        let items = Array((wanted.isEmpty ? pool : wanted).prefix(6))
+        let items = Array(ownItems(from: inventoryItems).prefix(6))
         return HomeDiscoveryCandidateFactory.candidates(
             from: items,
             source: .haves,

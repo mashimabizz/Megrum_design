@@ -93,12 +93,19 @@ struct MeguriScreen: View {
     }
 
     var visibleMapGrooms: [GroomPost] {
-        (appState.groomMapPosts.isEmpty ? appState.grooms : appState.groomMapPosts)
+        // ガイドツアー中はサンプルピンを表示レイヤで注入する（実データ・フィルタ非依存で確実に見せる）。
+        if appState.isTutorialActive {
+            return TutorialSampleMeguriData.grooms
+        }
+        return (appState.groomMapPosts.isEmpty ? appState.grooms : appState.groomMapPosts)
             .filter { contentFilter.matches(groom: $0) }
     }
 
     var visibleThreads: [BoardThread] {
-        appState.threads.filter { contentFilter.matches(thread: $0) }
+        if appState.isTutorialActive {
+            return TutorialSampleMeguriData.threads
+        }
+        return appState.threads.filter { contentFilter.matches(thread: $0) }
     }
 
     var body: some View {
@@ -168,6 +175,22 @@ struct MeguriScreen: View {
             // ツアー終了時に、抑制していた位置情報リクエストを呼び直す。
             if !isActive {
                 requestInitialLocationIfNeeded()
+                withAnimation(.easeOut(duration: 0.16)) {
+                    pendingMapCreationCoordinate = nil
+                }
+            }
+        }
+        .onChange(of: appState.tutorialMeguriCalloutRequestID) { _, requestID in
+            // ガイドツアーの実演：指のタップに合わせて、地図中心付近に実物の作成コールアウトを出す。
+            // ツアー中は位置情報を抑制しているため 1km 判定は通さない（見せるだけで作成はしない）。
+            guard requestID != nil else { return }
+            let center = homeCameraPosition.region?.center
+                ?? CLLocationCoordinate2D(latitude: 35.7056, longitude: 139.7519)
+            withAnimation(.easeOut(duration: 0.16)) {
+                pendingMapCreationCoordinate = MegrumLocationCoordinate(
+                    latitude: center.latitude,
+                    longitude: center.longitude
+                )
             }
         }
         .onDisappear {

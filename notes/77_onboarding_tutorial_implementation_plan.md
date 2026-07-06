@@ -9,6 +9,12 @@
 > - **QA**：`MEGRUM_VISUAL_QA_TUTORIAL_STEP`（数字 or home-1/inventory 等）で任意ステップ直接起動
 > 詳細は notes/08 iter1226.337。
 
+> **⚠️ v3.1改訂（iter1226.345, 2026-07-07）**：オーナー指示により「章×ビート」の実演デモ型へ大幅拡張（承認済み）。
+> - **10章・約50ビート**：ようこそ／ホーム3（指定文言・指定サンプル行・激求/求/定価バリエ）／タブ帯予告／マイグッズ＋登録デモ9ビート（TWICE×トレカ・9枚グリッド・トレカAI一括7枚・手動切り抜きアニメ・メンバー・Lensで#DIVE・9件登録）／ほしいもの／個別募集＋作成デモ13区切り／打診デモ9項目＋やりとりへ／やりとり2／めぐり3（サンプルピン＋実物作成コールアウト実演）／完了
+> - **デモステージ**：分離プレビューAppStateで実UI部品（GoodsInventoryCreateFlowView・IndividualListing各Step・HomeDiscoverySheetView・ProposalCreateFlow・TradesScreen・TradeDetailScreen）を状態注入描画＋指アイコン（TutorialPointerChoreographer）
+> - QA：`MEGRUM_VISUAL_QA_TUTORIAL_STEP=<ビートID例:4-7>` で任意ビート直接起動
+> 詳細は notes/08 iter1226.345。
+
 > **目的**：新規登録→初期設定（AccountSetup 8ステップ）完了直後のユーザーに、Megrum の価値と使い方をアプリ内で体験的に伝える「初回ガイドツアー」＋「最初の3ステップ・ミッションカード」を実装する。
 >
 > **想定読者**：この計画を受けて実装する別 AI／エンジニア。この文書だけで着手できるよう、統合ポイント（ファイル・シンボル・シグネチャ・行番号）を具体的に書いてある。

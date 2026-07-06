@@ -222,8 +222,8 @@ public struct MegrumRootView: View {
         .onChange(of: appState.viewer?.accountStatus) { oldValue, newValue in
             startTutorialTourIfNeeded(oldStatus: oldValue, newStatus: newValue)
         }
-        .onChange(of: tutorialCoordinator.currentStep) { _, step in
-            handleTutorialStepChange(step)
+        .onChange(of: tutorialCoordinator.currentBeat) { _, beat in
+            handleTutorialBeatChange(beat)
         }
         .onAppear {
             startVisualQATutorialIfNeeded()
@@ -239,20 +239,20 @@ public struct MegrumRootView: View {
     }
 
     /// VisualQA（MEGRUM_VISUAL_QA_INITIAL_SCREEN=tutorial）では既読フラグを無視して強制起動する。
-    /// MEGRUM_VISUAL_QA_TUTORIAL_STEP で任意ステップから開始できる（スクショ検証用）。
+    /// MEGRUM_VISUAL_QA_TUTORIAL_STEP でビートID（例: 4-7）指定の直接起動もできる（スクショ検証用）。
     private func startVisualQATutorialIfNeeded() {
         guard visualQAInitialScreen == .tutorial, !tutorialCoordinator.isActive else { return }
-        let startStep = VisualQAPreviewMode.tutorialStartStep(
+        let startBeat = VisualQAPreviewMode.tutorialStartBeat(
             environment: ProcessInfo.processInfo.environment
-        ) ?? .welcome
-        tutorialCoordinator.start(at: startStep)
+        )
+        tutorialCoordinator.start(at: startBeat)
     }
 
-    /// ステップ変化に応じてタブを自動遷移し、割り込み抑制フラグと完了フラグを更新する。
-    private func handleTutorialStepChange(_ step: TutorialTourStep?) {
-        appState.setTutorialActive(step != nil)
+    /// ビート変化に応じてタブを自動遷移し、割り込み抑制フラグと完了フラグを更新する。
+    private func handleTutorialBeatChange(_ beat: TutorialBeat?) {
+        appState.setTutorialActive(beat != nil)
 
-        guard let step else {
+        guard let beat else {
             // ツアー終了：既読フラグを保存。
             if let userID = appState.viewer?.id {
                 OnboardingTutorialProgressStore.markTourCompleted(userID: userID)
@@ -261,10 +261,10 @@ public struct MegrumRootView: View {
         }
 
         requestedTradesStage = nil
-        if let section = step.requestedWishSection {
+        if let section = beat.requestedWishSection {
             requestedWishSection = section
         }
-        selectedTab = step.targetTab
+        selectedTab = beat.targetTab
     }
 
     private var directVisualQAProposalRoute: HomeRelationRoute? {

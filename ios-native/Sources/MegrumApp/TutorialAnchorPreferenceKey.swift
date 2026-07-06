@@ -7,6 +7,7 @@ enum TutorialAnchorID: Hashable, Sendable {
     case homeSectionHaves
     case inventoryAddButton
     case wishAddButton
+    case wishSectionSegment
     case listingAddButton
     case tradesStageBar
 }

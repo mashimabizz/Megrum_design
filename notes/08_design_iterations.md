@@ -4,6 +4,64 @@
 
 ---
 
+## イテレーション1226.345：ガイドツアーv3.1（10章・約50ビートの指アイコン実演デモ）
+
+### 背景・問題意識
+オーナーFB（v2への詳細指摘）を反映した大改訂。①ホーム文言の指定差し替え＋サンプルを「サナ×#DICON D'FESTA MINI EDITION／ニンニン×#MY WORLD／V×#LOVE YOURSELF: SPEAK YOURSELF」・需要行バリエーション（激求！/求！/定価¥1,500）へ ②タブ移動前にフッター帯で予告 ③各タブは全体説明→操作の2段 ④マイグッズは登録一連（TWICE×トレカ→9枚グリッド写真→トレカAI一括7枚→残り2枚を指で手動切り抜き→メンバー→シリーズ+Google Lensで#DIVE→9件登録→一覧反映）を実演 ⑤個別募集はオーナー指定の13区切りを1画面ずつ ⑥打診は激求例で項目ごと（プロフィール/交換条件/募集詳細/相手の希望から/自分のグッズから/追加選択/確認/打診に進む→やりとりへ） ⑦めぐりは新文言＋サンプルピン表示＋指タップで実物の作成コールアウト出現。承認済み仕様（会話ログ2026-07-07）。
+
+### 変更内容
+
+#### 1. 章×ビートモデルへ全面改訂（`TutorialTourStep.swift`＝TutorialScript / `TutorialTourCoordinator.swift` / `TutorialTourOverlay.swift`）
+- 10章・50ビートのデータ駆動台本（id="4-7"等）。上部に全体プログレスバー、吹き出しは章内カウンタ「マイグッズ 7/11」＋「終了／この章をとばす／次へ」
+- 見せ方6種：centerCard／spotlight（切り抜き余白+26）／banner／tabBand（下部タブ帯の幾何切り抜き）／demo（デモステージ）／meguriTapDemo
+- VisualQA：`MEGRUM_VISUAL_QA_TUTORIAL_STEP` はビートID（4-7等）or 通し番号で直接起動
+
+#### 2. デモステージ基盤（`TutorialDemoStage.swift` / `TutorialPointerView.swift`）
+- 分離した PreviewMegrumRepository ベースの demoAppState で実UI部品をスクリプト状態描画（実データ不変・通信なし）
+- 指アイコン（TutorialPointerChoreographer：move/tap/drag、reduceMotion対応）
+- アセット：`TWICE トレカAI用.jpg` を9分割（twice_dive_card_1..9.png / twice_dive_grid.jpg、白余白トリム済）
+
+#### 3. 第4章 マイグッズ登録デモ（`TutorialGoodsDemoScenes.swift`）
+- 実物 `GoodsInventoryCreateFlowView` を draft/photos/step 注入で駆動（共通条件=TWICE×トレカ→写真=9枚グリッド→一括読み取り結果7枚＋ステータス文言→メンバー割当→シリーズ+Lens結果カード）
+- 手動切り抜きは元写真上で切り抜き枠が右下カードへドラッグされるアニメ、完了は一覧グリッド再現＋「9件登録しました」
+
+#### 4. 第6章 個別募集作成デモ（`TutorialListingDemoScenes.swift`）
+- 実物 `IndividualListingHavesStep/OptionsStep/ExchangeStep` をローカルBinding注入で駆動。定価で選ぶ→金額指定¥1,500、条件から選ぶ=TWICE×トレカ、定価タブ、現地・郵送OK→現地/郵送/条件外/メモ→保存→完了後カード
+
+#### 5. 第7-8章 打診・やりとりデモ（`TutorialProposalDemoScenes.swift`）
+- 実物 `HomeDiscoverySheetView(goodsHit)`（激求ヒット）/ `PublicUserProfileScreen` / `ProposalCreateFlow(initialStep: .confirm)` / `TradesScreen`（広告はプレミアム扱いで抑制）/ `TradeDetailScreen` をプレビューデータで描画
+
+#### 6. 第9章 めぐり（`MeguriScreen.swift` / `TutorialSampleMeguriData`）
+- サンプルピンは表示レイヤ注入（visibleMapGrooms/visibleThreads がツアー中フィクスチャを返す。実データ・フィルタ・後発ロードに非依存）。クラスタ闾値=実効緯度スパン(約0.067)/6.5≈0.0105度を全ペアが超える配置で丸ピン/角ピン個別表示
+- `appState.requestTutorialMeguriCallout()`（指タップ演出と同期）→ 地図中心に実物の「作成しますか？」コールアウトを表示（1km判定はツアー中バイパス、作成はしない）。ツアー終了で解除
+
+#### 7. ホームサンプル刷新（`TutorialSampleHomeData.swift` / `HomeScreen` / `HavesDerivedState`）
+- オーナー指定3行＋メンバー名ラベル（memberID/memberName設定）。激求はあなたのモモトレカ指名（wantedOptions kind .goods）、求はダヒョン他条件一致、定価は cashAmount 1500
+- inventoryItemsOverride（あなたのグッズ4点）で激求サムネイル＆求められているグッズrail（N件バッジ）を成立させる
+
+### 影響範囲
+- ガイドツアー全面、ホーム（ツアー中のみ）、めぐり（ツアー中のみ）、AppState（isTutorialActive/コールアウト要求）。実データ書き込みなし
+
+### 確認方法
+- swift test 1511件 0失敗（台本整合性テスト含む：ID一意・章単調・章内件数）
+- シミュレータ（iPhone 17）で29ビートをスクショ検証：`SIMCTL_CHILD_MEGRUM_VISUAL_QA_INITIAL_SCREEN=tutorial SIMCTL_CHILD_MEGRUM_VISUAL_QA_TUTORIAL_STEP=<beat-id>`
+
+### セルフレビュー結果
+- ✅ オーナー指定の文言・行内容・区切り（13画面）・打診9項目・めぐり新文言をそのまま実装
+- ✅ デモは実UI部品を状態注入で駆動（recreationは登録完了一覧/募集完了カード/Lens結果カード/エディタ薄クロームのみ）
+- ✅ 切り抜きズレ座標系・広告/共有/通知/位置/通知許可の抑制はv2から継続
+- ⚠️ デモ内の指タップ位置は代表座標（画面比率指定）。文言・位置の微調整はビートID指定で1画面ずつ再検証可能
+- ⚠️ ツアー途中でアプリを強制終了すると再開しない（既知・再視聴導線は今後）。TestGoodsImages に実写真を同梱するため権利面はオーナー判断（既存準拠）
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/TutorialTourStep.swift`（台本）/ `TutorialTourOverlay.swift` / `TutorialTourCoordinator.swift` / `TutorialDemoStage.swift` / `TutorialPointerView.swift`
+- `ios-native/Sources/MegrumApp/TutorialGoodsDemoScenes.swift` / `TutorialListingDemoScenes.swift` / `TutorialProposalDemoScenes.swift`
+- `ios-native/Sources/MegrumApp/TutorialSampleHomeData.swift`（ホーム/めぐりフィクスチャ）
+- `ios-native/Sources/MegrumApp/MeguriScreen.swift` / `MegrumAppState.swift` / `WishCollectionScreen.swift`（セグメントアンカー）
+- `notes/77_onboarding_tutorial_implementation_plan.md`（v3.1追記）
+
+---
+
 ## イテレーション1226.342：めぐりメッセージのグルーム文脈画像を表示時に再署名
 
 ### 背景・問題意識

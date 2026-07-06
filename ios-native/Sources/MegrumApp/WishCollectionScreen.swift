@@ -213,6 +213,7 @@ struct WishCollectionScreen: View {
             .pickerStyle(.segmented)
             .accessibilityLabel("ほしいものの表示切り替え")
             .frame(maxWidth: .infinity)
+            .tutorialAnchor(.wishSectionSegment)
         )
     }
 

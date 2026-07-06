@@ -83,11 +83,24 @@ enum VisualQAPreviewMode {
         return VisualQAInitialScreen(rawValue: rawValue)
     }
 
-    /// ガイドツアーの開始ステップ指定（INITIAL_SCREEN=tutorial と併用）。
-    /// 数字（rawValue）または kebab-case のステップ名（home-1 / inventory 等）を受け付ける。
+    /// ガイドツアーの開始ビート指定（INITIAL_SCREEN=tutorial と併用）。
+    /// ビートID（例: "4-7"）または全体通し番号（0始まり）を受け付ける。
     static let tutorialStepEnvironmentKey = "MEGRUM_VISUAL_QA_TUTORIAL_STEP"
 
-    static func tutorialStartStep(environment: [String: String]) -> TutorialTourStep? {
-        environment[tutorialStepEnvironmentKey].flatMap(TutorialTourStep.init(visualQAValue:))
+    static func tutorialStartBeat(environment: [String: String]) -> TutorialBeat? {
+        guard let raw = environment[tutorialStepEnvironmentKey]?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased(),
+            !raw.isEmpty
+        else {
+            return nil
+        }
+        if let beat = TutorialScript.beat(withID: raw) {
+            return beat
+        }
+        if let index = Int(raw), TutorialScript.beats.indices.contains(index) {
+            return TutorialScript.beats[index]
+        }
+        return nil
     }
 }

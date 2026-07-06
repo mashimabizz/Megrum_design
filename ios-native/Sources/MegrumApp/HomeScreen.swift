@@ -29,6 +29,8 @@ struct HomeScreen: View {
     var starterMissionEnabled: Bool = false
     /// ガイドツアーのサンプル候補用シグナル差し替え。指定時は appState 由来のシグナルより優先。
     var conditionSignalsByItemIDOverride: [UUID: HomeCandidateConditionSignals]? = nil
+    /// ガイドツアーのサンプル用：あなたのグッズ（求められているグッズ・激求サムネイル）を差し替える。
+    var inventoryItemsOverride: [GoodsItem]? = nil
     var visualQAInitialScreen: VisualQAInitialScreen? = nil
 
     @AppStorage("megrum.home.localMode.activityWindowID") var localModeActivityWindowID = ""
@@ -50,7 +52,7 @@ struct HomeScreen: View {
         HomeDiscoveryExperience(
             appState: appState,
             viewer: viewer,
-            inventoryItems: appState?.inventory ?? [],
+            inventoryItems: inventoryItemsOverride ?? appState?.inventory ?? [],
             matchedItems: matchedItems,
             possibleItems: possibleItems,
             recentPartnerItems: appState?.homeRecentPartnerItems ?? [],

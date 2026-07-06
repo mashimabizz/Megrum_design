@@ -172,14 +172,17 @@ struct MegrumAuthenticatedTabContentView: View {
         .overlayPreferenceValue(TutorialAnchorPreferenceKey.self) { anchors in
             // GeometryReader ごと ignoresSafeArea して、アンカー解決・dim・吹き出しを
             // 同一のフルスクリーン座標系に揃える（内側だけ広げると切り抜きがズレる）。
-            if let step = tutorialCoordinator.currentStep {
+            if let beat = tutorialCoordinator.currentBeat {
                 GeometryReader { proxy in
                     TutorialTourOverlay(
-                        step: step,
+                        beat: beat,
+                        overallProgress: tutorialCoordinator.overallProgress,
                         anchorFrames: anchors.mapValues { proxy[$0] },
                         containerSize: proxy.size,
                         onAdvance: { tutorialCoordinator.advance() },
-                        onSkip: { tutorialCoordinator.skip() }
+                        onSkipChapter: { tutorialCoordinator.skipChapter() },
+                        onEndTour: { tutorialCoordinator.skip() },
+                        onMeguriDemoTap: { appState.requestTutorialMeguriCallout() }
                     )
                 }
                 .ignoresSafeArea()
@@ -305,9 +308,12 @@ struct MegrumAuthenticatedTabContentView: View {
                     selectedTab = .inventory
                 },
                 tutorialSampleActive: tutorialSampleActive,
-                tutorialFocusAnchor: tutorialCoordinator.currentStep?.homeFocusAnchor,
+                tutorialFocusAnchor: tutorialCoordinator.currentBeat?.homeFocusAnchor,
                 starterMissionEnabled: !tutorialSampleActive,
                 conditionSignalsByItemIDOverride: tutorialSampleActive ? TutorialSampleHomeData.conditionSignals : nil,
+                inventoryItemsOverride: tutorialSampleActive
+                    ? TutorialSampleHomeData.viewerInventory(ownerID: appState.viewer?.id ?? TutorialSampleHomeData.placeholderViewerID)
+                    : nil,
                 visualQAInitialScreen: visualQAInitialScreen
             )
         }

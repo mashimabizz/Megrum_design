@@ -1,57 +1,50 @@
 import MegrumDesign
 import SwiftUI
 
-/// 初回ガイドツアーの最上位オーバーレイ。
-/// - centerCard（ようこそ/完了）：全画面dim＋中央カード
-/// - spotlight：dim＋対象の切り抜き＋対象に隣接する矢印付き吹き出し（対象を隠さない）
-/// - banner（めぐり）：dimなし・下部バナー（画面全体を見せる）
-/// 画面のどこをタップしても次へ進む。座標系は呼び出し側の full-screen GeometryReader に統一する。
+/// 初回ガイドツアーの最上位オーバーレイ（v3.1 章×ビート）。
+/// - centerCard：全画面dim＋中央カード（ようこそ/完了）
+/// - spotlight：dim＋対象切り抜き＋隣接吹き出し
+/// - banner：dimなし・下部バナー（画面全体を見せる）
+/// - tabBand：下部タブ帯だけ明るく残す（タブ移動の予告）
+/// - demo：全画面デモステージ＋上部キャプション（指アイコン実演）
+/// - meguriTapDemo：実マップ上で指が1km圏内をタップする実演＋下部バナー
+/// 画面のどこをタップしても次へ。上部に全体プログレスバー、吹き出しに章内カウンタと「この章をとばす」。
 struct TutorialTourOverlay: View {
-    let step: TutorialTourStep
+    let beat: TutorialBeat
+    let overallProgress: Double
     let anchorFrames: [TutorialAnchorID: CGRect]
     let containerSize: CGSize
     var onAdvance: () -> Void
-    var onSkip: () -> Void
+    var onSkipChapter: () -> Void
+    var onEndTour: () -> Void
+    /// meguriTapDemo：指がタップした瞬間に呼ばれる（実画面側で作成コールアウトを出す）。
+    var onMeguriDemoTap: () -> Void = {}
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var calloutSize: CGSize = CGSize(width: 290, height: 150)
+    @State private var calloutSize: CGSize = CGSize(width: 300, height: 170)
+    @StateObject private var meguriPointer = TutorialPointerChoreographer()
 
     private var spotlightRect: CGRect? {
-        step.spotlightAnchor.flatMap { anchorFrames[$0] }
+        if case .spotlight(let anchor) = beat.presentation {
+            return anchorFrames[anchor]
+        }
+        return nil
+    }
+
+    /// タブバー帯（下部）の近似矩形。タブアイテム個別の frame は取れないため幾何計算。
+    private var tabBandRect: CGRect {
+        let height: CGFloat = 96
+        return CGRect(x: 8, y: containerSize.height - height - 6, width: containerSize.width - 16, height: height)
     }
 
     var body: some View {
         ZStack {
-            switch step.presentation {
-            case .centerCard:
-                TutorialCenterCard(
-                    step: step,
-                    showsSkip: step == .welcome,
-                    onPrimary: onAdvance,
-                    onSkip: onSkip
-                )
-            case .banner:
-                TutorialBottomBanner(
-                    step: step,
-                    containerSize: containerSize,
-                    onNext: onAdvance,
-                    onSkip: onSkip
-                )
-            case .spotlight:
-                TutorialSpotlightDim(rect: clampedSpotlightRect)
-                TutorialCalloutCard(
-                    step: step,
-                    onNext: onAdvance,
-                    onSkip: onSkip
-                )
-                .background(TutorialCalloutSizeReader())
-                .onPreferenceChange(TutorialCalloutSizePreferenceKey.self) { size in
-                    if size != .zero {
-                        calloutSize = size
-                    }
-                }
-                .position(calloutCenter)
-            }
+            content
+
+            TutorialOverallProgressBar(progress: overallProgress)
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal, 56)
+                .position(x: containerSize.width / 2, y: 66)
         }
         .contentShape(Rectangle())
         .onTapGesture {
@@ -59,10 +52,82 @@ struct TutorialTourOverlay: View {
             onAdvance()
         }
         .transition(.opacity)
-        .animation(reduceMotion ? nil : .snappy(duration: 0.22), value: step)
+        .animation(reduceMotion ? nil : .snappy(duration: 0.22), value: beat)
     }
 
-    /// 対象が画面外へはみ出す場合（スクロール途中など）は表示領域内へクランプする。
+    @ViewBuilder
+    private var content: some View {
+        switch beat.presentation {
+        case .centerCard:
+            TutorialCenterCard(
+                beat: beat,
+                onPrimary: onAdvance,
+                onEndTour: onEndTour
+            )
+
+        case .spotlight:
+            TutorialSpotlightDim(rect: clampedSpotlightRect)
+            calloutCard
+                .position(calloutCenter(around: clampedSpotlightRect))
+
+        case .banner:
+            bottomBanner
+
+        case .tabBand:
+            TutorialSpotlightDim(rect: tabBandRect, cornerRadius: 26)
+            calloutCard
+                .position(calloutCenter(around: tabBandRect))
+
+        case .demo(let scene):
+            TutorialDemoStageView(scene: scene, beatToken: beat.id)
+                .allowsHitTesting(false)
+            if demoCaptionPlacedAtBottom(for: scene) {
+                bottomBanner
+            } else {
+                topCaption
+            }
+
+        case .meguriTapDemo:
+            TutorialPointerLayer(choreo: meguriPointer)
+            bottomBanner
+                .task(id: beat.id) {
+                    await runMeguriTapChoreo()
+                }
+        }
+    }
+
+    // MARK: 吹き出し・キャプション
+
+    private var calloutCard: some View {
+        TutorialBeatCard(beat: beat, layoutWidth: 300, onAdvance: onAdvance, onSkipChapter: onSkipChapter, onEndTour: onEndTour)
+            .background(TutorialCalloutSizeReader())
+            .onPreferenceChange(TutorialCalloutSizePreferenceKey.self) { size in
+                if size != .zero {
+                    calloutSize = size
+                }
+            }
+    }
+
+    private var bottomBanner: some View {
+        VStack {
+            Spacer()
+            TutorialBeatCard(beat: beat, layoutWidth: nil, onAdvance: onAdvance, onSkipChapter: onSkipChapter, onEndTour: onEndTour)
+                .padding(.horizontal, 20)
+                .padding(.bottom, 108)
+        }
+    }
+
+    private var topCaption: some View {
+        VStack {
+            TutorialBeatCard(beat: beat, layoutWidth: nil, onAdvance: onAdvance, onSkipChapter: onSkipChapter, onEndTour: onEndTour)
+                .padding(.horizontal, 16)
+                .padding(.top, 84)
+            Spacer()
+        }
+    }
+
+    // MARK: 配置計算
+
     private var clampedSpotlightRect: CGRect? {
         guard let rect = spotlightRect else { return nil }
         let visible = CGRect(origin: .zero, size: containerSize).insetBy(dx: 0, dy: 8)
@@ -71,11 +136,10 @@ struct TutorialTourOverlay: View {
         return clamped
     }
 
-    /// 吹き出しは対象を隠さない側（上下の広い方）に、対象の中心寄りへ配置する。
-    private var calloutCenter: CGPoint {
+    private func calloutCenter(around rect: CGRect?) -> CGPoint {
         let margin: CGFloat = 20
         let gap: CGFloat = 18
-        guard let rect = clampedSpotlightRect else {
+        guard let rect else {
             return CGPoint(x: containerSize.width / 2, y: containerSize.height * 0.5)
         }
         let spaceAbove = rect.minY
@@ -85,25 +149,56 @@ struct TutorialTourOverlay: View {
         let y = placeAbove
             ? rect.minY - gap - halfHeight
             : rect.maxY + gap + halfHeight
-        let clampedY = min(max(y, margin + halfHeight + 40), containerSize.height - margin - halfHeight)
+        let clampedY = min(max(y, margin + halfHeight + 48), containerSize.height - margin - halfHeight)
         let halfWidth = calloutSize.width / 2
         let x = min(max(rect.midX, margin + halfWidth), containerSize.width - margin - halfWidth)
         return CGPoint(x: x, y: clampedY)
     }
+
+    /// デモシーンの見せ場（サムネイル群・上部ヘッダー等）を隠さない側にキャプションを置く。
+    private func demoCaptionPlacedAtBottom(for scene: TutorialDemoScene) -> Bool {
+        switch scene {
+        case .goods(.saved):
+            return false
+        case .goods:
+            // ウィザードの写真グリッドや選択UIは上部に出るため、下に置く。
+            return true
+        case .proposal(.confirm), .proposal(.send):
+            // 打診確認は下部CTAが見せ場なので上に置く。
+            return false
+        case .proposal:
+            return true
+        case .listing, .trades:
+            // エディタの下部バー／ステージバーが下にあるため上に置く。
+            return false
+        }
+    }
+
+    // MARK: めぐりタップ実演
+
+    private func runMeguriTapChoreo() async {
+        let target = CGPoint(x: containerSize.width * 0.5, y: containerSize.height * 0.33)
+        meguriPointer.appear(at: CGPoint(x: containerSize.width * 0.72, y: containerSize.height * 0.62))
+        try? await Task.sleep(nanoseconds: 350_000_000)
+        await meguriPointer.move(to: target, duration: 0.55)
+        await meguriPointer.tap()
+        onMeguriDemoTap()
+    }
 }
 
-// MARK: - スポットライト（dim＋切り抜き）
+// MARK: - dim＋切り抜き
 
 private struct TutorialSpotlightDim: View {
     let rect: CGRect?
+    var cornerRadius: CGFloat? = nil
 
     var body: some View {
         Rectangle()
             .fill(Color.black.opacity(0.5))
             .overlay {
                 if let rect {
-                    RoundedRectangle(cornerRadius: cutoutCornerRadius(for: rect), style: .continuous)
-                        .frame(width: rect.width + 14, height: rect.height + 14)
+                    RoundedRectangle(cornerRadius: cornerRadius ?? adaptiveRadius(for: rect), style: .continuous)
+                        .frame(width: rect.width + 26, height: rect.height + 26)
                         .position(x: rect.midX, y: rect.midY)
                         .blendMode(.destinationOut)
                 }
@@ -111,130 +206,119 @@ private struct TutorialSpotlightDim: View {
             .compositingGroup()
     }
 
-    /// ＋ボタンのような正円に近い対象は丸く、セクションのような大きい対象は角丸で切り抜く。
-    private func cutoutCornerRadius(for rect: CGRect) -> CGFloat {
-        min(40, (min(rect.width, rect.height) + 14) / 2)
+    private func adaptiveRadius(for rect: CGRect) -> CGFloat {
+        min(44, (min(rect.width, rect.height) + 26) / 2)
     }
 }
 
-// MARK: - 吹き出し（対象に隣接・矢印なしのコンパクトカード）
+// MARK: - ビート共通カード（吹き出し／バナー／キャプション兼用）
 
-private struct TutorialCalloutCard: View {
-    let step: TutorialTourStep
-    var onNext: () -> Void
-    var onSkip: () -> Void
+private struct TutorialBeatCard: View {
+    let beat: TutorialBeat
+    /// nil なら横幅いっぱい（バナー/キャプション）。数値なら固定幅の吹き出し。
+    let layoutWidth: CGFloat?
+    var onAdvance: () -> Void
+    var onSkipChapter: () -> Void
+    var onEndTour: () -> Void
+
+    private var chapterLabel: String {
+        let progress = TutorialScript.chapterProgress(of: beat)
+        return "\(beat.chapter.title) \(progress.index)/\(progress.count)"
+    }
+
+    private var showsChapterSkip: Bool {
+        TutorialScript.chapterProgress(of: beat).count > 1
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline) {
-                Text(step.calloutTitle)
+                Text(beat.title)
                     .font(.system(size: 16, weight: .black, design: .rounded))
                     .foregroundStyle(MegrumTheme.ink)
                 Spacer(minLength: 8)
-                TutorialStepCounter(step: step)
+                Text(chapterLabel)
+                    .font(.system(size: 11.5, weight: .black, design: .rounded))
+                    .foregroundStyle(MegrumTheme.lavender)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(MegrumTheme.lavender.opacity(0.14), in: Capsule(style: .continuous))
             }
 
-            Text(step.calloutBody)
+            Text(beat.body)
                 .font(.system(size: 13, weight: .semibold, design: .rounded))
                 .foregroundStyle(MegrumTheme.muted)
                 .lineSpacing(2.5)
                 .fixedSize(horizontal: false, vertical: true)
 
-            HStack {
+            HStack(spacing: 14) {
                 Button {
-                    MegrumHaptics.performButtonTap(onSkip)
+                    MegrumHaptics.performButtonTap(onEndTour)
                 } label: {
-                    Text("スキップ")
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                    Text("終了")
+                        .font(.system(size: 12.5, weight: .bold, design: .rounded))
                         .foregroundStyle(MegrumTheme.muted)
                 }
                 .buttonStyle(.plain)
 
+                if showsChapterSkip {
+                    Button {
+                        MegrumHaptics.performButtonTap(onSkipChapter)
+                    } label: {
+                        Text("この章をとばす")
+                            .font(.system(size: 12.5, weight: .bold, design: .rounded))
+                            .foregroundStyle(MegrumTheme.lavender)
+                    }
+                    .buttonStyle(.plain)
+                }
+
                 Spacer()
 
-                TutorialNextButton(onNext: onNext)
+                Button {
+                    MegrumHaptics.performButtonTap(onAdvance)
+                } label: {
+                    Text("次へ")
+                        .font(.system(size: 14, weight: .black, design: .rounded))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 22)
+                        .frame(height: 40)
+                        .background(
+                            LinearGradient(
+                                colors: [MegrumTheme.sky, MegrumTheme.lavender],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            ),
+                            in: RoundedRectangle(cornerRadius: 13, style: .continuous)
+                        )
+                }
+                .buttonStyle(.plain)
             }
         }
         .padding(16)
-        .frame(width: 300)
+        .frame(width: layoutWidth)
+        .frame(maxWidth: layoutWidth == nil ? .infinity : nil)
         .background(.white, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         .shadow(color: .black.opacity(0.18), radius: 20, x: 0, y: 10)
     }
 }
 
-// MARK: - 下部バナー（めぐり：画面全体を見せる）
-
-private struct TutorialBottomBanner: View {
-    let step: TutorialTourStep
-    let containerSize: CGSize
-    var onNext: () -> Void
-    var onSkip: () -> Void
-
-    var body: some View {
-        VStack {
-            Spacer()
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(alignment: .firstTextBaseline) {
-                    Text(step.calloutTitle)
-                        .font(.system(size: 16, weight: .black, design: .rounded))
-                        .foregroundStyle(MegrumTheme.ink)
-                    Spacer(minLength: 8)
-                    TutorialStepCounter(step: step)
-                }
-
-                Text(step.calloutBody)
-                    .font(.system(size: 13, weight: .semibold, design: .rounded))
-                    .foregroundStyle(MegrumTheme.muted)
-                    .lineSpacing(2.5)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                HStack {
-                    Button {
-                        MegrumHaptics.performButtonTap(onSkip)
-                    } label: {
-                        Text("スキップ")
-                            .font(.system(size: 13, weight: .bold, design: .rounded))
-                            .foregroundStyle(MegrumTheme.muted)
-                    }
-                    .buttonStyle(.plain)
-
-                    Spacer()
-
-                    TutorialNextButton(onNext: onNext)
-                }
-            }
-            .padding(16)
-            .background(.white, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .shadow(color: .black.opacity(0.18), radius: 20, x: 0, y: 10)
-            .padding(.horizontal, 20)
-            // タブバー＋ホームインジケータの上に載せる。
-            .padding(.bottom, 108)
-        }
-    }
-}
-
-// MARK: - ウェルカム/完了の中央カード
+// MARK: - ようこそ/完了の中央カード
 
 private struct TutorialCenterCard: View {
-    let step: TutorialTourStep
-    let showsSkip: Bool
+    let beat: TutorialBeat
     var onPrimary: () -> Void
-    var onSkip: () -> Void
+    var onEndTour: () -> Void
 
     var body: some View {
         ZStack {
             Color.black.opacity(0.42)
 
             VStack(alignment: .leading, spacing: 16) {
-                HStack(alignment: .firstTextBaseline) {
-                    Text(step.calloutTitle)
-                        .font(.system(size: 20, weight: .black, design: .rounded))
-                        .foregroundStyle(MegrumTheme.ink)
-                    Spacer(minLength: 8)
-                    TutorialStepCounter(step: step)
-                }
+                Text(beat.title)
+                    .font(.system(size: 20, weight: .black, design: .rounded))
+                    .foregroundStyle(MegrumTheme.ink)
 
-                Text(step.calloutBody)
+                Text(beat.body)
                     .font(.system(size: 13.5, weight: .semibold, design: .rounded))
                     .foregroundStyle(MegrumTheme.muted)
                     .lineSpacing(3)
@@ -259,14 +343,14 @@ private struct TutorialCenterCard: View {
                 }
                 .buttonStyle(.plain)
 
-                if showsSkip {
+                if beat.chapter == .welcome {
                     Text("画面のどこでもタップで進めます")
                         .font(.system(size: 11.5, weight: .semibold, design: .rounded))
                         .foregroundStyle(MegrumTheme.muted.opacity(0.85))
                         .frame(maxWidth: .infinity)
 
                     Button {
-                        MegrumHaptics.performButtonTap(onSkip)
+                        MegrumHaptics.performButtonTap(onEndTour)
                     } label: {
                         Text("スキップ")
                             .font(.system(size: 13.5, weight: .bold, design: .rounded))
@@ -284,48 +368,35 @@ private struct TutorialCenterCard: View {
     }
 }
 
-// MARK: - 共通部品
+// MARK: - 上部プログレスバー
 
-/// 「3/10」形式のステップカウンタ。ドット列よりも現在地が明確（iter1226.337 オーナーFB反映）。
-private struct TutorialStepCounter: View {
-    let step: TutorialTourStep
-
-    var body: some View {
-        Text("\(step.rawValue + 1)/\(TutorialTourStep.allCases.count)")
-            .font(.system(size: 12, weight: .black, design: .rounded))
-            .foregroundStyle(MegrumTheme.lavender)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 3)
-            .background(MegrumTheme.lavender.opacity(0.14), in: Capsule(style: .continuous))
-    }
-}
-
-private struct TutorialNextButton: View {
-    var onNext: () -> Void
+private struct TutorialOverallProgressBar: View {
+    let progress: Double
 
     var body: some View {
-        Button {
-            MegrumHaptics.performButtonTap(onNext)
-        } label: {
-            Text("次へ")
-                .font(.system(size: 14, weight: .black, design: .rounded))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 22)
-                .frame(height: 40)
-                .background(
-                    LinearGradient(
-                        colors: [MegrumTheme.sky, MegrumTheme.lavender],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    ),
-                    in: RoundedRectangle(cornerRadius: 13, style: .continuous)
-                )
+        GeometryReader { proxy in
+            ZStack(alignment: .leading) {
+                Capsule(style: .continuous)
+                    .fill(.white.opacity(0.55))
+                Capsule(style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [MegrumTheme.sky, MegrumTheme.lavender],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .frame(width: max(8, proxy.size.width * progress))
+            }
         }
-        .buttonStyle(.plain)
+        .frame(height: 5)
+        .shadow(color: .black.opacity(0.18), radius: 4, y: 1)
+        .animation(.snappy(duration: 0.25), value: progress)
+        .allowsHitTesting(false)
     }
 }
 
-// MARK: - 吹き出しサイズ計測（隣接配置の重なり防止に実寸を使う）
+// MARK: - 吹き出しサイズ計測
 
 private struct TutorialCalloutSizePreferenceKey: PreferenceKey {
     static let defaultValue: CGSize = .zero

@@ -6,114 +6,103 @@ final class TutorialTourCoordinatorTests: XCTestCase {
     func testStartsInactive() {
         let coordinator = TutorialTourCoordinator()
         XCTAssertFalse(coordinator.isActive)
-        XCTAssertNil(coordinator.currentStep)
+        XCTAssertNil(coordinator.currentBeat)
     }
 
-    func testStartBeginsAtWelcome() {
+    func testStartBeginsAtFirstBeat() {
         let coordinator = TutorialTourCoordinator()
         coordinator.start()
         XCTAssertTrue(coordinator.isActive)
-        XCTAssertEqual(coordinator.currentStep, .welcome)
+        XCTAssertEqual(coordinator.currentBeat?.id, "1-1")
+        XCTAssertEqual(coordinator.currentBeat?.chapter, .welcome)
     }
 
-    func testStartAtSpecificStep() {
+    func testStartAtSpecificBeat() {
         let coordinator = TutorialTourCoordinator()
-        coordinator.start(at: .inventory)
-        XCTAssertEqual(coordinator.currentStep, .inventory)
+        let beat = TutorialScript.beat(withID: "4-7")
+        XCTAssertNotNil(beat)
+        coordinator.start(at: beat)
+        XCTAssertEqual(coordinator.currentBeat?.id, "4-7")
     }
 
-    func testAdvanceWalksEveryStepThenFinishes() {
+    func testAdvanceWalksAllBeatsThenFinishes() {
         let coordinator = TutorialTourCoordinator()
         coordinator.start()
-
-        let expected: [TutorialTourStep] = [
-            .homeSectionUserTag, .homeSectionUser, .homeSectionHaves,
-            .inventory, .wish, .listing, .trades, .meguri, .completion,
-        ]
-        for step in expected {
+        for expected in TutorialScript.beats.dropFirst() {
             coordinator.advance()
-            XCTAssertEqual(coordinator.currentStep, step)
+            XCTAssertEqual(coordinator.currentBeat, expected)
         }
-
-        // completion からもう一度進むと閉じる。
         coordinator.advance()
-        XCTAssertNil(coordinator.currentStep)
+        XCTAssertNil(coordinator.currentBeat)
         XCTAssertFalse(coordinator.isActive)
     }
 
-    func testSkipClosesImmediately() {
+    func testSkipChapterJumpsToNextChapterHead() {
         let coordinator = TutorialTourCoordinator()
-        coordinator.start()
-        coordinator.advance()
-        coordinator.skip()
-        XCTAssertNil(coordinator.currentStep)
+        coordinator.start(at: TutorialScript.beat(withID: "4-3"))
+        coordinator.skipChapter()
+        XCTAssertEqual(coordinator.currentBeat?.id, "5-1")
+        XCTAssertEqual(coordinator.currentBeat?.chapter, .wish)
     }
 
-    func testTargetTabPerStep() {
-        XCTAssertEqual(TutorialTourStep.welcome.targetTab, .home)
-        XCTAssertEqual(TutorialTourStep.homeSectionUserTag.targetTab, .home)
-        XCTAssertEqual(TutorialTourStep.homeSectionUser.targetTab, .home)
-        XCTAssertEqual(TutorialTourStep.homeSectionHaves.targetTab, .home)
-        XCTAssertEqual(TutorialTourStep.inventory.targetTab, .inventory)
-        XCTAssertEqual(TutorialTourStep.wish.targetTab, .wish)
-        XCTAssertEqual(TutorialTourStep.listing.targetTab, .wish)
-        XCTAssertEqual(TutorialTourStep.trades.targetTab, .trades)
-        XCTAssertEqual(TutorialTourStep.meguri.targetTab, .meguri)
-        XCTAssertEqual(TutorialTourStep.completion.targetTab, .home)
+    func testSkipChapterOnLastChapterFinishes() {
+        let coordinator = TutorialTourCoordinator()
+        coordinator.start(at: TutorialScript.beat(withID: "10-1"))
+        coordinator.skipChapter()
+        XCTAssertNil(coordinator.currentBeat)
     }
 
-    func testWishSectionRouting() {
-        XCTAssertEqual(TutorialTourStep.wish.requestedWishSection, .wishes)
-        XCTAssertEqual(TutorialTourStep.listing.requestedWishSection, .listings)
-        XCTAssertNil(TutorialTourStep.inventory.requestedWishSection)
+    func testScriptIntegrity() {
+        let beats = TutorialScript.beats
+        XCTAssertFalse(beats.isEmpty)
+        // ID一意
+        XCTAssertEqual(Set(beats.map(\.id)).count, beats.count)
+        // 章は登場順に単調（後戻りしない）
+        let chapterOrder = beats.map(\.chapter.rawValue)
+        XCTAssertEqual(chapterOrder, chapterOrder.sorted())
+        // 全10章が存在する
+        XCTAssertEqual(Set(beats.map(\.chapter)).count, TutorialChapter.allCases.count)
     }
 
-    func testPresentationKinds() {
-        XCTAssertEqual(TutorialTourStep.welcome.presentation, .centerCard)
-        XCTAssertEqual(TutorialTourStep.completion.presentation, .centerCard)
-        XCTAssertEqual(TutorialTourStep.meguri.presentation, .banner)
-        XCTAssertEqual(TutorialTourStep.homeSectionUserTag.presentation, .spotlight)
-        XCTAssertEqual(TutorialTourStep.inventory.presentation, .spotlight)
+    func testChapterProgressCountsMatchScript() {
+        let inventoryBeats = TutorialScript.beats.filter { $0.chapter == .inventory }
+        XCTAssertEqual(inventoryBeats.count, 11)
+        let first = TutorialScript.chapterProgress(of: inventoryBeats[0])
+        XCTAssertEqual(first.index, 1)
+        XCTAssertEqual(first.count, 11)
+        let listingBeats = TutorialScript.beats.filter { $0.chapter == .listing }
+        XCTAssertEqual(listingBeats.count, 16)
+        let proposalBeats = TutorialScript.beats.filter { $0.chapter == .proposal }
+        XCTAssertEqual(proposalBeats.count, 10)
     }
 
-    func testHomeSectionStepsHaveFocusAnchors() {
-        XCTAssertEqual(TutorialTourStep.homeSectionUserTag.homeFocusAnchor, .homeSectionUserTag)
-        XCTAssertEqual(TutorialTourStep.homeSectionUser.homeFocusAnchor, .homeSectionUser)
-        XCTAssertEqual(TutorialTourStep.homeSectionHaves.homeFocusAnchor, .homeSectionHaves)
-        XCTAssertNil(TutorialTourStep.inventory.homeFocusAnchor)
-        XCTAssertNil(TutorialTourStep.welcome.homeFocusAnchor)
+    func testTargetTabsFollowChapters() {
+        XCTAssertEqual(TutorialScript.beat(withID: "2-1")?.targetTab, .home)
+        XCTAssertEqual(TutorialScript.beat(withID: "4-1")?.targetTab, .inventory)
+        XCTAssertEqual(TutorialScript.beat(withID: "5-2")?.targetTab, .wish)
+        XCTAssertEqual(TutorialScript.beat(withID: "5-2")?.requestedWishSection, .wishes)
+        XCTAssertEqual(TutorialScript.beat(withID: "6-2")?.requestedWishSection, .listings)
+        XCTAssertEqual(TutorialScript.beat(withID: "8-1")?.targetTab, .trades)
+        XCTAssertEqual(TutorialScript.beat(withID: "9-2")?.targetTab, .meguri)
     }
 
-    func testSpotlightStepsHaveAnchors() {
-        for step in TutorialTourStep.allCases where step.presentation == .spotlight {
-            XCTAssertNotNil(step.spotlightAnchor, "spotlight step \(step) must have an anchor")
-        }
-        XCTAssertNil(TutorialTourStep.welcome.spotlightAnchor)
-        XCTAssertNil(TutorialTourStep.meguri.spotlightAnchor)
-        XCTAssertNil(TutorialTourStep.completion.spotlightAnchor)
+    func testHomeFocusAnchorsOnHomeChapter() {
+        XCTAssertEqual(TutorialScript.beat(withID: "2-1")?.homeFocusAnchor, .homeSectionUserTag)
+        XCTAssertEqual(TutorialScript.beat(withID: "2-2")?.homeFocusAnchor, .homeSectionUser)
+        XCTAssertEqual(TutorialScript.beat(withID: "2-3")?.homeFocusAnchor, .homeSectionHaves)
+        XCTAssertNil(TutorialScript.beat(withID: "4-2")?.homeFocusAnchor)
     }
 
-    func testVisualQAValueParsing() {
-        XCTAssertEqual(TutorialTourStep(visualQAValue: "welcome"), .welcome)
-        XCTAssertEqual(TutorialTourStep(visualQAValue: "home-1"), .homeSectionUserTag)
-        XCTAssertEqual(TutorialTourStep(visualQAValue: "home-2"), .homeSectionUser)
-        XCTAssertEqual(TutorialTourStep(visualQAValue: "home-3"), .homeSectionHaves)
-        XCTAssertEqual(TutorialTourStep(visualQAValue: "inventory"), .inventory)
-        XCTAssertEqual(TutorialTourStep(visualQAValue: " Meguri "), .meguri)
-        XCTAssertEqual(TutorialTourStep(visualQAValue: "4"), .inventory)
-        XCTAssertNil(TutorialTourStep(visualQAValue: "unknown"))
-        XCTAssertNil(TutorialTourStep(visualQAValue: "99"))
-    }
-
-    func testVisualQATutorialStepEnvironmentParsing() {
+    func testVisualQAStartBeatParsing() {
         XCTAssertEqual(
-            VisualQAPreviewMode.tutorialStartStep(
-                environment: ["MEGRUM_VISUAL_QA_TUTORIAL_STEP": "trades"]
-            ),
-            .trades
+            VisualQAPreviewMode.tutorialStartBeat(environment: ["MEGRUM_VISUAL_QA_TUTORIAL_STEP": "6-10"])?.id,
+            "6-10"
         )
-        XCTAssertNil(
-            VisualQAPreviewMode.tutorialStartStep(environment: [:])
+        XCTAssertEqual(
+            VisualQAPreviewMode.tutorialStartBeat(environment: ["MEGRUM_VISUAL_QA_TUTORIAL_STEP": "0"])?.id,
+            "1-1"
         )
+        XCTAssertNil(VisualQAPreviewMode.tutorialStartBeat(environment: [:]))
+        XCTAssertNil(VisualQAPreviewMode.tutorialStartBeat(environment: ["MEGRUM_VISUAL_QA_TUTORIAL_STEP": "unknown"]))
     }
 }
