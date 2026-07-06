@@ -337,20 +337,13 @@ private struct GroomViewerLikeButton: View {
             }
             action()
         } label: {
-            // バーストは overlay（レイアウト非干渉）にして、いいね時に
-            // アイコン列が左へ動く見た目のズレを起こさない。
-            Image(systemName: isLiked ? "heart.fill" : "heart")
+            // 未押下時も枠線と同じ色で中まで塗る（塗り付きハート）。
+            Image(systemName: "heart.fill")
                 .font(.system(size: 30, weight: .heavy))
                 .foregroundStyle(isLiked ? Color.red : GroomViewerEngagementStyle.idleIconColor)
                 .shadow(color: .black.opacity(0.35), radius: 6, y: 1)
                 .scaleEffect(presentationState.likeIconScale)
                 .frame(width: 48, height: 44)
-                .overlay {
-                    if presentationState.isBursting {
-                        GroomLikeBurst(token: presentationState.burstToken)
-                            .allowsHitTesting(false)
-                    }
-                }
         }
         .buttonStyle(.plain)
         .opacity(isEnabled ? 1 : 0.82)
@@ -364,11 +357,12 @@ private struct GroomViewerLikeButton: View {
         )
         .onChange(of: isLiked) { _, next in
             guard next else { return }
+            // 周囲の演出は出さず、ハート自体の弾みだけにする。
             withAnimation(.spring(response: 0.24, dampingFraction: 0.52)) {
                 presentationState.startBurst()
             }
             Task { @MainActor in
-                try? await Task.sleep(for: .milliseconds(620))
+                try? await Task.sleep(for: .milliseconds(320))
                 withAnimation(.easeOut(duration: 0.16)) {
                     presentationState.finishBurst()
                 }
@@ -577,36 +571,4 @@ private struct GroomViewerSheetReplyComposer: View {
     }
 }
 
-private struct GroomLikeBurst: View {
-    var token: UUID
 
-    var body: some View {
-        ZStack {
-            ForEach(0..<6, id: \.self) { index in
-                Image(systemName: index.isMultiple(of: 2) ? "heart.fill" : "sparkle")
-                    .font(.system(size: index.isMultiple(of: 2) ? 12 : 10, weight: .heavy))
-                    .foregroundStyle(index.isMultiple(of: 2) ? MegrumTheme.pink : .white)
-                    .offset(burstOffset(index))
-                    .opacity(0.92)
-                    .animation(
-                        .easeOut(duration: 0.58).delay(Double(index) * 0.025),
-                        value: token
-                    )
-            }
-        }
-        .frame(width: 86, height: 86)
-        .transition(.scale.combined(with: .opacity))
-    }
-
-    private func burstOffset(_ index: Int) -> CGSize {
-        let offsets: [CGSize] = [
-            CGSize(width: -26, height: -24),
-            CGSize(width: 0, height: -34),
-            CGSize(width: 28, height: -22),
-            CGSize(width: -30, height: 8),
-            CGSize(width: 28, height: 10),
-            CGSize(width: 2, height: 30)
-        ]
-        return offsets[index % offsets.count]
-    }
-}

@@ -120,9 +120,14 @@ struct GroomViewerScreen: View {
         return appState.groomReactions(for: currentGroom.id)
             .sorted { $0.createdAt > $1.createdAt }
             .map { reaction in
+                // 自分のいいねは自分の交換プロフィールのアイコンで解決する
+                //（publicProfilesByUserID には自分は入らないため）。
+                let fallbackAvatarURL = reaction.userID == appState.viewer?.id
+                    ? appState.viewer?.avatarURL
+                    : appState.publicProfilesByUserID[reaction.userID]?.profile.avatarURL
                 let identity = appState.meguriIdentity(
                     for: reaction.userID,
-                    fallbackAvatarURL: appState.publicProfilesByUserID[reaction.userID]?.profile.avatarURL
+                    fallbackAvatarURL: fallbackAvatarURL
                 )
                 return GroomFloatingLiker(
                     id: reaction.userID,

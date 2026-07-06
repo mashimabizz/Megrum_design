@@ -300,6 +300,28 @@ extension MegrumAppState {
             adjustsCount: didChange,
             in: ownGroomArchive
         )
+        // 自分のグルームの表示件数は reactions 一覧から数えるため、
+        // 押した瞬間に +1/-1 されるようこちらも楽観更新する。
+        let previousReactions = groomReactionsByPostID[postID]
+        if didChange, let viewerID = viewer?.id {
+            var reactions = groomReactionsByPostID[postID] ?? []
+            if isLiked {
+                if !reactions.contains(where: { $0.userID == viewerID }) {
+                    reactions.insert(
+                        GroomReaction(
+                            groomPostID: postID,
+                            userID: viewerID,
+                            reactionType: "like",
+                            createdAt: .now
+                        ),
+                        at: 0
+                    )
+                }
+            } else {
+                reactions.removeAll { $0.userID == viewerID }
+            }
+            groomReactionsByPostID[postID] = reactions
+        }
         do {
             try await repository.setGroomLiked(postID: postID, isLiked: isLiked)
         } catch {
@@ -307,6 +329,7 @@ extension MegrumAppState {
             grooms = previousGrooms
             groomMapPosts = previousMapPosts
             ownGroomArchive = previousArchive
+            groomReactionsByPostID[postID] = previousReactions
             errorMessage = "グルームのいいねを更新できませんでした"
         }
     }

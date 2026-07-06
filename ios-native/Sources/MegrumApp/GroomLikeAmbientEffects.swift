@@ -36,7 +36,6 @@ struct GroomLikeHeartRainLayer: View {
         let duration: Double
         let drift: CGFloat
         let riseRatio: CGFloat
-        let isPink: Bool
     }
 
     var body: some View {
@@ -66,8 +65,7 @@ struct GroomLikeHeartRainLayer: View {
                     delay: Double.random(in: 0...0.9),
                     duration: Double.random(in: 1.2...2.2),
                     drift: CGFloat.random(in: -34...34),
-                    riseRatio: CGFloat.random(in: 0.45...0.72),
-                    isPink: Bool.random()
+                    riseRatio: CGFloat.random(in: 0.45...0.72)
                 )
             }
         }
@@ -83,7 +81,8 @@ private struct GroomRisingHeart: View {
     var body: some View {
         Image(systemName: "heart.fill")
             .font(.system(size: seed.size, weight: .heavy))
-            .foregroundStyle(seed.isPink ? MegrumTheme.pink : .white.opacity(0.85))
+            // いいねアイコン（赤）と同じ色に揃える
+            .foregroundStyle(Color.red.opacity(0.9))
             .position(
                 x: containerSize.width * seed.xRatio + (isRisen ? seed.drift : 0),
                 y: isRisen
@@ -92,7 +91,8 @@ private struct GroomRisingHeart: View {
             )
             .opacity(isRisen ? 0 : 0.95)
             .onAppear {
-                withAnimation(.easeOut(duration: seed.duration).delay(seed.delay)) {
+                // 出はじめと消えぎわがゆっくりになるイージング
+                withAnimation(.easeInOut(duration: seed.duration).delay(seed.delay)) {
                     isRisen = true
                 }
             }

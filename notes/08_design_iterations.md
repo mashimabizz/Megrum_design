@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション1226.323：グルームいいねの色/演出統一・即時カウント・アイコン解決
+
+### 背景・問題意識
+オーナーFB：いいね押下時のキラキラ/ハートの飛び散りは不要。押した瞬間に数が+1されない。下から湧くハートといいねアイコンの色を統一したい（赤）。湧き方は出はじめ・消えぎわがゆっくりに。左下のいいねユーザーアイコンが取得されない。地図ピンの湧きハートも同色に。未押下時のハートは中も枠線色で塗ってほしい。
+
+### 変更内容
+
+#### 1. 押下時の演出（`GroomViewerChromeViews.swift`）
+- キラキラ＋ハートが飛び散る `GroomLikeBurst` を削除（ハート自体の弾みだけ残す）
+- 未押下時も `heart.fill`＋枠線と同じ色（白系）で中まで塗る。押下時は赤
+
+#### 2. いいね数の即時反映（`MegrumAppStateGroomActions.swift`）
+- 自分のグルームの表示件数は reactions 一覧から数えるため、押した瞬間は増えなかった
+- `setGroomLiked` で `groomReactionsByPostID` にも自分のリアクションを楽観挿入/削除（失敗時はロールバック）
+
+#### 3. ハートの色とイージング統一
+- 下から湧くハートレイン（`GroomLikeAmbientEffects.swift`）：ピンク/白ミックス → いいねと同じ赤に統一。easeOut → easeInOut（出はじめ・消えぎわがゆっくり）
+- めぐり地図ピンの湧きハート（`MeguriMapAnnotationViews.swift`）：ピンク → 赤に統一
+
+#### 4. 左下いいねユーザーアイコン（`GroomViewerScreen.swift`）
+- 自分のいいねは `publicProfilesByUserID` に載らないため、viewer 自身の交換プロフィールのアイコンで解決するフォールバックを追加（他ユーザーは従来通り公開プロフィールから）
+
+### 影響範囲
+- グルームビューア（いいねボタン・演出）、めぐり地図のグルームピン
+
+### 確認方法
+- swift test 1491件 0失敗
+
+### セルフレビュー結果
+- ✅ 廃止した演出（GroomLikeBurst）のコード削除
+- ✅ 楽観更新は失敗時ロールバックあり
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/GroomViewerChromeViews.swift`
+- `ios-native/Sources/MegrumApp/MegrumAppStateGroomActions.swift`
+
+---
+
 ## イテレーション1226.322：一覧フィルタのメンバー名解決を全グループキャッシュに
 
 ### 背景・問題意識

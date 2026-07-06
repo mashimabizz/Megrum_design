@@ -177,7 +177,8 @@ private struct GroomPinAmbientHeart: View {
 
         Image(systemName: "heart.fill")
             .font(.system(size: size, weight: .bold))
-            .foregroundStyle(MegrumTheme.pink)
+            // グルーム内のいいね（赤）と同じ色に揃える
+            .foregroundStyle(Color.red.opacity(0.88))
             .shadow(color: .white.opacity(0.8), radius: 1)
             .scaleEffect(isRising ? 1.15 : 0.5)
             // easeIn：ピンの近くでゆっくり漂ってから昇るので、
