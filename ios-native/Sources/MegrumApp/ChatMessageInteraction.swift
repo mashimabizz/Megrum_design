@@ -289,10 +289,12 @@ enum MegrumChatBubbleStyle {
 }
 
 extension View {
-    /// LINE風の長押しメニュー（コピー・リプライ・通報）＋右スワイプでリプライ。
+    /// LINE風の長押しメニュー（コピー・リプライ・通報）＋左スワイプでリプライ。
+    /// 左へスワイプするとメッセージが指に追従して動き、右側にリプライアイコンが
+    /// 現れる。しきい値を超えて指を離すとリプライを開始する。
     /// - Parameters:
     ///   - copyText: コピーするテキスト（nil なら項目を出さない）
-    ///   - onReply: リプライ開始（nil なら項目を出さない。右スワイプも無効）
+    ///   - onReply: リプライ開始（nil なら項目を出さない。スワイプも無効）
     ///   - onReport: 通報（nil なら項目を出さない）
     func chatMessageInteraction(
         copyText: String?,
@@ -325,20 +327,83 @@ extension View {
                     }
                 }
             }
-            .simultaneousGesture(
-                DragGesture(minimumDistance: 24)
-                    .onEnded { value in
-                        guard let onReply else {
-                            return
-                        }
-                        let horizontal = abs(value.translation.width)
-                        let vertical = abs(value.translation.height)
-                        // 左右どちらでも、はっきり横へスワイプした時にリプライを開始する。
-                        if horizontal > 56, horizontal > vertical * 1.4 {
-                            MegrumHaptics.buttonTap()
-                            onReply()
-                        }
-                    }
-            )
+            .modifier(ChatSwipeReplyModifier(onReply: onReply))
+    }
+}
+
+/// 左スワイプでリプライ：メッセージが追従して左へ動き、右にリプライアイコンが出る。
+private struct ChatSwipeReplyModifier: ViewModifier {
+    var onReply: (() -> Void)?
+
+    @State private var dragOffset: CGFloat = 0
+    @State private var isTrackingHorizontal: Bool?
+
+    private static let triggerDistance: CGFloat = 56
+    private static let maxOffset: CGFloat = 84
+
+    private var progress: CGFloat {
+        min(1, -dragOffset / Self.triggerDistance)
+    }
+
+    func body(content: Content) -> some View {
+        content
+            .offset(x: dragOffset)
+            // offset は見た目だけずらすので、background は元のフレーム位置に留まり
+            // バブルが左へ動いた隙間にリプライアイコンが現れる。
+            .background(alignment: .trailing) {
+                if dragOffset < -4 {
+                    Image(systemName: "arrowshape.turn.up.left.fill")
+                        .font(.system(size: 15, weight: .heavy))
+                        .foregroundStyle(progress >= 1 ? Color.white : MegrumTheme.lavender)
+                        .frame(width: 34, height: 34)
+                        .background(
+                            progress >= 1
+                                ? AnyShapeStyle(MegrumTheme.lavender)
+                                : AnyShapeStyle(MegrumTheme.lavender.opacity(0.14)),
+                            in: Circle()
+                        )
+                        .scaleEffect(0.55 + 0.45 * progress)
+                        .opacity(Double(min(1, progress * 1.6)))
+                        .padding(.trailing, 2)
+                        .accessibilityHidden(true)
+                }
+            }
+            .simultaneousGesture(swipeGesture)
+    }
+
+    private var swipeGesture: some Gesture {
+        DragGesture(minimumDistance: 16)
+            .onChanged { value in
+                guard onReply != nil else {
+                    return
+                }
+                // 最初の動きで横スワイプ意図かを判定し、縦スクロール時は関与しない。
+                if isTrackingHorizontal == nil {
+                    isTrackingHorizontal = abs(value.translation.width) > abs(value.translation.height) * 1.2
+                }
+                guard isTrackingHorizontal == true else {
+                    return
+                }
+                let translation = min(0, value.translation.width)
+                // しきい値を超えたら少し重くする（ラバーバンド）。
+                if translation < -Self.triggerDistance {
+                    let overshoot = -translation - Self.triggerDistance
+                    dragOffset = -(Self.triggerDistance + overshoot * 0.35)
+                } else {
+                    dragOffset = translation
+                }
+                dragOffset = max(dragOffset, -Self.maxOffset)
+            }
+            .onEnded { _ in
+                let shouldReply = -dragOffset >= Self.triggerDistance
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    dragOffset = 0
+                }
+                isTrackingHorizontal = nil
+                if shouldReply, let onReply {
+                    MegrumHaptics.buttonTap()
+                    onReply()
+                }
+            }
     }
 }
