@@ -16,11 +16,16 @@ struct TradesScreen: View {
 
     private var proposals: [TradeProposal] {
         // ガイドツアー中で実データが空の時はサンプル打診を表示する（実データ不変）。
-        // ほぼ同一内容のカードが並んで見えないよう、ステータスごとに1件へ間引く。
+        // ほぼ同一内容のカードが並んで見えないよう、表示ステージごとに1件へ間引く。
         let fallback: [TradeProposal]
         if appState.isTutorialActive && appState.proposals.isEmpty {
-            var seenStatuses = Set<ProposalStatus>()
-            fallback = NativePreviewData.proposals.filter { seenStatuses.insert($0.status).inserted }
+            var seenStages = Set<TradeStage>()
+            fallback = NativePreviewData.proposals.filter { proposal in
+                guard let stage = TradeStage.allCases.first(where: { $0.containsForDisplay(proposal) }) else {
+                    return false
+                }
+                return seenStages.insert(stage).inserted
+            }
         } else {
             fallback = appState.proposals
         }

@@ -120,6 +120,19 @@ final class TutorialTourCoordinatorTests: XCTestCase {
         XCTAssertNil(TutorialScript.beat(withID: "4-2")?.homeFocusAnchor)
     }
 
+    func testVisualQAStartChapterParsing() {
+        XCTAssertEqual(
+            VisualQAPreviewMode.tutorialStartChapter(environment: ["MEGRUM_VISUAL_QA_TUTORIAL_CHAPTER": "meguri"]),
+            .meguri
+        )
+        XCTAssertEqual(
+            VisualQAPreviewMode.tutorialStartChapter(environment: ["MEGRUM_VISUAL_QA_TUTORIAL_CHAPTER": "Inventory"]),
+            .inventory
+        )
+        XCTAssertNil(VisualQAPreviewMode.tutorialStartChapter(environment: [:]))
+        XCTAssertNil(VisualQAPreviewMode.tutorialStartChapter(environment: ["MEGRUM_VISUAL_QA_TUTORIAL_CHAPTER": "unknown"]))
+    }
+
     func testVisualQAStartBeatParsing() {
         XCTAssertEqual(
             VisualQAPreviewMode.tutorialStartBeat(environment: ["MEGRUM_VISUAL_QA_TUTORIAL_STEP": "6-10"])?.id,

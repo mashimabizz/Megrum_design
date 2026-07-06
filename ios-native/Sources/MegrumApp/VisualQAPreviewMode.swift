@@ -103,4 +103,19 @@ enum VisualQAPreviewMode {
         }
         return nil
     }
+
+    /// 章別再生（ヘルプ＞使い方ガイド相当）の検証用。章のrawValue（例: "meguri"）を受け付ける。
+    /// INITIAL_SCREEN=tutorial と併用し、STEP指定より優先される。
+    static let tutorialChapterEnvironmentKey = "MEGRUM_VISUAL_QA_TUTORIAL_CHAPTER"
+
+    static func tutorialStartChapter(environment: [String: String]) -> TutorialChapter? {
+        guard let raw = environment[tutorialChapterEnvironmentKey]?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased(),
+            !raw.isEmpty
+        else {
+            return nil
+        }
+        return TutorialChapter.allCases.first { String(describing: $0).lowercased() == raw }
+    }
 }

@@ -246,12 +246,16 @@ public struct MegrumRootView: View {
     }
 
     /// VisualQA（MEGRUM_VISUAL_QA_INITIAL_SCREEN=tutorial）では既読フラグを無視して強制起動する。
-    /// MEGRUM_VISUAL_QA_TUTORIAL_STEP でビートID（例: 4-7）指定の直接起動もできる（スクショ検証用）。
+    /// MEGRUM_VISUAL_QA_TUTORIAL_STEP でビートID（例: 4-7）指定、
+    /// MEGRUM_VISUAL_QA_TUTORIAL_CHAPTER で章別再生（ヘルプ導線相当）の直接起動もできる（スクショ検証用）。
     private func startVisualQATutorialIfNeeded() {
         guard visualQAInitialScreen == .tutorial, !tutorialCoordinator.isActive else { return }
-        let startBeat = VisualQAPreviewMode.tutorialStartBeat(
-            environment: ProcessInfo.processInfo.environment
-        )
+        let environment = ProcessInfo.processInfo.environment
+        if let chapter = VisualQAPreviewMode.tutorialStartChapter(environment: environment) {
+            tutorialCoordinator.startChapter(chapter)
+            return
+        }
+        let startBeat = VisualQAPreviewMode.tutorialStartBeat(environment: environment)
         tutorialCoordinator.start(at: startBeat)
     }
 
