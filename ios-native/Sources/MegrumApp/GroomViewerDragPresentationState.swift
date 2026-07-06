@@ -1,36 +1,40 @@
 import CoreGraphics
 
+/// グルームビューアの下スワイプ（閉じる）の見た目と判定。
+/// - 動くのは下方向のみ（縮小・角丸などの演出はなし）
+/// - 引っ張れるのは画面のおよそ1/10まで（ラバーバンドで漸近）
+/// - 生の引っ張り量が閾値を超えた状態で離したら閉じる
 struct GroomViewerDragPresentationState: Equatable {
-    static let dismissThreshold: CGFloat = 100
+    static let dismissThreshold: CGFloat = 130
 
-    private static let progressDenominator: CGFloat = 320
-    private static let scaleReduction: CGFloat = 0.12
-    private static let minimumScale: CGFloat = 0.88
-    private static let cornerRadiusMultiplier: CGFloat = 28
+    /// 画面高さ（約840pt級）の1/10相当の見た目上限。
+    private static let maxVisualOffset: CGFloat = 84
 
     var translation: CGSize = .zero
 
-    var progress: CGFloat {
-        min(max(translation.height / Self.progressDenominator, 0), 1)
-    }
-
     var verticalOffset: CGFloat {
-        max(translation.height, 0)
+        let pull = max(translation.height, 0)
+        // ラバーバンド：引くほど重くなり、maxVisualOffset に漸近する。
+        return Self.maxVisualOffset * pull / (pull + Self.maxVisualOffset)
     }
 
+    /// 縮小演出は廃止（常に等倍）。
     var scale: CGFloat {
-        max(Self.minimumScale, 1 - progress * Self.scaleReduction)
+        1
     }
 
+    /// 角丸演出も廃止。
     var cornerRadius: CGFloat {
-        progress * Self.cornerRadiusMultiplier
+        0
     }
 
     mutating func update(with translation: CGSize) {
         guard translation.height > 0 else {
+            self.translation = .zero
             return
         }
-        self.translation = translation
+        // 横方向は無視して下方向のみ反映する。
+        self.translation = CGSize(width: 0, height: translation.height)
     }
 
     mutating func reset() {

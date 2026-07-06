@@ -7,13 +7,15 @@ final class GroomViewerPresentationTests: XCTestCase {
 
         state.update(with: CGSize(width: 12, height: 160))
 
-        XCTAssertEqual(state.translation, CGSize(width: 12, height: 160))
-        XCTAssertEqual(state.progress, 0.5, accuracy: 0.0001)
-        XCTAssertEqual(state.verticalOffset, 160, accuracy: 0.0001)
-        XCTAssertEqual(state.scale, 0.94, accuracy: 0.0001)
-        XCTAssertEqual(state.cornerRadius, 14, accuracy: 0.0001)
-        XCTAssertFalse(state.shouldDismiss(for: CGSize(width: 0, height: 100)))
-        XCTAssertTrue(state.shouldDismiss(for: CGSize(width: 0, height: 101)))
+        // 横方向は無視して下方向のみ保持する。
+        XCTAssertEqual(state.translation, CGSize(width: 0, height: 160))
+        // 見た目のオフセットはラバーバンドで実移動より小さくなる。
+        XCTAssertLessThan(state.verticalOffset, 160)
+        XCTAssertGreaterThan(state.verticalOffset, 0)
+        XCTAssertEqual(state.scale, 1, accuracy: 0.0001)
+        XCTAssertEqual(state.cornerRadius, 0, accuracy: 0.0001)
+        XCTAssertFalse(state.shouldDismiss(for: CGSize(width: 0, height: 130)))
+        XCTAssertTrue(state.shouldDismiss(for: CGSize(width: 0, height: 131)))
 
         state.reset()
 
@@ -27,12 +29,16 @@ final class GroomViewerPresentationTests: XCTestCase {
 
         XCTAssertEqual(state.translation, .zero)
 
-        state.update(with: CGSize(width: 0, height: 800))
+        state.update(with: CGSize(width: 120, height: 800))
 
-        XCTAssertEqual(state.progress, 1, accuracy: 0.0001)
-        XCTAssertEqual(state.verticalOffset, 800, accuracy: 0.0001)
-        XCTAssertEqual(state.scale, 0.88, accuracy: 0.0001)
-        XCTAssertEqual(state.cornerRadius, 28, accuracy: 0.0001)
+        // 横方向は無視され、下方向のみ反映される。
+        XCTAssertEqual(state.translation.width, 0, accuracy: 0.0001)
+        // 見た目のオフセットは画面1/10相当（84pt）へラバーバンドで漸近し、超えない。
+        XCTAssertLessThan(state.verticalOffset, 84)
+        XCTAssertGreaterThan(state.verticalOffset, 70)
+        // 縮小・角丸の演出は無し。
+        XCTAssertEqual(state.scale, 1, accuracy: 0.0001)
+        XCTAssertEqual(state.cornerRadius, 0, accuracy: 0.0001)
     }
 
     func testRelativeTimeFormatterUsesCompactJapaneseLabels() {
