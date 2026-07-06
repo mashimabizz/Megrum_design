@@ -28,6 +28,7 @@ struct WishCollectionScreen: View {
     @State private var topChromeHeight: CGFloat = CollectionScreenLayoutMetrics.estimatedPinnedChromeBottomEdge
     @State private var isTopChromeCollapsed = false
     @State private var topChromeCollapseTracker = MegrumTopChromeCollapseTracker()
+    @State private var sectionScrollResetToken = 0
 
     init(
         items: [WishItem],
@@ -93,6 +94,8 @@ struct WishCollectionScreen: View {
         }
         .onChange(of: presentationState.selectedSection) { _, _ in
             resetTopChromeCollapse()
+            // セクションを行き来した時は必ず先頭まで戻った状態で表示する
+            sectionScrollResetToken += 1
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .ignoresSafeArea(.container, edges: .bottom)
@@ -127,7 +130,8 @@ struct WishCollectionScreen: View {
                 adDisplayContext: adDisplayContext,
                 onScrollContentTopChange: { contentTop in
                     handleSectionScrollContentTop(contentTop, section: .wishes)
-                }
+                },
+                scrollToTopToken: sectionScrollResetToken
             )
         case .listings:
             if let appState {

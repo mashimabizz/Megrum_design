@@ -75,8 +75,12 @@ struct BoardReplyInput: View {
         .foregroundStyle(MegrumTheme.lavender)
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
-        .background(.regularMaterial)
-        .padding(.bottom, 8)
+        .background {
+            // 入力欄の背景を下端（ホームインジケータ側）まで同色で伸ばす
+            Rectangle()
+                .fill(.regularMaterial)
+                .ignoresSafeArea(edges: .bottom)
+        }
         .opacity(isDisabled ? 0.62 : 1)
     }
 }

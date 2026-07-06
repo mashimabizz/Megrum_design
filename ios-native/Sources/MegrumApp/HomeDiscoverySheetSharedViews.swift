@@ -1,3 +1,4 @@
+import Foundation
 import MegrumDesign
 import SwiftUI
 
@@ -9,6 +10,8 @@ struct HomeSelectedGoodsHeader: View {
     var exchangeCalendarContext: HomePartnerExchangeCalendarContext? = nil
     var listingNote: String?
     var listingDetail: HomeIndividualListingDetailContext?
+    /// 個別募集の更新日。nil なら譲グッズ側の日付（goods.updatedAt）を登録日として出す。
+    var listingUpdatedAt: Date? = nil
     var onOpenOwnerProfile: (UUID) -> Void = { _ in }
     @State private var presentationState = HomeSelectedGoodsHeaderPresentationState()
 
@@ -23,8 +26,17 @@ struct HomeSelectedGoodsHeader: View {
             }
 
             HStack(alignment: .top, spacing: 20) {
-                HomeSelectedGoodsSingleCard(goods: goods, conditionTags: conditionTags)
-                    .frame(width: 136, height: 162)
+                VStack(alignment: .leading, spacing: 4) {
+                    HomeSelectedGoodsSingleCard(goods: goods, conditionTags: conditionTags)
+                        .frame(width: 136, height: 162)
+
+                    // メモが無い時はグッズ画像の左下に日時を出す
+                    if listingNote?.nilIfBlank == nil, let timestampText {
+                        Text(timestampText)
+                            .font(.system(size: 9.5, weight: .semibold, design: .rounded))
+                            .foregroundStyle(MegrumTheme.muted.opacity(0.85))
+                    }
+                }
 
                 VStack(alignment: .leading, spacing: 10) {
                     if !usesOwnerSummaryAsHeader, let ownerSummary = goods.ownerSummary {
@@ -54,6 +66,12 @@ struct HomeSelectedGoodsHeader: View {
 
             if let listingNote = listingNote?.nilIfBlank {
                 HomeListingNoteBox(note: listingNote)
+
+                if let timestampText {
+                    Text(timestampText)
+                        .font(.system(size: 9.5, weight: .semibold, design: .rounded))
+                        .foregroundStyle(MegrumTheme.muted.opacity(0.85))
+                }
             }
         }
         .sheet(item: $presentationState.presentedListingDetail) { detail in
@@ -71,6 +89,24 @@ struct HomeSelectedGoodsHeader: View {
     private var usesOwnerSummaryAsHeader: Bool {
         title == "選んだグッズ"
     }
+
+    /// 個別募集ならその更新日、そうでなければ譲グッズの登録日。
+    private var timestampText: String? {
+        if let listingUpdatedAt {
+            return "更新日 " + Self.timestampFormatter.string(from: listingUpdatedAt)
+        }
+        if let goodsUpdatedAt = goods.updatedAt {
+            return "登録日 " + Self.timestampFormatter.string(from: goodsUpdatedAt)
+        }
+        return nil
+    }
+
+    private static let timestampFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "ja_JP")
+        formatter.dateFormat = "yyyy/M/d"
+        return formatter
+    }()
 }
 
 struct HomeSelectedGoodsSingleCard: View {

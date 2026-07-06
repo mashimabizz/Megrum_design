@@ -94,7 +94,8 @@ enum HomeCandidateListingSelectionFactory {
             offeredMinimumCount: offeredMinimumCount,
             wantedOptions: wantedOptions,
             listingNote: listingNote,
-            detail: detail
+            detail: detail,
+            listingUpdatedAt: listing.updatedAt ?? listing.createdAt
         )
     }
 

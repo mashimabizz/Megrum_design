@@ -80,6 +80,8 @@ public struct HomeIndividualListingSelectionContext: Equatable, Sendable {
     public var wantedOptions: [HomeIndividualListingWantedOption]
     public var listingNote: String?
     public var detail: HomeIndividualListingDetailContext?
+    /// 個別募集の更新日（候補シートの日時表示用）。
+    public var listingUpdatedAt: Date?
 
     public init(
         wantedLogic: ListingLogic = .one,
@@ -88,7 +90,8 @@ public struct HomeIndividualListingSelectionContext: Equatable, Sendable {
         offeredMinimumCount: Int = 1,
         wantedOptions: [HomeIndividualListingWantedOption] = [],
         listingNote: String? = nil,
-        detail: HomeIndividualListingDetailContext? = nil
+        detail: HomeIndividualListingDetailContext? = nil,
+        listingUpdatedAt: Date? = nil
     ) {
         self.wantedLogic = wantedLogic
         self.offeredLogic = offeredLogic
@@ -97,6 +100,7 @@ public struct HomeIndividualListingSelectionContext: Equatable, Sendable {
         self.wantedOptions = wantedOptions
         self.listingNote = listingNote?.nilIfBlank
         self.detail = detail
+        self.listingUpdatedAt = listingUpdatedAt
     }
 
     public static var defaultSelection: HomeIndividualListingSelectionContext {

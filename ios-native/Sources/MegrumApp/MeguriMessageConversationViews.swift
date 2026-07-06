@@ -24,7 +24,13 @@ struct MeguriMessageList: View {
                     } else if messages.isEmpty {
                         MeguriMessageEmptyState()
                     } else {
-                        ForEach(messages) { message in
+                        ForEach(Array(messages.enumerated()), id: \.element.id) { index, message in
+                            if ChatTimestampFormatter.startsNewDay(
+                                message.createdAt,
+                                after: index > 0 ? messages[index - 1].createdAt : nil
+                            ) {
+                                ChatDaySeparator(date: message.createdAt)
+                            }
                             MeguriMessageBubble(
                                 message: message,
                                 viewerID: viewerID,
@@ -288,7 +294,7 @@ struct MeguriMessageMeta: View {
     var isMine: Bool
 
     var body: some View {
-        Text(message.createdAt.formatted(date: .omitted, time: .shortened))
+        Text(ChatTimestampFormatter.timeText(for: message.createdAt))
             .font(.system(size: 10.5, weight: .bold, design: .rounded))
             .foregroundStyle(MegrumTheme.muted.opacity(0.82))
             .padding(.bottom, 3)

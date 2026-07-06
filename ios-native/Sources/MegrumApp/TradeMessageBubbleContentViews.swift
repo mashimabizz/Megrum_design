@@ -97,7 +97,7 @@ struct TradeMessageMeta: View {
             if isMine, isReadByPartner {
                 Text("既読")
             }
-            Text(message.createdAt.formatted(date: .omitted, time: .shortened))
+            Text(ChatTimestampFormatter.timeText(for: message.createdAt))
         }
         .font(.system(size: 10.5, weight: .bold, design: .rounded))
         .foregroundStyle(foregroundColor)

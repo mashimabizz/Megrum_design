@@ -94,7 +94,8 @@ enum HomeCandidateRowMapper {
             ownerCompletedTradeCount: ownerUser?.completedTradeCount,
             ownerPaymentMethods: HomeCandidatePaymentPolicy.methods(fallbackOwnerPaymentMethods),
             ownerPaymentNote: fallbackOwnerPaymentNote,
-            ownerHasMegrumPlus: ownerHasMegrumPlus
+            ownerHasMegrumPlus: ownerHasMegrumPlus,
+            updatedAt: row.updatedAt
         )
     }
 

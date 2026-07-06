@@ -36,6 +36,7 @@ struct HomeWishHitDetailSheet: View {
                 ),
                 listingNote: selection.individualListingSelection.listingNote,
                 listingDetail: selection.individualListingSelection.detail,
+                listingUpdatedAt: selection.individualListingSelection.listingUpdatedAt,
                 onOpenOwnerProfile: onOpenOwnerProfile
             )
 

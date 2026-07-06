@@ -19,6 +19,7 @@ struct TradeCardExclusivePressModifier: ViewModifier {
                         MegrumHaptics.longPress()
                         onLongPress()
                     case .second:
+                        MegrumHaptics.buttonTap()
                         onTap()
                     case .first(false):
                         break
@@ -26,7 +27,10 @@ struct TradeCardExclusivePressModifier: ViewModifier {
                 }
             )
         } else {
-            content.onTapGesture(perform: onTap)
+            content.onTapGesture {
+                MegrumHaptics.buttonTap()
+                onTap()
+            }
         }
     }
 }

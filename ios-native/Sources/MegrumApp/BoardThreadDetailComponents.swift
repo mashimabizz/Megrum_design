@@ -36,6 +36,8 @@ struct BoardThreadChatMessageDisplay: Identifiable {
     var goodReactionCount: Int
     var badReactionCount: Int
     var viewerReaction: BoardMessageReaction?
+    /// 日を跨いだ直前に挟むセパレータ（今日/昨日/M/d(曜)）。
+    var daySeparatorText: String?
 
     var id: String {
         switch target {

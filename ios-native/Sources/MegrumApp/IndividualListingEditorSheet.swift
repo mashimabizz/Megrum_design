@@ -12,6 +12,9 @@ struct IndividualListingEditorSheet: View {
     @State var draft: IndividualListingDraft
     @State var presentationState: IndividualListingEditorPresentationState
     @State var showsAddOptionPrompt = false
+    @State var showsDiscardConfirmation = false
+    @State var initialDraftSnapshot: IndividualListingDraft?
+    @State var initialStagedOptionIDs: [UUID] = []
 
     init(
         appState: MegrumAppState,
@@ -99,7 +102,7 @@ struct IndividualListingEditorSheet: View {
             goodsTypes: appState.goodsTypes,
             stepValidationMessage: stepValidationMessage,
             optionReviewCount: optionReviewItems.count,
-            onBack: goBack,
+            onBack: requestExit,
             onSelectStep: selectStep,
             onShowOptionReview: { presentationState.showOptionReview() },
             onToggleHave: toggleHave,
@@ -127,7 +130,7 @@ struct IndividualListingEditorSheet: View {
                 canSelectAllVisible: canSelectAllVisible,
                 isDisabled: stepValidationMessage != nil || isSaving,
                 isSaving: isSaving,
-                onBack: goBack,
+                onBack: stepBack,
                 onSelectAllVisible: selectAllVisibleItems,
                 onAddOption: addCurrentOption,
                 onPrimary: primaryAction
@@ -138,13 +141,30 @@ struct IndividualListingEditorSheet: View {
                 addCurrentOption()
                 proceedToExchangeStep()
             }
-            Button("追加せずに進む", role: .destructive) {
-                clearCurrentOption()
-                proceedToExchangeStep()
+            // 選択肢が1つも無い状態では「追加せずに進む」を出さない（選択肢0で先へ進ませない）
+            if !presentationState.stagedOptionSummaries.isEmpty {
+                Button("追加せずに進む", role: .destructive) {
+                    clearCurrentOption()
+                    proceedToExchangeStep()
+                }
             }
             Button("キャンセル", role: .cancel) {}
         } message: {
             Text("いま選択中のほしいものを、この募集の選択肢として追加できます。")
+        }
+        .confirmationDialog("編集内容を破棄して戻りますか？", isPresented: $showsDiscardConfirmation, titleVisibility: .visible) {
+            Button("破棄して戻る", role: .destructive) {
+                dismiss()
+            }
+            Button("編集を続ける", role: .cancel) {}
+        } message: {
+            Text("保存していない変更は失われます。")
+        }
+        .onAppear {
+            if initialDraftSnapshot == nil {
+                initialDraftSnapshot = draft
+                initialStagedOptionIDs = presentationState.stagedOptionSummaries.map(\.id)
+            }
         }
         .overlay(alignment: .bottom) {
             if let optionToastMessage = presentationState.optionToastMessage {

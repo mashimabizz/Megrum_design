@@ -16,6 +16,8 @@ struct GoodsCollectionScreen: View {
     var adPlacement: AdPlacement?
     var adDisplayContext: AdDisplayContext = AdDisplayContext()
     var onScrollContentTopChange: ((CGFloat) -> Void)? = nil
+    /// 値が変わるとページ先頭までスクロールを戻す（タブ切替時のリセット用）。
+    var scrollToTopToken: Int = 0
     @State var columns = GoodsGridLayout.minimumColumns
     @State var editorRoute: GoodsEditorRoute?
     @State var isShowingUnavailableAlert = false

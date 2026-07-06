@@ -161,8 +161,13 @@ struct BoardThreadDetailPresentationBuilder {
             badReactionCount: max(0, thread.badReactionCount ?? 0),
             viewerReaction: thread.viewerReaction
         )
-        let replyMessages = replyRows(now: now).map { reply in
-            BoardThreadChatMessageDisplay(
+        var previousDate = thread.createdAt
+        let replyMessages = replyRows(now: now).map { reply -> BoardThreadChatMessageDisplay in
+            let separator = ChatTimestampFormatter.startsNewDay(reply.reply.createdAt, after: previousDate)
+                ? ChatTimestampFormatter.daySeparatorText(for: reply.reply.createdAt, now: now)
+                : nil
+            previousDate = reply.reply.createdAt
+            return BoardThreadChatMessageDisplay(
                 target: .reply(reply.reply.id),
                 authorID: reply.reply.authorID,
                 displayName: reply.displayName,
@@ -176,10 +181,13 @@ struct BoardThreadDetailPresentationBuilder {
                 relativeTime: reply.relativeTime,
                 goodReactionCount: reply.goodReactionCount,
                 badReactionCount: reply.badReactionCount,
-                viewerReaction: reply.viewerReaction
+                viewerReaction: reply.viewerReaction,
+                daySeparatorText: separator
             )
         }
-        return [opening] + replyMessages
+        var openingMessage = opening
+        openingMessage.daySeparatorText = ChatTimestampFormatter.daySeparatorText(for: thread.createdAt, now: now)
+        return [openingMessage] + replyMessages
     }
 
     private func participantDisplayName(for userID: UUID, fallbackIndex: Int) -> String {
@@ -231,16 +239,6 @@ struct BoardThreadDetailPresentationBuilder {
     }
 
     private func relativeTime(from date: Date, now: Date) -> String {
-        let elapsed = max(0, now.timeIntervalSince(date))
-        if elapsed < 60 {
-            return "たった今"
-        }
-        if elapsed < 3_600 {
-            return "\(Int(elapsed / 60))分前"
-        }
-        if elapsed < 86_400 {
-            return "\(Int(elapsed / 3_600))時間前"
-        }
-        return date.formatted(date: .numeric, time: .omitted)
+        ChatTimestampFormatter.timeText(for: date, now: now)
     }
 }

@@ -2332,10 +2332,11 @@ final class TradeChatAffordanceTests: XCTestCase {
             calendar: calendar
         )
 
+        // iter1226.299: セパレータは日付のみ（今日/昨日/M/d(曜)）に統一
         XCTAssertEqual(rows.map(\.dayDividerText), [
-            "1/15 (金) · 08:00",
+            "1/15(金)",
             nil,
-            "1/16 (土) · 08:00"
+            "1/16(土)"
         ])
         XCTAssertEqual(rows.map(\.isMine), [false, true, true])
         XCTAssertEqual(rows.map(\.isReadByPartner), [false, true, false])

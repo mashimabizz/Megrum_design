@@ -39,6 +39,7 @@ struct HomeMockGoods: Identifiable, Equatable, Sendable {
     var palette: [Color]
     var symbol: String
     var imageURL: URL?
+    var updatedAt: Date?
 
     static func make(
         _ uuidTail: String,
@@ -136,7 +137,8 @@ struct HomeMockGoods: Identifiable, Equatable, Sendable {
             shape: shape,
             palette: palette,
             symbol: displayTitle.first.map(String.init) ?? "M",
-            imageURL: item.imageURL
+            imageURL: item.imageURL,
+            updatedAt: item.updatedAt
         )
     }
 

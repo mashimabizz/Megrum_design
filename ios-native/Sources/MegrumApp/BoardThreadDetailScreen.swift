@@ -96,7 +96,6 @@ struct BoardThreadDetailScreen: View {
                             .id(BoardThreadScrollAnchor.bottom)
                     }
                     .scrollDismissesKeyboard(.interactively)
-                    .padding(.bottom, 92)
                 }
 
                 if let selectedRemoteImage = photoPresentationState.selectedRemoteImage {

@@ -2,20 +2,9 @@ import Foundation
 import MegrumCore
 
 struct TradeChatTimestampFormatter: Equatable, Sendable {
-    static func dayDividerText(for date: Date, calendar: Calendar = .current) -> String {
-        let components = calendar.dateComponents([.month, .day, .weekday, .hour, .minute], from: date)
-        let weekdaySymbols = ["日", "月", "火", "水", "木", "金", "土"]
-        let weekday = components.weekday.flatMap { weekday -> String? in
-            guard (1...7).contains(weekday) else {
-                return nil
-            }
-            return weekdaySymbols[weekday - 1]
-        } ?? ""
-        let month = components.month ?? 1
-        let day = components.day ?? 1
-        let hour = components.hour ?? 0
-        let minute = components.minute ?? 0
-        return "\(month)/\(day) (\(weekday)) · \(String(format: "%02d:%02d", hour, minute))"
+    /// 日跨ぎセパレータ（今日/昨日/M/d(曜)）。チャット共通の表記に合わせる。
+    static func dayDividerText(for date: Date, now: Date = .now, calendar: Calendar = .current) -> String {
+        ChatTimestampFormatter.daySeparatorText(for: date, now: now, calendar: calendar)
     }
 }
 

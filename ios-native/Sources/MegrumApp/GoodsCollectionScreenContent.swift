@@ -108,8 +108,21 @@ extension GoodsCollectionScreen {
     }
 
     func collectionPageScroll(status: GoodsEntryStatus?) -> some View {
+        ScrollViewReader { proxy in
+            collectionPageScrollBody(status: status)
+                .onChange(of: scrollToTopToken) { _, _ in
+                    proxy.scrollTo(GoodsCollectionScrollAnchor.top, anchor: .top)
+                    resetTopChromeCollapse()
+                }
+        }
+    }
+
+    private func collectionPageScrollBody(status: GoodsEntryStatus?) -> some View {
         ScrollView(.vertical) {
             VStack(alignment: .leading, spacing: CollectionScreenLayoutMetrics.mainStackSpacing) {
+                Color.clear
+                    .frame(height: 0)
+                    .id(GoodsCollectionScrollAnchor.top)
                 GoodsCollectionResultsArea(
                     isShowingLoadingState: isShowingLoadingState,
                     filteredItems: filteredItems(for: status),
@@ -168,4 +181,8 @@ extension GoodsCollectionScreen {
                 : 0
         )
     }
+}
+
+enum GoodsCollectionScrollAnchor {
+    static let top = "goods-collection-top"
 }

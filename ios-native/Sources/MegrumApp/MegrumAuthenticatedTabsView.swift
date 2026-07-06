@@ -61,6 +61,7 @@ struct MegrumAuthenticatedTabsView: View {
     }
 
     private func openDrawer() {
+        MegrumHaptics.buttonTap()
         withAnimation(AppDrawerInteractiveMetrics.animation) {
             showsDrawer = true
         }

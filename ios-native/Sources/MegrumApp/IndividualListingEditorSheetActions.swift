@@ -80,6 +80,34 @@ extension IndividualListingEditorSheet {
         dismiss()
     }
 
+    /// 画面下部の「戻る」：ステップを1つ戻す（交換条件→ほしいもの選択）。
+    func stepBack() {
+        switch presentationState.step {
+        case .exchange:
+            selectStep(.options)
+        case .options:
+            selectStep(.haves)
+        case .haves:
+            requestExit()
+        }
+    }
+
+    /// 画面左上の「戻る」：変更があれば破棄確認を出してから閉じる。
+    func requestExit() {
+        if hasUnsavedChanges {
+            showsDiscardConfirmation = true
+        } else {
+            dismiss()
+        }
+    }
+
+    var hasUnsavedChanges: Bool {
+        if let initialDraftSnapshot, initialDraftSnapshot != draft {
+            return true
+        }
+        return initialStagedOptionIDs != presentationState.stagedOptionSummaries.map(\.id)
+    }
+
     func selectStep(_ targetStep: IndividualListingEditorStep) {
         withAnimation(.smooth(duration: 0.2)) {
             presentationState.selectStep(targetStep)

@@ -17,6 +17,9 @@ struct BoardThreadChatTimeline: View {
             }
 
             ForEach(messages) { message in
+                if let daySeparatorText = message.daySeparatorText {
+                    BoardChatDaySeparatorLabel(text: daySeparatorText)
+                }
                 BoardThreadChatMessageRow(
                     message: message,
                     onReact: { reaction in
@@ -196,21 +199,22 @@ struct BoardMessageReactionBar: View {
     ) -> some View {
         let isSelected = selectedReaction == reaction
         return Button {
-            onSelect(isSelected ? nil : reaction)
+            MegrumHaptics.performButtonTap {
+                onSelect(isSelected ? nil : reaction)
+            }
         } label: {
             HStack(spacing: 4) {
+                // 背景を塗らず、選択時はアイコンの中を塗る
                 Image(systemName: isSelected ? selectedSystemImage : systemImage)
-                    .font(.system(size: 11.5, weight: .black, design: .rounded))
+                    .font(.system(size: 12.5, weight: .black, design: .rounded))
+                    .foregroundStyle(isSelected ? MegrumTheme.lavender : MegrumTheme.muted)
                 Text("\(max(0, count))")
                     .font(.system(size: 10.5, weight: .black, design: .rounded))
+                    .foregroundStyle(isSelected ? MegrumTheme.lavender : MegrumTheme.muted)
             }
-            .foregroundStyle(isSelected ? .white : MegrumTheme.muted)
             .padding(.horizontal, 6)
             .frame(minWidth: 34, minHeight: 24)
-            .background(
-                isSelected ? AnyShapeStyle(MegrumTheme.lavender) : AnyShapeStyle(.clear),
-                in: Capsule()
-            )
+            .contentShape(Capsule())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(reaction == .good ? "グッド" : "バッド")
@@ -391,5 +395,21 @@ struct BoardThreadDetailAvatar: View {
         Text(initial)
             .font(.system(size: size * 0.38, weight: .black, design: .rounded))
             .foregroundStyle(MegrumTheme.lavender)
+    }
+}
+
+/// チャットルームの日付セパレータ（presentation 側で文言決定済み）。
+private struct BoardChatDaySeparatorLabel: View {
+    var text: String
+
+    var body: some View {
+        Text(text)
+            .font(.system(size: 11, weight: .heavy, design: .rounded))
+            .foregroundStyle(MegrumTheme.muted)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 4)
+            .background(MegrumTheme.ink.opacity(0.05), in: Capsule())
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 2)
     }
 }

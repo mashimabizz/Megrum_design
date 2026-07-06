@@ -145,7 +145,7 @@ struct IndividualListingsScreen: View {
                 }
             }
         }
-        .confirmationDialog("この交換条件を削除しますか？", isPresented: Binding(
+        .confirmationDialog("この個別募集を本当に削除しますか？", isPresented: Binding(
             get: { presentationState.hasPendingDelete },
             set: { if !$0 { presentationState.clearPendingDelete() } }
         ), titleVisibility: .visible) {

@@ -87,6 +87,7 @@ struct GoodsGrid: View {
         case .toggleSelection:
             onToggleSelection?(item)
         case .openItem:
+            MegrumHaptics.buttonTap()
             onOpenItem?(item)
         case .openOwnerProfile(let ownerID):
             onOpenOwnerProfile?(ownerID)

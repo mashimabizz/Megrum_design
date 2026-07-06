@@ -238,7 +238,9 @@ struct AddIndividualListingButton: View {
     var action: () -> Void
 
     var body: some View {
-        Button(action: action) {
+        Button {
+            MegrumHaptics.performButtonTap(action)
+        } label: {
             HStack(spacing: 10) {
                 Image(systemName: "plus")
                     .font(.system(size: 17, weight: .black, design: .rounded))

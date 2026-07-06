@@ -54,6 +54,8 @@ public struct GoodsItem: Identifiable, Codable, Hashable, Sendable {
     public var ownerPaymentMethods: [UserPaymentMethod]
     public var ownerPaymentNote: String?
     public var ownerHasMegrumPlus: Bool?
+    /// 譲グッズの登録・更新日（ホーム候補シートの日時表示用）。
+    public var updatedAt: Date?
 
     public init(
         id: UUID,
@@ -84,7 +86,8 @@ public struct GoodsItem: Identifiable, Codable, Hashable, Sendable {
         ownerCompletedTradeCount: Int? = nil,
         ownerPaymentMethods: [UserPaymentMethod] = [],
         ownerPaymentNote: String? = nil,
-        ownerHasMegrumPlus: Bool? = nil
+        ownerHasMegrumPlus: Bool? = nil,
+        updatedAt: Date? = nil
     ) {
         let normalizedQuantity = max(0, quantity)
         let normalizedLockedQuantity = max(0, lockedQuantity)
@@ -117,6 +120,7 @@ public struct GoodsItem: Identifiable, Codable, Hashable, Sendable {
         self.ownerPaymentMethods = UserPaymentMethod.normalized(ownerPaymentMethods)
         self.ownerPaymentNote = ownerPaymentNote
         self.ownerHasMegrumPlus = ownerHasMegrumPlus
+        self.updatedAt = updatedAt
     }
 
     public var masterDisplayName: String? {

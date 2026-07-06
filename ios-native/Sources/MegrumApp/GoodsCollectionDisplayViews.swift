@@ -98,7 +98,9 @@ struct AddGoodsButton: View {
     var action: () -> Void
 
     var body: some View {
-        Button(action: action) {
+        Button {
+            MegrumHaptics.performButtonTap(action)
+        } label: {
             Image(systemName: "plus")
                 .font(.system(size: 26, weight: .heavy, design: .rounded))
                 .foregroundStyle(.white)

@@ -84,11 +84,13 @@ struct IndividualListingsContent: View {
                         ScrollFriendlyHorizontalPanView(
                             isPanEnabled: listings.count > 1 || onSwipeBackFromFirst != nil,
                             onTap: nil,
+                            passesTouchesThrough: true,
                             onChanged: { _ in },
                             onEnded: { _, projectedWidth in
                                 handleListingSwipe(projectedWidth: projectedWidth)
                             }
                         )
+                        .allowsHitTesting(false)
                     }
                     #endif
                 }

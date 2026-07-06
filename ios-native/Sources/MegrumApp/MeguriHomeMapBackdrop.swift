@@ -184,6 +184,7 @@ struct MeguriHomeMapBackdrop: View {
                             case .single(.groom(let groom)):
                                 Annotation("", coordinate: coordinate) {
                                     Button {
+                                        MegrumHaptics.buttonTap()
                                         onSelectGroom(
                                             groom,
                                             sourceAnchor(for: groom, in: proxy, containerSize: geometry.size)
@@ -209,6 +210,7 @@ struct MeguriHomeMapBackdrop: View {
                             case .single(.thread(let thread)):
                                 Annotation("", coordinate: coordinate) {
                                     Button {
+                                        MegrumHaptics.buttonTap()
                                         onSelectThread(thread)
                                     } label: {
                                         MeguriPinConditionalPopIn(popsIn: displayed.popsIn) {
