@@ -8,6 +8,9 @@ struct HomeDiscoverySheetView: View {
     var appState: MegrumAppState?
     var viewerOfferGoods: [HomeMockGoods] = []
     var presentationContext: HomeDiscoverySheetPresentationContext = .primary
+    /// 「求められているグッズ」画像タップ経由の画面（とその入れ子）でのみ
+    /// 推し以外でマッチ を表示する。
+    var allowsNonOshiOfferSection: Bool = false
     var onClose: (() -> Void)? = nil
     var onAddExtraCandidate: (HomeExtraHitPayload) -> Void = { _ in }
     var onAddExtraProposalSelection: (HomeDiscoveryProposalSelection) -> Void = { _ in }
@@ -15,12 +18,20 @@ struct HomeDiscoverySheetView: View {
     var onStartProposal: (HomeDiscoveryProposalSelection) -> Void = { _ in }
     @State private var presentationState = HomeDiscoverySheetPresentationState()
 
+    private var sheetIsHavesLookup: Bool {
+        if case .havesLookup = sheet {
+            return true
+        }
+        return false
+    }
+
     var body: some View {
         HomeDiscoverySheetContent(
             sheet: sheet,
             viewerOfferGoods: viewerOfferGoods,
             addedExtraCandidateIDs: addedExtraCandidateIDs,
             presentationContext: presentationContext,
+            allowsNonOshiOfferSection: allowsNonOshiOfferSection || sheetIsHavesLookup,
             copyingWishGoodsID: presentationState.copyingWishGoodsID,
             onClose: onClose,
             onOpenOwnerProfile: openOwnerProfile,
@@ -44,6 +55,7 @@ struct HomeDiscoverySheetView: View {
                         appState: appState,
                         viewerOfferGoods: viewerOfferGoods,
                         presentationContext: .additionalCandidate,
+                        allowsNonOshiOfferSection: allowsNonOshiOfferSection || sheetIsHavesLookup,
                         onClose: {
                             presentationState.closeNestedPresentation()
                         },

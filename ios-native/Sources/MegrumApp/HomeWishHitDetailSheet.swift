@@ -4,6 +4,8 @@ import MegrumDesign
 import SwiftUI
 
 struct HomeWishHitDetailSheet: View {
+    /// 「求められているグッズ」経由の画面でのみ 推し以外でマッチ を表示する。
+    var showsNonOshiOfferSection: Bool = false
     var selection: HomeDiscoverySheetPayload
     var viewerOfferGoods: [HomeMockGoods]
     var addedExtraCandidateIDs: Set<UUID>
@@ -73,8 +75,9 @@ struct HomeWishHitDetailSheet: View {
                 }
             }
 
-            // 推しの登録に紐づかない手持ちグッズも提示できるようにする（項目16）。
-            if !otherOfferGoods.isEmpty {
+            // 推しの登録に紐づかない手持ちグッズの提示は、
+            // 「求められているグッズ」画像タップ経由の画面でのみ出す。
+            if showsNonOshiOfferSection, !otherOfferGoods.isEmpty {
                 HomeSheetSectionTitle(
                     systemName: "sparkles",
                     title: "推し以外でマッチ"
@@ -120,9 +123,9 @@ struct HomeWishHitDetailSheet: View {
         return viewerOfferGoods.filter { !matchedIDs.contains($0.id) }
     }
 
-    /// 選択・打診処理は「推しマッチ＋推し以外」を連結した1つの配列として扱う。
+    /// 選択・打診処理は「推しマッチ＋（表示時のみ）推し以外」を連結した1つの配列として扱う。
     private var offerGoods: [HomeMockGoods] {
-        matchedOfferGoods + otherOfferGoods
+        showsNonOshiOfferSection ? matchedOfferGoods + otherOfferGoods : matchedOfferGoods
     }
 
     private func prepareInitialSelection() {

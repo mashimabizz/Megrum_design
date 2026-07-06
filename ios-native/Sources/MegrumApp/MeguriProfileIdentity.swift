@@ -13,64 +13,27 @@ struct MeguriProfileIdentity: Equatable, Sendable {
 enum MeguriProfileIdentityResolver {
     static func identity(
         for userID: UUID,
-        meguriProfile: MeguriProfile?,
+        meguriProfile _: MeguriProfile?,
         publicProfile: PublicUserProfile?,
         fallbackName: String? = nil,
         fallbackHandle: String? = nil,
         fallbackAvatarURL: URL? = nil
     ) -> MeguriProfileIdentity {
         // iter1226.296: めぐりプロフィール（カスタム名/アイコン）は廃止。
-        // グルーム・めぐりメッセージは常にグッズ交換側のプロフィールを使う。
+        // グルーム・めぐりメッセージは常にグッズ交換側のプロフィールだけを使い、
+        // 旧めぐりプロフィールのアイコンには一切フォールバックしない。
         return MeguriProfileIdentity(
             userID: userID,
             displayName: publicProfile?.profile.displayName.nilIfBlank
                 ?? fallbackName?.nilIfBlank
-                ?? meguriProfile?.displayName.nilIfBlank
                 ?? "ユーザー",
             handle: publicProfile?.profile.handle.nilIfBlank ?? fallbackHandle?.nilIfBlank,
             avatarID: nil,
-            avatarURL: publicProfile?.profile.avatarURL ?? fallbackAvatarURL ?? meguriProfile?.avatarURL,
+            avatarURL: publicProfile?.profile.avatarURL ?? fallbackAvatarURL,
             usesPublicProfile: true
         )
     }
 
-    private static func legacyIdentity(
-        for userID: UUID,
-        meguriProfile: MeguriProfile?,
-        publicProfile: PublicUserProfile?,
-        fallbackName: String? = nil,
-        fallbackHandle: String? = nil,
-        fallbackAvatarURL: URL? = nil
-    ) -> MeguriProfileIdentity {
-        if meguriProfile?.usesPublicProfile == true {
-            return MeguriProfileIdentity(
-                userID: userID,
-                displayName: publicProfile?.profile.displayName.nilIfBlank
-                    ?? fallbackName?.nilIfBlank
-                    ?? meguriProfile?.displayName.nilIfBlank
-                    ?? "ユーザー",
-                handle: publicProfile?.profile.handle.nilIfBlank ?? fallbackHandle?.nilIfBlank,
-                avatarID: nil,
-                avatarURL: publicProfile?.profile.avatarURL ?? fallbackAvatarURL ?? meguriProfile?.avatarURL,
-                usesPublicProfile: true
-            )
-        }
-
-        return MeguriProfileIdentity(
-            userID: userID,
-            displayName: meguriProfile?.displayName.nilIfBlank
-                ?? fallbackName?.nilIfBlank
-                ?? publicProfile?.profile.displayName.nilIfBlank
-                ?? "めぐりユーザー",
-            handle: meguriProfile == nil
-                ? (publicProfile?.profile.handle.nilIfBlank ?? fallbackHandle?.nilIfBlank)
-                : nil,
-            avatarID: meguriProfile?.avatarID,
-            avatarURL: meguriProfile?.avatarURL
-                ?? (meguriProfile == nil ? (publicProfile?.profile.avatarURL ?? fallbackAvatarURL) : nil),
-            usesPublicProfile: false
-        )
-    }
 }
 
 extension MegrumAppState {

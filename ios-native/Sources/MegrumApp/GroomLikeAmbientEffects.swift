@@ -99,35 +99,60 @@ private struct GroomRisingHeart: View {
     }
 }
 
-/// 自分のグルームにいいねが付いている時、いいねしたユーザーのアイコン＋ハートが
-/// 下からふわふわ浮かんでくるレイヤー（項目12。コメント本文は出さない）。
+/// 自分のグルームにいいねが付いている時、いいねしたユーザーを1人ずつ見せるレイヤー。
+/// 左下にユーザーアイコン（右下にハート付き）がゆっくり現れて約1秒とどまり、
+/// ゆっくり上へ昇りながらフェードアウトしていく。
 struct GroomLikeFloatingLikersLayer: View {
     var groomID: UUID
     var likers: [GroomFloatingLiker]
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var visibleLikers: [GroomFloatingLiker] = []
+    @State private var currentLiker: GroomFloatingLiker?
+    @State private var phase: LikerPhase = .hidden
+
+    private enum LikerPhase {
+        case hidden
+        case visible
+        case leaving
+    }
 
     var body: some View {
-        GeometryReader { proxy in
-            ZStack {
-                ForEach(Array(visibleLikers.enumerated()), id: \.element.id) { index, liker in
-                    GroomFloatingLikerBubble(
-                        liker: liker,
-                        index: index,
-                        containerSize: proxy.size
-                    )
-                }
+        ZStack(alignment: .bottomLeading) {
+            if let currentLiker {
+                GroomFloatingLikerBadge(liker: currentLiker)
+                    .opacity(phase == .visible ? 1 : 0)
+                    .offset(y: phase == .leaving ? -110 : (phase == .hidden ? 10 : 0))
+                    .padding(.leading, 20)
+                    .padding(.bottom, 130)
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
         .allowsHitTesting(false)
         .task(id: groomID) {
-            visibleLikers = []
+            currentLiker = nil
+            phase = .hidden
             guard !reduceMotion, !likers.isEmpty else {
                 return
             }
-            try? await Task.sleep(nanoseconds: 550_000_000)
-            visibleLikers = Array(likers.prefix(5))
+            try? await Task.sleep(nanoseconds: 600_000_000)
+            for liker in likers.prefix(6) {
+                if Task.isCancelled { return }
+                currentLiker = liker
+                phase = .hidden
+                // ゆっくり現れる
+                withAnimation(.easeOut(duration: 0.7)) {
+                    phase = .visible
+                }
+                try? await Task.sleep(nanoseconds: 1_700_000_000)
+                if Task.isCancelled { return }
+                // ゆっくり上へ昇りながら消える
+                withAnimation(.easeIn(duration: 1.1)) {
+                    phase = .leaving
+                }
+                try? await Task.sleep(nanoseconds: 1_200_000_000)
+                currentLiker = nil
+                try? await Task.sleep(nanoseconds: 350_000_000)
+            }
         }
     }
 }
@@ -139,53 +164,29 @@ struct GroomFloatingLiker: Identifiable, Equatable {
     var initial: String
 }
 
-private struct GroomFloatingLikerBubble: View {
+/// いいねしたユーザーのアイコン＋右下ハート（グッズ交換用プロフィールのアイコンを使用）。
+private struct GroomFloatingLikerBadge: View {
     let liker: GroomFloatingLiker
-    let index: Int
-    let containerSize: CGSize
-
-    @State private var isRisen = false
-    @State private var wobble = false
-
-    private var xPosition: CGFloat {
-        // 左下寄りから順にずらして出す。
-        let ratios: [CGFloat] = [0.16, 0.26, 0.12, 0.3, 0.2]
-        return containerSize.width * ratios[index % ratios.count]
-    }
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
             BoardThreadDetailAvatar(
-                avatarID: liker.avatarID,
+                avatarID: nil,
                 imageURL: liker.avatarURL,
                 initial: liker.initial,
-                size: 34
+                size: 46
             )
             .overlay {
-                Circle().stroke(.white.opacity(0.8), lineWidth: 1.5)
+                Circle().stroke(.white.opacity(0.85), lineWidth: 1.5)
             }
 
             Image(systemName: "heart.fill")
-                .font(.system(size: 11, weight: .black))
+                .font(.system(size: 12, weight: .black))
                 .foregroundStyle(.white)
-                .padding(3)
-                .background(MegrumTheme.pink, in: Circle())
-                .offset(x: 5, y: 5)
+                .padding(3.5)
+                .background(Color.red, in: Circle())
+                .offset(x: 6, y: 6)
         }
-        .offset(x: wobble ? 7 : -7)
-        .position(
-            x: xPosition,
-            y: isRisen ? containerSize.height * 0.5 : containerSize.height - 60
-        )
-        .opacity(isRisen ? 0 : 1)
-        .onAppear {
-            let delay = Double(index) * 0.55
-            withAnimation(.easeOut(duration: 2.4).delay(delay)) {
-                isRisen = true
-            }
-            withAnimation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true).delay(delay)) {
-                wobble = true
-            }
-        }
+        .shadow(color: .black.opacity(0.3), radius: 8, y: 3)
     }
 }

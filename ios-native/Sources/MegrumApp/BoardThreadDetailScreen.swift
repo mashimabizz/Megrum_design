@@ -65,6 +65,8 @@ struct BoardThreadDetailScreen: View {
     }
 
     @State private var headerChromeHeight: CGFloat = 120
+    @State private var isHeaderRowCollapsed = false
+    @State private var chatHeaderCollapseTracker = ChatHeaderCollapseTracker()
 
     var body: some View {
         let presentation = detailPresentation
@@ -74,9 +76,11 @@ struct BoardThreadDetailScreen: View {
                 MegrumTheme.canvas
                     .ignoresSafeArea()
 
-                // ホームと同様：ヘッダーは半透明ガラスで浮かせ、チャットはその下を
-                // すべって透ける。下方向へスクロールしたらヘッダーを隠す。
-                MegrumCollapsingTopChromeContainer {
+                // ヘッダーは半透明ガラスで浮かせ、チャットはその下をすべって透ける。
+                // 下方向へスクロールしたらルーム名称の行だけ隠す（バナーは残す）。
+                // 一度隠れたらスクロールを止めても隠れたままで、明確に上へ
+                // スクロールした時だけ戻る（バウンスでは戻らない）。
+                ZStack(alignment: .top) {
                     ScrollView(showsIndicators: false) {
                         Color.clear
                             .frame(height: headerChromeHeight + 6)
@@ -124,7 +128,7 @@ struct BoardThreadDetailScreen: View {
                     }
                     .coordinateSpace(name: MegrumScrollContentTopSpace.name)
                     .scrollDismissesKeyboard(.interactively)
-                } chrome: { isCollapsed in
+
                     VStack(spacing: 0) {
                         BoardThreadDetailHeader(
                             title: currentThread.title,
@@ -133,6 +137,10 @@ struct BoardThreadDetailScreen: View {
                         )
                         .padding(.horizontal, 20)
                         .padding(.top, 10)
+                        // ルーム名称の行だけ折りたたむ（バナーは常時表示）。
+                        .frame(height: isHeaderRowCollapsed ? 0 : nil, alignment: .bottom)
+                        .clipped()
+                        .opacity(isHeaderRowCollapsed ? 0 : 1)
 
                         AdBannerSlot(
                             placement: .boardRoomHeaderBanner,
@@ -151,10 +159,26 @@ struct BoardThreadDetailScreen: View {
                     .onGeometryChange(for: CGFloat.self) { proxy in
                         proxy.size.height
                     } action: { newValue in
-                        headerChromeHeight = newValue
+                        // コンテンツ上部の余白は展開時の高さ基準で固定する
+                        //（収納で余白が動くとスクロール位置が跳ねるため）。
+                        if !isHeaderRowCollapsed {
+                            headerChromeHeight = newValue
+                        }
                     }
-                    .offset(y: isCollapsed ? -(headerChromeHeight + 80) : 0)
-                    .opacity(isCollapsed ? 0 : 1)
+                }
+                .onPreferenceChange(MegrumScrollContentTopPreferenceKey.self) { contentTop in
+                    MainActor.assumeIsolated {
+                        let next = chatHeaderCollapseTracker.updatedCollapsedState(
+                            contentTop: contentTop,
+                            isCollapsed: isHeaderRowCollapsed
+                        )
+                        guard next != isHeaderRowCollapsed else {
+                            return
+                        }
+                        withAnimation(.snappy(duration: 0.22)) {
+                            isHeaderRowCollapsed = next
+                        }
+                    }
                 }
 
                 if let selectedRemoteImage = photoPresentationState.selectedRemoteImage {

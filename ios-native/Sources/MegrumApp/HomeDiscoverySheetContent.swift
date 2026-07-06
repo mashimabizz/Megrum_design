@@ -7,6 +7,7 @@ struct HomeDiscoverySheetContent: View {
     let viewerOfferGoods: [HomeMockGoods]
     let addedExtraCandidateIDs: Set<UUID>
     let presentationContext: HomeDiscoverySheetPresentationContext
+    let allowsNonOshiOfferSection: Bool
     let copyingWishGoodsID: UUID?
     let onClose: (() -> Void)?
     let onOpenOwnerProfile: (UUID) -> Void
@@ -32,6 +33,7 @@ struct HomeDiscoverySheetContent: View {
             )
         case .wishHit(let payload):
             HomeWishHitDetailSheet(
+                showsNonOshiOfferSection: allowsNonOshiOfferSection,
                 selection: payload,
                 viewerOfferGoods: viewerOfferGoods,
                 addedExtraCandidateIDs: addedExtraCandidateIDs,
@@ -66,6 +68,7 @@ struct HomeDiscoverySheetContent: View {
                 )
             case .wish:
                 HomeWishHitDetailSheet(
+                    showsNonOshiOfferSection: allowsNonOshiOfferSection,
                     selection: payload.sheetPayload,
                     viewerOfferGoods: viewerOfferGoods,
                     addedExtraCandidateIDs: addedExtraCandidateIDs,

@@ -193,46 +193,88 @@ struct MapChatBubbleShape: Shape {
     var tailOnTrailing: Bool
 
     func path(in rect: CGRect) -> Path {
+        // しっぽ込みの輪郭を1本のパスで描く（サブパスの重なりを使わない）。
+        // 別サブパスで三角を重ねると巻き方向次第で nonzero 塗りが相殺されて
+        // 本体としっぽの間に切れ目が出るため（左側出現時の形崩れの原因）、
+        // 底辺の途中にしっぽを織り込んだ完全ミラーの単一輪郭にする。
         let tailHeight = Self.tailHeight
         let tailWidth = Self.tailWidth
+        let radius = cornerRadius
         let body = CGRect(
             x: rect.minX,
             y: rect.minY,
             width: rect.width,
             height: rect.height - tailHeight
         )
-        var path = Path(roundedRect: body, cornerRadius: cornerRadius, style: .continuous)
 
-        var tail = Path()
+        var path = Path()
+        path.move(to: CGPoint(x: body.minX + radius, y: body.minY))
+        // 上辺 → 右上角
+        path.addLine(to: CGPoint(x: body.maxX - radius, y: body.minY))
+        path.addArc(
+            center: CGPoint(x: body.maxX - radius, y: body.minY + radius),
+            radius: radius,
+            startAngle: .degrees(-90),
+            endAngle: .degrees(0),
+            clockwise: false
+        )
+        // 右辺 → 右下角
+        path.addLine(to: CGPoint(x: body.maxX, y: body.maxY - radius))
+        path.addArc(
+            center: CGPoint(x: body.maxX - radius, y: body.maxY - radius),
+            radius: radius,
+            startAngle: .degrees(0),
+            endAngle: .degrees(90),
+            clockwise: false
+        )
+        // 底辺（右→左）。trailing 側のしっぽはここに織り込む。
         if tailOnTrailing {
-            let baseEnd = body.maxX - cornerRadius * 0.55
+            let baseEnd = body.maxX - radius - 1
             let baseStart = baseEnd - tailWidth
             let tip = CGPoint(x: body.maxX + 2, y: rect.maxY)
-            tail.move(to: CGPoint(x: baseStart, y: body.maxY - 1))
-            tail.addQuadCurve(
+            path.addLine(to: CGPoint(x: baseEnd, y: body.maxY))
+            path.addQuadCurve(
                 to: tip,
-                control: CGPoint(x: baseStart + tailWidth * 0.55, y: body.maxY + tailHeight * 0.55)
+                control: CGPoint(x: baseEnd + 1, y: body.maxY + tailHeight * 0.45)
             )
-            tail.addQuadCurve(
-                to: CGPoint(x: baseEnd, y: body.maxY - 1),
-                control: CGPoint(x: baseEnd - tailWidth * 0.12, y: body.maxY + tailHeight * 0.32)
-            )
-        } else {
-            let baseStart = body.minX + cornerRadius * 0.55
-            let baseEnd = baseStart + tailWidth
-            let tip = CGPoint(x: body.minX - 2, y: rect.maxY)
-            tail.move(to: CGPoint(x: baseEnd, y: body.maxY - 1))
-            tail.addQuadCurve(
-                to: tip,
-                control: CGPoint(x: baseEnd - tailWidth * 0.55, y: body.maxY + tailHeight * 0.55)
-            )
-            tail.addQuadCurve(
-                to: CGPoint(x: baseStart, y: body.maxY - 1),
-                control: CGPoint(x: baseStart + tailWidth * 0.12, y: body.maxY + tailHeight * 0.32)
+            path.addQuadCurve(
+                to: CGPoint(x: baseStart, y: body.maxY),
+                control: CGPoint(x: baseStart + tailWidth * 0.3, y: body.maxY + tailHeight * 0.5)
             )
         }
-        tail.closeSubpath()
-        path.addPath(tail)
+        if !tailOnTrailing {
+            let baseStart = body.minX + radius + 1
+            let baseEnd = baseStart + tailWidth
+            let tip = CGPoint(x: body.minX - 2, y: rect.maxY)
+            path.addLine(to: CGPoint(x: baseEnd, y: body.maxY))
+            path.addQuadCurve(
+                to: tip,
+                control: CGPoint(x: baseEnd - tailWidth * 0.3, y: body.maxY + tailHeight * 0.5)
+            )
+            path.addQuadCurve(
+                to: CGPoint(x: baseStart, y: body.maxY),
+                control: CGPoint(x: baseStart - 1, y: body.maxY + tailHeight * 0.45)
+            )
+        }
+        // 左下角
+        path.addLine(to: CGPoint(x: body.minX + radius, y: body.maxY))
+        path.addArc(
+            center: CGPoint(x: body.minX + radius, y: body.maxY - radius),
+            radius: radius,
+            startAngle: .degrees(90),
+            endAngle: .degrees(180),
+            clockwise: false
+        )
+        // 左辺 → 左上角
+        path.addLine(to: CGPoint(x: body.minX, y: body.minY + radius))
+        path.addArc(
+            center: CGPoint(x: body.minX + radius, y: body.minY + radius),
+            radius: radius,
+            startAngle: .degrees(180),
+            endAngle: .degrees(270),
+            clockwise: false
+        )
+        path.closeSubpath()
         return path
     }
 }

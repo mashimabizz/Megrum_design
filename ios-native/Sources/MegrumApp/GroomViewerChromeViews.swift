@@ -337,19 +337,20 @@ private struct GroomViewerLikeButton: View {
             }
             action()
         } label: {
-            ZStack {
-                if presentationState.isBursting {
-                    GroomLikeBurst(token: presentationState.burstToken)
-                        .allowsHitTesting(false)
+            // バーストは overlay（レイアウト非干渉）にして、いいね時に
+            // アイコン列が左へ動く見た目のズレを起こさない。
+            Image(systemName: isLiked ? "heart.fill" : "heart")
+                .font(.system(size: 30, weight: .heavy))
+                .foregroundStyle(isLiked ? Color.red : GroomViewerEngagementStyle.idleIconColor)
+                .shadow(color: .black.opacity(0.35), radius: 6, y: 1)
+                .scaleEffect(presentationState.likeIconScale)
+                .frame(width: 48, height: 44)
+                .overlay {
+                    if presentationState.isBursting {
+                        GroomLikeBurst(token: presentationState.burstToken)
+                            .allowsHitTesting(false)
+                    }
                 }
-
-                Image(systemName: isLiked ? "heart.fill" : "heart")
-                    .font(.system(size: 30, weight: .heavy))
-                    .foregroundStyle(isLiked ? MegrumTheme.pink : GroomViewerEngagementStyle.idleIconColor)
-                    .shadow(color: .black.opacity(0.35), radius: 6, y: 1)
-                    .scaleEffect(presentationState.likeIconScale)
-                    .frame(width: 48, height: 44)
-            }
         }
         .buttonStyle(.plain)
         .opacity(isEnabled ? 1 : 0.82)
