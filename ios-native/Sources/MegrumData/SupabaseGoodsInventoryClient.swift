@@ -68,7 +68,10 @@ public final class SupabaseGoodsInventoryClient: @unchecked Sendable {
             )
         }
         let megrumPlusUserIDs = try await loadMegrumPlusUserIDsIfNeeded(userIDs: rows.map(\.userId))
-        return try await goodsItemsWithTags(from: rows, megrumPlusUserIDs: megrumPlusUserIDs)
+        let items = try await goodsItemsWithTags(from: rows, megrumPlusUserIDs: megrumPlusUserIDs)
+        // 検索結果の行に相手のユーザー名・アバターを表示するため、オーナー要約を付加する。
+        let owners = (try? await loadGoodsOwnerSummaries(userIDs: rows.map(\.userId))) ?? [:]
+        return applyingOwnerSummaries(items, owners: owners)
     }
 
     public func loadPublicTradeGoods(userID: UUID, limit: Int = 60) async throws -> [GoodsItem] {

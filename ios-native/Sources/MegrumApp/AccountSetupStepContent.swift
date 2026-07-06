@@ -67,7 +67,7 @@ struct AccountSetupStepContent: View {
                 focusCase: .handle,
                 leadingText: "@",
                 isHandleField: true,
-                footnote: "半角英数字と _ の3〜20文字で設定してください。",
+                footnote: "半角英数字と _ の3〜20文字で設定してください。ユーザーIDは登録後に変更できません。",
                 errorMessage: setupErrorMessage,
                 onClearError: onClearError
             )

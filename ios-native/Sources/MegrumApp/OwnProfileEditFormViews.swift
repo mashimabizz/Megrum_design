@@ -60,29 +60,17 @@ struct OwnProfileEditProfileFields: View {
         )
     }
 
-    @ViewBuilder
+    /// ユーザーID（ハンドル）は初回登録から変更できないため、表示のみにする。
     private var handleField: some View {
-#if os(iOS)
-        LabeledContent("ユーザーネーム") {
-            TextField("ユーザーネーム", text: $draft.handle)
-                .multilineTextAlignment(.trailing)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .focused($focusedField, equals: .handle)
-                .submitLabel(.next)
-                .onSubmit {
-                    focusedField = .bio
-                }
+        LabeledContent("ユーザーID") {
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(draft.handle.isEmpty ? "未設定" : "@\(draft.handle)")
+                    .foregroundStyle(.secondary)
+                Text("登録後は変更できません")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
         }
-#else
-        LabeledContent("ユーザーネーム") {
-            TextField("ユーザーネーム", text: $draft.handle)
-                .focused($focusedField, equals: .handle)
-                .onSubmit {
-                    focusedField = .bio
-                }
-        }
-#endif
     }
 
     @ViewBuilder
@@ -94,7 +82,7 @@ struct OwnProfileEditProfileFields: View {
                 .focused($focusedField, equals: .displayName)
                 .submitLabel(.next)
                 .onSubmit {
-                    focusedField = .handle
+                    focusedField = .bio
                 }
         }
 #else
@@ -102,7 +90,7 @@ struct OwnProfileEditProfileFields: View {
             TextField("名前", text: $draft.displayName)
                 .focused($focusedField, equals: .displayName)
                 .onSubmit {
-                    focusedField = .handle
+                    focusedField = .bio
                 }
         }
 #endif

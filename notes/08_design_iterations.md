@@ -4,6 +4,42 @@
 
 ---
 
+## イテレーション1226.304：検索結果のユーザー名表示＋ユーザーID変更不可化
+
+### 背景・問題意識
+オーナー指摘：①ホーム経由の検索結果でユーザー名（あいこにゃ等）が「ユーザー」のまま表示されない ②ユーザーIDは初回登録から変更できない仕様にし、オンボーディングにも注意書きを入れたい。
+
+### 変更内容
+
+#### ① 検索結果のオーナー情報付加（`SupabaseGoodsInventoryClient(+Queries).swift`）
+- 原因：検索の goods_inventory select にプロフィール埋め込みがなく、GoodsItem の owner 系フィールドが常に nil だった（goods_inventory→users のFKが無いため PostgREST 埋め込みも不可）
+- `loadGoodsOwnerSummaries`（users を id in.(...) で1リクエスト取得）を追加し、searchGoods の結果へ表示名・ハンドル・アバターURLを付加。失敗しても検索自体は成立（try?）
+- シミュレータで「はる」「みち」の名前＋アバター表示を確認
+
+#### ② ユーザーID（handle）の変更不可化
+- **DB**：migration `20260706180000_lock_user_handle_after_set.sql`（push済み）— users.handle は未設定→設定の1回のみ許可、以後の変更は BEFORE UPDATE トリガで拒否
+- **プロフィール編集**（`OwnProfileEditFormViews.swift`）：ユーザーID欄を表示のみ（@handle＋「登録後は変更できません」キャプション）に変更。名前欄の次フォーカスは自己紹介へ
+- **オンボーディング**（`AccountSetupStepContent.swift`）：ユーザーID登録ステップの footnote に「ユーザーIDは登録後に変更できません。」を追記
+
+### 影響範囲
+- 検索結果一覧・プロフィール編集・新規登録オンボーディング・users テーブル更新経路
+
+### 確認方法
+- シミュレータ search ルート：検索結果行にユーザー名・アバターが表示される（スクショ確認済み）
+- swift test（全件）
+
+### セルフレビュー結果
+- ✅ 表示名は display_name → handle の順でフォールバック（ホーム行と同じ規則）
+- ✅ handle 固定はUI・DB両面で強制（APIから直接更新しても拒否される）
+- ⚠️ 用語：アプリ内表記は「ユーザーID」（オンボーディングと編集画面で統一）。glossary への追記は不要（既存用語）
+
+### 関連ファイル
+- `ios-native/Sources/MegrumData/SupabaseGoodsInventoryClientQueries.swift`
+- `ios-native/Sources/MegrumApp/OwnProfileEditFormViews.swift`
+- `supabase/migrations/20260706180000_lock_user_handle_after_set.sql`
+
+---
+
 ## イテレーション1226.303：FBフィックス（スクロール/タップ不能・グルームかくっ・自分いいね）
 
 ### 背景・問題意識

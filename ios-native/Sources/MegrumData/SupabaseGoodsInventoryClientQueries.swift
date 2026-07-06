@@ -94,3 +94,54 @@ extension SupabaseGoodsInventoryClient {
         ]
     }
 }
+
+/// 検索結果に相手の表示名・アバターを載せるためのオーナー要約。
+struct GoodsOwnerSummaryRow: Decodable, Sendable {
+    static let select = "id,handle,display_name,avatar_url"
+
+    var id: UUID
+    var handle: String?
+    var displayName: String?
+    var avatarUrl: String?
+}
+
+extension SupabaseGoodsInventoryClient {
+    /// user_id in.(...) でオーナーの表示名・ハンドル・アバターをまとめて取得する。
+    /// 表示補助なので失敗しても検索自体は成立させる（呼び出し側で try? する）。
+    func loadGoodsOwnerSummaries(userIDs: [UUID]) async throws -> [UUID: GoodsOwnerSummaryRow] {
+        let uniqueIDs = Set(userIDs)
+        guard !uniqueIDs.isEmpty else {
+            return [:]
+        }
+        let idList = uniqueIDs.map { $0.uuidString.lowercased() }.sorted().joined(separator: ",")
+        let rows: [GoodsOwnerSummaryRow] = try await client.fetchRows(
+            from: "users",
+            select: GoodsOwnerSummaryRow.select,
+            queryItems: [URLQueryItem(name: "id", value: "in.(\(idList))")]
+        )
+        return Dictionary(rows.map { ($0.id, $0) }) { first, _ in first }
+    }
+
+    /// GoodsItem の owner 系フィールドへオーナー要約を反映する。
+    func applyingOwnerSummaries(
+        _ items: [GoodsItem],
+        owners: [UUID: GoodsOwnerSummaryRow]
+    ) -> [GoodsItem] {
+        guard !owners.isEmpty else {
+            return items
+        }
+        return items.map { item in
+            guard let owner = owners[item.ownerID] else {
+                return item
+            }
+            var item = item
+            let displayName = owner.displayName?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let handle = owner.handle?.trimmingCharacters(in: .whitespacesAndNewlines)
+            item.ownerDisplayName = (displayName?.isEmpty == false ? displayName : nil)
+                ?? (handle?.isEmpty == false ? handle : nil)
+            item.ownerHandle = handle?.isEmpty == false ? handle : nil
+            item.ownerAvatarURL = owner.avatarUrl.flatMap(URL.init(string:))
+            return item
+        }
+    }
+}
