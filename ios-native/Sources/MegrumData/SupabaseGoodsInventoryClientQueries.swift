@@ -46,16 +46,29 @@ extension SupabaseGoodsInventoryClient {
         if !query.isEmpty {
             queryItems.append(URLQueryItem(name: "title", value: "ilike.*\(query)*"))
         }
-        if let groupID = input.groupID {
-            queryItems.append(URLQueryItem(name: "group_id", value: "eq.\(groupID.uuidString.lowercased())"))
+        if let groupFilter = idFilterValue(input.groupIDs) {
+            queryItems.append(URLQueryItem(name: "group_id", value: groupFilter))
         }
-        if let memberID = input.memberID {
-            queryItems.append(URLQueryItem(name: "character_id", value: "eq.\(memberID.uuidString.lowercased())"))
+        if let memberFilter = idFilterValue(input.memberIDs) {
+            queryItems.append(URLQueryItem(name: "character_id", value: memberFilter))
         }
-        if let goodsTypeID = input.goodsTypeID {
-            queryItems.append(URLQueryItem(name: "goods_type_id", value: "eq.\(goodsTypeID.uuidString.lowercased())"))
+        if let goodsTypeFilter = idFilterValue(input.goodsTypeIDs) {
+            queryItems.append(URLQueryItem(name: "goods_type_id", value: goodsTypeFilter))
         }
         return queryItems
+    }
+
+    /// 単数は eq、複数は in.(...)（項目内OR）。
+    private func idFilterValue(_ ids: [UUID]) -> String? {
+        let lowercased = ids.map { $0.uuidString.lowercased() }
+        switch lowercased.count {
+        case 0:
+            return nil
+        case 1:
+            return "eq.\(lowercased[0])"
+        default:
+            return "in.(\(lowercased.sorted().joined(separator: ",")))"
+        }
     }
 
     func publicTradeGoodsQueryItems(

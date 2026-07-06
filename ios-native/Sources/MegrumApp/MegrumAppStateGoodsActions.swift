@@ -111,6 +111,20 @@ extension MegrumAppState {
         memberID: UUID? = nil,
         goodsTypeID: UUID? = nil
     ) async {
+        await searchGoods(
+            query: query,
+            groupIDs: groupID.map { [$0] } ?? [],
+            memberIDs: memberID.map { [$0] } ?? [],
+            goodsTypeIDs: goodsTypeID.map { [$0] } ?? []
+        )
+    }
+
+    public func searchGoods(
+        query: String,
+        groupIDs: [UUID],
+        memberIDs: [UUID] = [],
+        goodsTypeIDs: [UUID] = []
+    ) async {
         let requestID = UUID()
         activeSearchRequestID = requestID
         isSearchingGoods = true
@@ -120,9 +134,9 @@ extension MegrumAppState {
             let items = try await repository.searchGoods(
                 GoodsSearchInput(
                     query: query,
-                    groupID: groupID,
-                    memberID: memberID,
-                    goodsTypeID: goodsTypeID
+                    groupIDs: groupIDs,
+                    memberIDs: memberIDs,
+                    goodsTypeIDs: goodsTypeIDs
                 )
             )
             let results = items.map { item in

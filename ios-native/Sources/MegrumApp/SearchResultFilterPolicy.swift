@@ -4,29 +4,33 @@ import MegrumCore
 enum SearchResultFilterPolicy {
     static func filteredResults(
         _ results: [SearchResultItem],
-        selectedMemberID: UUID?,
-        selectedGoodsTypeID: UUID?,
+        selectedMemberIDs: Set<UUID>,
+        selectedGoodsTypeIDs: Set<UUID>,
         selectedGoodsTagNames: Set<String>,
         selectedPaymentMethods: Set<UserPaymentMethod>,
         selectedExchangeMethod: ExchangeMethod?,
         selectedMeetupPrefecture: String,
-        conditionMatches: SearchConditionMatchFilters,
-        wishes: [WishItem],
+        wantsMyGoodsOnly: Bool,
+        wantsCashOK: Bool,
         listings: [IndividualListing],
-        viewerInventory: [GoodsItem] = [],
-        viewer: UserProfile?
+        viewerInventory: [GoodsItem] = []
     ) -> [SearchResultItem] {
         results.filter { result in
             let item = result.item
-            if let selectedMemberID, item.memberID != selectedMemberID {
-                return false
+            if !selectedMemberIDs.isEmpty {
+                guard let memberID = item.memberID, selectedMemberIDs.contains(memberID) else {
+                    return false
+                }
             }
-            if let selectedGoodsTypeID, item.goodsTypeID != selectedGoodsTypeID {
-                return false
+            if !selectedGoodsTypeIDs.isEmpty {
+                guard let goodsTypeID = item.goodsTypeID, selectedGoodsTypeIDs.contains(goodsTypeID) else {
+                    return false
+                }
             }
             if !selectedGoodsTagNames.isEmpty {
+                // シリーズは複数選択OR
                 let itemTagNames = Set(item.tags.map(\.name))
-                if !selectedGoodsTagNames.isSubset(of: itemTagNames) {
+                if selectedGoodsTagNames.isDisjoint(with: itemTagNames) {
                     return false
                 }
             }
@@ -40,39 +44,37 @@ enum SearchResultFilterPolicy {
             ) {
                 return false
             }
-            if conditionMatches.matchesWish, !itemMatchesWish(item, wishes: wishes) {
-                return false
-            }
-            if conditionMatches.matchesIndividualListing,
+            if wantsMyGoodsOnly,
                !itemMatchesPartnerIndividualListings(
                    item,
                    listings: listings,
                    viewerInventory: viewerInventory,
-                   includesCash: true
+                   includesCash: false
                ) {
                 return false
             }
-            if conditionMatches.matchesExchangeCondition, !itemMatchesViewerExchangeCondition(item, viewer: viewer, selectedExchangeMethod: selectedExchangeMethod) {
-                return false
-            }
-            if conditionMatches.matchesPaymentCondition, !itemMatchesViewerPaymentCondition(item, viewer: viewer) {
+            if wantsCashOK, !ownerHasCashListing(item, listings: listings) {
                 return false
             }
             return true
         }
     }
 
+    /// 相手（結果の持ち主）が定価交換の選択肢を持っているか。
+    static func ownerHasCashListing(_ item: GoodsItem, listings: [IndividualListing]) -> Bool {
+        listings.contains { listing in
+            listing.status == .active
+                && listing.ownerID == item.ownerID
+                && listing.options.contains(where: \.isCashOffer)
+        }
+    }
+
     static func sortedResults(_ results: [SearchResultItem], sort: SearchResultSort) -> [SearchResultItem] {
+        // 需要順・新着順とも、まずプレミアム優先の安定ソート。
+        // 需要順の並べ替え自体は SearchResultDemandListBuilder がセクション単位で行う。
         switch sort {
-        case .newest:
+        case .demand, .newest:
             stableMegrumPlusPrioritySort(results)
-        case .title:
-            results.sorted { lhs, rhs in
-                if megrumPlusRank(lhs) != megrumPlusRank(rhs) {
-                    return megrumPlusRank(lhs) > megrumPlusRank(rhs)
-                }
-                return lhs.item.title.localizedStandardCompare(rhs.item.title) == .orderedAscending
-            }
         }
     }
 

@@ -17,23 +17,22 @@ extension SearchScreen {
     var filteredSearchResults: [SearchResultItem] {
         let filtered = SearchResultFilterPolicy.filteredResults(
             appState.searchResults,
-            selectedMemberID: filterDraft.selectedMemberID,
-            selectedGoodsTypeID: resolvedGoodsTypeID,
+            selectedMemberIDs: filterDraft.selectedMemberIDs,
+            selectedGoodsTypeIDs: resolvedGoodsTypeIDs,
             selectedGoodsTagNames: resolvedGoodsTagNames,
             selectedPaymentMethods: filterDraft.selectedPaymentMethods,
             selectedExchangeMethod: filterDraft.selectedExchangeMethod,
             selectedMeetupPrefecture: filterDraft.selectedMeetupPrefecture,
-            conditionMatches: filterDraft.conditionMatches,
-            wishes: appState.wishes,
+            wantsMyGoodsOnly: filterDraft.wantsMyGoodsOnly,
+            wantsCashOK: filterDraft.wantsCashOK,
             listings: searchRelevantListings,
-            viewerInventory: viewerInventoryForMatching,
-            viewer: appState.viewer
+            viewerInventory: viewerInventoryForMatching
         )
         return SearchResultFilterPolicy.sortedResults(filtered, sort: presentationState.selectedSort)
     }
 
     var queryMatchedGoodsTypeID: UUID? {
-        guard filterDraft.selectedGoodsTypeID == nil else {
+        guard filterDraft.selectedGoodsTypeIDs.isEmpty else {
             return nil
         }
         return SearchQueryResolver.matchingGoodsTypeID(query: presentationState.query, goodsTypes: appState.goodsTypes)
@@ -46,8 +45,11 @@ extension SearchScreen {
         return SearchQueryResolver.matchingTagName(query: presentationState.query, tagNames: availableGoodsTagNames)
     }
 
-    var resolvedGoodsTypeID: UUID? {
-        filterDraft.selectedGoodsTypeID ?? queryMatchedGoodsTypeID
+    var resolvedGoodsTypeIDs: Set<UUID> {
+        if !filterDraft.selectedGoodsTypeIDs.isEmpty {
+            return filterDraft.selectedGoodsTypeIDs
+        }
+        return queryMatchedGoodsTypeID.map { Set([$0]) } ?? []
     }
 
     var resolvedGoodsTagNames: Set<String> {
@@ -59,25 +61,20 @@ extension SearchScreen {
         return tagNames
     }
 
+    var selectedGroups: [OshiGroup] {
+        appState.oshiGroups.filter { filterDraft.selectedGroupIDs.contains($0.id) }
+    }
+
     var selectedGroup: OshiGroup? {
-        guard let selectedGroupID = filterDraft.selectedGroupID else {
-            return nil
-        }
-        return appState.oshiGroups.first { $0.id == selectedGroupID }
+        selectedGroups.first
     }
 
-    var selectedMember: OshiCharacter? {
-        guard let selectedMemberID = filterDraft.selectedMemberID else {
-            return nil
-        }
-        return appState.oshiCharacters.first { $0.id == selectedMemberID }
+    var selectedMembers: [OshiCharacter] {
+        appState.oshiCharacters.filter { filterDraft.selectedMemberIDs.contains($0.id) }
     }
 
-    var selectedGoodsType: GoodsType? {
-        guard let selectedGoodsTypeID = filterDraft.selectedGoodsTypeID else {
-            return nil
-        }
-        return appState.goodsTypes.first { $0.id == selectedGoodsTypeID }
+    var selectedGoodsTypes: [GoodsType] {
+        appState.goodsTypes.filter { filterDraft.selectedGoodsTypeIDs.contains($0.id) }
     }
 
     var availableGoodsTagNames: [String] {
@@ -143,16 +140,17 @@ extension SearchScreen {
         if !filterDraft.shippingFee.isBlank { count += 1 }
         if !filterDraft.shippingWindow.isBlank { count += 1 }
         if filterDraft.allowsOutOfConditionProposal { count += 1 }
-        count += filterDraft.conditionMatches.activeCount
+        if filterDraft.wantsMyGoodsOnly { count += 1 }
+        if filterDraft.wantsCashOK { count += 1 }
         return count
     }
 
     var activeCriteriaChips: [SearchActiveCriteriaChipItem] {
         SearchActiveCriteriaChipBuilder.chips(
             query: presentationState.query,
-            selectedGroup: selectedGroup,
-            selectedMember: selectedMember,
-            selectedGoodsType: selectedGoodsType,
+            selectedGroupNames: selectedGroups.map(\.name),
+            selectedMemberNames: selectedMembers.map(\.name),
+            selectedGoodsTypeNames: selectedGoodsTypes.map(\.name),
             selectedGoodsTagNames: filterDraft.selectedGoodsTagNames,
             selectedPaymentMethods: filterDraft.selectedPaymentMethods,
             selectedExchangeMethod: filterDraft.selectedExchangeMethod,
@@ -162,7 +160,8 @@ extension SearchScreen {
             shippingFee: filterDraft.shippingFee,
             shippingWindow: filterDraft.shippingWindow,
             allowsOutOfConditionProposal: filterDraft.allowsOutOfConditionProposal,
-            conditionMatches: filterDraft.conditionMatches
+            wantsMyGoodsOnly: filterDraft.wantsMyGoodsOnly,
+            wantsCashOK: filterDraft.wantsCashOK
         )
     }
 

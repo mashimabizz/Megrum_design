@@ -40,34 +40,21 @@ struct SearchFilterSheetState: Equatable {
     }
 
     mutating func selectGroup(_ group: OshiGroup) {
-        draft.selectedGroupID = group.id
-        draft.selectedMemberID = nil
+        if draft.selectedGroupIDs.contains(group.id) {
+            draft.selectedGroupIDs.remove(group.id)
+        } else {
+            draft.selectedGroupIDs.insert(group.id)
+        }
+        draft.selectedMemberIDs = []
     }
 
     mutating func clearGroupSelection() {
-        draft.selectedGroupID = nil
-        draft.selectedMemberID = nil
+        draft.selectedGroupIDs = []
+        draft.selectedMemberIDs = []
     }
 
     mutating func resetDraft() {
         draft = draft.reset()
     }
 
-    mutating func applyDefaultConditions(
-        previous: SearchConditionMatchFilters,
-        current: SearchConditionMatchFilters,
-        defaultExchangeSettings: HomeDefaultExchangeSettings,
-        defaultPaymentMethods: [UserPaymentMethod],
-        viewer: UserProfile?
-    ) {
-        if current.matchesExchangeCondition, !previous.matchesExchangeCondition {
-            draft.applyDefaultExchangeCondition(
-                settings: defaultExchangeSettings,
-                viewer: viewer
-            )
-        }
-        if current.matchesPaymentCondition, !previous.matchesPaymentCondition {
-            draft.applyDefaultPaymentCondition(methods: defaultPaymentMethods)
-        }
-    }
 }

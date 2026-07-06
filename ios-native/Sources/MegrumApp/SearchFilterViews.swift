@@ -54,27 +54,25 @@ struct SearchFilterSheet: View {
 
     var body: some View {
         Form {
-            SearchOfferedGoodsFilterSection(
-                genres: appState.oshiGenres,
-                groups: appState.oshiGroups,
-                characters: hasSelectedGroup ? appState.oshiCharacters : [],
-                goodsTypes: appState.goodsTypes,
-                myOshiGroupIDs: Set(appState.userOshiSelections.compactMap(\.groupID)),
+            SearchGoodsConditionMultiSection(
+                appState: appState,
+                selectedGroupIDs: $sheetState.draft.selectedGroupIDs,
+                selectedMemberIDs: $sheetState.draft.selectedMemberIDs,
+                selectedGoodsTypeIDs: $sheetState.draft.selectedGoodsTypeIDs,
                 selectedTagSummary: selectedTagSummary,
-                selectedGroupID: $sheetState.draft.selectedGroupID,
-                selectedMemberID: $sheetState.draft.selectedMemberID,
-                selectedGoodsTypeID: $sheetState.draft.selectedGoodsTypeID,
-                isLoadingGroups: appState.isLoadingOshiGroups,
-                isLoadingMembers: appState.isLoadingOshiCharacters,
-                isLoadingGoodsTypes: appState.isLoadingGoodsTypes,
-                onSelectGroup: selectGroup,
-                onClearGroup: clearGroupSelection,
                 onOpenTagPicker: {
                     sheetState.showTagPicker()
                 }
             )
 
-            SearchConditionMatchFilterSection(filters: $sheetState.draft.conditionMatches)
+            Section {
+                Toggle("あなたのグッズを求めている相手だけ", isOn: $sheetState.draft.wantsMyGoodsOnly)
+                Toggle("定価交換OKの相手だけ", isOn: $sheetState.draft.wantsCashOK)
+            } header: {
+                Label("需要マッチ", systemImage: "flame")
+            } footer: {
+                Text("個別募集であなたのグッズを求めている相手や、定価交換の選択肢がある相手に絞り込みます。")
+            }
 
             SearchExchangeConditionFilterSection(
                 selectedExchangeMethod: $sheetState.draft.selectedExchangeMethod,
@@ -86,14 +84,14 @@ struct SearchFilterSheet: View {
                 shippingFee: $sheetState.draft.shippingFee,
                 shippingWindow: $sheetState.draft.shippingWindow,
                 allowsOutOfConditionProposal: $sheetState.draft.allowsOutOfConditionProposal,
-                isLocked: sheetState.draft.conditionMatches.matchesExchangeCondition,
+                isLocked: false,
                 onAddDate: addMeetupDate,
                 onRemoveDate: removeMeetupDate
             )
 
             SearchPaymentMethodFilterSection(
                 selectedMethods: $sheetState.draft.selectedPaymentMethods,
-                isLocked: sheetState.draft.conditionMatches.matchesPaymentCondition
+                isLocked: false
             )
 
             SearchFilterResetSection(onReset: resetDraft)
@@ -122,9 +120,6 @@ struct SearchFilterSheet: View {
                 )
             }
         }
-        .onChange(of: sheetState.draft.conditionMatches) { previous, current in
-            applyDefaultConditions(previous: previous, current: current)
-        }
     }
 
     private func addMeetupDate(_ date: Date) {
@@ -133,20 +128,6 @@ struct SearchFilterSheet: View {
 
     private func removeMeetupDate(_ date: Date) {
         sheetState.removeMeetupDate(date)
-    }
-
-    private func selectGroup(_ group: OshiGroup) {
-        sheetState.selectGroup(group)
-        Task {
-            await appState.loadOshiCharacters(group: group)
-        }
-    }
-
-    private func clearGroupSelection() {
-        sheetState.clearGroupSelection()
-        Task {
-            await appState.loadOshiCharacters(group: nil)
-        }
     }
 
     private func resetDraft() {
@@ -161,18 +142,6 @@ struct SearchFilterSheet: View {
         dismiss()
     }
 
-    private func applyDefaultConditions(
-        previous: SearchConditionMatchFilters,
-        current: SearchConditionMatchFilters
-    ) {
-        sheetState.applyDefaultConditions(
-            previous: previous,
-            current: current,
-            defaultExchangeSettings: defaultExchangeSettings,
-            defaultPaymentMethods: defaultPaymentMethods,
-            viewer: appState.viewer
-        )
-    }
 }
 
 private struct SearchFilterApplyFooter: View {

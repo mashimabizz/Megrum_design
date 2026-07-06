@@ -11,6 +11,7 @@ struct OshiMasterSelectSheet: View {
     /// 自分が設定済みの推し（L1）のグループID。空でなければ「自分の推し」カテゴリを先頭に出し、既定にする。
     var myOshiGroupIDs: Set<UUID> = []
     var allowsMultipleSelection = false
+    var showsRequestButton = true
     var onClose: () -> Void
     var onRequest: (String?) -> Void
     var onSelect: (OshiGroup) -> Void
@@ -48,6 +49,7 @@ struct OshiMasterSelectSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             OshiMasterSelectHeader(
+                showsRequestButton: showsRequestButton,
                 onRequest: { onRequest(sheetState.requestSearchText) },
                 onClose: onClose
             )

@@ -1,13 +1,6 @@
 import Foundation
 import MegrumCore
 
-enum SearchConditionMatchKind: String, Hashable, Sendable {
-    case wish
-    case individualListing
-    case exchangeCondition
-    case paymentCondition
-}
-
 enum SearchActiveCriteriaRemoval: Hashable, Sendable {
     case query
     case group
@@ -22,7 +15,8 @@ enum SearchActiveCriteriaRemoval: Hashable, Sendable {
     case shippingFee
     case shippingWindow
     case allowsOutOfConditionProposal
-    case conditionMatch(SearchConditionMatchKind)
+    case demandMatch
+    case cashMatch
 
     var id: String {
         switch self {
@@ -52,8 +46,10 @@ enum SearchActiveCriteriaRemoval: Hashable, Sendable {
             "shipping-window"
         case .allowsOutOfConditionProposal:
             "allows-out-of-condition-proposal"
-        case .conditionMatch(let kind):
-            "condition-\(kind.rawValue)"
+        case .demandMatch:
+            "demand-match"
+        case .cashMatch:
+            "cash-match"
         }
     }
 }
@@ -67,9 +63,9 @@ struct SearchActiveCriteriaChipItem: Identifiable, Equatable, Sendable {
 enum SearchActiveCriteriaChipBuilder {
     static func chips(
         query: String,
-        selectedGroup: OshiGroup?,
-        selectedMember: OshiCharacter?,
-        selectedGoodsType: GoodsType?,
+        selectedGroupNames: [String],
+        selectedMemberNames: [String],
+        selectedGoodsTypeNames: [String],
         selectedGoodsTagNames: Set<String>,
         selectedPaymentMethods: Set<UserPaymentMethod>,
         selectedExchangeMethod: ExchangeMethod?,
@@ -79,7 +75,8 @@ enum SearchActiveCriteriaChipBuilder {
         shippingFee: String,
         shippingWindow: String,
         allowsOutOfConditionProposal: Bool,
-        conditionMatches: SearchConditionMatchFilters
+        wantsMyGoodsOnly: Bool,
+        wantsCashOK: Bool
     ) -> [SearchActiveCriteriaChipItem] {
         var chips: [SearchActiveCriteriaChipItem] = []
 
@@ -87,14 +84,14 @@ enum SearchActiveCriteriaChipBuilder {
         if !trimmedQuery.isEmpty {
             chips.append(SearchActiveCriteriaChipItem(title: trimmedQuery, removal: .query))
         }
-        if let selectedGroup {
-            chips.append(SearchActiveCriteriaChipItem(title: selectedGroup.name, removal: .group))
+        if !selectedGroupNames.isEmpty {
+            chips.append(SearchActiveCriteriaChipItem(title: selectedGroupNames.joined(separator: "・"), removal: .group))
         }
-        if let selectedMember {
-            chips.append(SearchActiveCriteriaChipItem(title: selectedMember.name, removal: .member))
+        if !selectedMemberNames.isEmpty {
+            chips.append(SearchActiveCriteriaChipItem(title: selectedMemberNames.joined(separator: "・"), removal: .member))
         }
-        if let selectedGoodsType {
-            chips.append(SearchActiveCriteriaChipItem(title: selectedGoodsType.name, removal: .goodsType))
+        if !selectedGoodsTypeNames.isEmpty {
+            chips.append(SearchActiveCriteriaChipItem(title: selectedGoodsTypeNames.joined(separator: "・"), removal: .goodsType))
         }
         chips.append(
             contentsOf: selectedGoodsTagNames.sorted().map { tagName in
@@ -132,17 +129,11 @@ enum SearchActiveCriteriaChipBuilder {
         if allowsOutOfConditionProposal {
             chips.append(SearchActiveCriteriaChipItem(title: "条件外打診可", removal: .allowsOutOfConditionProposal))
         }
-        if conditionMatches.matchesWish {
-            chips.append(SearchActiveCriteriaChipItem(title: "グッズ○", removal: .conditionMatch(.wish)))
+        if wantsMyGoodsOnly {
+            chips.append(SearchActiveCriteriaChipItem(title: "あなたのグッズを求む相手", removal: .demandMatch))
         }
-        if conditionMatches.matchesIndividualListing {
-            chips.append(SearchActiveCriteriaChipItem(title: "グッズ◎", removal: .conditionMatch(.individualListing)))
-        }
-        if conditionMatches.matchesExchangeCondition {
-            chips.append(SearchActiveCriteriaChipItem(title: "交換条件一致", removal: .conditionMatch(.exchangeCondition)))
-        }
-        if conditionMatches.matchesPaymentCondition {
-            chips.append(SearchActiveCriteriaChipItem(title: "支払条件一致", removal: .conditionMatch(.paymentCondition)))
+        if wantsCashOK {
+            chips.append(SearchActiveCriteriaChipItem(title: "定価交換OK", removal: .cashMatch))
         }
 
         return chips

@@ -3,7 +3,7 @@ import Foundation
 struct SearchScreenPresentationState: Equatable {
     var query = ""
     var queryDraft = ""
-    var selectedSort: SearchResultSort = .newest
+    var selectedSort: SearchResultSort = .demand
     var isApplyingSuggestion = false
     var appliedInitialCriteriaID: String?
     var isShowingFilters = false
@@ -61,9 +61,9 @@ struct SearchScreenPresentationState: Equatable {
 
         appliedInitialCriteriaID = initialCriteria.id
         setQuery(initialCriteria.query)
-        filterDraft.selectedGroupID = initialCriteria.groupID
-        filterDraft.selectedMemberID = initialCriteria.memberID
-        filterDraft.selectedGoodsTypeID = initialCriteria.goodsTypeID
+        filterDraft.selectedGroupIDs = initialCriteria.groupID.map { [$0] } ?? []
+        filterDraft.selectedMemberIDs = initialCriteria.memberID.map { [$0] } ?? []
+        filterDraft.selectedGoodsTypeIDs = initialCriteria.goodsTypeID.map { [$0] } ?? []
         filterDraft.selectedGoodsTagNames = Set(initialCriteria.tagNames)
         return true
     }

@@ -2,18 +2,39 @@ import Foundation
 
 public struct GoodsSearchInput: Equatable, Sendable {
     public var query: String
-    public var groupID: UUID?
-    public var memberID: UUID?
-    public var goodsTypeID: UUID?
+    /// 複数選択（項目内OR）。空 = 指定なし。
+    public var groupIDs: [UUID]
+    public var memberIDs: [UUID]
+    public var goodsTypeIDs: [UUID]
     public var limit: Int
 
-    public init(query: String, groupID: UUID? = nil, memberID: UUID? = nil, goodsTypeID: UUID? = nil, limit: Int = 60) {
+    public init(
+        query: String,
+        groupIDs: [UUID],
+        memberIDs: [UUID] = [],
+        goodsTypeIDs: [UUID] = [],
+        limit: Int = 60
+    ) {
         self.query = query
-        self.groupID = groupID
-        self.memberID = memberID
-        self.goodsTypeID = goodsTypeID
+        self.groupIDs = groupIDs
+        self.memberIDs = memberIDs
+        self.goodsTypeIDs = goodsTypeIDs
         self.limit = limit
     }
+
+    public init(query: String, groupID: UUID? = nil, memberID: UUID? = nil, goodsTypeID: UUID? = nil, limit: Int = 60) {
+        self.init(
+            query: query,
+            groupIDs: groupID.map { [$0] } ?? [],
+            memberIDs: memberID.map { [$0] } ?? [],
+            goodsTypeIDs: goodsTypeID.map { [$0] } ?? [],
+            limit: limit
+        )
+    }
+
+    public var groupID: UUID? { groupIDs.first }
+    public var memberID: UUID? { memberIDs.first }
+    public var goodsTypeID: UUID? { goodsTypeIDs.first }
 }
 
 public enum SearchMatchBucket: String, Codable, Sendable, CaseIterable, Identifiable {

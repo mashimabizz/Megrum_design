@@ -2,9 +2,10 @@ import Foundation
 import MegrumCore
 
 struct SearchFilterDraft: Equatable, Sendable {
-    var selectedGroupID: UUID?
-    var selectedMemberID: UUID?
-    var selectedGoodsTypeID: UUID?
+    /// グループ・メンバー・グッズ種別は複数選択（項目内OR・項目間AND）。
+    var selectedGroupIDs: Set<UUID>
+    var selectedMemberIDs: Set<UUID>
+    var selectedGoodsTypeIDs: Set<UUID>
     var selectedGoodsTagNames: Set<String>
     var selectedPaymentMethods: Set<UserPaymentMethod>
     var selectedExchangeMethod: ExchangeMethod?
@@ -15,12 +16,15 @@ struct SearchFilterDraft: Equatable, Sendable {
     var shippingFee: String
     var shippingWindow: String
     var allowsOutOfConditionProposal: Bool
-    var conditionMatches: SearchConditionMatchFilters
+    /// 需要マッチ：あなたのグッズを求めている相手（個別募集）だけに絞る。
+    var wantsMyGoodsOnly: Bool
+    /// 需要マッチ：定価交換OK（定価選択肢のある募集を持つ相手）だけに絞る。
+    var wantsCashOK: Bool
 
     init(
-        selectedGroupID: UUID? = nil,
-        selectedMemberID: UUID? = nil,
-        selectedGoodsTypeID: UUID? = nil,
+        selectedGroupIDs: Set<UUID> = [],
+        selectedMemberIDs: Set<UUID> = [],
+        selectedGoodsTypeIDs: Set<UUID> = [],
         selectedGoodsTagNames: Set<String> = [],
         selectedPaymentMethods: Set<UserPaymentMethod> = [],
         selectedExchangeMethod: ExchangeMethod? = nil,
@@ -31,11 +35,12 @@ struct SearchFilterDraft: Equatable, Sendable {
         shippingFee: String = "",
         shippingWindow: String = "",
         allowsOutOfConditionProposal: Bool = false,
-        conditionMatches: SearchConditionMatchFilters = SearchConditionMatchFilters()
+        wantsMyGoodsOnly: Bool = false,
+        wantsCashOK: Bool = false
     ) {
-        self.selectedGroupID = selectedGroupID
-        self.selectedMemberID = selectedMemberID
-        self.selectedGoodsTypeID = selectedGoodsTypeID
+        self.selectedGroupIDs = selectedGroupIDs
+        self.selectedMemberIDs = selectedMemberIDs
+        self.selectedGoodsTypeIDs = selectedGoodsTypeIDs
         self.selectedGoodsTagNames = selectedGoodsTagNames
         self.selectedPaymentMethods = selectedPaymentMethods
         self.selectedExchangeMethod = selectedExchangeMethod
@@ -46,14 +51,20 @@ struct SearchFilterDraft: Equatable, Sendable {
         self.shippingFee = shippingFee
         self.shippingWindow = shippingWindow
         self.allowsOutOfConditionProposal = allowsOutOfConditionProposal
-        self.conditionMatches = conditionMatches
+        self.wantsMyGoodsOnly = wantsMyGoodsOnly
+        self.wantsCashOK = wantsCashOK
     }
+
+    /// 旧単数アクセサ（互換用）。
+    var selectedGroupID: UUID? { selectedGroupIDs.first }
+    var selectedMemberID: UUID? { selectedMemberIDs.first }
+    var selectedGoodsTypeID: UUID? { selectedGoodsTypeIDs.first }
 
     var activeFilterCount: Int {
         var count = 0
-        if selectedGroupID != nil { count += 1 }
-        if selectedMemberID != nil { count += 1 }
-        if selectedGoodsTypeID != nil { count += 1 }
+        count += selectedGroupIDs.count
+        count += selectedMemberIDs.count
+        count += selectedGoodsTypeIDs.count
         count += selectedGoodsTagNames.count
         count += selectedPaymentMethods.count
         if selectedExchangeMethod != nil { count += 1 }
@@ -63,7 +74,8 @@ struct SearchFilterDraft: Equatable, Sendable {
         if !shippingFee.isBlank { count += 1 }
         if !shippingWindow.isBlank { count += 1 }
         if allowsOutOfConditionProposal { count += 1 }
-        count += conditionMatches.activeCount
+        if wantsMyGoodsOnly { count += 1 }
+        if wantsCashOK { count += 1 }
         return count
     }
 
@@ -99,51 +111,19 @@ struct SearchFilterDraft: Equatable, Sendable {
     }
 }
 
-struct SearchConditionMatchFilters: Equatable, Sendable {
-    var matchesWish = false
-    var matchesIndividualListing = false
-    var matchesExchangeCondition = false
-    var matchesPaymentCondition = false
-
-    var activeCount: Int {
-        [
-            matchesWish,
-            matchesIndividualListing,
-            matchesExchangeCondition,
-            matchesPaymentCondition
-        ].filter { $0 }.count
-    }
-
-    var summaryTitles: [String] {
-        var titles: [String] = []
-        if matchesWish {
-            titles.append("グッズ○")
-        }
-        if matchesIndividualListing {
-            titles.append("グッズ◎")
-        }
-        if matchesExchangeCondition {
-            titles.append("交換条件一致")
-        }
-        if matchesPaymentCondition {
-            titles.append("支払条件一致")
-        }
-        return titles
-    }
-}
 
 enum SearchResultSort: String, CaseIterable, Identifiable, Sendable {
+    case demand
     case newest
-    case title
 
     var id: String { rawValue }
 
     var displayName: String {
         switch self {
+        case .demand:
+            "需要順"
         case .newest:
             "新着順"
-        case .title:
-            "タイトル順"
         }
     }
 }

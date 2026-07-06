@@ -5,15 +5,15 @@ extension SearchScreen {
         presentationState.beginSuggestionApplication()
         switch action {
         case .group(let groupID):
-            filterDraft.selectedGroupID = groupID
-            filterDraft.selectedMemberID = nil
+            filterDraft.selectedGroupIDs = [groupID]
+            filterDraft.selectedMemberIDs = []
         case .member(let groupID, let memberID):
-            filterDraft.selectedGroupID = groupID
-            filterDraft.selectedMemberID = memberID
+            filterDraft.selectedGroupIDs = [groupID]
+            filterDraft.selectedMemberIDs = [memberID]
         case .wish(let groupID, let memberID, let goodsTypeID, let tagNames):
-            filterDraft.selectedGroupID = groupID
-            filterDraft.selectedMemberID = memberID
-            filterDraft.selectedGoodsTypeID = goodsTypeID
+            filterDraft.selectedGroupIDs = groupID.map { [$0] } ?? []
+            filterDraft.selectedMemberIDs = memberID.map { [$0] } ?? []
+            filterDraft.selectedGoodsTypeIDs = goodsTypeID.map { [$0] } ?? []
             if groupID == nil, memberID == nil, goodsTypeID == nil {
                 filterDraft.selectedGoodsTagNames.formUnion(
                     SearchSuggestionTagPolicy.allowedRequestedTagNames(
@@ -22,9 +22,8 @@ extension SearchScreen {
                     )
                 )
             }
-            filterDraft.conditionMatches.matchesWish = true
         case .goodsType(let goodsTypeID):
-            filterDraft.selectedGoodsTypeID = goodsTypeID
+            filterDraft.selectedGoodsTypeIDs = [goodsTypeID]
         case .tag(let tagName):
             filterDraft.selectedGoodsTagNames.insert(tagName)
         case .payment(let method):

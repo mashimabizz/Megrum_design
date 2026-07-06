@@ -2,6 +2,7 @@ import MegrumDesign
 import SwiftUI
 
 struct OshiMasterSelectHeader: View {
+    var showsRequestButton = true
     var onRequest: () -> Void
     var onClose: () -> Void
 
@@ -13,15 +14,9 @@ struct OshiMasterSelectHeader: View {
                     .foregroundStyle(MegrumTheme.ink)
             }
             Spacer()
-            Button(action: onRequest) {
-                Text("追加リクエスト")
-                    .font(.system(size: 14, weight: .black, design: .rounded))
-                    .foregroundStyle(MegrumTheme.lavender)
-                    .padding(.horizontal, 16)
-                    .frame(height: 42)
-                    .background(MegrumTheme.lavender.opacity(0.11), in: Capsule())
+            if showsRequestButton {
+                requestButton
             }
-            .buttonStyle(.plain)
 
             Button(action: onClose) {
                 Image(systemName: "xmark")
@@ -35,5 +30,17 @@ struct OshiMasterSelectHeader: View {
         .padding(.horizontal, 18)
         .padding(.top, 24)
         .padding(.bottom, 10)
+    }
+
+    private var requestButton: some View {
+        Button(action: onRequest) {
+                Text("追加リクエスト")
+                    .font(.system(size: 14, weight: .black, design: .rounded))
+                    .foregroundStyle(MegrumTheme.lavender)
+                    .padding(.horizontal, 16)
+                    .frame(height: 42)
+                    .background(MegrumTheme.lavender.opacity(0.11), in: Capsule())
+        }
+        .buttonStyle(.plain)
     }
 }

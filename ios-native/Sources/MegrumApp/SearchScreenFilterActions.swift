@@ -15,12 +15,12 @@ extension SearchScreen {
         case .query:
             presentationState.clearQuery()
         case .group:
-            filterDraft.selectedGroupID = nil
-            filterDraft.selectedMemberID = nil
+            filterDraft.selectedGroupIDs = []
+            filterDraft.selectedMemberIDs = []
         case .member:
-            filterDraft.selectedMemberID = nil
+            filterDraft.selectedMemberIDs = []
         case .goodsType:
-            filterDraft.selectedGoodsTypeID = nil
+            filterDraft.selectedGoodsTypeIDs = []
         case .goodsTag(let tagName):
             filterDraft.selectedGoodsTagNames.remove(tagName)
         case .paymentMethod(let method):
@@ -39,17 +39,10 @@ extension SearchScreen {
             filterDraft.shippingWindow = ""
         case .allowsOutOfConditionProposal:
             filterDraft.allowsOutOfConditionProposal = false
-        case .conditionMatch(let kind):
-            switch kind {
-            case .wish:
-                filterDraft.conditionMatches.matchesWish = false
-            case .individualListing:
-                filterDraft.conditionMatches.matchesIndividualListing = false
-            case .exchangeCondition:
-                filterDraft.conditionMatches.matchesExchangeCondition = false
-            case .paymentCondition:
-                filterDraft.conditionMatches.matchesPaymentCondition = false
-            }
+        case .demandMatch:
+            filterDraft.wantsMyGoodsOnly = false
+        case .cashMatch:
+            filterDraft.wantsCashOK = false
         }
         scheduleSearch(delayNanoseconds: 0)
     }
@@ -61,17 +54,6 @@ extension SearchScreen {
         }
     }
 
-    func applyConditionMatchDefaults(
-        previous: SearchConditionMatchFilters,
-        current: SearchConditionMatchFilters
-    ) {
-        if current.matchesExchangeCondition, !previous.matchesExchangeCondition {
-            applyDefaultExchangeCondition()
-        }
-        if current.matchesPaymentCondition, !previous.matchesPaymentCondition {
-            applyDefaultPaymentCondition()
-        }
-    }
 
     func applyDefaultExchangeCondition() {
         let settings = HomeDefaultExchangeSettings(

@@ -129,6 +129,25 @@ final class SupabaseGoodsInventoryClientTests: XCTestCase {
         XCTAssertTrue(url.contains("goods_type_id=eq.33333333-3333-3333-3333-333333333333"))
     }
 
+    func testBuildsSearchGoodsRequestWithMultipleIDsUsesInFilter() throws {
+        let client = SupabaseGoodsInventoryClient(configuration: configuration)
+        let viewerID = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
+        let groupA = UUID(uuidString: "22222222-2222-2222-2222-222222222222")!
+        let groupB = UUID(uuidString: "55555555-5555-5555-5555-555555555555")!
+        let input = GoodsSearchInput(
+            query: "",
+            groupIDs: [groupA, groupB],
+            limit: 25
+        )
+
+        let request = try client.makeSearchGoodsRequest(viewerID: viewerID, input: input)
+        let url = try XCTUnwrap(request.url?.absoluteString.removingPercentEncoding)
+
+        XCTAssertTrue(url.contains("group_id=in.(22222222-2222-2222-2222-222222222222,55555555-5555-5555-5555-555555555555)"))
+        XCTAssertFalse(url.contains("character_id="))
+        XCTAssertFalse(url.contains("goods_type_id="))
+    }
+
     func testBuildsLegacySearchGoodsRequestWithQuantityAvailability() throws {
         let client = SupabaseGoodsInventoryClient(configuration: configuration)
         let viewerID = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!

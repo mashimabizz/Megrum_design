@@ -47,9 +47,11 @@ extension SearchScreen {
                 matchedGoodsTypeID: matchedGoodsTypeID,
                 matchedTagName: matchedTagName
             ),
-            groupID: filterDraft.selectedGroupID,
-            memberID: filterDraft.selectedMemberID,
-            goodsTypeID: filterDraft.selectedGoodsTypeID ?? matchedGoodsTypeID
+            groupIDs: Array(filterDraft.selectedGroupIDs),
+            memberIDs: Array(filterDraft.selectedMemberIDs),
+            goodsTypeIDs: filterDraft.selectedGoodsTypeIDs.isEmpty
+                ? (matchedGoodsTypeID.map { [$0] } ?? [])
+                : Array(filterDraft.selectedGoodsTypeIDs)
         )
         await loadSearchResultOwnerExchangeContentIfNeeded()
     }
@@ -85,9 +87,7 @@ extension SearchScreen {
     }
 
     func loadSearchResultOwnerExchangeContentIfNeeded() async {
-        guard filterDraft.conditionMatches.matchesIndividualListing else {
-            return
-        }
+        // 需要行の表示に相手の個別募集情報を使うため、結果の持ち主の交換情報を常に読み込む
         let viewerID = appState.viewer?.id
         let ownerIDs = Set(appState.searchResults.map(\.ownerUserID)).filter { $0 != viewerID }
         for ownerID in ownerIDs where appState.publicListingsByUserID[ownerID] == nil {

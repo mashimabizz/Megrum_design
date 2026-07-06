@@ -87,12 +87,9 @@ struct SearchScreen: View {
             await loadFiltersAndSearch()
             onRequestInterstitial(.searchBrowseInterstitial)
         }
-        .onChange(of: filterDraft.selectedGroupID) { _, newValue in
-            if newValue == nil {
-                filterDraft.selectedMemberID = nil
-            }
-            Task {
-                await appState.loadOshiCharacters(group: selectedGroup)
+        .onChange(of: filterDraft.selectedGroupIDs) { _, newValue in
+            if newValue.isEmpty {
+                filterDraft.selectedMemberIDs = []
             }
         }
         .onDisappear {

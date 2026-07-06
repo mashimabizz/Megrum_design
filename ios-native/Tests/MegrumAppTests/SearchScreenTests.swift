@@ -216,27 +216,15 @@ final class SearchScreenTests: XCTestCase {
         XCTAssertEqual(tagNames, ["トレカ"])
     }
 
-    func testConditionMatchFilterSummaryUsesUserFacingMatchLabels() {
-        let filters = SearchConditionMatchFilters(
-            matchesWish: true,
-            matchesIndividualListing: true,
-            matchesExchangeCondition: true,
-            matchesPaymentCondition: true
-        )
-
-        XCTAssertEqual(filters.activeCount, 4)
-        XCTAssertEqual(filters.summaryTitles, ["グッズ○", "グッズ◎", "交換条件一致", "支払条件一致"])
-        XCTAssertEqual(SearchFilterPresentation.individualListingMatchTitle, "相手の個別募集に合う")
-    }
 
     func testSearchFilterDraftKeepsTagsIndependentFromGroupSelection() {
         let meetupDate = Date(timeIntervalSinceReferenceDate: 42)
         let draft = SearchFilterDraft(
-            selectedGroupID: nil,
+            selectedGroupIDs: [],
             selectedGoodsTagNames: ["会場限定", "東京2026"],
             selectedPaymentMethods: [.paypay],
             meetupDateDraft: meetupDate,
-            conditionMatches: SearchConditionMatchFilters(matchesIndividualListing: true)
+            wantsMyGoodsOnly: true
         )
 
         XCTAssertNil(draft.selectedGroupID)
@@ -256,7 +244,7 @@ final class SearchScreenTests: XCTestCase {
         calendar.timeZone = TimeZone(identifier: "Asia/Tokyo")!
         var state = SearchFilterSheetState(
             draft: SearchFilterDraft(
-                selectedMemberID: selectedMemberID,
+                selectedMemberIDs: [selectedMemberID],
                 selectedGoodsTagNames: ["会場限定"],
                 meetupDateDraft: meetupDateDraft
             )
@@ -269,8 +257,12 @@ final class SearchScreenTests: XCTestCase {
         XCTAssertTrue(state.isShowingTagPicker)
 
         state.selectGroup(group)
-        XCTAssertEqual(state.draft.selectedGroupID, group.id)
+        XCTAssertEqual(state.draft.selectedGroupIDs, [group.id])
         XCTAssertNil(state.draft.selectedMemberID)
+        // もう一度選ぶと解除（複数選択トグル）
+        state.selectGroup(group)
+        XCTAssertTrue(state.draft.selectedGroupIDs.isEmpty)
+        state.selectGroup(group)
 
         let firstDate = calendar.date(from: DateComponents(year: 2026, month: 7, day: 3, hour: 18))!
         let sameDate = calendar.date(from: DateComponents(year: 2026, month: 7, day: 3, hour: 21))!
@@ -289,26 +281,6 @@ final class SearchScreenTests: XCTestCase {
 
         state.removeMeetupDate(sameDate, calendar: calendar)
         XCTAssertEqual(state.draft.selectedMeetupDates, [calendar.startOfDay(for: secondDate)])
-
-        state.applyDefaultConditions(
-            previous: SearchConditionMatchFilters(),
-            current: SearchConditionMatchFilters(
-                matchesExchangeCondition: true,
-                matchesPaymentCondition: true
-            ),
-            defaultExchangeSettings: HomeDefaultExchangeSettings(preference: .local, requiresSamePrefecture: true),
-            defaultPaymentMethods: [.paypay, .paypay, .bankTransfer],
-            viewer: UserProfile(
-                id: UUID(uuidString: "30000000-0000-0000-0000-000000000012")!,
-                handle: "michi",
-                displayName: "みち",
-                prefecture: "東京都"
-            )
-        )
-
-        XCTAssertEqual(state.draft.selectedExchangeMethod, .hand)
-        XCTAssertEqual(state.draft.selectedMeetupPrefecture, "東京都")
-        XCTAssertEqual(state.draft.selectedPaymentMethods, [.bankTransfer, .paypay])
 
         state.resetDraft()
         XCTAssertEqual(state.draft.meetupDateDraft, meetupDateDraft)
@@ -347,9 +319,9 @@ final class SearchScreenTests: XCTestCase {
     func testActiveCriteriaChipsCarryRemovableFilterIdentity() {
         let chips = SearchActiveCriteriaChipBuilder.chips(
             query: " BTS ",
-            selectedGroup: NativePreviewData.oshiGroups.first,
-            selectedMember: NativePreviewData.oshiCharacters.first,
-            selectedGoodsType: NativePreviewData.goodsTypes.first,
+            selectedGroupNames: [NativePreviewData.oshiGroups[0].name],
+            selectedMemberNames: [NativePreviewData.oshiCharacters[0].name],
+            selectedGoodsTypeNames: [NativePreviewData.goodsTypes[0].name],
             selectedGoodsTagNames: ["2026 LIVE"],
             selectedPaymentMethods: [.paypay],
             selectedExchangeMethod: .hand,
@@ -359,12 +331,8 @@ final class SearchScreenTests: XCTestCase {
             shippingFee: "送料相談",
             shippingWindow: "2〜4日以内",
             allowsOutOfConditionProposal: true,
-            conditionMatches: SearchConditionMatchFilters(
-                matchesWish: true,
-                matchesIndividualListing: true,
-                matchesExchangeCondition: true,
-                matchesPaymentCondition: true
-            )
+            wantsMyGoodsOnly: true,
+            wantsCashOK: true
         )
 
         XCTAssertTrue(chips.contains(SearchActiveCriteriaChipItem(title: "BTS", removal: .query)))
@@ -380,10 +348,8 @@ final class SearchScreenTests: XCTestCase {
         XCTAssertTrue(chips.contains(SearchActiveCriteriaChipItem(title: "送料相談", removal: .shippingFee)))
         XCTAssertTrue(chips.contains(SearchActiveCriteriaChipItem(title: "2〜4日以内", removal: .shippingWindow)))
         XCTAssertTrue(chips.contains(SearchActiveCriteriaChipItem(title: "条件外打診可", removal: .allowsOutOfConditionProposal)))
-        XCTAssertTrue(chips.contains(SearchActiveCriteriaChipItem(title: "グッズ○", removal: .conditionMatch(.wish))))
-        XCTAssertTrue(chips.contains(SearchActiveCriteriaChipItem(title: "グッズ◎", removal: .conditionMatch(.individualListing))))
-        XCTAssertTrue(chips.contains(SearchActiveCriteriaChipItem(title: "交換条件一致", removal: .conditionMatch(.exchangeCondition))))
-        XCTAssertTrue(chips.contains(SearchActiveCriteriaChipItem(title: "支払条件一致", removal: .conditionMatch(.paymentCondition))))
+        XCTAssertTrue(chips.contains(SearchActiveCriteriaChipItem(title: "あなたのグッズを求む相手", removal: .demandMatch)))
+        XCTAssertTrue(chips.contains(SearchActiveCriteriaChipItem(title: "定価交換OK", removal: .cashMatch)))
     }
 
     func testSearchResultHomePresentationUsesHomeConditionSignalsAndSheets() {
@@ -601,33 +567,32 @@ final class SearchScreenTests: XCTestCase {
 
         let payPayResults = SearchResultFilterPolicy.filteredResults(
             partnerResults,
-            selectedMemberID: nil,
-            selectedGoodsTypeID: nil,
+            selectedMemberIDs: [],
+            selectedGoodsTypeIDs: [],
             selectedGoodsTagNames: [],
             selectedPaymentMethods: [.paypay],
             selectedExchangeMethod: nil,
             selectedMeetupPrefecture: "",
-            conditionMatches: SearchConditionMatchFilters(matchesWish: true),
-            wishes: NativePreviewData.wishes,
-            listings: NativePreviewData.listings,
-            viewer: NativePreviewData.viewer
+            wantsMyGoodsOnly: false,
+            wantsCashOK: false,
+            listings: NativePreviewData.listings
         )
 
         XCTAssertTrue(payPayResults.contains { $0.item.title == "ニンニン 制服" })
-        XCTAssertFalse(payPayResults.contains { $0.item.title == "V トレカ" })
+        // iter1226.300: ほしいもの一致トグルは需要マッチへ置換されたため、支払一致のみで残る
+        XCTAssertTrue(payPayResults.contains { $0.item.title == "V トレカ" })
 
         let bankTransferResults = SearchResultFilterPolicy.filteredResults(
             partnerResults,
-            selectedMemberID: nil,
-            selectedGoodsTypeID: nil,
+            selectedMemberIDs: [],
+            selectedGoodsTypeIDs: [],
             selectedGoodsTagNames: [],
             selectedPaymentMethods: [.bankTransfer],
             selectedExchangeMethod: nil,
             selectedMeetupPrefecture: "",
-            conditionMatches: SearchConditionMatchFilters(),
-            wishes: NativePreviewData.wishes,
-            listings: NativePreviewData.listings,
-            viewer: NativePreviewData.viewer
+            wantsMyGoodsOnly: false,
+            wantsCashOK: false,
+            listings: NativePreviewData.listings
         )
 
         XCTAssertTrue(bankTransferResults.isEmpty)
@@ -666,17 +631,16 @@ final class SearchScreenTests: XCTestCase {
 
         let filtered = SearchResultFilterPolicy.filteredResults(
             partnerResults,
-            selectedMemberID: nil,
-            selectedGoodsTypeID: nil,
+            selectedMemberIDs: [],
+            selectedGoodsTypeIDs: [],
             selectedGoodsTagNames: [],
             selectedPaymentMethods: [],
             selectedExchangeMethod: nil,
             selectedMeetupPrefecture: "",
-            conditionMatches: SearchConditionMatchFilters(matchesIndividualListing: true),
-            wishes: NativePreviewData.wishes,
+            wantsMyGoodsOnly: true,
+            wantsCashOK: false,
             listings: NativePreviewData.publicListings,
-            viewerInventory: viewerInventory,
-            viewer: NativePreviewData.viewer
+            viewerInventory: viewerInventory
         )
 
         XCTAssertTrue(filtered.contains { $0.item.title == "サナ 2026 LIVE" })
@@ -699,7 +663,7 @@ final class SearchScreenTests: XCTestCase {
             ["ニンニン 制服", "V トレカ"]
         )
         XCTAssertEqual(
-            SearchResultFilterPolicy.sortedResults(results, sort: .title).first?.item.title,
+            SearchResultFilterPolicy.sortedResults(results, sort: .demand).first?.item.title,
             "ニンニン 制服"
         )
     }

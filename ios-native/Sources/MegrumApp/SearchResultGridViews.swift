@@ -12,17 +12,23 @@ struct SearchResultGrid: View {
     var onOpenOwnerProfile: (UUID) -> Void
     var onReportItem: (GoodsItem, GoodsReportReason, String) -> Void
 
+    var sort: SearchResultSort = .demand
     @State private var presentationState = SearchResultGridPresentationState()
+    /// 20件ずつの追い読み。
+    @State private var visibleRowLimit = 20
 
     var body: some View {
-        Grid(horizontalSpacing: SearchResultGridMetrics.columnSpacing, verticalSpacing: SearchResultGridMetrics.rowSpacing) {
-            ForEach(displayRows) { row in
-                GridRow(alignment: .top) {
-                    ForEach(row.cells) { cell in
-                        gridCell(for: cell.entry)
-                            .gridCellColumns(cell.columnSpan)
+        LazyVStack(alignment: .leading, spacing: 14) {
+            ForEach(listEntries) { entry in
+                listEntryView(entry)
+            }
+
+            if hasMoreRows {
+                Color.clear
+                    .frame(height: 1)
+                    .onAppear {
+                        visibleRowLimit += 20
                     }
-                }
             }
         }
         .sheet(
@@ -63,15 +69,52 @@ struct SearchResultGrid: View {
             }
     }
 
-    private var displayEntries: [SearchResultGridEntry] {
-        SearchResultAdInsertion.entries(
-            for: results,
-            includesNativeAds: nativeAdDecision.isAllowed
+    private var demandSections: [SearchDemandSection] {
+        SearchResultDemandListBuilder.sections(
+            results: results,
+            signals: appState?.homeCandidateConditionSignals ?? [:],
+            sort: sort
         )
     }
 
-    private var displayRows: [SearchResultGridRow] {
-        SearchResultGridLayout.rows(for: displayEntries)
+    /// 追い読み分だけ行を残したセクション。
+    private var visibleSections: [SearchDemandSection] {
+        var remaining = visibleRowLimit
+        var sections: [SearchDemandSection] = []
+        for section in demandSections {
+            guard remaining > 0 else {
+                break
+            }
+            let rows = Array(section.rows.prefix(remaining))
+            remaining -= rows.count
+            sections.append(SearchDemandSection(groupTitle: section.groupTitle, rows: rows))
+        }
+        return sections
+    }
+
+    private var hasMoreRows: Bool {
+        results.count > visibleRowLimit
+    }
+
+    private var listEntries: [SearchDemandListEntry] {
+        SearchResultDemandListBuilder.entries(
+            sections: visibleSections,
+            includesAds: nativeAdDecision.isAllowed
+        )
+    }
+
+    private var viewerGoodsImageURLByID: [UUID: URL] {
+        guard let viewerID else {
+            return [:]
+        }
+        return Dictionary(
+            (appState?.inventory ?? [])
+                .filter { $0.ownerID == viewerID }
+                .compactMap { item in
+                    item.imageURL.map { (item.id, $0) }
+                },
+            uniquingKeysWith: { first, _ in first }
+        )
     }
 
     private var nativeAdDecision: AdDisplayDecision {
@@ -130,29 +173,49 @@ struct SearchResultGrid: View {
     }
 
     @ViewBuilder
-    private func gridCell(for entry: SearchResultGridEntry) -> some View {
+    private func listEntryView(_ entry: SearchDemandListEntry) -> some View {
         switch entry {
-        case let .goods(index, result):
-            SearchResultGridCard(
-                item: result.item,
-                goods: homeGoods(for: result.item, index: index),
-                conditionTags: conditionTags(for: result, index: index),
-                viewerID: viewerID,
-                onOpen: {
-                    presentationState.showSheet(
-                        SearchResultHomePresentation.sheet(
-                            for: result,
-                            index: index,
-                            goodsTypes: appState?.goodsTypes ?? [],
-                            explicitSignals: appState?.homeCandidateConditionSignals ?? [:]
-                        )
-                    )
-                },
-                onReport: {
-                    presentationState.showReport(item: result.item)
+        case .groupHeader(let title):
+            Text(title)
+                .font(.system(size: 19, weight: .heavy, design: .rounded))
+                .foregroundStyle(MegrumTheme.ink)
+                .padding(.top, 6)
+        case .row(let row):
+            VStack(alignment: .leading, spacing: 5) {
+                if let subheading = row.subheading {
+                    Text(subheading)
+                        .font(.system(size: 12, weight: .regular))
+                        .foregroundStyle(MegrumTheme.ink.opacity(0.82))
+                        .lineLimit(1)
                 }
-            )
-        case .nativeAd:
+                SearchResultDemandRow(
+                    goods: homeGoods(for: row.result.item, index: row.index),
+                    signals: SearchResultHomePresentation.signals(
+                        for: row.result,
+                        index: row.index,
+                        explicitSignals: appState?.homeCandidateConditionSignals ?? [:]
+                    ),
+                    viewerGoodsImageURLByID: viewerGoodsImageURLByID,
+                    onOpen: {
+                        presentationState.showSheet(
+                            SearchResultHomePresentation.sheet(
+                                for: row.result,
+                                index: row.index,
+                                goodsTypes: appState?.goodsTypes ?? [],
+                                explicitSignals: appState?.homeCandidateConditionSignals ?? [:]
+                            )
+                        )
+                    }
+                )
+                .contextMenu {
+                    Button(role: .destructive) {
+                        presentationState.showReport(item: row.result.item)
+                    } label: {
+                        Label("通報する", systemImage: "exclamationmark.bubble")
+                    }
+                }
+            }
+        case .ad:
             AdNativeSlot(
                 placement: .searchResultsNative,
                 displayContext: adDisplayContext,

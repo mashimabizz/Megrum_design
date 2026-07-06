@@ -11,8 +11,31 @@ struct GoodsTypeSelectSheet: View {
     var selectedGoodsTypeID: UUID?
     var onSelect: (GoodsType) -> Void
     var onClose: () -> Void
+    /// 複数選択モード（検索フィルター用）。設定時はタップでトグルし、閉じるまで選択を続けられる。
+    var multiSelection: Binding<Set<UUID>>?
 
     @State private var searchText = ""
+
+    init(
+        goodsTypes: [GoodsType],
+        selectedGoodsTypeID: UUID?,
+        onSelect: @escaping (GoodsType) -> Void,
+        onClose: @escaping () -> Void
+    ) {
+        self.goodsTypes = goodsTypes
+        self.selectedGoodsTypeID = selectedGoodsTypeID
+        self.onSelect = onSelect
+        self.onClose = onClose
+        self.multiSelection = nil
+    }
+
+    init(goodsTypes: [GoodsType], selectedGoodsTypeIDs: Binding<Set<UUID>>) {
+        self.goodsTypes = goodsTypes
+        self.selectedGoodsTypeID = nil
+        self.onSelect = { _ in }
+        self.onClose = {}
+        self.multiSelection = selectedGoodsTypeIDs
+    }
 
     private var filteredGoodsTypes: [GoodsType] {
         GoodsTypeSelectFilter.filtered(goodsTypes, searchText: searchText)
@@ -33,8 +56,8 @@ struct GoodsTypeSelectSheet: View {
                         ForEach(filteredGoodsTypes) { goodsType in
                             OshiMasterCandidateTag(
                                 title: goodsType.name,
-                                isSelected: goodsType.id == selectedGoodsTypeID,
-                                action: { onSelect(goodsType) }
+                                isSelected: isSelected(goodsType),
+                                action: { handleTap(goodsType) }
                             )
                         }
                     }
@@ -48,20 +71,41 @@ struct GoodsTypeSelectSheet: View {
         }
     }
 
+    private func isSelected(_ goodsType: GoodsType) -> Bool {
+        if let multiSelection {
+            return multiSelection.wrappedValue.contains(goodsType.id)
+        }
+        return goodsType.id == selectedGoodsTypeID
+    }
+
+    private func handleTap(_ goodsType: GoodsType) {
+        if let multiSelection {
+            if multiSelection.wrappedValue.contains(goodsType.id) {
+                multiSelection.wrappedValue.remove(goodsType.id)
+            } else {
+                multiSelection.wrappedValue.insert(goodsType.id)
+            }
+        } else {
+            onSelect(goodsType)
+        }
+    }
+
     private var header: some View {
         HStack(alignment: .center, spacing: 12) {
             Text("グッズ種別を選ぶ")
                 .font(.system(size: 22, weight: .black, design: .rounded))
                 .foregroundStyle(MegrumTheme.ink)
             Spacer()
-            Button(action: onClose) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 20, weight: .black, design: .rounded))
-                    .foregroundStyle(MegrumTheme.muted)
-                    .frame(width: 48, height: 48)
-                    .background(.black.opacity(0.04), in: Circle())
+            if multiSelection == nil {
+                Button(action: onClose) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 20, weight: .black, design: .rounded))
+                        .foregroundStyle(MegrumTheme.muted)
+                        .frame(width: 48, height: 48)
+                        .background(.black.opacity(0.04), in: Circle())
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
         }
         .padding(.horizontal, 18)
         .padding(.top, 24)
