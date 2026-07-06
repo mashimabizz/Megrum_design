@@ -190,3 +190,48 @@ private struct GroomFloatingLikerBadge: View {
         .shadow(color: .black.opacity(0.3), radius: 8, y: 3)
     }
 }
+
+/// ダブルタップいいねの大きなハート。
+struct GroomDoubleTapHeart: Identifiable, Equatable {
+    let id = UUID()
+    var position: CGPoint
+}
+
+/// タップ位置に「ドクン」と現れて、そのまま上へふわりふわり揺れながら
+/// フェードアウトしていく大きなハート。
+struct GroomDoubleTapHeartView: View {
+    var position: CGPoint
+
+    @State private var thumpScale: CGFloat = 0.25
+    @State private var rise: CGFloat = 0
+    @State private var sway = false
+    @State private var fade: Double = 1
+
+    var body: some View {
+        Image(systemName: "heart.fill")
+            .font(.system(size: 88, weight: .heavy))
+            .foregroundStyle(Color.red.opacity(0.92))
+            .shadow(color: .black.opacity(0.25), radius: 10, y: 4)
+            .scaleEffect(thumpScale)
+            .offset(x: sway ? 14 : -14)
+            .position(x: position.x, y: position.y + rise)
+            .opacity(fade)
+            .allowsHitTesting(false)
+            .onAppear {
+                // ドクン：一気に膨らんで少し戻る（心拍のような弾み）
+                withAnimation(.spring(response: 0.24, dampingFraction: 0.42)) {
+                    thumpScale = 1.0
+                }
+                // ふわりふわり：左右に揺れながらゆっくり上昇してフェードアウト
+                withAnimation(.easeInOut(duration: 0.55).repeatForever(autoreverses: true)) {
+                    sway = true
+                }
+                withAnimation(.easeInOut(duration: 1.4).delay(0.35)) {
+                    rise = -190
+                }
+                withAnimation(.easeIn(duration: 1.0).delay(0.7)) {
+                    fade = 0
+                }
+            }
+    }
+}

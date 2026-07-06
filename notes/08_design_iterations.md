@@ -4,6 +4,38 @@
 
 ---
 
+## イテレーション1226.324：いいね触覚FB＋ダブルタップいいね（ドクン→ふわり上昇）
+
+### 背景・問題意識
+オーナーFB：ハートを押したら触覚フィードバックが欲しい。グルームを2回タップでいいねできるように。タップ位置から大きいハートが「ドクン」と出て、上へふわりふわり揺れながらフェードしていく演出に。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/GroomViewerScreen.swift`
+- `toggleCurrentGroomLike` に `MegrumHaptics.buttonTap()` を追加（ON/OFFどちらも）
+- ページ送りのタップ領域に `SpatialTapGesture(count: 2)`（タップ位置つき）を `.exclusively(before:)` で単タップより優先して追加
+  - 2回タップ＝いいね（権限がある場合のみ。既にいいね済みなら演出だけ）＋触覚FB
+  - 単タップのページ送りはダブルタップ判定を待ってから発火（Instagram等と同じ挙動）
+
+#### `ios-native/Sources/MegrumApp/GroomLikeAmbientEffects.swift`
+- `GroomDoubleTapHeartView` 新設：タップ位置に大きな赤ハート（88pt）が spring で「ドクン」と膨らんで現れ、左右に±14ptふわりふわり揺れながら約1.4秒かけて上昇し、フェードアウト。1.9秒後に破棄
+
+### 影響範囲
+- グルームビューア
+
+### 確認方法
+- swift test 1491件 0失敗（ジェスチャ・演出はシミュレータで自動タップ不可のため実機確認）
+
+### セルフレビュー結果
+- ✅ いいねの権限判定（canReplyToCurrentGroom / 自分のグルーム）を尊重
+- ⚠️ 単タップのページ送りにダブルタップ判定分のわずかな遅延が入る（標準的なトレードオフ）
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/GroomViewerScreen.swift`
+- `ios-native/Sources/MegrumApp/GroomLikeAmbientEffects.swift`
+
+---
+
 ## イテレーション1226.323：グルームいいねの色/演出統一・即時カウント・アイコン解決
 
 ### 背景・問題意識

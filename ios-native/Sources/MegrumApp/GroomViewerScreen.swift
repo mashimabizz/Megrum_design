@@ -44,6 +44,8 @@ struct GroomViewerScreen: View {
     var onOpenMeguriUserProfile: (UUID) -> Void = { _ in }
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    static let doubleTapSpaceName = "groom-viewer-double-tap"
+    @State private var doubleTapHearts: [GroomDoubleTapHeart] = []
     @State private var currentIndex: Int
     @State private var dragState = GroomViewerDragPresentationState()
     @State private var interactionState = GroomViewerInteractionState()
@@ -270,15 +272,17 @@ struct GroomViewerScreen: View {
                 HStack(spacing: 0) {
                     Color.clear
                         .contentShape(Rectangle())
-                        .onTapGesture {
-                            move(by: -1)
-                        }
+                        .gesture(pageTapGesture(delta: -1))
 
                     Color.clear
                         .contentShape(Rectangle())
-                        .onTapGesture {
-                            move(by: 1)
-                        }
+                        .gesture(pageTapGesture(delta: 1))
+                }
+                .coordinateSpace(name: Self.doubleTapSpaceName)
+
+                // ダブルタップいいねの大きなハート（ドクン→ふわり上昇フェード）
+                ForEach(doubleTapHearts) { heart in
+                    GroomDoubleTapHeartView(position: heart.position)
                 }
 
                 Color.black
@@ -422,8 +426,39 @@ struct GroomViewerScreen: View {
     }
 
     private func toggleCurrentGroomLike() {
+        // いいね（ON/OFFどちらも）に触覚フィードバックを添える
+        MegrumHaptics.buttonTap()
         Task {
             await appState.setGroomLiked(currentGroom.id, isLiked: !isCurrentGroomLiked)
+        }
+    }
+
+    /// 2回タップ＝いいね（既にいいね済みでも演出だけ出す）。
+    /// 1回タップのページ送りはダブルタップ判定を待ってから発火する。
+    private func pageTapGesture(delta: Int) -> some Gesture {
+        SpatialTapGesture(count: 2, coordinateSpace: .named(Self.doubleTapSpaceName))
+            .onEnded { value in
+                handleDoubleTapLike(at: value.location)
+            }
+            .exclusively(
+                before: TapGesture().onEnded {
+                    move(by: delta)
+                }
+            )
+    }
+
+    private func handleDoubleTapLike(at location: CGPoint) {
+        MegrumHaptics.buttonTap()
+        if canReplyToCurrentGroom || isCurrentGroomMine, !isCurrentGroomLiked {
+            Task {
+                await appState.setGroomLiked(currentGroom.id, isLiked: true)
+            }
+        }
+        let heart = GroomDoubleTapHeart(position: location)
+        doubleTapHearts.append(heart)
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 1_900_000_000)
+            doubleTapHearts.removeAll { $0.id == heart.id }
         }
     }
 
