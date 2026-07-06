@@ -47,8 +47,11 @@ struct HomeDiscoverySeeAllSheet: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 16) {
-                    ForEach(candidates) { candidate in
+                VStack(spacing: 0) {
+                    ForEach(Array(candidates.enumerated()), id: \.element.id) { index, candidate in
+                        if index > 0 {
+                            HomeDiscoveryRowSeparator()
+                        }
                         HomeDiscoveryCandidateSummaryRow(
                             candidate: candidate,
                             titleStyle: route.cardTitleStyle,
@@ -56,6 +59,7 @@ struct HomeDiscoverySeeAllSheet: View {
                             onSelect: onSelect,
                             onSearch: onSearch
                         )
+                        .padding(.vertical, 8)
                     }
                 }
                 .padding(.horizontal, 20)

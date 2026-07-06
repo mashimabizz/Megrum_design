@@ -30,6 +30,10 @@ public extension MegrumRepository {
         []
     }
 
+    func loadTradeEvidencePhotosBulk(proposalIDs: [UUID]) async throws -> [UUID: [TradeEvidencePhoto]] {
+        [:]
+    }
+
     func deleteTradeEvidencePhoto(proposalID: UUID, photoID: UUID) async throws -> TradeProposal {
         throw MegrumRepositoryError.unsupportedMutation
     }

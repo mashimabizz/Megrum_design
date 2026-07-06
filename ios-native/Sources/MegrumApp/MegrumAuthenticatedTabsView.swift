@@ -258,6 +258,7 @@ struct AppDrawerInteractiveHost<Content: View>: View {
     }
 
     private func closeDrawer() {
+        MegrumHaptics.buttonTap()
         withAnimation(AppDrawerInteractiveMetrics.animation) {
             dragTranslation = 0
             showsDrawer = false

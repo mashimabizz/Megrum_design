@@ -82,6 +82,44 @@ extension SupabaseProposalClient {
         return await refreshedEvidencePhotos(from: rows.compactMap(\.evidencePhoto))
     }
 
+    /// やりとり一覧の先読み用：複数proposalの証跡写真を1リクエストでまとめて取得する。
+    public func loadEvidencePhotosBulk(proposalIDs: [UUID]) async throws -> [UUID: [TradeEvidencePhoto]] {
+        guard !proposalIDs.isEmpty else {
+            return [:]
+        }
+        let idList = proposalIDs.map { $0.uuidString.lowercased() }.sorted().joined(separator: ",")
+        let queryItems = [
+            URLQueryItem(name: "proposal_id", value: "in.(\(idList))"),
+            URLQueryItem(name: "order", value: "position.asc")
+        ]
+        let rows: [EvidencePhotoRow]
+        do {
+            rows = try await client.fetchRows(
+                from: "proposal_evidence_photos",
+                select: EvidencePhotoRow.select,
+                queryItems: queryItems
+            )
+        } catch let error as SupabaseRESTError where error.statusCode == 400 {
+            rows = try await client.fetchRows(
+                from: "proposal_evidence_photos",
+                select: EvidencePhotoRow.legacySelect,
+                queryItems: queryItems
+            )
+        }
+        var photosByProposalID: [UUID: [TradeEvidencePhoto]] = [:]
+        for row in rows {
+            guard let photo = row.evidencePhoto else {
+                continue
+            }
+            photosByProposalID[row.proposalId, default: []].append(photo)
+        }
+        var refreshed: [UUID: [TradeEvidencePhoto]] = [:]
+        for (proposalID, photos) in photosByProposalID {
+            refreshed[proposalID] = await refreshedEvidencePhotos(from: photos)
+        }
+        return refreshed
+    }
+
     public func deleteEvidencePhoto(userID: UUID, proposalID: UUID, photoID: UUID) async throws -> TradeProposal {
         let proposal = try await loadProposal(proposalID: proposalID)
         guard proposal.isParticipant(userID) else {

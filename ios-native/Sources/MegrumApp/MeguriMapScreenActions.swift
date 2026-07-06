@@ -102,7 +102,13 @@ extension MeguriMapScreen {
         }
         if canOpen(groom: groom) {
             mapNotice = nil
-            selectedGroom = groom
+            // 1km圏内＋地図表示中のグルームを1つのストーリーとして繋げて開く。
+            let connected = GroomNearbyStoryResolver.connectedGrooms(
+                around: groom,
+                in: mapGrooms.filter(canOpen(groom:))
+            )
+            prefetchGroomImages(connected)
+            selectedGroomGroup = GroomMapGroomSelection(grooms: connected, initialGroom: groom)
             return
         }
         guard locationState.coordinate != nil else {
@@ -130,7 +136,28 @@ extension MeguriMapScreen {
             return
         }
         mapNotice = nil
-        selectedGroomGroup = GroomMapGroomSelection(grooms: visibleGrooms, initialGroom: first)
+        // クラスタも同様に、1km圏内のグルームまで繋げて1つのストーリーで見せる。
+        let connected = GroomNearbyStoryResolver.connectedGrooms(
+            around: first,
+            in: mapGrooms.filter(canOpen(groom:))
+        )
+        let storyGrooms = connected.count > 1 ? connected : visibleGrooms
+        prefetchGroomImages(storyGrooms)
+        selectedGroomGroup = GroomMapGroomSelection(
+            grooms: storyGrooms,
+            initialGroom: first
+        )
+    }
+
+    /// ビューアを開く前に先頭数枚の画像を温めて、開いた瞬間のローディングを防ぐ。
+    private func prefetchGroomImages(_ grooms: [GroomPost]) {
+        let urls = grooms.prefix(3).map(\.imageURL)
+        guard !urls.isEmpty else {
+            return
+        }
+        Task(priority: .userInitiated) {
+            await GoodsRemoteImageDataLoader.preload(urls: urls)
+        }
     }
 
     func openThreadIfInRange(_ thread: BoardThread) {

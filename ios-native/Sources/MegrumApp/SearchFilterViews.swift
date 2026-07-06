@@ -138,6 +138,7 @@ struct SearchFilterSheet: View {
     }
 
     private func applyAndDismiss() {
+        MegrumHaptics.buttonTap()
         onApply(sheetState.draft)
         dismiss()
     }

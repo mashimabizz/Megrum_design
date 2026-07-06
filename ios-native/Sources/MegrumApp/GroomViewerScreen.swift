@@ -101,7 +101,36 @@ struct GroomViewerScreen: View {
     }
 
     private var currentGroomCommentCount: Int {
-        appState.groomReplies(for: currentGroom.id).count
+        let replies = appState.groomReplies(for: currentGroom.id)
+        // コメントは投稿者本人以外には自分の送信分しか見えないため、件数も揃える。
+        if isCurrentGroomMine {
+            return replies.count
+        }
+        guard let viewerID = appState.viewer?.id else {
+            return replies.count
+        }
+        return replies.filter { $0.senderID == viewerID }.count
+    }
+
+    /// 自分のグルームに付いたいいねを、浮遊エフェクト用の表示データへ変換する。
+    private var floatingLikers: [GroomFloatingLiker] {
+        guard isCurrentGroomMine else {
+            return []
+        }
+        return appState.groomReactions(for: currentGroom.id)
+            .sorted { $0.createdAt > $1.createdAt }
+            .map { reaction in
+                let identity = appState.meguriIdentity(
+                    for: reaction.userID,
+                    fallbackAvatarURL: appState.publicProfilesByUserID[reaction.userID]?.profile.avatarURL
+                )
+                return GroomFloatingLiker(
+                    id: reaction.userID,
+                    avatarID: identity.avatarID,
+                    avatarURL: identity.avatarURL,
+                    initial: String(identity.displayName.prefix(1)).uppercased()
+                )
+            }
     }
 
     private var viewerVerticalOffset: CGFloat {
@@ -143,6 +172,7 @@ struct GroomViewerScreen: View {
         .background(Color.black.ignoresSafeArea(.container, edges: .top))
         .ignoresSafeArea()
         .task(id: currentGroom.id) {
+            prefetchNeighborGroomImages()
             await appState.markGroomViewed(currentGroom.id)
             await appState.loadGroomEngagement(postIDs: [currentGroom.id], reportsFailure: false)
             await appState.loadMeguriProfiles(userIDs: [currentGroom.authorID], reportsFailure: false)
@@ -229,22 +259,8 @@ struct GroomViewerScreen: View {
             ZStack {
                 Color.black.ignoresSafeArea(.container, edges: .top)
 
-                AsyncImage(url: currentGroom.imageURL) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .scaledToFit()
-                            .id(currentGroom.id)
-                    case .failure:
-                        GroomImageFailureView(message: "画像を読み込めませんでした", foregroundColor: .white)
-                    default:
-                        ProgressView()
-                            .tint(.white)
-                            .controlSize(.large)
-                    }
-                }
-                .padding(.horizontal, 8)
+                GroomViewerCachedImage(url: currentGroom.imageURL)
+                    .padding(.horizontal, 8)
 
                 HStack(spacing: 0) {
                     Color.clear
@@ -264,6 +280,16 @@ struct GroomViewerScreen: View {
                     .frame(height: GroomViewerChromeLayout.topObstructionHeight(safeAreaTop: proxy.safeAreaInsets.top))
                     .frame(maxHeight: .infinity, alignment: .top)
                     .allowsHitTesting(false)
+
+                // いいね演出：背景から湧くハート＋（自分のグルームなら）いいねした人のアイコン浮遊
+                GroomLikeHeartRainLayer(
+                    groomID: currentGroom.id,
+                    likeCount: currentGroomLikeCount
+                )
+                GroomLikeFloatingLikersLayer(
+                    groomID: currentGroom.id,
+                    likers: floatingLikers
+                )
 
                 VStack(spacing: 0) {
                     GroomViewerPageIndicator(
@@ -362,6 +388,24 @@ struct GroomViewerScreen: View {
         move(by: 1)
     }
 
+    /// 前後のグルーム画像を先読みして、切り替え時にローディングを挟まないようにする。
+    private func prefetchNeighborGroomImages() {
+        let neighborOffsets = [-1, 1, 2]
+        let urls = neighborOffsets.compactMap { offset -> URL? in
+            let index = currentIndex + offset
+            guard grooms.indices.contains(index) else {
+                return nil
+            }
+            return grooms[index].imageURL
+        }
+        guard !urls.isEmpty else {
+            return
+        }
+        Task(priority: .userInitiated) {
+            await GoodsRemoteImageDataLoader.preload(urls: urls)
+        }
+    }
+
     private func dismissViewer() {
         if let onDismiss {
             onDismiss()
@@ -417,5 +461,71 @@ enum GroomViewerChromeLayout {
     /// なるため、ウィンドウ実測値でフォールバックする。
     static func topObstructionHeight(safeAreaTop: CGFloat) -> CGFloat {
         max(safeAreaTop, MegrumWindowInsets.top)
+    }
+}
+
+/// グルーム表示用のキャッシュ対応画像。読み込み中も直前の画像を出したままにして、
+/// 切り替え時のローディング表示・表示後のガクつきをなくす。
+private struct GroomViewerCachedImage: View {
+    var url: URL
+
+    #if canImport(UIKit)
+    @State private var image: UIImage?
+    #endif
+    @State private var hasFailed = false
+
+    var body: some View {
+        ZStack {
+            #if canImport(UIKit)
+            if let image {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFit()
+                    .transition(.opacity)
+            } else if hasFailed {
+                GroomImageFailureView(message: "画像を読み込めませんでした", foregroundColor: .white)
+            } else {
+                ProgressView()
+                    .tint(.white)
+                    .controlSize(.large)
+            }
+            #else
+            AsyncImage(url: url) { phase in
+                switch phase {
+                case .success(let image):
+                    image.resizable().scaledToFit()
+                case .failure:
+                    GroomImageFailureView(message: "画像を読み込めませんでした", foregroundColor: .white)
+                default:
+                    ProgressView().tint(.white).controlSize(.large)
+                }
+            }
+            #endif
+        }
+        #if canImport(UIKit)
+        .task(id: url) {
+            hasFailed = false
+            do {
+                let data = try await GoodsRemoteImageDataLoader.loadData(from: url)
+                guard !Task.isCancelled else {
+                    return
+                }
+                if let loaded = UIImage(data: data) {
+                    withAnimation(.easeInOut(duration: 0.12)) {
+                        image = loaded
+                    }
+                } else if image == nil {
+                    hasFailed = true
+                }
+            } catch {
+                guard !Task.isCancelled else {
+                    return
+                }
+                if image == nil {
+                    hasFailed = true
+                }
+            }
+        }
+        #endif
     }
 }

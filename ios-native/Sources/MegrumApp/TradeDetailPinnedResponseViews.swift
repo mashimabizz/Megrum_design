@@ -5,6 +5,10 @@ import SwiftUI
 struct TradeIncomingProposalSummaryCard: View {
     var label: String
     var summary: String
+    var offeredGoods: [GoodsItem] = []
+    var requestedGoods: [GoodsItem] = []
+    var offeredGoodsCount: Int = 0
+    var requestedGoodsCount: Int = 0
     var action: () -> Void
 
     var body: some View {
@@ -27,13 +31,25 @@ struct TradeIncomingProposalSummaryCard: View {
                 .fill(MegrumTheme.ink.opacity(0.08))
                 .frame(width: 1, height: 48)
 
-            Text(summary)
-                .font(.system(size: 12.5, weight: .black, design: .rounded))
-                .foregroundStyle(MegrumTheme.ink)
-                .lineLimit(1)
-                .minimumScaleFactor(0.68)
-                .frame(maxWidth: .infinity)
-                .padding(.horizontal, 10)
+            // 打診内容は文章ではなく小さなグッズ画像で見せる（画像が無い時のみ文章）。
+            Group {
+                if offeredGoods.isEmpty && requestedGoods.isEmpty {
+                    Text(summary)
+                        .font(.system(size: 12.5, weight: .black, design: .rounded))
+                        .foregroundStyle(MegrumTheme.ink)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.68)
+                } else {
+                    TradeProposalGoodsPreviewStrip(
+                        offeredGoods: offeredGoods,
+                        requestedGoods: requestedGoods,
+                        offeredGoodsCount: offeredGoodsCount,
+                        requestedGoodsCount: requestedGoodsCount
+                    )
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 10)
 
             Button(action: action) {
                 Text("詳細")
@@ -192,5 +208,87 @@ struct TradeIncomingProposalResponseCard: View {
         case .both, nil:
             "checkmark.circle.fill"
         }
+    }
+}
+
+/// 打診内容のミニプレビュー：ゆずる⇄うけとるのグッズ画像を枠内サイズで並べる。
+struct TradeProposalGoodsPreviewStrip: View {
+    var offeredGoods: [GoodsItem]
+    var requestedGoods: [GoodsItem]
+    var offeredGoodsCount: Int
+    var requestedGoodsCount: Int
+
+    private static let visibleLimit = 2
+
+    var body: some View {
+        HStack(spacing: 7) {
+            sideThumbs(goods: offeredGoods, totalCount: offeredGoodsCount)
+
+            Image(systemName: "arrow.left.arrow.right")
+                .font(.system(size: 11, weight: .black))
+                .foregroundStyle(MegrumTheme.lavender)
+
+            sideThumbs(goods: requestedGoods, totalCount: requestedGoodsCount)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("ゆずる \(offeredGoodsCount)点、うけとる \(requestedGoodsCount)点")
+    }
+
+    @ViewBuilder
+    private func sideThumbs(goods: [GoodsItem], totalCount: Int) -> some View {
+        HStack(spacing: 4) {
+            if goods.isEmpty {
+                TradeProposalGoodsPreviewPlaceholder()
+            } else {
+                ForEach(goods.prefix(Self.visibleLimit)) { item in
+                    TradeProposalGoodsPreviewThumb(item: item)
+                }
+                if totalCount > Self.visibleLimit {
+                    Text("+\(totalCount - Self.visibleLimit)")
+                        .font(.system(size: 10.5, weight: .black, design: .rounded))
+                        .foregroundStyle(MegrumTheme.muted)
+                }
+            }
+        }
+    }
+}
+
+private struct TradeProposalGoodsPreviewThumb: View {
+    var item: GoodsItem
+
+    var body: some View {
+        ZStack {
+            if let imageURL = item.imageURL {
+                AsyncImage(url: imageURL) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image.resizable().scaledToFill()
+                    default:
+                        MegrumTheme.lavender.opacity(0.14)
+                    }
+                }
+            } else {
+                MegrumTheme.lavender.opacity(0.14)
+            }
+        }
+        .frame(width: 34, height: 34)
+        .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .strokeBorder(MegrumTheme.lavender.opacity(0.22), lineWidth: 1)
+        }
+    }
+}
+
+private struct TradeProposalGoodsPreviewPlaceholder: View {
+    var body: some View {
+        RoundedRectangle(cornerRadius: 9, style: .continuous)
+            .fill(MegrumTheme.lavender.opacity(0.10))
+            .frame(width: 34, height: 34)
+            .overlay {
+                Image(systemName: "yensign.circle")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(MegrumTheme.lavender.opacity(0.8))
+            }
     }
 }

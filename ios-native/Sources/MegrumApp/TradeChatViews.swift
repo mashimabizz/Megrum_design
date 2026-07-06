@@ -10,23 +10,11 @@ struct TradeChatPartnerStrip: View {
     var body: some View {
         Button(action: onOpenProfile) {
             HStack(spacing: 10) {
-                Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                MegrumTheme.lavender.opacity(0.42),
-                                MegrumTheme.sky.opacity(0.3)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .frame(width: 38, height: 38)
-                    .overlay {
-                        Text(presentation.partnerInitial)
-                            .font(.system(size: 16, weight: .black, design: .rounded))
-                            .foregroundStyle(.white)
-                    }
+                ProfileVisualAvatar(
+                    url: presentation.partnerAvatarURL,
+                    fallback: presentation.partnerInitial,
+                    size: 38
+                )
 
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 5) {

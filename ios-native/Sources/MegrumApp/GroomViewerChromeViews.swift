@@ -147,6 +147,11 @@ enum GroomPostRelativeTimeFormatter {
     }
 }
 
+/// いいね・コメントの未選択時アイコン色（少し透明なグレー）。
+enum GroomViewerEngagementStyle {
+    static let idleIconColor = Color(white: 0.94).opacity(0.72)
+}
+
 struct GroomViewerBottomControls: View {
     let canReply: Bool
     let canLike: Bool
@@ -232,29 +237,39 @@ struct GroomViewerEngagementColumn: View {
     let onOpenComments: () -> Void
     let onOpenLikes: () -> Void
 
+    var showsComments = true
+
     var body: some View {
-        VStack(spacing: 10) {
-            GroomViewerLikeButton(
-                isLiked: isLiked,
-                isEnabled: canLike,
-                action: onToggleLike,
-                onLongPress: onOpenLikes
-            )
-            Text("\(likeCount)")
-                .font(.system(size: 13, weight: .black, design: .rounded))
-
-            Button(action: onOpenComments) {
-                Image(systemName: "bubble.left.fill")
-                    .font(.system(size: 24, weight: .heavy))
-                    .foregroundStyle(.white)
-                    .frame(width: 54, height: 54)
-                    .background(.black.opacity(0.28), in: Circle())
+        VStack(spacing: 14) {
+            VStack(spacing: 3) {
+                GroomViewerLikeButton(
+                    isLiked: isLiked,
+                    isEnabled: canLike,
+                    action: onToggleLike,
+                    onLongPress: onOpenLikes
+                )
+                Text("\(likeCount)")
+                    .font(.system(size: 12.5, weight: .black, design: .rounded))
+                    .shadow(color: .black.opacity(0.4), radius: 4, y: 1)
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("コメントを開く")
 
-            Text("\(commentCount)")
-                .font(.system(size: 13, weight: .black, design: .rounded))
+            if showsComments {
+                VStack(spacing: 3) {
+                    Button(action: onOpenComments) {
+                        Image(systemName: "bubble.left.fill")
+                            .font(.system(size: 26, weight: .heavy))
+                            .foregroundStyle(GroomViewerEngagementStyle.idleIconColor)
+                            .shadow(color: .black.opacity(0.35), radius: 6, y: 1)
+                            .frame(width: 44, height: 40)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("コメントを開く")
+
+                    Text("\(commentCount)")
+                        .font(.system(size: 12.5, weight: .black, design: .rounded))
+                        .shadow(color: .black.opacity(0.4), radius: 4, y: 1)
+                }
+            }
         }
         .foregroundStyle(.white)
         .accessibilityLabel("いいね\(likeCount)件、コメント\(commentCount)件")
@@ -327,11 +342,11 @@ private struct GroomViewerLikeButton: View {
                 }
 
                 Image(systemName: isLiked ? "heart.fill" : "heart")
-                    .font(.system(size: 24, weight: .heavy))
-                    .foregroundStyle(isLiked ? MegrumTheme.pink : .white)
+                    .font(.system(size: 30, weight: .heavy))
+                    .foregroundStyle(isLiked ? MegrumTheme.pink : GroomViewerEngagementStyle.idleIconColor)
+                    .shadow(color: .black.opacity(0.35), radius: 6, y: 1)
                     .scaleEffect(presentationState.likeIconScale)
-                    .frame(width: 54, height: 54)
-                    .background(.black.opacity(0.28), in: Circle())
+                    .frame(width: 48, height: 44)
             }
         }
         .buttonStyle(.plain)
@@ -370,7 +385,12 @@ struct GroomViewerCommentsSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     private var replies: [GroomReply] {
-        appState.groomReplies(for: groom.id).sorted { $0.createdAt > $1.createdAt }
+        let allReplies = appState.groomReplies(for: groom.id).sorted { $0.createdAt > $1.createdAt }
+        // コメントは投稿者本人には全件、他のユーザーには自分が送ったものだけ表示する。
+        guard let viewerID = appState.viewer?.id, viewerID != groom.authorID else {
+            return allReplies
+        }
+        return allReplies.filter { $0.senderID == viewerID }
     }
 
     var body: some View {

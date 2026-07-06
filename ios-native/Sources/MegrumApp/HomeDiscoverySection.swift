@@ -63,8 +63,11 @@ struct HomeDiscoverySection: View {
                     .padding(.trailing, 20)
                 }
             case .summaryRows:
-                VStack(spacing: 14) {
-                    ForEach(displayedCandidates) { candidate in
+                VStack(spacing: 0) {
+                    ForEach(Array(displayedCandidates.enumerated()), id: \.element.id) { index, candidate in
+                        if index > 0 {
+                            HomeDiscoveryRowSeparator()
+                        }
                         HomeDiscoveryCandidateSummaryRow(
                             candidate: candidate,
                             titleStyle: cardTitleStyle,
@@ -72,6 +75,7 @@ struct HomeDiscoverySection: View {
                             onSelect: onSelect,
                             onSearch: onSearchCandidate
                         )
+                        .padding(.vertical, 7)
                     }
                 }
             }
@@ -122,7 +126,7 @@ private struct HomeDiscoverySectionHeader: View {
             Spacer()
 
             if showsSeeAllButton {
-                Button(action: onSeeAll) {
+                Button(action: { MegrumHaptics.performButtonTap(onSeeAll) }) {
                     HStack(spacing: 4) {
                         Text("すべて見る")
                             .font(.system(size: seeAllFontSize, weight: .heavy))
@@ -143,5 +147,15 @@ private struct HomeDiscoverySectionHeader: View {
             return 12.5
         }
         return 14
+    }
+}
+
+/// 推しごとの行の間に入れる「うすくて短い」区切り線。
+struct HomeDiscoveryRowSeparator: View {
+    var body: some View {
+        Rectangle()
+            .fill(MegrumTheme.ink.opacity(0.07))
+            .frame(height: 1)
+            .padding(.horizontal, 36)
     }
 }

@@ -10,7 +10,7 @@ struct BoardThreadChatTimeline: View {
     var onOpenImage: (URL) -> Void = { _ in }
 
     var body: some View {
-        LazyVStack(spacing: 12) {
+        LazyVStack(spacing: 8) {
             if let missingReplyContextMessage {
                 MeguriNoticeBanner(message: missingReplyContextMessage)
                     .padding(.horizontal, 16)
@@ -58,7 +58,7 @@ struct BoardThreadChatMessageRow: View {
                 Spacer(minLength: 0)
             }
 
-            VStack(alignment: message.isMine ? .trailing : .leading, spacing: 4) {
+            VStack(alignment: message.isMine ? .trailing : .leading, spacing: 2) {
                 messageRow
                 BoardMessageReactionBar(
                     goodCount: message.goodReactionCount,
@@ -203,17 +203,17 @@ struct BoardMessageReactionBar: View {
                 onSelect(isSelected ? nil : reaction)
             }
         } label: {
-            HStack(spacing: 4) {
+            HStack(spacing: 3) {
                 // 背景を塗らず、選択時はアイコンの中を塗る
                 Image(systemName: isSelected ? selectedSystemImage : systemImage)
-                    .font(.system(size: 12.5, weight: .black, design: .rounded))
-                    .foregroundStyle(isSelected ? MegrumTheme.lavender : MegrumTheme.muted)
-                Text("\(max(0, count))")
                     .font(.system(size: 10.5, weight: .black, design: .rounded))
                     .foregroundStyle(isSelected ? MegrumTheme.lavender : MegrumTheme.muted)
+                Text("\(max(0, count))")
+                    .font(.system(size: 9.5, weight: .black, design: .rounded))
+                    .foregroundStyle(isSelected ? MegrumTheme.lavender : MegrumTheme.muted)
             }
-            .padding(.horizontal, 6)
-            .frame(minWidth: 34, minHeight: 24)
+            .padding(.horizontal, 5)
+            .frame(minWidth: 28, minHeight: 18)
             .contentShape(Capsule())
         }
         .buttonStyle(.plain)

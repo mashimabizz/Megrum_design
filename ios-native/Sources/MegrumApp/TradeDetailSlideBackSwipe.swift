@@ -8,6 +8,8 @@ enum TradeDetailSlidePresentationMetrics {
     static let dismissFraction: CGFloat = 0.30
     static let presentationSettledDelayNanoseconds: UInt64 = 420_000_000
     static let animation: Animation = .interactiveSpring(response: 0.32, dampingFraction: 0.88, blendDuration: 0.04)
+    /// 開く時だけ少しゆっくり右からスライドする（閉じる・スワイプ戻しは従来の速さ）。
+    static let presentAnimation: Animation = .interactiveSpring(response: 0.52, dampingFraction: 0.92, blendDuration: 0.04)
 }
 
 enum TradeDetailSlideBackSwipeResolver {

@@ -58,6 +58,10 @@ struct TradeDetailPinnedSummaryArea: View {
                 TradeIncomingProposalSummaryCard(
                     label: proposalSummaryLabel,
                     summary: tradeSummaryLine,
+                    offeredGoods: offeredGoods,
+                    requestedGoods: requestedGoods,
+                    offeredGoodsCount: offeredGoodsCount,
+                    requestedGoodsCount: requestedGoodsCount,
                     action: {
                         presentationState.openTradeContentDetails()
                     }

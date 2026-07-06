@@ -56,7 +56,10 @@ extension MegrumAppState {
             evidencePhotosByProposalID = TradeEvidencePhotoStateReducer.replacingLoadedPhotos(
                 in: evidencePhotosByProposalID,
                 proposal: proposal,
-                loadedPhotos: photos,
+                loadedPhotos: TradeEvidencePhotoStateReducer.preservingCachedURLs(
+                    loadedPhotos: photos,
+                    cachedPhotos: previousPhotos
+                ),
                 viewerID: viewer?.id
             )
         } catch {
@@ -74,6 +77,32 @@ extension MegrumAppState {
             }
         }
         loadingEvidencePhotosProposalID = nil
+    }
+
+    /// やりとり一覧の先読み：証跡写真もまとめて取得しておき、取引チャットを
+    /// 開いた時に読み込み表示なしで証跡が出るようにする。読み込み済みは上書きしない。
+    public func preloadTradeEvidencePhotos() async {
+        let targetProposals = proposals.filter { evidencePhotosByProposalID[$0.id] == nil }
+        guard !targetProposals.isEmpty else {
+            return
+        }
+        do {
+            let bulkPhotos = try await repository.loadTradeEvidencePhotosBulk(
+                proposalIDs: targetProposals.map(\.id)
+            )
+            for proposal in targetProposals where evidencePhotosByProposalID[proposal.id] == nil {
+                evidencePhotosByProposalID = TradeEvidencePhotoStateReducer.replacingLoadedPhotos(
+                    in: evidencePhotosByProposalID,
+                    proposal: proposal,
+                    loadedPhotos: bulkPhotos[proposal.id] ?? [],
+                    viewerID: viewer?.id
+                )
+            }
+        } catch {
+            #if DEBUG
+            MegrumAppLogger.general.debug("Megrum trade evidence preload failed: \(String(describing: error), privacy: .public)")
+            #endif
+        }
     }
 
     public func deleteTradeEvidencePhoto(proposalID: UUID, photoID: UUID) async -> Bool {

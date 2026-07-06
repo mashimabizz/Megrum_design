@@ -37,6 +37,7 @@ enum VisualQAInitialScreen: String, Equatable {
     case wish
     case goodsTypeSelect = "goods-type-select"
     case search
+    case profileProposal = "profile-proposal"
 
     var isAuthRoute: Bool {
         switch self {

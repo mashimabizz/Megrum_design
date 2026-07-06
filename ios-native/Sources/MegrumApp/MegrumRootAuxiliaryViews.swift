@@ -13,6 +13,19 @@ extension View {
         sheet(item: item, content: content)
         #endif
     }
+
+    /// iOSはfullScreenCover、macOS（テストビルド）はsheetで表示する汎用ヘルパー。
+    @ViewBuilder
+    func megrumFullScreenItemPresentation<Item: Identifiable, Content: View>(
+        item: Binding<Item?>,
+        @ViewBuilder content: @escaping (Item) -> Content
+    ) -> some View {
+        #if os(iOS)
+        fullScreenCover(item: item, content: content)
+        #else
+        sheet(item: item, content: content)
+        #endif
+    }
 }
 
 struct NativeLoadingScreen: View {

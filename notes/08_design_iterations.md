@@ -4,6 +4,77 @@
 
 ---
 
+## イテレーション1226.302：UI/UX改善12項目（打診ヘッダー・やりとり遷移・グルームいいね演出ほか）
+
+### 背景・問題意識
+オーナー指示の12項目バッチ。プロフィール経由打診のヘッダー被り、やりとり遷移の速度と押下フィードバック、証跡の毎回読み込み、取引チャットヘッダー、ホーム行の区切り、触覚FB、グルームのカクつき・いいね演出、チャットルームのリアクション縮小など。
+
+### 変更内容
+
+#### 1. プロフィール経由打診のヘッダー被り＋フッター位置（`PublicUserProfileScreen.swift` / `MegrumRootAuxiliaryViews.swift`）
+- プロフィールは呼び出し元 NavigationStack 内に置かれるため、スライドオーバーレイをネストするとセーフエリアが消失（ヘッダーがステータスバー被り・フッターが最下部へ張り付き）
+- iOS標準 `fullScreenCover` で表示する `megrumFullScreenItemPresentation` ヘルパーを追加し、打診2ルート（通常/個別募集）を置き換え
+- VisualQAルート `profile-proposal` 追加（`MEGRUM_VISUAL_QA_PROFILE_USER_ID` でプロフィール対象を指定可能）→ シミュレータで修正前後を確認済み
+
+#### 2. やりとり一覧→詳細（`TradeDetailSlideBackSwipe.swift` / `TradesDetailPresentationModifier.swift` / `TradeCardComponents.swift`）
+- 開く時だけ `presentAnimation`（response 0.52）でゆっくり右からスライド（閉じ・スワイプ戻しは従来）
+- パネル押下中は黒0.12のオーバーレイで暗くなる（GestureState なのでスクロール移行・指離しで自動解除）
+
+#### 3. 証跡の事前読み込み（`SupabaseProposalEvidenceClient.swift` / `MegrumAppStateTradeEvidenceActions.swift` ほか）
+- `loadEvidencePhotosBulk`（proposal_id in.(...) の1リクエスト）を新設し、初期読込/更新時に `preloadTradeEvidencePhotos()` で全取引分を先読み
+- 署名URLは取得毎に変わり画像キャッシュが効かなかったため、同じ写真IDならキャッシュ済みURLを保つ `preservingCachedURLs` を追加（開くたびの再ダウンロード表示を解消）
+
+#### 4-5. 取引チャットヘッダー（`TradeDetailPinnedResponseViews.swift` / `TradeChatViews.swift` / `TradeDetailHeroPresentation.swift`）
+- 打診内容プレビューを文章→小さなグッズ画像（34px・ゆずる⇄うけとる、各2枚＋超過は+N。枠48pt内に収まる）
+- パートナーのアイコンをイニシャル円→実アバター画像（未設定はグレー人型）に。ヘッダー帯とヒーロー両方
+
+#### 6. ホーム推し行（`HomeDiscoverySection.swift` / `HomeDiscoveryCandidateSummaryRow.swift` / `HomeDiscoverySeeAllSheet.swift`）
+- 行間に「うすくて短い」区切り線（ink 7%・左右36pt インセット）
+- 行全体をタップ可能にし、押下中は薄グレー（黒6%）のハイライト＋タップで候補シートを開く
+
+#### 7. 触覚フィードバック追加
+- ドロワー閉（開は既存）／ホーム「すべて見る」／ロータリーのグッズ選択／検索候補タップ／フィルター適用（検索ボタン・フィルターアイコンは既存）
+
+#### 8. グルーム表示のカクつき解消（`GroomViewerScreen.swift` / `MeguriMapScreenActions.swift`）
+- AsyncImage→`GroomViewerCachedImage`（GoodsRemoteImageDataCache 使用・切り替え中は直前の画像を保持しローディングを挟まない）
+- 表示中グルームの前後±1/+2 を先読み。地図タップ時も開く前に先頭3枚を先読み
+
+#### 9. 1km圏内グルームの連結表示（`GroomNearbyStoryResolver.swift` 新規）
+- 地図でグルームを開くと、半径1km圏内＋地図表示中のグルームを投稿者問わず1つのストーリーに連結（タップした投稿が先頭、以降は近い順）。クラスタタップも同様
+- テスト3件追加（圏内抽出・距離順・単独）
+
+#### 10. いいね数に応じたハート湧きエフェクト（`GroomLikeAmbientEffects.swift` 新規）
+- グルームを開いた時、いいねがあれば背景下からハートが湧き上がる（1-10=8個/10-50=16個/50+=28個、`GroomLikeHeartRainPolicy`）。Reduce Motion では再生しない
+
+#### 11. チャットルームのリアクション縮小（`BoardThreadDetailReplyViews.swift`）
+- いいね/バッドを縮小（アイコン10.5pt・高さ18）・バブルとの間隔2pt・メッセージ間隔12→8pt
+
+#### 12. グルームいいねUI（`GroomViewerChromeViews.swift` / `GroomLikeAmbientEffects.swift` / `GroomViewerScreen.swift`）
+- いいね/コメントボタンを黒円背景→少し透明なグレーのアイコンのみ（heart 30pt、白94%×72%＋影）に変更。いいね時はピンク塗り
+- 自分のグルームでは、いいねしたユーザーのアイコン＋ハートバッジが下からふわふわ浮上（最大5人、コメント本文は出さない）
+- **コメントは投稿者本人のみ全件表示**。他ユーザーは自分が送ったものだけ見える（件数表示も同基準）
+
+### 影響範囲
+- プロフィール/検索/めぐり経由の打診、やりとり一覧・取引チャット、ホーム候補一覧、検索、グルームビューア、チャットルーム
+
+### 確認方法
+- シミュレータ：profile-proposal ルートで打診ヘッダー正常化を確認、ホームで区切り線を確認（スクショ）
+- swift test 1480件（+6）0 failures
+
+### セルフレビュー結果
+- ✅ ブランドカラー直書きなし（MegrumTheme 経由）
+- ✅ iOS標準優先：打診の全画面表示は fullScreenCover を採用
+- ✅ 新規ロジック（1km連結・広告下限・証跡バルク）はテスト付き
+- ⚠️ グルームのハート湧き・浮遊アイコンはシミュレータの実タップ確認ができないため実機で要確認
+- ⚠️ コメントの表示制限はクライアント側フィルタのみ（サーバ側RLSは未変更＝APIでは取得可能。必要なら次イテレーションでRLS対応）
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/GroomLikeAmbientEffects.swift`（新規）
+- `ios-native/Sources/MegrumApp/GroomNearbyStoryResolver.swift`（新規）
+- `ios-native/Sources/MegrumApp/PublicUserProfileScreen.swift` ほか
+
+---
+
 ## イテレーション1226.301：広告非表示の修正（テスト広告有効化＋検索結果の最低1枠保証）
 
 ### 背景・問題意識

@@ -5,10 +5,22 @@ struct TradeCardExclusivePressModifier: ViewModifier {
     var onTap: () -> Void
     var onLongPress: (() -> Void)?
 
+    /// 押下中はパネル背景を暗くして「押した」ことを視覚的に返す。
+    /// GestureState なので指を離す・スクロールに移った時点で自動的に解除される。
+    @GestureState private var isPressed = false
+
     @ViewBuilder
     func body(content: Content) -> some View {
+        let highlighted = content
+            .overlay {
+                Color.black.opacity(isPressed ? 0.12 : 0)
+                    .allowsHitTesting(false)
+            }
+            .animation(.easeOut(duration: isPressed ? 0.08 : 0.24), value: isPressed)
+            .simultaneousGesture(pressHighlightGesture)
+
         if let onLongPress {
-            content.gesture(
+            highlighted.gesture(
                 ExclusiveGesture(
                     LongPressGesture(minimumDuration: 0.45, maximumDistance: 18),
                     TapGesture()
@@ -27,11 +39,21 @@ struct TradeCardExclusivePressModifier: ViewModifier {
                 }
             )
         } else {
-            content.onTapGesture {
+            highlighted.onTapGesture {
                 MegrumHaptics.buttonTap()
                 onTap()
             }
         }
+    }
+
+    /// 押下ハイライト専用（タップ／長押しの判定には関与しない）。
+    /// 指が大きく動いた（＝スクロール）時はハイライトを消す。
+    private var pressHighlightGesture: some Gesture {
+        DragGesture(minimumDistance: 0)
+            .updating($isPressed) { value, state, _ in
+                let moved = abs(value.translation.width) > 12 || abs(value.translation.height) > 12
+                state = !moved
+            }
     }
 }
 

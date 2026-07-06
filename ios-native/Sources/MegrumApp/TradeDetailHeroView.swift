@@ -7,24 +7,11 @@ struct TradeDetailHero: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top, spacing: 12) {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                MegrumTheme.lavender.opacity(0.34),
-                                MegrumTheme.sky.opacity(0.24)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .frame(width: 46, height: 46)
-                    .overlay {
-                        Text(presentation.partnerInitial)
-                            .font(.system(size: 20, weight: .black, design: .rounded))
-                            .foregroundStyle(.white)
-                            .shadow(color: MegrumTheme.ink.opacity(0.16), radius: 6, y: 2)
-                    }
+                ProfileVisualAvatar(
+                    url: presentation.partnerAvatarURL,
+                    fallback: presentation.partnerInitial,
+                    size: 46
+                )
 
                 VStack(alignment: .leading, spacing: 5) {
                     Text("@\(presentation.partnerHandle)")

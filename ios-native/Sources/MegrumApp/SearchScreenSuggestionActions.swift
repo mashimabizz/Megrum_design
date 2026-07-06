@@ -2,6 +2,7 @@ import Foundation
 
 extension SearchScreen {
     func applySuggestion(_ action: SearchSuggestionAction) {
+        MegrumHaptics.buttonTap()
         presentationState.beginSuggestionApplication()
         switch action {
         case .group(let groupID):

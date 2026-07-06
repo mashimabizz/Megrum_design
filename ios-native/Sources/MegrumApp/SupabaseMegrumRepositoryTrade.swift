@@ -35,6 +35,10 @@ public extension SupabaseMegrumRepository {
         try await proposalClient.loadEvidencePhotos(proposalID: proposalID)
     }
 
+    func loadTradeEvidencePhotosBulk(proposalIDs: [UUID]) async throws -> [UUID: [TradeEvidencePhoto]] {
+        try await proposalClient.loadEvidencePhotosBulk(proposalIDs: proposalIDs)
+    }
+
     func deleteTradeEvidencePhoto(proposalID: UUID, photoID: UUID) async throws -> TradeProposal {
         try await proposalClient.deleteEvidencePhoto(userID: viewerID, proposalID: proposalID, photoID: photoID)
     }

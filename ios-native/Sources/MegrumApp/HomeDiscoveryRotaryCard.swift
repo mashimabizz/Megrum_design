@@ -32,6 +32,7 @@ struct HomeDiscoveryRotaryCard: View {
         .accessibilityHint("タップで詳細を開きます。横スワイプで画像を切り替えます。")
         .accessibilityAction {
             if let selectedGoods {
+                MegrumHaptics.buttonTap()
                 onActivate?(selectedGoods)
             }
         }
@@ -145,6 +146,7 @@ struct HomeDiscoveryRotaryCard: View {
     private func handleTap(position: Double) {
         if abs(position) <= 0.45 {
             if let selectedGoods {
+                MegrumHaptics.buttonTap()
                 onActivate?(selectedGoods)
             }
             return

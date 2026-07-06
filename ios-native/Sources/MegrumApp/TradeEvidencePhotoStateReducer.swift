@@ -24,6 +24,25 @@ public enum TradeEvidencePhotoStateReducer {
         return next
     }
 
+    /// 同じ写真IDならキャッシュ済みURLを使い続ける。署名URLは取得のたびに変わるため、
+    /// そのまま差し替えると画像キャッシュが効かず開くたびに再ダウンロード表示になる。
+    public static func preservingCachedURLs(
+        loadedPhotos: [TradeEvidencePhoto],
+        cachedPhotos: [TradeEvidencePhoto]?
+    ) -> [TradeEvidencePhoto] {
+        guard let cachedPhotos, !cachedPhotos.isEmpty else {
+            return loadedPhotos
+        }
+        let cachedURLByID = Dictionary(cachedPhotos.map { ($0.id, $0.photoURL) }) { first, _ in first }
+        return loadedPhotos.map { photo in
+            var photo = photo
+            if let cachedURL = cachedURLByID[photo.id] {
+                photo.photoURL = cachedURL
+            }
+            return photo
+        }
+    }
+
     public static func fallbackPhotos(
         for proposal: TradeProposal,
         viewerID: UUID?

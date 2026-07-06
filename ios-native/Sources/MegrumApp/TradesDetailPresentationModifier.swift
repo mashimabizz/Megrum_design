@@ -158,7 +158,7 @@ struct TradeDetailSlidePresentationOverlay: View {
             ) else {
                 return
             }
-            withAnimation(TradeDetailSlidePresentationMetrics.animation) {
+            withAnimation(TradeDetailSlidePresentationMetrics.presentAnimation) {
                 presentationState.markPresented()
             }
         }

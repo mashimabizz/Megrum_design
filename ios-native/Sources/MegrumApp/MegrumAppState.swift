@@ -354,6 +354,7 @@ public final class MegrumAppState: ObservableObject {
             await loadMeguriMessages(reportsFailure: false)
             await loadViewerEvaluatedProposalIDs()
             await preloadTradeMessages()
+            await preloadTradeEvidencePhotos()
         } catch {
             errorMessage = "データを読み込めませんでした"
         }
@@ -378,6 +379,7 @@ public final class MegrumAppState: ObservableObject {
             await loadMeguriMessages(reportsFailure: false)
             await loadViewerEvaluatedProposalIDs()
             await preloadTradeMessages()
+            await preloadTradeEvidencePhotos()
         } catch {
             errorMessage = "ホームを更新できませんでした"
         }

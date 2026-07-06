@@ -97,6 +97,11 @@ struct PublicUserProfileScreen: View {
             if appState.goodsTypes.isEmpty {
                 await appState.loadGoodsTypes()
             }
+            // VisualQA（profile-proposal）：プロフィール経由の打診画面をタップ操作なしで検証する。
+            if VisualQAPreviewMode.initialScreen(environment: ProcessInfo.processInfo.environment) == .profileProposal,
+               presentationState.proposalTargetItem == nil {
+                startPrimaryProposal()
+            }
         }
         .sheet(isPresented: $presentationState.isEvaluationListPresented) {
             UserEvaluationListSheet(
@@ -116,12 +121,15 @@ struct PublicUserProfileScreen: View {
                 )
             }
         }
-        .megrumSlideItemPresentation(item: $presentationState.proposalTargetItem) { item, _ in
+        // プロフィールは呼び出し元の NavigationStack 内に置かれるため、スライドオーバーレイを
+        // ネストするとセーフエリアが失われる（ヘッダーがステータスバーに被る）。
+        // iOS標準の fullScreenCover で正しいセーフエリアのまま全画面表示する。
+        .megrumFullScreenItemPresentation(item: $presentationState.proposalTargetItem) { item in
             NavigationStack {
                 ProposalCreateFlow(appState: appState, targetItem: item)
             }
         }
-        .megrumSlideItemPresentation(item: $presentationState.listingProposalTarget) { target, _ in
+        .megrumFullScreenItemPresentation(item: $presentationState.listingProposalTarget) { target in
             NavigationStack {
                 ProposalCreateFlow(
                     appState: appState,

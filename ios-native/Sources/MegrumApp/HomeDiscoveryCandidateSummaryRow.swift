@@ -21,6 +21,8 @@ struct HomeDiscoveryCandidateSummaryRow: View {
     var onSearch: (HomeDiscoveryCandidate, HomeMockGoods?) -> Void
 
     @State private var presentationState = HomeDiscoveryCandidateButtonPresentationState()
+    /// 行タップの押下ハイライト（指を離す・スクロールで自動解除）。
+    @GestureState private var isRowPressed = false
 
     private var orderedGoods: [HomeMockGoods] {
         HomeCandidateDemandPolicy.orderedGoodsByDemand(of: candidate)
@@ -42,12 +44,35 @@ struct HomeDiscoveryCandidateSummaryRow: View {
             }
             infoColumn
         }
+        .contentShape(Rectangle())
+        .overlay {
+            // 行のどこを押しても「押した」ことが分かるよう、押下中は薄いグレーを重ねる。
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(Color.black.opacity(isRowPressed ? 0.06 : 0))
+                .padding(.horizontal, -6)
+                .allowsHitTesting(false)
+        }
+        .animation(.easeOut(duration: isRowPressed ? 0.08 : 0.24), value: isRowPressed)
+        .simultaneousGesture(rowPressHighlightGesture)
+        .onTapGesture {
+            MegrumHaptics.buttonTap()
+            onSelect(candidate.sheet(selectedGoods: selectedGoods))
+        }
         .onAppear {
             presentationState.hydrateIfNeeded(goods: orderedGoods)
         }
         .onChange(of: candidate.goods.map(\.id)) { _, _ in
             presentationState.resetSelection(goods: orderedGoods)
         }
+    }
+
+    /// 押下ハイライト専用（タップ判定には関与しない）。大きく動いたら＝スクロールとみなして消す。
+    private var rowPressHighlightGesture: some Gesture {
+        DragGesture(minimumDistance: 0)
+            .updating($isRowPressed) { value, state, _ in
+                let moved = abs(value.translation.width) > 12 || abs(value.translation.height) > 12
+                state = !moved
+            }
     }
 
     private var labelButton: some View {

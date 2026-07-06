@@ -5,6 +5,7 @@ struct TradeDetailHeroPresentation: Equatable, Sendable {
     var partnerDisplayName: String
     var partnerHandle: String
     var partnerInitial: String
+    var partnerAvatarURL: URL?
     var partnerMetaText: String
     var relationText: String
     var statusLabel: String
@@ -31,6 +32,7 @@ struct TradeDetailHeroPresentation: Equatable, Sendable {
         self.partnerDisplayName = (profile?.displayName).nilIfBlank ?? handle
         self.partnerHandle = handle
         self.partnerInitial = String(self.partnerDisplayName.prefix(1)).uppercased()
+        self.partnerAvatarURL = profile?.avatarURL
         self.exchangeMethodText = proposal.exchangeMethod.displayName
         self.partnerMetaText = Self.partnerMetaText(for: profile)
 
