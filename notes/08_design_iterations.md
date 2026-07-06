@@ -4,6 +4,47 @@
 
 ---
 
+## イテレーション1226.321：現地/広域探し分け仕様メモの削除
+
+### 背景・問題意識
+
+オーナーから、「現地/広域の探し分け」は現在のプロダクト仕様にないため、仕様メモ側から削除したいという指摘があった。現地交換、待ち合わせ候補、グルーム/掲示板の位置情報リスク説明は残しつつ、ホームやマッチングを広域/現地モードで切り替える前提を外す。
+
+### 変更内容
+
+#### `notes/02_system_requirements.md`
+- マッチング構成から広域マッチ/現地マッチ/現地モード切替の説明を削除し、通常のホーム候補と個別募集中心の説明へ整理した。
+
+#### `notes/05_data_model.md`
+- `user_local_mode_settings` の仕様セクションを削除した。
+
+#### `notes/09_state_machines.md`
+- Local Mode状態機械を削除し、目次から現地モード項目を外した。
+
+#### `notes/10_glossary.md`
+- 広域マッチ、現地マッチ、現地交換モードの用語定義を削除した。
+
+#### その他仕様・法務・リリースメモ
+- `notes/11_screen_inventory.md` / `notes/18_matching_v2_design.md` / `notes/21_oshi_encounter_strategy.md` / `notes/22_swift_native_migration.md` / `notes/24_app_store_submission_pack.md` / `notes/25_public_legal_support_pages.md` / `notes/27_app_privacy_data_inventory.md` / `notes/40_app_store_connect_copy_paste_sheet.md` / `notes/43_app_privacy_connect_answer_sheet.md` / `notes/46_app_store_questionnaire_answer_sheet.md` / `notes/50_release_go_no_go_decision_matrix.md` / `notes/52_data_retention_deletion_matrix.md` / `notes/54_prelaunch_security_audit_checklist.md` / `notes/55_public_help_faq_draft.md` / `notes/56_in_app_legal_safety_copy_deck.md` / `notes/59_initial_release_scope_exposure_audit.md` / `notes/62_app_review_manual_submission_checklist.md` / `notes/63_public_page_redaction_qa.md` / `notes/66_legal_review_publication_runbook.md` / `notes/67_support_inbox_triage_runbook.md` / `notes/71_app_store_connect_final_input_reconciliation.md` / `notes/legal/01_terms_of_service_draft.md` / `notes/legal/02_privacy_policy_draft.md` から、現地/広域探し分けや現地交換モード前提の表現を削除・言い換えた。
+
+### 影響範囲
+
+- ホーム候補、マッチング設計、データモデル、状態遷移、画面棚卸し、App Privacy/法務/リリース前チェックの仕様メモ。
+- 現地交換という交換方法、待ち合わせ候補、現在地共有、グルーム/掲示板の近距離表示・位置情報リスク説明は維持。
+
+### 確認方法
+- `rg -n -C 1 '現地交換モード|現地モード|広域マッチ|現地マッチ|user_local_mode_settings|HomeLocal|LocalMode|run_global_match|広域 / 現地|現地交換に切り替え|広域に戻す|selected_wish_ids|global match|local match' notes ios-native/README.md -g '!notes/08_design_iterations.md'`
+  - 対象語句の残存なし
+- `git diff --check`
+  - passed
+
+### セルフレビュー結果
+- ✅ 現地/広域を切り替えて探す仕様前提を削除した。
+- ✅ 現地交換、待ち合わせ候補、位置情報の安全・法務注意は必要な範囲で維持した。
+- ✅ 旧実装名や旧DB名が現行仕様メモとして読まれないように削除・言い換えた。
+
+---
+
 ## イテレーション1226.320：優先度仕様メモの削除
 
 ### 背景・問題意識
@@ -48,6 +89,51 @@
 - ✅ wish/個別募集/API/データモデルからユーザー設定としての優先度を削除した。
 - ✅ 否定文としての「優先度は使わない」も残さず、現行仕様から概念を外した。
 - ✅ 推し並び順や運用優先度など別概念は変更していない。
+
+---
+
+## イテレーション1226.320：アーカイブのクラスタ統合・吹き出し端アンカー・検索インターステイシャル
+
+### 背景・問題意識
+オーナーFB 3件：グルームアーカイブ地図もホーム同様に統合/分解してほしい。吹き出しが長文だとしっぽ位置がずれアイコンに被る（外側・近すぎず・バッジ回避）。1日の検索2回目に1回、以降2回ごとにインターステイシャル広告を挟みたい（AdMobユニット作成済み）。
+
+### 変更内容
+
+#### 1. グルームアーカイブのクラスタ統合/分解
+- `MeguriClusterMorphController.swift`（新規）：ホーム地図の統合/分解モーフ（寄って1つになる・散らばる）を @Observable コントローラとして抽出
+- `GroomArchiveMapViews.swift`：アーカイブ地図を MeguriMapClusterBuilder＋モーフコントローラ化。ズームに応じて統合（青バッジ付きクラスタ）・タップで分解ズーム。ホーム側の実装は現状維持（将来コントローラへ移行可）
+
+#### 2. 吹き出しの端アンカー配置（`BoardThreadMessagePopBubbles.swift`）
+- 中心オフセット配置をやめ、「しっぽ側の角を固定する端アンカー」方式へ：
+  左横＝アイコン左端-7ptに bottomTrailing を固定して左へ伸びる／右横＝アイコン右端+13pt・低めに bottomLeading を固定して右へ伸びる
+- 文章の長さに関係なくしっぽは常にアイコン外側の定位置でアイコンへ向く
+- 右横はクラスタバッジ（右上の件数）の右外側から始まるため被らない（シミュレータで両配置とも目視確認）
+
+#### 3. 検索インターステイシャル広告
+- `SearchInterstitialAds.swift`（新規）：
+  - `SearchInterstitialFrequencyPolicy`：1日の検索2回目に表示、以降2回ごと（2・4・6…回目）
+  - `SearchDailyCountStore`：UserDefaults の日付キーで毎日リセットされる検索カウンタ
+  - `SearchInterstitialAdController`：GoogleMobileAds InterstitialAd を事前ロードし、該当回の検索直後に全画面表示（閉じたら次回分を再ロード）。プレミアム/設定はAdDisplayPolicyで抑制、VisualQAでは無効
+- カウント対象＝ユーザー操作の検索：クエリ送信・推し/シリーズ等のチップ・ほしいもの/個別募集ピッカー・フィルタ適用
+- `Config/MegrumNative.xcconfig`：`MEGRUM_ADMOB_SEARCH_INTERSTITIAL_UNIT_ID = ca-app-pub-8452629012277819/3070048280`（実ID）。`MEGRUM_ADMOB_TEST_ADS_ENABLED=YES` の間はGoogleデモ・インターステイシャルに自動差し替え（AdRuntimeConfiguration に demo interstitial 追加）
+- テスト：`SearchInterstitialFrequencyTests`（頻度ルール＋日次リセット）追加
+
+### 影響範囲
+- グルームアーカイブ、めぐり地図の吹き出し、検索画面（広告）
+
+### 確認方法
+- シミュレータ：アーカイブで5件→1クラスタ（青バッジ5）を確認。吹き出しは左「？」・右「ぴえんぴえん」両配置でアイコン外側＋バッジ非重複を確認
+- swift test 1488件 0失敗
+
+### セルフレビュー結果
+- ✅ 共通化：モーフはコントローラ抽出で再利用
+- ✅ 広告はAdDisplayPolicy経由（プレミアム抑制・設定無効を尊重）
+- ⚠️ インターステイシャルの実表示はテスト広告で実機確認が必要（本番IDへの切替は TEST_ADS_ENABLED=NO のリリース時）
+- ⚠️ ホーム地図のモーフは既存実装のまま（挙動同一・重複コードは将来統合）
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/MeguriClusterMorphController.swift`
+- `ios-native/Sources/MegrumApp/SearchInterstitialAds.swift`
 
 ---
 

@@ -33,12 +33,11 @@
 7. [Account Lifecycle](#7-account-lifecycle)
 8. [Listing Lifecycle（個別募集 / iter64〜）](#8-listing-lifecycle)
 9. [Calendar Disclosure（カレンダー公開 / iter65〜）](#9-calendar-disclosure)
-10. [Local Mode（現地モード / iter63〜）](#10-local-mode)
-11. [Meguri Message Lifecycle（めぐりメッセージ）](#11-meguri-message-lifecycle)
-12. [Groom Lifecycle（グルーム）](#12-groom-lifecycle)
-13. [Meguri Board Lifecycle（チャットルーム）](#13-meguri-board-lifecycleチャットルーム)
-14. [Admin / Billing Lifecycle（管理者・有料権限）](#14-admin--billing-lifecycle管理者有料権限)
-15. [付録：エンティティ間の関係](#15-付録エンティティ間の関係)
+10. [Meguri Message Lifecycle（めぐりメッセージ）](#11-meguri-message-lifecycle)
+11. [Groom Lifecycle（グルーム）](#12-groom-lifecycle)
+12. [Meguri Board Lifecycle（チャットルーム）](#13-meguri-board-lifecycleチャットルーム)
+13. [Admin / Billing Lifecycle（管理者・有料権限）](#14-admin--billing-lifecycle管理者有料権限)
+14. [付録：エンティティ間の関係](#15-付録エンティティ間の関係)
 
 ---
 

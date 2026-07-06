@@ -182,7 +182,7 @@ App Store Connect > App Privacyで確認する。
 | AP-006.6d | メール認証、パスワードリセット、Google OAuth、native callback、通知linkPath又はdeep linkを出す場合、URL scheme、Supabase Redirect URLs、Google OAuth設定、Web中継Route、認証リンク/認証コード共有禁止説明、App Privacy/FAQ/Review Notesが一致 | TODO | `notes/24`, `notes/27`, `notes/36`, `notes/43`, `notes/48`, `notes/54`, `notes/55`, `notes/56`, `notes/75` |
 | AP-006.6e | Keychain保存session、access token、refresh token、session更新、logout時local clear、Keychain accessibility方針、端末紛失/バックアップ/他端末session説明がPrivacy/App Privacy/FAQ/Review Notesで一致 | TODO | `notes/17`, `notes/24`, `notes/27`, `notes/36`, `notes/43`, `notes/48`, `notes/52`, `notes/54`, `notes/55`, `notes/75` |
 | AP-006.6a | 現在地共有、服装写真、取引チャット写真を出す場合、30日後自動削除ではなく運用目標であること、署名URL/端末キャッシュ/相手保存/通報・法令対応による例外保持をPrivacy、FAQ、Review Notesで一致させている | TODO | `notes/legal/02`, `notes/52`, `notes/55` |
-| AP-006.6b | 近くのグルーム、スポット掲示板、現在地共有、待ち合わせ候補、現地交換モード、作成位置、閲覧者位置、地図表示、逆ジオコーディング、場所名又は距離表示を出す場合、Precise Location、MapKit/CoreLocation/CLGeocoder、精密座標の送信/保存、作成位置、閲覧者位置、保持/削除例外、地図/距離/場所名の非保証、1km/3km非保証がPrivacy/App Privacy/FAQ/Review Notesで一致 | TODO | `notes/27`, `notes/43`, `notes/48`, `notes/55`, `notes/56` |
+| AP-006.6b | 近くのグルーム、スポット掲示板、現在地共有、待ち合わせ候補、作成位置、閲覧者位置、地図表示、逆ジオコーディング、場所名又は距離表示を出す場合、Precise Location、MapKit/CoreLocation/CLGeocoder、精密座標の送信/保存、作成位置、閲覧者位置、保持/削除例外、地図/距離/場所名の非保証、1km/3km非保証がPrivacy/App Privacy/FAQ/Review Notesで一致 | TODO | `notes/27`, `notes/43`, `notes/48`, `notes/55`, `notes/56` |
 | AP-006.7 | Push通知を出す場合、APNs/Expo token、push provider、app version、last seen、revoked状態、通知本文、通知ID、linkPath、sound、未読バッジ、ロック画面/通知センター/連携端末表示、Push任意性、販促Push同意/停止手段、User Content/Usage Data影響がPrivacy回答と説明に反映済み | TODO | `notes/27`, `notes/43`, `notes/48`, `notes/52`, `notes/56` |
 | AP-006.8 | 生年月日/年齢表示を出す場合、Other Data Types候補、自己申告年齢説明、Age Rating、FAQ/Review Notesが一致 | TODO | `notes/25`, `notes/43`, `notes/46`, `notes/55` |
 | AP-006.9 | 性別、活動エリア、公開プロフィール、評価、支払い方法要約を出す場合、Other Data Types / Coarse Location / User Content候補、自己申告プロフィール説明、FAQ/Review Notesが一致 | TODO | `notes/25`, `notes/43`, `notes/46`, `notes/55` |
@@ -197,7 +197,7 @@ No-Go:
 - ホーム候補、検索結果、「マッチしてるよ！」「交換できるかも？」「全一致」等が見えるのに、参考表示であり本人性、安全性、信用、所有権、真贋、支払い、発送、現地合流又は取引成立を保証しない説明を確認していない。
 - 検索語、`normalized_term`、`result_count`、検索時刻、人気検索、検索候補、表示順、Plus優先表示、広告挿入又はProduct Personalizationが有効なのに、App Privacy、Privacy、FAQ、Review Notesの一致を確認していない。
 - 外部SDKの収集データを確認していない。
-- 近くのグルーム、スポット掲示板、現在地共有、待ち合わせ候補、現地交換モード、作成位置、閲覧者位置、地図表示、逆ジオコーディング、場所名又は距離表示が見えるのに、Precise Location、MapKit/CoreLocation/CLGeocoder、精密座標の送信/保存、作成位置、閲覧者位置、保持/削除例外、地図/距離/場所名の非保証、1km/3km非保証を確認していない。
+- 近くのグルーム、スポット掲示板、現在地共有、待ち合わせ候補、作成位置、閲覧者位置、地図表示、逆ジオコーディング、場所名又は距離表示が見えるのに、Precise Location、MapKit/CoreLocation/CLGeocoder、精密座標の送信/保存、作成位置、閲覧者位置、保持/削除例外、地図/距離/場所名の非保証、1km/3km非保証を確認していない。
 - 外部AIが見えるのにOpenAI等の送信先、画像又は画像URL、web search、保持、学習利用、削除可否、Privacy回答と規約/ポリシーに説明がない。
 - Push通知が見えるのにAPNs/Expo token、通知本文、未読バッジ、ロック画面表示、App Privacy回答を確認していない。
 - Push通知を許可しないと登録又は主要機能を使えない、正確な現在地、住所、銀行口座、認証コード、本人確認書類、通報/異議申し立て詳細本文をPush本文へ出す、又は販促Pushに同意・停止手段がない。
@@ -245,7 +245,7 @@ Review Notesで必ず触れること:
 - カメラ、写真ライブラリ又は共有シートが見える場合は、写真ライブラリ由来の画像メタデータが残る可能性、共有用画像/テキストに含まれる情報、外部共有後のpublication/storage/reshare/deletion/analytics/metadata handlingは共有先サービスのポリシーに従うこと。
 - 評価コメント、通報、ブロック、モデレーションが見える場合は、緊急通報、legal judgment、identity verification、safety verification、credit check、deletion guaranteeではないこと。
 - 広告を出す場合は、不適切又は年齢に合わない広告を通報できること。AdMobを出す場合は、test adsのまま一般公開していないこと、ATT/Tracking/App Privacy/Google公式データ開示が一致していること。
-- 近くのグルーム、スポット掲示板、現在地共有、待ち合わせ候補、現地交換モード、作成位置、閲覧者位置、地図表示、逆ジオコーディング、場所名又は距離表示を出す場合は、精密座標を扱い得ること、MapKit/CoreLocation/CLGeocoder等を使うこと、1km/3kmが匿名化又は安全保証ではないこと、地図/距離/場所名が安全又は到着を保証しないこと。
+- 近くのグルーム、スポット掲示板、現在地共有、待ち合わせ候補、作成位置、閲覧者位置、地図表示、逆ジオコーディング、場所名又は距離表示を出す場合は、精密座標を扱い得ること、MapKit/CoreLocation/CLGeocoder等を使うこと、1km/3kmが匿名化又は安全保証ではないこと、地図/距離/場所名が安全又は到着を保証しないこと。
 - Megrumはユーザー同士のグッズ交換補助であり、売買マーケット、古物商、買取、販売代理、オークション、チケット譲渡又は決済代行ではないこと。チケット、入場用QRコード、抽選権、盗品、不正取得品、権利侵害品、反復継続的販売又は古物営業のおそれがある取引は禁止であること。
 - 公開URLがログイン不要であること。
 

@@ -42,6 +42,7 @@ extension SearchScreen {
             }
         }
         scheduleSearch(delayNanoseconds: 0)
+        registerUserSearchForInterstitial()
         finishSuggestionApplication()
     }
 
@@ -58,6 +59,7 @@ extension SearchScreen {
         presentationState.beginSuggestionApplication()
         assignListingCriteria(criteria)
         scheduleSearch(delayNanoseconds: 0)
+        registerUserSearchForInterstitial()
         finishSuggestionApplication()
     }
 

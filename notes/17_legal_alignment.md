@@ -31,11 +31,11 @@
 
 - 現行Swift Nativeでは、`MegrumLocationState` が `CLLocationManager` を `kCLLocationAccuracyNearestTenMeters`、`distanceFilter = 10` で使い、`CLGeocoder.reverseGeocodeLocation` で座標を場所名へ変換する。
 - 取引チャットでは `messages.message_type = 'location'` が `location_lat`、`location_lng`、`location_label` を保存し、`TradeLocationPreviewBubble` は地図プレビューと緯度/経度表示を出す。服装写真は `outfit_photo`、到着状況は `arrival_status` として追記型メッセージに保存され、参加者だけが読めるRLSだが、相手保存、通知、署名URL、端末キャッシュ、スクリーンショットを完全防止できない。
-- 打診作成では待ち合わせ候補が `startAt`、`endAt`、`placeName`、`lat`、`lng` を持ち、UI下書きは最大5件、送信payloadは有効候補を最大3件に丸める。現地交換モードは `user_local_mode_settings.last_lat/lng` と `activity_windows.center_lat/lng`、半径、有効時間を保存する。
+- 打診作成では待ち合わせ候補が `startAt`、`endAt`、`placeName`、`lat`、`lng` を持ち、UI下書きは最大5件、送信payloadは有効候補を最大3件に丸める。
 - めぐりでは `groom_posts.origin_lat/lng` と `meguri_board_threads.origin_lat/lng`、閲覧者lat/lng、公開範囲を用いて近距離表示、閲覧、返信可否を判定する。Swift側は詳細閲覧/作成で1km制限を使う一方、RPC/一覧には3km系の互換判定が残るため、法務文言は「1km/3kmは安全・匿名保証ではない」と整理する。
 - 利用規約第15条へ、近距離公開、1km、3km、同じ都道府県、同じスポット等が匿名化、秘匿化、安全確認、本人確認、所在確認、ストーカー防止又は推測防止を保証しないこと、自宅、学校、勤務先、宿泊先、座席番号、未成年者の居場所等を入力、投稿又は共有しないことを追加した。
-- プライバシーポリシー第2.5条、第2.6条及び第13条へ、グルーム/掲示板の作成座標、閲覧者座標、距離、公開範囲、現地交換モード最終座標、活動ウィンドウ中心座標、保持/削除例外を追加した。
-- 公開前No-Go: Precise Location、App Privacy、FAQ、Review Notes、アプリ内コピーで、現在地共有、近距離投稿、現地交換モード、待ち合わせ候補、グルーム、掲示板が見えるのに、精密座標、作成位置、閲覧者座標、保持例外、推測リスク、地図サービス送信、緊急対応非代替を説明しない状態では提出しない。
+- プライバシーポリシー第2.5条、第2.6条及び第13条へ、グルーム/掲示板の作成座標、閲覧者座標、距離、公開範囲、待ち合わせ候補、保持/削除例外を追加した。
+- 公開前No-Go: Precise Location、App Privacy、FAQ、Review Notes、アプリ内コピーで、現在地共有、近距離投稿、待ち合わせ候補、グルーム、掲示板が見えるのに、精密座標、作成位置、閲覧者座標、保持例外、推測リスク、地図サービス送信、緊急対応非代替を説明しない状態では提出しない。
 
 参照:
 - `ios-native/Sources/MegrumApp/MegrumLocationState.swift`
@@ -49,8 +49,6 @@
 - `ios-native/Sources/MegrumData/SupabaseProposalPayloads.swift`
 - `ios-native/Sources/MegrumApp/ProposalCreateMeetupModels.swift`
 - `ios-native/Sources/MegrumApp/ProposalMeetupPlaceSheet.swift`
-- `ios-native/Sources/MegrumApp/SupabaseHomeLocalModePersistence.swift`
-- `ios-native/Sources/MegrumApp/HomeLocalModeSettingsContent.swift`
 - `ios-native/Sources/MegrumApp/MeguriAccessPolicy.swift`
 - `ios-native/Sources/MegrumData/SupabaseBoardClient.swift`
 - `ios-native/Sources/MegrumData/SupabaseBoardRows.swift`
@@ -352,16 +350,15 @@
 
 ## 2026-06-29 追記：会場・施設ルールとイベント主催者非関与の責任境界
 
-- 現行Swift Nativeでは、現地交換モード、場所メモ、会場名、駅名、会場周辺、会場横、東京ドーム22ゲート前、会場ロビー等の表示・プレビュー・入力欄が存在する。ユーザー体験上は自然だが、イベント主催者、興行主、会場、駅、商業施設、公共空間、交通機関又は店舗がMegrum上の交換を承認、公認、提携、許可、推奨又は安全確認したように見えるリスクがある。
+- 現行Swift Nativeでは、場所メモ、会場名、駅名、会場周辺、会場横、東京ドーム22ゲート前、会場ロビー等の表示・プレビュー・入力欄が存在する。ユーザー体験上は自然だが、イベント主催者、興行主、会場、駅、商業施設、公共空間、交通機関又は店舗がMegrum上の交換を承認、公認、提携、許可、推奨又は安全確認したように見えるリスクがある。
 - 利用規約第15条へ、イベント主催者、興行主、会場、施設、駅、商業施設、公共空間、交通機関、警備会社、店舗、自治体その他関係者が定める利用規則、掲示、案内、警備員又はスタッフの指示、撮影禁止、交換、譲渡、物販、金銭授受、滞留、行列、荷物、通行、立入り、営業時間その他の制限を会員自身が確認し、従うことを追加した。
 - 第15条へ、通行妨害、滞留、騒音、周辺住民又は来場者への迷惑、無許可営業、無許可の物販、勧誘、転売、チラシ配布、禁止エリアへの立入り、施設設備の占有、会場又は施設の運営妨害、警備員、スタッフ又は管理者の指示違反を禁止する説明を追加した。
 - 第15条へ、イベント名、会場名、駅名、店舗名、施設名、場所名、地図、距離、周辺情報又は会場情報が表示されても、当該イベント、主催者、興行主、会場、施設、店舗、交通機関又は権利者がMegrum、現地交換、会員間取引、待ち合わせ又は投稿を承認、公認、提携、許可、推奨又は安全確認したことを意味しないことを追加した。
 - 第26条の禁止行為へ、会場・施設・駅・イベント等のルール、掲示、案内、警備員又はスタッフ指示に反し、通行妨害、滞留、無許可営業、無許可の物販、勧誘、転売、禁止エリア立入り、撮影禁止違反、施設設備占有等を行うことを禁止対象として追加した。
 - 公開FAQとアプリ内安全コピー案にも、会場、駅、施設、イベント主催者、警備員、スタッフのルールに従うこと、表示された場所が交換を公認又は許可しているとは限らないことを追加した。
-- 公開前No-Goとして、会場名、駅名、施設名、イベント名、地図、場所メモ、現地交換モード、グルーム又はスポット掲示板を、会場公認の交換場所、主催者提携サービス、施設許可済み導線、滞留や物販の許可、警備員確認済み、安全確認済みスポット、会場ルール適合保証のように説明しない。Review Notes、FAQ、アプリ内コピー、サポート返信では、表示場所が参考情報であり、現地ルール確認は会員責任であることを維持する。
+- 公開前No-Goとして、会場名、駅名、施設名、イベント名、地図、場所メモ、グルーム又はスポット掲示板を、会場公認の交換場所、主催者提携サービス、施設許可済み導線、滞留や物販の許可、警備員確認済み、安全確認済みスポット、会場ルール適合保証のように説明しない。Review Notes、FAQ、アプリ内コピー、サポート返信では、表示場所が参考情報であり、現地ルール確認は会員責任であることを維持する。
 
 参照:
-- `ios-native/Sources/MegrumApp/HomeLocalModeSettingsContent.swift`
 - `ios-native/Sources/MegrumApp/ProposalCreateConditionSteps.swift`
 - `ios-native/Sources/MegrumApp/NativePreviewTradeData.swift`
 - `ios-native/Sources/MegrumApp/HomeGroomEntrySurface.swift`
@@ -471,7 +468,7 @@
 
 - `ios-native/App/PrivacyInfo.xcprivacy` は `NSPrivacyAccessedAPICategoryUserDefaults` / `CA92.1` を申告している。AppleのRequired Reason API説明上、UserDefaultsはPrivacy Manifestで利用理由を示す対象であり、App Privacy回答や公開Privacyのデータ説明とは役割が異なる。
 - 現行Swift Nativeでは、`@AppStorage` により、交換方法の希望、同一都道府県条件、日程重複条件、活動都道府県、選択日、郵送条件、近くモードの有効状態、活動場所名、緯度経度、開始時刻、継続時間、半径、掲示板の都道府県又は閲覧範囲等が端末内UserDefaults系保存領域に残り得る。
-- `HomeLocalCoordinateStorageCodec` は緯度経度を小数8桁の文字列として保存・復元できる。`MegrumRemoteImageCache` は `URLCache` のdisk cacheとして `MegrumRemoteImages` を利用し、リモート画像を端末内キャッシュする。
+- `MegrumRemoteImageCache` は `URLCache` のdisk cacheとして `MegrumRemoteImages` を利用し、リモート画像を端末内キャッシュする。
 - プライバシーポリシーへ、UserDefaults、AppStorage、URLCacheその他端末内の保存領域又はキャッシュに、交換条件、日程条件、活動場所、緯度経度、掲示板の表示範囲、画像キャッシュ等を保存する場合があること、端末、OS、バックアップ、復元、アプリ削除、再インストール、キャッシュ削除又は空き容量管理により保存・消去・復元の挙動が異なることを追記した。
 - 公開前No-Goとして、Privacy ManifestにUserDefaults Required Reasonがあるだけで、App Privacyや公開Privacyでローカル保存データの説明が不要と判断しない。反対に、UserDefaults/AppStorageへ近くモードの緯度経度、活動場所、日程条件等が残り得るのに、「端末内に個人情報や位置情報は保存しない」と説明しない。
 
@@ -480,7 +477,6 @@
 - `ios-native/App/PrivacyInfo.xcprivacy`
 - `ios-native/Sources/MegrumApp/HomeExchangeSettingsStorageKeys.swift`
 - `ios-native/Sources/MegrumApp/HomeScreen.swift`
-- `ios-native/Sources/MegrumApp/HomeLocalLocationModels.swift`
 - `ios-native/Sources/MegrumApp/MegrumRemoteImageCache.swift`
 
 ---
@@ -657,7 +653,7 @@
 
 ## 2026-06-29 追記：精密位置・地図・逆ジオコーディングを公開前No-Goへ追加
 
-- 現行Swift Nativeでは、`MegrumLocationState` が `CLLocationManager` を `kCLLocationAccuracyNearestTenMeters`、`distanceFilter=10` で利用し、`CLGeocoder.reverseGeocodeLocation` により座標を場所名へ変換する。`HomeLocalCoordinateStorageCodec` は緯度経度を小数8桁で保持でき、`TradeDetailScreenActions.sendLocationMessage`、`MegrumAppStateMeguriActions`、`BoardThreadDetailScreen`、`SupabaseGroomPayloads`、`BoardScopeQueryContext` では現在地共有、近くのグルーム、スポット掲示板の閲覧・作成・返信範囲判定へ緯度経度を送信する経路がある。
+- 現行Swift Nativeでは、`MegrumLocationState` が `CLLocationManager` を `kCLLocationAccuracyNearestTenMeters`、`distanceFilter=10` で利用し、`CLGeocoder.reverseGeocodeLocation` により座標を場所名へ変換する。`TradeDetailScreenActions.sendLocationMessage`、`MegrumAppStateMeguriActions`、`BoardThreadDetailScreen`、`SupabaseGroomPayloads`、`BoardScopeQueryContext` では現在地共有、近くのグルーム、スポット掲示板の閲覧・作成・返信範囲判定へ緯度経度を送信する経路がある。
 - 利用規約では、地図表示、現在地、場所名、近接表示、距離表示、逆ジオコーディングが参考情報であり、端末、OS、MapKit、CoreLocation、通信環境、会員操作等に依存し、正確性、継続性、安全性、到達可能性又は現地状況を保証しないことを追記した。現地交換条項では、表示された現在地や場所名だけに依存せず、公共性、安全性、会場又は施設ルールを自ら確認する義務を追記した。
 - プライバシーポリシーでは、位置情報を許可した場合に、精密な緯度経度、精度、時刻、場所名を取得、表示、送信、保存又は場所名へ変換し得ること、画面上で「近く」「1km圏内」「3km圏内」等と表示されても内部処理やサーバー送信では精密座標を扱い得ること、MapKit/CoreLocation/CLGeocoder等のOS・地図関連サービスで処理され得ることを追記した。
 - 公開前No-Goとして、近くのグルーム、スポット掲示板、現在地共有、位置情報メッセージ、地図表示又は逆ジオコーディングが見えるのに、App PrivacyでPrecise Locationを選ばない、Privacy/FAQ/Review Notesで精密座標・外部地図サービス・保持/削除例外を説明しない、又は「ざっくり地域だけ」「常時共有なしだからLocation回答不要」として提出する状態では提出しない。

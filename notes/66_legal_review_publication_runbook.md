@@ -55,7 +55,7 @@
 |---|---|---|---|
 | 現地交換安全/免責 | Terms, Support, FAQ, Review Notes | Safety説明、サポート導線 | 事故時の責任分界や緊急時案内がない |
 | 位置情報/服装写真 | Privacy, Data Retention, App Privacy, Review Notes | Location / Photos / user content回答 | 保存期間や共有範囲が矛盾。30日後の自動削除、完全削除、即時反映を未確認のまま保証 |
-| 近距離公開/作成位置 | Terms, Privacy, FAQ, App Privacy, Data Retention, Review Notes | Precise Location回答、Safety説明 | 作成位置、閲覧者位置、現地交換モード、待ち合わせ候補、1km/3km非保証、生活圏推測リスクがない |
+| 近距離公開/作成位置 | Terms, Privacy, FAQ, App Privacy, Data Retention, Review Notes | Precise Location回答、Safety説明 | 作成位置、閲覧者位置、待ち合わせ候補、1km/3km非保証、生活圏推測リスクがない |
 | 未成年利用 | Terms, FAQ, Age Rating, Safety | Age Rating、Review Notes | 保護者同意や安全注意が未整理 |
 | UGC/評価/通報/ブロック/モデレーション | Terms, Trust & Safety, Support, FAQ, Review Notes, App Privacy | Guideline 1.2説明、評価コメント注意、通報者秘匿の限界、緊急時外部連絡 | UGCや評価が見えるのに通報/ブロック/モデレーション説明不能。通報者絶対秘匿や削除保証をしている |
 | 公開法務ページ同期 | Terms, Privacy, Support, FAQ, App Store URLs, アプリ内同意リンク | Privacy Policy URL、Support URL、License Agreement、Review Notes | `2026年6月26日` の短縮Terms/Privacy、又は `/terms` / `/privacy` と `/legal/terms` / `/legal/privacy` の分裂を残したまま提出する |
@@ -94,7 +94,7 @@ No-Go:
 - Privacyで説明した取得情報とApp Privacy回答が一致しない。
 - 現在地共有又は服装写真について、Privacy、FAQ、Review Notes、App Privacy回答、公開Web実装のどこかで30日後自動削除又は完全削除を保証している。
 - 近く、1km圏内、3km圏内、同じスポット又は同じ都道府県を、匿名化、安全確認、本人確認、所在確認又は推測防止として説明している。
-- 現地交換モード、待ち合わせ候補、グルーム、掲示板が見えるのに、作成位置、閲覧者位置、半径、距離、公開範囲、保持例外、生活圏推測リスクをPrivacy、FAQ、Review Notes、App Privacyへ反映していない。
+- 待ち合わせ候補、グルーム、掲示板が見えるのに、作成位置、閲覧者位置、半径、距離、公開範囲、保持例外、生活圏推測リスクをPrivacy、FAQ、Review Notes、App Privacyへ反映していない。
 - 通知本文、未読バッジ、ロック画面表示、APNs/Expo token、アプリ内通知履歴の説明がTerms/Privacy/FAQ/App Privacyで不一致。
 - 外部画像URL又はAI/検索候補画像の外部ホスト通信、第三者ポリシー、権利確認責任がTerms/Privacy/FAQ/Content Rightsで不一致。
 - 写真メタデータの残存、削除可否、ユーザー注意、App Privacy回答が不一致。
@@ -130,7 +130,7 @@ No-Go:
 | 対象 | 確認すること | No-Go |
 |---|---|---|
 | `web/src/app/terms/page.tsx` | 公開するTerms URL、最終更新日、本文が最新ドラフトと一致。Keychain/session保存、認証リンク、候補表示非保証、AdMob/外部AI/写真メタデータ、UGC・App Review 1.2、公開レビュー返信、事故初動、販促通知、公式連絡・フィッシング等の最新追加論点が反映済み | 2026-06-26短縮版のままApp Store又はアプリ内リンクで正式本文として使う |
-| `web/src/app/privacy/page.tsx` | Privacy Policy URL、App Privacy回答、外部サービス台帳、SDK/通信監査、Keychain/session保存、access token、refresh token、認証callback、通知linkPath、現在地共有/服装写真の保持文言、近距離公開、作成位置、閲覧者位置、現地交換モード、1km/3km非保証、公開レビュー返信、事故疑い、販促同意/停止履歴、不審連絡/フィッシング報告と一致 | 2026-06-29版で追加した取得情報又は利用目的が公開Privacyにない。又は30日後自動削除/完全削除を未確認のまま保証している |
+| `web/src/app/privacy/page.tsx` | Privacy Policy URL、App Privacy回答、外部サービス台帳、SDK/通信監査、Keychain/session保存、access token、refresh token、認証callback、通知linkPath、現在地共有/服装写真の保持文言、近距離公開、作成位置、閲覧者位置、1km/3km非保証、公開レビュー返信、事故疑い、販促同意/停止履歴、不審連絡/フィッシング報告と一致 | 2026-06-29版で追加した取得情報又は利用目的が公開Privacyにない。又は30日後自動削除/完全削除を未確認のまま保証している |
 | `web/src/app/support/page.tsx` | Support URLから削除、個人情報請求、通報、安全、AI、FAQ、広告報告、最新Terms/Privacy、公式連絡・フィッシング注意、販促通知停止案内へ辿れる | 存在しない個別URLをReview Notesや公開サポートで公開済みと書く。又はSupport関連リンクが旧短縮Terms/Privacyだけへ誘導する。又は公式が秘密情報を求めるように読める |
 | `ios-native/Sources/MegrumApp/AuthLegalConsentNotice.swift` | 登録同意リンクが公開正URLへ向いている | App Storeでは `/legal/privacy`、登録同意では `/privacy` のように分裂している |
 | `ios-native/Sources/MegrumApp/LegalDocumentContent.swift` / `SettingsLegalViews.swift` | アプリ内要約が正式本文ではない旨と、正式本文リンクが整合 | 要約表示だけで正式な公開規約/Privacy要件を満たした扱いにする |

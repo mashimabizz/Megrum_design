@@ -60,7 +60,7 @@
 | G29 | Auth Links / URL Scheme / Deep Links | メール認証、パスワードリセット、Google OAuth、native callback、Web中継Route、Supabase Redirect URLs、Google OAuth設定、通知 `linkPath`、FAQ、Review Notesが一致し、認証リンク/認証コード/認証callbackを共有しない説明がある | `MEGRUM_URL_SCHEME`、`MEGRUM_AUTH_EMAIL_REDIRECT_URL`、`MEGRUM_AUTH_OAUTH_AUTHORIZE_URL`、Supabase Redirect URLs、Google OAuth設定、Web中継Route、App Store提出メモが不一致。custom URL schemeをUniversal Links同等に安全保証している。認証callbackのaccess token/refresh token、通知linkPath、ID付きdeep linkを公開・転送してよいように見える | `notes/24`, `notes/27`, `notes/36`, `notes/43`, `notes/48`, `notes/54`, `notes/75` |
 | G30 | Keychain Session / Refresh Token | AuthSessionのKeychain保存、access token/refresh token、refresh更新、logout時clear、`kSecAttrAccessible`方針、ThisDeviceOnly要否、端末紛失/バックアップ/復元/他端末session説明がPrivacy、FAQ、Security checklistと一致 | tokenをログ、スクショ、公開証跡、問い合わせテンプレートへ出す。Keychain accessibility/backups/復元/他端末session未確認のまま、ログアウト又は退会ですべてのsession/tokenが即時完全削除されると説明する | `notes/17`, `notes/27`, `notes/48`, `notes/52`, `notes/54`, `notes/55`, `notes/75` |
 | G31 | Member Payment / Financial Boundary | 支払い方法、銀行口座、口座名義、PayPay対応可否、現金交換、金額指定、成立後支払い情報スナップショットの表示範囲、保持、App Privacy、FAQ、Review Notes、規約/Privacyが一致し、Megrumが資金受領、保管、送金、収納代行、回収、返金、チャージバック、エスクロー、本人確認、口座名義確認、支払能力確認をしない説明がある | 口座情報又は支払いスナップショットが見えるのにPayment Info回答や保持説明がない。Megrumが決済代行、資金移動、収納代行、回収、返金、チャージバック、エスクロー、口座名義確認、支払能力確認、外部ID/送金リンク/QRの真正性確認をするように見える。又はログ/通知/サポート証跡に銀行口座、送金リンク、送金用QR、外部サービスIDを不用意に含める | `notes/legal/01`, `notes/legal/02`, `notes/25`, `notes/27`, `notes/43`, `notes/48`, `notes/52`, `notes/54`, `notes/55`, `notes/56` |
-| G32 | Location Scope / Creation Location | 現在地共有、待ち合わせ候補、現地交換モード、グルーム/掲示板の作成座標、閲覧者座標、半径、距離、公開範囲、1km/3km非保証、生活圏推測リスク、保持/削除例外がTerms、Privacy、FAQ、App Privacy、Review Notes、アプリ内コピー、Security checklistと一致 | 近く、1km圏内、3km圏内、同じスポット、同じ都道府県が匿名化、安全確認、本人確認、所在確認、ストーカー防止又は推測防止に見える。作成位置、閲覧者位置、現地交換モード座標又は待ち合わせ候補座標を扱うのにPrecise Location、保持例外、相手保存/通知/スクリーンショットリスクを説明していない | `notes/legal/01`, `notes/legal/02`, `notes/25`, `notes/27`, `notes/43`, `notes/52`, `notes/54`, `notes/55`, `notes/56`, `notes/59`, `notes/63` |
+| G32 | Location Scope / Creation Location | 現在地共有、待ち合わせ候補、グルーム/掲示板の作成座標、閲覧者座標、半径、距離、公開範囲、1km/3km非保証、生活圏推測リスク、保持/削除例外がTerms、Privacy、FAQ、App Privacy、Review Notes、アプリ内コピー、Security checklistと一致 | 近く、1km圏内、3km圏内、同じスポット、同じ都道府県が匿名化、安全確認、本人確認、所在確認、ストーカー防止又は推測防止に見える。作成位置、閲覧者位置又は待ち合わせ候補座標を扱うのにPrecise Location、保持例外、相手保存/通知/スクリーンショットリスクを説明していない | `notes/legal/01`, `notes/legal/02`, `notes/25`, `notes/27`, `notes/43`, `notes/52`, `notes/54`, `notes/55`, `notes/56`, `notes/59`, `notes/63` |
 
 ## 3. P0トラッカー対応
 
@@ -102,7 +102,7 @@
 | 未完成3D | 3D画面、スクショ、説明が出ない | 表示崩れなし、審査説明、Privacy影響確認 |
 | Push通知 | 通知許可、通知送信が出ない | APNs token、push provider、app version、last seen、revoked状態、通知タイトル/本文、通知ID、linkPath、sound、未読バッジ、ロック画面/通知センター/連携端末表示、Push任意性、販促Push同意/停止手段、Identifiers/User Content/Usage Data回答。過去又は別環境でExpo Pushを使う場合はExpo push tokenも別途確認 |
 | Storage画像 | 写真/画像アップロード導線が出ない | public/private bucket、signed URL期限、削除/キャッシュ、相手保存、画像メタデータ、Photos or Videos回答 |
-| 位置情報 | 現在地共有/近くの表示/地図/場所名/逆ジオコーディング/現地交換モード/待ち合わせ候補/近距離投稿が出ない | Precise Location、MapKit/CoreLocation/CLGeocoder、精密座標の送信/保存、作成位置、閲覧者位置、半径、距離、公開範囲、権限文言、共有範囲、保持/削除例外、地図/距離/場所名の非保証、1km/3kmが匿名化又は安全保証ではない説明 |
+| 位置情報 | 現在地共有/近くの表示/地図/場所名/逆ジオコーディング/待ち合わせ候補/近距離投稿が出ない | Precise Location、MapKit/CoreLocation/CLGeocoder、精密座標の送信/保存、作成位置、閲覧者位置、半径、距離、公開範囲、権限文言、共有範囲、保持/削除例外、地図/距離/場所名の非保証、1km/3kmが匿名化又は安全保証ではない説明 |
 | 生年月日 / 年齢表示 | 生年月日入力又は年齢表示を完全に隠すなら、プロフィール設定・表示導線・App Store文面からも外す | 自己申告年齢としての説明、App Privacy/Other Data候補、Age Rating、未成年者の保護者同意・現地交換安全説明 |
 | 公開プロフィール / 性別 / 活動エリア | プロフィール・候補表示を隠すなら、画面/説明/FAQ/Review Notesからも外す | 表示範囲、自己申告性、非保証、目的外利用禁止、App Privacy分類 |
 | 広告 | 広告枠、AdMob、スポンサー表示、広告通報説明が出ない | 広告表示証跡、不適切/年齢不相応広告の通報導線、App Privacy回答 |
@@ -171,7 +171,7 @@ Evidence folder:
 - App Store説明文、FAQ、スクショ、Review Notes又はアプリ内コピーで、Megrumが売買マーケット、古物商、古物市場、古物競りあっせん、オークション、買取、委託売買、販売代理、チケット譲渡、入場資格保証、決済代行、エスクロー又は正規/公式流通確認サービスであるように見える。
 - チケット、入場用QRコード、抽選権、アカウント、盗品、不正取得品、権利侵害品、反復継続的販売又は古物営業のおそれがある取引が見えるのに、禁止説明、通報導線、非保証説明が公開文面と一致していない。
 - 近くのグルーム、スポット掲示板、現在地共有、地図表示、逆ジオコーディング、場所名又は距離表示が見えるのに、Precise Location、MapKit/CoreLocation/CLGeocoder等の外部処理、精密座標のサーバー送信/保存、保持/削除例外、地図/距離/場所名の非保証がApp Privacy、Privacy、FAQ、Review Notesで一致していない。
-- 待ち合わせ候補、現地交換モード、近距離投稿、グルーム/掲示板の作成座標、閲覧者座標、半径、距離、公開範囲が見えるのに、作成位置、閲覧者位置、生活圏推測リスク、保持/削除例外、相手保存/スクリーンショット/通知リスクを説明していない。
+- 待ち合わせ候補、近距離投稿、グルーム/掲示板の作成座標、閲覧者座標、半径、距離、公開範囲が見えるのに、作成位置、閲覧者位置、生活圏推測リスク、保持/削除例外、相手保存/スクリーンショット/通知リスクを説明していない。
 - 近く、1km圏内、3km圏内、同じスポット又は同じ都道府県を、匿名化、安全確認、本人確認、所在確認、ストーカー防止又は推測防止として説明している。
 - 生年月日を収集し、年齢又は年代を表示するのに、App Privacy、Age Rating、FAQ、Review Notes、公開サポートが自己申告年齢として一致していない。
 - 年齢確認機構、身分証確認、保護者同意確認又は保護者管理機能が未実装なのに、年齢確認済み、本人確認済み、保護者同意確認済みと説明している。

@@ -22,18 +22,31 @@ struct BoardThreadMessagePopBubbles: View {
         case left
         case right
 
-        /// アイコン上端アンカー（overlay .top / offset -30）からの相対位置。
-        /// 右横はアイコン右上のバッジと重ならないよう、外側かつ低めに出す。
-        var offset: CGSize {
+        /// しっぽ先端を固定する「端アンカー」の位置。
+        /// コンテナ（overlay .top / offset -30 → アイコン上端中央の少し上）基準。
+        /// 吹き出しはこの点からアイコンの外側へ向かって伸びるため、
+        /// 文章が長くなってもしっぽがアイコンに被ったりズレたりしない。
+        /// 右側はアイコン右上のバッジ（クラスタ数）を避けて外側・低めに置く。
+        var anchorOffset: CGSize {
             switch self {
             case .left:
-                CGSize(width: -66, height: 18)
+                CGSize(width: -36, height: 50)
             case .right:
-                CGSize(width: 74, height: 38)
+                CGSize(width: 42, height: 58)
             }
         }
 
-        /// 「ぽんっ」の起点。アイコン側から膨らむように見せる。
+        /// アンカーから吹き出しが伸びる向き（＝しっぽ側の角を固定する）。
+        var growthAlignment: Alignment {
+            switch self {
+            case .left:
+                .bottomTrailing
+            case .right:
+                .bottomLeading
+            }
+        }
+
+        /// 「ぽんっ」の起点。アイコン側（しっぽ側）から膨らむように見せる。
         var popAnchor: UnitPoint {
             switch self {
             case .left:
@@ -48,9 +61,13 @@ struct BoardThreadMessagePopBubbles: View {
         ZStack {
             if let visibleIndex, previews.indices.contains(visibleIndex) {
                 let placement = placement(for: visibleIndex)
-                bubble(text: truncated(previews[visibleIndex]), placement: placement)
-                    .fixedSize()
-                    .offset(placement.offset)
+                Color.clear
+                    .frame(width: 1, height: 1)
+                    .overlay(alignment: placement.growthAlignment) {
+                        bubble(text: truncated(previews[visibleIndex]), placement: placement)
+                            .fixedSize()
+                    }
+                    .offset(placement.anchorOffset)
                     .offset(y: driftOffset)
                     .transition(.asymmetric(
                         insertion: .scale(scale: 0.3, anchor: placement.popAnchor)
@@ -62,7 +79,6 @@ struct BoardThreadMessagePopBubbles: View {
                     .id(visibleIndex)
             }
         }
-        .frame(maxWidth: 170)
         .allowsHitTesting(false)
         .onAppear {
             startCycling()

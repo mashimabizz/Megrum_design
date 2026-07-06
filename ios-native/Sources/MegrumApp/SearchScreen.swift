@@ -25,6 +25,7 @@ struct SearchScreen: View {
     @State var profileRoute: PublicProfileRoute?
     @State var showsWishPicker = false
     @State var showsListingPicker = false
+    @StateObject var searchInterstitialController = SearchInterstitialAdController()
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -150,6 +151,7 @@ struct SearchScreen: View {
                     onApply: { draft in
                         applyFilterDraft(draft)
                         scheduleSearch(delayNanoseconds: 0)
+                        registerUserSearchForInterstitial()
                     }
                 )
             }

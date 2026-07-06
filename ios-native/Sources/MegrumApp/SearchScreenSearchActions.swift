@@ -93,6 +93,23 @@ extension SearchScreen {
     func submitSearch() {
         presentationState.submitQuery()
         scheduleSearch(delayNanoseconds: 0)
+        registerUserSearchForInterstitial()
+    }
+
+    /// ユーザー操作による検索1回を記録し、1日2回目・以降2回ごとに
+    /// インターステイシャル広告を表示する。
+    func registerUserSearchForInterstitial() {
+        searchInterstitialController.registerSearch(
+            displayContext: effectiveAdDisplayContext,
+            configuration: AdRuntimeConfiguration.current()
+        )
+    }
+
+    private var effectiveAdDisplayContext: AdDisplayContext {
+        AdDisplayContext(
+            viewerID: appState.viewer?.id,
+            isPremiumSubscriber: appState.subscriptionState.suppressesAds
+        )
     }
 
     func loadSearchResultOwnerExchangeContentIfNeeded() async {

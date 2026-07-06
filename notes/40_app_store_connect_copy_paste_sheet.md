@@ -243,7 +243,7 @@ App Store Connectの実際の質問文に合わせて、運営提供コンテン
 - User Content
 - Sensitive Info
 - Other Data Types（生年月日、算出年齢又は年代、性別、ブロック関係、通報/モデレーション状態の回答候補）
-- Location（近くのグルーム、スポット掲示板、現在地共有、待ち合わせ候補、現地交換モード、作成位置、閲覧者位置、地図表示、逆ジオコーディング、場所名又は距離表示が出る場合はPrecise Location候補）
+- Location（近くのグルーム、スポット掲示板、現在地共有、待ち合わせ候補、作成位置、閲覧者位置、地図表示、逆ジオコーディング、場所名又は距離表示が出る場合はPrecise Location候補）
 - Identifiers
 - Purchases
 - Usage Data
@@ -255,7 +255,7 @@ Push通知を出す場合は、APNs/Expo tokenだけでなく、通知タイト�
 
 生年月日又は年齢表示を出す場合は、Other Data Types又はAppleの最新UIで最も近いカテゴリとして開示し、Age RatingのAge Assurance/Parental Controls回答と矛盾しないようにする。
 
-近くのグルーム、スポット掲示板、現在地共有、待ち合わせ候補、現地交換モード、作成位置、閲覧者位置、地図表示、逆ジオコーディング、場所名又は距離表示を出す場合は、Swift Nativeが精密な緯度経度、精度、時刻、場所名、検索/地図関連情報、半径、距離、公開範囲を扱い得る前提で、App PrivacyのPrecise Location、MapKit/CoreLocation/CLGeocoder等の外部処理、サーバー送信/保存、保持/削除例外、地図/距離/場所名の非保証、1km/3kmが匿名化又は安全保証ではない説明をPrivacy/FAQ/Review Notesと照合する。内部で精密座標を使う実装なのに、Coarse Locationのみ、又は位置情報なしとして転記しない。
+近くのグルーム、スポット掲示板、現在地共有、待ち合わせ候補、作成位置、閲覧者位置、地図表示、逆ジオコーディング、場所名又は距離表示を出す場合は、Swift Nativeが精密な緯度経度、精度、時刻、場所名、検索/地図関連情報、半径、距離、公開範囲を扱い得る前提で、App PrivacyのPrecise Location、MapKit/CoreLocation/CLGeocoder等の外部処理、サーバー送信/保存、保持/削除例外、地図/距離/場所名の非保証、1km/3kmが匿名化又は安全保証ではない説明をPrivacy/FAQ/Review Notesと照合する。内部で精密座標を使う実装なのに、Coarse Locationのみ、又は位置情報なしとして転記しない。
 
 評価、通報、異議申し立て、ブロック、モデレーションを出す場合は、Customer Support、Other User Content、Other Data Types、Product Interactionのどこで回答するか確認する。評価コメントや通報補足を単なる内部ログとして過少申告しない。
 
@@ -278,7 +278,7 @@ No-Go:
 - 独自EULAを入れるのに、Appleの最低条項、第三者受益者、保守/サポート、製品請求、知的財産、法令遵守、連絡先表示の確認がない。
 - 実在IP、商標、公式名称、AI/検索候補、外部画像URLが見えるのに、公式/公認/提携/代理ではない説明、権利確認責任、真贋非保証、取引可否非保証をReview Notes、FAQ、Content Rights回答で揃えていない。
 - 初回Japan-only方針なのに、All Countries or Regions、EU 27 territories、又はIAP Availabilityの広域販売を選び、DSA trader statusと商品ページ表示連絡先を確認していない。
-- 近くのグルーム、スポット掲示板、現在地共有、待ち合わせ候補、現地交換モード、作成位置、閲覧者位置、地図表示、逆ジオコーディング、場所名又は距離表示が見えるのに、Precise Location、MapKit/CoreLocation/CLGeocoder、サーバー送信/保存、保持/削除例外、地図/距離/場所名の非保証、1km/3km非保証をPrivacy/FAQ/Review Notes/App Privacyで揃えていない。
+- 近くのグルーム、スポット掲示板、現在地共有、待ち合わせ候補、作成位置、閲覧者位置、地図表示、逆ジオコーディング、場所名又は距離表示が見えるのに、Precise Location、MapKit/CoreLocation/CLGeocoder、サーバー送信/保存、保持/削除例外、地図/距離/場所名の非保証、1km/3km非保証をPrivacy/FAQ/Review Notes/App Privacyで揃えていない。
 
 ---
 

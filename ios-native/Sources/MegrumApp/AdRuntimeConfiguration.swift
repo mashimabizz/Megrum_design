@@ -2,6 +2,7 @@ import Foundation
 
 struct AdRuntimeConfiguration: Equatable, Sendable {
     static let googleDemoBannerUnitID = "ca-app-pub-3940256099942544/2435281174"
+    static let googleDemoInterstitialUnitID = "ca-app-pub-3940256099942544/4411468910"
     static let googleDemoNativeUnitID = "ca-app-pub-3940256099942544/3986624511"
     static let previewViewerIDsEnvironmentKey = "MEGRUM_AD_PREVIEW_VIEWER_IDS"
 
@@ -48,6 +49,9 @@ struct AdRuntimeConfiguration: Equatable, Sendable {
         }
         if usesGoogleTestAdUnits, placement.format == .native {
             return testNativeUnitID ?? Self.googleDemoNativeUnitID
+        }
+        if usesGoogleTestAdUnits, placement.format == .interstitial {
+            return Self.googleDemoInterstitialUnitID
         }
         return configuredUnitID
     }

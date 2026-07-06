@@ -10,39 +10,116 @@ struct GroomArchiveMap: View {
     var currentCoordinate: MegrumLocationCoordinate?
     var onSelect: (GroomPost) -> Void
 
+    /// めぐりホーム地図と同じ統合/分解モーフを使う（共通コントローラ）。
+    @State private var morphController = MeguriClusterMorphController()
+    @State private var visibleSpanLatitudeDelta: Double = 0.05
+
     var body: some View {
-        Map(position: $cameraPosition, interactionModes: [.pan, .zoom]) {
-            if let currentCoordinate {
-                Annotation("現在地", coordinate: currentCoordinate.clLocationCoordinate) {
-                    Image(systemName: "location.fill")
-                        .font(.system(size: 15, weight: .heavy))
-                        .foregroundStyle(.white)
-                        .frame(width: 36, height: 36)
-                        .background(MegrumTheme.lavender, in: Circle())
-                        .overlay(Circle().stroke(.white, lineWidth: 3))
-                        .shadow(color: MegrumTheme.ink.opacity(0.22), radius: 10, y: 5)
+        GeometryReader { geometry in
+            Map(position: $cameraPosition, interactionModes: [.pan, .zoom]) {
+                if let currentCoordinate {
+                    Annotation("現在地", coordinate: currentCoordinate.clLocationCoordinate) {
+                        Image(systemName: "location.fill")
+                            .font(.system(size: 15, weight: .heavy))
+                            .foregroundStyle(.white)
+                            .frame(width: 36, height: 36)
+                            .background(MegrumTheme.lavender, in: Circle())
+                            .overlay(Circle().stroke(.white, lineWidth: 3))
+                            .shadow(color: MegrumTheme.ink.opacity(0.22), radius: 10, y: 5)
+                    }
+                }
+
+                ForEach(morphController.displayedElements) { displayed in
+                    let coordinate = CLLocationCoordinate2D(
+                        latitude: displayed.latitude,
+                        longitude: displayed.longitude
+                    )
+                    switch displayed.element {
+                    case .single(.groom(let groom)):
+                        Annotation("", coordinate: coordinate) {
+                            Button {
+                                onSelect(groom)
+                            } label: {
+                                MeguriPinConditionalPopIn(popsIn: displayed.popsIn) {
+                                    GroomArchiveMapPin(groom: groom)
+                                }
+                            }
+                            .buttonStyle(.plain)
+                            .opacity(displayed.opacity)
+                        }
+                    case .cluster(let cluster):
+                        Annotation("", coordinate: coordinate) {
+                            Button {
+                                zoomToSplit(cluster, containerSize: geometry.size)
+                            } label: {
+                                MeguriPinConditionalPopIn(popsIn: displayed.popsIn) {
+                                    MeguriFloatingMotion(seed: cluster.id.hashValue) {
+                                        MeguriClusterPin(cluster: cluster)
+                                    }
+                                }
+                            }
+                            .buttonStyle(.plain)
+                            .opacity(displayed.opacity)
+                        }
+                    case .single(.thread):
+                        // アーカイブはグルームのみ
+                        EmptyMapContent()
+                    }
                 }
             }
-
-            ForEach(grooms) { groom in
-                Annotation("", coordinate: groom.coordinate) {
-                    Button {
-                        onSelect(groom)
-                    } label: {
-                        GroomArchiveMapPin(groom: groom)
-                    }
-                    .buttonStyle(.plain)
-                }
+            .mapStyle(MeguriMapVisualStyle.quietStandard)
+            .overlay {
+                MeguriMapBrandToneOverlay(
+                    topWhiteOpacity: 0.72,
+                    middleWhiteOpacity: 0.16,
+                    bottomWhiteOpacity: 0.04
+                )
+            }
+            .onMapCameraChange(frequency: .onEnd) { context in
+                visibleSpanLatitudeDelta = context.region.span.latitudeDelta
+                recomputeDisplayElements()
+            }
+            .onChange(of: grooms.map(\.id), initial: true) { _, _ in
+                recomputeDisplayElements()
             }
         }
-        .mapStyle(MeguriMapVisualStyle.quietStandard)
-        .overlay {
-            MeguriMapBrandToneOverlay(
-                topWhiteOpacity: 0.72,
-                middleWhiteOpacity: 0.16,
-                bottomWhiteOpacity: 0.04
+    }
+
+    private func recomputeDisplayElements() {
+        morphController.apply(
+            MeguriMapClusterBuilder.elements(
+                grooms: grooms,
+                threads: [],
+                spanLatitudeDelta: visibleSpanLatitudeDelta
+            )
+        )
+    }
+
+    private func zoomToSplit(_ cluster: MeguriMapClusterBuilder.Cluster, containerSize: CGSize) {
+        MegrumHaptics.buttonTap()
+        let targetSpan = MeguriMapClusterBuilder.splitSpan(
+            for: cluster,
+            currentSpanLatitudeDelta: visibleSpanLatitudeDelta
+        ) * 0.9
+        let aspect = containerSize.width > 0 && containerSize.height > 0
+            ? max(containerSize.height / containerSize.width, 1)
+            : 2.2
+        withAnimation(.smooth(duration: 0.34)) {
+            cameraPosition = .region(
+                MKCoordinateRegion(
+                    center: CLLocationCoordinate2D(
+                        latitude: cluster.latitude,
+                        longitude: cluster.longitude
+                    ),
+                    span: MKCoordinateSpan(
+                        latitudeDelta: targetSpan,
+                        longitudeDelta: targetSpan / aspect
+                    )
+                )
             )
         }
+        visibleSpanLatitudeDelta = targetSpan
+        recomputeDisplayElements()
     }
 }
 

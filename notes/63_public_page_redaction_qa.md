@@ -35,7 +35,7 @@ App Store審査前に公開するサポート、利用規約、プライバシ�
 | IMPL-001 | App Store Connectへ入力するPrivacy Policy URLが、実際に公開されるPrivacy本文と同一 | TODO | 現行Web実装は `web/src/app/privacy/page.tsx` の `/privacy`、公開原稿は `/legal/privacy` |
 | IMPL-002 | 利用規約URLが、登録同意画面、Settings、Support、App Store文面で同一 | TODO | 現行登録同意リンクは `ios-native/Sources/MegrumApp/AuthLegalConsentNotice.swift` から `/terms` |
 | IMPL-003 | Web公開Terms/Privacyの最終更新日が、法務ドラフト最新版と一致 | TODO | `web/src/app/terms/page.tsx` / `web/src/app/privacy/page.tsx` は `2026年6月26日` |
-| IMPL-004 | Web公開Terms/Privacyが短縮版ではなく、提出スコープのリスクを含む | TODO | `web/src/app/terms/page.tsx` / `web/src/app/privacy/page.tsx` は短縮ページ。Keychain/session保存、access token、refresh token、認証callback、通知linkPath、精密位置、作成位置、閲覧者位置、現地交換モード、待ち合わせ候補、1km/3km非保証、写真メタデータ、共有シート、郵送交換、会員間支払い、銀行口座/口座名義、成立後支払い情報スナップショット、金融/決済サービス非関与、外部ID/送金リンク/QR非保証、外部AI/web_search、広告、顔候補付け、評価/通報/削除申出、UGC・App Review 1.2、App Store評価・公開レビュー返信、漏えい等初動・事故疑い、広告宣伝メール・販促通知、公式連絡・フィッシング、サポートSLA・専門助言非保証、現在地共有/服装写真の30日保持目標と非保証等 |
+| IMPL-004 | Web公開Terms/Privacyが短縮版ではなく、提出スコープのリスクを含む | TODO | `web/src/app/terms/page.tsx` / `web/src/app/privacy/page.tsx` は短縮ページ。Keychain/session保存、access token、refresh token、認証callback、通知linkPath、精密位置、作成位置、閲覧者位置、待ち合わせ候補、1km/3km非保証、写真メタデータ、共有シート、郵送交換、会員間支払い、銀行口座/口座名義、成立後支払い情報スナップショット、金融/決済サービス非関与、外部ID/送金リンク/QR非保証、外部AI/web_search、広告、顔候補付け、評価/通報/削除申出、UGC・App Review 1.2、App Store評価・公開レビュー返信、漏えい等初動・事故疑い、広告宣伝メール・販促通知、公式連絡・フィッシング、サポートSLA・専門助言非保証、現在地共有/服装写真の30日保持目標と非保証等 |
 | IMPL-005 | Supportトップから、実際に存在する削除、個人情報請求、通報、AI、FAQページへ辿れる | TODO | 個別URL未実装なら、Supportトップ内の該当セクションへアンカー又は代替導線を用意 |
 | IMPL-006 | アプリ内法務表示が要約である場合、正式本文への公開リンクが最新本文へ到達する | TODO | `ios-native/Sources/MegrumApp/LegalDocumentContent.swift` / `SettingsLegalViews.swift` は正式本文ではない旨を表示 |
 | IMPL-007 | `PrivacyInfo.xcprivacy`、App Store Connect App Privacy、公開Privacy、SDK/通信監査の役割差が整理されている | TODO | Privacy Manifestに収集データ型が無いことだけでApp Privacy回答不要とは判断しない |
@@ -162,7 +162,7 @@ No-Go:
 | Check | 確認 | 結果 | メモ |
 |---|---|---|---|
 | PP-001 | 取得情報が実ビルド、App Privacy、外部サービス台帳と一致 | TODO | `notes/27`, `notes/43`, `notes/48` |
-| PP-002 | 位置情報、写真、通知token、購入状態、問い合わせ、通報の扱いが説明されている | TODO | 位置情報は、現在地共有、待ち合わせ候補、現地交換モード、グルーム/掲示板の作成座標、閲覧者座標、半径、距離、公開範囲、1km/3km非保証、保持/削除例外まで確認 |
+| PP-002 | 位置情報、写真、通知token、購入状態、問い合わせ、通報の扱いが説明されている | TODO | 位置情報は、現在地共有、待ち合わせ候補、グルーム/掲示板の作成座標、閲覧者座標、半径、距離、公開範囲、1km/3km非保証、保持/削除例外まで確認 |
 | PP-003 | 外部AIを出す場合、送信情報、目的、保存、学習利用の有無が説明されている | TODO | TODO |
 | PP-004 | 外部AIを隠す場合、公開ページで利用可能機能として読めない | TODO | TODO |
 | PP-005 | 個人情報請求窓口と手続がある | TODO | TODO |
@@ -170,7 +170,7 @@ No-Go:
 | PP-007 | 第三者提供/委託先の説明が外部サービス台帳と矛盾しない | TODO | `notes/48` |
 | PP-008 | トラッキング有無がPrivacy Manifest/SDK監査と一致 | TODO | `notes/44` |
 | PP-009 | 顔候補付けを出す場合、顔特徴量/画像特徴量、外部送信、保持/削除、Sensitive Info候補が説明されている | TODO | `notes/27`, `notes/43`, `notes/52` |
-| PP-010 | Web公開Privacyが2026-06-29版ドラフトの取得情報・利用目的・提供範囲を含む | TODO | Keychain/session保存、access token、refresh token、認証callback、通知linkPath、AdMob、精密位置、作成位置、閲覧者位置、現地交換モード、1km/3km非保証、写真メタデータ、外部AI/web_search、公開ページ、App Privacy、外部サービス台帳、現在地共有/服装写真の30日保持目標と非保証を照合 |
+| PP-010 | Web公開Privacyが2026-06-29版ドラフトの取得情報・利用目的・提供範囲を含む | TODO | Keychain/session保存、access token、refresh token、認証callback、通知linkPath、AdMob、精密位置、作成位置、閲覧者位置、1km/3km非保証、写真メタデータ、外部AI/web_search、公開ページ、App Privacy、外部サービス台帳、現在地共有/服装写真の30日保持目標と非保証を照合 |
 | PP-011 | Web公開Privacyが最新の横断取得・利用目的を含む | TODO | 公開レビュー返信、事故疑い、販促同意/停止履歴、不審連絡/フィッシング報告、通報/削除申出の記録 |
 | PP-012 | 会員間支払い情報の取得・表示・保持が説明されている | TODO | 支払い方法、銀行口座番号、口座名義、金額、成立後支払い情報スナップショット、相手方表示、設定変更/削除後の例外保持、外部決済サービス非関与 |
 
@@ -179,7 +179,7 @@ No-Go:
 - 実装で使う外部サービスがPrivacyに反映されていない。
 - Keychain内AuthSession、access token、refresh token、session更新、logout request、端末復元/バックアップ/他端末sessionの説明が公開Privacyにない。
 - 現在地共有又は服装写真について、実装未確認の30日自動削除を公開Privacyで保証している。
-- 近距離投稿、現地交換モード、待ち合わせ候補、グルーム、掲示板が見えるのに、作成位置、閲覧者位置、距離判定、保持例外、生活圏推測リスクをPrivacyで説明していない。
+- 近距離投稿、待ち合わせ候補、グルーム、掲示板が見えるのに、作成位置、閲覧者位置、距離判定、保持例外、生活圏推測リスクをPrivacyで説明していない。
 - 外部AIへの送信や学習利用について、アプリ内表示と公開説明が矛盾している。
 - 顔候補付けが本人確認、年齢確認、Face ID認証、出入場管理、真贋鑑定、信用判断に見える。
 
