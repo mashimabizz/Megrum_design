@@ -48,6 +48,9 @@ struct MeguriMessageInboxScreen: View {
     var body: some View {
         NavigationStack {
             inboxContent
+                .environment(\.groomContextImageURLResolver) { [appState] url in
+                    await appState.freshGroomContextImageURL(from: url)
+                }
                 .navigationTitle("メッセージ")
                 .megrumInlineNavigationTitle()
                 .toolbar {
@@ -254,7 +257,7 @@ private struct MeguriMessageThreadContextPill: View {
     var body: some View {
         HStack(spacing: 6) {
             if let imageURL {
-                AsyncImage(url: imageURL) { phase in
+                GroomContextResolvedImage(staleURL: imageURL) { phase in
                     switch phase {
                     case .success(let image):
                         image
@@ -348,6 +351,9 @@ struct MeguriMessagesScreen: View {
     var body: some View {
         ZStack {
             content
+                .environment(\.groomContextImageURLResolver) { [appState] url in
+                    await appState.freshGroomContextImageURL(from: url)
+                }
 
             if let selectedRemoteImage = photoPresentationState.selectedRemoteImage {
                 FullScreenRemoteImageView(

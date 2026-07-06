@@ -4,6 +4,41 @@
 
 ---
 
+## イテレーション1226.342：めぐりメッセージのグルーム文脈画像を表示時に再署名
+
+### 背景・問題意識
+オーナー報告：michilion⇔めぐるむ のめぐりメッセージで、相手からのグルーム返信の文脈カードが「画像を読み込めませんでした」になる。調査の結果、メッセージ行 `source_groom_image_url` には**約1時間で失効する署名付きURL**がそのまま保存されており、失効後は永久に読めなくなっていた。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/GroomSignedURLPathExtractor.swift`（新規）
+- 保存された署名URLから groom-posts バケット内のストレージパスを抽出する純関数＋テスト2件
+
+#### `ios-native/Sources/MegrumData/SupabaseGroomClientSupport.swift`
+- `SupabaseGroomClient.signedImageURL(forPath:)`：パス1件を署名（既存の50分キャッシュ利用）
+
+#### `ios-native/Sources/MegrumApp/GroomContextImageEnvironment.swift`（新規）
+- `groomContextImageURLResolver` Environment＋`GroomContextResolvedImage`（失効しうるURLを解決してから AsyncImage 表示）
+
+#### 配線
+- Repository: `freshGroomImageURL(storagePath:)`（デフォルト nil / Supabase実装は groomClient 経由）
+- appState: `freshGroomContextImageURL(from:)`
+- 会話の文脈カード（`MeguriGroomReplyContextCard`）とメッセージ一覧のピル（`MeguriMessageThreadContextPill`）を解決付き画像に変更
+- 会話画面・一覧画面の両方で Environment にリゾルバを注入
+
+### 影響範囲
+- めぐりメッセージ（会話・一覧）のグルーム文脈画像
+
+### 確認方法
+- シミュレータ実データ検証：昨日送信（署名失効済み）のグルーム返信カード画像が表示されることをスクショ確認
+
+### セルフレビュー結果
+- ✅ 送信時の保存形式は変更せず、表示側だけで解決（過去メッセージも遡って直る）
+- ✅ 署名キャッシュ（50分）利用で同一画像の再署名は1回のみ
+- ⚠️ グルーム自体が失効（24h超）するとストレージゲートにより再署名不可→現行のエラー表示のまま。文言改善（「グルームは終了しました」等）は必要なら次iter
+
+---
+
 ## イテレーション1226.341：やりとりバッジの起動時過計上を根治（評価済みIDを先読み）
 
 ### 背景・問題意識
