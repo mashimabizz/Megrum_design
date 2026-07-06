@@ -126,7 +126,7 @@ struct WishCollectionScreen: View {
                 showsHeader: false,
                 showsColumnToggle: false,
                 displayColumnsOverride: wishColumns,
-                adPlacement: .wishListBanner,
+                adPlacement: nil,
                 adDisplayContext: adDisplayContext,
                 onScrollContentTopChange: { contentTop in
                     handleSectionScrollContentTop(contentTop, section: .wishes)

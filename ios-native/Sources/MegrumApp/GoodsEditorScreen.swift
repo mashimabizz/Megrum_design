@@ -11,10 +11,17 @@ struct GoodsEditorSheet: View {
     var route: GoodsEditorRoute
     var onCreatedInventoryItems: ([GoodsItem]) -> Void
 
-    enum PhotoCaptureTarget {
+    enum PhotoCaptureTarget: String {
         case draft
         case inventoryCreate
         case tradingCardBulk
+    }
+
+    /// カメラsheet用ルート。isPresented+別Stateだと初回presentation時に
+    /// 古い photoCaptureTarget でビューが組まれるため、item として渡す。
+    struct CameraCaptureRoute: Identifiable {
+        let target: PhotoCaptureTarget
+        var id: String { target.rawValue }
     }
 
     enum SeriesSuggestionTarget {
@@ -39,6 +46,7 @@ struct GoodsEditorSheet: View {
     @State var isShowingPhotoLibraryPicker = false
     @State var isShowingCreatePhotoLibraryPicker = false
     @State var isShowingCameraCapture = false
+    @State var cameraCaptureRoute: CameraCaptureRoute?
     @State var isConfirmingInventoryDelete = false
     @State var isShowingTradingCardBulkSourceDialog = false
     @State var isShowingTradingCardBulkPhotoLibraryPicker = false
@@ -161,8 +169,8 @@ struct GoodsEditorSheet: View {
             }
 #endif
 #if os(iOS)
-            .sheet(isPresented: $isShowingCameraCapture) {
-                if photoCaptureTarget == .inventoryCreate {
+            .sheet(item: $cameraCaptureRoute) { route in
+                if route.target == .inventoryCreate {
                     // 複数枚登録は連続撮影（撮るたび左下プレビュー→左へシュッと消える）
                     ContinuousCameraCaptureView { imageData in
                         loadCapturedCameraPhoto(imageData)
@@ -179,6 +187,13 @@ struct GoodsEditorSheet: View {
                         createError = message
                     }
                     .ignoresSafeArea()
+                }
+            }
+            .onChange(of: isShowingCameraCapture) { _, isShowing in
+                // 既存の各所（ダイアログ等）は Bool を立てるだけなので、ここで item へ変換する。
+                if isShowing {
+                    cameraCaptureRoute = CameraCaptureRoute(target: photoCaptureTarget)
+                    isShowingCameraCapture = false
                 }
             }
 #endif

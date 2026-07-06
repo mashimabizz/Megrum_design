@@ -100,6 +100,8 @@ extension GoodsCollectionScreen {
         quickActionItem = nil
 
         switch action {
+        case .edit:
+            editorRoute = .edit(item, entryKind)
         case .tag:
             bulkTagRoute = GoodsBulkTagRoute(itemIDs: [item.id])
         case .share:

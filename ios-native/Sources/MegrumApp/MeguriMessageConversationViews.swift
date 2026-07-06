@@ -244,6 +244,9 @@ struct MeguriMessageBubble: View {
                 isMine ? MegrumChatBubbleStyle.mineBackground : MegrumChatBubbleStyle.otherBackground,
                 in: RoundedRectangle(cornerRadius: 18, style: .continuous)
             )
+        } else if text.contains("\n") {
+            // 改行入りは compact（1行固定）だと「…」に潰れるため常に折返しバブルを使う。
+            wrappedTextBubble(text)
         } else {
             ViewThatFits(in: .horizontal) {
                 compactTextBubble(text)

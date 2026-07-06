@@ -41,12 +41,13 @@ enum GoodsSelectionFooterMetrics {
 }
 
 enum GoodsQuickActionKind: CaseIterable, Identifiable, Equatable {
+    case edit
     case tag
     case share
     case delete
 
-    static let inventoryActions: [GoodsQuickActionKind] = [.tag, .share, .delete]
-    static let wishActions: [GoodsQuickActionKind] = [.tag, .share, .delete]
+    static let inventoryActions: [GoodsQuickActionKind] = [.edit, .tag, .share, .delete]
+    static let wishActions: [GoodsQuickActionKind] = [.edit, .tag, .share, .delete]
 
     static func actions(for entryKind: GoodsEntryKind) -> [GoodsQuickActionKind] {
         switch entryKind {
@@ -65,6 +66,8 @@ enum GoodsQuickActionKind: CaseIterable, Identifiable, Equatable {
 
     func title(for itemStatus: GoodsEntryStatus?) -> String {
         switch self {
+        case .edit:
+            "編集"
         case .tag:
             "シリーズ設定"
         case .share:
@@ -76,6 +79,8 @@ enum GoodsQuickActionKind: CaseIterable, Identifiable, Equatable {
 
     var systemImage: String {
         switch self {
+        case .edit:
+            "pencil"
         case .tag:
             "tag"
         case .share:
@@ -89,7 +94,7 @@ enum GoodsQuickActionKind: CaseIterable, Identifiable, Equatable {
         switch self {
         case .delete:
             .destructive
-        case .tag, .share:
+        case .edit, .tag, .share:
             nil
         }
     }

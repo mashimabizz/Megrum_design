@@ -29,6 +29,30 @@
 
 ---
 
+## イテレーション1226.312：FB5件（連写カメラ初回・編集項目・wishバナー削除・改行・吹き出し）
+
+### 背景・問題意識
+オーナーFB：①連続撮影カメラが初回は通常カメラになる ②マイグッズ/ほしいものタップ後のメニューに「編集」がない ③ほしいもの一覧下のバナーは不要 ④チャットの改行入りメッセージが「…」に潰れる ⑤地図の吹き出しが出ない（自分のメッセージも出したい）。
+
+### 変更内容
+- **①連写カメラ初回**：`.sheet(isPresented:)`＋別Stateだと初回presentationでビューが古い photoCaptureTarget で組まれるSwiftUIの罠が原因。`CameraCaptureRoute` を導入して `.sheet(item:)` 化（既存のBool設定箇所は onChange でitemへ変換）
+- **②編集項目**：`GoodsQuickActionKind` に `.edit`（鉛筆・先頭）を追加し、既存の editorRoute = .edit(item, entryKind) へ接続（マイグッズ/ほしいもの両方、テスト更新）
+- **③wishバナー**：ほしいもの一覧の adPlacement を nil に（枠ごと非表示）
+- **④改行「…」**：compact（1行固定）バブルは改行を含む本文では使わず常に折返しへ（チャットルーム・取引・めぐりの3チャット）
+- **⑤地図吹き出し**：リプライの status 実値は `visible` なのに `published` でフィルタしていて全件除外→修正。自分のメッセージは元々除外していない（フィルタ無し）
+
+### 確認方法
+- swift test 1483件 0 failures
+
+### セルフレビュー結果
+- ✅ 吹き出し不表示は推測でなくREST実データ（status=visible）で確認して修正
+- ⚠️ 連写カメラ初回・吹き出し表示は実機確認が必要
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/GoodsEditorScreen.swift` / `GoodsGridPresentation.swift` / `SupabaseBoardClient.swift`
+
+---
+
 ## イテレーション1226.311：リプライUIのLINE風強化＋自分バブルのグラデ化
 
 ### 背景・問題意識

@@ -69,7 +69,7 @@ public final class SupabaseBoardClient: @unchecked Sendable {
             select: "thread_id,body",
             queryItems: [
                 URLQueryItem(name: "thread_id", value: "in.(\(idList))"),
-                URLQueryItem(name: "status", value: "eq.published"),
+                URLQueryItem(name: "status", value: "eq.visible"),
                 URLQueryItem(name: "order", value: "created_at.desc"),
                 URLQueryItem(name: "limit", value: "\(max(perThreadLimit * threadIDs.count, 30))")
             ]

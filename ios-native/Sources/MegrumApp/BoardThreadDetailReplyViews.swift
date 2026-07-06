@@ -148,6 +148,9 @@ struct BoardThreadChatMessageRow: View {
                 message.isMine ? MegrumChatBubbleStyle.mineBackground : MegrumChatBubbleStyle.otherBackground,
                 in: RoundedRectangle(cornerRadius: 18, style: .continuous)
             )
+        } else if messageText.contains("\n") {
+            // 改行入りは compact（1行固定）だと「…」に潰れるため常に折返しバブルを使う。
+            wrappedTextBubble
         } else {
             ViewThatFits(in: .horizontal) {
                 compactTextBubble

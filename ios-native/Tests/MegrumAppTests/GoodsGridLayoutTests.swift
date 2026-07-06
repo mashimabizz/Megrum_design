@@ -294,8 +294,8 @@ final class GoodsGridLayoutTests: XCTestCase {
     }
 
     func testInventoryQuickActionsMatchOwnerMenuOrder() {
-        XCTAssertEqual(GoodsQuickActionKind.inventoryActions, [.tag, .share, .delete])
-        XCTAssertEqual(GoodsQuickActionKind.wishActions, [.tag, .share, .delete])
+        XCTAssertEqual(GoodsQuickActionKind.inventoryActions, [.edit, .tag, .share, .delete])
+        XCTAssertEqual(GoodsQuickActionKind.wishActions, [.edit, .tag, .share, .delete])
         XCTAssertEqual(GoodsQuickActionKind.tag.title, "シリーズ設定")
         XCTAssertEqual(GoodsQuickActionKind.share.title, "Xで投稿")
         XCTAssertEqual(GoodsQuickActionKind.delete.title, "削除")

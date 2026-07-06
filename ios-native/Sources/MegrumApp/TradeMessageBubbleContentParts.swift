@@ -281,6 +281,9 @@ struct TradeTextMessageBubble: View {
                 isMine ? MegrumChatBubbleStyle.mineBackground : MegrumChatBubbleStyle.otherBackground,
                 in: RoundedRectangle(cornerRadius: 18, style: .continuous)
             )
+        } else if parsed.text.contains("\n") {
+            // 改行入りは compact（1行固定）だと「…」に潰れるため常に折返しバブルを使う。
+            wrappedBubble
         } else {
             ViewThatFits(in: .horizontal) {
                 compactBubble
