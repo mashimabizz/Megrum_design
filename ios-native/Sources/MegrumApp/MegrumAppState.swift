@@ -352,15 +352,22 @@ public final class MegrumAppState: ObservableObject {
         errorMessage = nil
 
         do {
+            // 評価済みIDはスナップショットと並行で取得し、proposals を公開する前に
+            // 反映する。後から反映するとやりとりバッジが「開いた直後だけ多い→減る」
+            // 見え方になるため（iter1226.341）。
+            async let evaluatedProposalIDsTask = repository.loadViewerEvaluatedProposalIDs()
             let snapshot = try await repository.loadInitialSnapshot()
+            if let evaluatedIDs = try? await evaluatedProposalIDsTask {
+                viewerEvaluatedProposalIDs.formUnion(evaluatedIDs)
+            }
             apply(snapshot)
+            persistViewerEvaluatedProposalIDsIfPossible()
             preloadOwnedGoodsImages(inventory: snapshot.inventory, wishes: snapshot.wishes)
             await loadBlockedContentUserIDs(reportsFailure: false)
             await loadHomeCandidates(fallbackInventory: snapshot.inventory)
             await loadSubscriptionState(reportsFailure: false)
             await loadMeguriProfile(reportsFailure: false)
             await loadMeguriMessages(reportsFailure: false)
-            await loadViewerEvaluatedProposalIDs()
             await preloadTradeMessages()
             await preloadTradeEvidencePhotos()
         } catch {
@@ -380,15 +387,19 @@ public final class MegrumAppState: ObservableObject {
     public func refreshHomeDiscovery() async {
         errorMessage = nil
         do {
+            async let evaluatedProposalIDsTask = repository.loadViewerEvaluatedProposalIDs()
             let snapshot = try await repository.loadInitialSnapshot()
+            if let evaluatedIDs = try? await evaluatedProposalIDsTask {
+                viewerEvaluatedProposalIDs.formUnion(evaluatedIDs)
+            }
             apply(snapshot)
+            persistViewerEvaluatedProposalIDsIfPossible()
             preloadOwnedGoodsImages(inventory: snapshot.inventory, wishes: snapshot.wishes)
             await loadBlockedContentUserIDs(reportsFailure: false)
             await loadHomeCandidates(fallbackInventory: snapshot.inventory)
             await loadSubscriptionState(reportsFailure: false)
             await loadMeguriProfile(reportsFailure: false)
             await loadMeguriMessages(reportsFailure: false)
-            await loadViewerEvaluatedProposalIDs()
             await preloadTradeMessages()
             await preloadTradeEvidencePhotos()
         } catch {

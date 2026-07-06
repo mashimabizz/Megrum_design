@@ -4,6 +4,34 @@
 
 ---
 
+## イテレーション1226.341：やりとりバッジの起動時過計上を根治（評価済みIDを先読み）
+
+### 背景・問題意識
+iter1226.339（評価済みIDのローカル保存）後もオーナーから「開いたら数が減る」と再指摘。ローカル保存はサーバー読み込みが一度成功するまで空で、初回起動や保存漏れ時に過計上が残る余地があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- `loadInitialData` / `refreshHomeDiscovery`：評価済みproposal IDの取得をスナップショット取得と**並行実行**し、`apply(snapshot)` で proposals を公開する**前に** `viewerEvaluatedProposalIDs` へ反映。バッジは最初のフレームから確定値になる
+- 反映後にローカル保存も更新（オフライン起動時はローカル保存分のみで補完）
+
+#### `ios-native/Sources/MegrumApp/MegrumAppStateTradeResolutionActions.swift`
+- persistヘルパーを共有化（`persistViewerEvaluatedProposalIDsIfPossible`）
+
+### 影響範囲
+- やりとりタブバッジ・アプリアイコンバッジの起動直後の値
+
+### 確認方法
+- swift test: 1491件＋Storeテスト、0 failures
+- 起動シーケンス上、評価済みID→proposalsの順が構造的に保証される（後から引かれる経路が消滅）
+
+### セルフレビュー結果
+- ✅ 並行取得のためスナップショットの所要時間内に評価済みIDの取得が隠れ、起動は遅くならない
+- ✅ 取得失敗時（オフライン等）はローカル保存分で補完し、従来の遅延反映も残る
+- ⚠️ 完全オフラインかつローカル保存が空の初回のみ、従来同様の遅延反映
+
+---
+
 ## イテレーション1226.340：通知一覧の自動既読（閲覧済みめぐりメッセージ・チャットルーム）
 
 ### 背景・問題意識
