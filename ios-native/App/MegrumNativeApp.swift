@@ -141,11 +141,11 @@ struct MegrumNativeApp: App {
             let email = environment["MEGRUM_DEBUG_AUTO_SIGNIN_EMAIL"],
             let password = environment["MEGRUM_DEBUG_AUTO_SIGNIN_PASSWORD"],
             !email.isEmpty,
-            !password.isEmpty,
-            !authState.isAuthenticated
+            !password.isEmpty
         else {
             return
         }
+        // 保存済みセッションが期限切れでもQAが確実に動くよう、常に入り直す。
         await authState.signIn(email: email, password: password)
     }
 
@@ -219,6 +219,12 @@ struct MegrumNativeApp: App {
     @MainActor
     private func requestNativePushAuthorizationIfReady() async {
         guard authState.isConfigured, authState.isAuthenticated, !didRequestNativePushAuthorization else {
+            return
+        }
+        // VisualQA起動時は通知許可ダイアログがスクリーンショット検証を塞ぐため抑制する。
+        if ProcessInfo.processInfo.environment["MEGRUM_VISUAL_QA_INITIAL_SCREEN"]?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .isEmpty == false {
             return
         }
 

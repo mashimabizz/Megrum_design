@@ -53,17 +53,12 @@ struct ProposalGiveGoodsStep: View {
                     .padding(.vertical, 30)
                     .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
                 } else {
-                    VStack(spacing: ProposalCandidateListMetrics.spacing) {
-                        ForEach(filteredGoods) { item in
-                            ProposalSelectableGoodsRow(
-                                item: item,
-                                isSelected: selectedGoodsIDs.contains(item.id),
-                                hintText: "相手がほしいものかも？"
-                            ) {
-                                onToggleGoods(item.id)
-                            }
-                        }
-                    }
+                    ProposalSelectableGoodsGrid(
+                        items: filteredGoods,
+                        selectedGoodsIDs: selectedGoodsIDs,
+                        accessibilityHint: "を出すものに選択",
+                        onToggleGoods: onToggleGoods
+                    )
                 }
             }
         }
@@ -101,17 +96,12 @@ struct ProposalReceiveGoodsStep: View {
                     selectedGoodsTypeID: $selectedGoodsTypeID
                 )
 
-                VStack(spacing: ProposalCandidateListMetrics.spacing) {
-                    ForEach(filteredGoods) { item in
-                        ProposalSelectableGoodsRow(
-                            item: item,
-                            isSelected: selectedGoodsIDs.contains(item.id),
-                            hintText: "私がほしいものかも？"
-                        ) {
-                            onToggleGoods(item.id)
-                        }
-                    }
-                }
+                ProposalSelectableGoodsGrid(
+                    items: filteredGoods,
+                    selectedGoodsIDs: selectedGoodsIDs,
+                    accessibilityHint: "を受け取るものに選択",
+                    onToggleGoods: onToggleGoods
+                )
 
                 if filteredGoods.isEmpty {
                     ContentUnavailableView(
@@ -123,6 +113,35 @@ struct ProposalReceiveGoodsStep: View {
                     .padding(.vertical, 30)
                     .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
                 }
+            }
+        }
+    }
+}
+
+/// 個別募集の作成画面と同じ4列の画像グリッド（iter1226.346）。
+private struct ProposalSelectableGoodsGrid: View {
+    var items: [GoodsItem]
+    var selectedGoodsIDs: Set<UUID>
+    var accessibilityHint: String
+    var onToggleGoods: (UUID) -> Void
+
+    private static let columns = Array(repeating: GridItem(.flexible(), spacing: 10), count: 4)
+
+    var body: some View {
+        LazyVGrid(columns: Self.columns, spacing: 12) {
+            ForEach(items) { item in
+                Button {
+                    onToggleGoods(item.id)
+                } label: {
+                    ListingSelectableImageTile(
+                        imageURL: item.imageURL,
+                        title: item.title,
+                        isSelected: selectedGoodsIDs.contains(item.id)
+                    )
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("\(item.title)\(accessibilityHint)")
+                .accessibilityAddTraits(selectedGoodsIDs.contains(item.id) ? .isSelected : [])
             }
         }
     }
