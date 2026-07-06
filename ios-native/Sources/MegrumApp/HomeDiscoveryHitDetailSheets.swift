@@ -10,6 +10,8 @@ struct HomeGoodsHitDetailSheet: View {
     var showsOtherExchangeRows: Bool = true
     var bottomButtonTitle: String = "交換内容を確認する"
     var preselectPreferredOffer: Bool = true
+    /// ガイドツアーのデモ用：選択済み状態を注入して「実際の画面状態」を再現する（通常は nil）。
+    var initialSelectionState: HomeListingSheetSelectionState? = nil
     var onOpenOwnerProfile: (UUID) -> Void
     var onOpenNestedSheet: (HomeDiscoverySheet) -> Void
     var onStartProposal: (HomeDiscoveryProposalSelection) -> Void
@@ -188,6 +190,16 @@ struct HomeGoodsHitDetailSheet: View {
     }
 
     private func prepareInitialSelections() {
+        if let initialSelectionState {
+            selectionState = initialSelectionState
+            if !selectionState.selectedWantedIndices.isEmpty {
+                fillSuggestedCashAmountIfNeeded()
+                if preselectPreferredOffer {
+                    selectPreferredOfferIfNeeded()
+                }
+            }
+            return
+        }
         let context = selectionContext
         selectionState = HomeListingSheetSelectionStateReducer.preparingInitialSelection(
             itemCount: context.wantedItemCount,

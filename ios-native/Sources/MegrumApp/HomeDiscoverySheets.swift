@@ -16,6 +16,8 @@ struct HomeDiscoverySheetView: View {
     var onAddExtraProposalSelection: (HomeDiscoveryProposalSelection) -> Void = { _ in }
     var onOpenOwnerProfile: (UUID) -> Void = { _ in }
     var onStartProposal: (HomeDiscoveryProposalSelection) -> Void = { _ in }
+    /// ガイドツアーのデモ用：グッズヒット詳細に選択済み状態を注入する（通常は nil）。
+    var initialGoodsHitSelectionState: HomeListingSheetSelectionState? = nil
     @State private var presentationState = HomeDiscoverySheetPresentationState()
 
     private var sheetIsHavesLookup: Bool {
@@ -37,7 +39,8 @@ struct HomeDiscoverySheetView: View {
             onOpenOwnerProfile: openOwnerProfile,
             onOpenNestedSheet: { presentationState.showNestedSheet($0) },
             onStartProposal: submitSelection,
-            onCopyToWish: copyGoodsToWish
+            onCopyToWish: copyGoodsToWish,
+            initialGoodsHitSelectionState: initialGoodsHitSelectionState
         )
             .overlay(alignment: .bottom) {
                 if let wishCopyToastMessage = presentationState.wishCopyToastMessage {

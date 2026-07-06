@@ -122,7 +122,10 @@ extension NativePreviewData {
             prefecture: "東京都",
             groupID: groupID,
             characterID: memberID,
-            seriesName: "2026 LIVE"
+            seriesName: "2026 LIVE",
+            // 返信（1_780_170_000〜）より前に本文が来るよう固定（未指定だと .now になり日付が逆行して見える）。
+            createdAt: Date(timeIntervalSince1970: 1_780_169_700),
+            latestActivityAt: Date(timeIntervalSince1970: 1_780_170_180)
         ),
         BoardThread(
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000602")!,
@@ -133,7 +136,9 @@ extension NativePreviewData {
             prefecture: "東京都",
             groupID: secondGroupID,
             characterID: secondMemberID,
-            seriesName: "会場限定"
+            seriesName: "会場限定",
+            createdAt: Date(timeIntervalSince1970: 1_780_169_800),
+            latestActivityAt: Date(timeIntervalSince1970: 1_780_170_360)
         )
     ]
 

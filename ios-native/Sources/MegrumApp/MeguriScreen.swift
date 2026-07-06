@@ -186,12 +186,13 @@ struct MeguriScreen: View {
             // ガイドツアーの実演：指のタップに合わせて、地図中心付近に実物の作成コールアウトを出す。
             // ツアー中は位置情報を抑制しているため 1km 判定は通さない（見せるだけで作成はしない）。
             guard requestID != nil else { return }
-            // 指のタップ位置（画面上部寄り）に吹き出しが出るよう、中心より北へずらす。
+            // 指のタップ位置に吹き出しが出るよう、中心より北へずらす。
+            // 1km円（半径≈0.009度）の内側に収まるオフセットにする（円周ぎりぎりだと圏外に見える）。
             let center = homeCameraPosition.region?.center
                 ?? CLLocationCoordinate2D(latitude: 35.7056, longitude: 139.7519)
             withAnimation(.easeOut(duration: 0.16)) {
                 pendingMapCreationCoordinate = MegrumLocationCoordinate(
-                    latitude: center.latitude + 0.0112,
+                    latitude: center.latitude + 0.006,
                     longitude: center.longitude
                 )
             }

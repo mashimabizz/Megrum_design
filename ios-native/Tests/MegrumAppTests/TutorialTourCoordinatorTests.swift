@@ -61,6 +61,22 @@ final class TutorialTourCoordinatorTests: XCTestCase {
         XCTAssertNil(coordinator.currentBeat)
     }
 
+    func testChapterScopeSkipsLeadingTabBandBeat() {
+        let coordinator = TutorialTourCoordinator()
+        // めぐり章の先頭 9-1 は「タブへ移動するよ」のつなぎビート。単体再生では 9-2 から始める。
+        coordinator.startChapter(.meguri)
+        XCTAssertEqual(coordinator.currentBeat?.id, "9-2")
+        // 実質先頭より前（9-1）へは戻らない。
+        XCTAssertFalse(coordinator.canRetreat)
+        coordinator.retreat()
+        XCTAssertEqual(coordinator.currentBeat?.id, "9-2")
+        coordinator.advance()
+        XCTAssertTrue(coordinator.canRetreat)
+        // ほしいもの章も同様に 5-1（タブ帯）を飛ばして 5-2 から。
+        coordinator.startChapter(.wish)
+        XCTAssertEqual(coordinator.currentBeat?.id, "5-2")
+    }
+
     func testScriptIntegrity() {
         let beats = TutorialScript.beats
         XCTAssertFalse(beats.isEmpty)

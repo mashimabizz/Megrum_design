@@ -178,6 +178,9 @@ struct MegrumAuthenticatedTabContentView: View {
                         beat: beat,
                         overallProgress: tutorialCoordinator.overallProgress,
                         canRetreat: tutorialCoordinator.canRetreat,
+                        advanceTitle: tutorialCoordinator.isAtScopeEnd
+                            ? (tutorialCoordinator.scope == .full ? "はじめる！" : "閉じる")
+                            : "次へ",
                         anchorFrames: anchors.mapValues { proxy[$0] },
                         containerSize: proxy.size,
                         onAdvance: { tutorialCoordinator.advance() },

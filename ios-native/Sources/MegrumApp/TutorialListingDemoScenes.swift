@@ -45,7 +45,9 @@ struct TutorialListingDemoSceneView: View {
         switch beat {
         case .afterSave:
             // 実物の個別募集一覧（プレビューデータの募集カードが載った状態）。
+            // 画面タイトルが時計/Dynamic Islandと重ならないよう少し下げる。
             IndividualListingsScreen(appState: demoAppState)
+                .padding(.top, 44)
                 .allowsHitTesting(false)
         default:
             editorStage
@@ -188,22 +190,25 @@ struct TutorialListingDemoSceneView: View {
         try? await Task.sleep(nanoseconds: 300_000_000)
         switch beat {
         case .havesCashTab:
-            pointer.appear(at: CGPoint(x: size.width * 0.72, y: size.height * 0.20))
-            await pointer.tap()
-        case .havesCashAmount:
+            // 「グッズ/定価で選ぶ」タブ行（実測 y≈0.30）の右半分。
             pointer.appear(at: CGPoint(x: size.width * 0.72, y: size.height * 0.30))
             await pointer.tap()
+        case .havesCashAmount:
+            pointer.appear(at: CGPoint(x: size.width * 0.72, y: size.height * 0.40))
+            await pointer.tap()
         case .wishConditionTab:
-            pointer.appear(at: CGPoint(x: size.width * 0.5, y: size.height * 0.20))
+            pointer.appear(at: CGPoint(x: size.width * 0.5, y: size.height * 0.30))
             await pointer.tap()
         case .wishCashTab:
-            pointer.appear(at: CGPoint(x: size.width * 0.8, y: size.height * 0.20))
+            pointer.appear(at: CGPoint(x: size.width * 0.78, y: size.height * 0.30))
             await pointer.tap()
         case .exchangeMethod:
-            pointer.appear(at: CGPoint(x: size.width * 0.8, y: size.height * 0.24))
+            // 「現地交換・郵送OK」カード（実測 y≈0.40・右端）。
+            pointer.appear(at: CGPoint(x: size.width * 0.81, y: size.height * 0.40))
             await pointer.tap()
         case .exchangeLocal:
-            pointer.appear(at: CGPoint(x: size.width * 0.5, y: size.height * 0.42))
+            // 「2. 現地交換の条件」パネル（都道府県行あたり）。
+            pointer.appear(at: CGPoint(x: size.width * 0.3, y: size.height * 0.55))
             await pointer.tap()
         case .exchangeMail:
             pointer.appear(at: CGPoint(x: size.width * 0.5, y: size.height * 0.45))

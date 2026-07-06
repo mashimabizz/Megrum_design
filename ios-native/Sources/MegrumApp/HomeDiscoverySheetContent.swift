@@ -14,6 +14,8 @@ struct HomeDiscoverySheetContent: View {
     let onOpenNestedSheet: (HomeDiscoverySheet) -> Void
     let onStartProposal: (HomeDiscoveryProposalSelection) -> Void
     let onCopyToWish: (HomeMockGoods) -> Void
+    /// ガイドツアーのデモ用：グッズヒット詳細に選択済み状態を注入する（通常は nil）。
+    var initialGoodsHitSelectionState: HomeListingSheetSelectionState? = nil
 
     var body: some View {
         switch sheet {
@@ -25,6 +27,7 @@ struct HomeDiscoverySheetContent: View {
                 showsOtherExchangeRows: presentationContext.showsOtherExchangeRows,
                 bottomButtonTitle: presentationContext.bottomButtonTitle,
                 preselectPreferredOffer: presentationContext.preselectPreferredOffer,
+                initialSelectionState: initialGoodsHitSelectionState,
                 onOpenOwnerProfile: onOpenOwnerProfile,
                 onOpenNestedSheet: onOpenNestedSheet,
                 onStartProposal: onStartProposal,

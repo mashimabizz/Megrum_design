@@ -252,7 +252,8 @@ struct TutorialGoodsDemoSceneView: View {
                 .font(.system(size: 12, weight: .semibold, design: .rounded))
                 .foregroundStyle(MegrumTheme.muted)
 
-            Text(showsPastedTag ? "適用する" : "設定する")
+            // 実物のシリーズ一括設定シートのCTAに合わせる（途中で名前が変わって見えないように固定）。
+            Text("登録")
                 .font(.system(size: 16, weight: .black, design: .rounded))
                 .foregroundStyle(.white)
                 .frame(maxWidth: .infinity)
@@ -306,17 +307,19 @@ struct TutorialGoodsDemoSceneView: View {
                 HStack(spacing: 10) {
                     Image(systemName: "sparkle.magnifyingglass")
                         .foregroundStyle(.white)
-                    Text("TWICE『DIVE』トレカ 特典")
-                        .font(.system(size: 15, weight: .bold))
-                        .foregroundStyle(.white)
-                        .background(alignment: .bottomLeading) {
-                            if showsCopyBubble {
-                                Rectangle()
-                                    .fill(Color.blue.opacity(0.45))
-                                    .frame(height: 22)
-                                    .offset(y: 3)
+                    // 選択反転はコピー対象のシリーズ名「DIVE」だけに掛ける（4-13/4-14の物語と一致）。
+                    HStack(spacing: 0) {
+                        Text("TWICE『")
+                        Text("DIVE")
+                            .background {
+                                if showsCopyBubble {
+                                    Color.blue.opacity(0.45)
+                                }
                             }
-                        }
+                        Text("』トレカ 特典")
+                    }
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(.white)
                     Spacer()
                 }
                 .padding(14)
@@ -447,7 +450,8 @@ struct TutorialGoodsDemoSceneView: View {
     }
 
     private var savedItems: [GoodsItem] {
-        let members = ["ツウィ", "ジヒョ", "ダヒョン", "サナ", "ミナ", "チェヨン", "ジョンヨン", "ナヨン", "モモ"]
+        // 先頭2枚は4-9で割り当てて見せたメンバー（サナ・モモ）と一致させる。
+        let members = ["サナ", "モモ", "ダヒョン", "ツウィ", "ジヒョ", "ミナ", "チェヨン", "ジョンヨン", "ナヨン"]
         return TutorialDemoAssets.diveCardNames.enumerated().compactMap { index, name in
             guard let url = NativePreviewData.testGoodsImageURL(name) else { return nil }
             return GoodsItem(
@@ -504,7 +508,8 @@ struct TutorialGoodsDemoSceneView: View {
             createMetas = photoCache.enumerated().map { index, photo in
                 GoodsCreateMetaDraft(
                     photoID: photo.id,
-                    memberID: beat == .assignMembers && index < 2 ? members[index].id : nil,
+                    // 4-9で割り当てたメンバーは以降のビートでも保持する（巻き戻って見えないように）。
+                    memberID: index < 2 ? members[index].id : nil,
                     title: "",
                     tagNames: beat == .seriesPaste ? ["DIVE"] : []
                 )
@@ -531,7 +536,7 @@ struct TutorialGoodsDemoSceneView: View {
             pointer.appear(at: CGPoint(x: size.width * 0.68, y: size.height * 0.30))
             await pointer.tap()
         case .bulkDetect:
-            // 元写真の下にある「トレカ一括読み取り」を押す→切り抜き結果へ切替（FB③）。
+            // 元写真の下にある「トレカ専用 AIで一括登録」を押す→切り抜き結果へ切替（FB③）。
             pointer.appear(at: CGPoint(x: size.width * 0.5, y: size.height * 0.66))
             try? await Task.sleep(nanoseconds: 500_000_000)
             await pointer.tap()
@@ -549,6 +554,9 @@ struct TutorialGoodsDemoSceneView: View {
                 cropProgress = 1
             }
             await pointer.drag(to: end, duration: 0.85)
+            // ドラッグ終点は下部キャプションの裏に入るため、演技後は指を消す。
+            try? await Task.sleep(nanoseconds: 350_000_000)
+            pointer.hide()
         case .assignMembers:
             pointer.appear(at: CGPoint(x: size.width * 0.30, y: size.height * 0.80))
             await pointer.tap()

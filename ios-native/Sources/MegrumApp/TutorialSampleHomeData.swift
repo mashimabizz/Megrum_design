@@ -114,7 +114,14 @@ enum TutorialSampleHomeData {
                 tags: [tag("DICON D'FESTA MINI EDITION")],
                 quantity: 1,
                 exchangeMethod: .both,
-                ownerPrefecture: "東京都"
+                ownerPrefecture: "東京都",
+                // 第7章デモの相手プロフィール（michi）と一致させる。
+                ownerDisplayName: "michi",
+                ownerHandle: "michi1",
+                ownerGender: .female,
+                ownerAge: 27,
+                ownerAverageStars: 4.5,
+                ownerEvaluationCount: 2
             ),
             GoodsItem(
                 id: ningningItemID,
@@ -128,7 +135,13 @@ enum TutorialSampleHomeData {
                 tags: [tag("MY WORLD")],
                 quantity: 1,
                 exchangeMethod: .hand,
-                ownerPrefecture: "神奈川県"
+                ownerPrefecture: "神奈川県",
+                ownerDisplayName: "hana",
+                ownerHandle: "hana_krb",
+                ownerGender: .female,
+                ownerAge: 27,
+                ownerAverageStars: 4.8,
+                ownerEvaluationCount: 12
             ),
             GoodsItem(
                 id: vItemID,
@@ -142,7 +155,13 @@ enum TutorialSampleHomeData {
                 tags: [tag("LOVE YOURSELF: SPEAK YOURSELF")],
                 quantity: 1,
                 exchangeMethod: .both,
-                ownerPrefecture: "東京都"
+                ownerPrefecture: "東京都",
+                ownerDisplayName: "yuzu",
+                ownerHandle: "yuzu_318",
+                ownerGender: .female,
+                ownerAge: 24,
+                ownerAverageStars: 4.9,
+                ownerEvaluationCount: 31
             ),
         ]
     }

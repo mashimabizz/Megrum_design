@@ -131,6 +131,8 @@ struct TutorialBeat: Identifiable, Equatable, Sendable {
     let body: String
     /// spotlight ビートで指アイコンを出す位置（画面比率 0〜1）。nil なら指なし。
     var pointerFraction: CGPoint?
+    /// banner 提示で説明カードを上に置く（画面下部の切替UI等が説明対象のビート用）。
+    var bannerCaptionAtTop = false
 
     /// ホームのセクションへ自動スクロールするフォーカス。
     var homeFocusAnchor: TutorialAnchorID? {
@@ -169,19 +171,13 @@ enum TutorialScript {
         return (index, chapterBeats.count)
     }
 
-    /// 次の章の先頭ビート（章スキップ用）。無ければ nil（＝ツアー終了）。
-    static func firstBeatOfNextChapter(after beat: TutorialBeat) -> TutorialBeat? {
-        guard let currentIndex = beats.firstIndex(of: beat) else { return nil }
-        return beats.dropFirst(currentIndex + 1).first { $0.chapter != beat.chapter }
-    }
-
     // MARK: 第1章 ようこそ
 
     private static let welcomeBeats: [TutorialBeat] = [
         TutorialBeat(
             id: "1-1", chapter: .welcome, presentation: .centerCard, targetTab: .home,
             title: "Megrumへようこそ！🎉",
-            body: "これから使い方をサッと案内するよ。画面のどこでもタップで進めて、各章は「この章をとばす」でスキップもできるよ。"
+            body: "これから使い方をサッと案内するよ。画面のどこでもタップで進めて、「戻る」で1つ前にも戻れるよ。あとからヘルプの「使い方ガイド」でも見返せるよ。"
         ),
     ]
 
@@ -251,7 +247,7 @@ enum TutorialScript {
         TutorialBeat(
             id: "4-7", chapter: .inventory, presentation: .demo(.goods(.bulkDetect)), targetTab: .inventory,
             title: "トレカAIで一括登録",
-            body: "「トレカ一括読み取り」を押すと、AIが1枚ずつ自動で切り抜いてくれるよ。今回は7枚が自動でOK、右下の2枚だけ読み取れなかったみたい。"
+            body: "「トレカ専用 AIで一括登録」を押すと1枚ずつ自動で切り抜き。今回は7枚OK、右下の2枚は読み取れなかったみたい。"
         ),
         TutorialBeat(
             id: "4-8", chapter: .inventory, presentation: .demo(.goods(.manualCrop)), targetTab: .inventory,
@@ -261,12 +257,12 @@ enum TutorialScript {
         TutorialBeat(
             id: "4-9", chapter: .inventory, presentation: .demo(.goods(.assignMembers)), targetTab: .inventory,
             title: "メンバーを付ける",
-            body: "写真を選んで、下の「メンバー」ボタンからまとめて割り当てられるよ（あとからでもOK）。"
+            body: "写真を選んで、下の「メンバー登録」からまとめて割り当てられるよ（あとからでもOK）。"
         ),
         TutorialBeat(
             id: "4-10", chapter: .inventory, presentation: .demo(.goods(.seriesButton)), targetTab: .inventory,
             title: "シリーズを付ける",
-            body: "同じように、下の「シリーズ」ボタンからまとめて付けられるよ。"
+            body: "同じように、下の「シリーズ登録」からまとめて付けられるよ。"
         ),
         TutorialBeat(
             id: "4-11", chapter: .inventory, presentation: .demo(.goods(.seriesSheetLens)), targetTab: .inventory,
@@ -281,12 +277,12 @@ enum TutorialScript {
         TutorialBeat(
             id: "4-13", chapter: .inventory, presentation: .demo(.goods(.lensCopy)), targetTab: .inventory,
             title: "結果をコピー",
-            body: "出てきた「TWICE DIVE」を長押しでコピー。"
+            body: "出てきた結果からシリーズ名「DIVE」を長押しでコピー。"
         ),
         TutorialBeat(
             id: "4-14", chapter: .inventory, presentation: .demo(.goods(.seriesPaste)), targetTab: .inventory,
-            title: "タグ欄にペースト",
-            body: "シリーズ欄に貼り付けて適用。9枚ぜんぶに #DIVE が付いたよ。"
+            title: "シリーズ欄にペースト",
+            body: "シリーズ欄に貼り付けて「登録」。9枚ぜんぶに #DIVE が付くよ。"
         ),
         TutorialBeat(
             id: "4-15", chapter: .inventory, presentation: .demo(.goods(.saved)), targetTab: .inventory,
@@ -330,7 +326,7 @@ enum TutorialScript {
             id: "6-2", chapter: .listing, presentation: .banner, targetTab: .wish,
             requestedWishSection: .listings,
             title: "個別募集＝交換条件カード",
-            body: "「これを譲るから、これがほしい」の条件カード。求めるもの・譲るもの・交換条件の3つで1枚になっていて、ホームのマッチの材料になるよ。ためしに1枚作る流れを見てみよう。"
+            body: "「これを譲るからこれがほしい」の条件カード。ホームのマッチの材料になるよ。ためしに1枚作ってみよう。"
         ),
         TutorialBeat(
             id: "6-3", chapter: .listing, presentation: .spotlight(.listingAddButton), targetTab: .wish,
@@ -425,7 +421,7 @@ enum TutorialScript {
             id: "7-1", chapter: .proposal, presentation: .spotlight(.homeSectionUserTag), targetTab: .home,
             title: "「激求！」の相手で試そう",
             body: "激求＝あなたのグッズを名指しで求めている状態。一番上のサナの行をタップしてみよう。",
-            pointerFraction: CGPoint(x: 0.5, y: 0.30)
+            pointerFraction: CGPoint(x: 0.24, y: 0.295)
         ),
         TutorialBeat(
             id: "7-2", chapter: .proposal, presentation: .demo(.proposal(.openDetail)), targetTab: .home,
@@ -440,12 +436,12 @@ enum TutorialScript {
         TutorialBeat(
             id: "7-4", chapter: .proposal, presentation: .demo(.proposal(.profile)), targetTab: .home,
             title: "相手のプロフィール",
-            body: "評価や完了取引数はここで見られるよ。"
+            body: "評価やLike数、譲るグッズの一覧はここで見られるよ。"
         ),
         TutorialBeat(
             id: "7-5", chapter: .proposal, presentation: .demo(.proposal(.exchangeTerms)), targetTab: .home,
             title: "相手の交換条件",
-            body: "現地/郵送・都道府県などの条件はここ。"
+            body: "現地/郵送の可否や送料など、相手の交換条件はここ。"
         ),
         TutorialBeat(
             id: "7-6", chapter: .proposal, presentation: .demo(.proposal(.listingDetail)), targetTab: .home,
@@ -495,7 +491,8 @@ enum TutorialScript {
         TutorialBeat(
             id: "8-1", chapter: .trades, presentation: .banner, targetTab: .trades,
             title: "「やりとり」タブ",
-            body: "送った・届いた打診はここ。下の「打診中/進行中/完了済み」で切り替えられるよ。"
+            body: "送った・届いた打診はここ。下の「打診中/進行中/完了済み」で切り替えられるよ。",
+            bannerCaptionAtTop: true
         ),
         TutorialBeat(
             id: "8-2", chapter: .trades, presentation: .demo(.trades(.chatFlow)), targetTab: .trades,
@@ -535,7 +532,7 @@ enum TutorialScript {
         TutorialBeat(
             id: "9-6", chapter: .meguri, presentation: .demo(.meguri(.boardPreview)), targetTab: .meguri,
             title: "チャットルームのプレビュー",
-            body: "四角いピンから入ると紹介→参加の流れ。部屋ごとの名前で気軽に参加できるよ。"
+            body: "四角いピンがチャットルーム。部屋ごとの名前で、近くの人と気軽にやりとりできるよ。"
         ),
     ]
 

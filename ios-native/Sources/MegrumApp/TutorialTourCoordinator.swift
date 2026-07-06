@@ -12,6 +12,8 @@ enum TutorialPlaybackScope: Equatable {
 final class TutorialTourCoordinator: ObservableObject {
     @Published private(set) var currentBeat: TutorialBeat?
     private(set) var scope: TutorialPlaybackScope = .full
+    /// 章別再生の実質的な開始ビート（先頭のタブ帯つなぎを飛ばした位置）。これより前へは戻らない。
+    private var chapterHeadID: String?
 
     var isActive: Bool { currentBeat != nil }
 
@@ -28,13 +30,14 @@ final class TutorialTourCoordinator: ObservableObject {
         }
     }
 
-    /// 1つ前のビートへ戻れるか（章再生では章の先頭まで）。
+    /// 1つ前のビートへ戻れるか（章再生では章の実質先頭まで）。
     var canRetreat: Bool {
         guard let beat = currentBeat, let index = TutorialScript.beats.firstIndex(of: beat), index > 0 else {
             return false
         }
         let previous = TutorialScript.beats[index - 1]
         if case .chapter(let chapter) = scope {
+            guard beat.id != chapterHeadID else { return false }
             return previous.chapter == chapter
         }
         return true
@@ -42,12 +45,21 @@ final class TutorialTourCoordinator: ObservableObject {
 
     func start(at beat: TutorialBeat? = nil, scope: TutorialPlaybackScope = .full) {
         self.scope = scope
-        currentBeat = beat ?? TutorialScript.beats.first
+        let resolved = beat ?? TutorialScript.beats.first
+        if case .chapter = scope {
+            chapterHeadID = resolved?.id
+        } else {
+            chapterHeadID = nil
+        }
+        currentBeat = resolved
     }
 
     /// ヘルプからの章別再生：その章の先頭から再生し、章が終わったら閉じる。
+    /// 先頭が「次は◯◯タブへ」のタブ帯つなぎビートの場合は飛ばして本編から始める
+    /// （単体再生では前章の文脈がなく不自然なため）。
     func startChapter(_ chapter: TutorialChapter) {
-        let head = TutorialScript.beats.first { $0.chapter == chapter }
+        let chapterBeats = TutorialScript.beats.filter { $0.chapter == chapter }
+        let head = chapterBeats.first { $0.presentation != .tabBand } ?? chapterBeats.first
         start(at: head, scope: .chapter(chapter))
     }
 
@@ -64,6 +76,18 @@ final class TutorialTourCoordinator: ObservableObject {
             return
         }
         currentBeat = next
+    }
+
+    /// 再生範囲の最終ビートか（「次へ」を「はじめる！」「閉じる」に差し替える判定用）。
+    var isAtScopeEnd: Bool {
+        guard let beat = currentBeat, let index = TutorialScript.beats.firstIndex(of: beat) else {
+            return false
+        }
+        guard index + 1 < TutorialScript.beats.count else { return true }
+        if case .chapter(let chapter) = scope {
+            return TutorialScript.beats[index + 1].chapter != chapter
+        }
+        return false
     }
 
     /// 吹き出しの「戻る」：1つ前のビートへ（範囲の先頭では何もしない）。

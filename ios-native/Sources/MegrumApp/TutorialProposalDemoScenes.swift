@@ -14,17 +14,56 @@ struct TutorialProposalDemoSceneView: View {
     /// 激求ヒット（PreviewMegrumRepository が個別募集ヒットを付けている相手グッズ）。
     private var targetItem: GoodsItem? {
         let partnerItems = demoAppState.homeMatchedItems.filter { $0.ownerID != demoAppState.viewer?.id }
-        return partnerItems.first { demoAppState.homeCandidateConditionSignals[$0.id]?.individualListingSelection != nil }
+        let base = partnerItems.first { demoAppState.homeCandidateConditionSignals[$0.id]?.individualListingSelection != nil }
             ?? partnerItems.first
+        guard var item = base else { return nil }
+        // シート上部のオーナー表示を実プロフィール（michi）と一致させる
+        //（fixtureにオーナー情報が無いと「ユーザー/評価なし」になり、7-4のプロフィールと食い違う）。
+        let partner = NativePreviewData.partner
+        item.ownerDisplayName = partner.displayName
+        item.ownerHandle = partner.handle
+        item.ownerGender = partner.gender
+        item.ownerAge = partner.age
+        item.ownerPrefecture = partner.prefecture
+        item.ownerAverageStars = 4.5
+        item.ownerEvaluationCount = 2
+        return item
     }
 
     private var sheetPayload: HomeDiscoverySheetPayload? {
         guard let item = targetItem else { return nil }
         let goods = HomeMockGoods.from(item: item, index: 0, goodsTypes: demoAppState.goodsTypes)
-        let signals = demoAppState.homeCandidateConditionSignals[item.id]
+        var signals = demoAppState.homeCandidateConditionSignals[item.id]
             ?? HomeCandidateConditionSignalDefaults.previewSignals(matchedItems: [item], possibleItems: [])[item.id]
+        // 「相手の希望」の指名先をデモ在庫の実アイテムに揃える。これが一致しないと
+        // 「譲るグッズを選ぶ」が空になり、確認ボタンが非活性のままになる（7-9〜7-11）。
+        if var selection = signals?.individualListingSelection,
+           var option = selection.wantedOptions.first,
+           let mine = viewerOfferGoods.first {
+            option.goodsIDs = [mine.id]
+            option.matchingGoodsIDs = [mine.id]
+            selection.wantedOptions[0] = option
+            signals?.individualListingSelection = selection
+        }
         guard let signals else { return nil }
         return HomeDiscoverySheetPayload(goods: goods, signals: signals)
+    }
+
+    /// 各ビートの「実際の選択状態」（受け取り2点は7-7で選択→以降保持、希望からの譲るは7-8で選択→以降保持）。
+    private var scriptedSelectionState: HomeListingSheetSelectionState? {
+        switch beat {
+        case .receivePick, .pickFromWanted:
+            return HomeListingSheetSelectionState(selectedReceiveIndices: [0, 1])
+        case .pickFromMine, .pickMore, .confirmTap:
+            // 譲るグッズまで選択済みにして「交換内容を確認する」が活性の実状態を見せる。
+            return HomeListingSheetSelectionState(
+                selectedWantedIndices: [0],
+                selectedOfferIndices: [0],
+                selectedReceiveIndices: [0, 1]
+            )
+        default:
+            return nil
+        }
     }
 
     private var viewerOfferGoods: [HomeMockGoods] {
@@ -45,16 +84,6 @@ struct TutorialProposalDemoSceneView: View {
             return size.height * 0.22
         default:
             return 0
-        }
-    }
-
-    /// 受け取るもの2個選択済みの見た目（実シートの選択状態は外から注入できないためオーバーレイ）。
-    private var showsReceiveChecks: Bool {
-        switch beat {
-        case .pickFromWanted, .pickFromMine, .pickMore, .confirmTap:
-            return true
-        default:
-            return false
         }
     }
 
@@ -115,7 +144,8 @@ struct TutorialProposalDemoSceneView: View {
                     HomeDiscoverySheetView(
                         sheet: .goodsHit(payload),
                         appState: demoAppState,
-                        viewerOfferGoods: viewerOfferGoods
+                        viewerOfferGoods: viewerOfferGoods,
+                        initialGoodsHitSelectionState: scriptedSelectionState
                     )
                 }
                 .frame(width: size.width, height: size.height + lift)
@@ -123,32 +153,11 @@ struct TutorialProposalDemoSceneView: View {
                 .offset(y: -lift)
                 .frame(width: size.width, height: size.height, alignment: .top)
                 .clipped()
-                .overlay {
-                    if showsReceiveChecks {
-                        receiveSelectionChecks(size: size)
-                    }
-                }
                 .allowsHitTesting(false)
             } else {
                 MegrumTheme.canvas.ignoresSafeArea()
             }
         }
-    }
-
-    /// 「受け取るものを選ぶ」の先頭2つに選択済みチェックを重ねる（座標はシート持ち上げに追従）。
-    /// レールの各カード左上の◯位置（実測：x 0.12 / 0.34、y 0.478）に合わせる。
-    private func receiveSelectionChecks(size: CGSize) -> some View {
-        let lift = sheetLift(for: size)
-        let baseY = size.height * 0.478 - lift
-        return ZStack {
-            ForEach(0..<2, id: \.self) { index in
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 22, weight: .bold))
-                    .foregroundStyle(.white, MegrumTheme.lavender)
-                    .position(x: size.width * (0.12 + 0.222 * Double(index)), y: baseY)
-            }
-        }
-        .allowsHitTesting(false)
     }
 
     // MARK: 指の演技
@@ -179,8 +188,8 @@ struct TutorialProposalDemoSceneView: View {
             pointer.appear(at: CGPoint(x: size.width * 0.80, y: size.height * 0.60))
             await pointer.tap()
         case .pickMore:
-            pointer.appear(at: CGPoint(x: size.width * 0.30, y: size.height * 0.63))
-            await pointer.tap()
+            // 候補が無い時は空パネルの説明だけ（タップ演技なし）。
+            break
         case .confirmTap:
             pointer.appear(at: CGPoint(x: size.width * 0.5, y: size.height * 0.93))
             await pointer.tap()
@@ -243,7 +252,9 @@ struct TutorialMeguriDemoSceneView: View {
                         appState: demoAppState,
                         thread: thread,
                         selectedPrefecture: nil,
-                        coordinate: nil,
+                        // 現在地ありの通常状態で見せる（nilだと「返信には現在地が必要です」の注意が出て
+                        // ヘッダーと重なってしまう。実利用ではピンから入る時点で現在地がある）。
+                        coordinate: TutorialSampleMeguriData.centerCoordinate,
                         onClose: {}
                     )
                 }
