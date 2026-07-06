@@ -92,7 +92,7 @@ extension GoodsCollectionScreen {
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
         }
-        .sheet(item: $editorRoute) { route in
+        .sheet(item: $editorRoute, onDismiss: { internalScrollResetToken += 1 }) { route in
             if let appState {
                 NavigationStack {
                     GoodsEditorSheet(
@@ -105,7 +105,7 @@ extension GoodsCollectionScreen {
                 }
             }
         }
-        .sheet(item: $listingSeedWish) { item in
+        .sheet(item: $listingSeedWish, onDismiss: { internalScrollResetToken += 1 }) { item in
             if let appState {
                 NavigationStack {
                     IndividualListingEditorSheet(

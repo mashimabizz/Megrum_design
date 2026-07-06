@@ -140,10 +140,6 @@ struct BoardThreadChatMessageRow: View {
                     .multilineTextAlignment(.leading)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            .frame(
-                maxWidth: BoardThreadChatBubbleMetrics.maxWidth,
-                alignment: .leading
-            )
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
             .background(
@@ -182,10 +178,6 @@ struct BoardThreadChatMessageRow: View {
             .foregroundStyle(MegrumTheme.ink)
             .multilineTextAlignment(message.isMine ? .trailing : .leading)
             .fixedSize(horizontal: false, vertical: true)
-            .frame(
-                maxWidth: BoardThreadChatBubbleMetrics.maxWidth,
-                alignment: message.isMine ? .trailing : .leading
-            )
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
             .background(

@@ -313,7 +313,6 @@ struct TradeTextMessageBubble: View {
             .foregroundStyle(MegrumTheme.ink)
             .multilineTextAlignment(isMine ? .trailing : .leading)
             .fixedSize(horizontal: false, vertical: true)
-            .frame(maxWidth: 272, alignment: isMine ? .trailing : .leading)
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
             .background(

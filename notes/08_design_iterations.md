@@ -4,6 +4,39 @@
 
 ---
 
+## イテレーション1226.327：チャットバブルの幅フィット＋キーボードずれのスクロール復元
+
+### 背景・問題意識
+オーナーFB 2件：①チャットで一文字でもバブルが横いっぱいに伸びることがある（添付：改行入り「あ…あ」が全幅）②iter1226.325後も、マイグッズ作成→推し追加シートの入力欄でキーボードを出すと一覧が崩れる再現が残っている。
+
+### 変更内容
+
+#### 1. チャットバブルの幅フィット（3チャット共通）
+- 原因：折返し/引用バブンに `.frame(maxWidth: 270前後)` を背景の内側に付けており、frame(maxWidth:) は「提案幅いっぱいまで広がる」ためバブルが常に最大幅へ拡張されていた（改行入り・引用付きで顕在化）
+- `BoardThreadDetailReplyViews.swift` / `MeguriMessageConversationViews.swift` / `TradeMessageBubbleContentParts.swift`：折返し・引用バブルからこの frame を削除。Text は提案幅の範囲で実サイズを返すため、バブルは内容の幅にフィットし、長文は従来どおり折り返す
+- シミュレータ（めぐりメッセージ）で短文「We」が最小幅バブルになることを確認
+
+#### 2. キーボードずれのスクロール復元
+- iter1226.325 の ignoresSafeArea(.keyboard) では、二段シート（作成→推し追加）の入力欄ケースを防げなかったため、**閉じた時に必ず復元する**方式を追加：
+  - マイグッズ/ほしいもの：`internalScrollResetToken` を新設し、作成/編集シート・個別募集シードシートの `onDismiss` で先頭へスクロール＋ヘッダー展開（`GoodsCollectionScreenBody/Content/CollectionScreens`）
+  - 個別募集：`individualListingEditorPresentation` に onDismiss を追加し、`IndividualListingsContent` に先頭アンカー＋`scrollResetToken` を新設して同様に復元
+
+### 影響範囲
+- 取引チャット/めぐりメッセージ/チャットルームのバブル、マイグッズ/ほしいもの/個別募集一覧
+
+### 確認方法
+- swift test 1491件 0失敗、めぐりメッセージのバブルフィットをシミュレータで確認
+
+### セルフレビュー結果
+- ✅ compact/wrapped の ViewThatFits 構造は維持（長文の折返し挙動は不変）
+- ⚠️ 復元は「シートを閉じたら先頭へ戻る」動作。編集後に元のスクロール位置へは戻らない（壊れた位置に留まるより安全側）
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/BoardThreadDetailReplyViews.swift`
+- `ios-native/Sources/MegrumApp/GoodsCollectionScreenBody.swift`
+
+---
+
 ## イテレーション1226.326：グルームのタップ切替を即時化（ダブルタップいいね維持）
 
 ### 背景・問題意識

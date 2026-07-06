@@ -20,6 +20,8 @@ struct IndividualListingsScreen: View {
     var initialEditorStep: IndividualListingEditorStep = .haves
     var initiallyPresentsEditor = false
     @State private var presentationState = IndividualListingsPresentationState()
+    /// 編集/作成シートのキーボードで壊れたスクロール位置を閉了時に復元する。
+    @State private var listingScrollResetToken = 0
     @State private var sharePromptContext: GoodsSharePostContext?
     @State private var isPreparingSharePost = false
     @State private var sharePostErrorMessage: String?
@@ -61,7 +63,8 @@ struct IndividualListingsScreen: View {
                 onBeginSelection: beginListingSelection,
                 onToggleSelection: toggleListingSelection,
                 onScrollContentTopChange: onScrollContentTopChange,
-                onSwipeBackFromFirst: onSwipeBackFromFirst
+                onSwipeBackFromFirst: onSwipeBackFromFirst,
+                scrollResetToken: listingScrollResetToken
             )
             .refreshable {
                 presentationState.clearLocalEdits()
@@ -124,7 +127,10 @@ struct IndividualListingsScreen: View {
         .onChange(of: displayedListings.map(\.id), initial: true) { _, ids in
             reconcileListingSelection(with: ids)
         }
-        .individualListingEditorPresentation(item: $presentationState.editorRoute) { route in
+        .individualListingEditorPresentation(
+            item: $presentationState.editorRoute,
+            onDismiss: { listingScrollResetToken += 1 }
+        ) { route in
             NavigationStack {
                 switch route {
                 case .create(let optionKind):
@@ -405,12 +411,13 @@ private extension View {
     @ViewBuilder
     func individualListingEditorPresentation<Item: Identifiable, Content: View>(
         item: Binding<Item?>,
+        onDismiss: (() -> Void)? = nil,
         @ViewBuilder content: @escaping (Item) -> Content
     ) -> some View {
         #if os(iOS)
-        fullScreenCover(item: item, content: content)
+        fullScreenCover(item: item, onDismiss: onDismiss, content: content)
         #else
-        sheet(item: item, content: content)
+        sheet(item: item, onDismiss: onDismiss, content: content)
         #endif
     }
 }

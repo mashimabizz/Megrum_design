@@ -114,6 +114,10 @@ extension GoodsCollectionScreen {
                     proxy.scrollTo(GoodsCollectionScrollAnchor.top, anchor: .top)
                     resetTopChromeCollapse()
                 }
+                .onChange(of: internalScrollResetToken) { _, _ in
+                    proxy.scrollTo(GoodsCollectionScrollAnchor.top, anchor: .top)
+                    resetTopChromeCollapse()
+                }
         }
     }
 

@@ -18,6 +18,9 @@ struct GoodsCollectionScreen: View {
     var onScrollContentTopChange: ((CGFloat) -> Void)? = nil
     /// 値が変わるとページ先頭までスクロールを戻す（タブ切替時のリセット用）。
     var scrollToTopToken: Int = 0
+    /// 作成/編集シートを閉じた時のスクロール復元用（シート上のキーボードで
+    /// 背後の一覧のスクロール位置が壊れることがあるため、先頭へ戻して復元する）。
+    @State var internalScrollResetToken = 0
     @State var columns = GoodsGridLayout.minimumColumns
     @State var editorRoute: GoodsEditorRoute?
     @State var isShowingUnavailableAlert = false

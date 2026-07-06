@@ -27,12 +27,26 @@ struct IndividualListingsContent: View {
     var onScrollContentTopChange: ((CGFloat) -> Void)? = nil
     /// 1つ目の募集表示中に右スワイプした時の遷移（ほしいものタブへ戻る等）。
     var onSwipeBackFromFirst: (() -> Void)? = nil
+    /// 値が変わったら先頭へスクロールを戻す（シートのキーボードによる位置崩れの復元）。
+    var scrollResetToken: Int = 0
     @State private var selectionState = IndividualListingActiveSelectionState()
     @Environment(\.megrumPinnedTopChromeInset) private var pinnedTopChromeInset
 
     var body: some View {
+        ScrollViewReader { proxy in
+            scrollBody
+                .onChange(of: scrollResetToken) { _, _ in
+                    proxy.scrollTo("individual-listings-top", anchor: .top)
+                }
+        }
+    }
+
+    private var scrollBody: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
+                Color.clear
+                    .frame(height: 0)
+                    .id("individual-listings-top")
                 if showsHeader {
                     IndividualListingTopBar(title: headerTitle, accessory: headerAccessory)
                 }
