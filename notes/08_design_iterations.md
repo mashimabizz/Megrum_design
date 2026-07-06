@@ -4,6 +4,34 @@
 
 ---
 
+## イテレーション1226.351：相手の「＞」で開くカレンダーをホームの相手交換条件モジュールに差し替え
+
+### 背景・問題意識
+オーナー指摘：iter1226.348 で付けた相手行の「＞」から開くのは、プロフィールのスケジュール画面ではなく、ホームの「相手の交換条件」シート（現地交換可能な場所と日程の月カレンダー・都道府県チップ付き）とのこと。「このモジュールをそのまま呼び出してもらえればOK」。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlowBody.swift`
+- シートを `ProfileScheduleScreen` → `HomePartnerExchangeCalendarSheet`（ホームと同一モジュール）に差し替え。medium/large detents
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlowExchangeDerivedState.swift`
+- `partnerExchangeCalendarContext` 新設：相手の交換設定（`publicExchangeSettingsByUserID` の localDateDetails/localDateKeys/localPrefecture）を優先し、無ければ相手の現地条件テキストの解析（既存パーサ）でフォールバック
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlowInitialStateActions.swift`
+- `loadTargetOwnerExchangeContent` で `loadPublicExchangeSettings(userID:)` も読み込み
+
+### 影響範囲
+- 打診3/3 現地条件の相手カレンダー
+
+### 確認方法
+- swift test: 1491件 0 failures
+
+### セルフレビュー結果
+- ✅ ホームの「相手の交換条件」と同一コンポーネント（HomePartnerExchangeCalendarSheet）を再利用
+- ✅ 設定未取得でもテキスト解析でフォールバック表示
+
+---
+
 ## イテレーション1226.350：ホーム打診シートの譲グッズ選択を選択肢の数量・条件どおりに必須化
 
 ### 背景・問題意識

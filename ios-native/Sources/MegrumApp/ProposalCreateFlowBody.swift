@@ -103,14 +103,23 @@ extension ProposalCreateFlow {
             await loadPaymentSettingsIfNeeded()
         }
         .sheet(isPresented: $showsPartnerScheduleCalendar) {
-            NavigationStack {
-                ProfileScheduleScreen(
-                    appState: appState,
-                    userID: targetItem.ownerID,
-                    displayName: "@\(partnerHandle)"
-                ) {
-                    showsPartnerScheduleCalendar = false
-                }
+            // ホームの「相手の交換条件」カレンダーと同一モジュールを呼び出す。
+            if let context = partnerExchangeCalendarContext {
+                HomePartnerExchangeCalendarSheet(context: context)
+                    .presentationDetents([.medium, .large])
+                    .presentationDragIndicator(.visible)
+            } else {
+                HomePartnerExchangeCalendarSheet(
+                    context: HomePartnerExchangeCalendarContext(
+                        ownerName: "@\(partnerHandle)",
+                        methodTitle: "現地交換の条件",
+                        dateDetails: [:],
+                        fallbackPrefecture: nil,
+                        fallbackMemo: nil
+                    )
+                )
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
             }
         }
         .sheet(isPresented: $showsAddressSettings) {
