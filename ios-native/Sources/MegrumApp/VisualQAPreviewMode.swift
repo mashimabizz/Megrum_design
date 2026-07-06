@@ -54,6 +54,13 @@ enum VisualQAPreviewMode {
     static let environmentKey = "MEGRUM_VISUAL_QA_PREVIEW_AUTH"
     static let initialScreenEnvironmentKey = "MEGRUM_VISUAL_QA_INITIAL_SCREEN"
     static let subscriptionEnvironmentKey = "MEGRUM_VISUAL_QA_PREVIEW_SUBSCRIPTION"
+    static let profileUserIDEnvironmentKey = "MEGRUM_VISUAL_QA_PROFILE_USER_ID"
+
+    /// public-profile ルートで開く実ユーザーID（検証用・省略時はフィクスチャ）。
+    static func profileUserID(environment: [String: String]) -> UUID? {
+        environment[profileUserIDEnvironmentKey]
+            .flatMap { UUID(uuidString: $0.trimmingCharacters(in: .whitespacesAndNewlines)) }
+    }
 
     static func isEnabled(environment: [String: String]) -> Bool {
         switch environment[environmentKey]?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
@@ -74,5 +81,13 @@ enum VisualQAPreviewMode {
             return nil
         }
         return VisualQAInitialScreen(rawValue: rawValue)
+    }
+
+    /// ガイドツアーの開始ステップ指定（INITIAL_SCREEN=tutorial と併用）。
+    /// 数字（rawValue）または kebab-case のステップ名（home-1 / inventory 等）を受け付ける。
+    static let tutorialStepEnvironmentKey = "MEGRUM_VISUAL_QA_TUTORIAL_STEP"
+
+    static func tutorialStartStep(environment: [String: String]) -> TutorialTourStep? {
+        environment[tutorialStepEnvironmentKey].flatMap(TutorialTourStep.init(visualQAValue:))
     }
 }

@@ -3,6 +3,11 @@ import MegrumCore
 
 extension HomeDiscoveryExperience {
     var havesCandidates: [HomeDiscoveryCandidate] {
+        // ガイドツアー中：実在庫やシグナル突き合わせに依存せず、サンプルを rail 表示する
+        // （新規ユーザーは在庫0件でセクションが出ず、ハイライト対象が無くなるため）。
+        if tutorialSampleActive {
+            return tutorialSampleHavesCandidates
+        }
         let inventoryViewerItems = ownItems(from: inventoryItems)
         let viewerItems = inventoryViewerItems.isEmpty ? ownItems(from: matchedItems + possibleItems) : inventoryViewerItems
         let sourceItems = viewerItems.isEmpty ? possibleItems : viewerItems
@@ -22,6 +27,30 @@ extension HomeDiscoveryExperience {
             visibleHavesCandidate(candidate, sourceItem: itemByID[candidate.id])
         }
         return havesCandidates
+    }
+
+    /// ツアーのサンプル「求められているグッズ」：需要シグナル（求/激求）が付くものを優先し、
+    /// 足りなければ先頭から補完して rail に4〜6件並べる。タップはツアー中無効なので payload は不要。
+    private var tutorialSampleHavesCandidates: [HomeDiscoveryCandidate] {
+        var seenIDs = Set<UUID>()
+        let pool = (matchedItems + possibleItems).filter { seenIDs.insert($0.id).inserted }
+        let wanted = pool.filter { havesWishHitCount(for: $0) > 0 }
+        let items = Array((wanted.isEmpty ? pool : wanted).prefix(6))
+        return HomeDiscoveryCandidateFactory.candidates(
+            from: items,
+            source: .haves,
+            goodsTypes: goodsTypes,
+            conditionSignalsByItemID: displayConditionSignalsByItemID
+        )
+        .map { candidate in
+            // factory の .haves は空の havesLookup を sheet に入れ、件数表示が0件になる。
+            // サンプルは linkCounts ベースの件数（N件）を出したいので sheet を差し替える。
+            var updated = candidate
+            if let goods = candidate.goods.first {
+                updated.sheet = .goodsHit(HomeDiscoverySheetPayload(goods: goods, signals: candidate.signals))
+            }
+            return updated
+        }
     }
 
     private func visibleHavesCandidate(

@@ -2,6 +2,9 @@ import SwiftUI
 
 /// ガイドツアーでスポットライトを当てる対象UIの識別子。
 enum TutorialAnchorID: Hashable, Sendable {
+    case homeSectionUserTag
+    case homeSectionUser
+    case homeSectionHaves
     case inventoryAddButton
     case wishAddButton
     case listingAddButton

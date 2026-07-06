@@ -27,6 +27,8 @@ struct HomeDiscoveryExperience: View {
     var onRefresh: () async -> Void
     /// ガイドツアー中：3セクションに「サンプル」バッジを付け、候補タップを無効化する。
     var tutorialSampleActive: Bool = false
+    /// ガイドツアーのホーム3ステップ：ハイライト対象セクションへ自動スクロールする。
+    var tutorialFocusAnchor: TutorialAnchorID? = nil
     /// 「最初の3ステップ」ミッションカードを出す対象画面か（ホームタブのみ true）。
     var starterMissionEnabled: Bool = false
     var onOpenInventory: () -> Void = {}
@@ -58,6 +60,7 @@ struct HomeDiscoveryExperience: View {
 
     var body: some View {
         MegrumCollapsingTopChromeContainer {
+            ScrollViewReader { scrollProxy in
             HomePullRefreshScrollView(
                 coordinateSpaceName: "home-discovery-candidates-refresh",
                 indicatorTopPadding: HomeDiscoveryHeaderMetrics.pullRefreshIndicatorTopPadding,
@@ -91,6 +94,8 @@ struct HomeDiscoveryExperience: View {
                             },
                             onSeeAll: { seeAllRoute = .userTag }
                         )
+                        .tutorialAnchor(ifPresent: tutorialSampleActive ? .homeSectionUserTag : nil)
+                        .id(TutorialAnchorID.homeSectionUserTag)
                     }
 
                     if !userCandidates.isEmpty {
@@ -110,6 +115,8 @@ struct HomeDiscoveryExperience: View {
                             },
                             onSeeAll: { seeAllRoute = .user }
                         )
+                        .tutorialAnchor(ifPresent: tutorialSampleActive ? .homeSectionUser : nil)
+                        .id(TutorialAnchorID.homeSectionUser)
                     }
 
                     if !havesCandidates.isEmpty {
@@ -117,8 +124,11 @@ struct HomeDiscoveryExperience: View {
                             title: "求められているグッズ",
                             candidates: havesCandidates,
                             layout: .rail,
-                            onSelect: { selectedSheet = $0 }
+                            badgeText: tutorialSampleActive ? "サンプル" : nil,
+                            onSelect: { if !tutorialSampleActive { selectedSheet = $0 } }
                         )
+                        .tutorialAnchor(ifPresent: tutorialSampleActive ? .homeSectionHaves : nil)
+                        .id(TutorialAnchorID.homeSectionHaves)
                     }
 
                     // 候補が1件もない（新規ユーザー等）：導線カード＋新着のグッズ。
@@ -157,6 +167,13 @@ struct HomeDiscoveryExperience: View {
             }
             .megrumHiddenBottomScrollEdgeEffect()
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .onChange(of: tutorialFocusAnchor, initial: true) { _, anchor in
+                guard let anchor else { return }
+                withAnimation(.snappy(duration: 0.3)) {
+                    scrollProxy.scrollTo(anchor, anchor: .center)
+                }
+            }
+            }
         } chrome: { isCollapsed in
             pinnedHeader(isCollapsed: isCollapsed)
         }

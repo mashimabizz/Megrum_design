@@ -59,6 +59,13 @@ struct MegrumNativeApp: App {
                     await registerPendingNativePushToken()
                 }
             }
+            .onChange(of: appState.isTutorialActive) { _, isActive in
+                // ツアー終了後に、抑制していた通知許可を改めて要求する。
+                guard !isActive else { return }
+                Task {
+                    await requestNativePushAuthorizationIfReady()
+                }
+            }
             .onChange(of: appState.appIconBadgeCount, initial: true) { _, unreadCount in
                 Task {
                     do {
@@ -130,11 +137,11 @@ struct MegrumNativeApp: App {
             let email = environment["MEGRUM_DEBUG_AUTO_SIGNIN_EMAIL"],
             let password = environment["MEGRUM_DEBUG_AUTO_SIGNIN_PASSWORD"],
             !email.isEmpty,
-            !password.isEmpty,
-            !authState.isAuthenticated
+            !password.isEmpty
         else {
             return
         }
+        // 保存済みセッションが期限切れでもQAが確実に動くよう、常に入り直す。
         await authState.signIn(email: email, password: password)
     }
 
@@ -208,6 +215,16 @@ struct MegrumNativeApp: App {
     @MainActor
     private func requestNativePushAuthorizationIfReady() async {
         guard authState.isConfigured, authState.isAuthenticated, !didRequestNativePushAuthorization else {
+            return
+        }
+        // ガイドツアー中は通知許可ダイアログを割り込ませない（終了時に onChange から再要求）。
+        // VisualQAのツアー起動は、コーディネータ起動より .task が先行する競合があるため
+        // 環境変数でも判定して起動時点から抑制する。
+        let visualQAInitialScreen = ProcessInfo.processInfo.environment["MEGRUM_VISUAL_QA_INITIAL_SCREEN"]?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        // VisualQA起動時は通知許可ダイアログがスクリーンショット検証を塞ぐため常に抑制する。
+        guard !appState.isTutorialActive, visualQAInitialScreen == nil || visualQAInitialScreen?.isEmpty == true else {
             return
         }
 

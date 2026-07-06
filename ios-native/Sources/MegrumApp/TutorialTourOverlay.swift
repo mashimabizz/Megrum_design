@@ -2,8 +2,10 @@ import MegrumDesign
 import SwiftUI
 
 /// 初回ガイドツアーの最上位オーバーレイ。
-/// dim＋スポットライト＋吹き出し（通常ステップ）と、中央カード（ウェルカム/完了）を出し分ける。
-/// 画面のどこをタップしても次へ進む（スポットライト部分の実タップは要求しない）。
+/// - centerCard（ようこそ/完了）：全画面dim＋中央カード
+/// - spotlight：dim＋対象の切り抜き＋対象に隣接する矢印付き吹き出し（対象を隠さない）
+/// - banner（めぐり）：dimなし・下部バナー（画面全体を見せる）
+/// 画面のどこをタップしても次へ進む。座標系は呼び出し側の full-screen GeometryReader に統一する。
 struct TutorialTourOverlay: View {
     let step: TutorialTourStep
     let anchorFrames: [TutorialAnchorID: CGRect]
@@ -12,6 +14,7 @@ struct TutorialTourOverlay: View {
     var onSkip: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var calloutSize: CGSize = CGSize(width: 290, height: 150)
 
     private var spotlightRect: CGRect? {
         step.spotlightAnchor.flatMap { anchorFrames[$0] }
@@ -19,26 +22,35 @@ struct TutorialTourOverlay: View {
 
     var body: some View {
         ZStack {
-            if step.isCardStep {
+            switch step.presentation {
+            case .centerCard:
                 TutorialCenterCard(
                     step: step,
                     showsSkip: step == .welcome,
                     onPrimary: onAdvance,
                     onSkip: onSkip
                 )
-            } else {
-                // 対象アンカーがあるステップだけ dim＋切り抜き。
-                // homeSections / meguri はサンプル/マップを見せたいので dim しない。
-                if step.spotlightAnchor != nil {
-                    TutorialSpotlightDim(rect: spotlightRect)
-                }
-                TutorialCalloutCard(
+            case .banner:
+                TutorialBottomBanner(
                     step: step,
-                    targetRect: spotlightRect,
                     containerSize: containerSize,
                     onNext: onAdvance,
                     onSkip: onSkip
                 )
+            case .spotlight:
+                TutorialSpotlightDim(rect: clampedSpotlightRect)
+                TutorialCalloutCard(
+                    step: step,
+                    onNext: onAdvance,
+                    onSkip: onSkip
+                )
+                .background(TutorialCalloutSizeReader())
+                .onPreferenceChange(TutorialCalloutSizePreferenceKey.self) { size in
+                    if size != .zero {
+                        calloutSize = size
+                    }
+                }
+                .position(calloutCenter)
             }
         }
         .contentShape(Rectangle())
@@ -46,13 +58,42 @@ struct TutorialTourOverlay: View {
             MegrumHaptics.buttonTap()
             onAdvance()
         }
-        .ignoresSafeArea()
         .transition(.opacity)
         .animation(reduceMotion ? nil : .snappy(duration: 0.22), value: step)
     }
+
+    /// 対象が画面外へはみ出す場合（スクロール途中など）は表示領域内へクランプする。
+    private var clampedSpotlightRect: CGRect? {
+        guard let rect = spotlightRect else { return nil }
+        let visible = CGRect(origin: .zero, size: containerSize).insetBy(dx: 0, dy: 8)
+        let clamped = rect.intersection(visible)
+        guard !clamped.isNull, clamped.height > 24 else { return rect }
+        return clamped
+    }
+
+    /// 吹き出しは対象を隠さない側（上下の広い方）に、対象の中心寄りへ配置する。
+    private var calloutCenter: CGPoint {
+        let margin: CGFloat = 20
+        let gap: CGFloat = 18
+        guard let rect = clampedSpotlightRect else {
+            return CGPoint(x: containerSize.width / 2, y: containerSize.height * 0.5)
+        }
+        let spaceAbove = rect.minY
+        let spaceBelow = containerSize.height - rect.maxY
+        let placeAbove = spaceAbove >= spaceBelow
+        let halfHeight = calloutSize.height / 2
+        let y = placeAbove
+            ? rect.minY - gap - halfHeight
+            : rect.maxY + gap + halfHeight
+        let clampedY = min(max(y, margin + halfHeight + 40), containerSize.height - margin - halfHeight)
+        let halfWidth = calloutSize.width / 2
+        let x = min(max(rect.midX, margin + halfWidth), containerSize.width - margin - halfWidth)
+        return CGPoint(x: x, y: clampedY)
+    }
 }
 
-/// dim＋対象を切り抜くスポットライト。切り抜きは destinationOut + compositingGroup。
+// MARK: - スポットライト（dim＋切り抜き）
+
 private struct TutorialSpotlightDim: View {
     let rect: CGRect?
 
@@ -61,37 +102,42 @@ private struct TutorialSpotlightDim: View {
             .fill(Color.black.opacity(0.5))
             .overlay {
                 if let rect {
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .frame(width: rect.width + 16, height: rect.height + 16)
+                    RoundedRectangle(cornerRadius: cutoutCornerRadius(for: rect), style: .continuous)
+                        .frame(width: rect.width + 14, height: rect.height + 14)
                         .position(x: rect.midX, y: rect.midY)
                         .blendMode(.destinationOut)
                 }
             }
             .compositingGroup()
-            .ignoresSafeArea()
+    }
+
+    /// ＋ボタンのような正円に近い対象は丸く、セクションのような大きい対象は角丸で切り抜く。
+    private func cutoutCornerRadius(for rect: CGRect) -> CGFloat {
+        min(40, (min(rect.width, rect.height) + 14) / 2)
     }
 }
 
-/// スポットライト対象の近くに置く吹き出しカード。矢印は使わず切り抜き自体が指示になる。
+// MARK: - 吹き出し（対象に隣接・矢印なしのコンパクトカード）
+
 private struct TutorialCalloutCard: View {
     let step: TutorialTourStep
-    let targetRect: CGRect?
-    let containerSize: CGSize
     var onNext: () -> Void
     var onSkip: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            TutorialStepDots(currentIndex: step.rawValue)
-
-            Text(step.calloutTitle)
-                .font(.system(size: 16, weight: .black, design: .rounded))
-                .foregroundStyle(MegrumTheme.ink)
+            HStack(alignment: .firstTextBaseline) {
+                Text(step.calloutTitle)
+                    .font(.system(size: 16, weight: .black, design: .rounded))
+                    .foregroundStyle(MegrumTheme.ink)
+                Spacer(minLength: 8)
+                TutorialStepCounter(step: step)
+            }
 
             Text(step.calloutBody)
-                .font(.system(size: 12.5, weight: .semibold, design: .rounded))
+                .font(.system(size: 13, weight: .semibold, design: .rounded))
                 .foregroundStyle(MegrumTheme.muted)
-                .lineSpacing(2)
+                .lineSpacing(2.5)
                 .fixedSize(horizontal: false, vertical: true)
 
             HStack {
@@ -106,49 +152,69 @@ private struct TutorialCalloutCard: View {
 
                 Spacer()
 
-                Button {
-                    MegrumHaptics.performButtonTap(onNext)
-                } label: {
-                    Text("次へ")
-                        .font(.system(size: 14, weight: .black, design: .rounded))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 22)
-                        .frame(height: 40)
-                        .background(
-                            LinearGradient(
-                                colors: [MegrumTheme.sky, MegrumTheme.lavender],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            ),
-                            in: RoundedRectangle(cornerRadius: 13, style: .continuous)
-                        )
-                }
-                .buttonStyle(.plain)
+                TutorialNextButton(onNext: onNext)
             }
         }
         .padding(16)
-        .frame(maxWidth: 300)
+        .frame(width: 300)
         .background(.white, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         .shadow(color: .black.opacity(0.18), radius: 20, x: 0, y: 10)
-        .position(calloutCenter)
-    }
-
-    private var calloutCenter: CGPoint {
-        let approxHalfHeight: CGFloat = 96
-        let margin: CGFloat = 22
-        guard let targetRect else {
-            return CGPoint(x: containerSize.width / 2, y: containerSize.height * 0.52)
-        }
-        let placeAbove = targetRect.midY > containerSize.height / 2
-        let y = placeAbove
-            ? targetRect.minY - margin - approxHalfHeight
-            : targetRect.maxY + margin + approxHalfHeight
-        let clampedY = min(max(y, 150), containerSize.height - 160)
-        return CGPoint(x: containerSize.width / 2, y: clampedY)
     }
 }
 
-/// ウェルカム/完了の中央カード。
+// MARK: - 下部バナー（めぐり：画面全体を見せる）
+
+private struct TutorialBottomBanner: View {
+    let step: TutorialTourStep
+    let containerSize: CGSize
+    var onNext: () -> Void
+    var onSkip: () -> Void
+
+    var body: some View {
+        VStack {
+            Spacer()
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(step.calloutTitle)
+                        .font(.system(size: 16, weight: .black, design: .rounded))
+                        .foregroundStyle(MegrumTheme.ink)
+                    Spacer(minLength: 8)
+                    TutorialStepCounter(step: step)
+                }
+
+                Text(step.calloutBody)
+                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    .foregroundStyle(MegrumTheme.muted)
+                    .lineSpacing(2.5)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                HStack {
+                    Button {
+                        MegrumHaptics.performButtonTap(onSkip)
+                    } label: {
+                        Text("スキップ")
+                            .font(.system(size: 13, weight: .bold, design: .rounded))
+                            .foregroundStyle(MegrumTheme.muted)
+                    }
+                    .buttonStyle(.plain)
+
+                    Spacer()
+
+                    TutorialNextButton(onNext: onNext)
+                }
+            }
+            .padding(16)
+            .background(.white, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .shadow(color: .black.opacity(0.18), radius: 20, x: 0, y: 10)
+            .padding(.horizontal, 20)
+            // タブバー＋ホームインジケータの上に載せる。
+            .padding(.bottom, 108)
+        }
+    }
+}
+
+// MARK: - ウェルカム/完了の中央カード
+
 private struct TutorialCenterCard: View {
     let step: TutorialTourStep
     let showsSkip: Bool
@@ -158,14 +224,15 @@ private struct TutorialCenterCard: View {
     var body: some View {
         ZStack {
             Color.black.opacity(0.42)
-                .ignoresSafeArea()
 
             VStack(alignment: .leading, spacing: 16) {
-                TutorialStepDots(currentIndex: step.rawValue)
-
-                Text(step.calloutTitle)
-                    .font(.system(size: 20, weight: .black, design: .rounded))
-                    .foregroundStyle(MegrumTheme.ink)
+                HStack(alignment: .firstTextBaseline) {
+                    Text(step.calloutTitle)
+                        .font(.system(size: 20, weight: .black, design: .rounded))
+                        .foregroundStyle(MegrumTheme.ink)
+                    Spacer(minLength: 8)
+                    TutorialStepCounter(step: step)
+                }
 
                 Text(step.calloutBody)
                     .font(.system(size: 13.5, weight: .semibold, design: .rounded))
@@ -193,6 +260,11 @@ private struct TutorialCenterCard: View {
                 .buttonStyle(.plain)
 
                 if showsSkip {
+                    Text("画面のどこでもタップで進めます")
+                        .font(.system(size: 11.5, weight: .semibold, design: .rounded))
+                        .foregroundStyle(MegrumTheme.muted.opacity(0.85))
+                        .frame(maxWidth: .infinity)
+
                     Button {
                         MegrumHaptics.performButtonTap(onSkip)
                     } label: {
@@ -212,18 +284,63 @@ private struct TutorialCenterCard: View {
     }
 }
 
-/// ツアー進捗を示すカプセルドット（AccountSetupWelcomeStep と同トーン）。
-private struct TutorialStepDots: View {
-    let currentIndex: Int
+// MARK: - 共通部品
+
+/// 「3/10」形式のステップカウンタ。ドット列よりも現在地が明確（iter1226.337 オーナーFB反映）。
+private struct TutorialStepCounter: View {
+    let step: TutorialTourStep
 
     var body: some View {
-        HStack(spacing: 6) {
-            ForEach(TutorialTourStep.allCases) { step in
-                Capsule()
-                    .fill(step.rawValue == currentIndex ? MegrumTheme.lavender : MegrumTheme.lavender.opacity(0.22))
-                    .frame(width: step.rawValue == currentIndex ? 20 : 6, height: 6)
-            }
+        Text("\(step.rawValue + 1)/\(TutorialTourStep.allCases.count)")
+            .font(.system(size: 12, weight: .black, design: .rounded))
+            .foregroundStyle(MegrumTheme.lavender)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(MegrumTheme.lavender.opacity(0.14), in: Capsule(style: .continuous))
+    }
+}
+
+private struct TutorialNextButton: View {
+    var onNext: () -> Void
+
+    var body: some View {
+        Button {
+            MegrumHaptics.performButtonTap(onNext)
+        } label: {
+            Text("次へ")
+                .font(.system(size: 14, weight: .black, design: .rounded))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 22)
+                .frame(height: 40)
+                .background(
+                    LinearGradient(
+                        colors: [MegrumTheme.sky, MegrumTheme.lavender],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    ),
+                    in: RoundedRectangle(cornerRadius: 13, style: .continuous)
+                )
         }
-        .animation(.snappy(duration: 0.22), value: currentIndex)
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - 吹き出しサイズ計測（隣接配置の重なり防止に実寸を使う）
+
+private struct TutorialCalloutSizePreferenceKey: PreferenceKey {
+    static let defaultValue: CGSize = .zero
+    static func reduce(value: inout CGSize, nextValue: () -> CGSize) {
+        let next = nextValue()
+        if next != .zero {
+            value = next
+        }
+    }
+}
+
+private struct TutorialCalloutSizeReader: View {
+    var body: some View {
+        GeometryReader { proxy in
+            Color.clear.preference(key: TutorialCalloutSizePreferenceKey.self, value: proxy.size)
+        }
     }
 }

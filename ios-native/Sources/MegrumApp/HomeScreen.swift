@@ -25,6 +25,7 @@ struct HomeScreen: View {
     var onOpenTrades: (() -> Void)? = nil
     var onOpenInventory: () -> Void = {}
     var tutorialSampleActive: Bool = false
+    var tutorialFocusAnchor: TutorialAnchorID? = nil
     var starterMissionEnabled: Bool = false
     /// ガイドツアーのサンプル候補用シグナル差し替え。指定時は appState 由来のシグナルより優先。
     var conditionSignalsByItemIDOverride: [UUID: HomeCandidateConditionSignals]? = nil
@@ -79,6 +80,7 @@ struct HomeScreen: View {
                 await loadLocalActivitySettings()
             },
             tutorialSampleActive: tutorialSampleActive,
+            tutorialFocusAnchor: tutorialFocusAnchor,
             starterMissionEnabled: starterMissionEnabled,
             onOpenInventory: onOpenInventory
         )

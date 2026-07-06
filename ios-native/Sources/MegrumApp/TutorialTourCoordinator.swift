@@ -8,8 +8,8 @@ final class TutorialTourCoordinator: ObservableObject {
 
     var isActive: Bool { currentStep != nil }
 
-    func start() {
-        currentStep = .welcome
+    func start(at step: TutorialTourStep = .welcome) {
+        currentStep = step
     }
 
     /// 全面タップ or 「次へ」で前進。最後のステップを越えたら完了扱いで閉じる。

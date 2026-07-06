@@ -239,9 +239,13 @@ public struct MegrumRootView: View {
     }
 
     /// VisualQA（MEGRUM_VISUAL_QA_INITIAL_SCREEN=tutorial）では既読フラグを無視して強制起動する。
+    /// MEGRUM_VISUAL_QA_TUTORIAL_STEP で任意ステップから開始できる（スクショ検証用）。
     private func startVisualQATutorialIfNeeded() {
         guard visualQAInitialScreen == .tutorial, !tutorialCoordinator.isActive else { return }
-        tutorialCoordinator.start()
+        let startStep = VisualQAPreviewMode.tutorialStartStep(
+            environment: ProcessInfo.processInfo.environment
+        ) ?? .welcome
+        tutorialCoordinator.start(at: startStep)
     }
 
     /// ステップ変化に応じてタブを自動遷移し、割り込み抑制フラグと完了フラグを更新する。

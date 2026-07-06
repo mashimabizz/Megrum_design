@@ -4,6 +4,63 @@
 
 ---
 
+## イテレーション1226.337：ガイドツアーv2（オーナーFB反映：分割・隣接吹き出し・切り抜き修正）
+
+### 背景・問題意識
+iter1226.336 のガイドツアーをオーナーが実機確認し、指摘5点：①ホーム説明が1パネル詰め込みすぎ→3分割して対象だけハイライト ②〜⑥スポットライトの切り抜き位置が微妙にズレる ③説明ポップアップが常に画面中央で画面が見えない ④タップさせたいのか見せたいのか不明でユーザーが迷子 ⑤ボタンだけ見せても意味不明。「仕様を考え直して」。
+
+### 変更内容
+
+#### 1. ステップ構成を7→10に再編（`TutorialTourStep.swift` 全面改訂）
+- ホーム紹介を3分割：`homeSectionUserTag` / `homeSectionUser` / `homeSectionHaves`（各セクションをdim＋切り抜きでハイライトし、他は暗く）
+- 見せ方を3種に整理：`TutorialTourPresentation`（centerCard=ようこそ/完了、spotlight=対象切り抜き＋隣接吹き出し、banner=めぐり用の下部バナー。マップ全面を見せるためdimなし）
+- 文言を「この画面が何か→なぜ→どこを押すか」の順に全面書き直し（例：マイグッズ=「交換に出せる手持ちグッズを置いておく場所。左下の＋から、写真を撮るだけで登録できるよ」）
+
+#### 2. 切り抜きズレの根本修正（`MegrumAuthenticatedTabContentView.swift` / `TutorialTourOverlay.swift`）
+- 原因：dim側だけ `ignoresSafeArea` していたため、アンカー解決（セーフエリア内座標）と切り抜き描画（全画面座標）がセーフエリア分ズレていた
+- `overlayPreferenceValue` の GeometryReader ごと `ignoresSafeArea()` し、アンカー解決・dim・吹き出しを同一のフルスクリーン座標系に統一
+- 切り抜き角丸を対象サイズに適応（+ボタンは正円、セクションは角丸大）
+
+#### 3. 吹き出しの隣接配置（`TutorialTourOverlay.swift` 全面改訂）
+- 中央固定をやめ、対象の上下の広い側に隣接配置（実測サイズを PreferenceKey で取得して重なり防止、画面端クランプ）
+- ステップカウンタ「n/10」を常設（ドット列を置換）、スキップ/次へをカード内に固定
+- ようこそカードに「画面のどこでもタップで進めます」ヒントを追加
+
+#### 4. ホーム3ステップの自動スクロール（`HomeDiscoveryExperience.swift`）
+- `ScrollViewReader` でハイライト対象セクションへ `.scrollTo(anchor: .center)`（`tutorialFocusAnchor` を TabContentView→HomeScreen→Experience へ伝搬）
+- 3セクションに `.tutorialAnchor` + `.id` を付与（ツアー中のみ）
+
+#### 5. サンプルの充実（`HomeDiscoveryExperienceDerivedState.swift` / `HavesDerivedState.swift` / `TutorialSampleHomeData.swift`）
+- 「求められているグッズ」にツアー用サンプル経路を追加（実在庫・シグナル突き合わせ非依存。新規ユーザーでもrailが出る）
+- factory の `.haves` は空 havesLookup payload で件数が0件表示になるため、sheet を goodsHit に差し替えて linkCounts ベースの「N件」を表示。サンプルシグナルに求められ件数も付与
+
+#### 6. 通知許可ダイアログの抑制（`App/MegrumNativeApp.swift`）
+- ツアー中に iOS 通知許可ダイアログが割り込む問題を発見（オーナー指摘外）。`requestNativePushAuthorizationIfReady` に `isTutorialActive` ガード＋ツアー終了時 onChange で再要求。VisualQAツアー起動は環境変数でも判定（.task が coordinator 起動より先行する競合対策）
+
+#### 7. QA基盤（`VisualQAPreviewMode.swift` / `MegrumRootView.swift`）
+- `MEGRUM_VISUAL_QA_TUTORIAL_STEP`（数字 or kebab名: home-1/inventory等）で任意ステップから直接起動できるようにし、全ステップをスクショ検証可能に
+
+### 影響範囲
+- ガイドツアー全体、ホーム3セクション（ツアー中のみ）、アプリ起動時の通知許可タイミング（ツアー中のみ遅延）
+
+### 確認方法
+- swift test 1512件 0失敗
+- シミュレータで全10ステップをスクショ検証：ホーム3分割ハイライト＋自動スクロール、+ボタン正円切り抜き（ズレなし）、募集を追加/ステージバー切り抜き、めぐり下部バナー（マップ全面）、求められているグッズのN件表示、通知ダイアログ非表示
+- 起動例：`SIMCTL_CHILD_MEGRUM_VISUAL_QA_PREVIEW_AUTH=1 SIMCTL_CHILD_MEGRUM_VISUAL_QA_INITIAL_SCREEN=tutorial SIMCTL_CHILD_MEGRUM_VISUAL_QA_TUTORIAL_STEP=home-3 xcrun simctl launch ...`
+
+### セルフレビュー結果
+- ✅ オーナー指摘5点すべてに対応（3分割ハイライト／切り抜き座標修正／隣接配置／n/10カウンタ＋次へ常設／画面の意味→操作の順の文言）
+- ✅ 追加で発見した通知許可ダイアログの割り込みも抑制
+- ⚠️ アプリをツアー途中で強制終了すると再開しない（発火はaccountStatus遷移時のみ）。ミッションカードが後続導線になるが、再視聴導線（Phase 3）実装時に「途中離脱の再開」も検討
+- ⚠️ ツアー中フラグ同期は coordinator→onChange 経由のため、起動直後の割り込みは環境変数ガードで補完（VisualQA時のみ）
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/TutorialTourStep.swift` / `TutorialTourOverlay.swift` / `TutorialTourCoordinator.swift` / `TutorialAnchorPreferenceKey.swift` / `TutorialSampleHomeData.swift`
+- `ios-native/Sources/MegrumApp/HomeDiscoveryExperience.swift` / `HomeDiscoveryExperienceDerivedState.swift` / `HomeDiscoveryExperienceHavesDerivedState.swift` / `HomeScreen.swift` / `MegrumAuthenticatedTabContentView.swift`
+- `ios-native/Sources/MegrumApp/VisualQAPreviewMode.swift` / `MegrumRootView.swift` / `ios-native/App/MegrumNativeApp.swift`
+
+---
+
 ## イテレーション1226.336：初回オンボーディング・ガイドツアー＋最初の3ステップ・ミッションカード
 
 ### 背景・問題意識

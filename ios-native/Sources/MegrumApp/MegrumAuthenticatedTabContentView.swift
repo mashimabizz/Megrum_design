@@ -170,8 +170,10 @@ struct MegrumAuthenticatedTabContentView: View {
             .zIndex(112)
         }
         .overlayPreferenceValue(TutorialAnchorPreferenceKey.self) { anchors in
-            GeometryReader { proxy in
-                if let step = tutorialCoordinator.currentStep {
+            // GeometryReader ごと ignoresSafeArea して、アンカー解決・dim・吹き出しを
+            // 同一のフルスクリーン座標系に揃える（内側だけ広げると切り抜きがズレる）。
+            if let step = tutorialCoordinator.currentStep {
+                GeometryReader { proxy in
                     TutorialTourOverlay(
                         step: step,
                         anchorFrames: anchors.mapValues { proxy[$0] },
@@ -180,6 +182,7 @@ struct MegrumAuthenticatedTabContentView: View {
                         onSkip: { tutorialCoordinator.skip() }
                     )
                 }
+                .ignoresSafeArea()
             }
         }
         .onAppear {
@@ -302,6 +305,7 @@ struct MegrumAuthenticatedTabContentView: View {
                     selectedTab = .inventory
                 },
                 tutorialSampleActive: tutorialSampleActive,
+                tutorialFocusAnchor: tutorialCoordinator.currentStep?.homeFocusAnchor,
                 starterMissionEnabled: !tutorialSampleActive,
                 conditionSignalsByItemIDOverride: tutorialSampleActive ? TutorialSampleHomeData.conditionSignals : nil,
                 visualQAInitialScreen: visualQAInitialScreen

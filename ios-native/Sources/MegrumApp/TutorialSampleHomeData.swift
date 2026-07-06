@@ -14,10 +14,17 @@ enum TutorialSampleHomeData {
     }
 
     /// マッチ判定フィルタ（isMemberTagMatchEligible 等）を通すため、候補とペアで必要になるシグナル。
+    /// 「求められているグッズ」のサンプルで「0件」表示にならないよう、求められ件数も付与する。
     static var conditionSignals: [UUID: HomeCandidateConditionSignals] {
-        HomeCandidateConditionSignalDefaults.previewSignals(
+        var signals = HomeCandidateConditionSignalDefaults.previewSignals(
             matchedItems: matchedItems,
             possibleItems: possibleItems
         )
+        var seenIDs = Set<UUID>()
+        let orderedItems = (matchedItems + possibleItems).filter { seenIDs.insert($0.id).inserted }
+        for (index, item) in orderedItems.enumerated() where signals[item.id]?.linkCounts.wishCount == 0 {
+            signals[item.id]?.linkCounts.wishCount = index % 3 + 1
+        }
+        return signals
     }
 }
