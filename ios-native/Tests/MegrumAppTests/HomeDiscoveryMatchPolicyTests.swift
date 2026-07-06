@@ -776,7 +776,7 @@ final class HomeDiscoveryMatchPolicyTests: XCTestCase {
             possibleItems: [],
             inventoryItems: [sender]
         )
-        XCTAssertEqual(mailRoute?.initialStep, .shipping)
+        XCTAssertEqual(mailRoute?.initialStep, .conditions)
 
         let handRoute = HomeDiscoveryProposalRouteResolver.route(
             selection: HomeDiscoveryProposalSelection(
@@ -790,7 +790,7 @@ final class HomeDiscoveryMatchPolicyTests: XCTestCase {
             possibleItems: [],
             inventoryItems: [sender]
         )
-        XCTAssertEqual(handRoute?.initialStep, .meetup)
+        XCTAssertEqual(handRoute?.initialStep, .conditions)
     }
 
     func testDiscoveryProposalSelectionAppliesDefaultMailConditionsOnlyForMailRoutes() {
@@ -1834,7 +1834,7 @@ final class HomeDiscoveryMatchPolicyTests: XCTestCase {
         XCTAssertEqual(route.initialExchangeMethod, .mail)
         XCTAssertEqual(route.initialShippingFee, .owner)
         XCTAssertEqual(route.initialShippingDays, .oneDay)
-        XCTAssertEqual(route.initialStep, .shipping)
+        XCTAssertEqual(route.initialStep, .conditions)
     }
 
     func testHomeProposalRouteKeepsAdditionalReceiverGoodsIDsFromDiscoverySelection() throws {
@@ -1942,7 +1942,7 @@ final class HomeDiscoveryMatchPolicyTests: XCTestCase {
         )
 
         XCTAssertEqual(route.initialExchangeMethod, .hand)
-        XCTAssertEqual(route.initialStep, .meetup)
+        XCTAssertEqual(route.initialStep, .conditions)
     }
 
     func testHomeWishCopyInputCopiesTappedGoodsAsIndependentWish() throws {

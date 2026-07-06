@@ -31,7 +31,7 @@ extension ProposalCreateFlow {
                             .simultaneousGesture(stepSwipeGesture)
                     },
                     meetupContent: {
-                        meetupStep
+                        conditionsStep
                     },
                     shippingContent: {
                         shippingStep

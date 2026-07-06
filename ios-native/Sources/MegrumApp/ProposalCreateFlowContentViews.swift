@@ -78,18 +78,10 @@ struct ProposalCreateActiveContent<GiveContent: View, ReceiveContent: View, Meet
 
             ScrollView {
                 VStack(alignment: .leading, spacing: contentSpacing) {
+                    // 個別募集エディタ準拠：ステップ大見出し（1/3〜3/3）。
+                    // 交換手段の選択は 3/3「交換条件」内へ移動した（iter1226.344）。
                     if selectedStep != .payment && selectedStep != .confirm {
-                        ProposalExchangeMethodSelector(
-                            exchangeMethod: $exchangeMethod
-                        )
-
-                        ProposalStepHeader(
-                            selectedStep: $selectedStep,
-                            steps: selectionTabs,
-                            configuration: configuration,
-                            senderCount: senderCount,
-                            receiverCount: receiverCount
-                        )
+                        ProposalStepProgressTitle(step: selectedStep)
                     }
 
                     ProposalCreateActiveStepContent(
@@ -164,7 +156,8 @@ private struct ProposalCreateActiveStepContent<GiveContent: View, ReceiveContent
             giveContent()
         case .receive:
             receiveContent()
-        case .meetup:
+        case .conditions, .meetup:
+            // .conditions は結合ステップ（呼び出し側が meetupContent スロットで渡す）。
             meetupContent()
         case .shipping:
             shippingContent()

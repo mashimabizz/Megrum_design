@@ -139,3 +139,100 @@ struct ProposalMutualConditionCard: View {
         }
     }
 }
+
+
+/// 個別募集エディタ準拠のステップ大見出し（1/3〜3/3）。
+struct ProposalStepProgressTitle: View {
+    var step: ProposalCreateStep
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(progressText)
+                .font(.system(size: 13, weight: .black, design: .rounded))
+                .foregroundStyle(MegrumTheme.lavender)
+            Text(titleText)
+                .font(.system(size: step == .conditions ? 27 : 29, weight: .black, design: .rounded))
+                .foregroundStyle(MegrumTheme.ink)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var progressText: String {
+        switch step {
+        case .give: "1/3"
+        case .receive: "2/3"
+        default: "3/3"
+        }
+    }
+
+    private var titleText: String {
+        switch step {
+        case .give: "譲るものを選ぶ"
+        case .receive: "受け取るものを選ぶ"
+        default: "交換条件を設定する"
+        }
+    }
+}
+
+/// 3/3 交換条件：交換手段・現地・郵送・支払をひとつのステップにまとめる。
+/// 各セクションの下に「お互いの希望条件」（現地/郵送の各サブビューが内包）を表示する。
+struct ProposalExchangeConditionsStep<MeetupContent: View, ShippingContent: View, PaymentContent: View>: View {
+    @Binding var exchangeMethod: ExchangeMethod
+    var requiresPaymentSelection: Bool
+    @ViewBuilder var meetupContent: () -> MeetupContent
+    @ViewBuilder var shippingContent: () -> ShippingContent
+    @ViewBuilder var paymentContent: () -> PaymentContent
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 28) {
+            VStack(alignment: .leading, spacing: 14) {
+                sectionTitle("1. 交換手段")
+                ProposalExchangeMethodSelector(exchangeMethod: $exchangeMethod)
+            }
+
+            if exchangeMethod == .hand || exchangeMethod == .both {
+                VStack(alignment: .leading, spacing: 14) {
+                    sectionTitle("\(localSectionNumber). 現地交換の条件")
+                    meetupContent()
+                }
+            }
+
+            if exchangeMethod == .mail || exchangeMethod == .both {
+                VStack(alignment: .leading, spacing: 14) {
+                    sectionTitle("\(mailSectionNumber). 郵送交換の条件")
+                    shippingContent()
+                }
+            }
+
+            if requiresPaymentSelection {
+                VStack(alignment: .leading, spacing: 14) {
+                    sectionTitle("\(paymentSectionNumber). 支払方法")
+                    paymentContent()
+                }
+            }
+        }
+    }
+
+    private func sectionTitle(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 18, weight: .black, design: .rounded))
+            .foregroundStyle(MegrumTheme.ink)
+    }
+
+    private var localSectionNumber: Int { 2 }
+
+    private var mailSectionNumber: Int {
+        exchangeMethod == .both ? 3 : 2
+    }
+
+    private var paymentSectionNumber: Int {
+        var number = 2
+        if exchangeMethod == .hand || exchangeMethod == .both {
+            number += 1
+        }
+        if exchangeMethod == .mail || exchangeMethod == .both {
+            number += 1
+        }
+        return number
+    }
+}

@@ -43,7 +43,7 @@ struct ProposalStepHeader: View {
             senderCount > 0 ? "\(senderCount)" : "!"
         case .receive:
             receiverCount > 0 ? "\(receiverCount)" : "!"
-        case .meetup:
+        case .conditions, .meetup:
             configuration.targetStatus == nil ? "!" : nil
         case .shipping:
             nil
@@ -60,7 +60,7 @@ struct ProposalStepHeader: View {
             senderCount > 0 ? MegrumTheme.lavender : MegrumTheme.muted
         case .receive:
             receiverCount > 0 ? MegrumTheme.sky : MegrumTheme.muted
-        case .meetup:
+        case .conditions, .meetup:
             configuration.targetStatus == nil ? MegrumTheme.muted : MegrumTheme.lavender
         case .shipping:
             MegrumTheme.sky
@@ -77,6 +77,8 @@ struct ProposalStepHeader: View {
             "私が出す"
         case .receive:
             "受け取る"
+        case .conditions:
+            "交換条件"
         case .meetup:
             "待ち合わせ"
         case .shipping:
