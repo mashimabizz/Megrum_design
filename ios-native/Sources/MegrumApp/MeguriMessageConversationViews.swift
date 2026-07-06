@@ -14,6 +14,8 @@ struct MeguriMessageList: View {
     var onOpenPremium: () -> Void = {}
     var onOpenPeerProfile: () -> Void = {}
     var onOpenImage: (URL) -> Void = { _ in }
+    var onReply: (MeguriMessage) -> Void = { _ in }
+    var onReport: (MeguriMessage) -> Void = { _ in }
 
     var body: some View {
         GeometryReader { proxy in
@@ -42,6 +44,11 @@ struct MeguriMessageList: View {
                                 onOpenPremium: onOpenPremium,
                                 onOpenPeerProfile: onOpenPeerProfile,
                                 onOpenImage: onOpenImage
+                            )
+                            .chatMessageInteraction(
+                                copyText: (message.body?.nilIfBlank).map(ChatReplyQuoteFormatter.copyText(of:)),
+                                onReply: message.body?.nilIfBlank != nil ? { onReply(message) } : nil,
+                                onReport: message.senderID == viewerID ? nil : { onReport(message) }
                             )
                             .id(message.id)
                         }
@@ -206,10 +213,29 @@ struct MeguriMessageBubble: View {
         }
     }
 
+    @ViewBuilder
     private func textBubble(_ text: String) -> some View {
-        ViewThatFits(in: .horizontal) {
-            compactTextBubble(text)
-            wrappedTextBubble(text)
+        let parsed = ChatReplyQuoteFormatter.parse(text)
+        if let quote = parsed.quote, !message.locked {
+            VStack(alignment: .leading, spacing: 0) {
+                ChatReplyQuoteLine(quote: quote, isMine: isMine)
+                Text(parsed.text)
+                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .foregroundStyle(isMine ? .white : MegrumTheme.ink)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(
+                isMine ? AnyShapeStyle(MegrumTheme.lavender) : AnyShapeStyle(.white.opacity(0.9)),
+                in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+            )
+        } else {
+            ViewThatFits(in: .horizontal) {
+                compactTextBubble(text)
+                wrappedTextBubble(text)
+            }
         }
     }
 

@@ -324,6 +324,8 @@ struct MeguriMessagesScreen: View {
     var onOpenUserProfile: (UUID) -> Void = { _ in }
     @State private var presentationState = MeguriMessagesPresentationState()
     @State private var photoPresentationState = MeguriMessagePhotoPresentationState()
+    @State private var replyTarget: ChatReplyTarget?
+    @State private var reportTargetMessage: MeguriMessage?
 
     private var messages: [MeguriMessage] {
         switch route.scope {
@@ -496,6 +498,27 @@ struct MeguriMessagesScreen: View {
                 onOpenPeerProfile: { onOpenUserProfile(route.peerID) },
                 onOpenImage: { url in
                     photoPresentationState.selectRemoteImage(url)
+                },
+                onReply: { message in
+                    let isMine = message.senderID == appState.viewer?.id
+                    replyTarget = ChatReplyTarget(
+                        senderID: message.senderID,
+                        senderName: isMine
+                            ? (appState.viewer?.displayName).nilIfBlank ?? "自分"
+                            : peerTitle,
+                        avatarID: isMine ? nil : peerAvatarID,
+                        avatarURL: isMine ? appState.viewer?.avatarURL : peerAvatarURL,
+                        initial: String(
+                            (isMine
+                                ? (appState.viewer?.displayName).nilIfBlank ?? "自分"
+                                : peerTitle
+                            ).prefix(1)
+                        ).uppercased(),
+                        body: ChatReplyQuoteFormatter.copyText(of: message.body ?? "")
+                    )
+                },
+                onReport: { message in
+                    reportTargetMessage = message
                 }
             )
             .onChange(of: messages.count) { _, _ in
@@ -508,7 +531,40 @@ struct MeguriMessagesScreen: View {
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            messageInputBar
+            VStack(spacing: 0) {
+                if let replyTarget {
+                    ChatReplyComposerPreview(target: replyTarget) {
+                        self.replyTarget = nil
+                    }
+                }
+                messageInputBar
+            }
+        }
+        .confirmationDialog(
+            "このメッセージを通報しますか？",
+            isPresented: Binding(
+                get: { reportTargetMessage != nil },
+                set: { if !$0 { reportTargetMessage = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("通報する", role: .destructive) {
+                if let message = reportTargetMessage {
+                    Task {
+                        _ = await appState.reportUser(
+                            targetUserID: message.senderID,
+                            reason: .harassment,
+                            note: "めぐりメッセージの通報: \(ChatReplyQuoteFormatter.preview(of: message.body ?? ""))"
+                        )
+                    }
+                }
+                reportTargetMessage = nil
+            }
+            Button("キャンセル", role: .cancel) {
+                reportTargetMessage = nil
+            }
+        } message: {
+            Text("運営が内容を確認します。")
         }
     }
 
@@ -534,15 +590,24 @@ struct MeguriMessagesScreen: View {
             presentationState.showMegrumPlusPrompt()
             return
         }
+        let outgoingBody: String
+        if let replyTarget {
+            outgoingBody = ChatReplyQuoteFormatter.compose(reply: replyTarget, body: presentationState.draft)
+        } else {
+            outgoingBody = presentationState.draft
+        }
         Task {
             let sent = await appState.sendMeguriMessage(
                 recipientID: route.peerID,
-                body: presentationState.draft,
+                body: outgoingBody,
                 sourceGroomPostID: routeSourceGroomPostID,
                 sourceGroomOwnerID: routeSourceGroomOwnerID,
                 sourceGroomImageURL: routeSourceGroomImageURL
             )
             presentationState.clearDraftAfterSend(sent)
+            if sent {
+                replyTarget = nil
+            }
         }
     }
 

@@ -16,6 +16,8 @@ struct TradeDetailMessagesSection: View {
     var isLoading: Bool
     var isApprovingCancel: Bool
     var onOpenImage: (URL) -> Void
+    var onReply: (TradeMessage) -> Void = { _ in }
+    var onReportMessage: (TradeMessage) -> Void = { _ in }
     var onOpenDispute: (TradeDisputeSummary) -> Void
     var onOpenMailingInfo: () -> Void
     var onOpenPaymentInfo: () -> Void
@@ -66,6 +68,15 @@ struct TradeDetailMessagesSection: View {
                         onOpenDispute: onOpenDispute,
                         onOpenEvidenceList: onOpenEvidenceList,
                         onApproveCancel: onApproveCancel
+                    )
+                    .chatMessageInteraction(
+                        copyText: row.message.messageType == .text
+                            ? (row.message.body?.nilIfBlank).map(ChatReplyQuoteFormatter.copyText(of:))
+                            : nil,
+                        onReply: row.message.messageType == .text && row.message.body?.nilIfBlank != nil
+                            ? { onReply(row.message) }
+                            : nil,
+                        onReport: row.isMine ? nil : { onReportMessage(row.message) }
                     )
                 }
                 if evaluationState.shouldRevealEvaluations {

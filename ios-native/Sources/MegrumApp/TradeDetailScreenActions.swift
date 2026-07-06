@@ -157,9 +157,18 @@ extension TradeDetailScreen {
     }
 
     func sendDraftMessage() {
+        let body: String
+        if let replyTarget = interactionState.replyTarget {
+            body = ChatReplyQuoteFormatter.compose(reply: replyTarget, body: interactionState.draftMessage)
+        } else {
+            body = interactionState.draftMessage
+        }
         Task {
-            let sent = await appState.sendMessage(proposalID: proposal.id, body: interactionState.draftMessage)
+            let sent = await appState.sendMessage(proposalID: proposal.id, body: body)
             interactionState.clearDraftAfterSend(succeeded: sent)
+            if sent {
+                interactionState.replyTarget = nil
+            }
         }
     }
 

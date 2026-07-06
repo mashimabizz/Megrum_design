@@ -56,6 +56,27 @@ extension TradeDetailScreen {
             onOpenImage: { url in
                 routePresentationState.selectRemoteImage(RemoteImageSelection(url: url))
             },
+            onReplyToMessage: { message in
+                let isMine = message.senderID == viewerID
+                interactionState.replyTarget = ChatReplyTarget(
+                    senderID: message.senderID,
+                    senderName: isMine
+                        ? (appState.viewer?.displayName).nilIfBlank ?? "自分"
+                        : heroPresentation.partnerDisplayName,
+                    avatarID: nil,
+                    avatarURL: isMine ? appState.viewer?.avatarURL : heroPresentation.partnerAvatarURL,
+                    initial: String(
+                        (isMine
+                            ? (appState.viewer?.displayName).nilIfBlank ?? "自分"
+                            : heroPresentation.partnerDisplayName
+                        ).prefix(1)
+                    ).uppercased(),
+                    body: ChatReplyQuoteFormatter.copyText(of: message.body ?? "")
+                )
+            },
+            onReportMessage: { message in
+                interactionState.reportTargetMessage = message
+            },
             onOpenEvidencePhoto: openEvidencePhoto,
             onApproveEvidence: { photo in
                 Task {
@@ -104,6 +125,12 @@ extension TradeDetailScreen {
                     .padding(.top, 10)
                     .padding(.bottom, 2)
                     .background(.regularMaterial)
+                }
+
+                if let replyTarget = interactionState.replyTarget, isChatInputVisible {
+                    ChatReplyComposerPreview(target: replyTarget) {
+                        interactionState.replyTarget = nil
+                    }
                 }
 
                 TradeDetailMessageInputBar(

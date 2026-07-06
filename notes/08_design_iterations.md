@@ -4,6 +4,42 @@
 
 ---
 
+## イテレーション1226.306：チャット長押しメニュー＋リプライ（3チャット共通）
+
+### 背景・問題意識
+オーナー指示項目18：取引チャット・めぐりメッセージ・チャットルームで、LINEのようにメッセージ長押しで機能を使いたい（コピー・リプライ・通報の3つに絞る）。リプライは入力欄上にリプライ先のアイコン・名前・元メッセージを表示し、右スワイプでもリプライ開始できるように。
+
+### 変更内容
+
+#### 共通コンポーネント（`ChatMessageInteraction.swift` 新規）
+- `chatMessageInteraction(copyText:onReply:onReport:)`：iOS標準 contextMenu によるコピー／リプライ／通報＋右スワイプ（56pt超・水平優位）でリプライ開始
+- `ChatReplyComposerPreview`：入力欄上のリプライ先プレビュー（アイコン・名前・元メッセージ・×）
+- `ChatReplyQuoteFormatter`：DBスキーマを変えず、本文先頭に「↩ 名前「元メッセージ…」」の引用行を埋め込み／分離（compose/parse/copyText、プレビュー40字）。テスト3件
+- `ChatReplyQuoteLine`：バブル内の引用表示（縦バー＋引用文）
+
+#### 3チャットへの配線
+- **取引チャット**：`TradeDetailInteractionState` に replyTarget/reportTargetMessage、送信時に引用合成、`TradeTextMessageBubble` で引用描画、通報は `reportUser`（確認ダイアログ付き）
+- **めぐりメッセージ**：`MeguriMessageViews` に同様の配線（相手名/アバターは peer 情報）
+- **チャットルーム**：`BoardThreadDetailScreen` に配線（匿名identityの名前/アバターで引用）。削除済み・画像のみは対象外
+
+### 影響範囲
+- 3チャットの送受信表示（既存メッセージは引用マーカーが無いため従来どおり表示）
+
+### 確認方法
+- swift test 1483件（+3）0 failures
+- 実機：各チャットで長押しメニュー・リプライプレビュー・右スワイプ・引用表示を確認
+
+### セルフレビュー結果
+- ✅ iOS標準 contextMenu を採用（LINE風独自メニューは作らず標準優先）
+- ⚠️ リプライは本文埋め込み方式（reply_to カラムは未追加）。タップで元メッセージへジャンプ等が必要になったらスキーマ対応を検討
+- ⚠️ 通報は「メッセージ本文の抜粋付きユーザー通報」として送信（reason=harassment 固定）
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/ChatMessageInteraction.swift`（新規）
+- `ios-native/Sources/MegrumApp/TradeDetailScreenPresentation.swift` / `MeguriMessageViews.swift` / `BoardThreadDetailScreen.swift`
+
+---
+
 ## イテレーション1226.305：新バッチ前半（アーカイブ上限・プレミアム黒・チャット画像安定ほか）
 
 ### 背景・問題意識

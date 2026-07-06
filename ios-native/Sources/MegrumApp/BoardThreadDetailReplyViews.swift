@@ -8,6 +8,8 @@ struct BoardThreadChatTimeline: View {
     var missingReplyContextMessage: String?
     var onReact: (BoardThreadChatMessageTarget, BoardMessageReaction?) -> Void
     var onOpenImage: (URL) -> Void = { _ in }
+    var onReply: (BoardThreadChatMessageDisplay) -> Void = { _ in }
+    var onReport: (BoardThreadChatMessageDisplay) -> Void = { _ in }
 
     var body: some View {
         LazyVStack(spacing: 8) {
@@ -26,6 +28,11 @@ struct BoardThreadChatTimeline: View {
                         onReact(message.target, reaction)
                     },
                     onOpenImage: onOpenImage
+                )
+                .chatMessageInteraction(
+                    copyText: message.isDeleted ? nil : ChatReplyQuoteFormatter.copyText(of: message.body),
+                    onReply: message.isDeleted ? nil : { onReply(message) },
+                    onReport: message.isMine || message.isDeleted ? nil : { onReport(message) }
                 )
                 .id(message.id)
             }
@@ -109,10 +116,32 @@ struct BoardThreadChatMessageRow: View {
         }
     }
 
+    @ViewBuilder
     private var textOnlyMessageBubble: some View {
-        ViewThatFits(in: .horizontal) {
-            compactTextBubble
-            wrappedTextBubble
+        if let replyQuote {
+            VStack(alignment: .leading, spacing: 0) {
+                ChatReplyQuoteLine(quote: replyQuote, isMine: message.isMine)
+                Text(messageText)
+                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .foregroundStyle(message.isMine ? .white : MegrumTheme.ink)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(
+                maxWidth: BoardThreadChatBubbleMetrics.maxWidth,
+                alignment: .leading
+            )
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(
+                message.isMine ? AnyShapeStyle(MegrumTheme.lavender) : AnyShapeStyle(.white.opacity(0.9)),
+                in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+            )
+        } else {
+            ViewThatFits(in: .horizontal) {
+                compactTextBubble
+                wrappedTextBubble
+            }
         }
     }
 
@@ -150,7 +179,11 @@ struct BoardThreadChatMessageRow: View {
     }
 
     private var messageText: String {
-        message.isDeleted ? "削除済みです" : message.body
+        message.isDeleted ? "削除済みです" : ChatReplyQuoteFormatter.parse(message.body).text
+    }
+
+    private var replyQuote: String? {
+        message.isDeleted ? nil : ChatReplyQuoteFormatter.parse(message.body).quote
     }
 
     private var messageTime: some View {

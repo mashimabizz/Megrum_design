@@ -41,6 +41,8 @@ struct TradeDetailContent: View {
     var onOpenEvidenceCamera: () -> Void
     var onOpenEvidenceList: () -> Void
     var onOpenImage: (URL) -> Void
+    var onReplyToMessage: (TradeMessage) -> Void = { _ in }
+    var onReportMessage: (TradeMessage) -> Void = { _ in }
     var onOpenEvidencePhoto: (TradeEvidencePhoto) -> Void
     var onApproveEvidence: (TradeEvidencePhoto) -> Void
     var onRate: () -> Void
@@ -104,6 +106,8 @@ struct TradeDetailContent: View {
                             isLoading: isLoadingMessages,
                             isApprovingCancel: isApprovingCancel,
                             onOpenImage: onOpenImage,
+                            onReply: onReplyToMessage,
+                            onReportMessage: onReportMessage,
                             onOpenDispute: onOpenDispute,
                             onOpenMailingInfo: {
                                 agreementDisclosureRoute = .mailingAddress

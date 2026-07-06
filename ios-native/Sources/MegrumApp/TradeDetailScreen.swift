@@ -14,6 +14,32 @@ struct TradeDetailScreen: View {
     var body: some View {
         bodyBeforeDialogs
         .confirmationDialog(
+            "このメッセージを通報しますか？",
+            isPresented: Binding(
+                get: { interactionState.reportTargetMessage != nil },
+                set: { if !$0 { interactionState.reportTargetMessage = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("通報する", role: .destructive) {
+                if let message = interactionState.reportTargetMessage {
+                    Task {
+                        _ = await appState.reportUser(
+                            targetUserID: message.senderID,
+                            reason: .harassment,
+                            note: "取引チャットのメッセージ通報: \(ChatReplyQuoteFormatter.preview(of: message.body ?? ""))"
+                        )
+                    }
+                }
+                interactionState.reportTargetMessage = nil
+            }
+            Button("キャンセル", role: .cancel) {
+                interactionState.reportTargetMessage = nil
+            }
+        } message: {
+            Text("運営が内容を確認します。")
+        }
+        .confirmationDialog(
             "この打診を断りますか？",
             isPresented: $routePresentationState.isShowingRejectConfirmation,
             titleVisibility: .visible

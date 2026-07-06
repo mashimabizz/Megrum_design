@@ -20,6 +20,8 @@ struct BoardThreadDetailScreen: View {
     @State private var photoPresentationState = MeguriMessagePhotoPresentationState()
     @State private var isShowingReportConfirmation = false
     @State private var showsJoinIdentitySheet = false
+    @State private var replyTarget: ChatReplyTarget?
+    @State private var reportTargetMessage: BoardThreadChatMessageDisplay?
     @State private var pendingReplyAfterJoin: (() -> Void)?
 
     private var currentThread: BoardThread {
@@ -98,6 +100,19 @@ struct BoardThreadDetailScreen: View {
                             onReact: react(to:reaction:),
                             onOpenImage: { url in
                                 photoPresentationState.selectRemoteImage(url)
+                            },
+                            onReply: { message in
+                                replyTarget = ChatReplyTarget(
+                                    senderID: message.authorID,
+                                    senderName: message.displayName,
+                                    avatarID: message.avatarID,
+                                    avatarURL: message.avatarURL,
+                                    initial: message.initial,
+                                    body: ChatReplyQuoteFormatter.copyText(of: message.body)
+                                )
+                            },
+                            onReport: { message in
+                                reportTargetMessage = message
                             }
                         )
                         .padding(.top, 14)
@@ -121,6 +136,12 @@ struct BoardThreadDetailScreen: View {
                 }
             }
             .safeAreaInset(edge: .bottom) {
+                VStack(spacing: 0) {
+                if let replyTarget {
+                    ChatReplyComposerPreview(target: replyTarget) {
+                        self.replyTarget = nil
+                    }
+                }
                 BoardReplyInput(
                     text: $replyComposerState.draftReply,
                     isSending: appState.sendingBoardReplyThreadID == currentThread.id,
@@ -131,6 +152,33 @@ struct BoardThreadDetailScreen: View {
                 ) {
                     sendReply(proxy: proxy)
                 }
+                }
+            }
+            .confirmationDialog(
+                "このメッセージを通報しますか？",
+                isPresented: Binding(
+                    get: { reportTargetMessage != nil },
+                    set: { if !$0 { reportTargetMessage = nil } }
+                ),
+                titleVisibility: .visible
+            ) {
+                Button("通報する", role: .destructive) {
+                    if let message = reportTargetMessage {
+                        Task {
+                            _ = await appState.reportUser(
+                                targetUserID: message.authorID,
+                                reason: .harassment,
+                                note: "チャットルームのメッセージ通報: \(ChatReplyQuoteFormatter.preview(of: message.body))"
+                            )
+                        }
+                    }
+                    reportTargetMessage = nil
+                }
+                Button("キャンセル", role: .cancel) {
+                    reportTargetMessage = nil
+                }
+            } message: {
+                Text("運営が内容を確認します。")
             }
             .photosPicker(
                 isPresented: $photoPresentationState.isShowingPhotoLibraryPicker,
@@ -265,14 +313,20 @@ struct BoardThreadDetailScreen: View {
             return
         }
 
+        let outgoingBody: String
+        if let replyTarget {
+            outgoingBody = ChatReplyQuoteFormatter.compose(reply: replyTarget, body: replyBody)
+        } else {
+            outgoingBody = replyBody
+        }
         guard let identity = resolvedRoomIdentity() else {
             pendingReplyAfterJoin = {
-                performSendReply(body: replyBody, proxy: proxy)
+                performSendReply(body: outgoingBody, proxy: proxy)
             }
             showsJoinIdentitySheet = true
             return
         }
-        performSendReply(body: replyBody, identity: identity, proxy: proxy)
+        performSendReply(body: outgoingBody, identity: identity, proxy: proxy)
     }
 
     private func performSendReply(
@@ -295,6 +349,7 @@ struct BoardThreadDetailScreen: View {
             if sent {
                 await MainActor.run {
                     replyComposerState.clearDraftAfterSend(succeeded: sent)
+                    replyTarget = nil
                     scrollToLatest(proxy)
                 }
             }

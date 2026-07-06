@@ -251,10 +251,31 @@ struct TradeTextMessageBubble: View {
     var text: String
     var isMine: Bool
 
+    private var parsed: (quote: String?, text: String) {
+        ChatReplyQuoteFormatter.parse(text)
+    }
+
     var body: some View {
-        ViewThatFits(in: .horizontal) {
-            compactBubble
-            wrappedBubble
+        if let quote = parsed.quote {
+            VStack(alignment: .leading, spacing: 0) {
+                ChatReplyQuoteLine(quote: quote, isMine: isMine)
+                Text(parsed.text)
+                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .foregroundStyle(isMine ? .white : MegrumTheme.ink)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(
+                isMine ? AnyShapeStyle(MegrumTheme.lavender) : AnyShapeStyle(.white.opacity(0.9)),
+                in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+            )
+        } else {
+            ViewThatFits(in: .horizontal) {
+                compactBubble
+                wrappedBubble
+            }
         }
     }
 

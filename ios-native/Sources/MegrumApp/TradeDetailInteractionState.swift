@@ -1,7 +1,12 @@
 import Foundation
+import MegrumCore
 
 struct TradeDetailInteractionState: Equatable {
     var draftMessage = ""
+    /// 長押し／右スワイプで選んだリプライ先。
+    var replyTarget: ChatReplyTarget?
+    /// 長押しメニューから通報対象に選んだメッセージ。
+    var reportTargetMessage: TradeMessage?
     var isWaitingToShareLocation = false
     var didSubmitEvaluation = false
     var toastMessage: String?
