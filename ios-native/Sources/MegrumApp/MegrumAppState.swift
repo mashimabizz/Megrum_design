@@ -9,6 +9,9 @@ public final class MegrumAppState: ObservableObject {
     @Published public internal(set) var wishes: [WishItem] = []
     @Published public internal(set) var homeMatchedItems: [GoodsItem] = []
     @Published public internal(set) var homeRecentPartnerItems: [GoodsItem] = []
+    /// ホーム候補の初回読み込みが完了したか（成功/失敗問わず）。
+    /// 確定前に空状態CTAを出すとちらつくため、これが true になるまでスケルトンを表示する。
+    @Published public internal(set) var hasLoadedHomeCandidates = false
     @Published public internal(set) var homePossibleItems: [GoodsItem] = []
     @Published public internal(set) var homeCandidateConditionSignals: [UUID: HomeCandidateConditionSignals] = [:]
     @Published public internal(set) var homeMutualMatchCandidates: [HomeMutualMatchCandidateData] = []
@@ -401,6 +404,7 @@ public final class MegrumAppState: ObservableObject {
     }
 
     private func loadHomeCandidates(fallbackInventory: [GoodsItem]) async {
+        defer { hasLoadedHomeCandidates = true }
         do {
             let sections = try await repository.loadHomeCandidateSections()
             applyHomeCandidateSections(sections, fallbackInventory: fallbackInventory)
@@ -445,6 +449,7 @@ public final class MegrumAppState: ObservableObject {
     }
 
     private func applyHomeCandidateSections(_ sections: HomeCandidateSections, fallbackInventory: [GoodsItem]) {
+        hasLoadedHomeCandidates = true
         let resolved = BlockedUserContentFilter.homeSections(
             sections.resolvedWithFallbackInventory(fallbackInventory),
             blockedUserIDs: blockedContentUserIDs

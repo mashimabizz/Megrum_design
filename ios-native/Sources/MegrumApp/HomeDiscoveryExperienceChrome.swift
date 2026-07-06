@@ -80,6 +80,50 @@ enum HomeDiscoveryHeaderMetrics {
     static let pullRefreshIndicatorTopPadding: CGFloat = 74
 }
 
+/// ホーム候補の読み込みが確定するまで出すスケルトン。
+/// 確定前に空状態CTAを出すと毎回一瞬ちらつくため、その代わりに表示する。
+struct HomeCandidateSkeletonView: View {
+    @State private var isPulsing = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            skeletonSection
+            skeletonSection
+        }
+        .opacity(isPulsing ? 0.45 : 1)
+        .animation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true), value: isPulsing)
+        .onAppear { isPulsing = true }
+        .accessibilityLabel("読み込み中")
+    }
+
+    private var skeletonSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .fill(MegrumTheme.lavender.opacity(0.16))
+                .frame(width: 132, height: 15)
+
+            ForEach(0..<2, id: \.self) { _ in
+                HStack(spacing: 12) {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(MegrumTheme.lavender.opacity(0.12))
+                        .frame(width: 64, height: 64)
+                    VStack(alignment: .leading, spacing: 8) {
+                        RoundedRectangle(cornerRadius: 5, style: .continuous)
+                            .fill(MegrumTheme.lavender.opacity(0.14))
+                            .frame(width: 150, height: 12)
+                        RoundedRectangle(cornerRadius: 5, style: .continuous)
+                            .fill(MegrumTheme.lavender.opacity(0.1))
+                            .frame(width: 96, height: 10)
+                    }
+                    Spacer(minLength: 0)
+                }
+                .padding(12)
+                .background(.white.opacity(0.7), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            }
+        }
+    }
+}
+
 /// 候補が1件もない時（新規ユーザー等）の導線カード。
 /// 推しを増やすか、ほしいものを登録すればマッチ候補が並び始めることを伝える。
 struct HomeEmptyCandidateCTACard: View {

@@ -4,6 +4,43 @@
 
 ---
 
+## イテレーション1226.335：ホーム空状態ちらつき解消＋グルームコメント改善＋入室画面の入力欄非表示
+
+### 背景・問題意識
+オーナーFB3件：①ホーム初回表示で「マッチ候補を見つけよう」カードが毎回一瞬ちらつく ②グルームでコメントを開いている間も進捗が進む／コメントにアイコン・ユーザーネームが出ない・タップでプロフィールに飛べない ③初めてのチャットルーム入室時の紹介画面の下に入力欄が見えてしまう。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- `hasLoadedHomeCandidates` 追加（候補読み込みの成否確定で true。`loadHomeCandidates` の defer と `applyHomeCandidateSections` で設定）
+
+#### `ios-native/Sources/MegrumApp/HomeDiscoveryExperience.swift` / `HomeDiscoveryExperienceChrome.swift` / `HomeScreen.swift`
+- 候補ゼロ時、読み込み確定前は `HomeCandidateSkeletonView`（パルスする2セクション分のプレースホルダ）を表示し、確定後にCTA＋新着グッズを表示
+
+#### `ios-native/Sources/MegrumApp/GroomViewerScreen.swift`
+- `runStoryProgress`：コメント/いいねシート表示中（`isShowingComments || isShowingLikes`）は進捗ループを待機
+
+#### `ios-native/Sources/MegrumApp/GroomViewerChromeViews.swift`
+- コメント/いいねシートの `identity(userID:)`：自分のコメントは viewer のプロフィール（名前・@handle・アイコン）で表示（publicProfiles に自分は入らないため）
+- コメントシートに送信者プロフィールの遅延読み込み `.task` を追加（未読み込みの他ユーザーの名前・アイコンを補充）
+- 行タップのプロフィール遷移を自分にも許可（profileAction の self ガード撤去）
+
+#### `ios-native/Sources/MegrumApp/BoardThreadDetailScreen.swift`
+- `safeAreaInset(bottom)` の入力欄を `roomEntryPhase` が entered/undetermined の時のみ表示（紹介画面・注意事項中は非表示）
+
+### 影響範囲
+- ホーム初回表示、グルームビューア（進捗・コメント・いいね）、チャットルーム入室フロー
+
+### 確認方法
+- simビルド成功、swift test 1491件＋2件 0 failures
+
+### セルフレビュー結果
+- ✅ ブランドカラー直書きなし（MegrumTheme経由）
+- ✅ 参加済みルームは appear 時に同期的に entered になるため入力欄のちらつきなし
+- ⚠️ アーカイブ側ストーリーのコメント行タップは onOpenProfile が no-op のため閉じるのみ（プロフィール遷移導線は未配線・必要なら次iter）
+
+---
+
 ## イテレーション1226.334：オンボ登録の生年月日がプロフィール編集で「未設定」になる問題の修正
 
 ### 背景・問題意識

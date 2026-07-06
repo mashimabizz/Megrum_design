@@ -12,6 +12,7 @@ struct HomeDiscoveryExperience: View {
     var goodsTypes: [GoodsType] = []
     var conditionSignalsByItemID: [UUID: HomeCandidateConditionSignals] = [:]
     var mutualMatchCandidateData: [HomeMutualMatchCandidateData] = []
+    var hasLoadedCandidates: Bool = true
     var adDisplayContext: AdDisplayContext = AdDisplayContext()
     var opensInitialHavesLookup: Bool = false
     var onOpenSettings: () -> Void
@@ -100,23 +101,28 @@ struct HomeDiscoveryExperience: View {
                         )
                     }
 
-                    // 候補が1件もない（新規ユーザー等）：導線カード＋新着のグッズ
+                    // 候補が1件もない（新規ユーザー等）：導線カード＋新着のグッズ。
+                    // 読み込み確定前はCTAを出さずスケルトンで待つ（初回ちらつき防止）。
                     if userTagCandidates.isEmpty,
                        userCandidates.isEmpty,
                        havesCandidates.isEmpty,
                        mutualMatchCandidates.isEmpty {
-                        HomeEmptyCandidateCTACard(
-                            onAddOshi: { showsEmptyStateOshiSettings = true },
-                            onAddWish: onOpenWish
-                        )
-
-                        if !recentCandidates.isEmpty {
-                            HomeDiscoverySection(
-                                title: "新着のグッズ",
-                                candidates: recentCandidates,
-                                layout: .rail,
-                                onSelect: { selectedSheet = $0 }
+                        if hasLoadedCandidates {
+                            HomeEmptyCandidateCTACard(
+                                onAddOshi: { showsEmptyStateOshiSettings = true },
+                                onAddWish: onOpenWish
                             )
+
+                            if !recentCandidates.isEmpty {
+                                HomeDiscoverySection(
+                                    title: "新着のグッズ",
+                                    candidates: recentCandidates,
+                                    layout: .rail,
+                                    onSelect: { selectedSheet = $0 }
+                                )
+                            }
+                        } else {
+                            HomeCandidateSkeletonView()
                         }
                     }
                 }

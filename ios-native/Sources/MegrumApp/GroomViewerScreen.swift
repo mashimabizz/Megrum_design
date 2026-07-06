@@ -389,6 +389,13 @@ struct GroomViewerScreen: View {
             if Task.isCancelled || currentGroom.id != groomID {
                 return
             }
+            // コメント・いいね一覧を開いている間は進捗を止める。
+            while isShowingComments || isShowingLikes {
+                try? await Task.sleep(nanoseconds: 100_000_000)
+                if Task.isCancelled || currentGroom.id != groomID {
+                    return
+                }
+            }
             try? await Task.sleep(nanoseconds: 100_000_000)
             if Task.isCancelled || currentGroom.id != groomID {
                 return

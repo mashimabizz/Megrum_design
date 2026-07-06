@@ -435,20 +435,40 @@ struct GroomViewerCommentsSheet: View {
                     )
                 }
             }
+            .task(id: replies.map(\.senderID)) {
+                await loadMissingSenderProfiles()
+            }
+        }
+    }
+
+    /// コメント送信者のプロフィールが未読み込みだと名前・アイコンが出ないため補充する。
+    private func loadMissingSenderProfiles() async {
+        let missing = Set(replies.map(\.senderID)).filter { userID in
+            userID != appState.viewer?.id && appState.publicProfilesByUserID[userID] == nil
+        }
+        for userID in missing {
+            await appState.loadPublicUserProfile(userID: userID, reportsFailure: false)
         }
     }
 
     private func profileAction(userID: UUID) -> (() -> Void)? {
-        guard userID != appState.viewer?.id else {
-            return nil
-        }
-        return {
+        {
             dismiss()
             onOpenProfile(userID)
         }
     }
 
     private func identity(userID: UUID) -> MeguriProfileIdentity {
+        // 自分のコメントは viewer のプロフィールで表示する
+        //（publicProfilesByUserID に自分は入らないため）。
+        if let viewer = appState.viewer, viewer.id == userID {
+            return appState.meguriIdentity(
+                for: userID,
+                fallbackName: viewer.displayName,
+                fallbackHandle: viewer.handle,
+                fallbackAvatarURL: viewer.avatarURL
+            )
+        }
         let profile = appState.publicProfilesByUserID[userID]?.profile
         return appState.meguriIdentity(
             for: userID,
@@ -509,16 +529,21 @@ struct GroomViewerLikesSheet: View {
     }
 
     private func profileAction(userID: UUID) -> (() -> Void)? {
-        guard userID != appState.viewer?.id else {
-            return nil
-        }
-        return {
+        {
             dismiss()
             onOpenProfile(userID)
         }
     }
 
     private func identity(userID: UUID) -> MeguriProfileIdentity {
+        if let viewer = appState.viewer, viewer.id == userID {
+            return appState.meguriIdentity(
+                for: userID,
+                fallbackName: viewer.displayName,
+                fallbackHandle: viewer.handle,
+                fallbackAvatarURL: viewer.avatarURL
+            )
+        }
         let profile = appState.publicProfilesByUserID[userID]?.profile
         return appState.meguriIdentity(
             for: userID,

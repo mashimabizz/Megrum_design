@@ -215,22 +215,25 @@ struct BoardThreadDetailScreen: View {
                 }
             }
             .safeAreaInset(edge: .bottom) {
-                VStack(spacing: 0) {
-                if let replyTarget {
-                    ChatReplyComposerPreview(target: replyTarget) {
-                        self.replyTarget = nil
+                // 入室確定前（紹介画面・注意事項）は入力欄を出さない。
+                if roomEntryPhase == .entered || roomEntryPhase == .undetermined {
+                    VStack(spacing: 0) {
+                        if let replyTarget {
+                            ChatReplyComposerPreview(target: replyTarget) {
+                                self.replyTarget = nil
+                            }
+                        }
+                        BoardReplyInput(
+                            text: $replyComposerState.draftReply,
+                            isSending: appState.sendingBoardReplyThreadID == currentThread.id,
+                            isDisabled: missingReplyContextMessage != nil,
+                            canUseCamera: canUseCamera,
+                            onOpenCamera: openCamera,
+                            onOpenPhotoLibrary: openPhotoLibrary
+                        ) {
+                            sendReply(proxy: proxy)
+                        }
                     }
-                }
-                BoardReplyInput(
-                    text: $replyComposerState.draftReply,
-                    isSending: appState.sendingBoardReplyThreadID == currentThread.id,
-                    isDisabled: missingReplyContextMessage != nil,
-                    canUseCamera: canUseCamera,
-                    onOpenCamera: openCamera,
-                    onOpenPhotoLibrary: openPhotoLibrary
-                ) {
-                    sendReply(proxy: proxy)
-                }
                 }
             }
             .confirmationDialog(

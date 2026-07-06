@@ -51,6 +51,7 @@ struct HomeScreen: View {
             goodsTypes: appState?.goodsTypes ?? [],
             conditionSignalsByItemID: appState?.homeCandidateConditionSignals ?? [:],
             mutualMatchCandidateData: appState?.homeMutualMatchCandidates ?? [],
+            hasLoadedCandidates: appState?.hasLoadedHomeCandidates ?? true,
             adDisplayContext: adDisplayContext,
             opensInitialHavesLookup: visualQAInitialScreen == .homeHavesLookup,
             onOpenSettings: onOpenSettings,
