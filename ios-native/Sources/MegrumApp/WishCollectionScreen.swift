@@ -99,6 +99,7 @@ struct WishCollectionScreen: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .ignoresSafeArea(.container, edges: .bottom)
+        .ignoresSafeArea(.keyboard, edges: .bottom)
         .background(MegrumTheme.canvas.ignoresSafeArea())
         .onChange(of: requestedSection, initial: true) { _, requestedSection in
             applyRequestedSection(requestedSection)

@@ -106,6 +106,8 @@ struct IndividualListingsScreen: View {
             }
         }
         .ignoresSafeArea(.container, edges: .bottom)
+        // 作成/編集シートのキーボードで背後の一覧がズレたままになるのを防ぐ。
+        .ignoresSafeArea(.keyboard, edges: .bottom)
         .task {
             if appState.listings.isEmpty {
                 await appState.loadIndividualListings()

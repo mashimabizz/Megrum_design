@@ -65,6 +65,9 @@ extension GoodsCollectionScreen {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
         .ignoresSafeArea(.container, edges: .bottom)
+        // 作成/編集シートのキーボードで背後の一覧がスクロールされて
+        // 戻ってもズレたままになるのを防ぐ（一覧に入力欄は無い）。
+        .ignoresSafeArea(.keyboard, edges: .bottom)
         .animation(
             .spring(
                 response: GoodsQuickActionPresentationMetrics.panelAnimationResponse,
