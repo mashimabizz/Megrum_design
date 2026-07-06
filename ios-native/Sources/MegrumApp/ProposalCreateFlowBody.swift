@@ -70,7 +70,8 @@ extension ProposalCreateFlow {
                     configuration: configuration,
                     meetupHasTimeDraft: meetupInput != nil,
                     isCreating: appState.isCreatingProposal,
-                    onPrimary: primaryAction
+                    onPrimary: primaryAction,
+                    onBack: handleHeaderLeadingAction
                 )
             }
         }

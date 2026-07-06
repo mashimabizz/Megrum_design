@@ -141,28 +141,15 @@ struct ProposalMutualConditionCard: View {
 }
 
 
-/// 個別募集エディタ準拠のステップ大見出し（1/3〜3/3）。
+/// 個別募集エディタ準拠のステップ大見出し。
 struct ProposalStepProgressTitle: View {
     var step: ProposalCreateStep
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(progressText)
-                .font(.system(size: 13, weight: .black, design: .rounded))
-                .foregroundStyle(MegrumTheme.lavender)
-            Text(titleText)
-                .font(.system(size: step == .conditions ? 27 : 29, weight: .black, design: .rounded))
-                .foregroundStyle(MegrumTheme.ink)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private var progressText: String {
-        switch step {
-        case .give: "1/3"
-        case .receive: "2/3"
-        default: "3/3"
-        }
+        Text(titleText)
+            .font(.system(size: step == .conditions ? 27 : 29, weight: .black, design: .rounded))
+            .foregroundStyle(MegrumTheme.ink)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var titleText: String {
@@ -170,6 +157,53 @@ struct ProposalStepProgressTitle: View {
         case .give: "譲るものを選ぶ"
         case .receive: "受け取るものを選ぶ"
         default: "交換条件を設定する"
+        }
+    }
+}
+
+/// 個別募集エディタと同じ進捗ピル（「1 /3」＋ドット3つ）。
+struct ProposalStepProgressPill: View {
+    var step: ProposalCreateStep
+    var onSelectStep: (ProposalCreateStep) -> Void
+
+    private static let steps: [ProposalCreateStep] = [.give, .receive, .conditions]
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Text("\(stepNumber)")
+                .font(.system(size: 19, weight: .black, design: .rounded))
+                .foregroundStyle(MegrumTheme.ink)
+            Text("/3")
+                .font(.system(size: 15, weight: .semibold, design: .rounded))
+                .foregroundStyle(MegrumTheme.muted)
+            ForEach(Self.steps, id: \.id) { item in
+                Button {
+                    onSelectStep(item)
+                } label: {
+                    Color.clear
+                        .frame(width: 22, height: 22)
+                        .overlay {
+                            Circle()
+                                .fill(item == step ? MegrumTheme.lavender : MegrumTheme.muted.opacity(0.22))
+                                .frame(width: item == step ? 16 : 9, height: item == step ? 16 : 9)
+                        }
+                        .contentShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(item.title)
+            }
+        }
+        .padding(.horizontal, 20)
+        .frame(height: 40)
+        .background(.white.opacity(0.92), in: Capsule())
+        .shadow(color: MegrumTheme.ink.opacity(0.08), radius: 10, y: 4)
+    }
+
+    private var stepNumber: Int {
+        switch step {
+        case .give: 1
+        case .receive: 2
+        default: 3
         }
     }
 }
