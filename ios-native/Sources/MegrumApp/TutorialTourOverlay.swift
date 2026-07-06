@@ -23,6 +23,9 @@ struct TutorialTourOverlay: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var calloutSize: CGSize = CGSize(width: 300, height: 170)
     @StateObject private var meguriPointer = TutorialPointerChoreographer()
+    /// 説明カードはユーザーが動かせる（FB⑩）。ビートが変わったらリセット。
+    @State private var cardDragOffset: CGSize = .zero
+    @State private var cardDragTranslation: CGSize = .zero
 
     private var spotlightRect: CGRect? {
         if case .spotlight(let anchor) = beat.presentation {
@@ -53,6 +56,32 @@ struct TutorialTourOverlay: View {
         }
         .transition(.opacity)
         .animation(reduceMotion ? nil : .snappy(duration: 0.22), value: beat)
+        .onChange(of: beat.id) { _, _ in
+            cardDragOffset = .zero
+            cardDragTranslation = .zero
+        }
+    }
+
+    /// 説明カードのドラッグ移動（どの提示形式でも掴んで動かせる）。
+    private var cardDragGesture: some Gesture {
+        DragGesture(minimumDistance: 6)
+            .onChanged { value in
+                cardDragTranslation = value.translation
+            }
+            .onEnded { value in
+                cardDragOffset = CGSize(
+                    width: cardDragOffset.width + value.translation.width,
+                    height: cardDragOffset.height + value.translation.height
+                )
+                cardDragTranslation = .zero
+            }
+    }
+
+    private var currentCardOffset: CGSize {
+        CGSize(
+            width: cardDragOffset.width + cardDragTranslation.width,
+            height: cardDragOffset.height + cardDragTranslation.height
+        )
     }
 
     @ViewBuilder
@@ -84,7 +113,7 @@ struct TutorialTourOverlay: View {
             if demoCaptionPlacedAtBottom(for: scene) {
                 bottomBanner
             } else {
-                topCaption
+                topCaption(topPadding: demoCaptionTopPadding(for: scene))
             }
 
         case .meguriTapDemo:
@@ -106,6 +135,8 @@ struct TutorialTourOverlay: View {
                     calloutSize = size
                 }
             }
+            .offset(currentCardOffset)
+            .gesture(cardDragGesture)
     }
 
     private var bottomBanner: some View {
@@ -114,16 +145,24 @@ struct TutorialTourOverlay: View {
             TutorialBeatCard(beat: beat, layoutWidth: nil, onAdvance: onAdvance, onSkipChapter: onSkipChapter, onEndTour: onEndTour)
                 .padding(.horizontal, 20)
                 .padding(.bottom, 108)
+                .offset(currentCardOffset)
+                .gesture(cardDragGesture)
         }
     }
 
-    private var topCaption: some View {
+    /// デモ用キャプション：コンパクト幅で右上寄せ（実画面のヘッダーを隠さない）。ドラッグで移動可。
+    private func topCaption(topPadding: CGFloat = 116) -> some View {
         VStack {
-            TutorialBeatCard(beat: beat, layoutWidth: nil, onAdvance: onAdvance, onSkipChapter: onSkipChapter, onEndTour: onEndTour)
-                .padding(.horizontal, 16)
-                .padding(.top, 84)
+            HStack {
+                Spacer()
+                TutorialBeatCard(beat: beat, layoutWidth: 316, onAdvance: onAdvance, onSkipChapter: onSkipChapter, onEndTour: onEndTour)
+                    .padding(.trailing, 14)
+            }
+            .padding(.top, topPadding)
             Spacer()
         }
+        .offset(currentCardOffset)
+        .gesture(cardDragGesture)
     }
 
     // MARK: 配置計算
@@ -155,22 +194,33 @@ struct TutorialTourOverlay: View {
         return CGPoint(x: x, y: clampedY)
     }
 
-    /// デモシーンの見せ場（サムネイル群・上部ヘッダー等）を隠さない側にキャプションを置く。
+    /// デモシーンの見せ場（サムネイル群・下部の設定ボタン等）を隠さない側にキャプションを置く。
     private func demoCaptionPlacedAtBottom(for scene: TutorialDemoScene) -> Bool {
         switch scene {
-        case .goods(.saved):
-            return false
-        case .goods:
-            // ウィザードの写真グリッドや選択UIは上部に出るため、下に置く。
+        case .goods(.openEditor), .goods(.pickOshi), .goods(.pickType),
+             .goods(.pickPhotos), .goods(.bulkDetect), .goods(.manualCrop),
+             .goods(.lensOpened), .goods(.lensCopy):
             return true
+        case .goods:
+            // 詳細ステップ（下部にメンバー/シリーズボタン）や完了一覧は上に置く。
+            return false
         case .proposal(.confirm), .proposal(.send):
-            // 打診確認は下部CTAが見せ場なので上に置く。
             return false
         case .proposal:
             return true
         case .listing, .trades:
             // エディタの下部バー／ステージバーが下にあるため上に置く。
             return false
+        }
+    }
+
+    /// 上置きキャプションの基準位置（実画面のヘッダーを避ける）。
+    private func demoCaptionTopPadding(for scene: TutorialDemoScene) -> CGFloat {
+        switch scene {
+        case .listing:
+            return 214
+        default:
+            return 116
         }
     }
 

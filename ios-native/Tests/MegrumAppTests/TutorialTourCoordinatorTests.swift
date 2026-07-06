@@ -66,10 +66,10 @@ final class TutorialTourCoordinatorTests: XCTestCase {
 
     func testChapterProgressCountsMatchScript() {
         let inventoryBeats = TutorialScript.beats.filter { $0.chapter == .inventory }
-        XCTAssertEqual(inventoryBeats.count, 11)
+        XCTAssertEqual(inventoryBeats.count, 15)
         let first = TutorialScript.chapterProgress(of: inventoryBeats[0])
         XCTAssertEqual(first.index, 1)
-        XCTAssertEqual(first.count, 11)
+        XCTAssertEqual(first.count, 15)
         let listingBeats = TutorialScript.beats.filter { $0.chapter == .listing }
         XCTAssertEqual(listingBeats.count, 16)
         let proposalBeats = TutorialScript.beats.filter { $0.chapter == .proposal }

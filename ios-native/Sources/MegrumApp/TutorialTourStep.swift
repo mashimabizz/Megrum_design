@@ -36,19 +36,22 @@ enum TutorialChapter: Int, CaseIterable, Sendable {
 /// 第4章 マイグッズ登録デモの各ビート。
 enum TutorialGoodsDemoBeat: Int, CaseIterable, Sendable {
     case openEditor      // ＋をタップ→作成シートが開く
-    case pickOshi        // TWICEをタップ
-    case pickType        // トレカをタップ→次へ
+    case pickOshi        // TWICEをタップ→推し欄に入る
+    case pickType        // トレカをタップ→種別欄に入る
     case pickPhotos      // 9枚グリッド写真を選択
-    case bulkDetect      // AIが7枚を自動切り抜き（右下2枚は未検出）
-    case manualCrop      // 指で枠をドラッグして手動切り抜き
-    case assignMembers   // メンバー割当
-    case assignSeries    // シリーズ＋Google Lensで#DIVE特定
+    case bulkDetect      // 一括読み取りを押す→AIが7枚を自動切り抜き（右下2枚は未検出）
+    case manualCrop      // 指が左上→右下へドラッグして黄色枠で手動切り抜き
+    case assignMembers   // メンバー割当（下部の一括設定ボタンを見せる）
+    case seriesButton    // 「シリーズ」ボタンを押す
+    case seriesSheetLens // シリーズ設定シートで「Google Lensで調べる」を押す
+    case lensOpened      // Google Lens が起動した画面
+    case lensCopy        // 結果「TWICE DIVE」をコピー
+    case seriesPaste     // タグ欄にペースト→適用
     case saved           // 9件まとめて登録→一覧に載る
 }
 
 /// 第6章 個別募集作成デモの各ビート（オーナー指定の区切りそのまま）。
 enum TutorialListingDemoBeat: Int, CaseIterable, Sendable {
-    case openEditor      // 「募集を追加」をタップ
     case havesOverview   // 譲るもの（Step1全体）
     case havesCashTab    // 「定価で選ぶ」タブ
     case havesCashAmount // 金額指定
@@ -247,15 +250,35 @@ enum TutorialScript {
         TutorialBeat(
             id: "4-9", chapter: .inventory, presentation: .demo(.goods(.assignMembers)), targetTab: .inventory,
             title: "メンバーを付ける",
-            body: "写真を選んでメンバーをまとめて割り当てられるよ（あとからでもOK）。"
+            body: "写真を選んで、下の「メンバー」ボタンからまとめて割り当てられるよ（あとからでもOK）。"
         ),
         TutorialBeat(
-            id: "4-10", chapter: .inventory, presentation: .demo(.goods(.assignSeries)), targetTab: .inventory,
+            id: "4-10", chapter: .inventory, presentation: .demo(.goods(.seriesButton)), targetTab: .inventory,
             title: "シリーズを付ける",
-            body: "シリーズ名がわからない時は「Google Lensで調べる」。今回は「#DIVE」だと分かったので入力したよ。"
+            body: "同じように、下の「シリーズ」ボタンからまとめて付けられるよ。"
         ),
         TutorialBeat(
-            id: "4-11", chapter: .inventory, presentation: .demo(.goods(.saved)), targetTab: .inventory,
+            id: "4-11", chapter: .inventory, presentation: .demo(.goods(.seriesSheetLens)), targetTab: .inventory,
+            title: "わからない時はGoogle Lens",
+            body: "シリーズ名が分からない時は「Google Lensで調べる」をタップ。"
+        ),
+        TutorialBeat(
+            id: "4-12", chapter: .inventory, presentation: .demo(.goods(.lensOpened)), targetTab: .inventory,
+            title: "Google Lensが起動",
+            body: "カードの写真からそのまま画像検索できるよ。"
+        ),
+        TutorialBeat(
+            id: "4-13", chapter: .inventory, presentation: .demo(.goods(.lensCopy)), targetTab: .inventory,
+            title: "結果をコピー",
+            body: "出てきた「TWICE DIVE」を長押しでコピー。"
+        ),
+        TutorialBeat(
+            id: "4-14", chapter: .inventory, presentation: .demo(.goods(.seriesPaste)), targetTab: .inventory,
+            title: "タグ欄にペースト",
+            body: "シリーズ欄に貼り付けて適用。9枚ぜんぶに #DIVE が付いたよ。"
+        ),
+        TutorialBeat(
+            id: "4-15", chapter: .inventory, presentation: .demo(.goods(.saved)), targetTab: .inventory,
             title: "まとめて登録！",
             body: "「9件まとめて登録」を押せば完了。マイグッズ一覧に9枚とも並んだよ。実際の登録もこの流れ！"
         ),
@@ -266,7 +289,7 @@ enum TutorialScript {
     private static let wishBeats: [TutorialBeat] = [
         TutorialBeat(
             id: "5-1", chapter: .wish, presentation: .tabBand, targetTab: .inventory,
-            title: "次は❤️ほしいもの",
+            title: "次は「ほしいもの」",
             body: "下の「ほしいもの」タブへ移動するよ。"
         ),
         TutorialBeat(
@@ -299,10 +322,10 @@ enum TutorialScript {
             body: "「これを譲るから、これがほしい」の条件カード。求めるもの・譲るもの・交換条件の3つで1枚になっていて、ホームのマッチの材料になるよ。ためしに1枚作る流れを見てみよう。"
         ),
         TutorialBeat(
-            id: "6-3", chapter: .listing, presentation: .demo(.listing(.openEditor)), targetTab: .wish,
+            id: "6-3", chapter: .listing, presentation: .spotlight(.listingAddButton), targetTab: .wish,
             requestedWishSection: .listings,
             title: "募集を追加",
-            body: "右下の「募集を追加」をタップ。"
+            body: "右下の「募集を追加」をタップすると作成がはじまるよ。"
         ),
         TutorialBeat(
             id: "6-4", chapter: .listing, presentation: .demo(.listing(.havesOverview)), targetTab: .wish,

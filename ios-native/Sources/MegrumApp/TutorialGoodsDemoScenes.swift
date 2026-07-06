@@ -2,8 +2,9 @@ import MegrumCore
 import MegrumDesign
 import SwiftUI
 
-/// 第4章 マイグッズ登録デモ。実物の作成ウィザード（GoodsInventoryCreateFlowView）を
-/// ビートごとのスクリプト状態で描画し、指アイコンの実演を重ねる。
+/// 第4章 マイグッズ登録デモ。実物の作成ウィザード（GoodsInventoryCreateFlowView）と
+/// 一括設定フッター（GoodsInventoryCreateMetaFooterView）をスクリプト状態で描画し、
+/// 指アイコンの実演を重ねる。マスタは TutorialSampleMasterData（TWICE×トレカ）で確実に選択済み表示にする。
 struct TutorialGoodsDemoSceneView: View {
     let beat: TutorialGoodsDemoBeat
     @ObservedObject var demoAppState: MegrumAppState
@@ -11,15 +12,12 @@ struct TutorialGoodsDemoSceneView: View {
     @StateObject private var pointer = TutorialPointerChoreographer()
     @State private var draft = GoodsEditorDraft(mode: .create, entryKind: .inventory)
     @State private var createMetas: [GoodsCreateMetaDraft] = []
+    /// ビート内で写真IDが揺れないよう、一度だけ生成してキャッシュする（FB⑤：リンク切れ対策）。
+    @State private var photoCache: [GoodsCreatePhotoDraft] = []
+    /// 4-7：一括読み取りの2段階（0=元写真＋ボタン、1=切り抜き結果7枚）。
+    @State private var bulkPhase = 0
+    /// 4-8：左上→右下ドラッグに追従する切り抜き進捗（0=開始点、1=カードにフィット）。
     @State private var cropProgress: CGFloat = 0
-
-    private var twiceGroup: OshiGroup? {
-        demoAppState.oshiGroups.first { $0.name.localizedCaseInsensitiveContains("TWICE") }
-    }
-
-    private var tradingCardType: GoodsType? {
-        demoAppState.goodsTypes.first { $0.name.contains("トレカ") }
-    }
 
     var body: some View {
         GeometryReader { proxy in
@@ -28,7 +26,7 @@ struct TutorialGoodsDemoSceneView: View {
                 TutorialPointerLayer(choreo: pointer)
             }
             .task(id: beat) {
-                configureDraft()
+                configureState()
                 await runChoreo(size: proxy.size)
             }
         }
@@ -41,25 +39,33 @@ struct TutorialGoodsDemoSceneView: View {
         switch beat {
         case .openEditor, .pickOshi, .pickType:
             wizard(step: .common, photos: [], statusMessage: nil)
+
         case .pickPhotos:
-            wizard(step: .shoot, photos: gridPhotoDrafts, statusMessage: nil)
+            wizard(step: .shoot, photos: photoCache, statusMessage: nil)
+
         case .bulkDetect:
             wizard(
                 step: .shoot,
-                photos: cardPhotoDrafts(count: 7),
-                statusMessage: "7枚を切り抜きました（右下の2枚は読み取れませんでした）"
+                photos: bulkPhase == 0 ? gridPhotoOnly : photoCache,
+                statusMessage: bulkPhase == 0 ? nil : "7枚を切り抜きました（右下の2枚は読み取れませんでした）"
             )
+
         case .manualCrop:
-            manualCropStage(size: size)
-        case .assignMembers, .assignSeries:
-            wizard(step: .meta, photos: cardPhotoDrafts(count: 9), statusMessage: nil)
-                .overlay(alignment: .bottomTrailing) {
-                    if beat == .assignSeries {
-                        lensResultCard
-                            .padding(.trailing, 20)
-                            .padding(.bottom, 140)
-                    }
-                }
+            manualCropStage
+
+        case .assignMembers, .seriesButton:
+            metaStage
+
+        case .seriesSheetLens, .seriesPaste:
+            ZStack {
+                metaStage.blur(radius: 2)
+                Color.black.opacity(0.25).ignoresSafeArea()
+                seriesSheetCard(showsPastedTag: beat == .seriesPaste)
+            }
+
+        case .lensOpened, .lensCopy:
+            lensStage(showsCopyBubble: beat == .lensCopy)
+
         case .saved:
             savedStage
         }
@@ -76,13 +82,13 @@ struct TutorialGoodsDemoSceneView: View {
                     createStep: step,
                     createPhotos: photos,
                     selectedCreateMetaIDs: selectedMetaIDs,
-                    groups: demoAppState.oshiGroups,
+                    groups: TutorialSampleMasterData.groups,
                     isLoadingOshiGroups: false,
-                    goodsTypes: demoAppState.goodsTypes,
+                    goodsTypes: TutorialSampleMasterData.goodsTypes,
                     isLoadingGoodsTypes: false,
-                    oshiCharacters: demoAppState.oshiCharacters,
+                    oshiCharacters: TutorialSampleMasterData.characters,
                     allowsMemberSelection: true,
-                    selectedGroupName: draft.groupID == nil ? nil : twiceGroup?.name,
+                    selectedGroupName: draft.groupID == nil ? nil : TutorialSampleMasterData.twiceGroup.name,
                     createError: nil,
                     canAdvanceFromCommon: draft.groupID != nil && draft.goodsTypeID != nil,
                     isTradingCardType: draft.goodsTypeID != nil,
@@ -114,8 +120,71 @@ struct TutorialGoodsDemoSceneView: View {
         .allowsHitTesting(false)
     }
 
-    /// 手動切り抜きビート：元写真の上で切り抜き枠が右下のカードへ動く実演。
-    private func manualCropStage(size: CGSize) -> some View {
+    /// 詳細ステップ＋実物の一括設定フッター（メンバー／シリーズボタンが見える状態）。
+    private var metaStage: some View {
+        VStack(spacing: 0) {
+            demoSheetHeader(title: "マイグッズに追加")
+            ScrollView {
+                GoodsInventoryCreateFlowView(
+                    draft: $draft,
+                    createMetas: $createMetas,
+                    createStep: .meta,
+                    createPhotos: photoCache,
+                    selectedCreateMetaIDs: selectedMetaIDs,
+                    groups: TutorialSampleMasterData.groups,
+                    isLoadingOshiGroups: false,
+                    goodsTypes: TutorialSampleMasterData.goodsTypes,
+                    isLoadingGoodsTypes: false,
+                    oshiCharacters: TutorialSampleMasterData.characters,
+                    allowsMemberSelection: true,
+                    selectedGroupName: TutorialSampleMasterData.twiceGroup.name,
+                    createError: nil,
+                    canAdvanceFromCommon: true,
+                    isTradingCardType: true,
+                    isProcessingTradingCardBulk: false,
+                    tradingCardBulkStatusMessage: nil,
+                    isItemReadOnly: false,
+                    isCreatingGoodsEntry: false,
+                    onShowOshiPicker: {},
+                    onCommonNext: {},
+                    onPickCamera: {},
+                    onPickPhotos: {},
+                    onStartTradingCardBulk: {},
+                    onRemovePhoto: { _ in },
+                    onCropPhoto: { _ in },
+                    onShootBack: {},
+                    onShootNext: {},
+                    onMetaBack: {},
+                    onToggleMetaSelection: { _ in },
+                    onSelectAllMetas: {},
+                    onClearMetaSelection: {},
+                    onRemoveMetaTag: { _, _ in }
+                )
+                .padding(.horizontal, 20)
+                .padding(.top, 14)
+                .padding(.bottom, 16)
+            }
+            GoodsInventoryCreateMetaFooterView(
+                selectedCount: selectedMetaIDs.count,
+                totalCount: createMetas.count,
+                memberOptions: TutorialSampleMasterData.characters,
+                allowsMemberSelection: true,
+                canSaveMetas: true,
+                isCreatingGoodsEntry: false,
+                onAssignMember: { _ in },
+                onShowTagAssignment: {},
+                onBack: {},
+                onSave: {}
+            )
+            .padding(.horizontal, 20)
+            .padding(.bottom, 100)
+        }
+        .background(MegrumTheme.canvas.ignoresSafeArea())
+        .allowsHitTesting(false)
+    }
+
+    /// 手動切り抜き（FB④）：黄色枠が指の左上→右下ドラッグに追従してカードにフィットする。
+    private var manualCropStage: some View {
         VStack(spacing: 0) {
             demoSheetHeader(title: "手動で切り抜き")
             Spacer(minLength: 0)
@@ -126,15 +195,13 @@ struct TutorialGoodsDemoSceneView: View {
                     .overlay {
                         GeometryReader { photoProxy in
                             let frame = cropFrame(in: photoProxy.size)
-                            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                .stroke(MegrumTheme.lavender, lineWidth: 3)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                        .fill(MegrumTheme.lavender.opacity(0.16))
-                                )
+                            Rectangle()
+                                .fill(Color.yellow.opacity(0.12))
+                                .overlay {
+                                    Rectangle().stroke(Color.yellow, lineWidth: 3)
+                                }
                                 .frame(width: frame.width, height: frame.height)
                                 .position(x: frame.midX, y: frame.midY)
-                                .animation(.easeInOut(duration: 0.6), value: cropProgress)
                         }
                     }
                     .padding(.horizontal, 24)
@@ -149,7 +216,138 @@ struct TutorialGoodsDemoSceneView: View {
         .allowsHitTesting(false)
     }
 
-    /// 登録完了ビート：マイグッズ一覧に9枚並んだ状態の再現＋完了トースト。
+    /// シリーズ一括設定シート（実物のシート構成に合わせた再現）。
+    private func seriesSheetCard(showsPastedTag: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("シリーズをまとめて設定")
+                .font(.system(size: 17, weight: .black, design: .rounded))
+                .foregroundStyle(MegrumTheme.ink)
+
+            HStack {
+                Text(showsPastedTag ? "DIVE" : "シリーズ名を入力")
+                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .foregroundStyle(showsPastedTag ? MegrumTheme.ink : MegrumTheme.muted.opacity(0.7))
+                Spacer()
+                if showsPastedTag {
+                    Text("ペースト")
+                        .font(.system(size: 11.5, weight: .black, design: .rounded))
+                        .foregroundStyle(MegrumTheme.lavender)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(MegrumTheme.lavender.opacity(0.14), in: Capsule(style: .continuous))
+                }
+            }
+            .padding(.horizontal, 14)
+            .frame(height: 46)
+            .background(MegrumTheme.canvas, in: RoundedRectangle(cornerRadius: 13, style: .continuous))
+
+            Label("Google Lensで調べる", systemImage: "camera.viewfinder")
+                .font(.system(size: 14, weight: .black, design: .rounded))
+                .foregroundStyle(MegrumTheme.lavender)
+                .frame(maxWidth: .infinity)
+                .frame(height: 46)
+                .background(MegrumTheme.lavender.opacity(0.12), in: RoundedRectangle(cornerRadius: 13, style: .continuous))
+
+            Text(showsPastedTag ? "選択中の9件に #DIVE を設定します" : "写真からシリーズ名を調べられます")
+                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                .foregroundStyle(MegrumTheme.muted)
+
+            Text(showsPastedTag ? "適用する" : "設定する")
+                .font(.system(size: 16, weight: .black, design: .rounded))
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .frame(height: 50)
+                .background(
+                    LinearGradient(colors: [MegrumTheme.sky, MegrumTheme.lavender], startPoint: .leading, endPoint: .trailing),
+                    in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+                )
+        }
+        .padding(20)
+        .background(.white, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .padding(.horizontal, 26)
+        .shadow(color: .black.opacity(0.2), radius: 24, y: 12)
+        .allowsHitTesting(false)
+    }
+
+    /// Google Lens 起動画面（外部アプリのためモック。カード写真＋検索結果）。
+    private func lensStage(showsCopyBubble: Bool) -> some View {
+        VStack(spacing: 0) {
+            HStack {
+                Image(systemName: "xmark")
+                Spacer()
+                Label("Google Lens", systemImage: "camera.viewfinder")
+                    .font(.system(size: 15, weight: .bold))
+                Spacer()
+                Image(systemName: "square.and.arrow.up")
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 20)
+            .padding(.top, 70)
+            .padding(.bottom, 14)
+
+            if let image = TutorialDemoAssets.image(named: "twice_dive_card_5") {
+                image
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxHeight: 330)
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .stroke(.white.opacity(0.9), lineWidth: 2)
+                    }
+                    .padding(.top, 8)
+            }
+
+            VStack(alignment: .leading, spacing: 12) {
+                Text("検索結果")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(.white.opacity(0.6))
+
+                HStack(spacing: 10) {
+                    Image(systemName: "sparkle.magnifyingglass")
+                        .foregroundStyle(.white)
+                    Text("TWICE『DIVE』トレカ 特典")
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundStyle(.white)
+                        .background(alignment: .bottomLeading) {
+                            if showsCopyBubble {
+                                Rectangle()
+                                    .fill(Color.blue.opacity(0.45))
+                                    .frame(height: 22)
+                                    .offset(y: 3)
+                            }
+                        }
+                    Spacer()
+                }
+                .padding(14)
+                .background(.white.opacity(0.12), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .overlay(alignment: .topTrailing) {
+                    if showsCopyBubble {
+                        Text("コピー")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(.black)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .background(.white, in: Capsule(style: .continuous))
+                            .offset(y: -40)
+                    }
+                }
+
+                Text("TWICE 12TH MINI ALBUM「DIVE」")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.75))
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 20)
+            .padding(.top, 18)
+
+            Spacer()
+        }
+        .background(Color.black.opacity(0.92).ignoresSafeArea())
+        .allowsHitTesting(false)
+    }
+
+    /// 登録完了：実物の GoodsTile（タグ右上・メンバー名右下）＋登録直後の緑チェック（左上）。
     private var savedStage: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("マイグッズ")
@@ -164,28 +362,27 @@ struct TutorialGoodsDemoSceneView: View {
                 .padding(.vertical, 7)
                 .background(MegrumTheme.lavender, in: Capsule(style: .continuous))
 
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 3), spacing: 10) {
-                ForEach(TutorialDemoAssets.diveCardNames, id: \.self) { name in
-                    if let image = TutorialDemoAssets.image(named: name) {
-                        image
-                            .resizable()
-                            .scaledToFill()
-                            .frame(height: 128)
-                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                            .overlay(alignment: .topLeading) {
-                                Text("# TWICE # DIVE")
-                                    .font(.system(size: 9, weight: .black, design: .rounded))
-                                    .foregroundStyle(.white)
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 3)
-                                    .background(.black.opacity(0.55), in: Capsule(style: .continuous))
-                                    .padding(5)
-                            }
+            ScrollView {
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 3), spacing: 10) {
+                    ForEach(savedItems) { item in
+                        GoodsTile(
+                            item: item,
+                            context: .tradeCandidate,
+                            onOpenDetail: {},
+                            onAction: { _ in },
+                            usesSystemContextMenu: false,
+                            onLongPress: nil
+                        )
+                        .overlay(alignment: .topLeading) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: 20, weight: .bold))
+                                .foregroundStyle(.white, MegrumTheme.ok)
+                                .padding(5)
+                        }
                     }
                 }
+                .padding(.bottom, 140)
             }
-
-            Spacer()
         }
         .padding(.horizontal, 20)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -224,41 +421,24 @@ struct TutorialGoodsDemoSceneView: View {
         .background(MegrumTheme.canvas)
     }
 
-    private var lensResultCard: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Label("Google Lens", systemImage: "camera.viewfinder")
-                .font(.system(size: 12, weight: .black, design: .rounded))
-                .foregroundStyle(MegrumTheme.muted)
-            Text("TWICE『DIVE』トレカ")
-                .font(.system(size: 14, weight: .black, design: .rounded))
-                .foregroundStyle(MegrumTheme.ink)
-            Text("シリーズ：#DIVE")
-                .font(.system(size: 13, weight: .bold, design: .rounded))
-                .foregroundStyle(MegrumTheme.lavender)
-        }
-        .padding(14)
-        .frame(width: 230, alignment: .leading)
-        .background(.white, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .shadow(color: .black.opacity(0.16), radius: 16, y: 8)
-    }
-
     // MARK: スクリプト状態
 
     private var selectedMetaIDs: Set<UUID> {
         switch beat {
-        case .assignMembers, .assignSeries:
-            return Set(createMetas.prefix(2).map(\.id))
+        case .assignMembers, .seriesButton, .seriesSheetLens, .seriesPaste:
+            return Set(createMetas.map(\.id))
         default:
             return []
         }
     }
 
-    private var gridPhotoDrafts: [GoodsCreatePhotoDraft] {
-        guard let data = TutorialDemoAssets.diveGridData else { return [] }
-        return [GoodsCreatePhotoDraft(upload: GoodsPhotoUpload(data: data, contentType: "image/jpeg"))]
+    private var gridPhotoOnly: [GoodsCreatePhotoDraft] {
+        TutorialDemoAssets.diveGridData.map {
+            [GoodsCreatePhotoDraft(upload: GoodsPhotoUpload(data: $0, contentType: "image/jpeg"))]
+        } ?? []
     }
 
-    private func cardPhotoDrafts(count: Int) -> [GoodsCreatePhotoDraft] {
+    private func makeCardPhotos(count: Int) -> [GoodsCreatePhotoDraft] {
         TutorialDemoAssets.diveCardNames.prefix(count).compactMap { name in
             TutorialDemoAssets.imageData(named: name).map {
                 GoodsCreatePhotoDraft(upload: GoodsPhotoUpload(data: $0, contentType: "image/png"))
@@ -266,34 +446,75 @@ struct TutorialGoodsDemoSceneView: View {
         }
     }
 
-    private func configureDraft() {
+    private var savedItems: [GoodsItem] {
+        let members = ["ツウィ", "ジヒョ", "ダヒョン", "サナ", "ミナ", "チェヨン", "ジョンヨン", "ナヨン", "モモ"]
+        return TutorialDemoAssets.diveCardNames.enumerated().compactMap { index, name in
+            guard let url = NativePreviewData.testGoodsImageURL(name) else { return nil }
+            return GoodsItem(
+                id: UUID(uuidString: "00000000-0000-0000-9997-00000000010\(index)") ?? UUID(),
+                ownerID: TutorialSampleHomeData.placeholderViewerID,
+                groupID: TutorialSampleMasterData.twiceGroupID,
+                goodsTypeID: TutorialSampleMasterData.tradingCardTypeID,
+                groupName: "TWICE",
+                memberName: members[index % members.count],
+                goodsTypeName: "トレカ",
+                title: "\(members[index % members.count]) DIVE トレカ",
+                imageURL: url,
+                tags: [GoodsTag(id: UUID(), name: "DIVE")],
+                quantity: 1
+            )
+        }
+    }
+
+    private func configureState() {
         draft = GoodsEditorDraft(mode: .create, entryKind: .inventory)
+        bulkPhase = 0
+        cropProgress = 0
         switch beat {
         case .openEditor:
-            break
+            photoCache = []
+            createMetas = []
         case .pickOshi:
-            draft.groupID = twiceGroup?.id
-        default:
-            draft.groupID = twiceGroup?.id
-            draft.goodsTypeID = tradingCardType?.id
-        }
-        if beat == .assignMembers || beat == .assignSeries {
-            createMetas = cardPhotoDrafts(count: 9).map { photo in
+            draft.groupID = TutorialSampleMasterData.twiceGroupID
+            photoCache = []
+            createMetas = []
+        case .pickType:
+            draft.groupID = TutorialSampleMasterData.twiceGroupID
+            draft.goodsTypeID = TutorialSampleMasterData.tradingCardTypeID
+            photoCache = []
+            createMetas = []
+        case .pickPhotos:
+            draft.groupID = TutorialSampleMasterData.twiceGroupID
+            draft.goodsTypeID = TutorialSampleMasterData.tradingCardTypeID
+            photoCache = gridPhotoOnly
+            createMetas = []
+        case .bulkDetect:
+            draft.groupID = TutorialSampleMasterData.twiceGroupID
+            draft.goodsTypeID = TutorialSampleMasterData.tradingCardTypeID
+            photoCache = makeCardPhotos(count: 7)
+            createMetas = []
+        case .manualCrop, .lensOpened, .lensCopy, .saved:
+            break
+        case .assignMembers, .seriesButton, .seriesSheetLens, .seriesPaste:
+            draft.groupID = TutorialSampleMasterData.twiceGroupID
+            draft.goodsTypeID = TutorialSampleMasterData.tradingCardTypeID
+            // 写真→メタを同一キャッシュから作り、photoID のリンク切れを防ぐ（FB⑤）。
+            photoCache = makeCardPhotos(count: 9)
+            let members = TutorialSampleMasterData.characters
+            createMetas = photoCache.enumerated().map { index, photo in
                 GoodsCreateMetaDraft(
                     photoID: photo.id,
+                    memberID: beat == .assignMembers && index < 2 ? members[index].id : nil,
                     title: "",
-                    tagNames: beat == .assignSeries ? ["DIVE"] : []
+                    tagNames: beat == .seriesPaste ? ["DIVE"] : []
                 )
             }
-        } else {
-            createMetas = []
         }
     }
 
     // MARK: 指の演技
 
     private func runChoreo(size: CGSize) async {
-        cropProgress = 0
         try? await Task.sleep(nanoseconds: 300_000_000)
         switch beat {
         case .openEditor:
@@ -304,48 +525,63 @@ struct TutorialGoodsDemoSceneView: View {
             pointer.appear(at: CGPoint(x: size.width * 0.5, y: size.height * 0.30))
             await pointer.tap()
         case .pickType:
-            pointer.appear(at: CGPoint(x: size.width * 0.5, y: size.height * 0.45))
-            await pointer.tap()
-            await pointer.move(to: CGPoint(x: size.width * 0.5, y: size.height * 0.62), duration: 0.4)
+            pointer.appear(at: CGPoint(x: size.width * 0.5, y: size.height * 0.47))
             await pointer.tap()
         case .pickPhotos:
-            pointer.appear(at: CGPoint(x: size.width * 0.68, y: size.height * 0.33))
+            pointer.appear(at: CGPoint(x: size.width * 0.68, y: size.height * 0.30))
             await pointer.tap()
         case .bulkDetect:
-            pointer.appear(at: CGPoint(x: size.width * 0.5, y: size.height * 0.36))
+            // 元写真の下にある「トレカ一括読み取り」を押す→切り抜き結果へ切替（FB③）。
+            pointer.appear(at: CGPoint(x: size.width * 0.5, y: size.height * 0.66))
+            try? await Task.sleep(nanoseconds: 500_000_000)
             await pointer.tap()
+            withAnimation(.easeInOut(duration: 0.3)) {
+                bulkPhase = 1
+            }
+            pointer.hide()
         case .manualCrop:
-            pointer.appear(at: CGPoint(x: size.width * 0.5, y: size.height * 0.5))
-            await pointer.tap()
-            await pointer.move(to: CGPoint(x: size.width * 0.68, y: size.height * 0.62), duration: 0.4)
-            cropProgress = 1
-            await pointer.drag(to: CGPoint(x: size.width * 0.80, y: size.height * 0.72), duration: 0.7)
+            // 対象カード（右下エリアの未読み取り分）の左上→右下へドラッグ（FB④）。
+            let start = CGPoint(x: size.width * 0.38, y: size.height * 0.545)
+            let end = CGPoint(x: size.width * 0.62, y: size.height * 0.75)
+            pointer.appear(at: start)
+            try? await Task.sleep(nanoseconds: 400_000_000)
+            withAnimation(.easeInOut(duration: 0.85)) {
+                cropProgress = 1
+            }
+            await pointer.drag(to: end, duration: 0.85)
         case .assignMembers:
-            pointer.appear(at: CGPoint(x: size.width * 0.25, y: size.height * 0.35))
+            pointer.appear(at: CGPoint(x: size.width * 0.30, y: size.height * 0.80))
             await pointer.tap()
-            await pointer.move(to: CGPoint(x: size.width * 0.5, y: size.height * 0.35), duration: 0.35)
+        case .seriesButton:
+            pointer.appear(at: CGPoint(x: size.width * 0.62, y: size.height * 0.80))
             await pointer.tap()
-        case .assignSeries:
-            pointer.appear(at: CGPoint(x: size.width * 0.3, y: size.height * 0.5))
+        case .seriesSheetLens:
+            pointer.appear(at: CGPoint(x: size.width * 0.5, y: size.height * 0.52))
+            await pointer.tap()
+        case .lensOpened:
+            break
+        case .lensCopy:
+            pointer.appear(at: CGPoint(x: size.width * 0.4, y: size.height * 0.62))
+            await pointer.tap()
+        case .seriesPaste:
+            pointer.appear(at: CGPoint(x: size.width * 0.5, y: size.height * 0.42))
             await pointer.tap()
         case .saved:
             break
         }
     }
 
-    /// 手動切り抜き枠：開始位置（中央小さめ）→右下カードへフィット。
+    /// 手動切り抜き枠：対象カード（3行目・中央=未読み取り分）の左上を起点に、右下へ広がる。
     private func cropFrame(in photoSize: CGSize) -> CGRect {
         let cell = CGSize(width: photoSize.width / 3, height: photoSize.height / 3)
-        if cropProgress < 0.5 {
-            return CGRect(
-                x: photoSize.width * 0.30, y: photoSize.height * 0.36,
-                width: cell.width * 1.3, height: cell.height * 1.3
-            )
-        }
-        // 右下（3行目・2列目＝読み取れなかったカード）へフィット。
+        let origin = CGPoint(x: cell.width * 1.04, y: cell.height * 2.02)
+        let fullSize = CGSize(width: cell.width * 0.92, height: cell.height * 0.94)
+        let progress = max(0.12, cropProgress)
         return CGRect(
-            x: cell.width * 1.06, y: cell.height * 2.04,
-            width: cell.width * 0.88, height: cell.height * 0.92
+            x: origin.x,
+            y: origin.y,
+            width: fullSize.width * progress,
+            height: fullSize.height * progress
         )
     }
 }

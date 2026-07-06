@@ -9,6 +9,30 @@ import MegrumCore
 ///   2. ニンニン × #MY WORLD ……………………… あなたの〈グッズ〉が求められている
 ///   3. V × #LOVE YOURSELF: SPEAK YOURSELF … 定価OK
 /// 推しでマッチのラベルはメンバー名のみ（サナ／ニンニン／V）。
+/// デモステージ（登録ウィザード／個別募集エディタ）で使うマスタfixture。
+/// デモ用AppStateのマスタ読込に依存せず、TWICE×トレカの選択済み状態を確実に描画する。
+enum TutorialSampleMasterData {
+    static let twiceGroupID = UUID(uuidString: "00000000-0000-0000-9998-000000000001")!
+    static let tradingCardTypeID = UUID(uuidString: "00000000-0000-0000-9998-000000000002")!
+
+    static let twiceGroup = OshiGroup(id: twiceGroupID, name: "TWICE")
+
+    static var groups: [OshiGroup] { [twiceGroup] }
+
+    static var goodsTypes: [GoodsType] {
+        [GoodsType(id: tradingCardTypeID, name: "トレカ")]
+    }
+
+    /// メンバー割当デモ用（サナ・モモ・ダヒョン）。
+    static var characters: [OshiCharacter] {
+        [
+            OshiCharacter(id: UUID(uuidString: "00000000-0000-0000-9998-000000000011")!, groupID: twiceGroupID, name: "サナ"),
+            OshiCharacter(id: UUID(uuidString: "00000000-0000-0000-9998-000000000012")!, groupID: twiceGroupID, name: "モモ"),
+            OshiCharacter(id: UUID(uuidString: "00000000-0000-0000-9998-000000000013")!, groupID: twiceGroupID, name: "ダヒョン"),
+        ]
+    }
+}
+
 /// ガイドツアー中だけ、めぐりマップに表示するサンプルピン（表示レイヤ注入・実データ不変）。
 /// 地図の初期カメラ（東京・位置情報はツアー中抑制）に合わせて配置する。
 /// クラスタ闾値は「実効緯度スパン/6.5」。縦長画面では緯度スパンが約0.067度になるため
@@ -118,7 +142,9 @@ enum TutorialSampleHomeData {
         ]
     }
 
-    static var possibleItems: [GoodsItem] { [] }
+    /// 「推しでマッチ」セクションは possibleItems から生成されるため、同じ3件を供給する
+    /// （空だとセクション自体が消えてハイライト対象が無くなる：v3.1 FB①）。
+    static var possibleItems: [GoodsItem] { matchedItems }
 
     // MARK: あなた側（求められているグッズ／激求サムネイル用）
 
