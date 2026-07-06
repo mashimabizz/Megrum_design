@@ -4,6 +4,38 @@
 
 ---
 
+## イテレーション1226.328：グループ選択の「自分の推し」初期表示＋グルーム切替のデジタル化
+
+### 背景・問題意識
+オーナーFB 2件：①ホーム検索フィルタの「他のグループから追加」は最初に「自分の推し」グループが出るが、マイグッズ/ほしいもの/個別募集のほしいもの条件のグループ選択でも同じ仕様にしたい（だいたい推しのものを登録するため）②グルームのタップ切替が徐々にグラデーションで変わる→もっとデジタルにパッと切り替えたい。
+
+### 変更内容
+
+#### 1. グループ選択の「自分の推し」初期表示
+- 仕組み自体（OshiMasterSelectSheet の「自分の推し」カテゴリ初期選択）は共通で、各エディタも `myOshiGroupIDs` を渡していたが、**`appState.userOshiSelections` が未ロード**だと空になり効いていなかった（ホーム検索は明示ロードしていたため動いていた）
+- ロードを追加：
+  - `GoodsEditorSheetChoiceActions.swift`：グッズ/ほしいものエディタの `loadChoices()` で未ロードなら `loadUserOshiSelections()`
+  - `IndividualListingsScreen.swift`：一覧の `loadChoicesIfNeeded()` に同様の読み込み
+  - `IndividualListingEditorSheet.swift`：一覧を経ずに開くケース（ホーム経由等）に備え onAppear でもロード
+
+#### 2. グルーム切替のデジタル化（`GroomViewerScreen.swift`）
+- `GroomViewerCachedImage` の画像差し替えに付いていた `.transition(.opacity)`＋`withAnimation(easeInOut 0.12)` のクロスフェードを撤去し、Transaction(disablesAnimations) で「パッ」と切り替わるハードカットに
+
+### 影響範囲
+- マイグッズ/ほしいもの/個別募集のグループ選択シート、グルームビューアのページ切替
+
+### 確認方法
+- swift test 1491件 0失敗（シートの初期カテゴリとハードカットは実機確認）
+
+### セルフレビュー結果
+- ✅ 既存の共通シート（OshiMasterSelectSheet）の仕様に寄せただけで新規UIなし
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/GoodsEditorSheetChoiceActions.swift`
+- `ios-native/Sources/MegrumApp/GroomViewerScreen.swift`
+
+---
+
 ## イテレーション1226.327：チャットバブルの幅フィット＋キーボードずれのスクロール復元
 
 ### 背景・問題意識

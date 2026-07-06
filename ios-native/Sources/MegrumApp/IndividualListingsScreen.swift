@@ -226,6 +226,10 @@ struct IndividualListingsScreen: View {
         if appState.goodsTypes.isEmpty {
             await appState.loadGoodsTypes()
         }
+        // 条件のグループ選択シートで「自分の推し」を最初に出すために必要。
+        if appState.userOshiSelections.isEmpty {
+            await appState.loadUserOshiSelections()
+        }
     }
 
     private func presentInitialEditorIfNeeded() {

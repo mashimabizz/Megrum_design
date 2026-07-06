@@ -562,7 +562,6 @@ private struct GroomViewerCachedImage: View {
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFit()
-                    .transition(.opacity)
             } else if hasFailed {
                 GroomImageFailureView(message: "画像を読み込めませんでした", foregroundColor: .white)
             } else {
@@ -592,7 +591,10 @@ private struct GroomViewerCachedImage: View {
                     return
                 }
                 if let loaded = UIImage(data: data) {
-                    withAnimation(.easeInOut(duration: 0.12)) {
+                    // ページ切替はフェードさせず「パッ」と切り替える（デジタルな切替）。
+                    var transaction = Transaction()
+                    transaction.disablesAnimations = true
+                    withTransaction(transaction) {
                         image = loaded
                     }
                 } else if image == nil {

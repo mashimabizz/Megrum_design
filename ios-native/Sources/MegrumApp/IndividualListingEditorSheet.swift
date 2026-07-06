@@ -161,6 +161,12 @@ struct IndividualListingEditorSheet: View {
             Text("保存していない変更は失われます。")
         }
         .onAppear {
+            // グループ選択シートの「自分の推し」初期表示用（未ロードなら取得）。
+            if appState.userOshiSelections.isEmpty {
+                Task {
+                    await appState.loadUserOshiSelections()
+                }
+            }
             if initialDraftSnapshot == nil {
                 initialDraftSnapshot = draft
                 initialStagedOptionIDs = presentationState.stagedOptionSummaries.map(\.id)

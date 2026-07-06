@@ -9,6 +9,12 @@ extension GoodsEditorSheet {
         if appState.goodsTypes.isEmpty {
             await appState.loadGoodsTypes()
         }
+        // グループ選択シートの初期カテゴリ「自分の推し」に使う。
+        // 未ロードだと myOshiGroupIDs が空になり、ホーム検索フィルタと
+        // 同じ「自分の推しを最初に表示」が効かない。
+        if appState.userOshiSelections.isEmpty {
+            await appState.loadUserOshiSelections()
+        }
         assignDefaultsIfNeeded()
         await loadMembers(for: draft.groupID)
         isTagFieldFocused = false
