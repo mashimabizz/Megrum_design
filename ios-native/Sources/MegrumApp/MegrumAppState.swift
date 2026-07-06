@@ -8,6 +8,7 @@ public final class MegrumAppState: ObservableObject {
     @Published public internal(set) var inventory: [GoodsItem] = []
     @Published public internal(set) var wishes: [WishItem] = []
     @Published public internal(set) var homeMatchedItems: [GoodsItem] = []
+    @Published public internal(set) var homeRecentPartnerItems: [GoodsItem] = []
     @Published public internal(set) var homePossibleItems: [GoodsItem] = []
     @Published public internal(set) var homeCandidateConditionSignals: [UUID: HomeCandidateConditionSignals] = [:]
     @Published public internal(set) var homeMutualMatchCandidates: [HomeMutualMatchCandidateData] = []
@@ -452,6 +453,9 @@ public final class MegrumAppState: ObservableObject {
         homePossibleItems = resolved.possibleItems
         homeCandidateConditionSignals = resolved.conditionSignalsByItemID
         homeMutualMatchCandidates = resolved.mutualMatchCandidates
+        homeRecentPartnerItems = sections.recentPartnerItems.filter { item in
+            !blockedContentUserIDs.contains(item.ownerID)
+        }
     }
 
     private func preloadOwnedGoodsImages(inventory: [GoodsItem], wishes: [WishItem]) {

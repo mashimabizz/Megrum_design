@@ -4,6 +4,45 @@
 
 ---
 
+## イテレーション1226.333：新規ユーザーの画像閲覧不可修正＋ホーム空状態の導線と新着グッズ
+
+### 背景・問題意識
+新規登録直後：①めぐりのグルーム画像・チャットルーム内画像が読み込めない ②ホームに何も出ない。推し設定ベースで「推しでマッチ」に候補が出る仕様のはず。ゼロ件なら推し追加/ほしいもの登録の導線＋「新着のグッズ」を出したい。
+
+### 変更内容
+
+#### 1. 画像閲覧ゲートを現行の1km半径モデルへ整合（DB修正）
+- 原因：Storage署名URLのゲート関数が旧モデルのままだった
+  - グルーム `can_view_groom_post`：audience_user_ids 包含 or 登録エリア一致が必要 → encounter履歴の無い新規ユーザーは全滅
+  - チャットルーム `can_view_meguri_board_thread`：閲覧者の登録エリア（users.primary_area）とルームの都道府県一致が必要 → 北海道登録ユーザーが大阪のルーム画像を読めない
+- `supabase/migrations/20260706230000_relax_media_gates_for_radius_model.sql`：フィードRPCと同じ「認証済み・公開中・未失効・非表示/ブロック除外」まで緩和（距離ルールは従来どおりクライアント強制）。**push済み**、署名URL発行をRESTで確認
+
+#### 2. ホームの空状態（クライアント）
+- 前提：ほしいもの未登録でも推し設定から候補を出す仕組み（viewerInterests の oshi フォールバック）は既存。新規ユーザーで空だったのは、ハンドルロック不具合（iter1226.331で修正）でオンボの推し保存ごと失敗していたため
+- 追加実装：
+  - `HomeCandidateSections.recentPartnerItems`：マッチ有無に関係ない他ユーザーの新着グッズ（更新日時降順・12件・ブロック除外）をビルダーで収集
+  - `HomeEmptyCandidateCTACard`（新規）：候補が全セクション0件の時に「マッチ候補を見つけよう」カード＝【推しを追加する】（推し設定シートを開く）と【ほしいものを登録】（ほしいものタブへ）の2ボタン
+  - その下に「新着のグッズ」セクション（rail・タップで通常の候補詳細シート）
+
+### 影響範囲
+- グルーム/チャットルームの画像表示、ホームの空状態
+
+### 確認方法
+- migration push済み・署名URL発行を確認。swift test 1491件 0失敗
+- 新規アカウントでのE2E（画像表示・推しでマッチ表示・空状態導線）は実機で要確認
+
+### セルフレビュー結果
+- ✅ migration push 済み
+- ✅ 1km開封ルールはクライアント側で従来どおり
+- ⚠️ 新着のグッズは partner取得上限（500件）内の新着。増加時はRPC化を検討
+
+### 関連ファイル
+- `supabase/migrations/20260706230000_relax_media_gates_for_radius_model.sql`
+- `ios-native/Sources/MegrumApp/HomeCandidateSectionsBuilder.swift`
+- `ios-native/Sources/MegrumApp/HomeDiscoveryExperienceChrome.swift`
+
+---
+
 ## イテレーション1226.332：グルーム下スワイプの引っ張り挙動を刷新
 
 ### 背景・問題意識

@@ -40,6 +40,18 @@ extension HomeDiscoveryExperience {
         return HomeCandidateDemandPolicy.sortedCandidates(candidates)
     }
 
+    /// 新着のグッズ（候補ゼロの時に見せる、他ユーザーの新着登録）。
+    var recentCandidates: [HomeDiscoveryCandidate] {
+        let items = partnerItems(from: recentPartnerItems)
+            .sorted { ($0.updatedAt ?? .distantPast) > ($1.updatedAt ?? .distantPast) }
+        return HomeDiscoveryCandidateFactory.candidates(
+            from: items,
+            source: .user,
+            goodsTypes: goodsTypes,
+            conditionSignalsByItemID: displayConditionSignalsByItemID
+        )
+    }
+
     /// 需要行のサムネイル用：自分のグッズID→画像URL。
     var viewerGoodsImageURLByID: [UUID: URL] {
         Dictionary(

@@ -8,6 +8,7 @@ struct HomeDiscoveryExperience: View {
     var inventoryItems: [GoodsItem] = []
     var matchedItems: [GoodsItem] = []
     var possibleItems: [GoodsItem] = []
+    var recentPartnerItems: [GoodsItem] = []
     var goodsTypes: [GoodsType] = []
     var conditionSignalsByItemID: [UUID: HomeCandidateConditionSignals] = [:]
     var mutualMatchCandidateData: [HomeMutualMatchCandidateData] = []
@@ -31,6 +32,7 @@ struct HomeDiscoveryExperience: View {
     @AppStorage(HomeExchangeSettingsStorageKeys.localDateKeys) var exchangeLocalDateKeysRawValue = ""
     @AppStorage(HomeExchangeSettingsStorageKeys.mailShippingFee) var exchangeMailShippingFeeRawValue = HomeDefaultExchangeSettings.standard.mailShippingFee.rawValue
     @AppStorage(HomeExchangeSettingsStorageKeys.mailShippingDays) var exchangeMailShippingDaysRawValue = HomeDefaultExchangeSettings.standard.mailShippingDays.rawValue
+    @State private var showsEmptyStateOshiSettings = false
     @State var selectedSheet: HomeDiscoverySheet?
     @State var selectedMutualMatchCandidate: HomeMutualMatchCandidate?
     @State var showsMatchHelp = false
@@ -97,6 +99,26 @@ struct HomeDiscoveryExperience: View {
                             onSelect: { selectedSheet = $0 }
                         )
                     }
+
+                    // 候補が1件もない（新規ユーザー等）：導線カード＋新着のグッズ
+                    if userTagCandidates.isEmpty,
+                       userCandidates.isEmpty,
+                       havesCandidates.isEmpty,
+                       mutualMatchCandidates.isEmpty {
+                        HomeEmptyCandidateCTACard(
+                            onAddOshi: { showsEmptyStateOshiSettings = true },
+                            onAddWish: onOpenWish
+                        )
+
+                        if !recentCandidates.isEmpty {
+                            HomeDiscoverySection(
+                                title: "新着のグッズ",
+                                candidates: recentCandidates,
+                                layout: .rail,
+                                onSelect: { selectedSheet = $0 }
+                            )
+                        }
+                    }
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, HomeDiscoveryHeaderMetrics.contentTopPadding)
@@ -108,6 +130,11 @@ struct HomeDiscoveryExperience: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } chrome: { isCollapsed in
             pinnedHeader(isCollapsed: isCollapsed)
+        }
+        .sheet(isPresented: $showsEmptyStateOshiSettings) {
+            if let appState {
+                OshiSettingsScreen(appState: appState)
+            }
         }
         .overlay {
             if let sharePromptContext {

@@ -47,6 +47,7 @@ struct HomeScreen: View {
             inventoryItems: appState?.inventory ?? [],
             matchedItems: matchedItems,
             possibleItems: possibleItems,
+            recentPartnerItems: appState?.homeRecentPartnerItems ?? [],
             goodsTypes: appState?.goodsTypes ?? [],
             conditionSignalsByItemID: appState?.homeCandidateConditionSignals ?? [:],
             mutualMatchCandidateData: appState?.homeMutualMatchCandidates ?? [],

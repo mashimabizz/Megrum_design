@@ -6,17 +6,22 @@ public struct HomeCandidateSections: Equatable, Sendable {
     public var possibleItems: [GoodsItem]
     public var conditionSignalsByItemID: [UUID: HomeCandidateConditionSignals]
     public var mutualMatchCandidates: [HomeMutualMatchCandidateData]
+    /// マッチ有無に関係ない、他ユーザーの新着グッズ（新しい順）。
+    /// 候補ゼロの新規ユーザー向け「新着のグッズ」セクションに使う。
+    public var recentPartnerItems: [GoodsItem]
 
     public init(
         matchedItems: [GoodsItem] = [],
         possibleItems: [GoodsItem] = [],
         conditionSignalsByItemID: [UUID: HomeCandidateConditionSignals] = [:],
-        mutualMatchCandidates: [HomeMutualMatchCandidateData] = []
+        mutualMatchCandidates: [HomeMutualMatchCandidateData] = [],
+        recentPartnerItems: [GoodsItem] = []
     ) {
         self.matchedItems = matchedItems
         self.possibleItems = possibleItems
         self.conditionSignalsByItemID = conditionSignalsByItemID
         self.mutualMatchCandidates = mutualMatchCandidates
+        self.recentPartnerItems = recentPartnerItems
     }
 
     public var isEmpty: Bool {
@@ -37,7 +42,8 @@ public struct HomeCandidateSections: Equatable, Sendable {
                 matchedItems: matchedItems,
                 possibleItems: possibleItems
             ),
-            mutualMatchCandidates: mutualMatchCandidates
+            mutualMatchCandidates: mutualMatchCandidates,
+            recentPartnerItems: recentPartnerItems
         )
     }
 }

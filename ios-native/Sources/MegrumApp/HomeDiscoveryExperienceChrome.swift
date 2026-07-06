@@ -79,3 +79,65 @@ enum HomeDiscoveryHeaderMetrics {
     static let contentBottomPadding: CGFloat = FloatingActionLayoutMetrics.contentBottomPadding + 120
     static let pullRefreshIndicatorTopPadding: CGFloat = 74
 }
+
+/// 候補が1件もない時（新規ユーザー等）の導線カード。
+/// 推しを増やすか、ほしいものを登録すればマッチ候補が並び始めることを伝える。
+struct HomeEmptyCandidateCTACard: View {
+    var onAddOshi: () -> Void
+    var onAddWish: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 10) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 20, weight: .heavy))
+                    .foregroundStyle(MegrumTheme.lavender)
+                Text("マッチ候補を見つけよう")
+                    .font(.system(size: 17, weight: .black, design: .rounded))
+                    .foregroundStyle(MegrumTheme.ink)
+            }
+
+            Text("推しを設定したり、ほしいものを登録すると、あなたに合う交換相手の候補がここに並びます。")
+                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                .foregroundStyle(MegrumTheme.muted)
+                .lineSpacing(3)
+                .fixedSize(horizontal: false, vertical: true)
+
+            HStack(spacing: 10) {
+                Button {
+                    MegrumHaptics.performButtonTap(onAddOshi)
+                } label: {
+                    Label("推しを追加する", systemImage: "star.fill")
+                        .font(.system(size: 13.5, weight: .black, design: .rounded))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 44)
+                        .background(MegrumTheme.lavender, in: RoundedRectangle(cornerRadius: 13, style: .continuous))
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    MegrumHaptics.performButtonTap(onAddWish)
+                } label: {
+                    Label("ほしいものを登録", systemImage: "heart.fill")
+                        .font(.system(size: 13.5, weight: .black, design: .rounded))
+                        .foregroundStyle(MegrumTheme.lavender)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 44)
+                        .background(.white, in: RoundedRectangle(cornerRadius: 13, style: .continuous))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 13, style: .continuous)
+                                .strokeBorder(MegrumTheme.lavender.opacity(0.4), lineWidth: 1.2)
+                        }
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(16)
+        .background(.white.opacity(0.88), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(MegrumTheme.lavender.opacity(0.16), lineWidth: 1)
+        }
+    }
+}
