@@ -172,6 +172,7 @@ extension SearchScreen {
             oshiCharacters: appState.oshiCharacters,
             wishes: appState.wishes,
             inventory: appState.inventory,
+            listings: appState.listings,
             viewer: appState.viewer
         )
     }

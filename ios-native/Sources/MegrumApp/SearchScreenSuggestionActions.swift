@@ -33,6 +33,16 @@ extension SearchScreen {
             filterDraft.selectedMeetupPrefecture = prefecture
         case .query(let text):
             presentationState.setQuery(text)
+        case .listing(let listingID):
+            // 自分の個別募集の「求めるもの」を検索条件へ変換して探す。
+            if let listing = appState.listings.first(where: { $0.id == listingID }) {
+                let criteria = ListingSearchCriteriaBuilder.criteria(for: listing, wishes: appState.wishes)
+                filterDraft.selectedGroupIDs = criteria.groupIDs
+                filterDraft.selectedMemberIDs = criteria.memberIDs
+                filterDraft.selectedGoodsTypeIDs = criteria.goodsTypeIDs
+                filterDraft.selectedGoodsTagNames = criteria.tagNames
+                filterDraft.wantsCashOK = criteria.wantsCashOK
+            }
         }
         scheduleSearch(delayNanoseconds: 0)
         finishSuggestionApplication()

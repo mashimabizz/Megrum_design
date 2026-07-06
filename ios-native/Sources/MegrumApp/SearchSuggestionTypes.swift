@@ -10,6 +10,7 @@ enum SearchSuggestionAction: Hashable, Sendable {
     case payment(UserPaymentMethod)
     case meetupPrefecture(String)
     case query(String)
+    case listing(UUID)
 }
 
 struct SearchSuggestionItem: Identifiable, Equatable, Sendable {
