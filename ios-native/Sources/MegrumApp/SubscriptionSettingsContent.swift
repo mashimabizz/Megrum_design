@@ -46,7 +46,7 @@ struct SubscriptionSettingsContent: View {
             .padding(.top, 14)
             .padding(.bottom, 40)
         }
-        .background(SubscriptionPremiumTheme.background.ignoresSafeArea())
+        .background(SubscriptionPremiumTheme.backgroundGradient.ignoresSafeArea())
     }
 
     private var statusAndMessages: some View {
@@ -57,7 +57,7 @@ struct SubscriptionSettingsContent: View {
                     systemImage: state.isMegrumPlusActive ? "checkmark.seal.fill" : "person.crop.circle"
                 )
                 .font(.system(size: 14, weight: .heavy, design: .rounded))
-                .foregroundStyle(.white.opacity(0.92))
+                .foregroundStyle(MegrumTheme.ink)
                 Spacer()
                 if isLoading {
                     ProgressView()
@@ -87,7 +87,7 @@ struct SubscriptionSettingsContent: View {
             }
         }
         .padding(14)
-        .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(.white.opacity(0.92), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
     private var purchaseButtons: some View {
@@ -133,7 +133,7 @@ struct SubscriptionSettingsContent: View {
             } else {
                 Label("購入機能は公開準備中です", systemImage: "lock.fill")
                     .font(.system(size: 14, weight: .bold, design: .rounded))
-                    .foregroundStyle(SubscriptionPremiumTheme.subduedText)
+                    .foregroundStyle(MegrumTheme.muted)
                     .frame(maxWidth: .infinity)
 
                 Button("状態を更新", action: onReload)
@@ -144,7 +144,7 @@ struct SubscriptionSettingsContent: View {
 
             Text(purchaseFooterText)
                 .font(.system(size: 11.5, weight: .semibold, design: .rounded))
-                .foregroundStyle(SubscriptionPremiumTheme.subduedText)
+                .foregroundStyle(MegrumTheme.muted)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
@@ -252,7 +252,7 @@ private struct SubscriptionComparisonTable: View {
             .foregroundStyle(MegrumTheme.muted)
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
-            .background(Color.white.opacity(0.08))
+            .background(MegrumTheme.lavender.opacity(0.10))
 
             ForEach(Array(SubscriptionComparisonRow.rows.enumerated()), id: \.element.id) { index, row in
                 HStack(spacing: 8) {
@@ -262,7 +262,7 @@ private struct SubscriptionComparisonTable: View {
                         .frame(width: 20)
                     Text(row.title)
                         .font(.system(size: 13, weight: .heavy, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.92))
+                        .foregroundStyle(MegrumTheme.ink)
                         .lineLimit(2)
                         .minimumScaleFactor(0.82)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -274,13 +274,13 @@ private struct SubscriptionComparisonTable: View {
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 11)
-                .background(Color.white.opacity(index.isMultiple(of: 2) ? 0.06 : 0.03))
+                .background(index.isMultiple(of: 2) ? Color.white.opacity(0.94) : Color.white.opacity(0.72))
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .strokeBorder(MegrumTheme.lavender.opacity(0.35), lineWidth: 1)
+                .strokeBorder(MegrumTheme.lavender.opacity(0.22), lineWidth: 1)
         }
     }
 
@@ -302,7 +302,7 @@ private struct SubscriptionComparisonTable: View {
         .foregroundStyle(
             isPremiumColumn
                 ? MegrumTheme.lavender
-                : Color.white.opacity(isAvailable ? 0.6 : 0.38)
+                : (isAvailable ? MegrumTheme.ink.opacity(0.62) : MegrumTheme.muted.opacity(0.55))
         )
     }
 }
@@ -315,9 +315,14 @@ private struct SubscriptionPlanPicker: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("プランを選ぶ")
-                .font(.system(size: 16, weight: .black, design: .rounded))
-                .foregroundStyle(.white)
+            HStack(spacing: 6) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 14, weight: .black))
+                    .foregroundStyle(MegrumTheme.lavender)
+                Text("プランを選ぶ")
+                    .font(.system(size: 16, weight: .black, design: .rounded))
+                    .foregroundStyle(MegrumTheme.ink)
+            }
 
             ForEach(SubscriptionPremiumPlanCatalog.plans) { plan in
                 planCard(plan)
@@ -335,13 +340,13 @@ private struct SubscriptionPlanPicker: View {
             HStack(spacing: 12) {
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: 21, weight: .bold))
-                    .foregroundStyle(isSelected ? MegrumTheme.lavender : .white.opacity(0.4))
+                    .foregroundStyle(isSelected ? MegrumTheme.lavender : MegrumTheme.muted.opacity(0.5))
 
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 8) {
                         Text("\(plan.title)プラン")
                             .font(.system(size: 15.5, weight: .black, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.94))
+                            .foregroundStyle(MegrumTheme.ink)
                         if let badge = plan.badge {
                             Text(badge)
                                 .font(.system(size: 10.5, weight: .black, design: .rounded))
@@ -360,22 +365,22 @@ private struct SubscriptionPlanPicker: View {
                     }
                     Text(plan.perMonthText)
                         .font(.system(size: 11.5, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.55))
+                        .foregroundStyle(MegrumTheme.muted)
                 }
 
                 Spacer(minLength: 8)
 
                 Text(displayPrice(for: plan))
                     .font(.system(size: 17, weight: .black, design: .rounded))
-                    .foregroundStyle(isSelected ? MegrumTheme.lavender : .white.opacity(0.85))
+                    .foregroundStyle(isSelected ? MegrumTheme.lavender : MegrumTheme.ink.opacity(0.8))
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 13)
-            .background(.white.opacity(isSelected ? 0.16 : 0.07), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .background(.white.opacity(isSelected ? 0.98 : 0.8), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
                     .strokeBorder(
-                        isSelected ? MegrumTheme.lavender : Color.white.opacity(0.18),
+                        isSelected ? MegrumTheme.lavender : MegrumTheme.lavender.opacity(0.14),
                         lineWidth: isSelected ? 1.8 : 1
                     )
             }
@@ -426,8 +431,19 @@ private struct DebugPlanToggleButton: View {
 }
 #endif
 
-/// プレミアム画面のダークテーマ（黒基調でプレミアム感を出す）。
+/// プレミアム画面のテーマ：メインターゲット（若年女性）に合わせ、
+/// 白ベースにブランドパステルが淡くにじむ上品なグラデ背景。
 enum SubscriptionPremiumTheme {
-    static let background = Color(red: 0.055, green: 0.05, blue: 0.09)
-    static let subduedText = Color.white.opacity(0.62)
+    static var backgroundGradient: some View {
+        LinearGradient(
+            stops: [
+                .init(color: Color.white, location: 0),
+                .init(color: MegrumTheme.sky.opacity(0.14), location: 0.32),
+                .init(color: MegrumTheme.lavender.opacity(0.16), location: 0.66),
+                .init(color: MegrumTheme.pink.opacity(0.2), location: 1)
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+    }
 }
