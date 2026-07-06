@@ -53,6 +53,8 @@ public final class MegrumAppState: ObservableObject {
     @Published public internal(set) var publicProfilesByUserID: [UUID: PublicUserProfile] = [:]
     @Published public internal(set) var publicTradeGoodsByUserID: [UUID: [GoodsItem]] = [:]
     @Published public internal(set) var publicListingsByUserID: [UUID: [IndividualListing]] = [:]
+    /// 他人プロフィールのほしいもの（userIDごと）。
+    @Published public internal(set) var publicWishesByUserID: [UUID: [WishItem]] = [:]
     @Published public internal(set) var publicExchangeSettingsByUserID: [UUID: HomeDefaultExchangeSettings] = [:]
     @Published public internal(set) var userEvaluationsByUserID: [UUID: [UserEvaluation]] = [:]
     @Published public internal(set) var groomLikeCountByUserID: [UUID: Int] = [:]
@@ -172,8 +174,8 @@ public final class MegrumAppState: ObservableObject {
         NotificationReadStateReducer.unreadCount(in: notifications)
     }
 
-    /// アプリアイコンのバッジに出す合計：未読通知＋やりとりの要対応＋めぐりの要返信。
-    /// アプリ内のタブバッジやドロワーのバッジで見える数の合算に相当する。
+    /// アプリアイコンのバッジ＝タブバーのバッジ合計（やりとり＋めぐり）。
+    /// タブバーで見えている数を正とし、それ以外は足さない。
     public var appIconBadgeCount: Int {
         let tradeAttention = TradeStageAttentionCounts(
             proposals: proposals,
@@ -182,7 +184,7 @@ public final class MegrumAppState: ObservableObject {
             viewerID: viewer?.id,
             evaluatedProposalIDs: viewerEvaluatedProposalIDs
         )
-        return unreadNotificationCount + tradeAttention.total + meguriPendingReplyCount
+        return tradeAttention.total + meguriUnreadMessageCount
     }
 
     public var meguriUnreadMessageCount: Int {
@@ -359,18 +361,28 @@ public final class MegrumAppState: ObservableObject {
         errorMessage = nil
 
         do {
+            // 評価済みIDはスナップショットと並行で取得し、proposals を公開する前に
+            // 反映する。後から反映するとやりとりバッジが「開いた直後だけ多い→減る」
+            // 見え方になるため（iter1226.341）。
+            async let evaluatedProposalIDsTask = repository.loadViewerEvaluatedProposalIDs()
             let snapshot = try await repository.loadInitialSnapshot()
+            if let evaluatedIDs = try? await evaluatedProposalIDsTask {
+                viewerEvaluatedProposalIDs.formUnion(evaluatedIDs)
+            }
             apply(snapshot)
+            persistViewerEvaluatedProposalIDsIfPossible()
             preloadOwnedGoodsImages(inventory: snapshot.inventory, wishes: snapshot.wishes)
             await loadBlockedContentUserIDs(reportsFailure: false)
             await loadHomeCandidates(fallbackInventory: snapshot.inventory)
             await loadSubscriptionState(reportsFailure: false)
             await loadMeguriProfile(reportsFailure: false)
             await loadMeguriMessages(reportsFailure: false)
-            await loadViewerEvaluatedProposalIDs()
             await preloadTradeMessages()
             await preloadTradeEvidencePhotos()
         } catch {
+            #if DEBUG
+            print("MEGRUM_DEBUG_SNAPSHOT error: \(error)")
+            #endif
             errorMessage = "データを読み込めませんでした"
         }
 
@@ -384,15 +396,19 @@ public final class MegrumAppState: ObservableObject {
     public func refreshHomeDiscovery() async {
         errorMessage = nil
         do {
+            async let evaluatedProposalIDsTask = repository.loadViewerEvaluatedProposalIDs()
             let snapshot = try await repository.loadInitialSnapshot()
+            if let evaluatedIDs = try? await evaluatedProposalIDsTask {
+                viewerEvaluatedProposalIDs.formUnion(evaluatedIDs)
+            }
             apply(snapshot)
+            persistViewerEvaluatedProposalIDsIfPossible()
             preloadOwnedGoodsImages(inventory: snapshot.inventory, wishes: snapshot.wishes)
             await loadBlockedContentUserIDs(reportsFailure: false)
             await loadHomeCandidates(fallbackInventory: snapshot.inventory)
             await loadSubscriptionState(reportsFailure: false)
             await loadMeguriProfile(reportsFailure: false)
             await loadMeguriMessages(reportsFailure: false)
-            await loadViewerEvaluatedProposalIDs()
             await preloadTradeMessages()
             await preloadTradeEvidencePhotos()
         } catch {
@@ -445,6 +461,11 @@ public final class MegrumAppState: ObservableObject {
         )
         viewer = state.viewer
         hiddenMeguriThreadEntries = MeguriHiddenThreadStore.load(viewerID: state.viewer.id)
+        // 評価済みIDはローカル保存分を proposals より先に反映して、
+        // 起動直後の「評価待ち」過計上（バッジが後から減る現象）を防ぐ。
+        viewerEvaluatedProposalIDs.formUnion(
+            ViewerEvaluatedProposalStore.load(viewerID: state.viewer.id)
+        )
         inventory = state.inventory
         wishes = state.wishes
         listings = state.listings

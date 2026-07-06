@@ -155,8 +155,33 @@ enum SearchResultFilterPolicy {
         guard option.wishGroupID != nil || option.wishGoodsTypeID != nil else {
             return false
         }
-        return fieldMatches(option.wishGroupID, viewerItem.groupID)
-            && fieldMatches(option.wishGoodsTypeID, viewerItem.goodsTypeID)
+        guard fieldMatches(option.wishGroupID, viewerItem.groupID),
+              fieldMatches(option.wishGoodsTypeID, viewerItem.goodsTypeID)
+        else {
+            return false
+        }
+        // メンバー指定/除外・シリーズ・数量もホーム側（iter1226.338）と同じ基準で判定する。
+        if !option.wishMemberIDs.isEmpty {
+            let matchesMember = viewerItem.memberID.map(option.wishMemberIDs.contains) ?? false
+            if option.excludesWishMembers {
+                if matchesMember {
+                    return false
+                }
+            } else if !matchesMember {
+                return false
+            }
+        }
+        if !option.wishSeriesNames.isEmpty {
+            let wantedSeries = Set(option.wishSeriesNames.compactMap(HomeCandidateTagMatcher.normalizedName))
+            let itemTags = Set(viewerItem.tags.compactMap { HomeCandidateTagMatcher.normalizedName($0.name) })
+            if !wantedSeries.isEmpty, wantedSeries.isDisjoint(with: itemTags) {
+                return false
+            }
+        }
+        if option.wishQuantity > 1, viewerItem.marketAvailableQuantity < option.wishQuantity {
+            return false
+        }
+        return true
     }
 
     private static func paymentMethodsMatch(_ ownerMethods: [UserPaymentMethod], selected: Set<UserPaymentMethod>) -> Bool {

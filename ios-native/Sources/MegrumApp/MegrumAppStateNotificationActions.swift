@@ -13,6 +13,8 @@ extension MegrumAppState {
         }
         do {
             notifications = try await repository.loadNotifications(limit: 100)
+            // すでに見ためぐりメッセージ/チャットルームの通知は自動で既読にする。
+            await autoMarkViewedNotificationsRead()
         } catch {
             if reportsFailure {
                 errorMessage = "通知を読み込めませんでした"

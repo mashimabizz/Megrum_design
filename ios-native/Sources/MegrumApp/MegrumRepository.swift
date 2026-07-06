@@ -158,6 +158,7 @@ public protocol MegrumRepository: Sendable {
     func archiveIndividualListing(listingID: UUID) async throws
     func loadPublicTradeGoods(userID: UUID, limit: Int) async throws -> [GoodsItem]
     func loadPublicIndividualListings(userID: UUID) async throws -> [IndividualListing]
+    func loadPublicWishes(userID: UUID) async throws -> [WishItem]
     func loadPublicUserProfile(userID: UUID) async throws -> PublicUserProfile?
     func loadUserEvaluations(userID: UUID, limit: Int) async throws -> [UserEvaluation]
     func loadGroomLikeCount(userID: UUID) async throws -> Int

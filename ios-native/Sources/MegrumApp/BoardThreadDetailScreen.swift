@@ -321,8 +321,13 @@ struct BoardThreadDetailScreen: View {
             .onChange(of: presentation.chatMessages.map(\.id)) { _, _ in
                 scrollToLatest(proxy)
             }
+            .onDisappear {
+                appState.recordBoardThreadVisit(currentThread.id)
+            }
             .task {
                 determineRoomEntryPhaseIfNeeded(afterRepliesLoaded: false)
+                // 通知一覧の自動既読用に「このルームを見た」記録を残す。
+                appState.recordBoardThreadVisit(currentThread.id)
                 await appState.loadBoardReplies(
                     threadID: currentThread.id,
                     latitude: coordinate?.latitude,

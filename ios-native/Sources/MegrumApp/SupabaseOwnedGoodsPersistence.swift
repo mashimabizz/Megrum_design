@@ -23,6 +23,37 @@ struct SupabaseOwnedGoodsPersistence: Sendable {
         return Self.wishItems(from: rows, tagMap: tagMap, projectURL: client.projectURL)
     }
 
+    /// 他人のプロフィール表示用：公開されているほしいもの（kind=wanted, active）。
+    func loadPublicWishes(of otherUserID: UUID) async throws -> [WishItem] {
+        let queryItems = Self.publicWishQueryItems(userID: otherUserID)
+        let rows: [GoodsInventoryRow]
+        do {
+            rows = try await client.fetchRows(
+                from: "goods_inventory",
+                select: GoodsInventoryRow.select,
+                queryItems: queryItems
+            )
+        } catch {
+            rows = try await client.fetchRows(
+                from: "goods_inventory",
+                select: GoodsInventoryRow.legacySelect,
+                queryItems: queryItems
+            )
+        }
+        let tagMap = await bestEffortGoodsTagMap(inventoryIDs: rows.map(\.id))
+        return Self.wishItems(from: rows, tagMap: tagMap, projectURL: client.projectURL)
+    }
+
+    static func publicWishQueryItems(userID: UUID) -> [URLQueryItem] {
+        [
+            URLQueryItem(name: "user_id", value: "eq.\(userID.uuidString.lowercased())"),
+            URLQueryItem(name: "kind", value: "eq.\(GoodsEntryKind.wish.inventoryKind)"),
+            URLQueryItem(name: "status", value: "eq.active"),
+            URLQueryItem(name: "order", value: "updated_at.desc"),
+            URLQueryItem(name: "limit", value: "60")
+        ]
+    }
+
     private func fetchOwnGoodsRows(kind: String) async throws -> [GoodsInventoryRow] {
         do {
             return try await client.fetchRows(

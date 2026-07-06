@@ -4,6 +4,157 @@
 
 ---
 
+## イテレーション1226.341：やりとりバッジの起動時過計上を根治（評価済みIDを先読み）
+
+### 背景・問題意識
+iter1226.339（評価済みIDのローカル保存）後もオーナーから「開いたら数が減る」と再指摘。ローカル保存はサーバー読み込みが一度成功するまで空で、初回起動や保存漏れ時に過計上が残る余地があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- `loadInitialData` / `refreshHomeDiscovery`：評価済みproposal IDの取得をスナップショット取得と**並行実行**し、`apply(snapshot)` で proposals を公開する**前に** `viewerEvaluatedProposalIDs` へ反映。バッジは最初のフレームから確定値になる
+- 反映後にローカル保存も更新（オフライン起動時はローカル保存分のみで補完）
+
+#### `ios-native/Sources/MegrumApp/MegrumAppStateTradeResolutionActions.swift`
+- persistヘルパーを共有化（`persistViewerEvaluatedProposalIDsIfPossible`）
+
+### 影響範囲
+- やりとりタブバッジ・アプリアイコンバッジの起動直後の値
+
+### 確認方法
+- swift test: 1491件＋Storeテスト、0 failures
+- 起動シーケンス上、評価済みID→proposalsの順が構造的に保証される（後から引かれる経路が消滅）
+
+### セルフレビュー結果
+- ✅ 並行取得のためスナップショットの所要時間内に評価済みIDの取得が隠れ、起動は遅くならない
+- ✅ 取得失敗時（オフライン等）はローカル保存分で補完し、従来の遅延反映も残る
+- ⚠️ 完全オフラインかつローカル保存が空の初回のみ、従来同様の遅延反映
+
+---
+
+## イテレーション1226.340：通知一覧の自動既読（閲覧済みめぐりメッセージ・チャットルーム）
+
+### 背景・問題意識
+オーナーFB：「ドロワーの通知一覧で、めぐりメッセージや対象のチャットルームをすでに見ていたら、その通知は勝手に既読になってほしい」。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/BoardThreadVisitStore.swift`（新規）
+- チャットルームを開いた時刻をUserDefaultsへviewer別に記録（上限200件・古い順に間引き）＋ユニットテスト2件
+
+#### `ios-native/Sources/MegrumApp/MegrumAppStateNotificationAutoRead.swift`（新規）
+- `autoMarkViewedNotificationsRead()`：未読通知のうち、
+  - めぐりメッセージ系（meguri_message / groom_reply）→ 該当相手からの未読メッセージが残っていなければ既読化
+  - チャットルーム系（meguri_board_*）→ 通知作成より後にそのルームを開いた記録があれば既読化
+  ローカル即時反映＋サーバーへはベストエフォートで反映
+- `recordBoardThreadVisit(_:)`：訪問記録＋スイープ起動
+
+#### 配線
+- `loadNotifications` 成功後にスイープ（ドロワー・通知一覧・起動時に自動適用）
+- `markMeguriMessagesRead` 成功後にスイープ（スレッドを読んだ直後に通知も消える）
+- `BoardThreadDetailScreen`：開いた時と閉じた時に訪問記録（表示中に届いた分も既読対象）
+
+### 影響範囲
+- ドロワーの通知一覧・未読通知数
+
+### 確認方法
+- swift test: 1491件＋新規Storeテスト2件、0 failures
+
+### セルフレビュー結果
+- ✅ 判定は通知のlinkPath（NotificationRouteIntent）ベースで、対象外の通知（取引等）は触らない
+- ✅ サーバー反映失敗時もローカル既読は維持し、次回ロードで再判定
+- ⚠️ チャットルームの「見た」判定は端末ローカル記録のため、別端末で見た分は既読化されない
+
+---
+
+## イテレーション1226.339：アプリアイコンバッジ＝タブ合計＋評価済み分の起動時過計上を解消
+
+### 背景・問題意識
+オーナーFB：①アプリアイコンのバッジ数とタブバーのバッジ合計が合わない（タブ合計を正とする）②アプリを開くと、自分は評価済みだが相手が未評価の取引が一瞬カウントされ、少し経つとやりとりバッジが減る。結果、開く前のアイコンバッジとも食い違う。
+
+### 原因
+- アイコンバッジは「未読通知＋やりとり＋めぐり」で、タブバー（やりとり＋めぐり）より通知分だけ多かった
+- 自分の評価済みproposal IDはサーバー読み込み（起動シーケンス後半）まで空のため、起動直後は「評価待ち」が過計上され、読み込み完了時に減っていた
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ViewerEvaluatedProposalStore.swift`（新規）
+- 評価済みproposal IDをUserDefaultsにviewer別で永続化（load/save）＋ユニットテスト
+
+#### `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- `appIconBadgeCount` を「やりとり＋めぐり未読」（タブバー合計と同一）に変更
+- スナップショット適用時、proposals反映より先にローカル保存分の評価済みIDを union（起動直後の過計上を防止）
+
+#### `ios-native/Sources/MegrumApp/MegrumAppStateTradeResolutionActions.swift`
+- 評価送信時とサーバー読み込み成功時にローカル保存。サーバー読み込みは置換ではなく union（直近送信分を保持）
+
+#### `ios-native/App/MegrumNativeApp.swift`
+- アイコンバッジ設定は viewer 確定後のみ（読み込み前の一時的な0で消さない）。サインアウト時は明示的に0クリア
+
+### 影響範囲
+- アプリアイコンバッジ、やりとりタブバッジの起動直後の挙動
+
+### 確認方法
+- swift test: 1491件＋新規Store round-tripテスト、0 failures
+
+### セルフレビュー結果
+- ✅ タブバッジとアイコンバッジが同一の計算（TradeStageAttentionCounts＋meguriUnreadMessageCount）
+- ✅ 評価済みIDはローカル→サーバーの順で反映され、起動時から一致
+- ⚠️ プッシュ通知ペイロード側がbadgeを直接設定する場合は別途サーバー側の調整が必要（現状クライアント設定のみ）
+
+---
+
+## イテレーション1226.338：他人プロフィール表示修正・マッチ厳格化・バッジ未読化ほか7件
+
+### 背景・問題意識
+オーナーFB7件：①他人プロフィールの個別募集・ほしいものが1件も出ない ②ほしいもの/譲グッズ登録後にホームが更新されない ③シリーズ・数量が合っていないのに「激求！」になる ④非マッチ時の「◯◯がほしい」は個別募集の先頭選択肢を出したい ⑤めぐり経由プロフィールのタブ下バナー広告が不要 ⑥グルーム返信への返信に「あなたのグルームに返信しました」が付く ⑦めぐりバッジが未返信数になっており、アプリアイコンのバッジと乖離。
+
+### 変更内容
+
+#### ①他人プロフィール（ほしいもの・個別募集）
+- `SupabaseOwnedGoodsPersistence.loadPublicWishes(of:)` 新設（goods_inventory kind=wanted/activeを他ユーザーIDで取得）＋ Repository / appState（`publicWishesByUserID`）配線
+- `PublicUserProfileScreenDerivedState`: `publicWishByID` を**viewer自身のwishes**から解決していたバグを修正（相手のwishで解決）。ほしいものタブは「募集で求めているもの→残りを新しい順」で全wish表示。個別募集カード内のwish画像・名称も相手のwishで解決される
+- `loadPublicExchangeContent` にwish取得を追加（失敗しても募集表示は継続）
+- VisualQA: `MEGRUM_VISUAL_QA_PROFILE_USER_ID` / `MEGRUM_VISUAL_QA_PROFILE_TAB`（goods/listings/wish）追加。実データで譲/個別募集/ほしいものの3タブをスクショ確認済み
+
+#### ②登録後のホーム更新
+- `MegrumAppStateGoodsActions`: グッズ/ほしいものの作成・更新・非表示・削除の成功後に `refreshHomeCandidates` を非同期実行（個別募集側は実装済みだった）
+
+#### ③マッチ厳格化（激求/求の判定）
+- `HomeCandidateListingMatchPolicy.optionWantsViewerGoods` が**グループ＋種別のみ**で判定していたのを、`HomeMutualMatchListingEvaluator.mutualOptionWantsCounterpartGoods`（メンバー指定/除外・シリーズタグ・グッズ指定はwish属性で判定）へ委譲
+- 同Evaluatorに**数量条件**を追加（wishQuantity > 1 なら相手の出せる数量が満たすこと）
+- `HomeCandidatePartnerDemandSummary` / `ViewerOfferDemandSummary` / 選択肢Factory / `SearchResultFilterPolicy`（検索側）にも同条件を配線
+
+#### ④非マッチ時の「◯◯がほしい」
+- `HomeCandidatePartnerDemandSummary.partnerLookingForText`: 相手の個別募集の**先頭選択肢**（グッズ指定）から短文を生成し、なければ従来どおりほしいもの先頭から
+
+#### ⑤めぐり経由プロフィールの広告
+- `MeguriUserProfileRouteScreen` から `adPlacement: .publicProfileFooterBanner` を除去
+
+#### ⑥グルーム返信への返信
+- `MeguriMessageViews.sendMessage/addPhoto`: `sourceGroomPostID`（会話グルーピングキー）は常に付与しつつ、文脈カード用の `sourceGroomOwnerID / ImageURL` は「その会話に文脈カード付きメッセージがまだ無い最初の送信」だけに付与。リプライ時は常に通常メッセージ
+
+#### ⑦バッジ
+- フッターのめぐりバッジを `meguriPendingReplyCount`（未返信）→ `meguriUnreadMessageCount`（未読）へ
+- `appIconBadgeCount` も同じ構成（未読通知＋やりとり要対応＋めぐり未読）に揃え、乖離を解消
+
+#### 付随修正（検証中に発見）
+- **期限切れセッションの復帰**: リフレッシュトークンが無効（400〜403）の場合はセッションを破棄してサインイン画面へ（従来はエラー画面に固定され続けた）`MegrumAuthStateSessionActions`
+- `loadInitialData` 失敗時のエラー内容をDEBUGログ出力
+- （ガイドツアーブランチ側にも同時期のQA改善あり：DEBUG自動サインインの常時入り直し・VisualQA時の通知ダイアログ抑制）
+
+### 影響範囲
+- 他人プロフィール、ホーム候補（激求/求判定・並び）、検索結果フィルタ、めぐりメッセージ、タブ/アプリバッジ、認証復帰
+
+### 確認方法
+- swift test: 1491件 0 failures（main）
+- シミュレータ実データ検証: プロフィール3タブのスクショ（譲4件・個別募集1/2切替・ほしいもの2件）
+- REST検証: listings / listing_wish_options / kind=wanted の他ユーザー可視性（RLS）を確認
+
+### セルフレビュー結果
+- ✅ RLS・データ取得はRESTで実データ検証済み
+- ✅ 会話グルーピングキー（sourceGroomPostID）は維持したままカード表示だけ抑制
+- ⚠️ マッチ厳格化により既存の「激求/求」表示は減る方向（仕様通り）。数量条件は「相手の出せる数量>=wishQuantity」と解釈
 ## イテレーション1226.337：ガイドツアーv2（オーナーFB反映：分割・隣接吹き出し・切り抜き修正）
 
 ### 背景・問題意識

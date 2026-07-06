@@ -126,6 +126,10 @@ public extension MegrumRepository {
         []
     }
 
+    func loadPublicWishes(userID: UUID) async throws -> [WishItem] {
+        []
+    }
+
     func loadPublicIndividualListings(userID: UUID) async throws -> [IndividualListing] {
         []
     }

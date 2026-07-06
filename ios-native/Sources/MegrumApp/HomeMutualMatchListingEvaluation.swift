@@ -290,6 +290,16 @@ enum HomeMutualMatchListingEvaluator {
             }
         }
 
+        // 数量指定：相手が出せる数量（在庫）を満たしていること。
+        if option.wishQuantity > 1 {
+            let availableQuantity = counterpartItem.marketAvailableQty
+                ?? counterpartItem.quantity
+                ?? 1
+            if availableQuantity < option.wishQuantity {
+                return false
+            }
+        }
+
         return true
     }
 }

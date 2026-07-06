@@ -44,6 +44,9 @@ extension MegrumAppState {
         do {
             async let tradeGoods = repository.loadPublicTradeGoods(userID: userID, limit: 60)
             async let listings = repository.loadPublicIndividualListings(userID: userID)
+            // ほしいものは補助情報なので、失敗しても募集・譲渡グッズの表示は止めない。
+            async let wishes = loadPublicWishesBestEffort(userID: userID)
+            publicWishesByUserID[userID] = await wishes
             publicTradeGoodsByUserID = PublicUserContentStateReducer.storingTradeGoods(
                 BlockedUserContentFilter.goods(
                     try await tradeGoods,
@@ -64,6 +67,10 @@ extension MegrumAppState {
             errorMessage = "プロフィールの交換情報を読み込めませんでした"
         }
         loadingPublicExchangeUserID = nil
+    }
+
+    private func loadPublicWishesBestEffort(userID: UUID) async -> [WishItem] {
+        (try? await repository.loadPublicWishes(userID: userID)) ?? []
     }
 
     /// グルームでもらった like 総数（プロフィールの Like 表示用）。

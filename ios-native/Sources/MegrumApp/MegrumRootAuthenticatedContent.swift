@@ -127,7 +127,8 @@ struct MegrumRootAuthenticatedContent<AuthenticatedTabs: View>: View {
                 NavigationStack {
                     PublicUserProfileScreen(
                         appState: appState,
-                        userID: NativePreviewData.partnerID,
+                        userID: VisualQAPreviewMode.profileUserID(environment: ProcessInfo.processInfo.environment)
+                            ?? NativePreviewData.partnerID,
                         adDisplayContext: adDisplayContext,
                         adPlacement: .publicProfileFooterBanner
                     )

@@ -26,6 +26,7 @@ extension MegrumAppState {
             )
             submittingEvaluationProposalID = nil
             viewerEvaluatedProposalIDs.insert(proposalID)
+            persistViewerEvaluatedProposalIDsIfPossible()
             appendLocalEvaluationNoticeIfNeeded(proposalID: proposalID, body: body, evaluation: evaluation)
             return true
         } catch {
@@ -39,12 +40,21 @@ extension MegrumAppState {
     /// 失敗時は現状維持（メッセージ由来の判定にフォールバック）。
     public func loadViewerEvaluatedProposalIDs() async {
         do {
-            viewerEvaluatedProposalIDs = try await repository.loadViewerEvaluatedProposalIDs()
+            // ローカル保存分（直近の送信）はサーバー反映前でも保持する。
+            viewerEvaluatedProposalIDs.formUnion(try await repository.loadViewerEvaluatedProposalIDs())
+            persistViewerEvaluatedProposalIDsIfPossible()
         } catch {
             #if DEBUG
             MegrumAppLogger.general.debug("Megrum evaluated proposal ids load failed: \(String(describing: error), privacy: .public)")
             #endif
         }
+    }
+
+    func persistViewerEvaluatedProposalIDsIfPossible() {
+        guard let viewerID = viewer?.id else {
+            return
+        }
+        ViewerEvaluatedProposalStore.save(viewerEvaluatedProposalIDs, viewerID: viewerID)
     }
 
     private func appendLocalEvaluationNoticeIfNeeded(

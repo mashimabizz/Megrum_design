@@ -86,6 +86,17 @@ struct PublicUserProfileScreen: View {
             closeProfile()
         }
         .task(id: userID) {
+            // VisualQA: 起動時に指定タブ（listings / wish）を開いた状態にする。
+            switch ProcessInfo.processInfo.environment["MEGRUM_VISUAL_QA_PROFILE_TAB"] {
+            case "goods":
+                presentationState.selectedVisualTab = .goods
+            case "listings":
+                presentationState.selectedVisualTab = .listings
+            case "wish":
+                presentationState.selectedVisualTab = .wish
+            default:
+                break
+            }
             await appState.loadPublicUserProfile(userID: userID)
             await appState.loadPublicExchangeContent(userID: userID)
             await appState.loadPublicExchangeSettings(userID: userID)

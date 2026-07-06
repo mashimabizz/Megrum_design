@@ -390,7 +390,8 @@ struct MegrumAuthenticatedTabContentView: View {
                     .renderingMode(.template)
             }
         }
-        .badge(appState.meguriPendingReplyCount)
+        // めぐりバッジは「未返信」ではなく未読メッセージ数（オーナーFB iter1226.338）。
+        .badge(appState.meguriUnreadMessageCount)
     }
 
     private func openWishSection(_ section: WishCollectionSection) {

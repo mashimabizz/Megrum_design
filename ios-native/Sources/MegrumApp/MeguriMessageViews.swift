@@ -603,18 +603,36 @@ struct MeguriMessagesScreen: View {
         } else {
             outgoingBody = presentationState.draft
         }
+        let attachesGroomContext = shouldAttachGroomContext
         Task {
+            // sourceGroomPostID は会話のグルーピングキーなので常に付ける。
+            // 文脈カード（owner / 画像）は最初のグルーム返信だけに付ける。
             let sent = await appState.sendMeguriMessage(
                 recipientID: route.peerID,
                 body: outgoingBody,
                 sourceGroomPostID: routeSourceGroomPostID,
-                sourceGroomOwnerID: routeSourceGroomOwnerID,
-                sourceGroomImageURL: routeSourceGroomImageURL
+                sourceGroomOwnerID: attachesGroomContext ? routeSourceGroomOwnerID : nil,
+                sourceGroomImageURL: attachesGroomContext ? routeSourceGroomImageURL : nil
             )
             presentationState.clearDraftAfterSend(sent)
             if sent {
                 replyTarget = nil
             }
+        }
+    }
+
+    /// グルーム文脈カード（「あなたのグルームに返信しました」等）は、その会話の
+    /// 最初のグルーム返信にだけ付ける。すでに同じグルームの文脈カード付き
+    /// メッセージが会話にあれば、以降（返信含む）は通常メッセージとして送る。
+    private var shouldAttachGroomContext: Bool {
+        guard let sourceGroomPostID = routeSourceGroomPostID else {
+            return false
+        }
+        guard replyTarget == nil else {
+            return false
+        }
+        return !messages.contains {
+            $0.sourceGroomPostID == sourceGroomPostID && $0.sourceGroomImageURL != nil
         }
     }
 
@@ -673,13 +691,14 @@ struct MeguriMessagesScreen: View {
             presentationState.showMegrumPlusPrompt()
             return
         }
+        let attachesGroomContext = shouldAttachGroomContext
         _ = await appState.sendMeguriPhotoMessage(
             recipientID: route.peerID,
             imageData: data,
             imageContentType: imageContentType,
             sourceGroomPostID: routeSourceGroomPostID,
-            sourceGroomOwnerID: routeSourceGroomOwnerID,
-            sourceGroomImageURL: routeSourceGroomImageURL
+            sourceGroomOwnerID: attachesGroomContext ? routeSourceGroomOwnerID : nil,
+            sourceGroomImageURL: attachesGroomContext ? routeSourceGroomImageURL : nil
         )
     }
 

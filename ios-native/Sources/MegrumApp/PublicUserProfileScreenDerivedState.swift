@@ -41,8 +41,15 @@ extension PublicUserProfileScreen {
         Dictionary(uniqueKeysWithValues: tradeGoods.map { ($0.id, $0) })
     }
 
+    /// プロフィール対象ユーザーのほしいもの（updated_at desc）。
+    var publicWishes: [WishItem] {
+        appState.publicWishesByUserID[userID] ?? []
+    }
+
     var publicWishByID: [UUID: WishItem] {
-        Dictionary(uniqueKeysWithValues: appState.wishes.map { ($0.id, $0) })
+        // 以前は viewer 自身の wishes で解決していたため、他人のほしいものが
+        // 1件も表示されなかった。プロフィール対象ユーザーの wish で解決する。
+        Dictionary(uniqueKeysWithValues: publicWishes.map { ($0.id, $0) })
     }
 
     func publicProfileBio(_ publicProfile: PublicUserProfile) -> String {
@@ -77,15 +84,20 @@ extension PublicUserProfileScreen {
     }
 
     var publicProfileWishGridItems: [ProfileVisualGridItem] {
-        orderedPublicWishIDs.compactMap { id in
-            if let wish = publicWishByID[id] {
-                return ProfileVisualGridItem(wish: wish)
+        // 個別募集で求めているものを先頭に、残りのほしいものを新しい順で続ける。
+        var seen: Set<UUID> = []
+        var items: [ProfileVisualGridItem] = []
+        for id in orderedPublicWishIDs {
+            if let wish = publicWishByID[id], seen.insert(id).inserted {
+                items.append(ProfileVisualGridItem(wish: wish))
+            } else if let goods = goodsByID[id], seen.insert(id).inserted {
+                items.append(ProfileVisualGridItem(goods: goods))
             }
-            if let goods = goodsByID[id] {
-                return ProfileVisualGridItem(goods: goods)
-            }
-            return nil
         }
+        for wish in publicWishes where seen.insert(wish.id).inserted {
+            items.append(ProfileVisualGridItem(wish: wish))
+        }
+        return items
     }
 
     private var orderedPublicWishIDs: [UUID] {
