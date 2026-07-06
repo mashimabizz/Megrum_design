@@ -34,11 +34,16 @@ struct TutorialDemoStageView: View {
             case .trades(let beat):
                 TutorialTradesDemoSceneView(beat: beat, demoAppState: demoAppState)
                     .id(beatToken)
+            case .meguri(let beat):
+                TutorialMeguriDemoSceneView(beat: beat, demoAppState: demoAppState)
+                    .id(beatToken)
             }
         }
         .task {
             guard !didLoad else { return }
             didLoad = true
+            // デモステージ内の実画面（チャットルーム等）でも広告・割り込みを抑制する。
+            demoAppState.setTutorialActive(true)
             await demoAppState.refresh()
         }
     }

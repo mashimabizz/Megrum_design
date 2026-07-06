@@ -15,7 +15,19 @@ struct TradesScreen: View {
     @State private var presentationState = TradesScreenPresentationState()
 
     private var proposals: [TradeProposal] {
-        presentationState.proposals(fallback: appState.proposals)
+        // ガイドツアー中で実データが空の時はサンプル打診を表示する（実データ不変）。
+        let fallback = appState.isTutorialActive && appState.proposals.isEmpty
+            ? NativePreviewData.proposals
+            : appState.proposals
+        return presentationState.proposals(fallback: fallback)
+    }
+
+    /// ガイドツアー中は広告を出さない（説明の主役である実画面を隠さない）。
+    private var effectiveAdDisplayContext: AdDisplayContext {
+        if appState.isTutorialActive {
+            return AdDisplayContext(viewerID: appState.viewer?.id, isPremiumSubscriber: true)
+        }
+        return adDisplayContext
     }
 
     private var messagesByProposalID: [UUID: [TradeMessage]] {
@@ -71,7 +83,7 @@ struct TradesScreen: View {
                 // 広告はタブ横断・スクロールしても固定のヘッダーとして表示する。
                 AdBannerSlot(
                     placement: .tradesListTopBanner,
-                    displayContext: adDisplayContext,
+                    displayContext: effectiveAdDisplayContext,
                     bottomSpacing: 6
                 )
                 .padding(.horizontal, 20)
@@ -90,7 +102,7 @@ struct TradesScreen: View {
                             evaluatedProposalIDs: appState.viewerEvaluatedProposalIDs,
                             isSelectingPendingProposals: isSelectingPendingProposals,
                             selectedPendingProposalIDs: presentationState.selectedPendingProposalIDs,
-                            adDisplayContext: adDisplayContext,
+                            adDisplayContext: effectiveAdDisplayContext,
                             topContentInset: 0,
                             canWithdraw: { canWithdrawPendingProposal($0, in: stage) },
                             onStartSelection: startPendingProposalSelection,

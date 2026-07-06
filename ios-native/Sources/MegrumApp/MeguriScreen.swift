@@ -117,7 +117,9 @@ struct MeguriScreen: View {
             mapGrooms: visibleMapGrooms,
             threads: visibleThreads,
             replyPreviewsByThreadID: appState.boardReplyPreviewsByThreadID,
-            currentCoordinate: locationState.coordinate,
+            currentCoordinate: appState.isTutorialActive
+                ? TutorialSampleMeguriData.centerCoordinate
+                : locationState.coordinate,
             subscriptionState: appState.subscriptionState,
             notice: notice,
             isRequestingLocation: locationState.isRequestingLocation,
@@ -184,11 +186,12 @@ struct MeguriScreen: View {
             // ガイドツアーの実演：指のタップに合わせて、地図中心付近に実物の作成コールアウトを出す。
             // ツアー中は位置情報を抑制しているため 1km 判定は通さない（見せるだけで作成はしない）。
             guard requestID != nil else { return }
+            // 指のタップ位置（画面上部寄り）に吹き出しが出るよう、中心より北へずらす。
             let center = homeCameraPosition.region?.center
                 ?? CLLocationCoordinate2D(latitude: 35.7056, longitude: 139.7519)
             withAnimation(.easeOut(duration: 0.16)) {
                 pendingMapCreationCoordinate = MegrumLocationCoordinate(
-                    latitude: center.latitude,
+                    latitude: center.latitude + 0.0112,
                     longitude: center.longitude
                 )
             }

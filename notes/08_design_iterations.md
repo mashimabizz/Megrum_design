@@ -4,6 +4,61 @@
 
 ---
 
+## イテレーション1226.352：ガイドツアーv3.3（FB第3弾11-22＋総括反映・章別再生）
+
+### 背景・問題意識
+v3.2 スクショレビューのFB第3弾（11〜22枚目＋総括）を反映。総括の要点は
+「実際の画面の状態を撮る」「ヘッダー/フッターを消さない」「吹き出しは3行以内＋戻るボタン」
+「この章をとばすは不要」「エラートースト抑制」「ヘルプから章別にいつでも再生できる導線」。
+
+### 変更内容
+- **章別再生（総括）**：`TutorialPlaybackScope`（.full / .chapter）を導入。ヘルプ＞問い合わせの下に
+  「使い方ガイド」セクション（ホーム/マイグッズ/ほしいもの/個別募集/打診/やりとり/めぐり の7章）を新設し、
+  シートを閉じてから `startChapter` で該当章だけ再生・章末で自動終了。既読フラグは全編再生時のみ保存
+- **「戻る」ボタン（総括）**：全吹き出しに 戻る を常設（範囲先頭では非表示）。「この章をとばす」を廃止
+- **⑪⑫⑬ 個別募集章の実セクション表示**：エディタ本体を「画面高＋lift」の背高フレームで描画してから
+  上へオフセットする方式に変更（単純offsetではScrollViewの初期ビューポート外が描画されない）。
+  郵送条件（送料 要相談・発送2〜4日選択済み）/条件外トグルON/その他メモ/保存 が実状態で見える。
+  6-16は実物 `IndividualListingsScreen`（プレビュー募集カード付き）
+- **⑭〜⑲ 打診章を13ビートへ再構成**：7-1はホーム激求行のスポットライト＋指タップ（激求の説明つき）。
+  実 `PublicUserProfileScreen`（NavigationStack内・レイアウト正常化）、受け取り2点チェックは
+  実測レール位置（x 0.12/0.34, y 0.478）へ、pickMoreはシート持ち上げ0.22H＋実物の
+  「他にも交換できそうなもの」枠（実挙動どおり空表示）、確認ボタンは下部固定のまま指差し（liftなし）、
+  7-12は実 `ProposalCreateFlow`(.confirm) で「この内容で打診を送信」を指差し（文言も実ボタンに一致）
+- **⑳㉑ キャプション**：3行超の文言を分割済み・コンパクト幅・ドラッグ移動可。pickFromWantedは上置きに変更
+  （下置きだと題材のレールを隠すため）
+- **㉒ めぐり章6ビート**：擬似現在地（1km円＋現在地ドット）・円内タップ地点に作成コールアウト・
+  グルームプレビュー（GroomViewerScreen）・チャットルームプレビュー（BoardThreadDetailScreen）各1画面
+- **ツアー中の広告抑制（総括）**：やりとり一覧上部バナー（TradesScreen）とチャットルームヘッダーバナー
+  （BoardThreadDetailScreen）を isTutorialActive で抑制。デモ用AppStateにも setTutorialActive(true) を付与
+- 8-1はバナー提示のまま実 `TradesScreen`＋サンプル打診（実データ空時のみ・実データ不変）
+- 掃除：旧 afterSave 再現ビュー（summaryPanel）と「この章をとばす」残置コメントを削除
+
+### 影響範囲
+ガイドツアー全章（約61ビート）・ヘルプ画面・やりとり一覧/チャットルームの広告表示（ツアー中のみ）
+
+### 確認方法
+- `swift test` 1511件 0失敗（3 skipped）
+- VisualQA per-beat スクショ検証：`SIMCTL_CHILD_MEGRUM_VISUAL_QA_PREVIEW_AUTH=1`
+  `SIMCTL_CHILD_MEGRUM_VISUAL_QA_INITIAL_SCREEN=tutorial` `SIMCTL_CHILD_MEGRUM_VISUAL_QA_TUTORIAL_STEP=<ビートID>`
+  で 6-12〜6-16 / 7-1,7-4,7-7〜7-12 / 8-1 / 9-4〜9-6 を目視確認（v33）
+- 注意：シミュレータ検証時は derivedData をセッション専用パスにする（並行セッションの main ビルドに
+  上書きされ、ツアー未搭載バイナリを検証してしまう事故が起きた）
+
+### セルフレビュー結果
+- ✅ 実UI部品のみで各ビートの「実際の画面状態」を再現（募集エディタ/一覧・打診シート/確認画面・やりとり・チャットルーム）
+- ✅ 実ヘッダー/フッター維持・吹き出し3行以内＋戻る・章とばし廃止・広告/トースト抑制
+- ✅ ヘルプ＞使い方ガイドの章別再生（コーディネータのscope挙動はユニットテストで担保）
+- ⚠️ 指ポインタ座標・持ち上げ量は実測ベースの定数。実UI側のレイアウト変更時は再調整が必要
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/TutorialTourCoordinator.swift` / `TutorialTourOverlay.swift` / `TutorialTourStep.swift`
+- `ios-native/Sources/MegrumApp/TutorialListingDemoScenes.swift` / `TutorialProposalDemoScenes.swift` / `TutorialDemoStage.swift`
+- `ios-native/Sources/MegrumApp/SettingsHelpViews.swift` / `MegrumRootDrawerDestinationSheet.swift` / `MegrumRootView.swift`
+- `ios-native/Sources/MegrumApp/TradesScreen.swift` / `BoardThreadDetailScreen.swift` / `MeguriScreen.swift` / `MeguriScreenFeedback.swift`
+
+---
+
 ## イテレーション1226.346：ガイドツアーv3.2（オーナーFB10点反映）
 
 ### 背景・問題意識

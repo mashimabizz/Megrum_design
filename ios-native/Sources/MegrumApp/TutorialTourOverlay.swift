@@ -8,14 +8,15 @@ import SwiftUI
 /// - tabBand：下部タブ帯だけ明るく残す（タブ移動の予告）
 /// - demo：全画面デモステージ＋上部キャプション（指アイコン実演）
 /// - meguriTapDemo：実マップ上で指が1km圏内をタップする実演＋下部バナー
-/// 画面のどこをタップしても次へ。上部に全体プログレスバー、吹き出しに章内カウンタと「この章をとばす」。
+/// 画面のどこをタップしても次へ。上部に全体プログレスバー、吹き出しに章内カウンタと「戻る」。
 struct TutorialTourOverlay: View {
     let beat: TutorialBeat
     let overallProgress: Double
+    let canRetreat: Bool
     let anchorFrames: [TutorialAnchorID: CGRect]
     let containerSize: CGSize
     var onAdvance: () -> Void
-    var onSkipChapter: () -> Void
+    var onRetreat: () -> Void
     var onEndTour: () -> Void
     /// meguriTapDemo：指がタップした瞬間に呼ばれる（実画面側で作成コールアウトを出す）。
     var onMeguriDemoTap: () -> Void = {}
@@ -23,6 +24,7 @@ struct TutorialTourOverlay: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var calloutSize: CGSize = CGSize(width: 300, height: 170)
     @StateObject private var meguriPointer = TutorialPointerChoreographer()
+    @StateObject private var spotlightPointer = TutorialPointerChoreographer()
     /// 説明カードはユーザーが動かせる（FB⑩）。ビートが変わったらリセット。
     @State private var cardDragOffset: CGSize = .zero
     @State private var cardDragTranslation: CGSize = .zero
@@ -96,6 +98,19 @@ struct TutorialTourOverlay: View {
 
         case .spotlight:
             TutorialSpotlightDim(rect: clampedSpotlightRect)
+            if let fraction = beat.pointerFraction {
+                TutorialPointerLayer(choreo: spotlightPointer)
+                    .task(id: beat.id) {
+                        let target = CGPoint(
+                            x: containerSize.width * fraction.x,
+                            y: containerSize.height * fraction.y
+                        )
+                        try? await Task.sleep(nanoseconds: 400_000_000)
+                        spotlightPointer.appear(at: CGPoint(x: target.x + 60, y: target.y + 90))
+                        await spotlightPointer.move(to: target, duration: 0.45)
+                        await spotlightPointer.tap()
+                    }
+            }
             calloutCard
                 .position(calloutCenter(around: clampedSpotlightRect))
 
@@ -128,7 +143,7 @@ struct TutorialTourOverlay: View {
     // MARK: 吹き出し・キャプション
 
     private var calloutCard: some View {
-        TutorialBeatCard(beat: beat, layoutWidth: 300, onAdvance: onAdvance, onSkipChapter: onSkipChapter, onEndTour: onEndTour)
+        TutorialBeatCard(beat: beat, layoutWidth: 300, canRetreat: canRetreat, onAdvance: onAdvance, onRetreat: onRetreat, onEndTour: onEndTour)
             .background(TutorialCalloutSizeReader())
             .onPreferenceChange(TutorialCalloutSizePreferenceKey.self) { size in
                 if size != .zero {
@@ -142,7 +157,7 @@ struct TutorialTourOverlay: View {
     private var bottomBanner: some View {
         VStack {
             Spacer()
-            TutorialBeatCard(beat: beat, layoutWidth: nil, onAdvance: onAdvance, onSkipChapter: onSkipChapter, onEndTour: onEndTour)
+            TutorialBeatCard(beat: beat, layoutWidth: nil, canRetreat: canRetreat, onAdvance: onAdvance, onRetreat: onRetreat, onEndTour: onEndTour)
                 .padding(.horizontal, 20)
                 .padding(.bottom, 108)
                 .offset(currentCardOffset)
@@ -155,7 +170,7 @@ struct TutorialTourOverlay: View {
         VStack {
             HStack {
                 Spacer()
-                TutorialBeatCard(beat: beat, layoutWidth: 316, onAdvance: onAdvance, onSkipChapter: onSkipChapter, onEndTour: onEndTour)
+                TutorialBeatCard(beat: beat, layoutWidth: 316, canRetreat: canRetreat, onAdvance: onAdvance, onRetreat: onRetreat, onEndTour: onEndTour)
                     .padding(.trailing, 14)
             }
             .padding(.top, topPadding)
@@ -204,13 +219,16 @@ struct TutorialTourOverlay: View {
         case .goods:
             // 詳細ステップ（下部にメンバー/シリーズボタン）や完了一覧は上に置く。
             return false
-        case .proposal(.confirm), .proposal(.send):
+        case .proposal(.preview), .proposal(.confirmTap), .proposal(.pickMore), .proposal(.pickFromWanted):
+            // 下部CTA・下部候補・下段の希望レールが見せ場なので上に置く。
             return false
         case .proposal:
             return true
         case .listing, .trades:
-            // エディタの下部バー／ステージバーが下にあるため上に置く。
+            // エディタの下部バー／取引チャット入力欄が下にあるため上に置く。
             return false
+        case .meguri:
+            return true
         }
     }
 
@@ -267,17 +285,14 @@ private struct TutorialBeatCard: View {
     let beat: TutorialBeat
     /// nil なら横幅いっぱい（バナー/キャプション）。数値なら固定幅の吹き出し。
     let layoutWidth: CGFloat?
+    let canRetreat: Bool
     var onAdvance: () -> Void
-    var onSkipChapter: () -> Void
+    var onRetreat: () -> Void
     var onEndTour: () -> Void
 
     private var chapterLabel: String {
         let progress = TutorialScript.chapterProgress(of: beat)
         return "\(beat.chapter.title) \(progress.index)/\(progress.count)"
-    }
-
-    private var showsChapterSkip: Bool {
-        TutorialScript.chapterProgress(of: beat).count > 1
     }
 
     var body: some View {
@@ -311,11 +326,11 @@ private struct TutorialBeatCard: View {
                 }
                 .buttonStyle(.plain)
 
-                if showsChapterSkip {
+                if canRetreat {
                     Button {
-                        MegrumHaptics.performButtonTap(onSkipChapter)
+                        MegrumHaptics.performButtonTap(onRetreat)
                     } label: {
-                        Text("この章をとばす")
+                        Text("戻る")
                             .font(.system(size: 12.5, weight: .bold, design: .rounded))
                             .foregroundStyle(MegrumTheme.lavender)
                     }

@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 
 // MARK: - 章
@@ -69,21 +70,28 @@ enum TutorialListingDemoBeat: Int, CaseIterable, Sendable {
 
 /// 第7章 打診デモの各ビート（激求の例）。
 enum TutorialProposalDemoBeat: Int, CaseIterable, Sendable {
-    case openDetail      // 激求行をタップ→詳細シート
-    case profile         // ユーザーネーム→相手プロフィール
+    case openDetail      // 詳細シートが開いた（全体像）
+    case profileTap      // ユーザーネームをタップ（実演）
+    case profile         // 相手プロフィール画面
     case exchangeTerms   // 交換条件を見る
     case listingDetail   // 個別募集の詳細
-    case pickFromWanted  // 相手の希望から譲るものを選ぶ
+    case receivePick     // 受け取るものを選ぶ（2つ選ぶ実演）
+    case pickFromWanted  // 相手の希望から譲るものを選ぶ（選択済み状態）
     case pickFromMine    // 自分のグッズから譲るものを選ぶ
-    case pickMore        // 追加で選ぶ（最低1つ）
-    case confirm         // 交換内容を確認する
-    case send            // 打診に進む
+    case pickMore        // 追加で選ぶ（最低1つ・下部を表示）
+    case confirmTap      // 「交換内容を確認する」をタップ
+    case preview         // 打診内容プレビュー→「打診に進む」
 }
 
 /// 第8章 やりとりデモ。
 enum TutorialTradesDemoBeat: Int, CaseIterable, Sendable {
-    case overview        // 一覧（サンプル打診カード）
     case chatFlow        // 取引チャットの一連の流れ
+}
+
+/// 第9章 めぐりのプレビューデモ。
+enum TutorialMeguriDemoBeat: Int, CaseIterable, Sendable {
+    case groomPreview    // グルームビューアのプレビュー
+    case boardPreview    // チャットルーム（紹介画面）のプレビュー
 }
 
 /// デモステージに出すシーン。
@@ -92,6 +100,7 @@ enum TutorialDemoScene: Equatable, Sendable {
     case listing(TutorialListingDemoBeat)
     case proposal(TutorialProposalDemoBeat)
     case trades(TutorialTradesDemoBeat)
+    case meguri(TutorialMeguriDemoBeat)
 }
 
 // MARK: - ビート
@@ -120,6 +129,8 @@ struct TutorialBeat: Identifiable, Equatable, Sendable {
     var requestedWishSection: WishCollectionSection?
     let title: String
     let body: String
+    /// spotlight ビートで指アイコンを出す位置（画面比率 0〜1）。nil なら指なし。
+    var pointerFraction: CGPoint?
 
     /// ホームのセクションへ自動スクロールするフォーカス。
     var homeFocusAnchor: TutorialAnchorID? {
@@ -411,52 +422,68 @@ enum TutorialScript {
 
     private static let proposalBeats: [TutorialBeat] = [
         TutorialBeat(
-            id: "7-1", chapter: .proposal, presentation: .demo(.proposal(.openDetail)), targetTab: .home,
+            id: "7-1", chapter: .proposal, presentation: .spotlight(.homeSectionUserTag), targetTab: .home,
             title: "「激求！」の相手で試そう",
-            body: "ホームの激求カードをタップすると、相手の詳細が開くよ。"
+            body: "激求＝あなたのグッズを名指しで求めている状態。一番上のサナの行をタップしてみよう。",
+            pointerFraction: CGPoint(x: 0.5, y: 0.30)
         ),
         TutorialBeat(
-            id: "7-2", chapter: .proposal, presentation: .demo(.proposal(.profile)), targetTab: .home,
+            id: "7-2", chapter: .proposal, presentation: .demo(.proposal(.openDetail)), targetTab: .home,
+            title: "相手の詳細が開いた",
+            body: "上に交換条件と支払い条件、下に選ぶエリアが並ぶよ。"
+        ),
+        TutorialBeat(
+            id: "7-3", chapter: .proposal, presentation: .demo(.proposal(.profileTap)), targetTab: .home,
+            title: "プロフィールを見るには",
+            body: "上のユーザーネームをタップ。"
+        ),
+        TutorialBeat(
+            id: "7-4", chapter: .proposal, presentation: .demo(.proposal(.profile)), targetTab: .home,
             title: "相手のプロフィール",
-            body: "ユーザーネームをタップすると、評価や完了取引数が見られるよ。"
+            body: "評価や完了取引数はここで見られるよ。"
         ),
         TutorialBeat(
-            id: "7-3", chapter: .proposal, presentation: .demo(.proposal(.exchangeTerms)), targetTab: .home,
+            id: "7-5", chapter: .proposal, presentation: .demo(.proposal(.exchangeTerms)), targetTab: .home,
             title: "相手の交換条件",
-            body: "「交換条件」を押すと、現地/郵送や都道府県などの条件が見られるよ。"
+            body: "現地/郵送・都道府県などの条件はここ。"
         ),
         TutorialBeat(
-            id: "7-4", chapter: .proposal, presentation: .demo(.proposal(.listingDetail)), targetTab: .home,
+            id: "7-6", chapter: .proposal, presentation: .demo(.proposal(.listingDetail)), targetTab: .home,
             title: "個別募集の詳細",
-            body: "相手の募集内容（譲・求・条件）もここで確認できるよ。"
+            body: "募集内容（譲・求・条件）は「個別募集の詳細を見る」から。"
         ),
         TutorialBeat(
-            id: "7-5", chapter: .proposal, presentation: .demo(.proposal(.pickFromWanted)), targetTab: .home,
-            title: "相手の希望から選ぶ",
-            body: "相手があなたのグッズを求めている時は、その中から譲るものを選べるよ。"
+            id: "7-7", chapter: .proposal, presentation: .demo(.proposal(.receivePick)), targetTab: .home,
+            title: "受け取るものを選ぶ",
+            body: "ほしいものをタップで選ぶよ。今回は2つ選んでみた。"
         ),
         TutorialBeat(
-            id: "7-6", chapter: .proposal, presentation: .demo(.proposal(.pickFromMine)), targetTab: .home,
-            title: "自分のグッズから選ぶ",
-            body: "自分のマイグッズ一覧からも選べるよ。"
+            id: "7-8", chapter: .proposal, presentation: .demo(.proposal(.pickFromWanted)), targetTab: .home,
+            title: "相手の希望から譲るを選ぶ",
+            body: "相手が求めているあなたのグッズから、どれか1つ選べるよ。"
         ),
         TutorialBeat(
-            id: "7-7", chapter: .proposal, presentation: .demo(.proposal(.pickMore)), targetTab: .home,
+            id: "7-9", chapter: .proposal, presentation: .demo(.proposal(.pickFromMine)), targetTab: .home,
+            title: "自分のグッズからも選べる",
+            body: "「他の選択肢」からマイグッズ一覧を開けるよ。"
+        ),
+        TutorialBeat(
+            id: "7-10", chapter: .proposal, presentation: .demo(.proposal(.pickMore)), targetTab: .home,
             title: "ほかにも交換できそうなら",
-            body: "交換できそうなものがあればタップで追加。最低1つ選べば進めるよ。"
+            body: "他にも交換できそうなものがあれば下に並ぶよ。タップで打診にまとめて追加できる。"
         ),
         TutorialBeat(
-            id: "7-8", chapter: .proposal, presentation: .demo(.proposal(.confirm)), targetTab: .home,
+            id: "7-11", chapter: .proposal, presentation: .demo(.proposal(.confirmTap)), targetTab: .home,
             title: "交換内容を確認する",
-            body: "「交換内容を確認する」を押すと、ゆずる・うけとるの最終確認になるよ。"
+            body: "選び終わったら、下の「交換内容を確認する」をタップ。"
         ),
         TutorialBeat(
-            id: "7-9", chapter: .proposal, presentation: .demo(.proposal(.send)), targetTab: .home,
-            title: "打診に進む",
-            body: "「打診に進む」で相手に届くよ。（今回はデモなのでここまで！）"
+            id: "7-12", chapter: .proposal, presentation: .demo(.proposal(.preview)), targetTab: .home,
+            title: "内容を確認して打診！",
+            body: "内容を確認して「この内容で打診を送信」で相手に届くよ。（デモはここまで）"
         ),
         TutorialBeat(
-            id: "7-10", chapter: .proposal, presentation: .tabBand, targetTab: .home,
+            id: "7-13", chapter: .proposal, presentation: .tabBand, targetTab: .home,
             title: "送った打診はどこへ？",
             body: "下の「やりとり」タブに届くよ。見にいこう。"
         ),
@@ -466,14 +493,14 @@ enum TutorialScript {
 
     private static let tradesBeats: [TutorialBeat] = [
         TutorialBeat(
-            id: "8-1", chapter: .trades, presentation: .demo(.trades(.overview)), targetTab: .trades,
+            id: "8-1", chapter: .trades, presentation: .banner, targetTab: .trades,
             title: "「やりとり」タブ",
-            body: "送った・届いた打診はここに並ぶよ。下の「打診中／進行中／完了済み」で進み具合ごとに見られる。"
+            body: "送った・届いた打診はここ。下の「打診中/進行中/完了済み」で切り替えられるよ。"
         ),
         TutorialBeat(
             id: "8-2", chapter: .trades, presentation: .demo(.trades(.chatFlow)), targetTab: .trades,
             title: "カードを開くと取引チャット",
-            body: "①成立前＝条件の相談 ②成立後＝当日チャット（現在地・服装の共有）③交換したら証跡撮影 ④最後に評価。ぜんぶこの1画面で進むよ。"
+            body: "成立前の相談→成立→当日チャット→証跡→評価まで、この1画面で進むよ。"
         ),
     ]
 
@@ -488,12 +515,27 @@ enum TutorialScript {
         TutorialBeat(
             id: "9-2", chapter: .meguri, presentation: .banner, targetTab: .meguri,
             title: "「めぐり」タブ",
-            body: "ここは「めぐり」。周囲に自分の活動を投稿できたり、チャットルームでユーザーと交流ができたりするよ。丸いピンがグルーム（写真の投稿）、四角いピンがチャットルーム（掲示板）。"
+            body: "ここは「めぐり」。周囲に自分の活動を投稿したり、チャットルームで交流できるよ。"
         ),
         TutorialBeat(
-            id: "9-3", chapter: .meguri, presentation: .meguriTapDemo, targetTab: .meguri,
+            id: "9-3", chapter: .meguri, presentation: .banner, targetTab: .meguri,
+            title: "2種類のピン",
+            body: "丸いピン＝グルーム（写真の投稿）、四角いピン＝チャットルーム（掲示板）。"
+        ),
+        TutorialBeat(
+            id: "9-4", chapter: .meguri, presentation: .meguriTapDemo, targetTab: .meguri,
             title: "1km圏内なら作成できる",
-            body: "地図の1km圏内をタップすると、グルームやチャットルームをその場所に作成できるよ。ピンをタップすれば参加もできる。"
+            body: "自分の1km圏内をタップすると、その場所に作成できるよ。"
+        ),
+        TutorialBeat(
+            id: "9-5", chapter: .meguri, presentation: .demo(.meguri(.groomPreview)), targetTab: .meguri,
+            title: "グルームのプレビュー",
+            body: "丸いピンをタップするとこんなふうに見られるよ。いいねやコメントもここから。"
+        ),
+        TutorialBeat(
+            id: "9-6", chapter: .meguri, presentation: .demo(.meguri(.boardPreview)), targetTab: .meguri,
+            title: "チャットルームのプレビュー",
+            body: "四角いピンから入ると紹介→参加の流れ。部屋ごとの名前で気軽に参加できるよ。"
         ),
     ]
 

@@ -3,6 +3,19 @@ import SwiftUI
 
 struct SettingsHelpScreen: View {
     private let supportEmail = "support@megrum.jp"
+    /// 使い方ガイド（チュートリアル）を章単位で再生する導線。nil の場合はセクション非表示。
+    var onStartTutorialChapter: ((TutorialChapter) -> Void)? = nil
+
+    /// ヘルプから部分再生できる章（ようこそ・タブ紹介・完了は単体再生の意味がないため除外）。
+    private static let tutorialChapters: [(chapter: TutorialChapter, title: String, symbol: String)] = [
+        (.home, "ホームの見かた", "house"),
+        (.inventory, "マイグッズの登録", "rectangle.on.rectangle"),
+        (.wish, "ほしいものの登録", "heart"),
+        (.listing, "個別募集の作成", "rectangle.stack.badge.plus"),
+        (.proposal, "打診の流れ", "paperplane"),
+        (.trades, "やりとり（取引チャット）", "message"),
+        (.meguri, "めぐりの使いかた", "dot.radiowaves.left.and.right"),
+    ]
 
     var body: some View {
         List {
@@ -22,6 +35,34 @@ struct SettingsHelpScreen: View {
                 Text("問い合わせ")
             }
 
+            if let onStartTutorialChapter {
+                Section {
+                    ForEach(Self.tutorialChapters, id: \.chapter) { entry in
+                        Button {
+                            MegrumHaptics.performButtonTap {
+                                onStartTutorialChapter(entry.chapter)
+                            }
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: entry.symbol)
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .foregroundStyle(MegrumTheme.lavender)
+                                    .frame(width: 26)
+                                Text(entry.title)
+                                    .font(.body)
+                                    .foregroundStyle(MegrumTheme.ink)
+                                Spacer()
+                                Image(systemName: "play.circle")
+                                    .foregroundStyle(MegrumTheme.muted)
+                            }
+                        }
+                    }
+                } header: {
+                    Text("使い方ガイド")
+                } footer: {
+                    Text("知りたいところだけ、ガイドツアーをもう一度見られます。")
+                }
+            }
         }
         .navigationTitle("ヘルプ")
         .megrumInlineNavigationTitle()

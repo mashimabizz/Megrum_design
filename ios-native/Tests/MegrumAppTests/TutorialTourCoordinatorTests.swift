@@ -37,18 +37,27 @@ final class TutorialTourCoordinatorTests: XCTestCase {
         XCTAssertFalse(coordinator.isActive)
     }
 
-    func testSkipChapterJumpsToNextChapterHead() {
+    func testRetreatMovesBackAndStopsAtStart() {
         let coordinator = TutorialTourCoordinator()
         coordinator.start(at: TutorialScript.beat(withID: "4-3"))
-        coordinator.skipChapter()
-        XCTAssertEqual(coordinator.currentBeat?.id, "5-1")
-        XCTAssertEqual(coordinator.currentBeat?.chapter, .wish)
+        XCTAssertTrue(coordinator.canRetreat)
+        coordinator.retreat()
+        XCTAssertEqual(coordinator.currentBeat?.id, "4-2")
+        coordinator.start()
+        XCTAssertFalse(coordinator.canRetreat)
+        coordinator.retreat()
+        XCTAssertEqual(coordinator.currentBeat?.id, "1-1")
     }
 
-    func testSkipChapterOnLastChapterFinishes() {
+    func testChapterScopePlaysSingleChapterOnly() {
         let coordinator = TutorialTourCoordinator()
-        coordinator.start(at: TutorialScript.beat(withID: "10-1"))
-        coordinator.skipChapter()
+        coordinator.startChapter(.trades)
+        XCTAssertEqual(coordinator.currentBeat?.id, "8-1")
+        XCTAssertFalse(coordinator.canRetreat)
+        coordinator.advance()
+        XCTAssertEqual(coordinator.currentBeat?.id, "8-2")
+        XCTAssertTrue(coordinator.canRetreat)
+        coordinator.advance()
         XCTAssertNil(coordinator.currentBeat)
     }
 
@@ -73,7 +82,9 @@ final class TutorialTourCoordinatorTests: XCTestCase {
         let listingBeats = TutorialScript.beats.filter { $0.chapter == .listing }
         XCTAssertEqual(listingBeats.count, 16)
         let proposalBeats = TutorialScript.beats.filter { $0.chapter == .proposal }
-        XCTAssertEqual(proposalBeats.count, 10)
+        XCTAssertEqual(proposalBeats.count, 13)
+        let meguriBeats = TutorialScript.beats.filter { $0.chapter == .meguri }
+        XCTAssertEqual(meguriBeats.count, 6)
     }
 
     func testTargetTabsFollowChapters() {

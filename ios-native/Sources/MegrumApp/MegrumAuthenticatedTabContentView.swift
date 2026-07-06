@@ -177,10 +177,11 @@ struct MegrumAuthenticatedTabContentView: View {
                     TutorialTourOverlay(
                         beat: beat,
                         overallProgress: tutorialCoordinator.overallProgress,
+                        canRetreat: tutorialCoordinator.canRetreat,
                         anchorFrames: anchors.mapValues { proxy[$0] },
                         containerSize: proxy.size,
                         onAdvance: { tutorialCoordinator.advance() },
-                        onSkipChapter: { tutorialCoordinator.skipChapter() },
+                        onRetreat: { tutorialCoordinator.retreat() },
                         onEndTour: { tutorialCoordinator.skip() },
                         onMeguriDemoTap: { appState.requestTutorialMeguriCallout() }
                     )

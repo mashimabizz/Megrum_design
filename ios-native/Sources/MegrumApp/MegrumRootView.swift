@@ -172,6 +172,13 @@ public struct MegrumRootView: View {
                     onOpenRouteIntent: { intent in
                         applyNotificationRouteIntent(intent)
                     },
+                    onStartTutorialChapter: { chapter in
+                        // ヘルプの「使い方ガイド」：シートを閉じてから章別再生を開始する。
+                        drawerDestination = nil
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                            tutorialCoordinator.startChapter(chapter)
+                        }
+                    },
                     onClose: dismiss
                 )
             }
@@ -253,8 +260,8 @@ public struct MegrumRootView: View {
         appState.setTutorialActive(beat != nil)
 
         guard let beat else {
-            // ツアー終了：既読フラグを保存。
-            if let userID = appState.viewer?.id {
+            // ツアー終了：全編再生の時だけ既読フラグを保存（ヘルプからの章別再生では触らない）。
+            if tutorialCoordinator.scope == .full, let userID = appState.viewer?.id {
                 OnboardingTutorialProgressStore.markTourCompleted(userID: userID)
             }
             return

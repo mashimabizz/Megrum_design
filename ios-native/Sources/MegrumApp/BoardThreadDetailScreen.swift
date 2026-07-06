@@ -148,7 +148,9 @@ struct BoardThreadDetailScreen: View {
                             placement: .boardRoomHeaderBanner,
                             displayContext: AdDisplayContext(
                                 viewerID: appState.viewer?.id,
+                                // ガイドツアー中（デモ表示含む）は広告を出さない。
                                 isPremiumSubscriber: appState.subscriptionState.suppressesAds
+                                    || appState.isTutorialActive
                             ),
                             bottomSpacing: 6
                         )

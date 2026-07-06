@@ -40,6 +40,11 @@ enum TutorialSampleMasterData {
 enum TutorialSampleMeguriData {
     private static let center = (latitude: 35.7056, longitude: 139.7519)
 
+    /// ツアー中に地図へ渡す擬似現在地（1km円・現在地ドット表示用）。
+    static var centerCoordinate: MegrumLocationCoordinate {
+        MegrumLocationCoordinate(latitude: center.latitude, longitude: center.longitude)
+    }
+
     static var grooms: [GroomPost] {
         let offsets: [(latitude: Double, longitude: Double)] = [
             (0.0145, 0.0000), (0.0025, -0.0125), (-0.0110, 0.0122),

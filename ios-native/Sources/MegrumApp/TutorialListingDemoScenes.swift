@@ -44,16 +44,21 @@ struct TutorialListingDemoSceneView: View {
     private var stage: some View {
         switch beat {
         case .afterSave:
-            afterSaveStage
+            // 実物の個別募集一覧（プレビューデータの募集カードが載った状態）。
+            IndividualListingsScreen(appState: demoAppState)
+                .allowsHitTesting(false)
         default:
             editorStage
         }
     }
 
     /// 実物のエディタ画面（ヘッダー＋ステップ本体＋下部バー）。
+    /// 下部セクションを見せるビートは、本体を「画面高＋lift」の背高フレームで描画してから
+    /// 上へオフセットする（単純なoffsetではScrollViewの初期ビューポート外が描画されないため）。
     private var editorStage: some View {
         VStack(spacing: 0) {
-            IndividualListingEditorContent(
+            GeometryReader { inner in
+                IndividualListingEditorContent(
                 draft: $draft,
                 havesTab: $havesTab,
                 haveSelectionFilter: $haveFilter,
@@ -75,8 +80,13 @@ struct TutorialListingDemoSceneView: View {
                 onToggleWish: { _ in },
                 onLoadCharacters: { _ in },
                 onCreateOshiRequest: { _ in }
-            )
-            .padding(.top, 58)
+                )
+                .padding(.top, 58)
+                .frame(width: inner.size.width, height: inner.size.height + contentLift)
+                // 下部セクション（郵送/条件外/メモ）を見せるビートは「スクロール後」の位置まで持ち上げる。
+                .offset(y: -contentLift)
+            }
+            .clipped()
 
             IndividualListingEditorBottomBar(
                 step: step,
@@ -106,6 +116,22 @@ struct TutorialListingDemoSceneView: View {
         .allowsHitTesting(false)
     }
 
+    /// 該当セクションが見える位置までコンテンツを持ち上げる量（FB12）。
+    private var contentLift: CGFloat {
+        switch beat {
+        case .exchangeMail:
+            return 320
+        case .exchangeOffSpec:
+            return 470
+        case .exchangeNote:
+            return 590
+        case .save:
+            return 590
+        default:
+            return 0
+        }
+    }
+
     private var stagedOptionCount: Int {
         switch beat {
         case .wishCashTab, .exchangeMethod, .exchangeLocal, .exchangeMail, .exchangeOffSpec, .exchangeNote, .save:
@@ -115,62 +141,6 @@ struct TutorialListingDemoSceneView: View {
         default:
             return 0
         }
-    }
-
-    /// 保存後：一覧に1枚目のカードが載った状態の再現＋完了トースト。
-    private var afterSaveStage: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text("個別募集")
-                .font(.system(size: 34, weight: .black))
-                .foregroundStyle(MegrumTheme.ink)
-                .padding(.top, 70)
-
-            Text("個別募集 1 / 1")
-                .font(.system(size: 13, weight: .black, design: .rounded))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 7)
-                .background(MegrumTheme.lavender, in: Capsule(style: .continuous))
-
-            HStack(alignment: .top, spacing: 12) {
-                summaryPanel(title: "求めるもの", lines: ["選択肢1：TWICE × トレカ", "選択肢2：定価もOK"])
-                summaryPanel(title: "譲るもの", lines: ["金額指定 ¥1,500"])
-            }
-
-            summaryPanel(title: "交換条件", lines: ["現地交換・郵送OK", "現地：東京都 / 土日", "郵送：送料 要相談・2〜4日"])
-
-            Spacer()
-        }
-        .padding(.horizontal, 20)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(MegrumTheme.canvas.ignoresSafeArea())
-        .overlay(alignment: .bottom) {
-            Label("個別募集を作成しました", systemImage: "checkmark.circle.fill")
-                .font(.system(size: 14, weight: .black, design: .rounded))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 18)
-                .padding(.vertical, 12)
-                .background(MegrumTheme.ok, in: Capsule(style: .continuous))
-                .padding(.bottom, 140)
-        }
-        .allowsHitTesting(false)
-    }
-
-    private func summaryPanel(title: String, lines: [String]) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(.system(size: 15, weight: .black, design: .rounded))
-                .foregroundStyle(MegrumTheme.ink)
-            ForEach(lines, id: \.self) { line in
-                Text(line)
-                    .font(.system(size: 12.5, weight: .semibold, design: .rounded))
-                    .foregroundStyle(MegrumTheme.muted)
-            }
-        }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.white, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .shadow(color: .black.opacity(0.05), radius: 10, y: 4)
     }
 
     // MARK: スクリプト状態
@@ -203,7 +173,8 @@ struct TutorialListingDemoSceneView: View {
             draft.handoffMethod = .both
             draft.localPrefecture = "東京都"
             draft.localPlaceMemo = "会場周辺（例：東京ドーム）"
-            draft.localSchedule = "土日ならOK"
+            // カレンダー展開で縦に伸びないよう日程は「相談して決める」のまま。
+            draft.localSchedule = ""
             draft.shippingFee = .negotiate
             draft.shippingDays = .twoToFourDays
             draft.acceptsOutsideCondition = true
@@ -235,13 +206,13 @@ struct TutorialListingDemoSceneView: View {
             pointer.appear(at: CGPoint(x: size.width * 0.5, y: size.height * 0.42))
             await pointer.tap()
         case .exchangeMail:
-            pointer.appear(at: CGPoint(x: size.width * 0.5, y: size.height * 0.60))
+            pointer.appear(at: CGPoint(x: size.width * 0.5, y: size.height * 0.45))
             await pointer.tap()
         case .exchangeOffSpec:
-            pointer.appear(at: CGPoint(x: size.width * 0.82, y: size.height * 0.72))
+            pointer.appear(at: CGPoint(x: size.width * 0.82, y: size.height * 0.52))
             await pointer.tap()
         case .exchangeNote:
-            pointer.appear(at: CGPoint(x: size.width * 0.5, y: size.height * 0.80))
+            pointer.appear(at: CGPoint(x: size.width * 0.5, y: size.height * 0.62))
             await pointer.tap()
         case .save:
             pointer.appear(at: CGPoint(x: size.width * 0.78, y: size.height * 0.88))
