@@ -7,6 +7,8 @@ struct TradeUserMessageStack: View {
     var isMine: Bool
     var isReadByPartner: Bool
     var onOpenImage: (URL) -> Void
+    var quoteAvatarURL: URL? = nil
+    var onJumpToMessage: (UUID) -> Void = { _ in }
 
     private var bodyText: String? {
         message.body.nilIfBlank
@@ -41,7 +43,9 @@ struct TradeUserMessageStack: View {
                         messageRow {
                             TradeTextMessageBubble(
                                 text: bodyText,
-                                isMine: isMine
+                                isMine: isMine,
+                                quoteAvatarURL: quoteAvatarURL,
+                                onJumpToMessage: onJumpToMessage
                             )
                         }
                     }
@@ -49,7 +53,9 @@ struct TradeUserMessageStack: View {
                     messageRow {
                         TradeTextMessageBubble(
                             text: bodyText,
-                            isMine: isMine
+                            isMine: isMine,
+                            quoteAvatarURL: quoteAvatarURL,
+                            onJumpToMessage: onJumpToMessage
                         )
                     }
                 }

@@ -41,7 +41,7 @@ struct AdBannerSlot: View {
     @ViewBuilder
     private var adMobBanner: some View {
         #if os(iOS) && canImport(GoogleMobileAds)
-        if let unitID = decision.unitID, adMobLoadState != .failed {
+        if let unitID = decision.unitID {
             AdMobBannerView(unitID: unitID, loadState: $adMobLoadState)
                 .frame(maxWidth: .infinity)
                 .frame(height: adMobBannerHeight)
@@ -53,10 +53,16 @@ struct AdBannerSlot: View {
     }
 
     private var adMobBannerHeight: CGFloat {
-        guard case let .loaded(height) = adMobLoadState else {
-            return 0
+        switch adMobLoadState {
+        case .loading:
+            // 高さ0のままだとSDKが "Invalid ad width or height" で失敗するため、
+            // 読み込み中から標準バナーの高さを確保しておく。
+            50
+        case .loaded(let height):
+            height
+        case .failed:
+            0
         }
-        return height
     }
 }
 
@@ -99,8 +105,9 @@ private struct AdMobBannerView: UIViewRepresentable {
     @Binding var loadState: AdMobBannerLoadState
 
     func makeUIView(context: Context) -> BannerView {
-        let adSize = largeAnchoredAdaptiveBanner(width: 320)
-        let banner = BannerView(adSize: adSize)
+        // アダプティブ系サイズは "Invalid ad width or height" で読み込みに失敗する
+        // 環境があるため、確実な標準バナー（320x50）を使う。
+        let banner = BannerView(adSize: AdSizeBanner)
         banner.adUnitID = unitID
         banner.rootViewController = UIApplication.shared.megrumAdRootViewController
         banner.delegate = context.coordinator
@@ -123,6 +130,7 @@ private struct AdMobBannerView: UIViewRepresentable {
 
     final class Coordinator: NSObject, BannerViewDelegate {
         @Binding private var loadState: AdMobBannerLoadState
+        private var retryCount = 0
 
         init(loadState: Binding<AdMobBannerLoadState>) {
             _loadState = loadState
@@ -133,7 +141,22 @@ private struct AdMobBannerView: UIViewRepresentable {
         }
 
         func bannerView(_ bannerView: BannerView, didFailToReceiveAdWithError error: Error) {
+            #if DEBUG
+            print("MegrumAdMob banner failed (unit: \(bannerView.adUnitID ?? "-")): \(error.localizedDescription)")
+            #endif
             loadState = .failed
+            // 起動直後は rootViewController 未確定などで失敗しうるため、少し待って再試行する。
+            guard retryCount < 2 else {
+                return
+            }
+            retryCount += 1
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak bannerView] in
+                guard let bannerView else {
+                    return
+                }
+                bannerView.rootViewController = UIApplication.shared.megrumAdRootViewController
+                bannerView.load(Request())
+            }
         }
     }
 }

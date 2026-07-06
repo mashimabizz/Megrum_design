@@ -59,6 +59,7 @@ extension TradeDetailScreen {
             onReplyToMessage: { message in
                 let isMine = message.senderID == viewerID
                 interactionState.replyTarget = ChatReplyTarget(
+                    messageID: message.id,
                     senderID: message.senderID,
                     senderName: isMine
                         ? (appState.viewer?.displayName).nilIfBlank ?? "自分"

@@ -7,12 +7,39 @@ import UIKit
 
 /// リプライ対象（取引チャット・めぐりメッセージ・チャットルーム共通）。
 struct ChatReplyTarget: Equatable {
+    var messageID: UUID?
     var senderID: UUID?
     var senderName: String
     var avatarID: String?
     var avatarURL: URL?
     var initial: String
     var body: String
+
+    init(
+        messageID: UUID? = nil,
+        senderID: UUID?,
+        senderName: String,
+        avatarID: String?,
+        avatarURL: URL?,
+        initial: String,
+        body: String
+    ) {
+        self.messageID = messageID
+        self.senderID = senderID
+        self.senderName = senderName
+        self.avatarID = avatarID
+        self.avatarURL = avatarURL
+        self.initial = initial
+        self.body = body
+    }
+}
+
+/// バブルに表示する引用（返信元）の構造化データ。
+struct ChatReplyQuote: Equatable {
+    var messageID: UUID?
+    var senderID: UUID?
+    var senderName: String
+    var preview: String
 }
 
 /// リプライの引用をメッセージ本文へ埋め込み／取り出しするフォーマッタ。
@@ -31,20 +58,50 @@ enum ChatReplyQuoteFormatter {
         return String(flattened.prefix(previewLimit)) + "…"
     }
 
+    /// 不可視区切り（U+2063）で メッセージID|送信者ID を埋め込む（タップジャンプ・アイコン解決用）。
+    static let metaSeparator = "\u{2063}"
+
     static func compose(reply: ChatReplyTarget, body: String) -> String {
-        "\(marker)\(reply.senderName)「\(preview(of: reply.body))」\n\(body)"
+        let meta = "\(reply.messageID?.uuidString ?? "")|\(reply.senderID?.uuidString ?? "")"
+        return "\(marker)\(metaSeparator)\(meta)\(metaSeparator)\(reply.senderName)「\(preview(of: reply.body))」\n\(body)"
     }
 
-    /// 本文から引用行を分離する。引用が無ければ quote は nil。
-    static func parse(_ body: String) -> (quote: String?, text: String) {
+    /// 本文から引用を分離する。引用が無ければ quote は nil。
+    static func parse(_ body: String) -> (quote: ChatReplyQuote?, text: String) {
         guard body.hasPrefix(marker),
               let newlineIndex = body.firstIndex(of: "\n")
         else {
             return (nil, body)
         }
-        let quote = String(body[body.index(body.startIndex, offsetBy: marker.count)..<newlineIndex])
+        var quoteRaw = String(body[body.index(body.startIndex, offsetBy: marker.count)..<newlineIndex])
         let text = String(body[body.index(after: newlineIndex)...])
-        return (quote, text)
+
+        var messageID: UUID?
+        var senderID: UUID?
+        if quoteRaw.hasPrefix(metaSeparator) {
+            let parts = quoteRaw.dropFirst().components(separatedBy: metaSeparator)
+            if parts.count >= 2 {
+                let ids = parts[0].components(separatedBy: "|")
+                messageID = ids.first.flatMap(UUID.init(uuidString:))
+                senderID = ids.count > 1 ? UUID(uuidString: ids[1]) : nil
+                quoteRaw = parts.dropFirst().joined(separator: metaSeparator)
+            }
+        }
+
+        // 「名前「プレビュー」」を分解（旧形式は名前と本文が繋がったまま表示する）。
+        let name: String
+        let preview: String
+        if let openIndex = quoteRaw.firstIndex(of: "「"), quoteRaw.hasSuffix("」") {
+            name = String(quoteRaw[..<openIndex])
+            preview = String(quoteRaw[quoteRaw.index(after: openIndex)..<quoteRaw.index(before: quoteRaw.endIndex)])
+        } else {
+            name = ""
+            preview = quoteRaw
+        }
+        return (
+            ChatReplyQuote(messageID: messageID, senderID: senderID, senderName: name, preview: preview),
+            text
+        )
     }
 
     static func copyText(of body: String) -> String {
@@ -102,23 +159,50 @@ struct ChatReplyComposerPreview: View {
     }
 }
 
-/// バブル内に出す引用表示（リプライ先の名前＋元メッセージ）。
+/// バブル内に出す引用表示：左に返信元アイコン、名前は太字・元メッセージは薄字。
+/// タップで元メッセージへスクロールできる（onTap 指定時）。
 struct ChatReplyQuoteLine: View {
-    var quote: String
+    var quote: ChatReplyQuote
     var isMine: Bool
+    var avatarID: String?
+    var avatarURL: URL?
+    var onTap: (() -> Void)?
 
     var body: some View {
-        HStack(spacing: 6) {
-            RoundedRectangle(cornerRadius: 1.5)
-                .fill(isMine ? Color.white.opacity(0.7) : MegrumTheme.lavender)
-                .frame(width: 3)
-            Text(quote)
-                .font(.system(size: 11.5, weight: .bold, design: .rounded))
-                .foregroundStyle(isMine ? Color.white.opacity(0.82) : MegrumTheme.muted)
+        Button {
+            if let onTap {
+                MegrumHaptics.performButtonTap(onTap)
+            }
+        } label: {
+            HStack(spacing: 7) {
+                RoundedRectangle(cornerRadius: 1.5)
+                    .fill(isMine ? Color.white.opacity(0.7) : MegrumTheme.lavender)
+                    .frame(width: 3)
+
+                BoardThreadDetailAvatar(
+                    avatarID: avatarID,
+                    imageURL: avatarURL,
+                    initial: String(quote.senderName.prefix(1)).uppercased(),
+                    size: 22
+                )
+
+                (
+                    Text(quote.senderName.isEmpty ? "" : "\(quote.senderName)")
+                        .font(.system(size: 11.5, weight: .black, design: .rounded))
+                        .foregroundStyle(isMine ? Color.white.opacity(0.92) : MegrumTheme.ink.opacity(0.82))
+                    + Text("「\(quote.preview)」")
+                        .font(.system(size: 11.5, weight: .semibold, design: .rounded))
+                        .foregroundStyle(isMine ? Color.white.opacity(0.6) : MegrumTheme.muted.opacity(0.85))
+                )
                 .lineLimit(2)
                 .multilineTextAlignment(.leading)
+            }
+            .contentShape(Rectangle())
         }
-        .padding(.bottom, 3)
+        .buttonStyle(.plain)
+        .disabled(onTap == nil)
+        .padding(.bottom, 4)
+        .accessibilityLabel("返信元: \(quote.senderName) \(quote.preview)")
     }
 }
 
@@ -165,9 +249,9 @@ extension View {
                         guard let onReply else {
                             return
                         }
-                        let horizontal = value.translation.width
+                        let horizontal = abs(value.translation.width)
                         let vertical = abs(value.translation.height)
-                        // 右方向へはっきりスワイプした時だけリプライを開始する。
+                        // 左右どちらでも、はっきり横へスワイプした時にリプライを開始する。
                         if horizontal > 56, horizontal > vertical * 1.4 {
                             MegrumHaptics.buttonTap()
                             onReply()

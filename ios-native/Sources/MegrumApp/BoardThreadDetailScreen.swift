@@ -102,7 +102,12 @@ struct BoardThreadDetailScreen: View {
                                 photoPresentationState.selectRemoteImage(url)
                             },
                             onReply: { message in
+                                let quotedMessageID: UUID? = {
+                                    if case .reply(let id) = message.target { return id }
+                                    return nil
+                                }()
                                 replyTarget = ChatReplyTarget(
+                                    messageID: quotedMessageID,
                                     senderID: message.authorID,
                                     senderName: message.displayName,
                                     avatarID: message.avatarID,
@@ -113,6 +118,13 @@ struct BoardThreadDetailScreen: View {
                             },
                             onReport: { message in
                                 reportTargetMessage = message
+                            },
+                            onJumpToMessage: { messageID in
+                                if let display = presentation.chatMessages.first(where: { $0.target == .reply(messageID) }) {
+                                    withAnimation(.snappy(duration: 0.3)) {
+                                        proxy.scrollTo(display.id, anchor: .center)
+                                    }
+                                }
                             }
                         )
                         .padding(.top, 14)

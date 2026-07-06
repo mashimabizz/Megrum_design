@@ -250,15 +250,25 @@ private struct TradeLocationMapGrid: View {
 struct TradeTextMessageBubble: View {
     var text: String
     var isMine: Bool
+    var quoteAvatarURL: URL? = nil
+    var onJumpToMessage: (UUID) -> Void = { _ in }
 
-    private var parsed: (quote: String?, text: String) {
+    private var parsed: (quote: ChatReplyQuote?, text: String) {
         ChatReplyQuoteFormatter.parse(text)
     }
 
     var body: some View {
         if let quote = parsed.quote {
             VStack(alignment: .leading, spacing: 0) {
-                ChatReplyQuoteLine(quote: quote, isMine: isMine)
+                ChatReplyQuoteLine(
+                    quote: quote,
+                    isMine: isMine,
+                    avatarID: nil,
+                    avatarURL: quoteAvatarURL,
+                    onTap: quote.messageID.map { messageID in
+                        { onJumpToMessage(messageID) }
+                    }
+                )
                 Text(parsed.text)
                     .font(.system(size: 15, weight: .bold, design: .rounded))
                     .foregroundStyle(isMine ? .white : MegrumTheme.ink)

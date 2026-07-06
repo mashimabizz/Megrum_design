@@ -502,6 +502,7 @@ struct MeguriMessagesScreen: View {
                 onReply: { message in
                     let isMine = message.senderID == appState.viewer?.id
                     replyTarget = ChatReplyTarget(
+                        messageID: message.id,
                         senderID: message.senderID,
                         senderName: isMine
                             ? (appState.viewer?.displayName).nilIfBlank ?? "自分"
@@ -519,6 +520,11 @@ struct MeguriMessagesScreen: View {
                 },
                 onReport: { message in
                     reportTargetMessage = message
+                },
+                onJumpToMessage: { messageID in
+                    withAnimation(.snappy(duration: 0.3)) {
+                        proxy.scrollTo(messageID, anchor: .center)
+                    }
                 }
             )
             .onChange(of: messages.count) { _, _ in

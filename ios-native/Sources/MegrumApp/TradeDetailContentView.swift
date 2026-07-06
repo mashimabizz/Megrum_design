@@ -108,6 +108,12 @@ struct TradeDetailContent: View {
                             onOpenImage: onOpenImage,
                             onReply: onReplyToMessage,
                             onReportMessage: onReportMessage,
+                            partnerAvatarURL: heroPresentation.partnerAvatarURL,
+                            onJumpToMessage: { messageID in
+                                withAnimation(.snappy(duration: 0.3)) {
+                                    proxy.scrollTo(messageID, anchor: .center)
+                                }
+                            },
                             onOpenDispute: onOpenDispute,
                             onOpenMailingInfo: {
                                 agreementDisclosureRoute = .mailingAddress

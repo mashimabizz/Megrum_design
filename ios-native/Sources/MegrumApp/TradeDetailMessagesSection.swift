@@ -18,6 +18,9 @@ struct TradeDetailMessagesSection: View {
     var onOpenImage: (URL) -> Void
     var onReply: (TradeMessage) -> Void = { _ in }
     var onReportMessage: (TradeMessage) -> Void = { _ in }
+    /// 引用の返信元が相手の時に出すアバターURL。
+    var partnerAvatarURL: URL? = nil
+    var onJumpToMessage: (UUID) -> Void = { _ in }
     var onOpenDispute: (TradeDisputeSummary) -> Void
     var onOpenMailingInfo: () -> Void
     var onOpenPaymentInfo: () -> Void
@@ -67,8 +70,11 @@ struct TradeDetailMessagesSection: View {
                         onOpenImage: onOpenImage,
                         onOpenDispute: onOpenDispute,
                         onOpenEvidenceList: onOpenEvidenceList,
-                        onApproveCancel: onApproveCancel
+                        onApproveCancel: onApproveCancel,
+                        quoteAvatarURL: partnerAvatarURL,
+                        onJumpToMessage: onJumpToMessage
                     )
+                    .id(row.message.id)
                     .chatMessageInteraction(
                         copyText: row.message.messageType == .text
                             ? (row.message.body?.nilIfBlank).map(ChatReplyQuoteFormatter.copyText(of:))

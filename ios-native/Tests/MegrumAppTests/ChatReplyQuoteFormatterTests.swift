@@ -3,8 +3,11 @@ import XCTest
 
 final class ChatReplyQuoteFormatterTests: XCTestCase {
     func testComposeAndParseRoundTrip() {
+        let messageID = UUID(uuidString: "00000000-0000-0000-0000-000000000101")!
+        let senderID = UUID(uuidString: "00000000-0000-0000-0000-000000000201")!
         let target = ChatReplyTarget(
-            senderID: nil,
+            messageID: messageID,
+            senderID: senderID,
             senderName: "みち",
             avatarID: nil,
             avatarURL: nil,
@@ -14,7 +17,10 @@ final class ChatReplyQuoteFormatterTests: XCTestCase {
         let composed = ChatReplyQuoteFormatter.compose(reply: target, body: "こちらこそ！")
 
         let parsed = ChatReplyQuoteFormatter.parse(composed)
-        XCTAssertEqual(parsed.quote, "みち「誘ってくれてありがとう！ 楽しかったです」")
+        XCTAssertEqual(parsed.quote?.messageID, messageID)
+        XCTAssertEqual(parsed.quote?.senderID, senderID)
+        XCTAssertEqual(parsed.quote?.senderName, "みち")
+        XCTAssertEqual(parsed.quote?.preview, "誘ってくれてありがとう！ 楽しかったです")
         XCTAssertEqual(parsed.text, "こちらこそ！")
         XCTAssertEqual(ChatReplyQuoteFormatter.copyText(of: composed), "こちらこそ！")
     }

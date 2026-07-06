@@ -16,6 +16,7 @@ struct MeguriMessageList: View {
     var onOpenImage: (URL) -> Void = { _ in }
     var onReply: (MeguriMessage) -> Void = { _ in }
     var onReport: (MeguriMessage) -> Void = { _ in }
+    var onJumpToMessage: (UUID) -> Void = { _ in }
 
     var body: some View {
         GeometryReader { proxy in
@@ -34,6 +35,7 @@ struct MeguriMessageList: View {
                                 ChatDaySeparator(date: message.createdAt)
                             }
                             MeguriMessageBubble(
+                                onJumpToMessage: onJumpToMessage,
                                 message: message,
                                 viewerID: viewerID,
                                 isMine: message.senderID == viewerID,
@@ -100,6 +102,7 @@ private struct MeguriMessageEmptyState: View {
 }
 
 struct MeguriMessageBubble: View {
+    var onJumpToMessage: (UUID) -> Void = { _ in }
     var message: MeguriMessage
     var viewerID: UUID?
     var isMine: Bool
@@ -218,7 +221,15 @@ struct MeguriMessageBubble: View {
         let parsed = ChatReplyQuoteFormatter.parse(text)
         if let quote = parsed.quote, !message.locked {
             VStack(alignment: .leading, spacing: 0) {
-                ChatReplyQuoteLine(quote: quote, isMine: isMine)
+                ChatReplyQuoteLine(
+                    quote: quote,
+                    isMine: isMine,
+                    avatarID: quote.senderID == viewerID ? nil : peerAvatarID,
+                    avatarURL: quote.senderID == viewerID ? nil : peerAvatarURL,
+                    onTap: quote.messageID.map { messageID in
+                        { onJumpToMessage(messageID) }
+                    }
+                )
                 Text(parsed.text)
                     .font(.system(size: 15, weight: .bold, design: .rounded))
                     .foregroundStyle(isMine ? .white : MegrumTheme.ink)

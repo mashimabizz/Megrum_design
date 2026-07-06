@@ -57,7 +57,7 @@ struct SubscriptionSettingsContent: View {
                     systemImage: state.isMegrumPlusActive ? "checkmark.seal.fill" : "person.crop.circle"
                 )
                 .font(.system(size: 14, weight: .heavy, design: .rounded))
-                .foregroundStyle(MegrumTheme.ink)
+                .foregroundStyle(.white.opacity(0.92))
                 Spacer()
                 if isLoading {
                     ProgressView()
@@ -87,7 +87,7 @@ struct SubscriptionSettingsContent: View {
             }
         }
         .padding(14)
-        .background(.white.opacity(0.9), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
     private var purchaseButtons: some View {
@@ -252,7 +252,7 @@ private struct SubscriptionComparisonTable: View {
             .foregroundStyle(MegrumTheme.muted)
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
-            .background(Color.white.opacity(0.96))
+            .background(Color.white.opacity(0.08))
 
             ForEach(Array(SubscriptionComparisonRow.rows.enumerated()), id: \.element.id) { index, row in
                 HStack(spacing: 8) {
@@ -262,7 +262,7 @@ private struct SubscriptionComparisonTable: View {
                         .frame(width: 20)
                     Text(row.title)
                         .font(.system(size: 13, weight: .heavy, design: .rounded))
-                        .foregroundStyle(MegrumTheme.ink)
+                        .foregroundStyle(.white.opacity(0.92))
                         .lineLimit(2)
                         .minimumScaleFactor(0.82)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -274,13 +274,13 @@ private struct SubscriptionComparisonTable: View {
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 11)
-                .background(index.isMultiple(of: 2) ? Color.white.opacity(0.9) : MegrumTheme.canvas)
+                .background(Color.white.opacity(index.isMultiple(of: 2) ? 0.06 : 0.03))
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .strokeBorder(MegrumTheme.lavender.opacity(0.16), lineWidth: 1)
+                .strokeBorder(MegrumTheme.lavender.opacity(0.35), lineWidth: 1)
         }
     }
 
@@ -302,7 +302,7 @@ private struct SubscriptionComparisonTable: View {
         .foregroundStyle(
             isPremiumColumn
                 ? MegrumTheme.lavender
-                : (isAvailable ? MegrumTheme.ink.opacity(0.68) : MegrumTheme.muted.opacity(0.55))
+                : Color.white.opacity(isAvailable ? 0.6 : 0.38)
         )
     }
 }
@@ -335,13 +335,13 @@ private struct SubscriptionPlanPicker: View {
             HStack(spacing: 12) {
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: 21, weight: .bold))
-                    .foregroundStyle(isSelected ? MegrumTheme.lavender : MegrumTheme.muted.opacity(0.5))
+                    .foregroundStyle(isSelected ? MegrumTheme.lavender : .white.opacity(0.4))
 
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 8) {
                         Text("\(plan.title)プラン")
                             .font(.system(size: 15.5, weight: .black, design: .rounded))
-                            .foregroundStyle(MegrumTheme.ink)
+                            .foregroundStyle(.white.opacity(0.94))
                         if let badge = plan.badge {
                             Text(badge)
                                 .font(.system(size: 10.5, weight: .black, design: .rounded))
@@ -360,18 +360,18 @@ private struct SubscriptionPlanPicker: View {
                     }
                     Text(plan.perMonthText)
                         .font(.system(size: 11.5, weight: .bold, design: .rounded))
-                        .foregroundStyle(MegrumTheme.muted)
+                        .foregroundStyle(.white.opacity(0.55))
                 }
 
                 Spacer(minLength: 8)
 
                 Text(displayPrice(for: plan))
                     .font(.system(size: 17, weight: .black, design: .rounded))
-                    .foregroundStyle(isSelected ? MegrumTheme.lavender : MegrumTheme.ink.opacity(0.8))
+                    .foregroundStyle(isSelected ? MegrumTheme.lavender : .white.opacity(0.85))
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 13)
-            .background(.white.opacity(isSelected ? 0.98 : 0.82), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .background(.white.opacity(isSelected ? 0.16 : 0.07), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
                     .strokeBorder(

@@ -12,6 +12,8 @@ struct TradeMessageBubble: View {
     var onOpenDispute: (TradeDisputeSummary) -> Void = { _ in }
     var onOpenEvidenceList: () -> Void = {}
     var onApproveCancel: () -> Void = {}
+    var quoteAvatarURL: URL? = nil
+    var onJumpToMessage: (UUID) -> Void = { _ in }
 
     var body: some View {
         if message.messageType == .system {
@@ -34,7 +36,9 @@ struct TradeMessageBubble: View {
             message: message,
             isMine: isMine,
             isReadByPartner: isReadByPartner,
-            onOpenImage: onOpenImage
+            onOpenImage: onOpenImage,
+            quoteAvatarURL: quoteAvatarURL,
+            onJumpToMessage: onJumpToMessage
         )
         .frame(maxWidth: .infinity, alignment: isMine ? .trailing : .leading)
     }

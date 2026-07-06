@@ -10,6 +10,7 @@ struct BoardThreadChatTimeline: View {
     var onOpenImage: (URL) -> Void = { _ in }
     var onReply: (BoardThreadChatMessageDisplay) -> Void = { _ in }
     var onReport: (BoardThreadChatMessageDisplay) -> Void = { _ in }
+    var onJumpToMessage: (UUID) -> Void = { _ in }
 
     var body: some View {
         LazyVStack(spacing: 8) {
@@ -27,7 +28,8 @@ struct BoardThreadChatTimeline: View {
                     onReact: { reaction in
                         onReact(message.target, reaction)
                     },
-                    onOpenImage: onOpenImage
+                    onOpenImage: onOpenImage,
+                    onJumpToMessage: onJumpToMessage
                 )
                 .chatMessageInteraction(
                     copyText: message.isDeleted ? nil : ChatReplyQuoteFormatter.copyText(of: message.body),
@@ -49,6 +51,7 @@ struct BoardThreadChatMessageRow: View {
     var message: BoardThreadChatMessageDisplay
     var onReact: (BoardMessageReaction?) -> Void
     var onOpenImage: (URL) -> Void
+    var onJumpToMessage: (UUID) -> Void = { _ in }
 
     var body: some View {
         HStack(alignment: .bottom, spacing: 8) {
@@ -120,7 +123,15 @@ struct BoardThreadChatMessageRow: View {
     private var textOnlyMessageBubble: some View {
         if let replyQuote {
             VStack(alignment: .leading, spacing: 0) {
-                ChatReplyQuoteLine(quote: replyQuote, isMine: message.isMine)
+                ChatReplyQuoteLine(
+                    quote: replyQuote,
+                    isMine: message.isMine,
+                    avatarID: nil,
+                    avatarURL: nil,
+                    onTap: replyQuote.messageID.map { messageID in
+                        { onJumpToMessage(messageID) }
+                    }
+                )
                 Text(messageText)
                     .font(.system(size: 15, weight: .bold, design: .rounded))
                     .foregroundStyle(message.isMine ? .white : MegrumTheme.ink)
@@ -182,7 +193,7 @@ struct BoardThreadChatMessageRow: View {
         message.isDeleted ? "削除済みです" : ChatReplyQuoteFormatter.parse(message.body).text
     }
 
-    private var replyQuote: String? {
+    private var replyQuote: ChatReplyQuote? {
         message.isDeleted ? nil : ChatReplyQuoteFormatter.parse(message.body).quote
     }
 
