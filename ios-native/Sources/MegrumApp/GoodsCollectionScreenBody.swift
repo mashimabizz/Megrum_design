@@ -79,7 +79,7 @@ extension GoodsCollectionScreen {
                     items: filterBaseItems,
                     availableGroups: availableGroups,
                     availableGoodsTypes: availableGoodsTypes,
-                    characters: appState?.oshiCharacters ?? [],
+                    characters: collectionFilterCharacters,
                     selectedGroupIDs: $selectedGroupIDs,
                     selectedMemberIDs: $selectedMemberIDs,
                     selectedGoodsTypeIDs: $selectedGoodsTypeIDs,

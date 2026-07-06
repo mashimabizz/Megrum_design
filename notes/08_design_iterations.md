@@ -4,6 +4,31 @@
 
 ---
 
+## イテレーション1226.322：一覧フィルタのメンバー名解決を全グループキャッシュに
+
+### 背景・問題意識
+マイグッズ/ほしいもの一覧のフィルタで、メンバーの選択肢が実名ではなく「メンバー」と表示されることが多い（オーナー指摘）。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/GoodsCollectionLookupActions.swift` / `GoodsCollectionScreenBody.swift`
+- 原因：フィルタシートへ渡す名前解決リストが `appState.oshiCharacters`（最後に読み込んだ1グループ分だけ）だったため、他グループのメンバーはフォールバックの「メンバー」になっていた
+- 画面が既に持っているグループ別キャッシュ `oshiCharactersByGroupID` の全値を結合した `collectionFilterCharacters` を新設し、フィルタシートへ渡すように変更（重複はID去重）
+
+### 影響範囲
+- マイグッズ/ほしいもの一覧の絞り込みシート（メンバー章）
+
+### 確認方法
+- swift test 1491件 0失敗
+
+### セルフレビュー結果
+- ✅ 既存のキャッシュ（loadCollectionCharactersIfNeeded）を再利用、追加ロードなし
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/GoodsCollectionLookupActions.swift`
+
+---
+
 ## イテレーション1226.321：現地/広域探し分け仕様メモの削除
 
 ### 背景・問題意識

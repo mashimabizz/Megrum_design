@@ -31,6 +31,18 @@ extension GoodsCollectionScreen {
         return appState?.oshiCharacters.first { $0.id == memberID }?.name
     }
 
+    /// フィルタシートのメンバー名解決用：読み込み済みの全グループのメンバーを結合して返す。
+    /// appState.oshiCharacters は「最後に読み込んだグループ」しか持たないため、
+    /// それだけを渡すと他グループのメンバーが「メンバー」表示になってしまう。
+    var collectionFilterCharacters: [OshiCharacter] {
+        var merged = oshiCharactersByGroupID.values.flatMap { $0 }
+        if let appState {
+            merged += appState.oshiCharacters
+        }
+        var seen: Set<UUID> = []
+        return merged.filter { seen.insert($0.id).inserted }
+    }
+
     func loadFilterChoicesIfNeeded() async {
         guard let appState else {
             return
