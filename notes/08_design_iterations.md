@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション1226.334：オンボ登録の生年月日がプロフィール編集で「未設定」になる問題の修正
+
+### 背景・問題意識
+オーナー報告「新規登録オンボーディングで生年月日を登録したはずなのに、自分のプロフィール編集を開いたら未設定になっている」。RESTでDB行を確認すると `birth_date` は保存済み（書き込みは正常）→ 読み込み側でセッション中の viewer から生年月日が落ちる経路を調査。
+
+### 原因
+1. **支払い方法の保存**（`SupabasePaymentSettingsPersistence.saveSettings`）が `paymentSummarySelect`（birth_date / bio を含まない縮小select）でプロフィールを取得し、それをそのまま `appState.viewer` に代入していた。以降そのセッションでは生年月日・自己紹介が消え、プロフィール編集が「未設定」表示になる。
+2. `fetchViewerRows()` のレガシーフォールバック（birth_date 等なしの `legacySelect`）が**あらゆるエラー**で発火する設計で、起動時の一時的な通信エラーでも同症状になり得た。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/SupabasePaymentSettingsPersistence.swift`
+- 支払い保存の返却selectを `UserRow.select`（birth_date / bio 含むフル項目）に変更
+
+#### `ios-native/Sources/MegrumApp/UserProfileFieldMerging.swift`（新規）
+- `UserProfile.fillingMissingProfileFields(from:)` — 部分select由来プロフィールで viewer を上書きする際、birthDate / age / bio の欠落を既存 viewer から補完する純関数
+
+#### `ios-native/Sources/MegrumApp/MegrumAppStateAccountSettingsActions.swift`
+- `savePaymentSettings` の viewer 代入を `saved.profile.fillingMissingProfileFields(from: viewer)` に（防御的マージ）
+
+#### `ios-native/Sources/MegrumApp/SupabaseAccountProfilePersistence.swift`
+- `fetchViewerRows()` のレガシーフォールバック条件を「HTTP 400（スキーマ不一致）のみ」に限定。一時的エラーで生年月日等が黙って落ちないようにした
+
+### 影響範囲
+- プロフィール編集（生年月日・自己紹介の表示）、支払い方法設定、起動時 viewer 読み込み
+
+### 確認方法
+- swift test: 1491件 + 新規 `UserProfileFieldMergingTests` 2件、0 failures
+- REST検証: アプリと同一のフルselectが birth_date を返すことを実データで確認
+
+### セルフレビュー結果
+- ✅ DB書き込みは正常（REST確認済）でクライアント読み込み側のみの修正
+- ✅ 純関数抽出＋ユニットテスト2件追加
+- ✅ レガシーフォールバックはスキーマ不一致（400）時のみ温存
+- ⚠️ オーナー側の再現手順（支払い設定を触ったか）は未特定だが、確認できた欠落経路は全て塞いだ
+
+---
+
 ## イテレーション1226.333：新規ユーザーの画像閲覧不可修正＋ホーム空状態の導線と新着グッズ
 
 ### 背景・問題意識

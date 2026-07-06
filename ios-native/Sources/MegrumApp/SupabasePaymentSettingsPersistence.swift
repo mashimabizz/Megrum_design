@@ -27,7 +27,9 @@ final class SupabasePaymentSettingsPersistence: @unchecked Sendable {
                 paymentMethods: normalized.methods,
                 paymentNote: normalized.otherNote
             ),
-            select: UserRow.paymentSummarySelect,
+            // birth_date / bio を含むフル項目で返す。縮小selectのプロフィールを
+            // そのまま viewer に代入すると、生年月日などがセッション内で消える。
+            select: UserRow.select,
             queryItems: Self.userQueryItems(userID: userID)
         )
         return (

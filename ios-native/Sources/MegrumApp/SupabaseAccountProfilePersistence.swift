@@ -132,6 +132,13 @@ struct SupabaseAccountProfilePersistence: Sendable {
                 queryItems: Self.viewerQueryItems(userID: userID)
             )
         } catch {
+            // レガシーselect（birth_date等なし）へのフォールバックは、列が存在しない
+            // スキーマ不一致（400）の時だけにする。通信エラー等の一時失敗で
+            // フォールバックすると、生年月日などがそのセッション中ずっと
+            // 「未設定」表示になってしまう。
+            guard (error as? SupabaseRESTError)?.statusCode == 400 else {
+                throw error
+            }
             return try await client.fetchRows(
                 from: "users",
                 select: UserRow.legacySelect,

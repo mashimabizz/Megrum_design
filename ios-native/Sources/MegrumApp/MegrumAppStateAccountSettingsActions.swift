@@ -72,7 +72,9 @@ extension MegrumAppState {
         errorMessage = nil
         do {
             let saved = try await repository.savePaymentSettings(settings.normalized(for: viewer.id))
-            self.viewer = saved.profile
+            // 返却プロフィールに欠けている項目は既存 viewer から補完する
+            //（部分selectで生年月日等が消えるのを防ぐ）。
+            self.viewer = saved.profile.fillingMissingProfileFields(from: viewer)
             self.paymentSettings = saved.settings
             hasLoadedPaymentSettings = true
             isSavingPaymentSettings = false
