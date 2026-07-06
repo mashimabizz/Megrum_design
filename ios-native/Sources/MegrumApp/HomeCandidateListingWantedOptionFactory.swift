@@ -20,7 +20,9 @@ enum HomeCandidateListingWantedOptionFactory {
 
         let matchingItems = HomeCandidateListingWantedOptionMatchPolicy.matchingItems(
             for: option,
-            in: viewerInventory
+            in: viewerInventory,
+            wantedRowsByID: Self.rowsByID(previewInventory),
+            tagsByInventoryID: tagsByInventoryID
         )
         guard HomeCandidateListingWantedOptionMatchPolicy.isSelectable(
             option: option,
@@ -61,7 +63,9 @@ enum HomeCandidateListingWantedOptionFactory {
 
         let matchingItems = HomeCandidateListingWantedOptionMatchPolicy.matchingItems(
             for: option,
-            in: viewerInventory
+            in: viewerInventory,
+            wantedRowsByID: Self.rowsByID(previewInventory),
+            tagsByInventoryID: tagsByInventoryID
         )
         let previews = HomeCandidateListingWantedOptionPreviewBuilder.previewItems(
             for: option,
@@ -81,6 +85,10 @@ enum HomeCandidateListingWantedOptionFactory {
             previewItems: previews,
             subtitleMatchingCount: max(matchingItems.count, previews.count)
         )
+    }
+
+    private static func rowsByID(_ rows: [SupabaseHomeGoodsRow]) -> [UUID: SupabaseHomeGoodsRow] {
+        Dictionary(rows.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
     }
 
     private static func cashWantedOption(

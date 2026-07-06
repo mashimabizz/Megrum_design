@@ -6,12 +6,16 @@ enum HomeCandidateListingMatchPolicy {
     static func listingWantsViewerGoods(
         listing: SupabaseHomeListingRow,
         options: [SupabaseHomeListingWishOptionRow],
-        viewerInventory: [SupabaseHomeGoodsRow]
+        viewerInventory: [SupabaseHomeGoodsRow],
+        wantedRowsByID: [UUID: SupabaseHomeGoodsRow] = [:],
+        tagsByInventoryID: [UUID: [SupabaseHomeInventoryTagRow]] = [:]
     ) -> Bool {
         listingHasSelectableWantedOption(
             listing: listing,
             options: options,
             viewerInventory: viewerInventory,
+            wantedRowsByID: wantedRowsByID,
+            tagsByInventoryID: tagsByInventoryID,
             includesCash: false
         )
     }
@@ -20,6 +24,8 @@ enum HomeCandidateListingMatchPolicy {
         listing _: SupabaseHomeListingRow,
         options: [SupabaseHomeListingWishOptionRow],
         viewerInventory: [SupabaseHomeGoodsRow],
+        wantedRowsByID: [UUID: SupabaseHomeGoodsRow] = [:],
+        tagsByInventoryID: [UUID: [SupabaseHomeInventoryTagRow]] = [:],
         includesCash: Bool
     ) -> Bool {
         options.contains { option in
@@ -27,7 +33,12 @@ enum HomeCandidateListingMatchPolicy {
                 return true
             }
             return viewerInventory.contains { viewerItem in
-                optionWantsViewerGoods(option, viewerItem: viewerItem)
+                optionWantsViewerGoods(
+                    option,
+                    viewerItem: viewerItem,
+                    wantedRowsByID: wantedRowsByID,
+                    tagsByInventoryID: tagsByInventoryID
+                )
             }
         }
     }
@@ -68,21 +79,21 @@ enum HomeCandidateListingMatchPolicy {
         )
     }
 
+    /// 選択肢の条件（グループ・種別に加えメンバー指定/除外・シリーズ・数量）を
+    /// すべて満たす時だけ「相手があなたのグッズを求めている」と判定する。
+    /// 旧実装はグループ＋種別のみで、シリーズや数量が違っても激求/求になっていた。
     static func optionWantsViewerGoods(
         _ option: SupabaseHomeListingWishOptionRow,
-        viewerItem: SupabaseHomeGoodsRow
+        viewerItem: SupabaseHomeGoodsRow,
+        wantedRowsByID: [UUID: SupabaseHomeGoodsRow] = [:],
+        tagsByInventoryID: [UUID: [SupabaseHomeInventoryTagRow]] = [:]
     ) -> Bool {
-        guard option.isCashOffer != true else {
-            return false
-        }
-        if option.wishIds.contains(viewerItem.id) {
-            return true
-        }
-        guard option.wishGroupId != nil || option.wishGoodsTypeId != nil else {
-            return false
-        }
-        return HomeCandidateGoodsMatchPolicy.fieldMatches(option.wishGroupId, viewerItem.groupId)
-            && HomeCandidateGoodsMatchPolicy.fieldMatches(option.wishGoodsTypeId, viewerItem.goodsTypeId)
+        HomeMutualMatchListingEvaluator.mutualOptionWantsCounterpartGoods(
+            option,
+            counterpartItem: viewerItem,
+            rowsByID: wantedRowsByID,
+            tagsByInventoryID: tagsByInventoryID
+        )
     }
 
     static func wantedOption(

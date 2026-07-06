@@ -123,6 +123,10 @@ public extension SupabaseMegrumRepository {
         try await listingClient.loadPublicListings(userID: userID)
     }
 
+    func loadPublicWishes(userID: UUID) async throws -> [WishItem] {
+        try await ownedGoodsPersistence.loadPublicWishes(of: userID)
+    }
+
     func loadPublicUserProfile(userID: UUID) async throws -> PublicUserProfile? {
         try await publicProfilePersistence.loadProfile(userID: userID)
     }

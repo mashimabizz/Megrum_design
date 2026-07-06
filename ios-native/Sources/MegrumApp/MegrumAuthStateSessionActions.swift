@@ -33,6 +33,16 @@ extension MegrumAuthState {
             activateSession(refreshedSession, source: sessionSource)
             return true
         } catch {
+            // リフレッシュトークン自体が無効（失効・取り消し）の場合は、
+            // 期限切れセッションのままエラー画面に固定せず、サインインからやり直してもらう。
+            if let status = (error as? SupabaseRESTError)?.statusCode,
+               (400...403).contains(status) {
+                session = nil
+                sessionSource = .none
+                try? sessionStore.clear()
+                errorMessage = "ログインの有効期限が切れました。もう一度ログインしてください"
+                return false
+            }
             errorMessage = "ログイン情報を更新できませんでした。接続を確認して再読み込みしてください"
             return false
         }

@@ -4,6 +4,60 @@
 
 ---
 
+## イテレーション1226.338：他人プロフィール表示修正・マッチ厳格化・バッジ未読化ほか7件
+
+### 背景・問題意識
+オーナーFB7件：①他人プロフィールの個別募集・ほしいものが1件も出ない ②ほしいもの/譲グッズ登録後にホームが更新されない ③シリーズ・数量が合っていないのに「激求！」になる ④非マッチ時の「◯◯がほしい」は個別募集の先頭選択肢を出したい ⑤めぐり経由プロフィールのタブ下バナー広告が不要 ⑥グルーム返信への返信に「あなたのグルームに返信しました」が付く ⑦めぐりバッジが未返信数になっており、アプリアイコンのバッジと乖離。
+
+### 変更内容
+
+#### ①他人プロフィール（ほしいもの・個別募集）
+- `SupabaseOwnedGoodsPersistence.loadPublicWishes(of:)` 新設（goods_inventory kind=wanted/activeを他ユーザーIDで取得）＋ Repository / appState（`publicWishesByUserID`）配線
+- `PublicUserProfileScreenDerivedState`: `publicWishByID` を**viewer自身のwishes**から解決していたバグを修正（相手のwishで解決）。ほしいものタブは「募集で求めているもの→残りを新しい順」で全wish表示。個別募集カード内のwish画像・名称も相手のwishで解決される
+- `loadPublicExchangeContent` にwish取得を追加（失敗しても募集表示は継続）
+- VisualQA: `MEGRUM_VISUAL_QA_PROFILE_USER_ID` / `MEGRUM_VISUAL_QA_PROFILE_TAB`（goods/listings/wish）追加。実データで譲/個別募集/ほしいものの3タブをスクショ確認済み
+
+#### ②登録後のホーム更新
+- `MegrumAppStateGoodsActions`: グッズ/ほしいものの作成・更新・非表示・削除の成功後に `refreshHomeCandidates` を非同期実行（個別募集側は実装済みだった）
+
+#### ③マッチ厳格化（激求/求の判定）
+- `HomeCandidateListingMatchPolicy.optionWantsViewerGoods` が**グループ＋種別のみ**で判定していたのを、`HomeMutualMatchListingEvaluator.mutualOptionWantsCounterpartGoods`（メンバー指定/除外・シリーズタグ・グッズ指定はwish属性で判定）へ委譲
+- 同Evaluatorに**数量条件**を追加（wishQuantity > 1 なら相手の出せる数量が満たすこと）
+- `HomeCandidatePartnerDemandSummary` / `ViewerOfferDemandSummary` / 選択肢Factory / `SearchResultFilterPolicy`（検索側）にも同条件を配線
+
+#### ④非マッチ時の「◯◯がほしい」
+- `HomeCandidatePartnerDemandSummary.partnerLookingForText`: 相手の個別募集の**先頭選択肢**（グッズ指定）から短文を生成し、なければ従来どおりほしいもの先頭から
+
+#### ⑤めぐり経由プロフィールの広告
+- `MeguriUserProfileRouteScreen` から `adPlacement: .publicProfileFooterBanner` を除去
+
+#### ⑥グルーム返信への返信
+- `MeguriMessageViews.sendMessage/addPhoto`: `sourceGroomPostID`（会話グルーピングキー）は常に付与しつつ、文脈カード用の `sourceGroomOwnerID / ImageURL` は「その会話に文脈カード付きメッセージがまだ無い最初の送信」だけに付与。リプライ時は常に通常メッセージ
+
+#### ⑦バッジ
+- フッターのめぐりバッジを `meguriPendingReplyCount`（未返信）→ `meguriUnreadMessageCount`（未読）へ
+- `appIconBadgeCount` も同じ構成（未読通知＋やりとり要対応＋めぐり未読）に揃え、乖離を解消
+
+#### 付随修正（検証中に発見）
+- **期限切れセッションの復帰**: リフレッシュトークンが無効（400〜403）の場合はセッションを破棄してサインイン画面へ（従来はエラー画面に固定され続けた）`MegrumAuthStateSessionActions`
+- `loadInitialData` 失敗時のエラー内容をDEBUGログ出力
+- （ガイドツアーブランチ側にも同時期のQA改善あり：DEBUG自動サインインの常時入り直し・VisualQA時の通知ダイアログ抑制）
+
+### 影響範囲
+- 他人プロフィール、ホーム候補（激求/求判定・並び）、検索結果フィルタ、めぐりメッセージ、タブ/アプリバッジ、認証復帰
+
+### 確認方法
+- swift test: 1491件 0 failures（main）
+- シミュレータ実データ検証: プロフィール3タブのスクショ（譲4件・個別募集1/2切替・ほしいもの2件）
+- REST検証: listings / listing_wish_options / kind=wanted の他ユーザー可視性（RLS）を確認
+
+### セルフレビュー結果
+- ✅ RLS・データ取得はRESTで実データ検証済み
+- ✅ 会話グルーピングキー（sourceGroomPostID）は維持したままカード表示だけ抑制
+- ⚠️ マッチ厳格化により既存の「激求/求」表示は減る方向（仕様通り）。数量条件は「相手の出せる数量>=wishQuantity」と解釈
+
+---
+
 ## イテレーション1226.335：ホーム空状態ちらつき解消＋グルームコメント改善＋入室画面の入力欄非表示
 
 ### 背景・問題意識

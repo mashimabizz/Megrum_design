@@ -5,10 +5,17 @@ import MegrumData
 enum HomeCandidateListingWantedOptionMatchPolicy {
     static func matchingItems(
         for option: SupabaseHomeListingWishOptionRow,
-        in viewerInventory: [SupabaseHomeGoodsRow]
+        in viewerInventory: [SupabaseHomeGoodsRow],
+        wantedRowsByID: [UUID: SupabaseHomeGoodsRow] = [:],
+        tagsByInventoryID: [UUID: [SupabaseHomeInventoryTagRow]] = [:]
     ) -> [SupabaseHomeGoodsRow] {
         viewerInventory.filter { viewerItem in
-            HomeCandidateListingMatchPolicy.optionWantsViewerGoods(option, viewerItem: viewerItem)
+            HomeCandidateListingMatchPolicy.optionWantsViewerGoods(
+                option,
+                viewerItem: viewerItem,
+                wantedRowsByID: wantedRowsByID,
+                tagsByInventoryID: tagsByInventoryID
+            )
         }
     }
 

@@ -22,11 +22,11 @@ struct MeguriUserProfileRouteScreen: View {
         if appState.viewer?.id == userID {
             OwnProfileScreen(appState: appState, onClose: onClose)
         } else {
+            // 各タブ下のバナー広告は不要（オーナーFB iter1226.338）。
             PublicUserProfileScreen(
                 appState: appState,
                 userID: userID,
-                adDisplayContext: adDisplayContext,
-                adPlacement: .publicProfileFooterBanner
+                adDisplayContext: adDisplayContext
             )
         }
     }

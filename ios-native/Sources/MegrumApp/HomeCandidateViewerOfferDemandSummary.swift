@@ -36,16 +36,27 @@ struct HomeCandidateViewerOfferDemandSummary {
         let matchingPartnerWishes = context.partnerScope.wishes.filter { partnerWish in
             HomeCandidateComposer.wishRow(partnerWish, matches: viewerItem)
         }
+        let partnerWishRowsByID = Dictionary(
+            context.partnerScope.wishes.map { ($0.id, $0) },
+            uniquingKeysWith: { first, _ in first }
+        )
         let matchingPartnerListings = context.partnerScope.listings.filter { listing in
             HomeCandidateListingMatchPolicy.listingWantsViewerGoods(
                 listing: listing,
                 options: context.listingOptionsByListingID[listing.id, default: []],
-                viewerInventory: [viewerItem]
+                viewerInventory: [viewerItem],
+                wantedRowsByID: partnerWishRowsByID,
+                tagsByInventoryID: context.tagsByInventoryID
             )
         }
         let matchingPartnerListingOptions = matchingPartnerListings.flatMap { listing in
             context.listingOptionsByListingID[listing.id, default: []].filter { option in
-                HomeCandidateListingMatchPolicy.optionWantsViewerGoods(option, viewerItem: viewerItem)
+                HomeCandidateListingMatchPolicy.optionWantsViewerGoods(
+                    option,
+                    viewerItem: viewerItem,
+                    wantedRowsByID: partnerWishRowsByID,
+                    tagsByInventoryID: context.tagsByInventoryID
+                )
             }
         }
 

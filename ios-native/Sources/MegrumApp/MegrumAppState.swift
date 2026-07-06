@@ -50,6 +50,8 @@ public final class MegrumAppState: ObservableObject {
     @Published public internal(set) var publicProfilesByUserID: [UUID: PublicUserProfile] = [:]
     @Published public internal(set) var publicTradeGoodsByUserID: [UUID: [GoodsItem]] = [:]
     @Published public internal(set) var publicListingsByUserID: [UUID: [IndividualListing]] = [:]
+    /// 他人プロフィールのほしいもの（userIDごと）。
+    @Published public internal(set) var publicWishesByUserID: [UUID: [WishItem]] = [:]
     @Published public internal(set) var publicExchangeSettingsByUserID: [UUID: HomeDefaultExchangeSettings] = [:]
     @Published public internal(set) var userEvaluationsByUserID: [UUID: [UserEvaluation]] = [:]
     @Published public internal(set) var groomLikeCountByUserID: [UUID: Int] = [:]
@@ -169,8 +171,8 @@ public final class MegrumAppState: ObservableObject {
         NotificationReadStateReducer.unreadCount(in: notifications)
     }
 
-    /// アプリアイコンのバッジに出す合計：未読通知＋やりとりの要対応＋めぐりの要返信。
-    /// アプリ内のタブバッジやドロワーのバッジで見える数の合算に相当する。
+    /// アプリアイコンのバッジに出す合計：未読通知＋やりとりの要対応＋めぐりの未読。
+    /// フッターのタブバッジと同じ構成要素の合算（乖離させない）。
     public var appIconBadgeCount: Int {
         let tradeAttention = TradeStageAttentionCounts(
             proposals: proposals,
@@ -179,7 +181,7 @@ public final class MegrumAppState: ObservableObject {
             viewerID: viewer?.id,
             evaluatedProposalIDs: viewerEvaluatedProposalIDs
         )
-        return unreadNotificationCount + tradeAttention.total + meguriPendingReplyCount
+        return unreadNotificationCount + tradeAttention.total + meguriUnreadMessageCount
     }
 
     public var meguriUnreadMessageCount: Int {
@@ -362,6 +364,9 @@ public final class MegrumAppState: ObservableObject {
             await preloadTradeMessages()
             await preloadTradeEvidencePhotos()
         } catch {
+            #if DEBUG
+            print("MEGRUM_DEBUG_SNAPSHOT error: \(error)")
+            #endif
             errorMessage = "データを読み込めませんでした"
         }
 

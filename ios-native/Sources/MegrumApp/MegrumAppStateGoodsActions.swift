@@ -51,6 +51,7 @@ extension MegrumAppState {
             let created = try await repository.createGoodsEntry(normalizedInput)
             upsertGoodsItemLocally(created, kind: normalizedInput.kind)
             isCreatingGoodsEntry = false
+            refreshHomeCandidatesAfterGoodsChange()
             return created
         } catch {
             errorMessage = "グッズを保存できませんでした"
@@ -89,6 +90,7 @@ extension MegrumAppState {
             let updated = try await repository.updateGoodsEntry(itemID: itemID, kind: kind, input: normalizedInput)
             upsertGoodsItemLocally(updated, kind: kind)
             mutatingGoodsItemID = nil
+            refreshHomeCandidatesAfterGoodsChange()
             return true
         } catch {
             errorMessage = "グッズを更新できませんでした"
@@ -175,6 +177,7 @@ extension MegrumAppState {
             try await repository.archiveGoodsItem(itemID: itemID)
             removeGoodsItemLocally(itemID)
             mutatingGoodsItemID = nil
+            refreshHomeCandidatesAfterGoodsChange()
             return true
         } catch {
             errorMessage = "グッズを非表示にできませんでした"
@@ -194,6 +197,7 @@ extension MegrumAppState {
             try await repository.deleteGoodsItem(itemID: itemID)
             removeGoodsItemLocally(itemID)
             mutatingGoodsItemID = nil
+            refreshHomeCandidatesAfterGoodsChange()
             return true
         } catch {
             errorMessage = "グッズを削除できませんでした"
@@ -243,6 +247,14 @@ extension MegrumAppState {
                 from: currentGoodsLocalState
             )
         )
+    }
+
+    /// ほしいもの・譲グッズの登録/更新/削除後、ホームのマッチ候補を裏で再計算する。
+    /// 画面を塞がないよう非同期で実行し、失敗しても現状表示を維持する。
+    private func refreshHomeCandidatesAfterGoodsChange() {
+        Task { [weak self] in
+            await self?.refreshHomeCandidates(reportsFailure: false)
+        }
     }
 
     private func upsertGoodsItemLocally(_ item: GoodsItem, kind: GoodsEntryKind) {
