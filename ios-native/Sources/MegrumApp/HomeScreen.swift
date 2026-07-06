@@ -23,6 +23,11 @@ struct HomeScreen: View {
     var onOpenProposalRoute: ((HomeProposalRoute) -> Void)?
     var onOpenMeguri: (() -> Void)? = nil
     var onOpenTrades: (() -> Void)? = nil
+    var onOpenInventory: () -> Void = {}
+    var tutorialSampleActive: Bool = false
+    var starterMissionEnabled: Bool = false
+    /// ガイドツアーのサンプル候補用シグナル差し替え。指定時は appState 由来のシグナルより優先。
+    var conditionSignalsByItemIDOverride: [UUID: HomeCandidateConditionSignals]? = nil
     var visualQAInitialScreen: VisualQAInitialScreen? = nil
 
     @AppStorage("megrum.home.localMode.activityWindowID") var localModeActivityWindowID = ""
@@ -49,7 +54,7 @@ struct HomeScreen: View {
             possibleItems: possibleItems,
             recentPartnerItems: appState?.homeRecentPartnerItems ?? [],
             goodsTypes: appState?.goodsTypes ?? [],
-            conditionSignalsByItemID: appState?.homeCandidateConditionSignals ?? [:],
+            conditionSignalsByItemID: conditionSignalsByItemIDOverride ?? appState?.homeCandidateConditionSignals ?? [:],
             mutualMatchCandidateData: appState?.homeMutualMatchCandidates ?? [],
             hasLoadedCandidates: appState?.hasLoadedHomeCandidates ?? true,
             adDisplayContext: adDisplayContext,
@@ -72,7 +77,10 @@ struct HomeScreen: View {
             onRefresh: {
                 await onRefresh()
                 await loadLocalActivitySettings()
-            }
+            },
+            tutorialSampleActive: tutorialSampleActive,
+            starterMissionEnabled: starterMissionEnabled,
+            onOpenInventory: onOpenInventory
         )
         .background(MegrumTheme.canvas.ignoresSafeArea())
         .megrumHiddenNavigationBar()

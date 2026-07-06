@@ -164,6 +164,12 @@ struct MeguriScreen: View {
         .task {
             requestInitialLocationIfNeeded()
         }
+        .onChange(of: appState.isTutorialActive) { _, isActive in
+            // ツアー終了時に、抑制していた位置情報リクエストを呼び直す。
+            if !isActive {
+                requestInitialLocationIfNeeded()
+            }
+        }
         .onDisappear {
             locationState.stopUpdatingCurrentLocation()
         }

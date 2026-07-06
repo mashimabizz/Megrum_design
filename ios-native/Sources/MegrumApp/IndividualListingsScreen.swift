@@ -78,6 +78,7 @@ struct IndividualListingsScreen: View {
                 AddIndividualListingButton(title: "募集を追加") {
                     openCreateEditor(optionKind: nil)
                 }
+                .tutorialAnchor(.listingAddButton)
                 // マイグッズ/ほしいものの右下フローティングと同じ余白に統一する
                 .padding(.trailing, FloatingActionLayoutMetrics.leadingPadding)
                 .padding(.bottom, FloatingActionLayoutMetrics.addButtonBottomPadding)
@@ -275,6 +276,10 @@ struct IndividualListingsScreen: View {
     }
 
     private func presentListingSharePrompt(_ listing: IndividualListing) {
+        // ガイドツアー中は共有プロンプトを出さない。
+        guard !appState.isTutorialActive else {
+            return
+        }
         sharePostErrorMessage = nil
         isPreparingSharePost = false
         let displayName = viewerDisplayNameForSharePost()

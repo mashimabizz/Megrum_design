@@ -4,6 +4,66 @@
 
 ---
 
+## イテレーション1226.336：初回オンボーディング・ガイドツアー＋最初の3ステップ・ミッションカード
+
+### 背景・問題意識
+新規登録→初期設定（AccountSetup 8ステップ）完了後、ユーザーは無言でホームに着地し、マイグッズ0件だとホーム3セクションが丸ごと非表示のため「ほぼ真っ白なホーム」を見ることになっていた（既存ガイダンスは?ボタンのヘルプシートのみ）。オーナー要望：StoryLane風に「案内を出しながらタップで一通りの流れを体験してもらう」オンボーディング。決定：A=サンプル表示方式（ツアー中のホームに「サンプル」バッジ付きデモ候補を本物のレイアウトで表示）、B=iOS標準TipKitでは暗転スポットライト＋強制ツアーが実現不能なためカスタムオーバーレイを新設（CLAUDE.mdのiOS標準優先の例外条項に基づきオーナー承認済み）。計画書は `notes/77_onboarding_tutorial_implementation_plan.md`。
+
+### 変更内容
+
+#### 1. ガイドツアー（7ステップ・タップで進む・スキップ可）
+- `TutorialTourStep`（新規）：welcome→homeSections→inventory→wish→listing→trades→meguri→completion の8ケース。各ステップの `targetTab` / `requestedWishSection` / `spotlightAnchor` / 吹き出し文言を定義
+- `TutorialTourCoordinator`（新規, ObservableObject）：`currentStep` / `isActive` / `advance()` / `skip()` / `finish()`。`MegrumRootView` が `@StateObject` で保持
+- `TutorialTourOverlay`（新規）：dim＋スポットライト（`blendMode(.destinationOut)`+`compositingGroup`で対象を切り抜き）＋吹き出しカード、welcome/completionは中央カード。全面タップで前進。reduceMotion対応。差し込みは `MegrumAuthenticatedTabContentView` の ZStack に `.overlayPreferenceValue`（兄弟の `tabs` に付けたアンカーを解決するため。groomViewerImmersiveOverlay より前＝下）
+- `TutorialAnchorPreferenceKey` / `.tutorialAnchor(_:)`（新規）：`HomeDiscoveryTabSwitcher` の anchorPreference パターンを踏襲。マイグッズ/ほしいもの/個別募集の+ボタン・やりとりのステージバーに付与
+- 発火：`MegrumRootView` の `.onChange(of: appState.viewer?.accountStatus)` で `old.requiresSetup==true && new==.active` の初回のみ。二重ガードに `OnboardingTutorialProgressStore`（per-user UserDefaults 既読フラグ）
+- タブ自動遷移：`.onChange(of: coordinator.currentStep)` で `selectedTab = step.targetTab`
+
+#### 2. サンプル表示（オプションA）
+- `TutorialSampleHomeData`（新規）：`NativePreviewData.homeMatchedItems/homePossibleItems` + `previewSignals`（`PreviewMegrumRepository` と同組み立て）
+- `MegrumAuthenticatedTabContentView.homeTab`：ツアー中は matched/possible/signals をサンプルに差し替えて `HomeScreen` へ
+- `HomeDiscoveryExperienceDerivedState`：ツアー中は推し一致フィルタ（isMemberMatchEligible等）を外し、任意ユーザーでもサンプルが本物のレイアウトで並ぶよう `tutorialSampleCandidates` を追加
+- `HomeDiscoverySection`：`badgeText`（「サンプル」カプセル）追加。候補タップはツアー中 no-op
+
+#### 3. 最初の3ステップ・ミッションカード
+- `HomeStarterMissionState`（新規, 純ロジック）：inventory/wishes/listings（closed除外）から3タスクの done を判定
+- `HomeStarterMissionCard`（新規）：ホーム最上部に常駐。実登録でチェックが付き、3完了 or 手動×で `markMissionCompleted` して以後非表示。表示中は既存 `HomeEmptyCandidateCTACard`（導線重複）を抑止
+
+#### 4. 割り込み抑制（`MegrumAppState.isTutorialActive`）
+- 広告：`MegrumRootView.requestInterstitial` 冒頭ガード（大元1本）
+- X共有プロンプト：`GoodsCollectionShareActions` / `IndividualListingsScreen` / `HomeDiscoveryExperienceActions` の3経路をガード
+- めぐり位置情報：`MeguriScreenBoardActions.requestInitialLocationIfNeeded` ガード＋ツアー終了時 `.onChange(of: appState.isTutorialActive)` で再実行
+- 通知タブ遷移：`MegrumRootView` の通知 onChange をツアー中は破棄
+
+#### 5. 検証
+- `VisualQAInitialScreen.tutorial` 追加（`SIMCTL_CHILD_MEGRUM_VISUAL_QA_INITIAL_SCREEN=tutorial`。既読フラグを無視して強制起動）
+- ユニットテスト3本（`TutorialTourCoordinatorTests` / `OnboardingTutorialProgressStoreTests` / `HomeStarterMissionStateTests`）
+
+### 影響範囲
+- 認証後ルート（MegrumRootView / TabsView / TabContentView）、ホーム（HomeScreen / HomeDiscoveryExperience）、マイグッズ/ほしいもの/個別募集の+ボタン、やりとりのステージバー、めぐりの位置情報、広告・共有プロンプト。既存ユーザーのログイン・セッション復帰では発火しない
+
+### 確認方法
+- `swift build` 成功、`swift test` 1507件 0失敗（新規16件含む）
+- シミュレータ（iPhone 17, VisualQA=tutorial）で ①ウェルカムカード＋背後のサンプル3セクション（「サンプル」バッジ付き）②マイグッズタブへ自動遷移＋を+ボタンをスポットライト＋吹き出し を目視確認
+
+### セルフレビュー結果
+- ✅ ブランドカラー直書きなし（MegrumTheme トークン、フォントは .rounded）
+- ✅ 既存パターン踏襲（anchorPreference / BoardRoomEntryNoticeOverlay スタイル / MeguriRoomIdentityStore 型ストア / VisualQA / 純ロジック+XCTest）
+- ✅ iOS標準タブバーの UIKit isHidden/toolbar 切替は不使用（dim で覆う）
+- ⚠️ 吹き出しは矢印を付けず、スポットライトの切り抜き自体を指示にした（矢印の位置合わせ脆弱性を回避）
+- ⚠️ タブアイテム個別の精密スポットライトは非対応（UIKit管理で SwiftUI から frame 取得不可）。タブへは実遷移して見せる方式
+- ⚠️ 計画のZStack子（zIndex 5000）案は兄弟アンカーを読めないため `.overlayPreferenceValue` 方式に変更（上下関係は計画通り維持）
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/TutorialTourStep.swift` / `TutorialTourCoordinator.swift` / `TutorialTourOverlay.swift` / `TutorialAnchorPreferenceKey.swift` / `TutorialSampleHomeData.swift` / `OnboardingTutorialProgressStore.swift`
+- `ios-native/Sources/MegrumApp/HomeStarterMissionState.swift` / `HomeStarterMissionCard.swift`
+- `ios-native/Sources/MegrumApp/MegrumRootView.swift` / `MegrumRootAuthenticatedContent.swift`（未変更）/ `MegrumAuthenticatedTabsView.swift` / `MegrumAuthenticatedTabContentView.swift`
+- `ios-native/Sources/MegrumApp/HomeScreen.swift` / `HomeDiscoveryExperience.swift` / `HomeDiscoveryExperienceDerivedState.swift` / `HomeDiscoverySection.swift`
+- `ios-native/Sources/MegrumApp/MegrumAppState.swift`（isTutorialActive）/ 割り込み抑制3ファイル / `MeguriScreen*.swift` / `VisualQAPreviewMode.swift`
+- `notes/77_onboarding_tutorial_implementation_plan.md`（計画書）
+
+---
+
 ## イテレーション1226.335：ホーム空状態ちらつき解消＋グルームコメント改善＋入室画面の入力欄非表示
 
 ### 背景・問題意識

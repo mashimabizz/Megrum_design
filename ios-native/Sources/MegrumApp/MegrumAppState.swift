@@ -5,6 +5,9 @@ import MegrumCore
 @MainActor
 public final class MegrumAppState: ObservableObject {
     @Published public internal(set) var viewer: UserProfile?
+    /// 初回ガイドツアー実行中フラグ。広告・共有プロンプト・位置情報・通知遷移などの
+    /// 割り込みを抑制するために深い階層からも参照する（`setTutorialActive` で更新）。
+    @Published public internal(set) var isTutorialActive = false
     @Published public internal(set) var inventory: [GoodsItem] = []
     @Published public internal(set) var wishes: [WishItem] = []
     @Published public internal(set) var homeMatchedItems: [GoodsItem] = []
@@ -258,6 +261,12 @@ public final class MegrumAppState: ObservableObject {
 
     public func clearErrorMessage() {
         errorMessage = nil
+    }
+
+    /// 初回ガイドツアーの実行状態を更新する。割り込み抑制の可否をこのフラグで判定する。
+    public func setTutorialActive(_ isActive: Bool) {
+        guard isTutorialActive != isActive else { return }
+        isTutorialActive = isActive
     }
 
     public func evidencePhotos(for proposal: TradeProposal) -> [TradeEvidencePhoto] {

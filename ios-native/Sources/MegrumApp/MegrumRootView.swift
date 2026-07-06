@@ -5,6 +5,7 @@ import SwiftUI
 public struct MegrumRootView: View {
     @StateObject private var appState: MegrumAppState
     @StateObject private var authState: MegrumAuthState
+    @StateObject private var tutorialCoordinator = TutorialTourCoordinator()
     @State private var selectedTab: MegrumTab = .home
     @State private var showsSearch = false
     @State private var showsDrawer = false
@@ -82,14 +83,19 @@ public struct MegrumRootView: View {
             guard let destination else {
                 return
             }
-            selectedTab = destination
+            // ツアー中は通知タブ遷移でスポットライトと実画面がズレるため破棄する。
+            if !tutorialCoordinator.isActive {
+                selectedTab = destination
+            }
             notificationDestinationTab = nil
         }
         .onChange(of: notificationRouteLinkPath) { _, linkPath in
             guard let linkPath else {
                 return
             }
-            handleNotificationRoute(linkPath: linkPath, kindRawValue: notificationRouteKindRawValue)
+            if !tutorialCoordinator.isActive {
+                handleNotificationRoute(linkPath: linkPath, kindRawValue: notificationRouteKindRawValue)
+            }
             notificationRouteLinkPath = nil
             notificationRouteKindRawValue = nil
         }
@@ -213,6 +219,48 @@ public struct MegrumRootView: View {
             displayContext: adDisplayContext,
             configuration: adConfiguration
         )
+        .onChange(of: appState.viewer?.accountStatus) { oldValue, newValue in
+            startTutorialTourIfNeeded(oldStatus: oldValue, newStatus: newValue)
+        }
+        .onChange(of: tutorialCoordinator.currentStep) { _, step in
+            handleTutorialStepChange(step)
+        }
+        .onAppear {
+            startVisualQATutorialIfNeeded()
+        }
+    }
+
+    /// セットアップ完了直後（requiresSetup→active）に初回のみツアーを起動する。
+    private func startTutorialTourIfNeeded(oldStatus: AccountStatus?, newStatus: AccountStatus?) {
+        guard oldStatus?.requiresSetup == true, newStatus == .active else { return }
+        guard let userID = appState.viewer?.id else { return }
+        guard !OnboardingTutorialProgressStore.isTourCompleted(userID: userID) else { return }
+        tutorialCoordinator.start()
+    }
+
+    /// VisualQA（MEGRUM_VISUAL_QA_INITIAL_SCREEN=tutorial）では既読フラグを無視して強制起動する。
+    private func startVisualQATutorialIfNeeded() {
+        guard visualQAInitialScreen == .tutorial, !tutorialCoordinator.isActive else { return }
+        tutorialCoordinator.start()
+    }
+
+    /// ステップ変化に応じてタブを自動遷移し、割り込み抑制フラグと完了フラグを更新する。
+    private func handleTutorialStepChange(_ step: TutorialTourStep?) {
+        appState.setTutorialActive(step != nil)
+
+        guard let step else {
+            // ツアー終了：既読フラグを保存。
+            if let userID = appState.viewer?.id {
+                OnboardingTutorialProgressStore.markTourCompleted(userID: userID)
+            }
+            return
+        }
+
+        requestedTradesStage = nil
+        if let section = step.requestedWishSection {
+            requestedWishSection = section
+        }
+        selectedTab = step.targetTab
     }
 
     private var directVisualQAProposalRoute: HomeRelationRoute? {
@@ -267,6 +315,7 @@ public struct MegrumRootView: View {
             homeSettingsRoute: $homeSettingsRoute,
             requestedWishSection: $requestedWishSection,
             pendingNotificationRouteIntent: $pendingNotificationRouteIntent,
+            tutorialCoordinator: tutorialCoordinator,
             adDisplayContext: adDisplayContext,
             visualQAInitialScreen: visualQAInitialScreen,
             onSignOut: {
@@ -356,6 +405,8 @@ public struct MegrumRootView: View {
     }
 
     private func requestInterstitial(_ placement: AdPlacement) {
+        // ツアー中はタブ自動遷移で広告が挟まらないよう抑制する。
+        guard !tutorialCoordinator.isActive else { return }
         interstitialAdRequest = AdInterstitialRequest(placement: placement)
     }
 }

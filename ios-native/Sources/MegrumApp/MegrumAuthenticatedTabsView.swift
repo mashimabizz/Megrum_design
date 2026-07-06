@@ -15,6 +15,7 @@ struct MegrumAuthenticatedTabsView: View {
     @Binding var homeSettingsRoute: HomeSettingsRoute?
     @Binding var requestedWishSection: WishCollectionSection?
     @Binding var pendingNotificationRouteIntent: NotificationRouteIntent?
+    @ObservedObject var tutorialCoordinator: TutorialTourCoordinator
     var adDisplayContext: AdDisplayContext
     var visualQAInitialScreen: VisualQAInitialScreen?
     var onSignOut: () async -> Void
@@ -53,6 +54,7 @@ struct MegrumAuthenticatedTabsView: View {
             requestedWishSection: $requestedWishSection,
             pendingNotificationRouteIntent: $pendingNotificationRouteIntent,
             isGroomViewerPresented: $isGroomViewerPresented,
+            tutorialCoordinator: tutorialCoordinator,
             adDisplayContext: adDisplayContext,
             visualQAInitialScreen: visualQAInitialScreen,
             onOpenDrawer: openDrawer,

@@ -121,6 +121,7 @@ struct TradesFooter: View {
                 inProgressBadgeCount: inProgressBadgeCount,
                 completedBadgeCount: completedBadgeCount
             )
+            .tutorialAnchor(.tradesStageBar)
         }
     }
 

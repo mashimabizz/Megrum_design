@@ -98,6 +98,10 @@ extension HomeDiscoveryExperience {
         guard let appState else {
             return
         }
+        // ガイドツアー中は共有プロンプトを出さない。
+        guard !appState.isTutorialActive else {
+            return
+        }
         Task { @MainActor in
             if !appState.hasLoadedPaymentSettings {
                 await appState.loadPaymentSettings(reportsFailure: false)

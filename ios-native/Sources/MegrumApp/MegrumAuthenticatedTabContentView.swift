@@ -13,6 +13,7 @@ struct MegrumAuthenticatedTabContentView: View {
     @Binding var requestedWishSection: WishCollectionSection?
     @Binding var pendingNotificationRouteIntent: NotificationRouteIntent?
     @Binding var isGroomViewerPresented: Bool
+    @ObservedObject var tutorialCoordinator: TutorialTourCoordinator
     var adDisplayContext: AdDisplayContext
     var visualQAInitialScreen: VisualQAInitialScreen?
     var onOpenDrawer: () -> Void
@@ -168,6 +169,19 @@ struct MegrumAuthenticatedTabContentView: View {
             }
             .zIndex(112)
         }
+        .overlayPreferenceValue(TutorialAnchorPreferenceKey.self) { anchors in
+            GeometryReader { proxy in
+                if let step = tutorialCoordinator.currentStep {
+                    TutorialTourOverlay(
+                        step: step,
+                        anchorFrames: anchors.mapValues { proxy[$0] },
+                        containerSize: proxy.size,
+                        onAdvance: { tutorialCoordinator.advance() },
+                        onSkip: { tutorialCoordinator.skip() }
+                    )
+                }
+            }
+        }
         .onAppear {
             openVisualQAMeguriMessagesIfNeeded()
             handlePendingNotificationRouteIntent(pendingNotificationRouteIntent)
@@ -231,12 +245,16 @@ struct MegrumAuthenticatedTabContentView: View {
     }
     #endif
 
+    private var tutorialSampleActive: Bool {
+        tutorialCoordinator.isActive
+    }
+
     private var homeTab: some View {
         NavigationStack {
             HomeScreen(
                 viewer: appState.viewer,
-                matchedItems: appState.homeMatchedItems,
-                possibleItems: appState.homePossibleItems,
+                matchedItems: tutorialSampleActive ? TutorialSampleHomeData.matchedItems : appState.homeMatchedItems,
+                possibleItems: tutorialSampleActive ? TutorialSampleHomeData.possibleItems : appState.homePossibleItems,
                 adDisplayContext: adDisplayContext,
                 showsSearch: $showsSearch,
                 onRefresh: appState.refresh,
@@ -279,6 +297,13 @@ struct MegrumAuthenticatedTabContentView: View {
                     requestedTradesStage = nil
                     selectedTab = .trades
                 },
+                onOpenInventory: {
+                    requestedTradesStage = nil
+                    selectedTab = .inventory
+                },
+                tutorialSampleActive: tutorialSampleActive,
+                starterMissionEnabled: !tutorialSampleActive,
+                conditionSignalsByItemIDOverride: tutorialSampleActive ? TutorialSampleHomeData.conditionSignals : nil,
                 visualQAInitialScreen: visualQAInitialScreen
             )
         }

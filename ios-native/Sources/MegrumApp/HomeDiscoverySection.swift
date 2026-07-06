@@ -20,6 +20,8 @@ struct HomeDiscoverySection: View {
     var displayLimit: Int? = nil
     /// 需要行のサムネイル用：自分のグッズID→画像URL。
     var viewerGoodsImageURLByID: [UUID: URL] = [:]
+    /// タイトル横に出す小バッジ（ガイドツアー中の「サンプル」表示に使う）。
+    var badgeText: String? = nil
     var onSelect: (HomeDiscoverySheet) -> Void
     var onSearchCandidate: (HomeDiscoveryCandidate, HomeMockGoods?) -> Void = { _, _ in }
     /// 「すべて見る」タップ時の遷移。未指定時は従来どおり先頭候補のシートを開く。
@@ -33,6 +35,7 @@ struct HomeDiscoverySection: View {
                 showsGridHeaderTitle: showsGridHeaderTitle,
                 showsSeeAllButton: showsSeeAllButton,
                 isSeeAllDisabled: candidates.isEmpty,
+                badgeText: badgeText,
                 onSeeAll: onSeeAll ?? openFirstCandidate
             )
 
@@ -111,6 +114,7 @@ private struct HomeDiscoverySectionHeader: View {
     var showsGridHeaderTitle: Bool
     var showsSeeAllButton: Bool
     var isSeeAllDisabled: Bool
+    var badgeText: String? = nil
     var onSeeAll: () -> Void
 
     var body: some View {
@@ -121,6 +125,15 @@ private struct HomeDiscoverySectionHeader: View {
                     .foregroundStyle(MegrumTheme.ink)
                     .lineLimit(1)
                     .minimumScaleFactor(0.78)
+            }
+
+            if let badgeText {
+                Text(badgeText)
+                    .font(.system(size: 11, weight: .black, design: .rounded))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(MegrumTheme.lavender, in: Capsule(style: .continuous))
             }
 
             Spacer()

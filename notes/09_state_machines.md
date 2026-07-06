@@ -3,8 +3,8 @@
 > **目的**：Megrum の主要エンティティのライフサイクルと状態遷移ルールを定義。
 > 実装が状態遷移でブレないための一次資料。デザイン・実装・QA の共通言語。
 
-最終更新: 2026-06-29
-ステータス: Draft v1.95（iter1226.112 評価・通報・ブロック・モデレーションの法務前提を追記）
+最終更新: 2026-07-06
+ステータス: Draft v1.96（iter1226.336 初回ガイドツアー・ミッションのライフサイクルを追記）
 
 ---
 
@@ -870,6 +870,46 @@ stateDiagram-v2
 - グルームアーカイブは無料プランでは最新10件まで。`megrum_plus` が有効ならビジネス上の保存上限を外し、アプリはページサイズ単位で取得する。
 - めぐり掲示板は無料プランでは県内または現在地1km圏内の閲覧を基本にし、`megrum_plus` / 旧 `premium` / 旧 `meguri_plus` が有効なら県外掲示板も閲覧できる。
 - 手動上書きは `plan_overrides` に履歴を残し、同時に `user_entitlements` を更新する。
+
+## 16. Onboarding Tutorial Lifecycle（初回ガイドツアー・ミッション）
+
+iter1226.336 で、初期設定完了直後の初回ガイドツアーと「最初の3ステップ」ミッションを追加した。
+どちらの完了状態も端末ローカルの per-user UserDefaults（`onboarding.tour.completed.<userID>` / `onboarding.mission.completed.<userID>`）に永続化し、サーバー状態は持たない。ツアーの各ステップ（welcome..completion）は永続化しない一時UI状態。
+
+### Guide Tour 状態図
+
+```mermaid
+stateDiagram-v2
+    [*] --> not_started
+    not_started --> in_progress: 初期設定完了（requiresSetup→active）かつ既読フラグなし
+    in_progress --> completed: 最終ステップ「はじめる」
+    in_progress --> skipped: 「スキップ」
+    completed --> [*]
+    skipped --> [*]
+```
+
+### Starter Mission 状態図
+
+```mermaid
+stateDiagram-v2
+    [*] --> pending
+    pending --> pending: 3タスク一部達成
+    pending --> done: マイグッズ・ほしいもの・個別募集すべて達成 or 手動クローズ
+    done --> [*]
+```
+
+### ビジネスルール
+- ツアー発火は `accountStatus` が `requiresSetup(registered/verified/onboarding)` → `active` に遷移した初回のみ。既存ユーザーのログイン・セッション復帰（nil→active）では発火しない。二重ガードに既読フラグ。
+- ツアー実行中（`in_progress`）は `MegrumAppState.isTutorialActive = true`。広告・X共有プロンプト・めぐり位置情報ダイアログ・通知タブ遷移を抑制する。
+- ミッションの3タスク達成判定は `inventory` / `wishes` / `listings`（`status != closed`）の実データ。`done` になったら既読フラグを保存し以後非表示。
+- `completed` / `skipped` / `done` はいずれも「以後自動表示しない」。VisualQA（`MEGRUM_VISUAL_QA_INITIAL_SCREEN=tutorial`）のみ既読フラグを無視して強制起動する。
+
+### 関連画面
+- 初回ガイドツアー（`GUIDE-tour`）／ミッションカード（`GUIDE-mission`）… notes/11 §A-3
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/TutorialTourStep.swift` / `TutorialTourCoordinator.swift` / `OnboardingTutorialProgressStore.swift` / `HomeStarterMissionState.swift`
+- 計画書：`notes/77_onboarding_tutorial_implementation_plan.md`
 
 ## 15. 付録：エンティティ間の関係
 

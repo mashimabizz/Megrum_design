@@ -6,6 +6,10 @@ extension GoodsCollectionScreen {
         guard !createdItems.isEmpty else {
             return
         }
+        // ガイドツアー中はスポットライトと二重の全画面dimになるため共有プロンプトを出さない。
+        guard appState?.isTutorialActive != true else {
+            return
+        }
         sharePostErrorMessage = nil
         isPreparingSharePost = false
         sharePromptContext = GoodsSharePostContext(

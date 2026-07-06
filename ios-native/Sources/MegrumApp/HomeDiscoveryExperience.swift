@@ -25,6 +25,11 @@ struct HomeDiscoveryExperience: View {
     var onOpenOwnerProfile: (UUID) -> Void = { _ in }
     var onStartProposal: (HomeDiscoveryProposalSelection) -> Void = { _ in }
     var onRefresh: () async -> Void
+    /// ガイドツアー中：3セクションに「サンプル」バッジを付け、候補タップを無効化する。
+    var tutorialSampleActive: Bool = false
+    /// 「最初の3ステップ」ミッションカードを出す対象画面か（ホームタブのみ true）。
+    var starterMissionEnabled: Bool = false
+    var onOpenInventory: () -> Void = {}
 
     @AppStorage(HomeExchangeSettingsStorageKeys.preference) var exchangePreferenceRawValue = HomeDefaultExchangeSettings.standard.preference.rawValue
     @AppStorage(HomeExchangeSettingsStorageKeys.requiresSamePrefecture) var exchangeRequiresSamePrefecture = HomeDefaultExchangeSettings.standard.requiresSamePrefecture
@@ -34,6 +39,7 @@ struct HomeDiscoveryExperience: View {
     @AppStorage(HomeExchangeSettingsStorageKeys.mailShippingFee) var exchangeMailShippingFeeRawValue = HomeDefaultExchangeSettings.standard.mailShippingFee.rawValue
     @AppStorage(HomeExchangeSettingsStorageKeys.mailShippingDays) var exchangeMailShippingDaysRawValue = HomeDefaultExchangeSettings.standard.mailShippingDays.rawValue
     @State private var showsEmptyStateOshiSettings = false
+    @State private var starterMissionCompleted = false
     @State var selectedSheet: HomeDiscoverySheet?
     @State var selectedMutualMatchCandidate: HomeMutualMatchCandidate?
     @State var showsMatchHelp = false
@@ -58,6 +64,16 @@ struct HomeDiscoveryExperience: View {
                 onRefresh: onRefresh
             ) {
                 VStack(alignment: .leading, spacing: 14) {
+                    if showsStarterMissionCard {
+                        HomeStarterMissionCard(
+                            state: starterMissionState,
+                            onOpenInventory: onOpenInventory,
+                            onOpenWish: onOpenWish,
+                            onOpenListings: onOpenIndividualListings,
+                            onDismiss: resolveStarterMission
+                        )
+                    }
+
                     if !userTagCandidates.isEmpty {
                         HomeDiscoverySection(
                             title: "推し×シリーズでマッチ",
@@ -67,8 +83,10 @@ struct HomeDiscoveryExperience: View {
                             showsSeeAllButton: userTagCandidates.count > HomeDiscoverySummarySectionMetrics.displayLimit,
                             displayLimit: HomeDiscoverySummarySectionMetrics.displayLimit,
                             viewerGoodsImageURLByID: viewerGoodsImageURLByID,
-                            onSelect: { selectedSheet = $0 },
+                            badgeText: tutorialSampleActive ? "サンプル" : nil,
+                            onSelect: { if !tutorialSampleActive { selectedSheet = $0 } },
                             onSearchCandidate: { candidate, selectedGoods in
+                                guard !tutorialSampleActive else { return }
                                 openSearch(for: candidate, selectedGoods: selectedGoods, source: .userTag)
                             },
                             onSeeAll: { seeAllRoute = .userTag }
@@ -84,8 +102,10 @@ struct HomeDiscoveryExperience: View {
                             showsSeeAllButton: userCandidates.count > HomeDiscoverySummarySectionMetrics.displayLimit,
                             displayLimit: HomeDiscoverySummarySectionMetrics.displayLimit,
                             viewerGoodsImageURLByID: viewerGoodsImageURLByID,
-                            onSelect: { selectedSheet = $0 },
+                            badgeText: tutorialSampleActive ? "サンプル" : nil,
+                            onSelect: { if !tutorialSampleActive { selectedSheet = $0 } },
                             onSearchCandidate: { candidate, selectedGoods in
+                                guard !tutorialSampleActive else { return }
                                 openSearch(for: candidate, selectedGoods: selectedGoods, source: .user)
                             },
                             onSeeAll: { seeAllRoute = .user }
@@ -108,10 +128,13 @@ struct HomeDiscoveryExperience: View {
                        havesCandidates.isEmpty,
                        mutualMatchCandidates.isEmpty {
                         if hasLoadedCandidates {
-                            HomeEmptyCandidateCTACard(
-                                onAddOshi: { showsEmptyStateOshiSettings = true },
-                                onAddWish: onOpenWish
-                            )
+                            // ミッションカード表示中は導線が重複するので空状態CTAを出さない。
+                            if !showsStarterMissionCard {
+                                HomeEmptyCandidateCTACard(
+                                    onAddOshi: { showsEmptyStateOshiSettings = true },
+                                    onAddWish: onOpenWish
+                                )
+                            }
 
                             if !recentCandidates.isEmpty {
                                 HomeDiscoverySection(
@@ -244,10 +267,60 @@ struct HomeDiscoveryExperience: View {
         .onChange(of: havesCandidates.map(\.id)) { _, _ in
             openInitialSheetIfNeeded()
         }
+        .task(id: viewer?.id) {
+            refreshStarterMissionCompletion()
+        }
+        .onChange(of: starterMissionState) { _, _ in
+            markStarterMissionCompletedIfNeeded()
+        }
         #if os(iOS)
         .sheet(item: $shareActivityPayload, content: GoodsShareActivitySheet.init)
         #endif
         .animation(.spring(response: 0.30, dampingFraction: 0.86), value: sharePromptContext?.id)
     }
 
+}
+
+extension HomeDiscoveryExperience {
+    var starterMissionState: HomeStarterMissionState {
+        HomeStarterMissionState.evaluate(
+            inventory: appState?.inventory ?? [],
+            wishes: appState?.wishes ?? [],
+            listings: appState?.listings ?? []
+        )
+    }
+
+    var showsStarterMissionCard: Bool {
+        guard starterMissionEnabled, viewer != nil, !starterMissionCompleted else {
+            return false
+        }
+        // 3タスク全達成なら表示しない（onChange 前の初期allDoneも拾う）。
+        return !starterMissionState.allDone
+    }
+
+    private func refreshStarterMissionCompletion() {
+        guard let userID = viewer?.id else {
+            starterMissionCompleted = false
+            return
+        }
+        starterMissionCompleted = OnboardingTutorialProgressStore.isMissionCompleted(userID: userID)
+        // 初回表示時点で既に全達成なら完了フラグを永続化する。
+        markStarterMissionCompletedIfNeeded()
+    }
+
+    private func markStarterMissionCompletedIfNeeded() {
+        guard starterMissionEnabled, !starterMissionCompleted, starterMissionState.allDone else {
+            return
+        }
+        resolveStarterMission()
+    }
+
+    /// ミッションを完了扱いにして以後表示しない（全達成 or 手動クローズ）。
+    func resolveStarterMission() {
+        guard let userID = viewer?.id else { return }
+        OnboardingTutorialProgressStore.markMissionCompleted(userID: userID)
+        withAnimation(.snappy(duration: 0.24)) {
+            starterMissionCompleted = true
+        }
+    }
 }

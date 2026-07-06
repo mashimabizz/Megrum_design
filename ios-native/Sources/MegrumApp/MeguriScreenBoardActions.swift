@@ -7,6 +7,11 @@ extension MeguriScreen {
         guard !VisualQAPreviewMode.isEnabled(environment: ProcessInfo.processInfo.environment) else {
             return
         }
+        // ガイドツアー中は位置情報ダイアログが割り込まないよう抑制する。
+        // ツアー終了時に onChange(of: appState.isTutorialActive) で呼び直す（MeguriScreen）。
+        guard !appState.isTutorialActive else {
+            return
+        }
         // センタリングは起動後の初回表示だけ。タブを離れて戻った時は
         // 直前に見ていた位置・ズームを維持する。
         if !didAutoCenterHomeMap {

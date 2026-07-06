@@ -5,6 +5,7 @@ struct GoodsCollectionFloatingControls: View {
     var showsAddButton: Bool
     var addButtonLabel: String
     var addButtonHint: String
+    var tutorialAnchorID: TutorialAnchorID? = nil
     var isSelectionMode: Bool
     var quickActionItem: GoodsItem?
     var quickActionHeader: GoodsQuickActionHeaderPresentation?
@@ -21,6 +22,7 @@ struct GoodsCollectionFloatingControls: View {
     var body: some View {
         if showsAddButton && !isSelectionMode && quickActionItem == nil {
             AddGoodsButton(accessibilityLabel: addButtonLabel, accessibilityHint: addButtonHint, action: onAdd)
+                .tutorialAnchor(ifPresent: tutorialAnchorID)
                 .padding(.leading, FloatingActionLayoutMetrics.leadingPadding)
                 .padding(.bottom, FloatingActionLayoutMetrics.addButtonBottomPadding)
         }

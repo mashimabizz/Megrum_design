@@ -82,6 +82,15 @@
 | `ONB-aw` | AW初期設定（4/4）— エリア選択（任意・スキップ可） | `auth-onboarding.jsx::OnboardAWScreen` | iter20 | 05 §4 aws |
 | `ONB-done` | 完了 — プロフサマリ＋次は何をする？3カード | `auth-onboarding.jsx::OnboardDoneScreen` | iter20 | — |
 
+### 初回ガイドツアー（A-3）
+
+初期設定（AccountSetup）完了直後に初回のみ自動起動する使い方案内。全画面dim＋スポットライト＋吹き出しで、タップで進む。Swift Native実装（モックアップ未）。
+
+| 画面ID | 名称 | 関連JSX関数 | 関連iter | 関連docs |
+|---|---|---|---|---|
+| `GUIDE-tour` | ガイドツアー（7ステップ・スキップ可・サンプル表示付き） | iter1226.336 で実装（モックアップ未） | iter1226.336 | 10 §A ガイドツアー, 77 |
+| `GUIDE-mission` | ホーム常駐「最初の3ステップ」ミッションカード | iter1226.336 で実装（モックアップ未） | iter1226.336 | 10 §A ミッションカード, 77 |
+
 ---
 
 ## B. 主要フロー（取引体験）
@@ -532,3 +541,4 @@ flowchart TD
 
 - v1.0 (2026-05-01, iter40): 初版。HTMLとJSXを全スキャンして 89画面（最新）+ 廃止12画面を整理。
 - v1.1 (2026-05-01, iter45): K. 広告配置サマリを追加。HOM-main/SCH-main/WSH-listに広告枠注釈。
+- v1.2 (2026-07-06, iter1226.336): A-3 初回ガイドツアー（GUIDE-tour / GUIDE-mission）を追加。計画書は notes/77。

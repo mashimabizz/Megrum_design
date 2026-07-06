@@ -11,6 +11,7 @@ extension GoodsCollectionScreen {
                 showsAddButton: showsAddButton,
                 addButtonLabel: addButtonLabel,
                 addButtonHint: addButtonHint,
+                tutorialAnchorID: entryKind == .wish ? .wishAddButton : .inventoryAddButton,
                 isSelectionMode: isSelectionMode,
                 quickActionItem: quickActionItem,
                 quickActionHeader: quickActionItem.map { quickActionHeaderPresentation(for: $0) },

@@ -3,6 +3,10 @@ import MegrumCore
 
 extension HomeDiscoveryExperience {
     var userTagCandidates: [HomeDiscoveryCandidate] {
+        // ガイドツアー中は推し一致フィルタを外し、サンプルを本物のレイアウトで見せる。
+        if tutorialSampleActive {
+            return tutorialSampleCandidates(from: matchedItems, source: .userTag)
+        }
         let items = partnerItems(from: matchedItems + possibleItems)
             .filter { item in
                 HomeDiscoveryMatchPolicy.isMemberTagMatchEligible(
@@ -23,6 +27,9 @@ extension HomeDiscoveryExperience {
     }
 
     var userCandidates: [HomeDiscoveryCandidate] {
+        if tutorialSampleActive {
+            return tutorialSampleCandidates(from: possibleItems, source: .user)
+        }
         let items = partnerItems(from: matchedItems + possibleItems)
             .filter { item in
                 HomeDiscoveryMatchPolicy.isMemberMatchEligible(
@@ -34,6 +41,22 @@ extension HomeDiscoveryExperience {
         let candidates = HomeDiscoveryCandidateFactory.candidates(
             from: items,
             source: .user,
+            goodsTypes: goodsTypes,
+            conditionSignalsByItemID: displayConditionSignalsByItemID
+        )
+        return HomeCandidateDemandPolicy.sortedCandidates(candidates)
+    }
+
+    /// ツアーのサンプル候補：推し一致フィルタを通さず、他ユーザー所有分をそのまま候補化する。
+    private func tutorialSampleCandidates(
+        from items: [GoodsItem],
+        source: HomeDiscoveryCandidateSource
+    ) -> [HomeDiscoveryCandidate] {
+        let partner = partnerItems(from: items)
+            .sorted(by: candidateSorter.areInCandidateOrder)
+        let candidates = HomeDiscoveryCandidateFactory.candidates(
+            from: partner,
+            source: source,
             goodsTypes: goodsTypes,
             conditionSignalsByItemID: displayConditionSignalsByItemID
         )
