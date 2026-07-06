@@ -54,12 +54,23 @@ struct MegrumNativeApp: App {
                     await registerPendingNativePushToken()
                 }
             }
-            .onChange(of: appState.viewer?.id) { _, _ in
+            .onChange(of: appState.viewer?.id) { _, viewerID in
                 Task {
                     await registerPendingNativePushToken()
                 }
+                // サインアウト時はアイコンバッジを消す（viewerありの間は確定値のみ反映）。
+                if viewerID == nil {
+                    Task {
+                        try? await UNUserNotificationCenter.current().setBadgeCount(0)
+                    }
+                }
             }
             .onChange(of: appState.appIconBadgeCount, initial: true) { _, unreadCount in
+                // データ読み込み前（viewer未確定・proposals空）の一時的な 0 で
+                // アイコンバッジを消さない。確定値のみ反映する。
+                guard appState.viewer != nil else {
+                    return
+                }
                 Task {
                     do {
                         try await UNUserNotificationCenter.current().setBadgeCount(unreadCount)

@@ -4,6 +4,43 @@
 
 ---
 
+## イテレーション1226.339：アプリアイコンバッジ＝タブ合計＋評価済み分の起動時過計上を解消
+
+### 背景・問題意識
+オーナーFB：①アプリアイコンのバッジ数とタブバーのバッジ合計が合わない（タブ合計を正とする）②アプリを開くと、自分は評価済みだが相手が未評価の取引が一瞬カウントされ、少し経つとやりとりバッジが減る。結果、開く前のアイコンバッジとも食い違う。
+
+### 原因
+- アイコンバッジは「未読通知＋やりとり＋めぐり」で、タブバー（やりとり＋めぐり）より通知分だけ多かった
+- 自分の評価済みproposal IDはサーバー読み込み（起動シーケンス後半）まで空のため、起動直後は「評価待ち」が過計上され、読み込み完了時に減っていた
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ViewerEvaluatedProposalStore.swift`（新規）
+- 評価済みproposal IDをUserDefaultsにviewer別で永続化（load/save）＋ユニットテスト
+
+#### `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- `appIconBadgeCount` を「やりとり＋めぐり未読」（タブバー合計と同一）に変更
+- スナップショット適用時、proposals反映より先にローカル保存分の評価済みIDを union（起動直後の過計上を防止）
+
+#### `ios-native/Sources/MegrumApp/MegrumAppStateTradeResolutionActions.swift`
+- 評価送信時とサーバー読み込み成功時にローカル保存。サーバー読み込みは置換ではなく union（直近送信分を保持）
+
+#### `ios-native/App/MegrumNativeApp.swift`
+- アイコンバッジ設定は viewer 確定後のみ（読み込み前の一時的な0で消さない）。サインアウト時は明示的に0クリア
+
+### 影響範囲
+- アプリアイコンバッジ、やりとりタブバッジの起動直後の挙動
+
+### 確認方法
+- swift test: 1491件＋新規Store round-tripテスト、0 failures
+
+### セルフレビュー結果
+- ✅ タブバッジとアイコンバッジが同一の計算（TradeStageAttentionCounts＋meguriUnreadMessageCount）
+- ✅ 評価済みIDはローカル→サーバーの順で反映され、起動時から一致
+- ⚠️ プッシュ通知ペイロード側がbadgeを直接設定する場合は別途サーバー側の調整が必要（現状クライアント設定のみ）
+
+---
+
 ## イテレーション1226.338：他人プロフィール表示修正・マッチ厳格化・バッジ未読化ほか7件
 
 ### 背景・問題意識

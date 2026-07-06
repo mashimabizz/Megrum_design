@@ -171,8 +171,8 @@ public final class MegrumAppState: ObservableObject {
         NotificationReadStateReducer.unreadCount(in: notifications)
     }
 
-    /// アプリアイコンのバッジに出す合計：未読通知＋やりとりの要対応＋めぐりの未読。
-    /// フッターのタブバッジと同じ構成要素の合算（乖離させない）。
+    /// アプリアイコンのバッジ＝タブバーのバッジ合計（やりとり＋めぐり）。
+    /// タブバーで見えている数を正とし、それ以外は足さない。
     public var appIconBadgeCount: Int {
         let tradeAttention = TradeStageAttentionCounts(
             proposals: proposals,
@@ -181,7 +181,7 @@ public final class MegrumAppState: ObservableObject {
             viewerID: viewer?.id,
             evaluatedProposalIDs: viewerEvaluatedProposalIDs
         )
-        return unreadNotificationCount + tradeAttention.total + meguriUnreadMessageCount
+        return tradeAttention.total + meguriUnreadMessageCount
     }
 
     public var meguriUnreadMessageCount: Int {
@@ -441,6 +441,11 @@ public final class MegrumAppState: ObservableObject {
         )
         viewer = state.viewer
         hiddenMeguriThreadEntries = MeguriHiddenThreadStore.load(viewerID: state.viewer.id)
+        // 評価済みIDはローカル保存分を proposals より先に反映して、
+        // 起動直後の「評価待ち」過計上（バッジが後から減る現象）を防ぐ。
+        viewerEvaluatedProposalIDs.formUnion(
+            ViewerEvaluatedProposalStore.load(viewerID: state.viewer.id)
+        )
         inventory = state.inventory
         wishes = state.wishes
         listings = state.listings
