@@ -54,7 +54,9 @@ struct BoardThreadChatMessageRow: View {
     var onJumpToMessage: (UUID) -> Void = { _ in }
 
     var body: some View {
-        HStack(alignment: .bottom, spacing: 8) {
+        // .top 揃えにして「吹き出しがアイコンの真横、グッド/バッドはその下」になるようにする
+        // （.bottom だとリアクションバーがアイコンの真横に来てしまう）。
+        HStack(alignment: .top, spacing: 8) {
             if !message.isMine {
                 BoardThreadDetailAvatar(
                     avatarID: message.avatarID,

@@ -4,6 +4,60 @@
 
 ---
 
+## イテレーション1226.316：7項目バッチ（位置情報誤通知・チャットUI・管理画面表形式ほか）
+
+### 背景・問題意識
+オーナーFB 7項目（モバイル6件＋管理者画面4小項目）。
+
+### 変更内容
+
+#### 1. めぐり：許可済みなのに「位置情報が許可されていません」（`MegrumLocationState.swift` / `MeguriHomeChromeViews.swift`）
+- 原因：`didFailWithError` が CLError.denied を受けると実際の許可状態を無視して `authorizationStatus = .denied` に上書き。許可ダイアログ表示中のリクエスト等で一時的な denied エラーが来ると、その後ずっと誤表示が残る
+- 修正：エラー時は `manager.authorizationStatus` を読み直す。実状態が許可済みなら denied エラーを無視（継続更新中なら再開）。`.locationUnknown` は継続更新中は無視。許可された時点で `locationErrorMessage` をクリア
+- ホームの通知カード見出しが「現在地を確認中」固定で矛盾していたため、エラー系メッセージ時は「位置情報を確認できません」に
+
+#### 2. めぐりチャットルーム：吹き出しをアイコン真横に（`BoardThreadDetailReplyViews.swift`）
+- 行の HStack を `.bottom`→`.top` 揃えに変更。グッド/バッドのリアクションバーが吹き出しの下に来る
+
+#### 3. 届いた打診も画像プレビュー（`TradeDetailPinnedSummaryArea.swift`）
+- 応答UI表示中（届いた打診）でも `TradeIncomingProposalSummaryCard`（譲⇄受サムネ＋詳細ボタン）を常時表示
+
+#### 4. フッターアイコン位置統一（`IndividualListingsScreen.swift`）
+- シミュレータ計測ではマイグッズ/ほしいものの＋・フィルタは同座標。個別募集ページの「募集を追加」だけ trailing 18 でズレていたため 24（共通メトリクス）に統一
+
+#### 5. 地図吹き出しの出現演出（`BoardThreadMessagePopBubbles.swift`）
+- 出現位置を 上/左横/右横 のローテーション（ピン・メッセージごとに決定的に変化）
+- 出現は「ぽんっ」（アイコン側アンカーの弾みスケール）、消滅は上へ22pt昇りながらフェードの「蒸発」
+
+#### 6. 画像スワイプリプライ（`MeguriMessageConversationViews.swift` / `TradeMessageBubbleContentParts.swift` / `ChatMessageInteraction.swift`）
+- 画像バブルの Button を TapGesture＋contentShape に変更（Button は横に56pt動かしても touch-up で発火するため、スワイプ後に画像が開いてしまっていた）
+- スワイプ時のリプライアイコン：円形ラベンダー塗りを廃止 → 半透明の色なし（ink 30%→55%）、行中央横・画面右端から12pt内側に表示
+
+#### 7. 管理者画面（`web/src/app/admin/operations/page.tsx` / `actions.ts` / `_components.tsx`）
+- L1/L2追加リクエストを1リクエスト1行の表形式に（リクエスト名/申請者/ジャンル/メモ/日時/操作）
+- 承認理由・統合理由の入力を廃止（監査ログには既定文言を記録）。却下理由は維持
+- 統合先をID入力→マスタ名のセレクトに（L1: グループ名＋ジャンル、L2: キャラ名＋所属L1）
+- 「推しマスタ検索」パネル新設：名前でL1/L2を検索し、名前・所属・IDを一覧表示（?master_q=）
+- 通報表：「通報理由・内容」列として理由ピル＋通報内容全文を常時表示（記載なしも明示）
+
+### 影響範囲
+- めぐりホーム/地図、めぐりチャットルーム、取引チャット、個別募集一覧、管理者運用画面
+
+### 確認方法
+- swift test 1486件 0失敗、web `npm run build` 成功
+- 位置情報・スワイプリプライは実機で要確認（シミュレータでは位置エラー再現不可）
+
+### セルフレビュー結果
+- ✅ ブランドカラー直書きなし（MegrumTheme / megrum-lavender 使用）
+- ✅ 通報・リクエスト処理の監査ログ（writeAdminAuditLog）維持
+- ⚠️ 4はシミュレータ計測で主要2画面に差分なし。実機で差が残る場合は再調査
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/MegrumLocationState.swift`
+- `web/src/app/admin/operations/page.tsx`
+
+---
+
 ## イテレーション1226.315：検索ブラウズ再構成（入口行＋ほしいもの/個別募集ピッカー）
 
 ### 背景・問題意識

@@ -349,22 +349,16 @@ private struct ChatSwipeReplyModifier: ViewModifier {
         content
             .offset(x: dragOffset)
             // offset は見た目だけずらすので、background は元のフレーム位置に留まり
-            // バブルが左へ動いた隙間にリプライアイコンが現れる。
+            // バブルが左へ動いた間、行の中央横・画面右端から少し離した位置に
+            // 半透明の色なしアイコンが現れる（円形の塗り背景は付けない）。
             .background(alignment: .trailing) {
                 if dragOffset < -4 {
                     Image(systemName: "arrowshape.turn.up.left.fill")
-                        .font(.system(size: 15, weight: .heavy))
-                        .foregroundStyle(progress >= 1 ? Color.white : MegrumTheme.lavender)
-                        .frame(width: 34, height: 34)
-                        .background(
-                            progress >= 1
-                                ? AnyShapeStyle(MegrumTheme.lavender)
-                                : AnyShapeStyle(MegrumTheme.lavender.opacity(0.14)),
-                            in: Circle()
-                        )
-                        .scaleEffect(0.55 + 0.45 * progress)
+                        .font(.system(size: 19, weight: .heavy))
+                        .foregroundStyle(MegrumTheme.ink.opacity(progress >= 1 ? 0.55 : 0.30))
+                        .scaleEffect(0.7 + 0.3 * progress)
                         .opacity(Double(min(1, progress * 1.6)))
-                        .padding(.trailing, 2)
+                        .padding(.trailing, 12)
                         .accessibilityHidden(true)
                 }
             }

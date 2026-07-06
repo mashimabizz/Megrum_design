@@ -54,19 +54,18 @@ struct TradeDetailPinnedSummaryArea: View {
         VStack(spacing: 8) {
             disputeBannerSection
 
-            if !responsePresentation.showsResponseControls {
-                TradeIncomingProposalSummaryCard(
-                    label: proposalSummaryLabel,
-                    summary: tradeSummaryLine,
-                    offeredGoods: offeredGoods,
-                    requestedGoods: requestedGoods,
-                    offeredGoodsCount: offeredGoodsCount,
-                    requestedGoodsCount: requestedGoodsCount,
-                    action: {
-                        presentationState.openTradeContentDetails()
-                    }
-                )
-            }
+            // 届いた打診（応答UI表示中）でも、送った打診と同じ画像プレビュー付きカードを出す。
+            TradeIncomingProposalSummaryCard(
+                label: proposalSummaryLabel,
+                summary: tradeSummaryLine,
+                offeredGoods: offeredGoods,
+                requestedGoods: requestedGoods,
+                offeredGoodsCount: offeredGoodsCount,
+                requestedGoodsCount: requestedGoodsCount,
+                action: {
+                    presentationState.openTradeContentDetails()
+                }
+            )
 
             if showsAgreementDisclosureActions {
                 TradeAgreementDisclosureActionsCard(

@@ -15,12 +15,13 @@ struct TradePhotoMessageBubble: View {
     var body: some View {
         Group {
             if let photoURL {
-                Button {
-                    onOpenImage(photoURL)
-                } label: {
-                    thumbnailContent(photoURL: photoURL)
-                }
-                .buttonStyle(.plain)
+                // Button だと横スワイプ後の touch-up でも発火して画像が開いてしまう。
+                // TapGesture は移動でキャンセルされるため左スワイプリプライと共存できる。
+                thumbnailContent(photoURL: photoURL)
+                    .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .onTapGesture {
+                        onOpenImage(photoURL)
+                    }
             } else {
                 unavailableThumbnail
             }

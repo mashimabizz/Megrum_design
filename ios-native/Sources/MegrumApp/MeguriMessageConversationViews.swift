@@ -353,12 +353,14 @@ struct MeguriPhotoMessageBubble: View {
     var body: some View {
         Group {
             if let photoURL {
-                Button {
-                    onOpenImage(photoURL)
-                } label: {
-                    thumbnailContent(photoURL: photoURL)
-                }
-                .buttonStyle(.plain)
+                // Button だと指が横へ動いても touch-up で発火してしまい、
+                // 左スワイプリプライの離し際に画像が開いてしまう。
+                // TapGesture は指の移動でキャンセルされるためスワイプと共存できる。
+                thumbnailContent(photoURL: photoURL)
+                    .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .onTapGesture {
+                        onOpenImage(photoURL)
+                    }
             } else {
                 photoPlaceholderContent
             }

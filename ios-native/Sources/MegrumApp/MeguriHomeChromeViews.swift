@@ -153,6 +153,12 @@ struct MeguriHomeNoticeCard: View {
         if notice.message.contains("読み込") {
             return "読み込めませんでした"
         }
+        // 「現在地を確認中」の見出しに「許可されていません」を並べると矛盾するため、
+        // 位置情報エラー系はエラーの見出しにする。
+        if notice.message.contains("許可され") || notice.message.contains("オフ")
+            || notice.message.contains("利用できません") || notice.message.contains("取得できません") {
+            return "位置情報を確認できません"
+        }
         return "現在地を確認中"
     }
 }

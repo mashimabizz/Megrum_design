@@ -148,11 +148,13 @@ export function AdminSelect({
   label,
   children,
   defaultValue,
+  required,
 }: {
   name: string;
   label: string;
   children: ReactNode;
   defaultValue?: string;
+  required?: boolean;
 }) {
   return (
     <label className="block">
@@ -162,6 +164,7 @@ export function AdminSelect({
       <select
         name={name}
         defaultValue={defaultValue}
+        required={required}
         className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-[13px] font-semibold text-slate-900 outline-none focus:border-megrum-lavender focus:ring-2 focus:ring-megrum-lavender/20"
       >
         {children}

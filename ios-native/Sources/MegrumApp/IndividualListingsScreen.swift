@@ -75,7 +75,8 @@ struct IndividualListingsScreen: View {
                 AddIndividualListingButton(title: "募集を追加") {
                     openCreateEditor(optionKind: nil)
                 }
-                .padding(.trailing, 18)
+                // マイグッズ/ほしいものの右下フローティングと同じ余白に統一する
+                .padding(.trailing, FloatingActionLayoutMetrics.leadingPadding)
                 .padding(.bottom, FloatingActionLayoutMetrics.addButtonBottomPadding)
             }
 

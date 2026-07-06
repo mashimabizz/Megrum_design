@@ -138,6 +138,13 @@ type GroupRow = {
   display_order: number;
 };
 
+type CharacterRow = {
+  id: string;
+  name: string;
+  group_id: string;
+  aliases: string[] | null;
+};
+
 type AdminNotificationRow = {
   id: string;
   user_id: string;
@@ -171,7 +178,12 @@ const REPORT_STATUS_OPTIONS = {
   disputes: ["submitted", "response_pending", "arbitrating", "closed"],
 } as const;
 
-export default async function AdminOperationsPage() {
+export default async function AdminOperationsPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ master_q?: string }>;
+}) {
+  const masterQuery = ((await searchParams)?.master_q ?? "").trim();
   const context = await getAdminContext();
   const canReadReports = hasAdminPermission(context, "reports.read");
   const canModerateReports = hasAdminPermission(context, "reports.moderate");
@@ -195,6 +207,7 @@ export default async function AdminOperationsPage() {
   let characterRequests: CharacterRequestRow[] = [];
   let genres: GenreRow[] = [];
   let groups: GroupRow[] = [];
+  let characters: CharacterRow[] = [];
   let recentAdminNotifications: AdminNotificationRow[] = [];
 
   if (canReadReports) {
@@ -268,7 +281,7 @@ export default async function AdminOperationsPage() {
   }
 
   if (canReadOshiRequests) {
-    const [oshiResult, characterResult, genresResult, groupsResult] =
+    const [oshiResult, characterResult, genresResult, groupsResult, charactersResult] =
       await Promise.all([
         adminSupabase
           .from("oshi_requests")
@@ -290,14 +303,20 @@ export default async function AdminOperationsPage() {
           .select("id, name, genre_id, kind, display_order")
           .order("display_order", { ascending: true })
           .limit(600),
+        adminSupabase
+          .from("characters_master")
+          .select("id, name, group_id, aliases")
+          .order("display_order", { ascending: true })
+          .limit(3000),
       ]);
-    for (const result of [oshiResult, characterResult, genresResult, groupsResult]) {
+    for (const result of [oshiResult, characterResult, genresResult, groupsResult, charactersResult]) {
       if (result.error) throw new Error(result.error.message);
     }
     oshiRequests = (oshiResult.data ?? []) as OshiRequestRow[];
     characterRequests = (characterResult.data ?? []) as CharacterRequestRow[];
     genres = (genresResult.data ?? []) as GenreRow[];
     groups = (groupsResult.data ?? []) as GroupRow[];
+    characters = (charactersResult.data ?? []) as CharacterRow[];
 
     for (const row of oshiRequests) {
       userIds.add(row.user_id);
@@ -374,9 +393,20 @@ export default async function AdminOperationsPage() {
           usersById={usersById}
           genres={genres}
           groups={groups}
+          characters={characters}
           genreById={genreById}
           groupById={groupById}
           canManage={canManageOshiRequests}
+        />
+      )}
+
+      {canReadOshiRequests && (
+        <MasterSearchPanel
+          query={masterQuery}
+          groups={groups}
+          characters={characters}
+          genreById={genreById}
+          groupById={groupById}
         />
       )}
 
@@ -416,7 +446,7 @@ function ReportsPanel({
                 <th className="border-b border-slate-200 px-3 py-2">通報</th>
                 <th className="border-b border-slate-200 px-3 py-2">通報者</th>
                 <th className="border-b border-slate-200 px-3 py-2">対象</th>
-                <th className="border-b border-slate-200 px-3 py-2">内容</th>
+                <th className="border-b border-slate-200 px-3 py-2">通報理由・内容</th>
                 <th className="border-b border-slate-200 px-3 py-2">状態</th>
                 <th className="border-b border-slate-200 px-3 py-2">操作</th>
               </tr>
@@ -453,11 +483,9 @@ function ReportsPanel({
                   </td>
                   <td className="border-b border-slate-100 px-3 py-3">
                     <StatusPill>{row.reason}</StatusPill>
-                    {row.note && (
-                      <p className="mt-2 max-w-[260px] whitespace-pre-wrap text-[12px] font-semibold leading-relaxed text-slate-600">
-                        {row.note}
-                      </p>
-                    )}
+                    <p className="mt-2 max-w-[300px] whitespace-pre-wrap text-[12px] font-semibold leading-relaxed text-slate-600">
+                      {row.note?.trim() ? row.note : "（通報内容の記載なし）"}
+                    </p>
                     {(row.evidenceUrls ?? []).length > 0 && (
                       <div className="mt-2 space-y-1">
                         {row.evidenceUrls?.slice(0, 3).map((url) => (
@@ -544,6 +572,7 @@ function OshiRequestsPanel({
   usersById,
   genres,
   groups,
+  characters,
   genreById,
   groupById,
   canManage,
@@ -553,186 +582,351 @@ function OshiRequestsPanel({
   usersById: Map<string, UserLite>;
   genres: GenreRow[];
   groups: GroupRow[];
+  characters: CharacterRow[];
   genreById: Map<string, GenreRow>;
   groupById: Map<string, GroupRow>;
   canManage: boolean;
 }) {
   return (
-    <div className="grid gap-5 xl:grid-cols-2">
+    <div className="space-y-5">
       <AdminPanel
         title={`推しL1追加リクエスト ${oshiRequests.length}件`}
-        description="ユーザーから届いたグループ/作品/ソロの追加希望をマスタへ登録します。"
+        description="1リクエスト1行。統合先は既存L1マスタ名から選べます。"
       >
-        <div className="space-y-4">
-          {oshiRequests.length === 0 ? (
-            <p className="text-[12px] font-semibold text-slate-500">
-              pending のL1リクエストはありません。
-            </p>
-          ) : (
-            oshiRequests.map((request) => (
-              <div key={request.id} className="rounded-lg border border-slate-200 p-3">
-                <RequestHeader
-                  title={request.requested_name}
-                  status={request.status}
-                  user={userLabel(usersById, request.user_id)}
-                  createdAt={request.created_at}
-                />
-                <div className="mt-2 grid gap-1 text-[11px] font-semibold text-slate-500">
-                  <div>希望ジャンル: {request.requested_genre_id ? genreById.get(request.requested_genre_id)?.name ?? request.requested_genre_id : "未指定"}</div>
-                  <div>種別: {request.requested_kind ?? "未指定"}</div>
-                  {request.note && <div className="whitespace-pre-wrap">メモ: {request.note}</div>}
-                  <div className="font-mono text-[10px] text-slate-400">{request.id}</div>
-                </div>
-
-                {canManage && (
-                  <div className="mt-3 grid gap-3">
-                    <form action={approveOshiRequestAsNew} className="grid gap-2 rounded-lg bg-slate-50 p-3">
-                      <input type="hidden" name="request_id" value={request.id} />
-                      <input type="hidden" name="return_to" value="/admin/operations" />
-                      <AdminTextInput
-                        name="name"
-                        label="新規L1名"
-                        defaultValue={request.requested_name}
-                        required
-                      />
-                      <div className="grid gap-2 sm:grid-cols-2">
-                        <AdminSelect
-                          name="genre_id"
-                          label="ジャンル"
-                          defaultValue={request.requested_genre_id ?? genres[0]?.id}
-                        >
-                          {genres.map((genre) => (
-                            <option key={genre.id} value={genre.id}>
-                              {genre.name}
-                            </option>
-                          ))}
-                        </AdminSelect>
-                        <AdminSelect
-                          name="kind"
-                          label="種別"
-                          defaultValue={request.requested_kind ?? "group"}
-                        >
-                          <option value="group">group</option>
-                          <option value="work">work</option>
-                          <option value="solo">solo</option>
-                        </AdminSelect>
+        {oshiRequests.length === 0 ? (
+          <p className="text-[12px] font-semibold text-slate-500">
+            pending のL1リクエストはありません。
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[1180px] border-separate border-spacing-0 text-left">
+              <thead>
+                <tr className="text-[11px] font-bold text-slate-500">
+                  <th className="border-b border-slate-200 px-3 py-2">リクエスト名</th>
+                  <th className="border-b border-slate-200 px-3 py-2">申請者</th>
+                  <th className="border-b border-slate-200 px-3 py-2">希望ジャンル / 種別</th>
+                  <th className="border-b border-slate-200 px-3 py-2">メモ</th>
+                  <th className="border-b border-slate-200 px-3 py-2">日時</th>
+                  <th className="border-b border-slate-200 px-3 py-2">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                {oshiRequests.map((request) => (
+                  <tr key={request.id} className="align-top">
+                    <td className="border-b border-slate-100 px-3 py-3">
+                      <div className="text-[13px] font-black text-slate-900">
+                        {request.requested_name}
                       </div>
-                      <div className="grid gap-2 sm:grid-cols-2">
-                        <AdminTextInput name="aliases" label="別名" placeholder="カンマ区切り" />
-                        <AdminTextInput name="display_order" label="表示順" type="number" defaultValue="0" />
+                      <div className="mt-1 font-mono text-[10px] text-slate-400">
+                        {shortId(request.id)}
                       </div>
-                      <AdminTextInput name="reason" label="承認理由" required />
-                      <SubmitButton>新規L1として登録</SubmitButton>
-                    </form>
-
-                    <form action={mergeOshiRequestIntoGroup} className="grid gap-2 rounded-lg border border-slate-100 p-3">
-                      <input type="hidden" name="request_id" value={request.id} />
-                      <input type="hidden" name="return_to" value="/admin/operations" />
-                      <AdminTextInput
-                        name="approved_group_id"
-                        label="既存L1 IDへ統合"
-                        placeholder="groups_master.id"
-                        required
-                      />
-                      <AdminTextInput name="reason" label="統合理由" required />
-                      <SubmitButton>既存L1に統合</SubmitButton>
-                    </form>
-
-                    <form action={rejectOshiRequest} className="grid gap-2 rounded-lg border border-rose-100 p-3">
-                      <input type="hidden" name="request_id" value={request.id} />
-                      <input type="hidden" name="return_to" value="/admin/operations" />
-                      <AdminTextInput name="reason" label="却下理由" required />
-                      <SubmitButton>却下する</SubmitButton>
-                    </form>
-                  </div>
-                )}
-              </div>
-            ))
-          )}
-        </div>
+                    </td>
+                    <td className="border-b border-slate-100 px-3 py-3 text-[12px] font-bold text-slate-900">
+                      {userLabel(usersById, request.user_id)}
+                    </td>
+                    <td className="border-b border-slate-100 px-3 py-3 text-[12px] font-semibold text-slate-600">
+                      {request.requested_genre_id
+                        ? genreById.get(request.requested_genre_id)?.name ?? shortId(request.requested_genre_id)
+                        : "未指定"}
+                      {" / "}
+                      {request.requested_kind ?? "未指定"}
+                    </td>
+                    <td className="border-b border-slate-100 px-3 py-3">
+                      <p className="max-w-[220px] whitespace-pre-wrap text-[12px] font-semibold text-slate-600">
+                        {request.note?.trim() ? request.note : "—"}
+                      </p>
+                    </td>
+                    <td className="border-b border-slate-100 px-3 py-3 text-[11px] font-semibold text-slate-500">
+                      {formatFullDateTime(request.created_at)}
+                    </td>
+                    <td className="border-b border-slate-100 px-3 py-3">
+                      {canManage ? (
+                        <div className="grid w-[320px] gap-2">
+                          <form action={approveOshiRequestAsNew} className="flex items-end gap-2">
+                            <input type="hidden" name="request_id" value={request.id} />
+                            <input type="hidden" name="return_to" value="/admin/operations" />
+                            <input type="hidden" name="name" value={request.requested_name} />
+                            <input type="hidden" name="kind" value={request.requested_kind ?? "group"} />
+                            <div className="min-w-[150px] flex-1">
+                              <AdminSelect
+                                name="genre_id"
+                                label="ジャンル"
+                                defaultValue={request.requested_genre_id ?? genres[0]?.id}
+                              >
+                                {genres.map((genre) => (
+                                  <option key={genre.id} value={genre.id}>
+                                    {genre.name}
+                                  </option>
+                                ))}
+                              </AdminSelect>
+                            </div>
+                            <SubmitButton>新規L1登録</SubmitButton>
+                          </form>
+                          <form action={mergeOshiRequestIntoGroup} className="flex items-end gap-2">
+                            <input type="hidden" name="request_id" value={request.id} />
+                            <input type="hidden" name="return_to" value="/admin/operations" />
+                            <div className="min-w-[150px] flex-1">
+                              <AdminSelect name="approved_group_id" label="統合先L1（マスタ名）" required>
+                                <option value="">選択してください</option>
+                                {groups.map((candidate) => (
+                                  <option key={candidate.id} value={candidate.id}>
+                                    {candidate.name}（{genreById.get(candidate.genre_id)?.name ?? "ジャンル未取得"}）
+                                  </option>
+                                ))}
+                              </AdminSelect>
+                            </div>
+                            <SubmitButton>統合</SubmitButton>
+                          </form>
+                          <form action={rejectOshiRequest} className="flex items-end gap-2">
+                            <input type="hidden" name="request_id" value={request.id} />
+                            <input type="hidden" name="return_to" value="/admin/operations" />
+                            <div className="min-w-[150px] flex-1">
+                              <AdminTextInput name="reason" label="却下理由" required />
+                            </div>
+                            <SubmitButton>却下</SubmitButton>
+                          </form>
+                        </div>
+                      ) : (
+                        <span className="text-[11px] font-semibold text-slate-400">権限なし</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </AdminPanel>
 
       <AdminPanel
         title={`推しL2追加リクエスト ${characterRequests.length}件`}
-        description="メンバー/キャラクターの追加希望を、所属L1の下へ登録します。"
+        description="1リクエスト1行。統合先は既存L2マスタ名から選べます。"
       >
-        <div className="space-y-4">
-          {characterRequests.length === 0 ? (
-            <p className="text-[12px] font-semibold text-slate-500">
-              pending のL2リクエストはありません。
-            </p>
-          ) : (
-            characterRequests.map((request) => {
-              const group = request.group_id ? groupById.get(request.group_id) : null;
-              return (
-                <div key={request.id} className="rounded-lg border border-slate-200 p-3">
-                  <RequestHeader
-                    title={request.requested_name}
-                    status={request.status}
-                    user={userLabel(usersById, request.user_id)}
-                    createdAt={request.created_at}
-                  />
-                  <div className="mt-2 grid gap-1 text-[11px] font-semibold text-slate-500">
-                    <div>所属L1: {group ? `${group.name} / ${genreById.get(group.genre_id)?.name ?? "genre未取得"}` : request.oshi_request_id ? `未承認L1 request ${shortId(request.oshi_request_id)}` : "未指定"}</div>
-                    {request.note && <div className="whitespace-pre-wrap">メモ: {request.note}</div>}
-                    <div className="font-mono text-[10px] text-slate-400">{request.id}</div>
-                  </div>
-
-                  {canManage && (
-                    <div className="mt-3 grid gap-3">
-                      <form action={approveCharacterRequestAsNew} className="grid gap-2 rounded-lg bg-slate-50 p-3">
-                        <input type="hidden" name="request_id" value={request.id} />
-                        <input type="hidden" name="return_to" value="/admin/operations" />
-                        <AdminTextInput
-                          name="name"
-                          label="新規L2名"
-                          defaultValue={request.requested_name}
-                          required
-                        />
-                        <AdminSelect name="group_id" label="所属L1" defaultValue={request.group_id ?? ""}>
-                          <option value="">選択してください</option>
-                          {groups.map((candidate) => (
-                            <option key={candidate.id} value={candidate.id}>
-                              {candidate.name} / {genreById.get(candidate.genre_id)?.name ?? "genre未取得"}
-                            </option>
-                          ))}
-                        </AdminSelect>
-                        <div className="grid gap-2 sm:grid-cols-2">
-                          <AdminTextInput name="aliases" label="別名" placeholder="カンマ区切り" />
-                          <AdminTextInput name="display_order" label="表示順" type="number" defaultValue="0" />
+        {characterRequests.length === 0 ? (
+          <p className="text-[12px] font-semibold text-slate-500">
+            pending のL2リクエストはありません。
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[1180px] border-separate border-spacing-0 text-left">
+              <thead>
+                <tr className="text-[11px] font-bold text-slate-500">
+                  <th className="border-b border-slate-200 px-3 py-2">リクエスト名</th>
+                  <th className="border-b border-slate-200 px-3 py-2">申請者</th>
+                  <th className="border-b border-slate-200 px-3 py-2">所属L1</th>
+                  <th className="border-b border-slate-200 px-3 py-2">メモ</th>
+                  <th className="border-b border-slate-200 px-3 py-2">日時</th>
+                  <th className="border-b border-slate-200 px-3 py-2">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                {characterRequests.map((request) => {
+                  const group = request.group_id ? groupById.get(request.group_id) : null;
+                  return (
+                    <tr key={request.id} className="align-top">
+                      <td className="border-b border-slate-100 px-3 py-3">
+                        <div className="text-[13px] font-black text-slate-900">
+                          {request.requested_name}
                         </div>
-                        <AdminTextInput name="reason" label="承認理由" required />
-                        <SubmitButton>新規L2として登録</SubmitButton>
-                      </form>
-
-                      <form action={mergeCharacterRequestIntoCharacter} className="grid gap-2 rounded-lg border border-slate-100 p-3">
-                        <input type="hidden" name="request_id" value={request.id} />
-                        <input type="hidden" name="return_to" value="/admin/operations" />
-                        <AdminTextInput
-                          name="approved_character_id"
-                          label="既存L2 IDへ統合"
-                          placeholder="characters_master.id"
-                          required
-                        />
-                        <AdminTextInput name="reason" label="統合理由" required />
-                        <SubmitButton>既存L2に統合</SubmitButton>
-                      </form>
-
-                      <form action={rejectCharacterRequest} className="grid gap-2 rounded-lg border border-rose-100 p-3">
-                        <input type="hidden" name="request_id" value={request.id} />
-                        <input type="hidden" name="return_to" value="/admin/operations" />
-                        <AdminTextInput name="reason" label="却下理由" required />
-                        <SubmitButton>却下する</SubmitButton>
-                      </form>
-                    </div>
-                  )}
-                </div>
-              );
-            })
-          )}
-        </div>
+                        <div className="mt-1 font-mono text-[10px] text-slate-400">
+                          {shortId(request.id)}
+                        </div>
+                      </td>
+                      <td className="border-b border-slate-100 px-3 py-3 text-[12px] font-bold text-slate-900">
+                        {userLabel(usersById, request.user_id)}
+                      </td>
+                      <td className="border-b border-slate-100 px-3 py-3 text-[12px] font-semibold text-slate-600">
+                        {group
+                          ? `${group.name}（${genreById.get(group.genre_id)?.name ?? "ジャンル未取得"}）`
+                          : request.oshi_request_id
+                            ? `未承認L1 request ${shortId(request.oshi_request_id)}`
+                            : "未指定"}
+                      </td>
+                      <td className="border-b border-slate-100 px-3 py-3">
+                        <p className="max-w-[220px] whitespace-pre-wrap text-[12px] font-semibold text-slate-600">
+                          {request.note?.trim() ? request.note : "—"}
+                        </p>
+                      </td>
+                      <td className="border-b border-slate-100 px-3 py-3 text-[11px] font-semibold text-slate-500">
+                        {formatFullDateTime(request.created_at)}
+                      </td>
+                      <td className="border-b border-slate-100 px-3 py-3">
+                        {canManage ? (
+                          <div className="grid w-[320px] gap-2">
+                            <form action={approveCharacterRequestAsNew} className="flex items-end gap-2">
+                              <input type="hidden" name="request_id" value={request.id} />
+                              <input type="hidden" name="return_to" value="/admin/operations" />
+                              <input type="hidden" name="name" value={request.requested_name} />
+                              <div className="min-w-[150px] flex-1">
+                                <AdminSelect
+                                  name="group_id"
+                                  label="所属L1（マスタ名）"
+                                  defaultValue={request.group_id ?? ""}
+                                  required
+                                >
+                                  <option value="">選択してください</option>
+                                  {groups.map((candidate) => (
+                                    <option key={candidate.id} value={candidate.id}>
+                                      {candidate.name}（{genreById.get(candidate.genre_id)?.name ?? "ジャンル未取得"}）
+                                    </option>
+                                  ))}
+                                </AdminSelect>
+                              </div>
+                              <SubmitButton>新規L2登録</SubmitButton>
+                            </form>
+                            <form action={mergeCharacterRequestIntoCharacter} className="flex items-end gap-2">
+                              <input type="hidden" name="request_id" value={request.id} />
+                              <input type="hidden" name="return_to" value="/admin/operations" />
+                              <div className="min-w-[150px] flex-1">
+                                <AdminSelect name="approved_character_id" label="統合先L2（マスタ名）" required>
+                                  <option value="">選択してください</option>
+                                  {characters.map((candidate) => (
+                                    <option key={candidate.id} value={candidate.id}>
+                                      {candidate.name}（{groupById.get(candidate.group_id)?.name ?? "L1未取得"}）
+                                    </option>
+                                  ))}
+                                </AdminSelect>
+                              </div>
+                              <SubmitButton>統合</SubmitButton>
+                            </form>
+                            <form action={rejectCharacterRequest} className="flex items-end gap-2">
+                              <input type="hidden" name="request_id" value={request.id} />
+                              <input type="hidden" name="return_to" value="/admin/operations" />
+                              <div className="min-w-[150px] flex-1">
+                                <AdminTextInput name="reason" label="却下理由" required />
+                              </div>
+                              <SubmitButton>却下</SubmitButton>
+                            </form>
+                          </div>
+                        ) : (
+                          <span className="text-[11px] font-semibold text-slate-400">権限なし</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </AdminPanel>
     </div>
+  );
+}
+
+function MasterSearchPanel({
+  query,
+  groups,
+  characters,
+  genreById,
+  groupById,
+}: {
+  query: string;
+  groups: GroupRow[];
+  characters: CharacterRow[];
+  genreById: Map<string, GenreRow>;
+  groupById: Map<string, GroupRow>;
+}) {
+  const normalized = query.toLowerCase();
+  const matchedGroups = normalized
+    ? groups.filter((group) => group.name.toLowerCase().includes(normalized))
+    : [];
+  const matchedCharacters = normalized
+    ? characters.filter((character) =>
+        character.name.toLowerCase().includes(normalized) ||
+        (character.aliases ?? []).some((alias) => alias.toLowerCase().includes(normalized)) ||
+        (groupById.get(character.group_id)?.name.toLowerCase().includes(normalized) ?? false),
+      )
+    : [];
+
+  return (
+    <AdminPanel
+      title="推しマスタ検索（L1 / L2）"
+      description="既存マスタの名前を検索して、登録済みのL1/L2とIDを確認できます。"
+    >
+      <form method="get" action="/admin/operations" className="flex items-end gap-2">
+        <div className="w-[280px]">
+          <AdminTextInput
+            name="master_q"
+            label="マスタ名で検索"
+            placeholder="例: aespa / カリナ"
+            defaultValue={query}
+          />
+        </div>
+        <SubmitButton>検索</SubmitButton>
+      </form>
+
+      {query && (
+        <div className="mt-4 grid gap-5 xl:grid-cols-2">
+          <div>
+            <div className="text-[12px] font-black text-slate-900">
+              L1マスタ {matchedGroups.length}件
+            </div>
+            {matchedGroups.length === 0 ? (
+              <p className="mt-2 text-[12px] font-semibold text-slate-500">一致するL1はありません。</p>
+            ) : (
+              <table className="mt-2 w-full border-separate border-spacing-0 text-left">
+                <thead>
+                  <tr className="text-[11px] font-bold text-slate-500">
+                    <th className="border-b border-slate-200 px-2 py-1.5">名前</th>
+                    <th className="border-b border-slate-200 px-2 py-1.5">ジャンル / 種別</th>
+                    <th className="border-b border-slate-200 px-2 py-1.5">ID</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {matchedGroups.slice(0, 30).map((group) => (
+                    <tr key={group.id}>
+                      <td className="border-b border-slate-100 px-2 py-2 text-[12px] font-black text-slate-900">
+                        {group.name}
+                      </td>
+                      <td className="border-b border-slate-100 px-2 py-2 text-[12px] font-semibold text-slate-600">
+                        {genreById.get(group.genre_id)?.name ?? "—"} / {group.kind}
+                      </td>
+                      <td className="border-b border-slate-100 px-2 py-2 font-mono text-[10px] text-slate-400">
+                        {group.id}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+          <div>
+            <div className="text-[12px] font-black text-slate-900">
+              L2マスタ {matchedCharacters.length}件
+            </div>
+            {matchedCharacters.length === 0 ? (
+              <p className="mt-2 text-[12px] font-semibold text-slate-500">一致するL2はありません。</p>
+            ) : (
+              <table className="mt-2 w-full border-separate border-spacing-0 text-left">
+                <thead>
+                  <tr className="text-[11px] font-bold text-slate-500">
+                    <th className="border-b border-slate-200 px-2 py-1.5">名前</th>
+                    <th className="border-b border-slate-200 px-2 py-1.5">所属L1</th>
+                    <th className="border-b border-slate-200 px-2 py-1.5">ID</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {matchedCharacters.slice(0, 30).map((character) => (
+                    <tr key={character.id}>
+                      <td className="border-b border-slate-100 px-2 py-2 text-[12px] font-black text-slate-900">
+                        {character.name}
+                      </td>
+                      <td className="border-b border-slate-100 px-2 py-2 text-[12px] font-semibold text-slate-600">
+                        {groupById.get(character.group_id)?.name ?? "—"}
+                      </td>
+                      <td className="border-b border-slate-100 px-2 py-2 font-mono text-[10px] text-slate-400">
+                        {character.id}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      )}
+    </AdminPanel>
   );
 }
 
@@ -827,30 +1021,6 @@ function AdminNotificationsPanel({
           )}
         </div>
       </AdminPanel>
-    </div>
-  );
-}
-
-function RequestHeader({
-  title,
-  status,
-  user,
-  createdAt,
-}: {
-  title: string;
-  status: string;
-  user: string;
-  createdAt: string;
-}) {
-  return (
-    <div className="flex items-start justify-between gap-3">
-      <div>
-        <div className="text-[13px] font-black text-slate-900">{title}</div>
-        <div className="mt-1 text-[11px] font-semibold text-slate-500">
-          {user} · {formatFullDateTime(createdAt)}
-        </div>
-      </div>
-      <StatusPill tone={reportTone(status)}>{status}</StatusPill>
     </div>
   );
 }

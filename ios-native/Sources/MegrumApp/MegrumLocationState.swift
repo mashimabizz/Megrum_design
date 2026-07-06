@@ -118,6 +118,8 @@ extension MegrumLocationState: CLLocationManagerDelegate {
         Task { @MainActor in
             authorizationStatus = status
             if isAuthorized {
+                // 許可された時点で古い「許可されていません」表示を確実に消す。
+                locationErrorMessage = nil
                 if wantsContinuousLocationUpdates {
                     startUpdatingCurrentLocation()
                 } else {
@@ -150,15 +152,38 @@ extension MegrumLocationState: CLLocationManagerDelegate {
     }
 
     nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        let currentStatus = manager.authorizationStatus
         Task { @MainActor in
+            // 実際の許可状態を必ず読み直す。エラー種別から .denied を推測して
+            // 上書きすると、許可済みなのに「許可されていません」が残り続ける。
+            authorizationStatus = currentStatus
+            if let error = error as? CLError {
+                switch error.code {
+                case .locationUnknown:
+                    // 一時的に測位できないだけ。継続更新中は次の更新を待つ。
+                    if wantsContinuousLocationUpdates {
+                        return
+                    }
+                case .denied:
+                    // 許可ダイアログ表示中のリクエスト等で、許可済みでも一時的に
+                    // denied エラーが届くことがある。実状態が許可済みなら無視して継続。
+                    if isAuthorized {
+                        if wantsContinuousLocationUpdates {
+                            self.manager.startUpdatingLocation()
+                        }
+                        return
+                    }
+                    isRequestingLocation = false
+                    isResolvingLocationLabel = false
+                    locationErrorMessage = Self.message(for: currentStatus == .notDetermined ? .denied : currentStatus)
+                    return
+                default:
+                    break
+                }
+            }
             isRequestingLocation = false
             isResolvingLocationLabel = false
-            if let error = error as? CLError, error.code == .denied {
-                authorizationStatus = .denied
-                locationErrorMessage = Self.message(for: .denied)
-            } else {
-                locationErrorMessage = "位置情報を取得できません"
-            }
+            locationErrorMessage = "位置情報を取得できません"
         }
     }
 }

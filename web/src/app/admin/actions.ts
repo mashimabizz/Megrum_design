@@ -316,7 +316,7 @@ export async function approveOshiRequestAsNew(formData: FormData) {
   const context = await getAdminContext(["oshi_requests.manage"]);
   const adminSupabase = createServiceRoleClient();
   const requestId = requiredUUID(formData, "request_id");
-  const reason = requiredString(formData, "reason");
+  const reason = optionalBoundedString(formData, "reason", 500) ?? "管理画面から新規L1として承認";
   const genreId = requiredUUID(formData, "genre_id");
   const name = boundedRequiredString(formData, "name", 100);
   const kind = requiredString(formData, "kind");
@@ -376,7 +376,7 @@ export async function mergeOshiRequestIntoGroup(formData: FormData) {
   const adminSupabase = createServiceRoleClient();
   const requestId = requiredUUID(formData, "request_id");
   const groupId = requiredUUID(formData, "approved_group_id");
-  const reason = requiredString(formData, "reason");
+  const reason = optionalBoundedString(formData, "reason", 500) ?? "管理画面から既存L1へ統合";
 
   const before = await loadPendingOshiRequest(adminSupabase, requestId);
   const group = await loadGroup(adminSupabase, groupId);
@@ -449,7 +449,7 @@ export async function approveCharacterRequestAsNew(formData: FormData) {
   const context = await getAdminContext(["oshi_requests.manage"]);
   const adminSupabase = createServiceRoleClient();
   const requestId = requiredUUID(formData, "request_id");
-  const reason = requiredString(formData, "reason");
+  const reason = optionalBoundedString(formData, "reason", 500) ?? "管理画面から新規L2として承認";
   const groupId = requiredUUID(formData, "group_id");
   const name = boundedRequiredString(formData, "name", 100);
   const aliases = parseAliasList(formData.get("aliases"));
@@ -505,7 +505,7 @@ export async function mergeCharacterRequestIntoCharacter(formData: FormData) {
   const adminSupabase = createServiceRoleClient();
   const requestId = requiredUUID(formData, "request_id");
   const characterId = requiredUUID(formData, "approved_character_id");
-  const reason = requiredString(formData, "reason");
+  const reason = optionalBoundedString(formData, "reason", 500) ?? "管理画面から既存L2へ統合";
 
   const before = await loadPendingCharacterRequest(adminSupabase, requestId);
   const { data: character, error: characterError } = await adminSupabase
