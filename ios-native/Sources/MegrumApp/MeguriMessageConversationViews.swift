@@ -163,6 +163,7 @@ struct MeguriMessageBubble: View {
             if let sourceGroomImageURL = message.sourceGroomImageURL {
                 MeguriGroomReplyContextCard(
                     imageURL: sourceGroomImageURL,
+                    messageCreatedAt: message.createdAt,
                     title: groomContextTitle,
                     isMine: isMine
                 )
@@ -308,28 +309,64 @@ struct MeguriMessageBubble: View {
 
 private struct MeguriGroomReplyContextCard: View {
     var imageURL: URL
+    var messageCreatedAt: Date
     var title: String
     var isMine: Bool
 
+    @Environment(\.groomContextImageURLResolver) private var resolver
+    @State private var resolvedURL: URL?
+    @State private var isUnavailable = false
+
     var body: some View {
+        // グルームが失効している（24時間超 or 再署名不可）場合は枠ごと出さない。
+        if !isUnavailable {
+            card
+                .task(id: imageURL) {
+                    await resolveImageURL()
+                }
+        }
+    }
+
+    private func resolveImageURL() async {
+        if GroomContextCardPolicy.isCertainlyExpired(messageCreatedAt: messageCreatedAt) {
+            isUnavailable = true
+            return
+        }
+        if let fresh = await resolver(imageURL) {
+            resolvedURL = fresh
+        } else {
+            isUnavailable = true
+        }
+    }
+
+    private var card: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
                 .font(.system(size: 12, weight: .black, design: .rounded))
                 .foregroundStyle(isMine ? .white.opacity(0.92) : MegrumTheme.ink.opacity(0.82))
 
-            // 保存された署名URLは失効するため、表示時に署名し直して読み込む。
-            GroomContextResolvedImage(staleURL: imageURL) { phase in
-                switch phase {
-                case .success(let image):
-                    image
-                        .resizable()
-                        .scaledToFill()
-                case .failure:
-                    GroomImageFailureView(
-                        message: "画像を読み込めませんでした",
-                        foregroundColor: isMine ? .white.opacity(0.84) : MegrumTheme.muted
-                    )
-                default:
+            Group {
+                if let resolvedURL {
+                    AsyncImage(url: resolvedURL) { phase in
+                        switch phase {
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .scaledToFill()
+                        case .failure:
+                            GroomImageFailureView(
+                                message: "画像を読み込めませんでした",
+                                foregroundColor: isMine ? .white.opacity(0.84) : MegrumTheme.muted
+                            )
+                        default:
+                            MegrumTheme.sky.opacity(isMine ? 0.20 : 0.12)
+                                .overlay {
+                                    ProgressView()
+                                        .controlSize(.small)
+                                }
+                        }
+                    }
+                } else {
                     MegrumTheme.sky.opacity(isMine ? 0.20 : 0.12)
                         .overlay {
                             ProgressView()
