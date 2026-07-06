@@ -75,6 +75,36 @@
 
 ---
 
+## イテレーション1226.298：グルーム→交換プロフ・Like統計・人型初期アイコン
+
+### 背景・問題意識
+オーナー指示3点。（1）グルームからプロフィールを開いた時にグッズ交換側のプロフィールを表示（自分のグルームなら自分の交換プロフィール）。（2）プロフィールの取引件数の枠を「Like」にして、グルームでもらったいいね数を表示。（3）アイコン未設定時はインスタグラムの初期アイコンのようなグレー人型を表示。
+
+### 変更内容
+
+#### グルーム→交換プロフィール
+- `MeguriUserProfileRouteScreen` を全面簡素化：viewer 本人なら `OwnProfileScreen`、他人なら `PublicUserProfileScreen` を常に表示（めぐり用簡易プロフィール画面と meguriProfile 分岐を削除）
+
+#### Like 統計
+- migration `20260706150000_count_groom_likes_received.sql`（push済み）— `count_groom_likes_received(p_user_id)` security definer RPC（groom_reactions は RLS で他人の行が読めないため集計専用関数。件数のみ公開）
+- `SupabaseUserProfileClient.loadGroomLikeCount` → repository（デフォルト実装 0）→ `MegrumAppState.loadGroomLikeCount`（`groomLikeCountByUserID` キャッシュ）
+- `ProfileVisualHero` / `ProfileVisualStatCluster` の統計を `tradeCount`（取引）→ `likeCount`（Like）に変更。自分/相手プロフィール双方で表示・profile task で読込
+
+#### 人型初期アイコン
+- `ProfileVisualAvatar` の未設定/読込前フォールバックを頭文字テキスト→グレー地＋person.fill シルエット（Instagram 風）に変更
+
+### 影響範囲
+プロフィール（自分/相手/グルーム経由）、プロフィール統計、アバター表示全般（ProfileVisualAvatar 使用箇所）
+
+### 確認方法
+- Simulator VisualQA `public-profile` で Like 24・グレー人型・タグトーンを目視確認
+- `swift test` 1471件 0 failures
+
+### セルフレビュー結果
+- ✅ RPC は件数のみ返し「誰が押したか」は開示しない
+- ✅ 取引件数の表示はプロフィール統計から撤去（Like に置換）。取引数はやりとりタブ側で把握可能
+- ✅ モック用 Preview repository は Like=24 を返し VisualQA で確認可能
+
 ## イテレーション1226.297：法務リンクとGoogle Lensのアプリ内表示
 
 ### 背景・問題意識

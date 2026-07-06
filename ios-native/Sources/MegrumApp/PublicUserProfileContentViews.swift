@@ -15,6 +15,7 @@ struct PublicUserProfileContent: View {
     @Binding var selectedVisualTab: ProfileVisualTab
     var bio: String
     var ratingText: String
+    var groomLikeCount: Int = 0
     var chips: [String]
     var oshiTags: [ProfileVisualTagItem]
     var goodsItems: [ProfileVisualGridItem]
@@ -43,7 +44,7 @@ struct PublicUserProfileContent: View {
                     handle: publicProfile.profile.handle,
                     bio: bio,
                     avatarURL: publicProfile.profile.avatarURL,
-                    tradeCount: "\(publicProfile.completedTradeCount)",
+                    likeCount: "\(groomLikeCount)",
                     ratingText: ratingText,
                     chips: chips,
                     tagItems: oshiTags,

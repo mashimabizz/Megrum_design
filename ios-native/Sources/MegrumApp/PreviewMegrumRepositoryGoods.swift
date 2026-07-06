@@ -277,6 +277,10 @@ public extension PreviewMegrumRepository {
         ]
     }
 
+    func loadGroomLikeCount(userID: UUID) async throws -> Int {
+        24
+    }
+
     func loadUserEvaluations(userID: UUID, limit: Int) async throws -> [UserEvaluation] {
         Array(NativePreviewData.userEvaluations.prefix(max(0, limit)))
     }

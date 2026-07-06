@@ -28,6 +28,14 @@ public final class SupabaseUserProfileClient: @unchecked Sendable {
         return rows.map(\.evaluation)
     }
 
+    /// そのユーザーのグルームが受け取った like 総数（公開集計）。
+    public func loadGroomLikeCount(userID: UUID) async throws -> Int {
+        try await client.rpcValue(
+            function: "count_groom_likes_received",
+            payload: PublicUserProfilePayload(userID: userID)
+        )
+    }
+
     public func makeLoadProfileRequest(userID: UUID) throws -> URLRequest {
         try client.makeRPCRequest(
             function: "get_public_user_profile_for_viewer",

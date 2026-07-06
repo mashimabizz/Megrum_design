@@ -123,6 +123,10 @@ public extension SupabaseMegrumRepository {
         try await publicProfilePersistence.loadProfile(userID: userID)
     }
 
+    func loadGroomLikeCount(userID: UUID) async throws -> Int {
+        try await publicProfilePersistence.loadGroomLikeCount(userID: userID)
+    }
+
     func loadUserEvaluations(userID: UUID, limit: Int) async throws -> [UserEvaluation] {
         try await publicProfilePersistence.loadEvaluations(userID: userID, limit: limit)
     }

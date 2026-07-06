@@ -46,6 +46,7 @@ public final class MegrumAppState: ObservableObject {
     @Published public internal(set) var publicListingsByUserID: [UUID: [IndividualListing]] = [:]
     @Published public internal(set) var publicExchangeSettingsByUserID: [UUID: HomeDefaultExchangeSettings] = [:]
     @Published public internal(set) var userEvaluationsByUserID: [UUID: [UserEvaluation]] = [:]
+    @Published public internal(set) var groomLikeCountByUserID: [UUID: Int] = [:]
     @Published public internal(set) var mailingAddress: MailingAddress?
     @Published public internal(set) var paymentSettings: UserPaymentSettings?
     @Published public internal(set) var hasLoadedPaymentSettings = false

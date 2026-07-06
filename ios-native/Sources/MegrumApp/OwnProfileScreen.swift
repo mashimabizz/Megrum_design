@@ -28,6 +28,7 @@ struct OwnProfileScreen: View {
                 summary: summary,
                 selectedProfileTab: $presentationState.selectedProfileTab,
                 profileBio: summary.map(profileBio) ?? "",
+                groomLikeCount: appState.viewer.map { appState.groomLikeCountByUserID[$0.id] ?? 0 } ?? 0,
                 profileTagItems: profileTagItems,
                 goodsItems: ownGoodsGridItems,
                 wishItems: ownWishGridItems,
@@ -80,6 +81,9 @@ struct OwnProfileScreen: View {
         }
         .task {
             await loadSupplementalProfileDataIfNeeded()
+            if let viewerID = appState.viewer?.id {
+                await appState.loadGroomLikeCount(userID: viewerID)
+            }
         }
     }
 

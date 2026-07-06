@@ -26,6 +26,10 @@ struct SupabasePublicProfilePersistence: Sendable {
         try await userProfileClient.loadEvaluations(userID: userID, limit: limit)
     }
 
+    func loadGroomLikeCount(userID: UUID) async throws -> Int {
+        try await userProfileClient.loadGroomLikeCount(userID: userID)
+    }
+
     static func profile(
         _ profile: PublicUserProfile,
         withOshiSelections selections: [UserOshiSelection]

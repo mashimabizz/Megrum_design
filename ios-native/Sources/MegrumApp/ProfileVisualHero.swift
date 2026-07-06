@@ -6,7 +6,8 @@ struct ProfileVisualHero: View {
     var handle: String
     var bio: String
     var avatarURL: URL?
-    var tradeCount: String
+    /// グルームでもらった Like の数（旧: 取引件数）。
+    var likeCount: String
     var ratingText: String
     var chips: [String]
     var tagItems: [ProfileVisualTagItem] = []
@@ -69,7 +70,7 @@ struct ProfileVisualHero: View {
                         if showsStats {
                             VStack(alignment: .trailing, spacing: 7) {
                                 ProfileVisualStatCluster(
-                                    tradeCount: tradeCount,
+                                    likeCount: likeCount,
                                     ratingText: ratingText,
                                     density: density,
                                     onRatingTap: onRatingTap

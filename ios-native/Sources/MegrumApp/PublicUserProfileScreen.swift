@@ -21,6 +21,7 @@ struct PublicUserProfileScreen: View {
                 selectedVisualTab: $presentationState.selectedVisualTab,
                 bio: profile.map(publicProfileBio) ?? "",
                 ratingText: profile.map(publicProfileRating) ?? "—",
+                groomLikeCount: appState.groomLikeCountByUserID[userID] ?? 0,
                 chips: [],
                 oshiTags: profile.map(publicProfileOshiTags) ?? [],
                 goodsItems: publicProfileGoodsGridItems,
@@ -89,6 +90,7 @@ struct PublicUserProfileScreen: View {
             await appState.loadPublicExchangeContent(userID: userID)
             await appState.loadPublicExchangeSettings(userID: userID)
             await appState.loadUserEvaluations(userID: userID)
+            await appState.loadGroomLikeCount(userID: userID)
             if appState.oshiGroups.isEmpty {
                 await appState.loadOshiGroups()
             }

@@ -2,14 +2,14 @@ import MegrumDesign
 import SwiftUI
 
 struct ProfileVisualStatCluster: View {
-    var tradeCount: String
+    var likeCount: String
     var ratingText: String
     var density: ProfileVisualHeroDensity
     var onRatingTap: (() -> Void)? = nil
 
     var body: some View {
         HStack(spacing: max(6, density.statRowSpacing * 0.55)) {
-            ProfileVisualStat(title: "取引", value: tradeCount, accent: false, density: density)
+            ProfileVisualStat(title: "Like", value: likeCount, accent: false, density: density)
             Divider()
                 .frame(height: density.statDividerHeight)
             if let onRatingTap {

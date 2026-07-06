@@ -66,6 +66,16 @@ extension MegrumAppState {
         loadingPublicExchangeUserID = nil
     }
 
+    /// グルームでもらった like 総数（プロフィールの Like 表示用）。
+    public func loadGroomLikeCount(userID: UUID) async {
+        do {
+            let count = try await repository.loadGroomLikeCount(userID: userID)
+            groomLikeCountByUserID[userID] = max(0, count)
+        } catch {
+            // 集計に失敗しても画面は既存キャッシュ or 0 表示のままにする
+        }
+    }
+
     public func loadUserEvaluations(userID: UUID, limit: Int = 50) async {
         guard loadingEvaluationsUserID != userID else {
             return

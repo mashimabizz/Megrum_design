@@ -125,7 +125,7 @@ struct ProfileVisualAvatar: View {
 
     var body: some View {
         Circle()
-            .fill(MegrumTheme.lavender.opacity(0.18))
+            .fill(Color(white: 0.90))
             .frame(width: size, height: size)
             .overlay {
                 if let url {
@@ -136,19 +136,21 @@ struct ProfileVisualAvatar: View {
                                 .resizable()
                                 .scaledToFill()
                         default:
-                            fallbackText
+                            defaultPersonPlaceholder
                         }
                     }
                     .clipShape(Circle())
                 } else {
-                    fallbackText
+                    defaultPersonPlaceholder
                 }
             }
     }
 
-    private var fallbackText: some View {
-        Text(fallback.first.map(String.init) ?? "M")
-            .font(.system(size: size * 0.33, weight: .black, design: .rounded))
-            .foregroundStyle(MegrumTheme.lavender)
+    /// アイコン未設定時の初期表示（グレーの人型シルエット）。
+    private var defaultPersonPlaceholder: some View {
+        Image(systemName: "person.fill")
+            .font(.system(size: size * 0.5, weight: .medium))
+            .foregroundStyle(Color(white: 0.62))
+            .offset(y: size * 0.06)
     }
 }

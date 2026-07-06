@@ -134,6 +134,10 @@ public extension MegrumRepository {
         nil
     }
 
+    func loadGroomLikeCount(userID: UUID) async throws -> Int {
+        0
+    }
+
     func loadUserEvaluations(userID: UUID, limit: Int) async throws -> [UserEvaluation] {
         []
     }

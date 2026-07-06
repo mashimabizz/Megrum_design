@@ -14,6 +14,7 @@ struct OwnProfileContent: View {
     var summary: OwnProfileSummary?
     @Binding var selectedProfileTab: ProfileVisualTab
     var profileBio: String
+    var groomLikeCount: Int = 0
     var profileTagItems: [ProfileVisualTagItem]
     var goodsItems: [ProfileVisualGridItem]
     var wishItems: [ProfileVisualGridItem]
@@ -38,7 +39,7 @@ struct OwnProfileContent: View {
                     handle: summary.handle,
                     bio: profileBio,
                     avatarURL: summary.avatarURL,
-                    tradeCount: summary.completedTradeText,
+                    likeCount: "\(groomLikeCount)",
                     ratingText: "—",
                     chips: [],
                     tagItems: profileTagItems,
