@@ -219,13 +219,29 @@ struct HomeGoodsHitDetailSelectionContext {
         )
     }
 
-    private var offerSelectionIsSatisfied: Bool {
-        HomeListingSelectionPolicy.isSatisfied(
-            selectedCount: selectionState.selectedOfferIndices.count,
-            itemCount: offerGoods.count,
+    /// 相手の選択肢が要求する譲るグッズの数（手持ち数でクランプしない）。
+    var offerRequiredCount: Int {
+        HomeListingSelectionPolicy.requiredOfferCount(
             logic: offerLogic,
+            designatedCount: offerDesignatedCount,
             minimumCount: offerMinimumCount
         )
+    }
+
+    private var offerDesignatedCount: Int {
+        if selectedWantedOptions.count == 1, let option = selectedWantedOptions.first {
+            return option.goodsIDs.isEmpty ? offerGoods.count : option.goodsIDs.count
+        }
+        return wantedGoods.count
+    }
+
+    private var offerSelectionIsSatisfied: Bool {
+        guard offerGoods.count >= offerRequiredCount else {
+            // 条件（グループ・メンバー・種別・シリーズ）に合う手持ちが
+            // 必要数に満たない場合は打診不可。
+            return false
+        }
+        return selectionState.selectedOfferIndices.count >= offerRequiredCount
     }
 
     func proposalSelection() -> HomeDiscoveryProposalSelection? {
