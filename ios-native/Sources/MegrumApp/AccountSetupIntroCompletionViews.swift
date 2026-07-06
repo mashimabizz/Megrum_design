@@ -2,32 +2,124 @@ import MegrumCore
 import MegrumDesign
 import SwiftUI
 
+/// ようこそ画面：スワイプできる3枚のスライドで、シンプルに価値を伝える。
 struct AccountSetupWelcomeStep: View {
+    @State private var slideIndex = 0
+
+    private struct WelcomeSlide: Identifiable {
+        let id: Int
+        let systemImage: String
+        let gradient: [Color]
+        let title: String
+        let message: String
+        let tagline: String
+    }
+
+    private static let slides: [WelcomeSlide] = [
+        WelcomeSlide(
+            id: 0,
+            systemImage: "arrow.left.arrow.right",
+            gradient: [MegrumTheme.sky, MegrumTheme.lavender],
+            title: "推し活グッズを、\nちゃんと交換。",
+            message: "譲りたいものと ほしいものを登録するだけ。\nぴったりの交換相手が自動でみつかる。",
+            tagline: "「探す」から「めぐりあう」へ"
+        ),
+        WelcomeSlide(
+            id: 1,
+            systemImage: "mappin.and.ellipse",
+            gradient: [MegrumTheme.lavender, MegrumTheme.pink],
+            title: "会って交換、\nだから安心。",
+            message: "待ち合わせを決めてから交換成立。\n当日はチャットでスムーズに合流。",
+            tagline: "現地交換にぴったりの流れ"
+        ),
+        WelcomeSlide(
+            id: 2,
+            systemImage: "heart.fill",
+            gradient: [MegrumTheme.pink, MegrumTheme.sky],
+            title: "めぐりで、\nゆるくつながる。",
+            message: "近くのファンと写真やチャットで交流。\n気軽なひとことから、深いつながりまで。",
+            tagline: "推し仲間が、すぐそばに"
+        )
+    ]
+
     var body: some View {
-        VStack(spacing: 26) {
-            AccountSetupFeatureRow(
-                systemImage: "arrow.left.arrow.right.circle",
-                title: "グッズ交換",
-                highlights: [
-                    .init(text: "AIでグッズ登録"),
-                    .init(text: "交換相手を自動で見つける"),
-                    .init(text: "「探す」から「めぐりあう」へ", style: .accent)
-                ]
-            )
+        VStack(spacing: 16) {
+            TabView(selection: $slideIndex) {
+                ForEach(Self.slides) { slide in
+                    slideView(slide)
+                        .tag(slide.id)
+                }
+            }
+            #if os(iOS)
+            .tabViewStyle(.page(indexDisplayMode: .never))
+            #endif
+            .frame(height: 380)
 
-            Divider()
-                .padding(.leading, 86)
-
-            AccountSetupFeatureRow(
-                systemImage: "heart.circle",
-                title: "めぐり",
-                highlights: [
-                    .init(text: "近くの人とゆるくつながれる"),
-                    .init(text: "気軽な交流から、深いつながりまで", style: .accent)
-                ]
-            )
+            HStack(spacing: 7) {
+                ForEach(Self.slides) { slide in
+                    Capsule()
+                        .fill(slide.id == slideIndex ? MegrumTheme.lavender : MegrumTheme.lavender.opacity(0.22))
+                        .frame(width: slide.id == slideIndex ? 22 : 7, height: 7)
+                }
+            }
+            .animation(.snappy(duration: 0.22), value: slideIndex)
         }
-        .padding(.top, 22)
+        .padding(.top, 10)
+    }
+
+    private func slideView(_ slide: WelcomeSlide) -> some View {
+        VStack(spacing: 22) {
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: slide.gradient.map { $0.opacity(0.16) },
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 150, height: 150)
+
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: slide.gradient,
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 104, height: 104)
+                    .shadow(color: slide.gradient[0].opacity(0.35), radius: 18, y: 10)
+
+                Image(systemName: slide.systemImage)
+                    .font(.system(size: 42, weight: .heavy))
+                    .foregroundStyle(.white)
+            }
+            .padding(.top, 8)
+
+            VStack(spacing: 12) {
+                Text(slide.title)
+                    .font(.system(size: 26, weight: .black, design: .rounded))
+                    .foregroundStyle(MegrumTheme.ink)
+                    .multilineTextAlignment(.center)
+                    .lineSpacing(3)
+
+                Text(slide.message)
+                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                    .foregroundStyle(MegrumTheme.muted)
+                    .multilineTextAlignment(.center)
+                    .lineSpacing(4)
+
+                Text(slide.tagline)
+                    .font(.system(size: 12.5, weight: .black, design: .rounded))
+                    .foregroundStyle(MegrumTheme.lavender)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 7)
+                    .background(MegrumTheme.lavender.opacity(0.10), in: Capsule())
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 20)
     }
 }
 

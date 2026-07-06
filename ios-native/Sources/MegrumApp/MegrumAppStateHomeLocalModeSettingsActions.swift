@@ -30,7 +30,9 @@ extension MegrumAppState {
             if homeLocalModeSettings == nil {
                 homeLocalModeSettings = fallback?.normalizedForPersistence(now: now)
             }
-            errorMessage = "現地交換モードを読み込めませんでした"
+            // 旧「現地交換モード」の読み込み失敗はユーザー向けに出さない
+            //（バックグラウンドの先読みで、オンボーディング等に無関係な
+            //  エラーバナーとして出てしまっていたため）。黙ってフォールバック。
             return homeLocalModeSettings ?? fallback
         }
     }
