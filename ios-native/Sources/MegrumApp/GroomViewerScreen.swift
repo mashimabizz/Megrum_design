@@ -46,6 +46,13 @@ struct GroomViewerScreen: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     static let doubleTapSpaceName = "groom-viewer-double-tap"
     @State private var doubleTapHearts: [GroomDoubleTapHeart] = []
+    @State private var pendingViewerTap: PendingViewerTap?
+    @State private var pendingDismissTask: Task<Void, Never>?
+
+    private struct PendingViewerTap {
+        var time: Date
+        var indexBeforeTap: Int
+    }
     @State private var currentIndex: Int
     @State private var dragState = GroomViewerDragPresentationState()
     @State private var interactionState = GroomViewerInteractionState()
@@ -433,18 +440,50 @@ struct GroomViewerScreen: View {
         }
     }
 
-    /// 2回タップ＝いいね（既にいいね済みでも演出だけ出す）。
-    /// 1回タップのページ送りはダブルタップ判定を待ってから発火する。
+    /// タップした瞬間にページを切り替える（ダブルタップ判定を待たない）。
+    /// ダブルタップいいねは自前のタイミング判定で検出し、
+    /// 1回目のタップで進んでいた場合は元のグルームへ即戻していいねする。
     private func pageTapGesture(delta: Int) -> some Gesture {
-        SpatialTapGesture(count: 2, coordinateSpace: .named(Self.doubleTapSpaceName))
+        SpatialTapGesture(coordinateSpace: .named(Self.doubleTapSpaceName))
             .onEnded { value in
-                handleDoubleTapLike(at: value.location)
+                handleViewerTap(delta: delta, location: value.location)
             }
-            .exclusively(
-                before: TapGesture().onEnded {
-                    move(by: delta)
+    }
+
+    private static let doubleTapWindow: TimeInterval = 0.30
+
+    private func handleViewerTap(delta: Int, location: CGPoint) {
+        let now = Date()
+        if let pending = pendingViewerTap,
+           now.timeIntervalSince(pending.time) < Self.doubleTapWindow {
+            // 2回目のタップ＝ダブルタップいいね。
+            pendingViewerTap = nil
+            pendingDismissTask?.cancel()
+            pendingDismissTask = nil
+            // 1回目で次へ進んでいたら、いいね対象（元のグルーム）へ即戻す。
+            if currentIndex != pending.indexBeforeTap {
+                move(by: pending.indexBeforeTap - currentIndex)
+            }
+            handleDoubleTapLike(at: location)
+            return
+        }
+
+        pendingViewerTap = PendingViewerTap(time: now, indexBeforeTap: currentIndex)
+        let nextIndex = currentIndex + delta
+        if grooms.indices.contains(nextIndex) {
+            // 押した瞬間に切り替える。
+            move(by: delta)
+        } else if delta > 0 {
+            // 最後のグルームで閉じる操作だけは、ダブルタップいいねの
+            // 猶予（0.3秒）を待ってから閉じる（即閉じるとダブルタップ不能になるため）。
+            pendingDismissTask = Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 320_000_000)
+                guard !Task.isCancelled else {
+                    return
                 }
-            )
+                dismissViewer()
+            }
+        }
     }
 
     private func handleDoubleTapLike(at location: CGPoint) {
