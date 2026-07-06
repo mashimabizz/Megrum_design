@@ -182,25 +182,27 @@ struct GroomViewerBottomControls: View {
 }
 
 struct GroomViewerOwnerBottomControls: View {
+    let isLiked: Bool
     let likeCount: Int
     let commentCount: Int
     let isDeleting: Bool
+    let onToggleLike: () -> Void
     let onOpenComments: () -> Void
     let onOpenLikes: () -> Void
     let onDelete: () -> Void
 
     var body: some View {
         VStack(alignment: .trailing, spacing: 8) {
+            // 自分のグルームにもいいねできる（RLSも合わせて解放済み）。
             GroomViewerEngagementColumn(
-                canLike: false,
-                isLiked: false,
+                canLike: true,
+                isLiked: isLiked,
                 likeCount: likeCount,
                 commentCount: commentCount,
-                onToggleLike: {},
+                onToggleLike: onToggleLike,
                 onOpenComments: onOpenComments,
                 onOpenLikes: onOpenLikes
             )
-            .accessibilityLabel("いいねとコメントを見る")
 
             Menu {
                 Button(role: .destructive, action: onDelete) {

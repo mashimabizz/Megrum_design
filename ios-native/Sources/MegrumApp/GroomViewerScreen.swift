@@ -317,9 +317,11 @@ struct GroomViewerScreen: View {
                         HStack {
                             Spacer()
                             GroomViewerOwnerBottomControls(
+                                isLiked: isCurrentGroomLiked,
                                 likeCount: currentGroomLikeCount,
                                 commentCount: currentGroomCommentCount,
                                 isDeleting: appState.deletingGroomPostID == currentGroom.id,
+                                onToggleLike: toggleCurrentGroomLike,
                                 onOpenComments: { isShowingComments = true },
                                 onOpenLikes: { isShowingLikes = true },
                                 onDelete: { isShowingDeleteConfirmation = true }

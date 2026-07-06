@@ -1,59 +1,58 @@
 import MegrumDesign
 import SwiftUI
 
+/// 押下中に黒の薄膜を重ねて「押した」ことを返すボタンスタイル。
+/// Button ベースなので ScrollView のスクロールやタップ判定を邪魔しない。
+struct MegrumPressHighlightButtonStyle: ButtonStyle {
+    var highlightOpacity: Double = 0.12
+    var cornerRadius: CGFloat = 0
+    var horizontalOutset: CGFloat = 0
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .overlay {
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .fill(Color.black.opacity(configuration.isPressed ? highlightOpacity : 0))
+                    .padding(.horizontal, -horizontalOutset)
+                    .allowsHitTesting(false)
+            }
+            .animation(.easeOut(duration: configuration.isPressed ? 0.08 : 0.24), value: configuration.isPressed)
+    }
+}
+
 struct TradeCardExclusivePressModifier: ViewModifier {
     var onTap: () -> Void
     var onLongPress: (() -> Void)?
 
-    /// 押下中はパネル背景を暗くして「押した」ことを視覚的に返す。
-    /// GestureState なので指を離す・スクロールに移った時点で自動的に解除される。
-    @GestureState private var isPressed = false
+    /// 長押しが成立した直後は、指を離した時の Button タップを1回だけ握りつぶす。
+    @State private var suppressesNextTap = false
 
     @ViewBuilder
     func body(content: Content) -> some View {
-        let highlighted = content
-            .overlay {
-                Color.black.opacity(isPressed ? 0.12 : 0)
-                    .allowsHitTesting(false)
+        let button = Button {
+            if suppressesNextTap {
+                suppressesNextTap = false
+                return
             }
-            .animation(.easeOut(duration: isPressed ? 0.08 : 0.24), value: isPressed)
-            .simultaneousGesture(pressHighlightGesture)
+            MegrumHaptics.buttonTap()
+            onTap()
+        } label: {
+            content
+        }
+        .buttonStyle(MegrumPressHighlightButtonStyle())
 
         if let onLongPress {
-            highlighted.gesture(
-                ExclusiveGesture(
-                    LongPressGesture(minimumDuration: 0.45, maximumDistance: 18),
-                    TapGesture()
-                )
-                .onEnded { value in
-                    switch value {
-                    case .first(true):
+            button.simultaneousGesture(
+                LongPressGesture(minimumDuration: 0.45, maximumDistance: 18)
+                    .onEnded { _ in
+                        suppressesNextTap = true
                         MegrumHaptics.longPress()
                         onLongPress()
-                    case .second:
-                        MegrumHaptics.buttonTap()
-                        onTap()
-                    case .first(false):
-                        break
                     }
-                }
             )
         } else {
-            highlighted.onTapGesture {
-                MegrumHaptics.buttonTap()
-                onTap()
-            }
+            button
         }
-    }
-
-    /// 押下ハイライト専用（タップ／長押しの判定には関与しない）。
-    /// 指が大きく動いた（＝スクロール）時はハイライトを消す。
-    private var pressHighlightGesture: some Gesture {
-        DragGesture(minimumDistance: 0)
-            .updating($isPressed) { value, state, _ in
-                let moved = abs(value.translation.width) > 12 || abs(value.translation.height) > 12
-                state = !moved
-            }
     }
 }
 

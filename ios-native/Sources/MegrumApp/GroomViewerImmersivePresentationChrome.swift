@@ -12,24 +12,30 @@ extension View {
         ZStack {
             self
 
-            if let presentedItem = item.wrappedValue {
-                Color.black
-                    .ignoresSafeArea(.all)
-                    .allowsHitTesting(false)
-                    .transition(.opacity)
-                    .zIndex(9_998)
+            // セーフエリア無視の全画面コンテナを常設し、その中でトランジションさせる。
+            // 条件付きビュー自体に ignoresSafeArea を付けると、トランジション終了時に
+            // セーフエリア拡張が非アニメーションで適用されて画像位置が「かくっ」とズレる。
+            ZStack {
+                if let presentedItem = item.wrappedValue {
+                    Color.black
+                        .allowsHitTesting(false)
+                        .transition(.opacity)
+                        .zIndex(9_998)
 
-                content(presentedItem) {
-                    item.wrappedValue = nil
-                    onDismiss()
+                    content(presentedItem) {
+                        item.wrappedValue = nil
+                        onDismiss()
+                    }
+                    .megrumGroomViewerImmersivePresentationChrome()
+                    .transition(.asymmetric(
+                        insertion: .scale(scale: 0.08, anchor: sourceAnchor).combined(with: .opacity),
+                        removal: .scale(scale: 0.08, anchor: sourceAnchor).combined(with: .opacity)
+                    ))
+                    .zIndex(9_999)
                 }
-                .megrumGroomViewerImmersivePresentationChrome()
-                .transition(.asymmetric(
-                    insertion: .scale(scale: 0.08, anchor: sourceAnchor).combined(with: .opacity),
-                    removal: .scale(scale: 0.08, anchor: sourceAnchor).combined(with: .opacity)
-                ))
-                .zIndex(9_999)
             }
+            .ignoresSafeArea()
+            .allowsHitTesting(item.wrappedValue != nil)
         }
         .animation(.spring(response: 0.34, dampingFraction: 0.86), value: item.wrappedValue?.id)
         #else

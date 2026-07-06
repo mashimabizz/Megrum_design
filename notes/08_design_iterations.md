@@ -4,6 +4,47 @@
 
 ---
 
+## イテレーション1226.303：FBフィックス（スクロール/タップ不能・グルームかくっ・自分いいね）
+
+### 背景・問題意識
+iter1226.302 へのオーナーフィードバック：①やりとり画面がスクロール不能＋進行中/完了済みタブのパネルが無反応 ②ホームのパネル部分が縦スクロール不能 ③グルームが開き切る直前と後で画像位置がズレて最後にかくっとなる ④自分のグルームにもいいねしたい。
+
+### 変更内容
+
+#### ①② 押下ハイライトの方式変更（`TradeCardComponents.swift` / `HomeDiscoveryCandidateSummaryRow.swift`）
+- 原因：302で入れた `DragGesture(minimumDistance: 0)` の simultaneousGesture が ScrollView のスクロールとタップ判定を奪っていた
+- iOS標準の Button ＋ カスタム `MegrumPressHighlightButtonStyle`（isPressed で黒薄膜）へ全面置き換え。スクロール・タップと自然に共存する
+- やりとりカードの長押し（取下げ選択）は simultaneousGesture の LongPress で維持。長押し成立直後の Button タップは1回握りつぶす
+
+#### ③ グルーム開閉終盤の「かくっ」（`GroomViewerImmersivePresentationChrome.swift`）
+- 原因：条件付きビュー自体に `ignoresSafeArea` が付いており、scale トランジション終了時にセーフエリア拡張が非アニメーションで適用されてレイアウトが数ptズレる
+- セーフエリア無視の全画面 ZStack を常設し、その内側でトランジションさせる構造に変更（開始時から最終レイアウトと同じ座標空間）
+
+#### ④ 自分のグルームへのいいね（migration `20260706170000_allow_self_groom_reactions.sql`・push済み）
+- RLS の insert ポリシーから `gp.user_id <> auth.uid()` 条件を除去
+- クライアントの「自分のグルームにはいいねできません」ガードを削除
+- オーナー用ボトムコントロール（ビューア＋アーカイブ）にいいねトグルを追加
+- テスト更新：testAppStateRejectsOwnGroomModeration の自分いいね拒否 → 許可の期待へ
+
+### 影響範囲
+- やりとり一覧・ホーム候補一覧・グルームビューア/アーカイブ・groom_reactions RLS
+
+### 確認方法
+- swift test 1480件 0 failures（自分いいねの期待反転を含む）
+- 実機でスクロール／タブ切替タップ／グルーム開閉／自分いいねを確認
+
+### セルフレビュー結果
+- ✅ iOS標準優先：ハイライトは ButtonStyle（isPressed）で実装し独自ジェスチャを廃止
+- ✅ migration は push まで実施
+- ⚠️ グルームの「かくっ」はトランジション構造の修正であり、実機での最終確認が必要
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/TradeCardComponents.swift`
+- `ios-native/Sources/MegrumApp/GroomViewerImmersivePresentationChrome.swift`
+- `supabase/migrations/20260706170000_allow_self_groom_reactions.sql`
+
+---
+
 ## イテレーション1226.302：UI/UX改善12項目（打診ヘッダー・やりとり遷移・グルームいいね演出ほか）
 
 ### 背景・問題意識

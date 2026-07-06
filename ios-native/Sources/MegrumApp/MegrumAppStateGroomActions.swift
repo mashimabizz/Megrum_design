@@ -226,15 +226,10 @@ extension MegrumAppState {
     }
 
     public func setGroomLiked(_ postID: UUID, isLiked: Bool) async {
-        guard let viewerID = viewer?.id else {
+        guard viewer?.id != nil else {
             errorMessage = "ログイン状態を確認できません"
             return
         }
-        if groomPostForGroomAction(postID)?.authorID == viewerID {
-            errorMessage = "自分のグルームにはいいねできません"
-            return
-        }
-
         let previousLikedIDs = likedGroomIDs
         let previousGrooms = grooms
         let previousMapPosts = groomMapPosts
@@ -456,12 +451,4 @@ extension MegrumAppState {
         }
     }
 
-    private func groomPostForGroomAction(_ postID: UUID) -> GroomPost? {
-        GroomPostLocalMutation.firstPost(
-            id: postID,
-            in: grooms,
-            groomMapPosts,
-            ownGroomArchive
-        )
-    }
 }

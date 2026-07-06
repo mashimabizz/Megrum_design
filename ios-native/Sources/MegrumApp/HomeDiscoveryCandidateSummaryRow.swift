@@ -21,8 +21,6 @@ struct HomeDiscoveryCandidateSummaryRow: View {
     var onSearch: (HomeDiscoveryCandidate, HomeMockGoods?) -> Void
 
     @State private var presentationState = HomeDiscoveryCandidateButtonPresentationState()
-    /// 行タップの押下ハイライト（指を離す・スクロールで自動解除）。
-    @GestureState private var isRowPressed = false
 
     private var orderedGoods: [HomeMockGoods] {
         HomeCandidateDemandPolicy.orderedGoodsByDemand(of: candidate)
@@ -37,42 +35,32 @@ struct HomeDiscoveryCandidateSummaryRow: View {
     }
 
     var body: some View {
-        HStack(alignment: .center, spacing: 14) {
-            VStack(alignment: .leading, spacing: 6) {
-                labelButton
-                rotaryCard
-            }
-            infoColumn
-        }
-        .contentShape(Rectangle())
-        .overlay {
-            // 行のどこを押しても「押した」ことが分かるよう、押下中は薄いグレーを重ねる。
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(Color.black.opacity(isRowPressed ? 0.06 : 0))
-                .padding(.horizontal, -6)
-                .allowsHitTesting(false)
-        }
-        .animation(.easeOut(duration: isRowPressed ? 0.08 : 0.24), value: isRowPressed)
-        .simultaneousGesture(rowPressHighlightGesture)
-        .onTapGesture {
+        // 行のどこを押しても開けるよう Button で包む（押下中は薄グレーのハイライト）。
+        // Button ベースなのでスクロールや内側のボタン・ロータリー操作は妨げない。
+        Button {
             MegrumHaptics.buttonTap()
             onSelect(candidate.sheet(selectedGoods: selectedGoods))
+        } label: {
+            HStack(alignment: .center, spacing: 14) {
+                VStack(alignment: .leading, spacing: 6) {
+                    labelButton
+                    rotaryCard
+                }
+                infoColumn
+            }
+            .contentShape(Rectangle())
         }
+        .buttonStyle(MegrumPressHighlightButtonStyle(
+            highlightOpacity: 0.06,
+            cornerRadius: 18,
+            horizontalOutset: 6
+        ))
         .onAppear {
             presentationState.hydrateIfNeeded(goods: orderedGoods)
         }
         .onChange(of: candidate.goods.map(\.id)) { _, _ in
             presentationState.resetSelection(goods: orderedGoods)
         }
-    }
-
-    /// 押下ハイライト専用（タップ判定には関与しない）。大きく動いたら＝スクロールとみなして消す。
-    private var rowPressHighlightGesture: some Gesture {
-        DragGesture(minimumDistance: 0)
-            .updating($isRowPressed) { value, state, _ in
-                let moved = abs(value.translation.width) > 12 || abs(value.translation.height) > 12
-                state = !moved
-            }
     }
 
     private var labelButton: some View {

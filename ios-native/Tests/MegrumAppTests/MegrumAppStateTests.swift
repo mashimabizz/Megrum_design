@@ -764,11 +764,12 @@ final class MegrumAppStateTests: XCTestCase {
         let ownGroom = try XCTUnwrap(state.grooms.first { $0.authorID == state.viewer?.id })
         let initialLikeCount = state.groomLikeCount(ownGroom.id)
 
+        // 自分のグルームへのいいねは許可される（フィードバック対応で解放）。
         await state.setGroomLiked(ownGroom.id, isLiked: true)
 
-        XCTAssertFalse(state.isGroomLiked(ownGroom.id))
-        XCTAssertEqual(state.groomLikeCount(ownGroom.id), initialLikeCount)
-        XCTAssertEqual(state.errorMessage, "自分のグルームにはいいねできません")
+        XCTAssertTrue(state.isGroomLiked(ownGroom.id))
+        XCTAssertEqual(state.groomLikeCount(ownGroom.id), initialLikeCount + 1)
+        XCTAssertNil(state.errorMessage)
 
         let reported = await state.reportGroom(ownGroom)
         let blocked = await state.blockGroomAuthor(ownGroom)

@@ -116,9 +116,18 @@ struct GroomArchiveStoryScreen: View {
                 HStack {
                     Spacer()
                     GroomViewerOwnerBottomControls(
+                        isLiked: appState.isGroomLiked(currentGroom.id),
                         likeCount: appState.groomReactions(for: currentGroom.id).count,
                         commentCount: appState.groomReplies(for: currentGroom.id).count,
                         isDeleting: appState.deletingGroomPostID == currentGroom.id,
+                        onToggleLike: {
+                            Task {
+                                await appState.setGroomLiked(
+                                    currentGroom.id,
+                                    isLiked: !appState.isGroomLiked(currentGroom.id)
+                                )
+                            }
+                        },
                         onOpenComments: { isShowingComments = true },
                         onOpenLikes: { isShowingLikes = true },
                         onDelete: { isShowingDeleteConfirmation = true }
