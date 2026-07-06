@@ -205,34 +205,35 @@ struct ChatReplyQuoteLine: View {
                 MegrumHaptics.performButtonTap(onTap)
             }
         } label: {
-            VStack(alignment: .leading, spacing: 7) {
-                HStack(spacing: 8) {
-                    BoardThreadDetailAvatar(
-                        avatarID: avatarID,
-                        imageURL: avatarURL,
-                        initial: String(quote.senderName.prefix(1)).uppercased(),
-                        size: 26
-                    )
+            // Spacer や全幅に広がる区切り線を置くとバブルが常に最大幅へ
+            // 伸びてしまうため、内容の幅にフィットする構成にする。
+            // 区切り線は overlay（内容と同じ幅）で描く。
+            HStack(spacing: 8) {
+                BoardThreadDetailAvatar(
+                    avatarID: avatarID,
+                    imageURL: avatarURL,
+                    initial: String(quote.senderName.prefix(1)).uppercased(),
+                    size: 26
+                )
 
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text(quote.senderName)
-                            .font(.system(size: 12, weight: .black, design: .rounded))
-                            .foregroundStyle(MegrumTheme.ink)
-                            .lineLimit(1)
-                        Text(quote.imageURL != nil && quote.preview.isEmpty ? "写真" : quote.preview)
-                            .font(.system(size: 11.5, weight: .semibold, design: .rounded))
-                            .foregroundStyle(MegrumTheme.muted)
-                            .lineLimit(2)
-                            .multilineTextAlignment(.leading)
-                    }
-
-                    Spacer(minLength: 6)
-
-                    if let imageURL = quote.imageURL {
-                        ChatReplyQuoteImageThumb(url: imageURL, size: 34)
-                    }
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(quote.senderName)
+                        .font(.system(size: 12, weight: .black, design: .rounded))
+                        .foregroundStyle(MegrumTheme.ink)
+                        .lineLimit(1)
+                    Text(quote.imageURL != nil && quote.preview.isEmpty ? "写真" : quote.preview)
+                        .font(.system(size: 11.5, weight: .semibold, design: .rounded))
+                        .foregroundStyle(MegrumTheme.muted)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
                 }
 
+                if let imageURL = quote.imageURL {
+                    ChatReplyQuoteImageThumb(url: imageURL, size: 34)
+                }
+            }
+            .padding(.bottom, 7)
+            .overlay(alignment: .bottom) {
                 Rectangle()
                     .fill(MegrumTheme.ink.opacity(0.12))
                     .frame(height: 0.8)

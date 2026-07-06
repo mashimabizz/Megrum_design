@@ -232,11 +232,15 @@ struct MeguriMessageBubble: View {
                         { onJumpToMessage(messageID) }
                     }
                 )
-                Text(parsed.text)
-                    .font(.system(size: 15, weight: .bold, design: .rounded))
-                    .foregroundStyle(MegrumTheme.ink)
-                    .multilineTextAlignment(.leading)
-                    .fixedSize(horizontal: false, vertical: true)
+                ViewThatFits(in: .horizontal) {
+                    Text(parsed.text)
+                        .fixedSize(horizontal: true, vertical: true)
+                    Text(parsed.text)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .font(.system(size: 15, weight: .bold, design: .rounded))
+                .foregroundStyle(MegrumTheme.ink)
+                .multilineTextAlignment(.leading)
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
@@ -245,8 +249,11 @@ struct MeguriMessageBubble: View {
                 in: RoundedRectangle(cornerRadius: 18, style: .continuous)
             )
         } else if text.contains("\n") {
-            // 改行入りは compact（1行固定）だと「…」に潰れるため常に折返しバブルを使う。
-            wrappedTextBubble(text)
+            // 改行入りは「最長行の幅」にフィットさせる（収まらない長文だけ折返し）。
+            ViewThatFits(in: .horizontal) {
+                multilineHuggingTextBubble(text)
+                wrappedTextBubble(text)
+            }
         } else {
             ViewThatFits(in: .horizontal) {
                 compactTextBubble(text)
@@ -261,6 +268,21 @@ struct MeguriMessageBubble: View {
             .foregroundStyle(MegrumTheme.ink)
             .multilineTextAlignment(isMine ? .trailing : .leading)
             .fixedSize(horizontal: true, vertical: false)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(
+                isMine ? MegrumChatBubbleStyle.mineBackground : MegrumChatBubbleStyle.otherBackground,
+                in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+            )
+    }
+
+    /// 改行入りテキストを最長行の幅で抱えるバブル（ViewThatFits の第一候補）。
+    private func multilineHuggingTextBubble(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 15, weight: .bold, design: .rounded))
+            .foregroundStyle(MegrumTheme.ink)
+            .multilineTextAlignment(isMine ? .trailing : .leading)
+            .fixedSize(horizontal: true, vertical: true)
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
             .background(

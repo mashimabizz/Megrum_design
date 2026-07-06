@@ -4,6 +4,37 @@
 
 ---
 
+## イテレーション1226.329：バブル幅の残存バグ修正（リプライ付き・改行入り）
+
+### 背景・問題意識
+iter1226.327後もオーナー指摘2件：①リプライ引用付きは短文でも全幅になる ②「あ\n\n\nあ」のような改行入りも全幅になる（1文字分の幅になってほしい）。
+
+### 変更内容
+
+#### 1. リプライ引用行のフィット化（`ChatMessageInteraction.swift` / ChatReplyQuoteLine）
+- 原因：引用行内の `Spacer(minLength:)` と、高さのみ指定の `Rectangle`（区切り線）が提案幅いっぱいに広がり、バブル全体を最大幅へ押し広げていた
+- Spacer を撤去し、区切り線は内容と同じ幅になる overlay(alignment: .bottom) 描画に変更。引用行＝アイコン＋名前/プレビュー＋（画像サムネ）の実幅にフィット
+
+#### 2. 改行入りテキストのフィット化（3チャット共通）
+- `multilineHugging` バブル（`fixedSize(horizontal: true, vertical: true)`＝最長行の幅で確定）を新設し、改行入りは `ViewThatFits(in: .horizontal)` で「最長行フィット→収まらなければ従来の折返し」の順に採用
+- 引用バブル内の本文にも同じ ViewThatFits ペアを適用
+- 対象：`BoardThreadDetailReplyViews.swift` / `MeguriMessageConversationViews.swift` / `TradeMessageBubbleContentParts.swift`
+
+### 影響範囲
+- 取引チャット／めぐりメッセージ／チャットルームのテキスト・リプライバブル
+
+### 確認方法
+- swift test 1491件 0失敗（見た目は実機で「あ改行あ」とリプライ短文にて確認）
+
+### セルフレビュー結果
+- ✅ 長文の折返し・引用タップジャンプ等の既存挙動は不変
+- ✅ 「あ\n\n\nあ」→ 1文字分の幅＋4行分の高さのバブルになる設計
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/ChatMessageInteraction.swift`
+
+---
+
 ## イテレーション1226.328：グループ選択の「自分の推し」初期表示＋グルーム切替のデジタル化
 
 ### 背景・問題意識

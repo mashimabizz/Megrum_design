@@ -134,11 +134,15 @@ struct BoardThreadChatMessageRow: View {
                         { onJumpToMessage(messageID) }
                     }
                 )
-                Text(messageText)
-                    .font(.system(size: 15, weight: .bold, design: .rounded))
-                    .foregroundStyle(MegrumTheme.ink)
-                    .multilineTextAlignment(.leading)
-                    .fixedSize(horizontal: false, vertical: true)
+                ViewThatFits(in: .horizontal) {
+                    Text(messageText)
+                        .fixedSize(horizontal: true, vertical: true)
+                    Text(messageText)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .font(.system(size: 15, weight: .bold, design: .rounded))
+                .foregroundStyle(MegrumTheme.ink)
+                .multilineTextAlignment(.leading)
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
@@ -147,8 +151,11 @@ struct BoardThreadChatMessageRow: View {
                 in: RoundedRectangle(cornerRadius: 18, style: .continuous)
             )
         } else if messageText.contains("\n") {
-            // 改行入りは compact（1行固定）だと「…」に潰れるため常に折返しバブルを使う。
-            wrappedTextBubble
+            // 改行入りは「最長行の幅」にフィットさせる（収まらない長文だけ折返し）。
+            ViewThatFits(in: .horizontal) {
+                multilineHuggingTextBubble
+                wrappedTextBubble
+            }
         } else {
             ViewThatFits(in: .horizontal) {
                 compactTextBubble
@@ -164,6 +171,21 @@ struct BoardThreadChatMessageRow: View {
             .multilineTextAlignment(message.isMine ? .trailing : .leading)
             .lineLimit(1)
             .fixedSize(horizontal: true, vertical: false)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(
+                message.isMine ? MegrumChatBubbleStyle.mineBackground : MegrumChatBubbleStyle.otherBackground,
+                in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+            )
+    }
+
+    /// 改行入りテキストを最長行の幅で抱えるバブル（ViewThatFits の第一候補）。
+    private var multilineHuggingTextBubble: some View {
+        Text(messageText)
+            .font(.system(size: 15, weight: .bold, design: .rounded))
+            .foregroundStyle(MegrumTheme.ink)
+            .multilineTextAlignment(message.isMine ? .trailing : .leading)
+            .fixedSize(horizontal: true, vertical: true)
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
             .background(
