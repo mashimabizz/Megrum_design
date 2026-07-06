@@ -229,9 +229,13 @@ struct TutorialTourOverlay: View {
         case .goods:
             // 詳細ステップ（下部にメンバー/シリーズボタン）や完了一覧は上に置く。
             return false
-        case .proposal(.preview), .proposal(.confirmTap), .proposal(.pickMore), .proposal(.pickFromWanted):
+        case .proposal(.confirmTap), .proposal(.pickMore), .proposal(.pickFromWanted):
             // 下部CTA・下部候補・下段の希望レールが見せ場なので上に置く。
             return false
+        case .proposal(.preview):
+            // 送信確認は上部の交換内容サマリーが確認対象。下置き（送信ボタンと指は
+            // カードのさらに下に見える）にして、サマリーを隠さない。
+            return true
         case .proposal:
             return true
         case .listing(.havesOverview), .listing(.havesCashTab), .listing(.havesCashAmount),

@@ -174,7 +174,8 @@ struct TutorialListingDemoSceneView: View {
             draft.haveCashAmount = 1500
             draft.handoffMethod = .both
             draft.localPrefecture = "東京都"
-            draft.localPlaceMemo = "会場周辺（例：東京ドーム）"
+            // 6-16の完成カード（プレビューデータ）の現地サマリーと逐語一致させる。
+            draft.localPlaceMemo = "東京ドーム周辺"
             // カレンダー展開で縦に伸びないよう日程は「相談して決める」のまま。
             draft.localSchedule = ""
             draft.shippingFee = .negotiate

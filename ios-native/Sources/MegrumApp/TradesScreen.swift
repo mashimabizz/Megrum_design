@@ -16,9 +16,14 @@ struct TradesScreen: View {
 
     private var proposals: [TradeProposal] {
         // ガイドツアー中で実データが空の時はサンプル打診を表示する（実データ不変）。
-        let fallback = appState.isTutorialActive && appState.proposals.isEmpty
-            ? NativePreviewData.proposals
-            : appState.proposals
+        // ほぼ同一内容のカードが並んで見えないよう、ステータスごとに1件へ間引く。
+        let fallback: [TradeProposal]
+        if appState.isTutorialActive && appState.proposals.isEmpty {
+            var seenStatuses = Set<ProposalStatus>()
+            fallback = NativePreviewData.proposals.filter { seenStatuses.insert($0.status).inserted }
+        } else {
+            fallback = appState.proposals
+        }
         return presentationState.proposals(fallback: fallback)
     }
 

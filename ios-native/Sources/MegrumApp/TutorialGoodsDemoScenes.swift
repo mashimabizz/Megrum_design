@@ -336,7 +336,7 @@ struct TutorialGoodsDemoSceneView: View {
                     }
                 }
 
-                Text("TWICE 12TH MINI ALBUM「DIVE」")
+                Text("TWICE 日本5thアルバム「DIVE」")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(.white.opacity(0.75))
             }
@@ -370,7 +370,8 @@ struct TutorialGoodsDemoSceneView: View {
                     ForEach(savedItems) { item in
                         GoodsTile(
                             item: item,
-                            context: .tradeCandidate,
+                            // マイグッズ一覧と同じ文脈（メタ行が「譲る候補」表記になる）。
+                            context: .inventory,
                             onOpenDetail: {},
                             onAction: { _ in },
                             usesSystemContextMenu: false,
@@ -450,19 +451,21 @@ struct TutorialGoodsDemoSceneView: View {
     }
 
     private var savedItems: [GoodsItem] {
-        // 先頭2枚は4-9で割り当てて見せたメンバー（サナ・モモ）と一致させる。
-        let members = ["サナ", "モモ", "ダヒョン", "ツウィ", "ジヒョ", "ミナ", "チェヨン", "ジョンヨン", "ナヨン"]
+        // デモで割り当てたのはサナ・モモの2枚だけ。残りはメンバー未設定のまま登録された状態を見せる
+        //（4-9「あとからでもOK」と接続。全員に名前が付いていると途中経過と矛盾する）。
+        let assignedMembers = ["サナ", "モモ"]
         return TutorialDemoAssets.diveCardNames.enumerated().compactMap { index, name in
             guard let url = NativePreviewData.testGoodsImageURL(name) else { return nil }
+            let member = index < assignedMembers.count ? assignedMembers[index] : nil
             return GoodsItem(
                 id: UUID(uuidString: "00000000-0000-0000-9997-00000000010\(index)") ?? UUID(),
                 ownerID: TutorialSampleHomeData.placeholderViewerID,
                 groupID: TutorialSampleMasterData.twiceGroupID,
                 goodsTypeID: TutorialSampleMasterData.tradingCardTypeID,
                 groupName: "TWICE",
-                memberName: members[index % members.count],
+                memberName: member,
                 goodsTypeName: "トレカ",
-                title: "\(members[index % members.count]) DIVE トレカ",
+                title: member.map { "\($0) DIVE トレカ" } ?? "DIVE トレカ",
                 imageURL: url,
                 tags: [GoodsTag(id: UUID(), name: "DIVE")],
                 quantity: 1
@@ -511,7 +514,9 @@ struct TutorialGoodsDemoSceneView: View {
                     // 4-9で割り当てたメンバーは以降のビートでも保持する（巻き戻って見えないように）。
                     memberID: index < 2 ? members[index].id : nil,
                     title: "",
-                    tagNames: beat == .seriesPaste ? ["DIVE"] : []
+                    // タグの適用は「登録」ボタン押下後（実アプリ同様）。ペースト時点で背景の
+                    // グリッドに先行反映すると1ビート早い状態ジャンプになる。
+                    tagNames: []
                 )
             }
         }
@@ -566,11 +571,12 @@ struct TutorialGoodsDemoSceneView: View {
         case .seriesSheetLens:
             pointer.appear(at: CGPoint(x: size.width * 0.5, y: size.height * 0.52))
             await pointer.tap()
+        case .lensCopy:
+            // 選択反転＋コピーボタンが出ている検索行の「DIVE」を指す。
+            pointer.appear(at: CGPoint(x: size.width * 0.35, y: size.height * 0.585))
+            await pointer.tap()
         case .lensOpened:
             break
-        case .lensCopy:
-            pointer.appear(at: CGPoint(x: size.width * 0.4, y: size.height * 0.62))
-            await pointer.tap()
         case .seriesPaste:
             pointer.appear(at: CGPoint(x: size.width * 0.5, y: size.height * 0.42))
             await pointer.tap()

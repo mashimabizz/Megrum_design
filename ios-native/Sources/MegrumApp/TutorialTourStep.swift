@@ -356,7 +356,7 @@ enum TutorialScript {
             id: "6-7", chapter: .listing, presentation: .demo(.listing(.wishOverview)), targetTab: .wish,
             requestedWishSection: .listings,
             title: "2. 欲しいものを登録",
-            body: "ほしいものから選ぶ・条件で指定する・定価、の3通り。選択肢は5つまで持てるよ。"
+            body: "ほしいものから選ぶ・条件から選ぶ・定価、の3通り。選択肢は5つまで持てるよ。"
         ),
         TutorialBeat(
             id: "6-8", chapter: .listing, presentation: .demo(.listing(.wishConditionTab)), targetTab: .wish,
@@ -392,7 +392,7 @@ enum TutorialScript {
             id: "6-13", chapter: .listing, presentation: .demo(.listing(.exchangeOffSpec)), targetTab: .wish,
             requestedWishSection: .listings,
             title: "条件外の打診",
-            body: "「条件ぴったりじゃない打診も受け付ける」かどうかを選べるよ。"
+            body: "「条件外の打診も受け付ける」かどうかを選べるよ。近い条件なら相談したい人向け。"
         ),
         TutorialBeat(
             id: "6-14", chapter: .listing, presentation: .demo(.listing(.exchangeNote)), targetTab: .wish,
