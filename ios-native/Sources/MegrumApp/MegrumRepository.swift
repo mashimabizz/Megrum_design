@@ -131,6 +131,7 @@ public protocol MegrumRepository: Sendable {
     func loadOshiGenres(limit: Int) async throws -> [OshiGenre]
     func loadOshiGroups(searchText: String?, limit: Int) async throws -> [OshiGroup]
     func loadOshiCharacters(groupID: UUID, limit: Int) async throws -> [OshiCharacter]
+    func searchOshiCharacterGroupIDs(query: String) async throws -> [UUID]
     func loadMemberFaceProfiles(memberIDs: [UUID], limit: Int) async throws -> [MemberFaceProfile]
     func loadUserOshiSelections() async throws -> [UserOshiSelection]
     func saveUserOshiSelections(_ selections: [AccountSetupOshiInput]) async throws -> [UserOshiSelection]
@@ -248,6 +249,10 @@ public protocol MegrumRepository: Sendable {
 }
 
 public extension MegrumRepository {
+    func searchOshiCharacterGroupIDs(query _: String) async throws -> [UUID] {
+        []
+    }
+
     func loadMeguriProfile(userID _: UUID) async throws -> MeguriProfile? {
         nil
     }

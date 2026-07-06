@@ -104,4 +104,14 @@ extension MegrumAppState {
             return nil
         }
     }
+
+    /// 推し追加検索：L2名の部分一致から所属L1のID集合を返す（失敗時は空）。
+    public func searchOshiCharacterGroupIDs(query: String) async -> Set<UUID> {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return []
+        }
+        let ids = (try? await repository.searchOshiCharacterGroupIDs(query: trimmed)) ?? []
+        return Set(ids)
+    }
 }

@@ -67,6 +67,8 @@ struct BoardThreadDetailScreen: View {
     @State private var headerChromeHeight: CGFloat = 120
     @State private var isHeaderRowCollapsed = false
     @State private var chatHeaderCollapseTracker = ChatHeaderCollapseTracker()
+    /// 他の人のルームに入る時の 紹介→プロフィール→注意 の入室フェーズ。
+    @State private var roomEntryPhase: BoardRoomEntryPhase = .undetermined
 
     var body: some View {
         let presentation = detailPresentation
@@ -191,6 +193,26 @@ struct BoardThreadDetailScreen: View {
                     .transition(.opacity.combined(with: .scale(scale: 0.94)))
                     .zIndex(10)
                 }
+
+                // 入室フロー：紹介画面（参加ボタン）→ プロフィール設定 → 注意事項
+                if roomEntryPhase == .intro {
+                    BoardRoomEntryIntroView(
+                        thread: currentThread,
+                        participantCount: presentation.participantAvatars.count,
+                        onJoin: { showsJoinIdentitySheet = true },
+                        onClose: close
+                    )
+                    .zIndex(30)
+                    .transition(.opacity)
+                }
+                if roomEntryPhase == .notice {
+                    BoardRoomEntryNoticeOverlay {
+                        withAnimation(.snappy(duration: 0.2)) {
+                            roomEntryPhase = .entered
+                        }
+                    }
+                    .zIndex(31)
+                }
             }
             .safeAreaInset(edge: .bottom) {
                 VStack(spacing: 0) {
@@ -266,6 +288,11 @@ struct BoardThreadDetailScreen: View {
                         showsJoinIdentitySheet = false
                         pendingReplyAfterJoin?()
                         pendingReplyAfterJoin = nil
+                        if roomEntryPhase == .intro {
+                            withAnimation(.snappy(duration: 0.2)) {
+                                roomEntryPhase = .notice
+                            }
+                        }
                     },
                     onCancel: {
                         showsJoinIdentitySheet = false
@@ -292,6 +319,7 @@ struct BoardThreadDetailScreen: View {
                 scrollToLatest(proxy)
             }
             .task {
+                determineRoomEntryPhaseIfNeeded(afterRepliesLoaded: false)
                 await appState.loadBoardReplies(
                     threadID: currentThread.id,
                     latitude: coordinate?.latitude,
@@ -301,6 +329,8 @@ struct BoardThreadDetailScreen: View {
                 )
                 await preloadParticipantProfiles()
                 await MainActor.run {
+                    // 過去に返信済み（＝参加済み）なら紹介画面を出さずに入室扱いへ。
+                    determineRoomEntryPhaseIfNeeded(afterRepliesLoaded: true)
                     scrollToLatest(proxy, animated: false)
                 }
             }
@@ -335,6 +365,18 @@ struct BoardThreadDetailScreen: View {
         }
         if currentThread.authorID != viewerID && appState.publicProfilesByUserID[currentThread.authorID] == nil {
             await appState.loadPublicUserProfile(userID: currentThread.authorID, reportsFailure: false)
+        }
+    }
+
+    /// 入室フェーズを決める：自分のルーム・参加済み（部屋プロフィールあり/過去に返信あり）
+    /// なら通常入室、未参加なら紹介画面から。
+    private func determineRoomEntryPhaseIfNeeded(afterRepliesLoaded: Bool) {
+        guard roomEntryPhase == .undetermined || (roomEntryPhase == .intro && afterRepliesLoaded) else {
+            return
+        }
+        let phase: BoardRoomEntryPhase = resolvedRoomIdentity() == nil ? .intro : .entered
+        if roomEntryPhase != phase {
+            roomEntryPhase = phase
         }
     }
 

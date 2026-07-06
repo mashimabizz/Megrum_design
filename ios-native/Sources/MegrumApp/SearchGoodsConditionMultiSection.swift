@@ -60,6 +60,7 @@ struct SearchGoodsConditionMultiSection: View {
                     genres: appState.oshiGenres,
                     groups: appState.oshiGroups,
                     myOshiGroupIDs: Set(myOshiGroupIDs),
+                    onSearchCharacterGroups: { await appState.searchOshiCharacterGroupIDs(query: $0) },
                     onToggleGroup: toggleGroup
                 )
             } label: {
@@ -208,6 +209,7 @@ private struct SearchFilterGroupAddDestination: View {
     var genres: [OshiGenre]
     var groups: [OshiGroup]
     var myOshiGroupIDs: Set<UUID>
+    var onSearchCharacterGroups: ((String) async -> Set<UUID>)? = nil
     var onToggleGroup: (UUID) -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -219,6 +221,7 @@ private struct SearchFilterGroupAddDestination: View {
             selectedGroupIDs: [],
             charactersByGroupID: [:],
             myOshiGroupIDs: myOshiGroupIDs,
+            onSearchCharacterGroups: onSearchCharacterGroups,
             showsRequestButton: false,
             onClose: { dismiss() },
             onRequest: { _ in dismiss() },

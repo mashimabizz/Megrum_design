@@ -237,6 +237,7 @@ struct GoodsEditorSheet: View {
                     selectedGroupIDs: draft.groupID.map { Set([$0]) } ?? [],
                     charactersByGroupID: [:],
                     myOshiGroupIDs: Set(appState.userOshiSelections.compactMap(\.groupID)),
+                    onSearchCharacterGroups: { await appState.searchOshiCharacterGroupIDs(query: $0) },
                     onClose: { showsCreateOshiMasterSheet = false },
                     onRequest: { query in
                         showsCreateOshiMasterSheet = false

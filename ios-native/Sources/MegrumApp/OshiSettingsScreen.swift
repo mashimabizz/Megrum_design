@@ -34,6 +34,7 @@ struct OshiSettingsScreen: View {
                 groups: appState.oshiGroups,
                 selectedGroupIDs: Set(presentationState.groups.compactMap(\.groupID)),
                 charactersByGroupID: presentationState.charactersByGroupID,
+                onSearchCharacterGroups: { await appState.searchOshiCharacterGroupIDs(query: $0) },
                 allowsMultipleSelection: true,
                 onClose: { presentationState.showsMasterSheet = false },
                 onRequest: { query in

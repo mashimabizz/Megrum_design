@@ -11,6 +11,10 @@ public extension SupabaseMegrumRepository {
         try await oshiClient.loadGenres(limit: limit)
     }
 
+    func searchOshiCharacterGroupIDs(query: String) async throws -> [UUID] {
+        try await oshiClient.searchCharacterGroupIDs(matching: query)
+    }
+
     func loadOshiCharacters(groupID: UUID, limit: Int) async throws -> [OshiCharacter] {
         try await oshiClient.loadCharacters(groupID: groupID, limit: limit)
     }

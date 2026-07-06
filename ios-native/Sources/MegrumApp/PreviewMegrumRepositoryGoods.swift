@@ -14,6 +14,12 @@ public extension PreviewMegrumRepository {
         Array(NativePreviewData.oshiGenres.prefix(limit))
     }
 
+    func searchOshiCharacterGroupIDs(query: String) async throws -> [UUID] {
+        NativePreviewData.oshiCharacters
+            .filter { $0.name.localizedCaseInsensitiveContains(query) }
+            .compactMap(\.groupID)
+    }
+
     func loadOshiCharacters(groupID: UUID, limit: Int) async throws -> [OshiCharacter] {
         Array(NativePreviewData.oshiCharacters.filter { $0.groupID == groupID }.prefix(limit))
     }

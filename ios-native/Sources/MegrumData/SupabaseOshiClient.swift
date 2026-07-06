@@ -42,6 +42,32 @@ public final class SupabaseOshiClient: @unchecked Sendable {
         return rows.map(\.character)
     }
 
+    /// L2（メンバー/キャラクター）名の部分一致で、所属するL1のIDを返す。
+    /// 推し追加の検索で「L2名からでも親L1がヒットする」ために使う。
+    public func searchCharacterGroupIDs(matching query: String, limit: Int = 80) async throws -> [UUID] {
+        let sanitized = query
+            .replacingOccurrences(of: "*", with: "")
+            .replacingOccurrences(of: ",", with: "")
+            .replacingOccurrences(of: "(", with: "")
+            .replacingOccurrences(of: ")", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !sanitized.isEmpty else {
+            return []
+        }
+        struct GroupIDRow: Decodable, Sendable {
+            var groupId: UUID
+        }
+        let rows: [GroupIDRow] = try await client.fetchRows(
+            from: "characters_master",
+            select: "group_id",
+            queryItems: [
+                URLQueryItem(name: "name", value: "ilike.*\(sanitized)*"),
+                URLQueryItem(name: "limit", value: "\(limit)")
+            ]
+        )
+        return rows.map(\.groupId)
+    }
+
     public func loadUserSelections(userID: UUID) async throws -> [UserOshiSelection] {
         let rows: [UserOshiSelectionRow] = try await client.fetchRows(
             from: "user_oshi",

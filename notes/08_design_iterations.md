@@ -4,6 +4,42 @@
 
 ---
 
+## イテレーション1226.330：チャットルーム入室フロー＋推し追加検索の横断化
+
+### 背景・問題意識
+オーナー要望2件：①他人のチャットルームに入る時、LINEオープンチャット風の「紹介画面→ルーム用プロフィール設定→注意事項ポップアップ」の3段階を挟みたい（規約・社名等はMegrumに合わせる）②推し追加の検索が選択中カテゴリ内しか探さない。L1/L2マスタ全体から検索して、L2名ヒットでも親L1を表示したい。
+
+### 変更内容
+
+#### 1. チャットルーム入室フロー（`BoardRoomEntryViews.swift` 新規 / `BoardThreadDetailScreen.swift`）
+- `BoardRoomEntryPhase`（undetermined→intro→notice→entered）を新設
+- **紹介画面** `BoardRoomEntryIntroView`：ルーム画像（ブランドグラデ枠）・ルーム名・参加者数・説明文・「新しいプロフィールで参加」ボタン（sky→lavenderグラデ）・詐欺注意の脚注。閉じるでルームから退出
+- **プロフィール設定**：既存の `BoardRoomJoinIdentitySheet`（部屋ごとの名前・アイコン）をそのまま利用。保存で次へ
+- **注意事項ポップアップ** `BoardRoomEntryNoticeOverlay`：①投稿は運営が確認することがある（Megrum利用規約に基づく）②秘匿性の高い情報は投稿しない③禁止事項（出会い目的・個人情報・誹謗中傷・わいせつ等）— 「確認しました」で入室
+- 表示条件：自分のルーム・参加済み（部屋プロフィール保存済み or 過去に返信あり）は従来どおり直接入室。返信ロード後に参加済みが判明した場合は紹介画面を自動解除
+
+#### 2. 推し追加検索の横断化
+- `OshiMasterSelectSheetState.filteredGroups`：検索文字列がある間は選択中カテゴリ（ジャンル/自分の推し）を無視してL1全体から検索
+- L2名ヒット：`characters_master` を name ilike で引く `searchCharacterGroupIDs` を SupabaseOshiClient に新設し、Repository（デフォルト実装[]）→AppState `searchOshiCharacterGroupIDs` →シートの `onSearchCharacterGroups` クロージャで配線。検索文字列を250msデバウンスして親L1のID集合を取得し、結果に合流
+- 配線済み呼び出し元：推し設定画面・グッズ/ほしいものエディタ・ホーム検索フィルタの「ほかのグループから追加」。実DBで「カリナ」→aespaのL1がヒットすることを確認
+
+### 影響範囲
+- チャットルーム入室、推し追加/グループ選択シート全般
+
+### 確認方法
+- swift test 1491件 0失敗。characters_master の ilike 検索を authed REST で確認
+
+### セルフレビュー結果
+- ✅ 規約文言はMegrum名義（LINE等の名称は不使用）
+- ✅ 既存の部屋プロフィール機構（MeguriRoomIdentityStore / JoinIdentitySheet）を再利用
+- ⚠️ 入室フローは初参加のルームのみ。ロード完了前に一瞬紹介画面が出るケースは返信ロード後に自動解除
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/BoardRoomEntryViews.swift`
+- `ios-native/Sources/MegrumApp/OshiMasterSelectSheetState.swift`
+
+---
+
 ## イテレーション1226.329：バブル幅の残存バグ修正（リプライ付き・改行入り）
 
 ### 背景・問題意識

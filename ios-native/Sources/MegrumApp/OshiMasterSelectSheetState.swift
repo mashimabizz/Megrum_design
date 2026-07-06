@@ -21,8 +21,19 @@ struct OshiMasterSelectSheetState: Equatable {
         !pendingSelectedGroupIDs.isEmpty
     }
 
-    func filteredGroups(from groups: [OshiGroup], myOshiGroupIDs: Set<UUID> = []) -> [OshiGroup] {
+    func filteredGroups(
+        from groups: [OshiGroup],
+        myOshiGroupIDs: Set<UUID> = [],
+        characterHitGroupIDs: Set<UUID> = []
+    ) -> [OshiGroup] {
         let normalized = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        // 検索中は選択中カテゴリを無視して、L1全体＋L2名ヒットの親L1から探す。
+        if !normalized.isEmpty {
+            return groups.filter { group in
+                characterHitGroupIDs.contains(group.id)
+                    || ([group.name] + group.aliases).contains { $0.localizedCaseInsensitiveContains(normalized) }
+            }
+        }
         return groups.filter { group in
             if selectedGenreID == Self.myOshiCategoryID {
                 if !myOshiGroupIDs.contains(group.id) {
@@ -31,10 +42,7 @@ struct OshiMasterSelectSheetState: Equatable {
             } else if let selectedGenreID, group.genreID != selectedGenreID {
                 return false
             }
-            guard !normalized.isEmpty else {
-                return true
-            }
-            return ([group.name] + group.aliases).contains { $0.localizedCaseInsensitiveContains(normalized) }
+            return true
         }
     }
 
