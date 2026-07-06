@@ -131,6 +131,10 @@ public extension SupabaseMegrumRepository {
         try await publicProfilePersistence.loadProfile(userID: userID)
     }
 
+    func freshGroomImageURL(storagePath: String) async -> URL? {
+        await groomClient.signedImageURL(forPath: storagePath)
+    }
+
     func loadGroomLikeCount(userID: UUID) async throws -> Int {
         try await publicProfilePersistence.loadGroomLikeCount(userID: userID)
     }

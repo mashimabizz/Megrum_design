@@ -317,7 +317,8 @@ private struct MeguriGroomReplyContextCard: View {
                 .font(.system(size: 12, weight: .black, design: .rounded))
                 .foregroundStyle(isMine ? .white.opacity(0.92) : MegrumTheme.ink.opacity(0.82))
 
-            AsyncImage(url: imageURL) { phase in
+            // 保存された署名URLは失効するため、表示時に署名し直して読み込む。
+            GroomContextResolvedImage(staleURL: imageURL) { phase in
                 switch phase {
                 case .success(let image):
                     image

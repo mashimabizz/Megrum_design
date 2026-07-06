@@ -130,6 +130,10 @@ public extension MegrumRepository {
         []
     }
 
+    func freshGroomImageURL(storagePath: String) async -> URL? {
+        nil
+    }
+
     func loadPublicIndividualListings(userID: UUID) async throws -> [IndividualListing] {
         []
     }

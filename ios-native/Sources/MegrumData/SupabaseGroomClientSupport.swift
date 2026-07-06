@@ -32,6 +32,20 @@ actor SupabaseGroomSignedURLCache {
 }
 
 extension SupabaseGroomClient {
+    /// ストレージパスから署名URLを1件取得する（キャッシュ利用）。
+    /// メッセージ等に保存された失効済み署名URLの再解決に使う。
+    public func signedImageURL(forPath path: String) async -> URL? {
+        let lookup = await signedURLCache.lookup(paths: [path])
+        if let cached = lookup.cached[path] {
+            return cached
+        }
+        guard let signedURL = try? await client.createSignedURL(bucket: Self.groomBucket, path: path) else {
+            return nil
+        }
+        await signedURLCache.store(signedURL, for: path)
+        return signedURL
+    }
+
     func signedURLMap(for rows: [GroomFeedRow]) async -> [String: URL] {
         let paths = Set(rows.compactMap(\.storageImagePath))
         let lookup = await signedURLCache.lookup(paths: paths)
