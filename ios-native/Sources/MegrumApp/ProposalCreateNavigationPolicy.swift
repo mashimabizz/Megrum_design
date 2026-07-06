@@ -15,10 +15,8 @@ enum ProposalCreateBottomBarCopy {
 
         switch selectedStep {
         case .give:
-            if configuration.hasReceiverSelection {
-                return nextStepTitle(configuration: configuration)
-            }
-            return "受け取るものへ進む"
+            // 個別募集の1/3と同じ文言。押下で常に受け取るもの選択（2/3）へ。
+            return "この内容で次へ"
         case .receive:
             return nextStepTitle(configuration: configuration)
         case .conditions:
@@ -54,9 +52,6 @@ enum ProposalCreatePrimaryStepDestination {
 
         switch selectedStep {
         case .give:
-            if configuration.hasReceiverSelection {
-                return nextMajorStep(configuration: configuration, visibleSteps: visibleSteps)
-            }
             return adjacentStep(after: selectedStep, visibleSteps: visibleSteps)
         case .receive:
             return nextMajorStep(configuration: configuration, visibleSteps: visibleSteps)

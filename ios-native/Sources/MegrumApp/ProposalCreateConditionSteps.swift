@@ -221,7 +221,7 @@ struct ProposalExchangeConditionsStep<MeetupContent: View, ShippingContent: View
         VStack(alignment: .leading, spacing: 28) {
             VStack(alignment: .leading, spacing: 14) {
                 sectionTitle("1. 交換手段")
-                ProposalExchangeMethodSelector(exchangeMethod: $exchangeMethod)
+                ProposalExchangeMethodCards(exchangeMethod: $exchangeMethod)
             }
 
             if exchangeMethod == .hand || exchangeMethod == .both {
@@ -268,5 +268,72 @@ struct ProposalExchangeConditionsStep<MeetupContent: View, ShippingContent: View
             number += 1
         }
         return number
+    }
+}
+
+
+/// 個別募集の作成画面と同じ交換手段カード（アイコン丸＋選択枠、iter1226.347）。
+struct ProposalExchangeMethodCards: View {
+    @Binding var exchangeMethod: ExchangeMethod
+
+    private static let methods: [ExchangeMethod] = [.hand, .mail, .both]
+
+    var body: some View {
+        HStack(spacing: 12) {
+            ForEach(Self.methods, id: \.self) { method in
+                Button {
+                    exchangeMethod = method
+                } label: {
+                    VStack(spacing: 10) {
+                        ZStack {
+                            Circle()
+                                .fill((method == .mail ? MegrumTheme.pink : MegrumTheme.lavender).opacity(0.12))
+                                .frame(width: 56, height: 56)
+                            if method == .both {
+                                HStack(spacing: -5) {
+                                    Image(systemName: "hand.raised")
+                                    Image(systemName: "envelope")
+                                }
+                                .font(.system(size: 23, weight: .bold))
+                            } else {
+                                Image(systemName: method == .mail ? "envelope" : "hand.raised")
+                                    .font(.system(size: 27, weight: .bold))
+                            }
+                        }
+                        .foregroundStyle(method == .mail ? MegrumTheme.pink : MegrumTheme.lavender)
+
+                        Text(buttonTitle(for: method))
+                            .font(.system(size: 15, weight: .black, design: .rounded))
+                            .foregroundStyle(method == exchangeMethod ? MegrumTheme.lavender : MegrumTheme.ink)
+                            .multilineTextAlignment(.center)
+                            .lineLimit(2)
+                            .minimumScaleFactor(0.92)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 108)
+                    .background(.white.opacity(0.9), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .stroke(
+                                method == exchangeMethod ? MegrumTheme.lavender : MegrumTheme.ink.opacity(0.10),
+                                lineWidth: method == exchangeMethod ? 1.6 : 1
+                            )
+                    }
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private func buttonTitle(for method: ExchangeMethod) -> String {
+        switch method {
+        case .hand:
+            "現地交換"
+        case .mail:
+            "郵送交換"
+        case .both:
+            "現地交換・\n郵送OK"
+        }
     }
 }

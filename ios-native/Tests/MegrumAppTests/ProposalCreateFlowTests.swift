@@ -957,7 +957,7 @@ final class ProposalCreateFlowTests: XCTestCase {
                 configuration: readyHand,
                 meetupHasTimeDraft: false
             ),
-            "交換条件へ進む"
+            "この内容で次へ"
         )
         XCTAssertEqual(
             ProposalCreateBottomBarCopy.primaryTitle(
@@ -974,7 +974,7 @@ final class ProposalCreateFlowTests: XCTestCase {
                 ),
                 meetupHasTimeDraft: false
             ),
-            "受け取るものへ進む"
+            "この内容で次へ"
         )
         XCTAssertEqual(
             ProposalCreateBottomBarCopy.primaryTitle(
@@ -1096,7 +1096,7 @@ final class ProposalCreateFlowTests: XCTestCase {
                 configuration: readyHand,
                 visibleSteps: [.give, .receive, .conditions, .confirm]
             ),
-            .conditions
+            .receive
         )
         XCTAssertEqual(
             ProposalCreatePrimaryStepDestination.destination(
@@ -1104,7 +1104,7 @@ final class ProposalCreateFlowTests: XCTestCase {
                 configuration: readyMail,
                 visibleSteps: [.give, .receive, .conditions, .confirm]
             ),
-            .conditions
+            .receive
         )
         XCTAssertEqual(
             ProposalCreatePrimaryStepDestination.destination(
