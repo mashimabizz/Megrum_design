@@ -8,8 +8,38 @@ public enum TradeMessageStateReducer {
         messages: [TradeMessage]
     ) -> [UUID: [TradeMessage]] {
         var next = messagesByProposalID
-        next[proposalID] = messages
+        next[proposalID] = preservingCachedPhotoURLs(
+            messages: messages,
+            cachedMessages: messagesByProposalID[proposalID]
+        )
         return next
+    }
+
+    /// 同じメッセージIDの写真URLはキャッシュ済みを使い続ける。署名URLは取得のたびに
+    /// 変わるため、そのまま差し替えるとチャットを開くたびに画像が再ダウンロードされる。
+    public static func preservingCachedPhotoURLs(
+        messages: [TradeMessage],
+        cachedMessages: [TradeMessage]?
+    ) -> [TradeMessage] {
+        guard let cachedMessages, !cachedMessages.isEmpty else {
+            return messages
+        }
+        let cachedURLByID = Dictionary(
+            cachedMessages.compactMap { message in
+                message.photoURL.map { (message.id, $0) }
+            }
+        ) { first, _ in first }
+        guard !cachedURLByID.isEmpty else {
+            return messages
+        }
+        return messages.map { message in
+            guard message.photoURL != nil, let cachedURL = cachedURLByID[message.id] else {
+                return message
+            }
+            var message = message
+            message.photoURL = cachedURL
+            return message
+        }
     }
 
     static func replacingMessagesPreservingViewerEvaluationNotices(

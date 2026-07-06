@@ -118,6 +118,15 @@ struct ScrollFriendlyHorizontalPanView: UIViewRepresentable {
             parent.onTap?(gesture.location(in: gesture.view))
         }
 
+        func gestureRecognizer(
+            _ gestureRecognizer: UIGestureRecognizer,
+            shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer
+        ) -> Bool {
+            // パススルー時はボタン等のSwiftUI内部ジェスチャと同時認識させる。
+            // これが無いと、ボタン上から始めた横スワイプが握りつぶされて切替できない。
+            usesPassthroughHost
+        }
+
         func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
             if gestureRecognizer === panGesture {
                 guard parent.isPanEnabled, let panGesture else {

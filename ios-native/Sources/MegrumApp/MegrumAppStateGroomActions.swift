@@ -213,6 +213,35 @@ extension MegrumAppState {
         }
     }
 
+    /// 無料プランで、次の投稿によりアーカイブが10件を超えるか（＝現在すでに上限に達しているか）。
+    public func groomArchiveWouldExceedFreeLimit() async -> Bool {
+        guard !subscriptionState.hasUnlimitedGroomArchive else {
+            return false
+        }
+        let archived = (try? await repository.loadOwnGroomArchive(
+            limit: MegrumPlusLimits.freeGroomArchiveLimit + 1
+        )) ?? []
+        return archived.count >= MegrumPlusLimits.freeGroomArchiveLimit
+    }
+
+    /// 無料プランのアーカイブ上限（10件）を超えた分を、最も古いものから削除する。
+    public func trimGroomArchiveToFreeLimitIfNeeded() async {
+        guard !subscriptionState.hasUnlimitedGroomArchive else {
+            return
+        }
+        guard let archived = try? await repository.loadOwnGroomArchive(limit: 100) else {
+            return
+        }
+        let overflow = archived.count - MegrumPlusLimits.freeGroomArchiveLimit
+        guard overflow > 0 else {
+            return
+        }
+        let oldestFirst = archived.sorted { $0.createdAt < $1.createdAt }
+        for groom in oldestFirst.prefix(overflow) {
+            _ = await deleteOwnGroom(groom)
+        }
+    }
+
     public func markGroomViewed(_ postID: UUID) async {
         viewedGroomIDs = GroomInteractionStateReducer.markingViewed(
             postID: postID,

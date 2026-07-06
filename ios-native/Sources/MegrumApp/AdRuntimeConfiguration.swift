@@ -154,6 +154,8 @@ struct AdRuntimeConfiguration: Equatable, Sendable {
             "MEGRUM_ADMOB_PROFILE_BANNER_UNIT_ID"
         case .tradesListTopBanner:
             "MEGRUM_ADMOB_TRADES_BANNER_UNIT_ID"
+        case .boardRoomHeaderBanner:
+            "MEGRUM_ADMOB_BOARD_ROOM_BANNER_UNIT_ID"
         case .homeBrowseInterstitial:
             "MEGRUM_ADMOB_HOME_INTERSTITIAL_UNIT_ID"
         case .wishBrowseInterstitial:

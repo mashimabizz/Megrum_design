@@ -69,6 +69,8 @@
 	<string>$(MEGRUM_ADMOB_TEST_BANNER_UNIT_ID)</string>
 	<key>MegrumAdMobTestNativeUnitID</key>
 	<string>$(MEGRUM_ADMOB_TEST_NATIVE_UNIT_ID)</string>
+	<key>MegrumAdMobBoardRoomBannerUnitID</key>
+	<string>$(MEGRUM_ADMOB_BOARD_ROOM_BANNER_UNIT_ID)</string>
 	<key>MegrumAdMobTradesBannerUnitID</key>
 	<string>$(MEGRUM_ADMOB_TRADES_BANNER_UNIT_ID)</string>
 	<key>MegrumAdMobWishBannerUnitID</key>

@@ -4,6 +4,33 @@
 
 ---
 
+## イテレーション1226.305：新バッチ前半（アーカイブ上限・プレミアム黒・チャット画像安定ほか）
+
+### 背景・問題意識
+オーナー指示バッチのうち項目1・2・3・14・15・16・17を先行実装（項目18のチャットリプライは次イテレーション）。
+
+### 変更内容
+- **①グルームアーカイブ上限**：無料は10件まで。超える投稿時に「最古のアーカイブが消去されます。Megrumプレミアムの加入で無制限でアーカイブできます」ポップアップ（このまま投稿/プレミアムを見る/キャンセル）。投稿後は最古から自動削除（`groomArchiveWouldExceedFreeLimit` / `trimGroomArchiveToFreeLimitIfNeeded`、`MeguriScreen` にアラート＋プレミアムシート）
+- **②プレミアム画面**：黒基調（`SubscriptionPremiumTheme`）でプレミアム感を強調。ヒーローコピーを「趣味を、もっと充実させよう」へ。上位表示等のチップ行は削除（MECEでないため）
+- **③取引チャット画像**：`TradeMessageStateReducer.preservingCachedPhotoURLs` — 同じメッセージIDの写真は署名URLを差し替えず、開くたびの再読み込みを解消（証跡と同方式）
+- **⑭**「シリーズ未設定」→「未設定」（グリッド・クイックアクション、テスト更新）
+- **⑮個別募集一覧**：パススルーパンに `shouldRecognizeSimultaneouslyWith` を追加し、ボタン上から始めた横スワイプでも募集切替できるように（ボタン押下と両立）
+- **⑯求められているグッズ**：ほしいものヒットのシートに「推し以外でマッチ」見出しを追加し、推しマッチ以外の自分の交換可能グッズも選択可能に（選択・打診は連結配列で処理）
+- **⑰チャットルーム**：ヘッダー直下に `boardRoomHeaderBanner` バナー広告（placement/Info.plist/xcconfig追加）
+
+### 確認方法
+- シミュレータ：subscription-settings ルートで黒基調・新コピー・チップ無しを確認（スクショ）
+- swift test 1480件 0 failures
+
+### セルフレビュー結果
+- ✅ アーカイブ上限はプレミアム判定（hasUnlimitedGroomArchive）連動。サーバ側の物理削除はクライアント主導（deleteOwnGroom 経由）
+- ⚠️ 項目18（チャット長押しメニュー＋リプライ）は次イテレーションで実装
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/MeguriScreenGroomActions.swift` / `SubscriptionSettingsContent.swift` / `TradeMessageStateReducer.swift` / `HomeWishHitDetailSheet.swift` / `AdPlacement.swift`
+
+---
+
 ## イテレーション1226.304：検索結果のユーザー名表示＋ユーザーID変更不可化
 
 ### 背景・問題意識

@@ -102,7 +102,7 @@ enum GoodsTileCollectionCardStyle {
 
     static func tagLine(for tags: [GoodsTag]) -> String {
         guard !tags.isEmpty else {
-            return "シリーズ未設定"
+            return "未設定"
         }
 
         let visibleTags = tags.prefix(2).map { "# \($0.name)" }.joined(separator: " ")

@@ -47,17 +47,17 @@ struct HomeWishHitDetailSheet: View {
                 title: "あなたが譲れる相手のほしいもの"
             )
 
-            if offerGoods.isEmpty {
+            if matchedOfferGoods.isEmpty {
                 HomeNoMatchingOfferGoodsPanel()
             } else {
                 HomeGoodsImagePanelPagedGrid(
-                    goods: offerGoods,
-                    selectedIndices: presentationState.selectedOfferIndices,
+                    goods: matchedOfferGoods,
+                    selectedIndices: presentationState.selectedOfferIndices.filter { $0 < matchedOfferGoods.count },
                     selectedBannerText: "これを譲る",
                     onSelect: { presentationState.selectOffer(at: $0) }
                 )
                 .overlay(alignment: .bottomTrailing) {
-                    Text("\(offerGoods.count)件の候補")
+                    Text("\(matchedOfferGoods.count)件の候補")
                         .font(.system(size: 12.5, weight: .black, design: .rounded))
                         .foregroundStyle(MegrumTheme.lavender)
                         .lineLimit(1)
@@ -71,6 +71,25 @@ struct HomeWishHitDetailSheet: View {
                         .padding(.trailing, 18)
                         .padding(.bottom, 2)
                 }
+            }
+
+            // 推しの登録に紐づかない手持ちグッズも提示できるようにする（項目16）。
+            if !otherOfferGoods.isEmpty {
+                HomeSheetSectionTitle(
+                    systemName: "sparkles",
+                    title: "推し以外でマッチ"
+                )
+
+                HomeGoodsImagePanelPagedGrid(
+                    goods: otherOfferGoods,
+                    selectedIndices: Set(
+                        presentationState.selectedOfferIndices
+                            .filter { $0 >= matchedOfferGoods.count }
+                            .map { $0 - matchedOfferGoods.count }
+                    ),
+                    selectedBannerText: "これを譲る",
+                    onSelect: { presentationState.selectOffer(at: $0 + matchedOfferGoods.count) }
+                )
             }
 
             if showsOtherExchangeRows {
@@ -87,12 +106,23 @@ struct HomeWishHitDetailSheet: View {
         }
     }
 
-    private var offerGoods: [HomeMockGoods] {
+    private var matchedOfferGoods: [HomeMockGoods] {
         HomeWishHitOfferGoodsPolicy.offerGoods(
             viewerOfferGoods: viewerOfferGoods,
             matchedOfferGoodsIDs: selection.signals.wishMatchedOfferGoodsIDs,
             preferredOfferGoodsID: selection.preferredOfferGoodsID
         )
+    }
+
+    /// 推しマッチに含まれない、自分が交換に出せる残りのグッズ。
+    private var otherOfferGoods: [HomeMockGoods] {
+        let matchedIDs = Set(matchedOfferGoods.map(\.id))
+        return viewerOfferGoods.filter { !matchedIDs.contains($0.id) }
+    }
+
+    /// 選択・打診処理は「推しマッチ＋推し以外」を連結した1つの配列として扱う。
+    private var offerGoods: [HomeMockGoods] {
+        matchedOfferGoods + otherOfferGoods
     }
 
     private func prepareInitialSelection() {

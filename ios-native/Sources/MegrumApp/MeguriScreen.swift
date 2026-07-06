@@ -26,6 +26,9 @@ struct MeguriScreen: View {
     @State var groomCreationCoordinate: MegrumLocationCoordinate?
     @State var isGroomCreationLocationLocked = false
     @State var isShowingGroomComposer = false
+    @State var pendingGroomPublish: PendingGroomPublish?
+    @State var isShowingGroomArchiveLimitAlert = false
+    @State var isShowingPremiumFromArchiveLimit = false
     @State var isShowingGroomCamera = false
     @State var isShowingGroomArchive = false
     @State var isShowingMeguriProfileSettings = false
@@ -134,6 +137,29 @@ struct MeguriScreen: View {
         .ignoresSafeArea(.container, edges: .bottom)
         .background(MegrumTheme.canvas.ignoresSafeArea())
         .megrumHiddenNavigationBar()
+        .alert(
+            "アーカイブの上限",
+            isPresented: $isShowingGroomArchiveLimitAlert,
+            presenting: pendingGroomPublish
+        ) { pending in
+            Button("このまま投稿する") {
+                confirmPendingGroomPublish(pending)
+            }
+            Button("Megrumプレミアムを見る") {
+                pendingGroomPublish = nil
+                isShowingPremiumFromArchiveLimit = true
+            }
+            Button("キャンセル", role: .cancel) {
+                pendingGroomPublish = nil
+            }
+        } message: { _ in
+            Text("グルームアーカイブが10件を超えるため、最古のアーカイブが消去されます。Megrumプレミアムの加入で無制限でアーカイブできます。")
+        }
+        .sheet(isPresented: $isShowingPremiumFromArchiveLimit) {
+            NavigationStack {
+                SubscriptionSettingsScreen(appState: appState)
+            }
+        }
         .task {
             requestInitialLocationIfNeeded()
         }

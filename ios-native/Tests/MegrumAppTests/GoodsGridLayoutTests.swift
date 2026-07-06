@@ -388,7 +388,7 @@ final class GoodsGridLayoutTests: XCTestCase {
         let header = GoodsQuickActionHeaderPresentation(item: item)
 
         XCTAssertEqual(header.masterLine, "グループ未設定トレカ")
-        XCTAssertEqual(header.tagLine, "シリーズ未設定")
+        XCTAssertEqual(header.tagLine, "未設定")
     }
 
     func testDeleteConfirmationPresentationMatchesOshiDeleteCalloutCopy() {
@@ -491,7 +491,7 @@ final class GoodsGridLayoutTests: XCTestCase {
         XCTAssertEqual(GoodsTileCollectionCardStyle.glyph(for: item), "K")
         XCTAssertEqual(GoodsTileCollectionCardStyle.tagLine(for: item), "# aespa # トレカ")
         XCTAssertEqual(GoodsTileCollectionCardStyle.glyph(for: untagged), "J")
-        XCTAssertEqual(GoodsTileCollectionCardStyle.tagLine(for: untagged), "シリーズ未設定")
+        XCTAssertEqual(GoodsTileCollectionCardStyle.tagLine(for: untagged), "未設定")
     }
 
     func testCollectionFilterMatchesGroupGoodsTypeAndTags() {

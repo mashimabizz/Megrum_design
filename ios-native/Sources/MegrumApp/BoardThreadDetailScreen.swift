@@ -79,6 +79,17 @@ struct BoardThreadDetailScreen: View {
                     .padding(.horizontal, 20)
                     .padding(.top, 24)
 
+                    AdBannerSlot(
+                        placement: .boardRoomHeaderBanner,
+                        displayContext: AdDisplayContext(
+                            viewerID: appState.viewer?.id,
+                            isPremiumSubscriber: appState.subscriptionState.suppressesAds
+                        ),
+                        bottomSpacing: 6
+                    )
+                    .padding(.horizontal, 20)
+                    .padding(.top, 10)
+
                     ScrollView(showsIndicators: false) {
                         BoardThreadChatTimeline(
                             messages: presentation.chatMessages,

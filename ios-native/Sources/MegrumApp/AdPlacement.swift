@@ -24,6 +24,7 @@ enum AdPlacement: String, CaseIterable, Identifiable, Sendable {
     case searchResultsNative
     case publicProfileFooterBanner
     case tradesListTopBanner
+    case boardRoomHeaderBanner
     case homeBrowseInterstitial
     case wishBrowseInterstitial
     case searchBrowseInterstitial
@@ -33,7 +34,8 @@ enum AdPlacement: String, CaseIterable, Identifiable, Sendable {
 
     var format: AdFormat {
         switch self {
-        case .homeFeedBanner, .wishListBanner, .searchResultsBanner, .publicProfileFooterBanner, .tradesListTopBanner:
+        case .homeFeedBanner, .wishListBanner, .searchResultsBanner, .publicProfileFooterBanner, .tradesListTopBanner,
+             .boardRoomHeaderBanner:
             .banner
         case .searchResultsNative:
             .native
@@ -56,12 +58,15 @@ enum AdPlacement: String, CaseIterable, Identifiable, Sendable {
             "TRD-list"
         case .meguriBrowseInterstitial:
             "MEG-main"
+        case .boardRoomHeaderBanner:
+            "MEG-room"
         }
     }
 
     var tier: AdScreenTier {
         switch self {
-        case .homeFeedBanner, .wishListBanner, .searchResultsBanner, .searchResultsNative, .tradesListTopBanner:
+        case .homeFeedBanner, .wishListBanner, .searchResultsBanner, .searchResultsNative, .tradesListTopBanner,
+             .boardRoomHeaderBanner:
             .nativeInline
         case .publicProfileFooterBanner:
             .footerBanner
@@ -84,6 +89,8 @@ enum AdPlacement: String, CaseIterable, Identifiable, Sendable {
             "MegrumAdMobProfileBannerUnitID"
         case .tradesListTopBanner:
             "MegrumAdMobTradesBannerUnitID"
+        case .boardRoomHeaderBanner:
+            "MegrumAdMobBoardRoomBannerUnitID"
         case .homeBrowseInterstitial:
             "MegrumAdMobHomeInterstitialUnitID"
         case .wishBrowseInterstitial:

@@ -46,7 +46,7 @@ struct SubscriptionSettingsContent: View {
             .padding(.top, 14)
             .padding(.bottom, 40)
         }
-        .background(MegrumTheme.canvas.ignoresSafeArea())
+        .background(SubscriptionPremiumTheme.background.ignoresSafeArea())
     }
 
     private var statusAndMessages: some View {
@@ -133,7 +133,7 @@ struct SubscriptionSettingsContent: View {
             } else {
                 Label("購入機能は公開準備中です", systemImage: "lock.fill")
                     .font(.system(size: 14, weight: .bold, design: .rounded))
-                    .foregroundStyle(MegrumTheme.muted)
+                    .foregroundStyle(SubscriptionPremiumTheme.subduedText)
                     .frame(maxWidth: .infinity)
 
                 Button("状態を更新", action: onReload)
@@ -144,7 +144,7 @@ struct SubscriptionSettingsContent: View {
 
             Text(purchaseFooterText)
                 .font(.system(size: 11.5, weight: .semibold, design: .rounded))
-                .foregroundStyle(MegrumTheme.muted)
+                .foregroundStyle(SubscriptionPremiumTheme.subduedText)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
@@ -203,22 +203,13 @@ private struct SubscriptionPremiumHero: View {
                     Text(SubscriptionCatalog.currentPremiumDisplayName)
                         .font(.system(size: 22, weight: .black, design: .rounded))
                         .foregroundStyle(.white)
-                    Text("推し活の交換を、もっと速く・もっと広く")
-                        .font(.system(size: 13, weight: .heavy, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.9))
+                    Text("趣味を、もっと充実させよう")
+                        .font(.system(size: 13.5, weight: .heavy, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.92))
                 }
-            }
 
-            HStack(spacing: 6) {
-                ForEach(["上位表示", "募集無制限", "めぐり解放"], id: \.self) { chip in
-                    Text(chip)
-                        .font(.system(size: 11.5, weight: .black, design: .rounded))
-                        .foregroundStyle(MegrumTheme.lavender)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .background(.white.opacity(0.94), in: Capsule())
-                }
-                Spacer()
+                Spacer(minLength: 0)
+
                 if isActive {
                     Label("利用中", systemImage: "checkmark.seal.fill")
                         .font(.system(size: 12, weight: .black, design: .rounded))
@@ -261,7 +252,7 @@ private struct SubscriptionComparisonTable: View {
             .foregroundStyle(MegrumTheme.muted)
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
-            .background(MegrumTheme.lavender.opacity(0.07))
+            .background(Color.white.opacity(0.96))
 
             ForEach(Array(SubscriptionComparisonRow.rows.enumerated()), id: \.element.id) { index, row in
                 HStack(spacing: 8) {
@@ -326,7 +317,7 @@ private struct SubscriptionPlanPicker: View {
         VStack(alignment: .leading, spacing: 10) {
             Text("プランを選ぶ")
                 .font(.system(size: 16, weight: .black, design: .rounded))
-                .foregroundStyle(MegrumTheme.ink)
+                .foregroundStyle(.white)
 
             ForEach(SubscriptionPremiumPlanCatalog.plans) { plan in
                 planCard(plan)
@@ -384,7 +375,7 @@ private struct SubscriptionPlanPicker: View {
             .overlay {
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
                     .strokeBorder(
-                        isSelected ? MegrumTheme.lavender : MegrumTheme.ink.opacity(0.08),
+                        isSelected ? MegrumTheme.lavender : Color.white.opacity(0.18),
                         lineWidth: isSelected ? 1.8 : 1
                     )
             }
@@ -434,3 +425,9 @@ private struct DebugPlanToggleButton: View {
     }
 }
 #endif
+
+/// プレミアム画面のダークテーマ（黒基調でプレミアム感を出す）。
+enum SubscriptionPremiumTheme {
+    static let background = Color(red: 0.055, green: 0.05, blue: 0.09)
+    static let subduedText = Color.white.opacity(0.62)
+}

@@ -57,6 +57,36 @@ extension MeguriScreen {
         coordinate: MegrumLocationCoordinate,
         metadata: MeguriContentMetadataDraft
     ) async -> Bool {
+        await publishGroomPhoto(
+            data: data,
+            imageContentType: imageContentType,
+            caption: caption,
+            coordinate: coordinate,
+            metadata: metadata,
+            skipsArchiveLimitCheck: false
+        )
+    }
+
+    func publishGroomPhoto(
+        data: Data,
+        imageContentType: String,
+        caption: String?,
+        coordinate: MegrumLocationCoordinate,
+        metadata: MeguriContentMetadataDraft,
+        skipsArchiveLimitCheck: Bool
+    ) async -> Bool {
+        // 無料プランはアーカイブ10件が上限。超える投稿の前に確認ポップアップを出す。
+        if !skipsArchiveLimitCheck, await appState.groomArchiveWouldExceedFreeLimit() {
+            pendingGroomPublish = PendingGroomPublish(
+                data: data,
+                imageContentType: imageContentType,
+                caption: caption,
+                coordinate: coordinate,
+                metadata: metadata
+            )
+            isShowingGroomArchiveLimitAlert = true
+            return false
+        }
         let currentCoordinate = locationState.coordinate ?? (isGroomCreationLocationLocked ? coordinate : nil)
         if currentCoordinate == nil {
             locationState.startUpdatingCurrentLocation()
@@ -86,6 +116,7 @@ extension MeguriScreen {
         )
         if created {
             localNoticeMessage = nil
+            await appState.trimGroomArchiveToFreeLimitIfNeeded()
             await reloadMeguriFeed(force: true)
             return true
         } else {
@@ -156,6 +187,36 @@ extension MeguriScreen {
             onOpenGroomViewer(groom, sourceAnchor)
         } else {
             selectedGroom = groom
+        }
+    }
+}
+
+/// アーカイブ上限確認中に保持する投稿内容。
+struct PendingGroomPublish {
+    var data: Data
+    var imageContentType: String
+    var caption: String?
+    var coordinate: MegrumLocationCoordinate
+    var metadata: MeguriContentMetadataDraft
+}
+
+extension MeguriScreen {
+    /// 上限ポップアップで「このまま投稿する」を選んだ時：確認済みとして投稿し直す。
+    func confirmPendingGroomPublish(_ pending: PendingGroomPublish) {
+        pendingGroomPublish = nil
+        Task {
+            let published = await publishGroomPhoto(
+                data: pending.data,
+                imageContentType: pending.imageContentType,
+                caption: pending.caption,
+                coordinate: pending.coordinate,
+                metadata: pending.metadata,
+                skipsArchiveLimitCheck: true
+            )
+            if published {
+                isShowingGroomComposer = false
+                resetGroomDraft()
+            }
         }
     }
 }
