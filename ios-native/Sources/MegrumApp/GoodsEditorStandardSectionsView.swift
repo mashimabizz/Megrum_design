@@ -128,7 +128,8 @@ struct GoodsEditorStandardSectionsView: View {
             tagDraft: $tagDraft,
             isTagFieldFocused: isTagFieldFocused,
             isItemReadOnly: isItemReadOnly,
-            onOpenTagSheet: draft.entryKind == .wish ? onOpenTagSheet : nil,
+            // マイグッズ編集でもほしいもの編集と同じシリーズ登録モジュール（シート）を使う
+            onOpenTagSheet: onOpenTagSheet,
             onAddSuggestedTag: onAddSuggestedTag,
             onRemoveTag: onRemoveTag,
             onAddTag: onAddTag

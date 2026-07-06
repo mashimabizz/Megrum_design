@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション1226.318：シリーズ登録モジュール統一・チャットルーム透過ヘッダー・地図吹き出し作り直し
+
+### 背景・問題意識
+オーナーFB 3項目：マイグッズ編集のシリーズ登録がモジュール未使用／ほしいもの編集のGoogle Lensが開かない、チャットルームのヘッダーを透過＋スクロールで隠す、地図吹き出しの品質（添付画像で「お粗末」との指摘）とルーム名の見た目。
+
+### 変更内容
+
+#### 1. シリーズ登録モジュール統一＋Google Lens起動修正
+- `GoodsEditorStandardSectionsView.swift` / `GoodsEditorSheetFormPresentation.swift`：`entryKind == .wish` の分岐を外し、マイグッズ編集でも共通のシリーズ登録シート（GoodsBulkTagSheet）を開く。フッター文言は wish/グッズで出し分け
+- `GoodsEditorScreen.swift`：シリーズ登録シート（単品用）に Google Lens のアプリ内ブラウザ `.sheet(item: $googleLensBrowserRoute)` を追加。従来は一括登録シート側にしか付いておらず、単品シートからは提示コンテキスト違いでブラウザが開けなかった
+
+#### 2. チャットルームの透過ヘッダー＋スクロールで隠す（`BoardThreadDetailScreen.swift`）
+- ヘッダー＋バナーを `MegrumCollapsingTopChromeContainer` の chrome に移し、ホームと同じ半透明ガラス（megrumTranslucentTopChromeBackground）でチャットの上に浮かせる
+- チャットはヘッダーの下をすべって透ける。下方向へスクロールするとヘッダーが上へ退避して隠れ、上方向スクロールで戻る（MegrumTopChromeCollapseTracker）
+
+#### 3. 地図吹き出し作り直し（`BoardThreadMessagePopBubbles.swift` / `MeguriMapAnnotationViews.swift`）
+- 本体としっぽを1つのパスで描く `MapChatBubbleShape` を新設（角丸長方形＋アイコン側下角からquadカーブで伸びるしっぽ。継ぎ目・輪郭線なし、白フィル＋ソフトシャドウ＋ごく薄いブランドグラデ）
+- 長文は2行まで表示（lineLimit 2 / previewLimit 48 / maxWidth 148）
+- アイコン下のチャットルーム名称は白枠背景を廃止して文字のみ（読みやすさ用に白のふちどり影のみ）
+
+### 影響範囲
+- マイグッズ/ほしいもの編集、チャットルーム詳細、めぐり地図
+
+### 確認方法
+- シミュレータ（meguriルート）で2行吹き出し・一体しっぽ・文字のみ名称を確認済み
+- swift test 1486件 0失敗
+
+### セルフレビュー結果
+- ✅ ブランドカラー直書きなし（MegrumTheme 経由）
+- ✅ 共通モジュール再利用（GoodsBulkTagSheet / MegrumCollapsingTopChromeContainer）
+- ⚠️ チャットルームのヘッダー退避はVisualQAルートが無くシミュレータで自動確認不可（実機で要確認）
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/BoardThreadMessagePopBubbles.swift`
+- `ios-native/Sources/MegrumApp/BoardThreadDetailScreen.swift`
+
+---
+
 ## イテレーション1226.317：地図吹き出し矢印/ランダム化・L2未承認L1名・マスタ検索ドック・リプライプレビュー
 
 ### 背景・問題意識

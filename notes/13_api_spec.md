@@ -544,7 +544,7 @@ AW削除。
 在庫新規登録。
 
 - **Auth**: 必須
-- **Request**: `{ genre_tag_id, character_id, goods_type_id, title, description?, condition_tags?, kind, is_carrying?, carry_event_id? }`
+- **Request**: `{ genre_tag_id, character_id, goods_type_id, title, description?, kind, is_carrying?, carry_event_id? }`
 - **Response 201**: `{ id, status: "available", ... }`
 - **備考**: 数量×N の場合は N 件 INSERT（iter29、1行=1個）
 - **Screen**: `INV-meta`（B-2③）

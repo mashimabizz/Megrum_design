@@ -754,7 +754,6 @@ iter29 で 1行=1個 の方針確定。UI で集約表示し、選択時は N �
 | `goods_type_id` | uuid | → goods_types_master（**必須**、iter24） |
 | `title` | text | 旧 `genre_name`/`character_name` 由来の表示名 |
 | `description` | text nullable | |
-| `condition_tags` | text[] | 美品 / コーティング有 / シリアル付き 等 |
 | `exchange_method` | text | 'hand'（現地交換）/ 'mail'（郵送交換）。アイテム単位の許容手段の自己申告 |
 | `kind` | text | `for_trade`（譲る候補）/ `keep`（自分用キープ） |
 | `status` | text | `available` / `in_negotiation` / `in_deal` / `traded`（09 Item Lifecycleと整合） |

@@ -145,15 +145,15 @@ struct BoardMapPinWithTitle: View {
         VStack(spacing: 3) {
             BoardMapPin(thread: thread, isOutOfRange: isOutOfRange)
 
+            // 吹き出しと見た目が紛れないよう、名称は背景枠なしの文字のみ。
+            // 地図上でも読めるように白の細いふちどり（影）だけ付ける。
             Text(thread.title)
                 .font(.system(size: 11, weight: .black, design: .rounded))
                 .foregroundStyle(MegrumTheme.ink)
                 .lineLimit(1)
                 .minimumScaleFactor(0.72)
-                .padding(.horizontal, 7)
-                .padding(.vertical, 3)
-                .background(.white.opacity(0.90), in: Capsule())
-                .shadow(color: MegrumTheme.ink.opacity(0.12), radius: 6, y: 3)
+                .shadow(color: .white.opacity(0.9), radius: 1.5)
+                .shadow(color: .white.opacity(0.9), radius: 1.5)
                 .frame(maxWidth: 118)
         }
         .accessibilityElement(children: .combine)

@@ -39,7 +39,8 @@ extension GoodsEditorSheet {
             onRemoveTag: removeTag,
             onAddTag: addCurrentTag,
             onAddSuggestedTag: addSuggestedTag,
-            onOpenTagSheet: draft.entryKind == .wish ? { showDraftTagSheet() } : nil,
+            // マイグッズ/ほしいもの共通でシリーズ登録モジュール（シート）を開く
+            onOpenTagSheet: { showDraftTagSheet() },
             onShowCreateOshiPicker: showCreateOshiMasterSheet,
             onCommonNext: goToCreateShoot,
             onPickCamera: startInventoryCreateCamera,

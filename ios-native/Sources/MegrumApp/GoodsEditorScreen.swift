@@ -264,7 +264,9 @@ struct GoodsEditorSheet: View {
                     previewItemsByTag: editorTagPreviewItemsByTag,
                     navigationTitle: "シリーズを登録",
                     textFieldPlaceholder: "例：会場限定",
-                    footerText: "このほしいものにシリーズを追加します。",
+                    footerText: draft.entryKind == .wish
+                        ? "このほしいものにシリーズを追加します。"
+                        : "このグッズにシリーズを追加します。",
                     confirmationTitle: "追加",
                     googleLensItems: draftGoogleLensItems,
                     isOpeningGoogleLens: isOpeningGoogleLensSearch,
@@ -272,6 +274,14 @@ struct GoodsEditorSheet: View {
                     onOpenGoogleLens: openDraftGoogleLensSearch,
                     onApply: addTagFromSelectionSheet
                 )
+                // Google Lens のアプリ内ブラウザは「このシートの上」に出す必要がある
+                // （親側のみだとシート表示中は提示コンテキストが違い、開かない）。
+                #if os(iOS)
+                .sheet(item: $googleLensBrowserRoute) { browserRoute in
+                    MegrumInAppSafariView(url: browserRoute.url)
+                        .ignoresSafeArea()
+                }
+                #endif
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
             }

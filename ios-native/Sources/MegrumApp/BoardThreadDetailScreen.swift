@@ -64,6 +64,8 @@ struct BoardThreadDetailScreen: View {
         .makePresentation()
     }
 
+    @State private var headerChromeHeight: CGFloat = 120
+
     var body: some View {
         let presentation = detailPresentation
 
@@ -72,27 +74,13 @@ struct BoardThreadDetailScreen: View {
                 MegrumTheme.canvas
                     .ignoresSafeArea()
 
-                VStack(spacing: 0) {
-                    BoardThreadDetailHeader(
-                        title: currentThread.title,
-                        onClose: close,
-                        onReport: { isShowingReportConfirmation = true }
-                    )
-                    .padding(.horizontal, 20)
-                    .padding(.top, 24)
-
-                    AdBannerSlot(
-                        placement: .boardRoomHeaderBanner,
-                        displayContext: AdDisplayContext(
-                            viewerID: appState.viewer?.id,
-                            isPremiumSubscriber: appState.subscriptionState.suppressesAds
-                        ),
-                        bottomSpacing: 6
-                    )
-                    .padding(.horizontal, 20)
-                    .padding(.top, 10)
-
+                // ホームと同様：ヘッダーは半透明ガラスで浮かせ、チャットはその下を
+                // すべって透ける。下方向へスクロールしたらヘッダーを隠す。
+                MegrumCollapsingTopChromeContainer {
                     ScrollView(showsIndicators: false) {
+                        Color.clear
+                            .frame(height: headerChromeHeight + 6)
+                            .megrumReportsScrollContentTop()
                         BoardThreadChatTimeline(
                             messages: presentation.chatMessages,
                             isLoadingReplies: appState.loadingBoardRepliesThreadID == currentThread.id,
@@ -134,7 +122,39 @@ struct BoardThreadDetailScreen: View {
                             .frame(height: 1)
                             .id(BoardThreadScrollAnchor.bottom)
                     }
+                    .coordinateSpace(name: MegrumScrollContentTopSpace.name)
                     .scrollDismissesKeyboard(.interactively)
+                } chrome: { isCollapsed in
+                    VStack(spacing: 0) {
+                        BoardThreadDetailHeader(
+                            title: currentThread.title,
+                            onClose: close,
+                            onReport: { isShowingReportConfirmation = true }
+                        )
+                        .padding(.horizontal, 20)
+                        .padding(.top, 10)
+
+                        AdBannerSlot(
+                            placement: .boardRoomHeaderBanner,
+                            displayContext: AdDisplayContext(
+                                viewerID: appState.viewer?.id,
+                                isPremiumSubscriber: appState.subscriptionState.suppressesAds
+                            ),
+                            bottomSpacing: 6
+                        )
+                        .padding(.horizontal, 20)
+                        .padding(.top, 10)
+                    }
+                    .padding(.bottom, 4)
+                    .frame(maxWidth: .infinity)
+                    .megrumTranslucentTopChromeBackground()
+                    .onGeometryChange(for: CGFloat.self) { proxy in
+                        proxy.size.height
+                    } action: { newValue in
+                        headerChromeHeight = newValue
+                    }
+                    .offset(y: isCollapsed ? -(headerChromeHeight + 80) : 0)
+                    .opacity(isCollapsed ? 0 : 1)
                 }
 
                 if let selectedRemoteImage = photoPresentationState.selectedRemoteImage {

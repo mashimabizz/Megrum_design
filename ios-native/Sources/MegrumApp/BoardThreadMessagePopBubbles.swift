@@ -15,7 +15,7 @@ struct BoardThreadMessagePopBubbles: View {
     @State private var driftOffset: CGFloat = 0
     @State private var cycleTask: Task<Void, Never>?
 
-    private static let previewLimit = 20
+    private static let previewLimit = 48
 
     /// 吹き出しの出現位置（アイコンから見てどちら側に出るか）。真上は使わない。
     private enum BubblePlacement: CaseIterable {
@@ -27,9 +27,9 @@ struct BoardThreadMessagePopBubbles: View {
         var offset: CGSize {
             switch self {
             case .left:
-                CGSize(width: -62, height: 22)
+                CGSize(width: -66, height: 18)
             case .right:
-                CGSize(width: 70, height: 38)
+                CGSize(width: 74, height: 38)
             }
         }
 
@@ -62,7 +62,7 @@ struct BoardThreadMessagePopBubbles: View {
                     .id(visibleIndex)
             }
         }
-        .frame(maxWidth: 150)
+        .frame(maxWidth: 170)
         .allowsHitTesting(false)
         .onAppear {
             startCycling()
@@ -73,32 +73,39 @@ struct BoardThreadMessagePopBubbles: View {
         }
     }
 
-    /// 矢印（しっぽ）付きの吹き出し。しっぽはアイコン側の下角から斜め下へ向く。
+    /// しっぽまで一体の吹き出し。しっぽはアイコン側の下角からなめらかにアイコンへ向く。
+    /// 長文は2行まで表示する。
     private func bubble(text: String, placement: BubblePlacement) -> some View {
-        Text(text)
+        let shape = MapChatBubbleShape(tailOnTrailing: placement == .left)
+        return Text(text)
             .font(.system(size: 10.5, weight: .heavy, design: .rounded))
             .foregroundStyle(MegrumTheme.ink)
-            .lineLimit(1)
-            .padding(.horizontal, 9)
-            .padding(.vertical, 5)
-            .background(.white.opacity(0.96), in: Capsule())
-            .overlay {
-                Capsule().strokeBorder(MegrumTheme.sky.opacity(0.5), lineWidth: 1)
-            }
-            .overlay(alignment: placement == .left ? .bottomTrailing : .bottomLeading) {
-                BubbleTail(pointsTowardTrailing: placement == .left)
-                    .fill(.white.opacity(0.96))
+            .lineLimit(2)
+            .multilineTextAlignment(.leading)
+            .frame(maxWidth: 148, alignment: .leading)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.horizontal, 11)
+            .padding(.top, 7)
+            .padding(.bottom, 7 + MapChatBubbleShape.tailHeight)
+            .background {
+                shape
+                    .fill(.white)
+                    .shadow(color: MegrumTheme.ink.opacity(0.18), radius: 7, y: 3)
                     .overlay {
-                        BubbleTail(pointsTowardTrailing: placement == .left)
-                            .stroke(MegrumTheme.sky.opacity(0.5), lineWidth: 1)
+                        // 本体としっぽの境目に線が出ないよう、輪郭線は引かず
+                        // ごく薄いブランドトーンのグラデを重ねるだけにする。
+                        shape.fill(
+                            LinearGradient(
+                                colors: [
+                                    MegrumTheme.sky.opacity(0.10),
+                                    MegrumTheme.lavender.opacity(0.06)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
                     }
-                    .frame(width: 11, height: 10)
-                    .offset(
-                        x: placement == .left ? 6 : -6,
-                        y: 7
-                    )
             }
-            .shadow(color: MegrumTheme.ink.opacity(0.16), radius: 5, y: 2)
     }
 
     /// 出現位置をピンごと・メッセージごとに変える（決定的：再描画でも揺れない）。
@@ -159,23 +166,57 @@ struct BoardThreadMessagePopBubbles: View {
     }
 }
 
-/// 吹き出しのしっぽ（アイコン側へ向く小さな三角形）。
-private struct BubbleTail: Shape {
-    /// true なら右下（trailing）方向へ、false なら左下（leading）方向へ向く。
-    var pointsTowardTrailing: Bool
+/// 地図用チャット吹き出しの一体シェイプ：角丸の本体＋アイコン側の下角から
+/// なめらかな曲線で伸びるしっぽを1つのパスで描く（継ぎ目が出ない）。
+struct MapChatBubbleShape: Shape {
+    static let tailHeight: CGFloat = 9
+    static let tailWidth: CGFloat = 14
+
+    var cornerRadius: CGFloat = 13
+    /// true なら右下（trailing＝アイコンが右にある）へ、false なら左下へ向く。
+    var tailOnTrailing: Bool
 
     func path(in rect: CGRect) -> Path {
-        var path = Path()
-        if pointsTowardTrailing {
-            path.move(to: CGPoint(x: rect.minX, y: rect.minY))
-            path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
-            path.addLine(to: CGPoint(x: rect.minX, y: rect.minY + rect.height * 0.45))
+        let tailHeight = Self.tailHeight
+        let tailWidth = Self.tailWidth
+        let body = CGRect(
+            x: rect.minX,
+            y: rect.minY,
+            width: rect.width,
+            height: rect.height - tailHeight
+        )
+        var path = Path(roundedRect: body, cornerRadius: cornerRadius, style: .continuous)
+
+        var tail = Path()
+        if tailOnTrailing {
+            let baseEnd = body.maxX - cornerRadius * 0.55
+            let baseStart = baseEnd - tailWidth
+            let tip = CGPoint(x: body.maxX + 2, y: rect.maxY)
+            tail.move(to: CGPoint(x: baseStart, y: body.maxY - 1))
+            tail.addQuadCurve(
+                to: tip,
+                control: CGPoint(x: baseStart + tailWidth * 0.55, y: body.maxY + tailHeight * 0.55)
+            )
+            tail.addQuadCurve(
+                to: CGPoint(x: baseEnd, y: body.maxY - 1),
+                control: CGPoint(x: baseEnd - tailWidth * 0.12, y: body.maxY + tailHeight * 0.32)
+            )
         } else {
-            path.move(to: CGPoint(x: rect.maxX, y: rect.minY))
-            path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
-            path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY + rect.height * 0.45))
+            let baseStart = body.minX + cornerRadius * 0.55
+            let baseEnd = baseStart + tailWidth
+            let tip = CGPoint(x: body.minX - 2, y: rect.maxY)
+            tail.move(to: CGPoint(x: baseEnd, y: body.maxY - 1))
+            tail.addQuadCurve(
+                to: tip,
+                control: CGPoint(x: baseEnd - tailWidth * 0.55, y: body.maxY + tailHeight * 0.55)
+            )
+            tail.addQuadCurve(
+                to: CGPoint(x: baseStart, y: body.maxY - 1),
+                control: CGPoint(x: baseStart + tailWidth * 0.12, y: body.maxY + tailHeight * 0.32)
+            )
         }
-        path.closeSubpath()
+        tail.closeSubpath()
+        path.addPath(tail)
         return path
     }
 }
