@@ -49,7 +49,9 @@ struct MeguriMessageList: View {
                             )
                             .chatMessageInteraction(
                                 copyText: (message.body?.nilIfBlank).map(ChatReplyQuoteFormatter.copyText(of:)),
-                                onReply: message.body?.nilIfBlank != nil ? { onReply(message) } : nil,
+                                onReply: message.body?.nilIfBlank != nil || message.imageURL != nil
+                                    ? { onReply(message) }
+                                    : nil,
                                 onReport: message.senderID == viewerID ? nil : { onReport(message) }
                             )
                             .id(message.id)
@@ -232,14 +234,14 @@ struct MeguriMessageBubble: View {
                 )
                 Text(parsed.text)
                     .font(.system(size: 15, weight: .bold, design: .rounded))
-                    .foregroundStyle(isMine ? .white : MegrumTheme.ink)
+                    .foregroundStyle(MegrumTheme.ink)
                     .multilineTextAlignment(.leading)
                     .fixedSize(horizontal: false, vertical: true)
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
             .background(
-                isMine ? AnyShapeStyle(MegrumTheme.lavender) : AnyShapeStyle(.white.opacity(0.9)),
+                isMine ? MegrumChatBubbleStyle.mineBackground : MegrumChatBubbleStyle.otherBackground,
                 in: RoundedRectangle(cornerRadius: 18, style: .continuous)
             )
         } else {
@@ -253,13 +255,13 @@ struct MeguriMessageBubble: View {
     private func compactTextBubble(_ text: String) -> some View {
         Text(text)
             .font(.system(size: 15, weight: .bold, design: .rounded))
-            .foregroundStyle(isMine ? .white : MegrumTheme.ink)
+            .foregroundStyle(MegrumTheme.ink)
             .multilineTextAlignment(isMine ? .trailing : .leading)
             .fixedSize(horizontal: true, vertical: false)
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
             .background(
-                isMine ? AnyShapeStyle(MegrumTheme.lavender) : AnyShapeStyle(.white.opacity(0.9)),
+                isMine ? MegrumChatBubbleStyle.mineBackground : MegrumChatBubbleStyle.otherBackground,
                 in: RoundedRectangle(cornerRadius: 18, style: .continuous)
             )
     }
@@ -267,14 +269,14 @@ struct MeguriMessageBubble: View {
     private func wrappedTextBubble(_ text: String) -> some View {
         Text(text)
             .font(.system(size: 15, weight: .bold, design: .rounded))
-            .foregroundStyle(isMine ? .white : MegrumTheme.ink)
+            .foregroundStyle(MegrumTheme.ink)
             .multilineTextAlignment(isMine ? .trailing : .leading)
             .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: 270, alignment: isMine ? .trailing : .leading)
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
             .background(
-                isMine ? AnyShapeStyle(MegrumTheme.lavender) : AnyShapeStyle(.white.opacity(0.9)),
+                isMine ? MegrumChatBubbleStyle.mineBackground : MegrumChatBubbleStyle.otherBackground,
                 in: RoundedRectangle(cornerRadius: 18, style: .continuous)
             )
     }

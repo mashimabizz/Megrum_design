@@ -14,6 +14,8 @@ struct ChatReplyTarget: Equatable {
     var avatarURL: URL?
     var initial: String
     var body: String
+    /// リプライ先が画像メッセージの時のサムネイルURL。
+    var imageURL: URL?
 
     init(
         messageID: UUID? = nil,
@@ -22,7 +24,8 @@ struct ChatReplyTarget: Equatable {
         avatarID: String?,
         avatarURL: URL?,
         initial: String,
-        body: String
+        body: String,
+        imageURL: URL? = nil
     ) {
         self.messageID = messageID
         self.senderID = senderID
@@ -31,6 +34,16 @@ struct ChatReplyTarget: Equatable {
         self.avatarURL = avatarURL
         self.initial = initial
         self.body = body
+        self.imageURL = imageURL
+    }
+
+    /// 表示用の本文（画像のみのメッセージは「写真」）。
+    var displayBody: String {
+        let trimmed = body.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            return imageURL != nil ? "写真" : ""
+        }
+        return trimmed
     }
 }
 
@@ -40,6 +53,7 @@ struct ChatReplyQuote: Equatable {
     var senderID: UUID?
     var senderName: String
     var preview: String
+    var imageURL: URL?
 }
 
 /// リプライの引用をメッセージ本文へ埋め込み／取り出しするフォーマッタ。
@@ -62,8 +76,10 @@ enum ChatReplyQuoteFormatter {
     static let metaSeparator = "\u{2063}"
 
     static func compose(reply: ChatReplyTarget, body: String) -> String {
-        let meta = "\(reply.messageID?.uuidString ?? "")|\(reply.senderID?.uuidString ?? "")"
-        return "\(marker)\(metaSeparator)\(meta)\(metaSeparator)\(reply.senderName)「\(preview(of: reply.body))」\n\(body)"
+        let encodedImageURL = reply.imageURL?.absoluteString
+            .addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? ""
+        let meta = "\(reply.messageID?.uuidString ?? "")|\(reply.senderID?.uuidString ?? "")|\(encodedImageURL)"
+        return "\(marker)\(metaSeparator)\(meta)\(metaSeparator)\(reply.senderName)「\(preview(of: reply.displayBody))」\n\(body)"
     }
 
     /// 本文から引用を分離する。引用が無ければ quote は nil。
@@ -78,12 +94,16 @@ enum ChatReplyQuoteFormatter {
 
         var messageID: UUID?
         var senderID: UUID?
+        var imageURL: URL?
         if quoteRaw.hasPrefix(metaSeparator) {
             let parts = quoteRaw.dropFirst().components(separatedBy: metaSeparator)
             if parts.count >= 2 {
                 let ids = parts[0].components(separatedBy: "|")
                 messageID = ids.first.flatMap(UUID.init(uuidString:))
                 senderID = ids.count > 1 ? UUID(uuidString: ids[1]) : nil
+                if ids.count > 2, let decoded = ids[2].removingPercentEncoding, !decoded.isEmpty {
+                    imageURL = URL(string: decoded)
+                }
                 quoteRaw = parts.dropFirst().joined(separator: metaSeparator)
             }
         }
@@ -99,7 +119,13 @@ enum ChatReplyQuoteFormatter {
             preview = quoteRaw
         }
         return (
-            ChatReplyQuote(messageID: messageID, senderID: senderID, senderName: name, preview: preview),
+            ChatReplyQuote(
+                messageID: messageID,
+                senderID: senderID,
+                senderName: name,
+                preview: preview,
+                imageURL: imageURL
+            ),
             text
         )
     }
@@ -128,13 +154,17 @@ struct ChatReplyComposerPreview: View {
                     .font(.system(size: 12.5, weight: .black, design: .rounded))
                     .foregroundStyle(MegrumTheme.ink)
                     .lineLimit(1)
-                Text(ChatReplyQuoteFormatter.preview(of: target.body))
+                Text(ChatReplyQuoteFormatter.preview(of: target.displayBody))
                     .font(.system(size: 12, weight: .semibold, design: .rounded))
                     .foregroundStyle(MegrumTheme.muted)
                     .lineLimit(1)
             }
 
             Spacer(minLength: 8)
+
+            if let imageURL = target.imageURL {
+                ChatReplyQuoteImageThumb(url: imageURL, size: 38)
+            }
 
             Button {
                 MegrumHaptics.performButtonTap(onCancel)
@@ -159,7 +189,8 @@ struct ChatReplyComposerPreview: View {
     }
 }
 
-/// バブル内に出す引用表示：左に返信元アイコン、名前は太字・元メッセージは薄字。
+/// バブル内に出す引用ブロック（LINE風）：返信元アイコン・太字名前・薄字プレビュー・
+/// 画像リプライなら右に小さなサムネイル。下に区切り線を挟んで本文が続く。
 /// タップで元メッセージへスクロールできる（onTap 指定時）。
 struct ChatReplyQuoteLine: View {
     var quote: ChatReplyQuote
@@ -174,36 +205,87 @@ struct ChatReplyQuoteLine: View {
                 MegrumHaptics.performButtonTap(onTap)
             }
         } label: {
-            HStack(spacing: 7) {
-                RoundedRectangle(cornerRadius: 1.5)
-                    .fill(isMine ? Color.white.opacity(0.7) : MegrumTheme.lavender)
-                    .frame(width: 3)
+            VStack(alignment: .leading, spacing: 7) {
+                HStack(spacing: 8) {
+                    BoardThreadDetailAvatar(
+                        avatarID: avatarID,
+                        imageURL: avatarURL,
+                        initial: String(quote.senderName.prefix(1)).uppercased(),
+                        size: 26
+                    )
 
-                BoardThreadDetailAvatar(
-                    avatarID: avatarID,
-                    imageURL: avatarURL,
-                    initial: String(quote.senderName.prefix(1)).uppercased(),
-                    size: 22
-                )
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(quote.senderName)
+                            .font(.system(size: 12, weight: .black, design: .rounded))
+                            .foregroundStyle(MegrumTheme.ink)
+                            .lineLimit(1)
+                        Text(quote.imageURL != nil && quote.preview.isEmpty ? "写真" : quote.preview)
+                            .font(.system(size: 11.5, weight: .semibold, design: .rounded))
+                            .foregroundStyle(MegrumTheme.muted)
+                            .lineLimit(2)
+                            .multilineTextAlignment(.leading)
+                    }
 
-                (
-                    Text(quote.senderName.isEmpty ? "" : "\(quote.senderName)")
-                        .font(.system(size: 11.5, weight: .black, design: .rounded))
-                        .foregroundStyle(isMine ? Color.white.opacity(0.92) : MegrumTheme.ink.opacity(0.82))
-                    + Text("「\(quote.preview)」")
-                        .font(.system(size: 11.5, weight: .semibold, design: .rounded))
-                        .foregroundStyle(isMine ? Color.white.opacity(0.6) : MegrumTheme.muted.opacity(0.85))
-                )
-                .lineLimit(2)
-                .multilineTextAlignment(.leading)
+                    Spacer(minLength: 6)
+
+                    if let imageURL = quote.imageURL {
+                        ChatReplyQuoteImageThumb(url: imageURL, size: 34)
+                    }
+                }
+
+                Rectangle()
+                    .fill(MegrumTheme.ink.opacity(0.12))
+                    .frame(height: 0.8)
             }
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .disabled(onTap == nil)
         .padding(.bottom, 4)
-        .accessibilityLabel("返信元: \(quote.senderName) \(quote.preview)")
+        .accessibilityLabel("返信元: \(quote.senderName) \(quote.imageURL != nil && quote.preview.isEmpty ? "写真" : quote.preview)")
     }
+}
+
+/// 引用内の画像サムネイル。
+struct ChatReplyQuoteImageThumb: View {
+    var url: URL
+    var size: CGFloat
+
+    var body: some View {
+        AsyncImage(url: url) { phase in
+            if case .success(let image) = phase {
+                image.resizable().scaledToFill()
+            } else {
+                MegrumTheme.lavender.opacity(0.14)
+            }
+        }
+        .frame(width: size, height: size)
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .strokeBorder(.white.opacity(0.7), lineWidth: 1)
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+/// 自分のメッセージバブルの共通スタイル：紫→水色のほんのりグラデ。
+enum MegrumChatBubbleStyle {
+    static var mineBackground: AnyShapeStyle {
+        AnyShapeStyle(
+            LinearGradient(
+                colors: [
+                    MegrumTheme.lavender.opacity(0.36),
+                    MegrumTheme.sky.opacity(0.34)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
+    }
+
+    static let mineText = MegrumTheme.ink
+    static let otherBackground = AnyShapeStyle(Color.white.opacity(0.9))
 }
 
 extension View {

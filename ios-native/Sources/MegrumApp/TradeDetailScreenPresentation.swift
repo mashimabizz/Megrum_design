@@ -72,7 +72,8 @@ extension TradeDetailScreen {
                             : heroPresentation.partnerDisplayName
                         ).prefix(1)
                     ).uppercased(),
-                    body: ChatReplyQuoteFormatter.copyText(of: message.body ?? "")
+                    body: ChatReplyQuoteFormatter.copyText(of: message.body ?? ""),
+                    imageURL: message.photoURL
                 )
             },
             onReportMessage: { message in

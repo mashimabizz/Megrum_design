@@ -134,7 +134,7 @@ struct BoardThreadChatMessageRow: View {
                 )
                 Text(messageText)
                     .font(.system(size: 15, weight: .bold, design: .rounded))
-                    .foregroundStyle(message.isMine ? .white : MegrumTheme.ink)
+                    .foregroundStyle(MegrumTheme.ink)
                     .multilineTextAlignment(.leading)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -145,7 +145,7 @@ struct BoardThreadChatMessageRow: View {
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
             .background(
-                message.isMine ? AnyShapeStyle(MegrumTheme.lavender) : AnyShapeStyle(.white.opacity(0.9)),
+                message.isMine ? MegrumChatBubbleStyle.mineBackground : MegrumChatBubbleStyle.otherBackground,
                 in: RoundedRectangle(cornerRadius: 18, style: .continuous)
             )
         } else {
@@ -159,14 +159,14 @@ struct BoardThreadChatMessageRow: View {
     private var compactTextBubble: some View {
         Text(messageText)
             .font(.system(size: 15, weight: .bold, design: .rounded))
-            .foregroundStyle(message.isMine ? .white : MegrumTheme.ink)
+            .foregroundStyle(MegrumTheme.ink)
             .multilineTextAlignment(message.isMine ? .trailing : .leading)
             .lineLimit(1)
             .fixedSize(horizontal: true, vertical: false)
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
             .background(
-                message.isMine ? AnyShapeStyle(MegrumTheme.lavender) : AnyShapeStyle(.white.opacity(0.9)),
+                message.isMine ? MegrumChatBubbleStyle.mineBackground : MegrumChatBubbleStyle.otherBackground,
                 in: RoundedRectangle(cornerRadius: 18, style: .continuous)
             )
     }
@@ -174,7 +174,7 @@ struct BoardThreadChatMessageRow: View {
     private var wrappedTextBubble: some View {
         Text(messageText)
             .font(.system(size: 15, weight: .bold, design: .rounded))
-            .foregroundStyle(message.isMine ? .white : MegrumTheme.ink)
+            .foregroundStyle(MegrumTheme.ink)
             .multilineTextAlignment(message.isMine ? .trailing : .leading)
             .fixedSize(horizontal: false, vertical: true)
             .frame(
@@ -184,7 +184,7 @@ struct BoardThreadChatMessageRow: View {
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
             .background(
-                message.isMine ? AnyShapeStyle(MegrumTheme.lavender) : AnyShapeStyle(.white.opacity(0.9)),
+                message.isMine ? MegrumChatBubbleStyle.mineBackground : MegrumChatBubbleStyle.otherBackground,
                 in: RoundedRectangle(cornerRadius: 18, style: .continuous)
             )
     }

@@ -76,10 +76,9 @@ struct TradeDetailMessagesSection: View {
                     )
                     .id(row.message.id)
                     .chatMessageInteraction(
-                        copyText: row.message.messageType == .text
-                            ? (row.message.body?.nilIfBlank).map(ChatReplyQuoteFormatter.copyText(of:))
-                            : nil,
-                        onReply: row.message.messageType == .text && row.message.body?.nilIfBlank != nil
+                        copyText: (row.message.body?.nilIfBlank).map(ChatReplyQuoteFormatter.copyText(of:)),
+                        onReply: row.message.messageType != .system
+                            && (row.message.body?.nilIfBlank != nil || row.message.photoURL != nil)
                             ? { onReply(row.message) }
                             : nil,
                         onReport: row.isMine ? nil : { onReportMessage(row.message) }

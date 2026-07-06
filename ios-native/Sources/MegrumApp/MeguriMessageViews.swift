@@ -515,7 +515,8 @@ struct MeguriMessagesScreen: View {
                                 : peerTitle
                             ).prefix(1)
                         ).uppercased(),
-                        body: ChatReplyQuoteFormatter.copyText(of: message.body ?? "")
+                        body: ChatReplyQuoteFormatter.copyText(of: message.body ?? ""),
+                        imageURL: message.imageURL
                     )
                 },
                 onReport: { message in

@@ -123,12 +123,12 @@ struct TradeRichOperationalMessageBubble: View {
                     .foregroundStyle(isMine ? .white.opacity(0.78) : MegrumTheme.muted)
             }
         }
-        .foregroundStyle(isMine ? .white : MegrumTheme.ink)
+        .foregroundStyle(MegrumTheme.ink)
         .frame(maxWidth: 300, alignment: .leading)
         .padding(.horizontal, 14)
         .padding(.vertical, 11)
         .background(
-            isMine ? AnyShapeStyle(MegrumTheme.lavender) : AnyShapeStyle(.white.opacity(0.9)),
+            isMine ? MegrumChatBubbleStyle.mineBackground : MegrumChatBubbleStyle.otherBackground,
             in: RoundedRectangle(cornerRadius: 18, style: .continuous)
         )
     }
@@ -271,14 +271,14 @@ struct TradeTextMessageBubble: View {
                 )
                 Text(parsed.text)
                     .font(.system(size: 15, weight: .bold, design: .rounded))
-                    .foregroundStyle(isMine ? .white : MegrumTheme.ink)
+                    .foregroundStyle(MegrumTheme.ink)
                     .multilineTextAlignment(.leading)
                     .fixedSize(horizontal: false, vertical: true)
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
             .background(
-                isMine ? AnyShapeStyle(MegrumTheme.lavender) : AnyShapeStyle(.white.opacity(0.9)),
+                isMine ? MegrumChatBubbleStyle.mineBackground : MegrumChatBubbleStyle.otherBackground,
                 in: RoundedRectangle(cornerRadius: 18, style: .continuous)
             )
         } else {
@@ -292,13 +292,13 @@ struct TradeTextMessageBubble: View {
     private var compactBubble: some View {
         Text(text)
             .font(.system(size: 15, weight: .bold, design: .rounded))
-            .foregroundStyle(isMine ? .white : MegrumTheme.ink)
+            .foregroundStyle(MegrumTheme.ink)
             .multilineTextAlignment(isMine ? .trailing : .leading)
             .fixedSize(horizontal: true, vertical: false)
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
             .background(
-                isMine ? AnyShapeStyle(MegrumTheme.lavender) : AnyShapeStyle(.white.opacity(0.9)),
+                isMine ? MegrumChatBubbleStyle.mineBackground : MegrumChatBubbleStyle.otherBackground,
                 in: RoundedRectangle(cornerRadius: 18, style: .continuous)
             )
     }
@@ -306,14 +306,14 @@ struct TradeTextMessageBubble: View {
     private var wrappedBubble: some View {
         Text(text)
             .font(.system(size: 15, weight: .bold, design: .rounded))
-            .foregroundStyle(isMine ? .white : MegrumTheme.ink)
+            .foregroundStyle(MegrumTheme.ink)
             .multilineTextAlignment(isMine ? .trailing : .leading)
             .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: 272, alignment: isMine ? .trailing : .leading)
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
             .background(
-                isMine ? AnyShapeStyle(MegrumTheme.lavender) : AnyShapeStyle(.white.opacity(0.9)),
+                isMine ? MegrumChatBubbleStyle.mineBackground : MegrumChatBubbleStyle.otherBackground,
                 in: RoundedRectangle(cornerRadius: 18, style: .continuous)
             )
     }

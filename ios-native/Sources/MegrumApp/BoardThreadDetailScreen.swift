@@ -113,7 +113,8 @@ struct BoardThreadDetailScreen: View {
                                     avatarID: message.avatarID,
                                     avatarURL: message.avatarURL,
                                     initial: message.initial,
-                                    body: ChatReplyQuoteFormatter.copyText(of: message.body)
+                                    body: ChatReplyQuoteFormatter.copyText(of: message.body),
+                                    imageURL: message.imageURLs.first
                                 )
                             },
                             onReport: { message in
