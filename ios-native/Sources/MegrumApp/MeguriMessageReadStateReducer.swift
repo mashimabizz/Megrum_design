@@ -34,7 +34,11 @@ public struct MeguriMessageThread: Identifiable, Hashable, Sendable {
             return "\(SubscriptionCatalog.currentPremiumDisplayName)で表示できます"
         }
         if let body = lastMessage.body?.trimmingCharacters(in: .whitespacesAndNewlines), !body.isEmpty {
-            return body
+            // リプライ付きは引用メタ（不可視文字＋ID列）が本文に埋まっているため、
+            // 返信本文だけを取り出してプレビューする。
+            let replyBody = ChatReplyQuoteFormatter.parse(body).text
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            return replyBody.isEmpty ? "メッセージ" : replyBody
         }
         return lastMessage.messageType == .image ? "画像が届きました" : "メッセージ"
     }

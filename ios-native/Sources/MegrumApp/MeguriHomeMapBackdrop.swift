@@ -228,7 +228,7 @@ struct MeguriHomeMapBackdrop: View {
                                                 )
                                                 .overlay(alignment: .top) {
                                                     if let previews = replyPreviewsByThreadID[thread.id], !previews.isEmpty {
-                                                        BoardThreadMessagePopBubbles(previews: previews)
+                                                        BoardThreadMessagePopBubbles(previews: previews, seed: thread.id.hashValue)
                                                             .offset(y: -30)
                                                             .fixedSize()
                                                     }
@@ -256,7 +256,7 @@ struct MeguriHomeMapBackdrop: View {
                                                             return []
                                                         }
                                                         if !clusterPreviews.isEmpty {
-                                                            BoardThreadMessagePopBubbles(previews: Array(clusterPreviews.prefix(3)))
+                                                            BoardThreadMessagePopBubbles(previews: Array(clusterPreviews.prefix(3)), seed: cluster.id.hashValue)
                                                                 .offset(y: -30)
                                                                 .fixedSize()
                                                         }

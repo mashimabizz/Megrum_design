@@ -25,6 +25,7 @@ import {
   hasAdminPermission,
 } from "@/lib/admin/permissions";
 import { createServiceRoleClient } from "@/lib/supabase/server";
+import { MasterSearchDock } from "./master-search-dock";
 
 type UserLite = {
   id: string;
@@ -178,12 +179,7 @@ const REPORT_STATUS_OPTIONS = {
   disputes: ["submitted", "response_pending", "arbitrating", "closed"],
 } as const;
 
-export default async function AdminOperationsPage({
-  searchParams,
-}: {
-  searchParams?: Promise<{ master_q?: string }>;
-}) {
-  const masterQuery = ((await searchParams)?.master_q ?? "").trim();
+export default async function AdminOperationsPage() {
   const context = await getAdminContext();
   const canReadReports = hasAdminPermission(context, "reports.read");
   const canModerateReports = hasAdminPermission(context, "reports.moderate");
@@ -396,17 +392,25 @@ export default async function AdminOperationsPage({
           characters={characters}
           genreById={genreById}
           groupById={groupById}
+          oshiRequestById={new Map(oshiRequests.map((request) => [request.id, request]))}
           canManage={canManageOshiRequests}
         />
       )}
 
       {canReadOshiRequests && (
-        <MasterSearchPanel
-          query={masterQuery}
-          groups={groups}
-          characters={characters}
-          genreById={genreById}
-          groupById={groupById}
+        <MasterSearchDock
+          groups={groups.map((group) => ({
+            id: group.id,
+            name: group.name,
+            kind: group.kind,
+            genreName: genreById.get(group.genre_id)?.name ?? "—",
+          }))}
+          characters={characters.map((character) => ({
+            id: character.id,
+            name: character.name,
+            aliases: character.aliases ?? [],
+            groupName: groupById.get(character.group_id)?.name ?? "—",
+          }))}
         />
       )}
 
@@ -575,6 +579,7 @@ function OshiRequestsPanel({
   characters,
   genreById,
   groupById,
+  oshiRequestById,
   canManage,
 }: {
   oshiRequests: OshiRequestRow[];
@@ -585,6 +590,7 @@ function OshiRequestsPanel({
   characters: CharacterRow[];
   genreById: Map<string, GenreRow>;
   groupById: Map<string, GroupRow>;
+  oshiRequestById: Map<string, OshiRequestRow>;
   canManage: boolean;
 }) {
   return (
@@ -722,6 +728,15 @@ function OshiRequestsPanel({
               <tbody>
                 {characterRequests.map((request) => {
                   const group = request.group_id ? groupById.get(request.group_id) : null;
+                  // 未承認L1に紐づくリクエストは、そのL1リクエスト名を表示する。
+                  // L1側が承認/統合されたら、確定したL1マスタ名に切り替わる。
+                  const linkedOshiRequest = request.oshi_request_id
+                    ? oshiRequestById.get(request.oshi_request_id)
+                    : null;
+                  const linkedGroup = linkedOshiRequest?.approved_group_id
+                    ? groupById.get(linkedOshiRequest.approved_group_id)
+                    : null;
+                  const resolvedGroup = group ?? linkedGroup ?? null;
                   return (
                     <tr key={request.id} className="align-top">
                       <td className="border-b border-slate-100 px-3 py-3">
@@ -736,11 +751,13 @@ function OshiRequestsPanel({
                         {userLabel(usersById, request.user_id)}
                       </td>
                       <td className="border-b border-slate-100 px-3 py-3 text-[12px] font-semibold text-slate-600">
-                        {group
-                          ? `${group.name}（${genreById.get(group.genre_id)?.name ?? "ジャンル未取得"}）`
-                          : request.oshi_request_id
-                            ? `未承認L1 request ${shortId(request.oshi_request_id)}`
-                            : "未指定"}
+                        {resolvedGroup
+                          ? `${resolvedGroup.name}（${genreById.get(resolvedGroup.genre_id)?.name ?? "ジャンル未取得"}）`
+                          : linkedOshiRequest
+                            ? `${linkedOshiRequest.requested_name}（未承認L1）`
+                            : request.oshi_request_id
+                              ? `未承認L1 request ${shortId(request.oshi_request_id)}`
+                              : "未指定"}
                       </td>
                       <td className="border-b border-slate-100 px-3 py-3">
                         <p className="max-w-[220px] whitespace-pre-wrap text-[12px] font-semibold text-slate-600">
@@ -761,7 +778,7 @@ function OshiRequestsPanel({
                                 <AdminSelect
                                   name="group_id"
                                   label="所属L1（マスタ名）"
-                                  defaultValue={request.group_id ?? ""}
+                                  defaultValue={resolvedGroup?.id ?? ""}
                                   required
                                 >
                                   <option value="">選択してください</option>
@@ -811,122 +828,6 @@ function OshiRequestsPanel({
         )}
       </AdminPanel>
     </div>
-  );
-}
-
-function MasterSearchPanel({
-  query,
-  groups,
-  characters,
-  genreById,
-  groupById,
-}: {
-  query: string;
-  groups: GroupRow[];
-  characters: CharacterRow[];
-  genreById: Map<string, GenreRow>;
-  groupById: Map<string, GroupRow>;
-}) {
-  const normalized = query.toLowerCase();
-  const matchedGroups = normalized
-    ? groups.filter((group) => group.name.toLowerCase().includes(normalized))
-    : [];
-  const matchedCharacters = normalized
-    ? characters.filter((character) =>
-        character.name.toLowerCase().includes(normalized) ||
-        (character.aliases ?? []).some((alias) => alias.toLowerCase().includes(normalized)) ||
-        (groupById.get(character.group_id)?.name.toLowerCase().includes(normalized) ?? false),
-      )
-    : [];
-
-  return (
-    <AdminPanel
-      title="推しマスタ検索（L1 / L2）"
-      description="既存マスタの名前を検索して、登録済みのL1/L2とIDを確認できます。"
-    >
-      <form method="get" action="/admin/operations" className="flex items-end gap-2">
-        <div className="w-[280px]">
-          <AdminTextInput
-            name="master_q"
-            label="マスタ名で検索"
-            placeholder="例: aespa / カリナ"
-            defaultValue={query}
-          />
-        </div>
-        <SubmitButton>検索</SubmitButton>
-      </form>
-
-      {query && (
-        <div className="mt-4 grid gap-5 xl:grid-cols-2">
-          <div>
-            <div className="text-[12px] font-black text-slate-900">
-              L1マスタ {matchedGroups.length}件
-            </div>
-            {matchedGroups.length === 0 ? (
-              <p className="mt-2 text-[12px] font-semibold text-slate-500">一致するL1はありません。</p>
-            ) : (
-              <table className="mt-2 w-full border-separate border-spacing-0 text-left">
-                <thead>
-                  <tr className="text-[11px] font-bold text-slate-500">
-                    <th className="border-b border-slate-200 px-2 py-1.5">名前</th>
-                    <th className="border-b border-slate-200 px-2 py-1.5">ジャンル / 種別</th>
-                    <th className="border-b border-slate-200 px-2 py-1.5">ID</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {matchedGroups.slice(0, 30).map((group) => (
-                    <tr key={group.id}>
-                      <td className="border-b border-slate-100 px-2 py-2 text-[12px] font-black text-slate-900">
-                        {group.name}
-                      </td>
-                      <td className="border-b border-slate-100 px-2 py-2 text-[12px] font-semibold text-slate-600">
-                        {genreById.get(group.genre_id)?.name ?? "—"} / {group.kind}
-                      </td>
-                      <td className="border-b border-slate-100 px-2 py-2 font-mono text-[10px] text-slate-400">
-                        {group.id}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-          <div>
-            <div className="text-[12px] font-black text-slate-900">
-              L2マスタ {matchedCharacters.length}件
-            </div>
-            {matchedCharacters.length === 0 ? (
-              <p className="mt-2 text-[12px] font-semibold text-slate-500">一致するL2はありません。</p>
-            ) : (
-              <table className="mt-2 w-full border-separate border-spacing-0 text-left">
-                <thead>
-                  <tr className="text-[11px] font-bold text-slate-500">
-                    <th className="border-b border-slate-200 px-2 py-1.5">名前</th>
-                    <th className="border-b border-slate-200 px-2 py-1.5">所属L1</th>
-                    <th className="border-b border-slate-200 px-2 py-1.5">ID</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {matchedCharacters.slice(0, 30).map((character) => (
-                    <tr key={character.id}>
-                      <td className="border-b border-slate-100 px-2 py-2 text-[12px] font-black text-slate-900">
-                        {character.name}
-                      </td>
-                      <td className="border-b border-slate-100 px-2 py-2 text-[12px] font-semibold text-slate-600">
-                        {groupById.get(character.group_id)?.name ?? "—"}
-                      </td>
-                      <td className="border-b border-slate-100 px-2 py-2 font-mono text-[10px] text-slate-400">
-                        {character.id}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </div>
-      )}
-    </AdminPanel>
   );
 }
 
