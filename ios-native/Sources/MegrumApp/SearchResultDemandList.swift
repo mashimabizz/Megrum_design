@@ -105,6 +105,10 @@ enum SearchResultDemandListBuilder {
                 }
             }
         }
+        // 結果が広告間隔未満だと1枠も入らないため、結果がある限り最低1枠は末尾に出す。
+        if includesAds, adCount == 0, totalRowCount > 0 {
+            entries.append(.ad(slotIndex: 1))
+        }
         return entries
     }
 

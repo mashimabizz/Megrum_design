@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション1226.301：広告非表示の修正（テスト広告有効化＋検索結果の最低1枠保証）
+
+### 背景・問題意識
+オーナー報告「広告が表示されません」（iter1226.300 の検索結果3行毎広告）。調査の結果、AdMob審査ではなくビルド設定が原因：`Config/MegrumNative.xcconfig` で `MEGRUM_ADS_ENABLED = NO`・全プレースメントのユニットID空 → `AdDisplayPolicy` の configurationDisabled / missingUnitID 抑制で**全画面の広告枠が非表示**（AdMob SDK も未起動）だった。
+
+### 変更内容
+
+#### `ios-native/Config/MegrumNative.xcconfig`
+- `MEGRUM_ADS_ENABLED = YES`・`MEGRUM_ADMOB_TEST_ADS_ENABLED = YES` に変更
+- バナー5枠＋検索ネイティブ枠に Google 公式デモユニットIDを設定（TEST_ADS_ENABLED=YES の間は実リクエストがデモユニットに差し替わる。空だと missingUnitID で枠ごと消えるため値が必要）
+- インタースティシャル枠は開発の邪魔になるため空のまま（＝非表示）
+- **本番リリース時**：TEST_ADS_ENABLED を NO に戻し実ユニットIDへ差し替え。実配信には AdMob アカウント承認が必要（承認拒否の解消は別課題）
+
+#### `ios-native/Sources/MegrumApp/SearchResultDemandList.swift`
+- 実質バグ修正：結果が3行以下だと広告が1枠も入らなかった → 結果があり広告可なら最低1枠を末尾に挿入
+
+#### `ios-native/Sources/MegrumApp/VisualQAPreviewMode.swift` / `MegrumRootView.swift` / `SearchScreenSearchActions.swift`
+- VisualQA ルート `search` 追加（検索画面を直接起動し、初期条件なしなら「トレカ」で自動検索 → タップ操作なしで結果＋広告行を検証できる）
+
+### 影響範囲
+- 検索結果・マイグッズ/ほしいもの一覧・プロフィール・やりとり一覧のバナー/ネイティブ広告枠すべて（プレビュー版でテスト広告が表示されるようになる）
+
+### 確認方法
+- シミュレータ：`SIMCTL_CHILD_MEGRUM_VISUAL_QA_INITIAL_SCREEN=search` ＋ auto-signin で起動 → 「トレカ」29件・3行目の後に「Ad / Test mode: Flood-It!」ネイティブテスト広告を確認
+- swift test 1477件 0 failures
+
+### セルフレビュー結果
+- ✅ 広告表示はレイアウト実装ではなく設定起因と特定（AdDisplayPolicy の抑制順を精読）
+- ✅ 3行未満の結果で広告ゼロになるビルダーの穴をテスト付きで修正（SearchScreenTests +3件）
+- ⚠️ インタースティシャルは未配信のまま（意図的）。本番ユニットID差し替えと AdMob 承認は別途
+
+### 関連ファイル
+- `ios-native/Config/MegrumNative.xcconfig`
+- `ios-native/Sources/MegrumApp/SearchResultDemandList.swift`
+- `ios-native/Sources/MegrumApp/VisualQAPreviewMode.swift`
+
+---
+
 ## イテレーション1226.300：検索リデザイン（需要ファースト一覧＋複数選択フィルタ＋3行毎広告）
 
 ### 背景・問題意識

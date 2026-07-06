@@ -23,8 +23,15 @@ extension SearchScreen {
     }
 
     func applyInitialCriteriaIfNeeded() async {
+        // VisualQA（search ルート）ではタップ操作なしで結果＋広告行を確認できるよう、
+        // 初期条件が無い時にクエリを補って自動検索する。
+        var effectiveInitialCriteria = initialCriteria
+        if effectiveInitialCriteria == nil,
+           VisualQAPreviewMode.initialScreen(environment: ProcessInfo.processInfo.environment) == .search {
+            effectiveInitialCriteria = SearchInitialCriteria(query: "トレカ")
+        }
         let didApplyInitialCriteria = presentationState.applyInitialCriteriaIfNeeded(
-            initialCriteria,
+            effectiveInitialCriteria,
             filterDraft: &filterDraft
         )
         guard didApplyInitialCriteria else {

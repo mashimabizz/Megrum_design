@@ -61,6 +61,40 @@ final class SearchScreenTests: XCTestCase {
         XCTAssertEqual(rows[3].cells.last?.entry, .nativeAd(slotIndex: 2))
     }
 
+    func testSearchDemandListInsertsAdEveryThirdRow() {
+        let results = makeSearchResults(count: 7)
+        let sections = SearchResultDemandListBuilder.sections(results: results, signals: [:], sort: .demand)
+        let entries = SearchResultDemandListBuilder.entries(sections: sections, includesAds: true)
+
+        let adIndices = entries.enumerated().compactMap { index, entry in
+            if case .ad = entry { return index } else { return nil }
+        }
+        // ヘッダ1 + 行3 の直後、さらに3行後に広告が入る（末尾行の後には入らない）。
+        XCTAssertEqual(adIndices, [4, 8])
+    }
+
+    func testSearchDemandListAppendsTrailingAdWhenResultsAreFewerThanInterval() {
+        let results = makeSearchResults(count: 2)
+        let sections = SearchResultDemandListBuilder.sections(results: results, signals: [:], sort: .demand)
+        let entries = SearchResultDemandListBuilder.entries(sections: sections, includesAds: true)
+
+        guard case .ad(let slotIndex) = entries.last else {
+            return XCTFail("結果が3行未満でも末尾に広告が1枠入るべき")
+        }
+        XCTAssertEqual(slotIndex, 1)
+    }
+
+    func testSearchDemandListShowsNoAdWhenDisabledOrEmpty() {
+        let results = makeSearchResults(count: 2)
+        let sections = SearchResultDemandListBuilder.sections(results: results, signals: [:], sort: .demand)
+
+        let disabled = SearchResultDemandListBuilder.entries(sections: sections, includesAds: false)
+        XCTAssertFalse(disabled.contains { if case .ad = $0 { true } else { false } })
+
+        let empty = SearchResultDemandListBuilder.entries(sections: [], includesAds: true)
+        XCTAssertTrue(empty.isEmpty)
+    }
+
     func testSearchBackSwipeDismissesOnlyForClearRightSwipe() {
         XCTAssertTrue(
             SearchBackSwipeResolver.shouldDismiss(

@@ -43,6 +43,7 @@ public struct MegrumRootView: View {
         _authState = StateObject(wrappedValue: authState)
         _selectedTab = State(initialValue: VisualQATabRouteResolver.initialTab(for: visualQAInitialScreen))
         _showsDrawer = State(initialValue: visualQAInitialScreen == .drawerOpen)
+        _showsSearch = State(initialValue: visualQAInitialScreen == .search)
         _requestedTradesStage = State(initialValue: VisualQATabRouteResolver.requestedTradesStage(for: visualQAInitialScreen))
         self.visualQAInitialScreen = visualQAInitialScreen
         _notificationDestinationTab = notificationDestinationTab
