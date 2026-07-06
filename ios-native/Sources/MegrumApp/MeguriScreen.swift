@@ -109,6 +109,7 @@ struct MeguriScreen: View {
             grooms: visibleGrooms,
             mapGrooms: visibleMapGrooms,
             threads: visibleThreads,
+            replyPreviewsByThreadID: appState.boardReplyPreviewsByThreadID,
             currentCoordinate: locationState.coordinate,
             subscriptionState: appState.subscriptionState,
             notice: notice,
@@ -193,6 +194,9 @@ struct MeguriScreen: View {
         }
         .task(id: appState.grooms.map(\.authorID)) {
             await preloadGroomAuthorProfiles()
+        }
+        .task(id: visibleThreads.map(\.id)) {
+            await appState.loadBoardReplyPreviews(threadIDs: visibleThreads.map(\.id))
         }
         .onReceive(locationState.$coordinate.compactMap { $0 }) { coordinate in
             handleCoordinateChange(coordinate)

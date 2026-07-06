@@ -2,14 +2,23 @@
 import XCTest
 
 final class GoodsInventoryCreateMetaTilePresentationTests: XCTestCase {
-    func testMissingSetupCountIgnoresMissingMemberDuringInitialCreate() {
+    func testMissingSetupCountIncludesMissingMemberAndSeries() {
         let meta = GoodsCreateMetaDraft()
 
+        // シリーズ未設定＋メンバー未設定 → 2（オーナー指示でメンバーもカウント対象）。
         XCTAssertEqual(
             GoodsInventoryCreateMetaTilePresentation.missingSetupCount(
                 for: meta,
                 allowsMemberSelection: true,
                 memberName: nil
+            ),
+            2
+        )
+        XCTAssertEqual(
+            GoodsInventoryCreateMetaTilePresentation.missingSetupCount(
+                for: meta,
+                allowsMemberSelection: true,
+                memberName: "ジミン"
             ),
             1
         )

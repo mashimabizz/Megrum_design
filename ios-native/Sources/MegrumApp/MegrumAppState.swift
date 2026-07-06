@@ -24,6 +24,8 @@ public final class MegrumAppState: ObservableObject {
     @Published public internal(set) var personalSchedules: [PersonalSchedule] = []
     @Published public internal(set) var profileSchedulesByUserID: [UUID: [PersonalSchedule]] = [:]
     @Published public internal(set) var boardRepliesByThreadID: [UUID: [BoardReply]] = [:]
+    /// 地図の吹き出し用：スレッドごとの最新リプライ本文（最大3件・引用行は除去済み）。
+    @Published public internal(set) var boardReplyPreviewsByThreadID: [UUID: [String]] = [:]
     @Published public internal(set) var groomRepliesByPostID: [UUID: [GroomReply]] = [:]
     @Published public internal(set) var groomReactionsByPostID: [UUID: [GroomReaction]] = [:]
     @Published public internal(set) var meguriMessages: [MeguriMessage] = []

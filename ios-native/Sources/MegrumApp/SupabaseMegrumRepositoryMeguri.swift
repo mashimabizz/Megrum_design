@@ -128,6 +128,10 @@ public extension SupabaseMegrumRepository {
         )
     }
 
+    func loadBoardReplyPreviews(threadIDs: [UUID]) async throws -> [UUID: [String]] {
+        try await boardClient.loadReplyPreviews(threadIDs: threadIDs)
+    }
+
     func loadBoardReplies(
         threadID: UUID,
         latitude: Double?,

@@ -83,6 +83,10 @@ public extension MegrumRepository {
         []
     }
 
+    func loadBoardReplyPreviews(threadIDs: [UUID]) async throws -> [UUID: [String]] {
+        [:]
+    }
+
     func loadBoardReplies(threadID: UUID, latitude: Double?, longitude: Double?, prefecture: String?, scope: BoardThread.Audience) async throws -> [BoardReply] {
         []
     }

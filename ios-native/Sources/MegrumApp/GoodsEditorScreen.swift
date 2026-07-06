@@ -162,13 +162,24 @@ struct GoodsEditorSheet: View {
 #endif
 #if os(iOS)
             .sheet(isPresented: $isShowingCameraCapture) {
-                NativeCameraCaptureView { imageData in
-                    loadCapturedCameraPhoto(imageData)
-                } onFailure: { message in
-                    photoError = message
-                    createError = message
+                if photoCaptureTarget == .inventoryCreate {
+                    // 複数枚登録は連続撮影（撮るたび左下プレビュー→左へシュッと消える）
+                    ContinuousCameraCaptureView { imageData in
+                        loadCapturedCameraPhoto(imageData)
+                    } onFailure: { message in
+                        photoError = message
+                        createError = message
+                    }
+                    .ignoresSafeArea()
+                } else {
+                    NativeCameraCaptureView { imageData in
+                        loadCapturedCameraPhoto(imageData)
+                    } onFailure: { message in
+                        photoError = message
+                        createError = message
+                    }
+                    .ignoresSafeArea()
                 }
-                .ignoresSafeArea()
             }
 #endif
             .sheet(item: $cropSession) { session in

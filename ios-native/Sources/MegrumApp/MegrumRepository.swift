@@ -215,6 +215,7 @@ public protocol MegrumRepository: Sendable {
     func markMeguriMessagesRead(peerID: UUID, sourceGroomPostID: UUID?, includesAllSources: Bool, readAt: Date) async throws -> [MeguriMessage]
     func loadBoardThreads(latitude: Double?, longitude: Double?, prefecture: String?, scope: BoardThread.Audience, allowsExtendedBoardAccess: Bool) async throws -> [BoardThread]
     func loadBoardReplies(threadID: UUID, latitude: Double?, longitude: Double?, prefecture: String?, scope: BoardThread.Audience) async throws -> [BoardReply]
+    func loadBoardReplyPreviews(threadIDs: [UUID]) async throws -> [UUID: [String]]
     func sendBoardReply(_ input: BoardReplyCreateInput) async throws -> BoardReply
     func setBoardThreadReaction(threadID: UUID, reaction: BoardMessageReaction?) async throws
     func setBoardReplyReaction(replyID: UUID, reaction: BoardMessageReaction?) async throws

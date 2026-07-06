@@ -54,6 +54,38 @@ public final class SupabaseBoardClient: @unchecked Sendable {
         }
     }
 
+    /// 地図の吹き出し用：複数スレッドの最新リプライ本文をまとめて取得する。
+    public func loadReplyPreviews(threadIDs: [UUID], perThreadLimit: Int = 3) async throws -> [UUID: [String]] {
+        guard !threadIDs.isEmpty else {
+            return [:]
+        }
+        struct PreviewRow: Decodable {
+            var threadId: UUID
+            var body: String?
+        }
+        let idList = threadIDs.map { $0.uuidString.lowercased() }.sorted().joined(separator: ",")
+        let rows: [PreviewRow] = try await client.fetchRows(
+            from: "meguri_board_replies",
+            select: "thread_id,body",
+            queryItems: [
+                URLQueryItem(name: "thread_id", value: "in.(\(idList))"),
+                URLQueryItem(name: "status", value: "eq.published"),
+                URLQueryItem(name: "order", value: "created_at.desc"),
+                URLQueryItem(name: "limit", value: "\(max(perThreadLimit * threadIDs.count, 30))")
+            ]
+        )
+        var previews: [UUID: [String]] = [:]
+        for row in rows {
+            guard let body = row.body?.trimmingCharacters(in: .whitespacesAndNewlines), !body.isEmpty else {
+                continue
+            }
+            if previews[row.threadId, default: []].count < perThreadLimit {
+                previews[row.threadId, default: []].append(body)
+            }
+        }
+        return previews
+    }
+
     public func loadReplies(
         threadID: UUID,
         latitude: Double?,

@@ -9,7 +9,7 @@ struct SearchSuggestionSectionsView: View {
     var onWishSuggestionHorizontalDrag: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 30) {
+        VStack(alignment: .leading, spacing: 20) {
             ForEach(sections) { section in
                 SearchSuggestionSectionView(
                     section: section,
@@ -29,14 +29,14 @@ private struct SearchSuggestionSectionView: View {
     var onWishSuggestionHorizontalDrag: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 10) {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
                 Image(systemName: section.systemImageName)
-                    .font(.system(size: 18, weight: .heavy))
+                    .font(.system(size: 15, weight: .heavy))
                     .foregroundStyle(tint)
 
                 Text(section.title)
-                    .font(.system(size: 22, weight: .heavy, design: .rounded))
+                    .font(.system(size: 18, weight: .heavy, design: .rounded))
                     .foregroundStyle(MegrumTheme.ink)
 
                 Spacer()
@@ -106,7 +106,7 @@ private struct SearchOshiSuggestionRows: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 6) {
             SearchSuggestionTagWrap(
                 items: groupItems,
                 selectedActions: selectedActions,

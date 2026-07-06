@@ -10,6 +10,7 @@ struct MeguriHomeContent: View {
     var grooms: [GroomPost]
     var mapGrooms: [GroomPost]
     var threads: [BoardThread]
+    var replyPreviewsByThreadID: [UUID: [String]] = [:]
     var currentCoordinate: MegrumLocationCoordinate?
     var subscriptionState: UserSubscriptionState
     var notice: MegrumLocationNotice?
@@ -42,6 +43,7 @@ struct MeguriHomeContent: View {
                     selectedKind: selectedMapKind,
                     grooms: mapGrooms,
                     threads: threads,
+                    replyPreviewsByThreadID: replyPreviewsByThreadID,
                     currentCoordinate: currentCoordinate,
                     viewerID: viewer?.id,
                     subscriptionState: subscriptionState,

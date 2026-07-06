@@ -8,6 +8,8 @@ struct MeguriHomeMapBackdrop: View {
     var selectedKind: MeguriMapKind
     var grooms: [GroomPost]
     var threads: [BoardThread]
+    /// チャットルームの吹き出し演出用：スレッドID→最新メッセージ本文。
+    var replyPreviewsByThreadID: [UUID: [String]] = [:]
     var currentCoordinate: MegrumLocationCoordinate?
     var viewerID: UUID?
     var subscriptionState: UserSubscriptionState
@@ -224,6 +226,13 @@ struct MeguriHomeMapBackdrop: View {
                                                         subscriptionState: subscriptionState
                                                     )
                                                 )
+                                                .overlay(alignment: .top) {
+                                                    if let previews = replyPreviewsByThreadID[thread.id], !previews.isEmpty {
+                                                        BoardThreadMessagePopBubbles(previews: previews)
+                                                            .offset(y: -30)
+                                                            .fixedSize()
+                                                    }
+                                                }
                                             }
                                         }
                                     }
@@ -239,6 +248,19 @@ struct MeguriHomeMapBackdrop: View {
                                         MeguriPinConditionalPopIn(popsIn: displayed.popsIn) {
                                             MeguriFloatingMotion(seed: cluster.id.hashValue) {
                                                 MeguriClusterPin(cluster: cluster)
+                                                    .overlay(alignment: .top) {
+                                                        let clusterPreviews = cluster.items.flatMap { item -> [String] in
+                                                            if case .thread(let thread) = item {
+                                                                return replyPreviewsByThreadID[thread.id] ?? []
+                                                            }
+                                                            return []
+                                                        }
+                                                        if !clusterPreviews.isEmpty {
+                                                            BoardThreadMessagePopBubbles(previews: Array(clusterPreviews.prefix(3)))
+                                                                .offset(y: -30)
+                                                                .fixedSize()
+                                                        }
+                                                    }
                                             }
                                         }
                                     }

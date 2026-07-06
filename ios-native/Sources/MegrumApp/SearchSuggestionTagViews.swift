@@ -8,7 +8,7 @@ struct SearchSuggestionTagWrap: View {
     var onSelect: (SearchSuggestionAction) -> Void
 
     var body: some View {
-        WrappingTagFlow(spacing: 8, rowSpacing: 9) {
+        WrappingTagFlow(spacing: 6, rowSpacing: 6) {
             ForEach(items) { item in
                 SearchSuggestionTagButton(
                     title: item.title,
@@ -34,12 +34,12 @@ private struct SearchSuggestionTagButton: View {
             MegrumHaptics.performSelectionChanged(action)
         } label: {
             Text(title)
-                .font(.system(size: 14.5, weight: .black, design: .rounded))
+                .font(.system(size: 12.5, weight: .black, design: .rounded))
                 .lineLimit(1)
                 .minimumScaleFactor(0.78)
                 .foregroundStyle(isSelected ? .white : MegrumTheme.ink)
-                .padding(.horizontal, 14)
-                .frame(minHeight: 38)
+                .padding(.horizontal, 11)
+                .frame(minHeight: 30)
                 .background(isSelected ? tint : Color.white.opacity(0.90), in: Capsule())
                 .overlay {
                     Capsule()

@@ -10,6 +10,8 @@ struct GoodsCollectionFilterSheet: View {
     var items: [GoodsItem]
     var availableGroups: [OshiGroup]
     var availableGoodsTypes: [GoodsType]
+    /// メンバー名の解決用（items 側に名前が無い場合のフォールバック）。
+    var characters: [OshiCharacter] = []
     @Binding var selectedGroupIDs: Set<UUID>
     @Binding var selectedMemberIDs: Set<UUID>
     @Binding var selectedGoodsTypeIDs: Set<UUID>
@@ -20,7 +22,13 @@ struct GoodsCollectionFilterSheet: View {
     @State private var didLoadDraft = false
 
     private var availableMembers: [(id: UUID, name: String)] {
-        GoodsCollectionFilterChoices.members(items: items, selectedGroupIDs: draft.groupIDs)
+        let nameByID = Dictionary(characters.map { ($0.id, $0.name) }) { first, _ in first }
+        return GoodsCollectionFilterChoices.members(items: items, selectedGroupIDs: draft.groupIDs)
+            .map { member in
+                member.name == "メンバー"
+                    ? (id: member.id, name: nameByID[member.id] ?? member.name)
+                    : member
+            }
     }
 
     private var availableTagNames: [String] {
@@ -50,6 +58,7 @@ struct GoodsCollectionFilterSheet: View {
                     }
                 }
 
+                if !draft.groupIDs.isEmpty {
                 filterSection(title: "メンバー", isEmptyMessage: "対象のメンバーがありません", isEmpty: availableMembers.isEmpty) {
                     ForEach(availableMembers, id: \.id) { member in
                         ChoiceChip(
@@ -60,6 +69,7 @@ struct GoodsCollectionFilterSheet: View {
                             toggle(\.memberIDs, value: member.id)
                         }
                     }
+                }
                 }
 
                 filterSection(title: "グッズ種別", isEmptyMessage: "対象のグッズ種別がありません", isEmpty: availableGoodsTypes.isEmpty) {

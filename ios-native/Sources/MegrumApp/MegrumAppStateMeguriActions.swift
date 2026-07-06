@@ -381,4 +381,22 @@ extension MegrumAppState {
             return nil
         }
     }
+
+    /// 地図に見えているチャットルームの最新メッセージを吹き出し用に読み込む。
+    /// 読み込み済みスレッドはスキップし、失敗しても致命扱いにしない。
+    public func loadBoardReplyPreviews(threadIDs: [UUID]) async {
+        let missing = threadIDs.filter { boardReplyPreviewsByThreadID[$0] == nil }
+        guard !missing.isEmpty else {
+            return
+        }
+        guard let previews = try? await repository.loadBoardReplyPreviews(threadIDs: missing) else {
+            return
+        }
+        for threadID in missing {
+            let bodies = (previews[threadID] ?? [])
+                .map { ChatReplyQuoteFormatter.copyText(of: $0) }
+                .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+            boardReplyPreviewsByThreadID[threadID] = bodies
+        }
+    }
 }

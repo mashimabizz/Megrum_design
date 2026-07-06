@@ -4,6 +4,59 @@
 
 ---
 
+## イテレーション1226.310：管理者トップの件数集計500修正
+
+### 背景・問題意識
+本番の管理者ログイン後、`/admin` が「This page couldn't load」になる。Vercelログでは `/admin` の500が出ており、実DBへ同じ集計クエリを投げると `user_entitlements` と `admin_roles` で `select("id", { head: true, count: "exact" })` が失敗していた。両テーブルは `id` 列を持たないため、件数取得を特定列に依存させない必要がある。
+
+### 変更内容
+
+#### `web/src/app/admin/page.tsx`
+- 管理者トップの `countRows` を `select("id")` から `select("*")` に変更し、`id` 列がないテーブルでも `head: true` + `count: exact` で件数を取得できるようにした。
+
+### 影響範囲
+- Web管理者トップ `/admin` の件数表示。
+
+### 確認方法
+- 実DBで `user_entitlements` / `admin_roles` に対する `select("*", { count: "exact", head: true })` が成功することを確認
+  - passed
+- `npm --prefix web run build`
+  - passed
+
+### セルフレビュー結果
+- ✅ 管理者権限、ログイン処理、監査ログ、DBスキーマは変更していない。
+- ✅ 件数取得だけの修正で、表示文言やナビゲーションは維持。
+
+---
+
+## イテレーション1226.310：新7項目（広告固定ヘッダー・カメラ連続撮影・地図吹き出しほか）
+
+### 背景・問題意識
+オーナー指示バッチ（広告ヘッダー化＋6項目）。
+
+### 変更内容
+- **⓪やりとり一覧の広告**：各タブのスクロール内から、タブ横断・スクロール固定のヘッダー（TabViewの上のVStack）へ移動（`TradesScreen.swift`）
+- **①⚠️カウント**：マイグッズ追加のメタ設定タイルで、シリーズ未設定に加えメンバー未設定もカウント（`GoodsInventoryCreateMetaTilePresentation`、テスト更新）
+- **②検索候補タグ縮小**：チップを14.5pt/38px→12.5pt/30px、間隔8/9→6/6、セクション見出し22→18pt・区間30→20pt（`SearchSuggestionTagViews` ほか）
+- **③個別募集の譲グッズ同一グループ縛り撤廃**：migration `20260706200000_allow_mixed_group_listing_haves.sql`（push済み）— validate_listing_haves から同一グループ/種別の強制を除去。混在時は have_group_id/goods_type_id を null に
+- **④カメラ連続撮影**：`ContinuousCameraCaptureView` 新規（AVFoundation）。シャッター毎に左下プレビュー→左へシュッと退場、枚数バッジ、「撮影を終える」。マイグッズ複数枚登録（inventoryCreate）で使用
+- **⑤一覧フィルタのメンバー**：グループ選択後にのみメンバー欄を表示。名前は items の memberName＋oshiCharacters でフォールバック解決
+- **⑥地図チャットルームの吹き出し**：スレッドの最新メッセージ3件（引用行除去済み）を取得する `loadBoardReplyPreviews`（REST 1回のバルク）を追加し、ホーム地図のチャットルームピン・クラスタの上で `BoardThreadMessagePopBubbles` が2.3秒ごとにポップ表示→消滅を循環
+
+### 確認方法
+- swift test 1483件 0 failures／やりとり一覧の固定ヘッダーバナーをスクショ確認
+- 実機：カメラ連続撮影・地図の吹き出し・フィルタのメンバー名
+
+### セルフレビュー結果
+- ✅ サーバ変更（同一グループ縛り）はトリガ関数の再定義のみ・所有権/数量検証は維持
+- ⚠️ 地図吹き出しはビューポートのスレッド分を一括取得（1リクエスト）。件数が増えたらキャッシュ/間引きを検討
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/ContinuousCameraCaptureView.swift`（新規）/ `BoardThreadMessagePopBubbles.swift`（新規）
+- `supabase/migrations/20260706200000_allow_mixed_group_listing_haves.sql`
+
+---
+
 ## イテレーション1226.309：プレミアム画面をパステル基調へ再デザイン
 
 ### 背景・問題意識

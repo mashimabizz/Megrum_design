@@ -38,7 +38,6 @@ struct TradeStagePage: View {
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 0) {
-                listTopAd
                 if proposals.isEmpty {
                     EmptyTradeStage(stage: stage)
                         .padding(.horizontal, TradeCardLayout.horizontalPadding)
@@ -100,15 +99,6 @@ struct TradeStagePage: View {
         }
     }
 
-    @ViewBuilder
-    private var listTopAd: some View {
-        AdBannerSlot(
-            placement: .tradesListTopBanner,
-            displayContext: adDisplayContext,
-            bottomSpacing: 12
-        )
-        .padding(.horizontal, TradeCardLayout.horizontalPadding)
-    }
 }
 
 struct TradesFooter: View {

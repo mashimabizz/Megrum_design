@@ -67,6 +67,16 @@ struct TradesScreen: View {
     var body: some View {
         GeometryReader { proxy in
             ZStack(alignment: .bottom) {
+                VStack(spacing: 0) {
+                // 広告はタブ横断・スクロールしても固定のヘッダーとして表示する。
+                AdBannerSlot(
+                    placement: .tradesListTopBanner,
+                    displayContext: adDisplayContext,
+                    bottomSpacing: 6
+                )
+                .padding(.horizontal, 20)
+                .padding(.top, 4)
+
                 TabView(selection: $presentationState.selectedStage) {
                     ForEach(TradeStage.allCases) { stage in
                         TradeStagePage(
@@ -81,7 +91,7 @@ struct TradesScreen: View {
                             isSelectingPendingProposals: isSelectingPendingProposals,
                             selectedPendingProposalIDs: presentationState.selectedPendingProposalIDs,
                             adDisplayContext: adDisplayContext,
-                            topContentInset: proxy.safeAreaInsets.top,
+                            topContentInset: 0,
                             canWithdraw: { canWithdrawPendingProposal($0, in: stage) },
                             onStartSelection: startPendingProposalSelection,
                             onToggleSelection: togglePendingProposalSelection,
@@ -93,7 +103,8 @@ struct TradesScreen: View {
                 .megrumPageTabViewStyle()
                 .megrumHiddenBottomScrollEdgeEffect()
                 .ignoresSafeArea(.keyboard, edges: .bottom)
-                .ignoresSafeArea(.container, edges: [.top, .bottom])
+                .ignoresSafeArea(.container, edges: .bottom)
+                }
 
                 tradeFooter
                     .padding(.horizontal, 20)
