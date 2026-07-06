@@ -150,7 +150,7 @@ async function countRows(
   table: string,
   filters: Array<[string, string | boolean]> = [],
 ) {
-  let query = adminSupabase.from(table).select("id", {
+  let query = adminSupabase.from(table).select("*", {
     count: "exact",
     head: true,
   });

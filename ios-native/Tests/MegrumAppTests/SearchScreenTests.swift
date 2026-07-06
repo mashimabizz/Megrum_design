@@ -515,13 +515,17 @@ final class SearchScreenTests: XCTestCase {
         )
 
         XCTAssertTrue(sections.contains { $0.title == "推しから探す" })
-        XCTAssertTrue(sections.contains { $0.title == "ほしいものから探す" })
+        // ほしいもの/個別募集はインラインセクションではなく入口行→専用ピッカーに移動した
+        XCTAssertFalse(sections.contains { $0.title == "ほしいものから探す" })
         XCTAssertTrue(sections.contains { $0.title == "シリーズから探す" })
         XCTAssertFalse(sections.contains { $0.title == "よく使う条件" })
         let items = sections.flatMap { $0.items }
         XCTAssertTrue(items.contains { $0.title == "aespa" })
         XCTAssertTrue(items.contains { $0.title == "カリナ" })
-        XCTAssertTrue(items.contains { $0.title == "スア ラキドロ" })
+        let wishPickerItems = SearchSuggestionBuilder.wishItems(
+            wishes: NativePreviewData.wishes + [wishWithoutExplicitTags, memberOnlyTaggedWish, nonOshiTaggedWish]
+        )
+        XCTAssertTrue(wishPickerItems.contains { $0.title == "スア ラキドロ" })
         XCTAssertTrue(items.contains { $0.title == "トレカ" })
         XCTAssertFalse(items.contains { $0.title == "生写真" })
         XCTAssertFalse(items.contains { $0.title == "L2だけ" })

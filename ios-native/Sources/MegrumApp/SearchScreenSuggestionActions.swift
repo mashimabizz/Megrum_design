@@ -36,12 +36,9 @@ extension SearchScreen {
         case .listing(let listingID):
             // 自分の個別募集の「求めるもの」を検索条件へ変換して探す。
             if let listing = appState.listings.first(where: { $0.id == listingID }) {
-                let criteria = ListingSearchCriteriaBuilder.criteria(for: listing, wishes: appState.wishes)
-                filterDraft.selectedGroupIDs = criteria.groupIDs
-                filterDraft.selectedMemberIDs = criteria.memberIDs
-                filterDraft.selectedGoodsTypeIDs = criteria.goodsTypeIDs
-                filterDraft.selectedGoodsTagNames = criteria.tagNames
-                filterDraft.wantsCashOK = criteria.wantsCashOK
+                assignListingCriteria(
+                    ListingSearchCriteriaBuilder.criteria(for: listing, wishes: appState.wishes)
+                )
             }
         }
         scheduleSearch(delayNanoseconds: 0)
@@ -53,5 +50,22 @@ extension SearchScreen {
             try? await Task.sleep(nanoseconds: 30_000_000)
             presentationState.finishSuggestionApplication()
         }
+    }
+
+    /// 個別募集ピッカーで選ばれた条件（募集全体 or 選択肢1つ）を適用して即検索する。
+    func applyListingSearchCriteria(_ criteria: ListingSearchCriteria) {
+        MegrumHaptics.buttonTap()
+        presentationState.beginSuggestionApplication()
+        assignListingCriteria(criteria)
+        scheduleSearch(delayNanoseconds: 0)
+        finishSuggestionApplication()
+    }
+
+    private func assignListingCriteria(_ criteria: ListingSearchCriteria) {
+        filterDraft.selectedGroupIDs = criteria.groupIDs
+        filterDraft.selectedMemberIDs = criteria.memberIDs
+        filterDraft.selectedGoodsTypeIDs = criteria.goodsTypeIDs
+        filterDraft.selectedGoodsTagNames = criteria.tagNames
+        filterDraft.wantsCashOK = criteria.wantsCashOK
     }
 }

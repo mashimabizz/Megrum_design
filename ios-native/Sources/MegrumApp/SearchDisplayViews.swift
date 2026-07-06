@@ -84,6 +84,10 @@ struct SearchContent: View {
     var onBack: () -> Void
     var onRemoveActiveCriteria: (SearchActiveCriteriaRemoval) -> Void
     var onFilterTap: () -> Void
+    var showsWishEntry = false
+    var showsListingEntry = false
+    var onOpenWishPicker: () -> Void = {}
+    var onOpenListingPicker: () -> Void = {}
     var onSelectSuggestion: (SearchSuggestionAction) -> Void
     var onWishSuggestionHorizontalDrag: () -> Void
     var onStartProposal: (GoodsItem) -> Void
@@ -130,7 +134,11 @@ struct SearchContent: View {
                         sections: suggestionSections,
                         selectedActions: selectedSuggestionActions,
                         onSelect: onSelectSuggestion,
-                        onWishSuggestionHorizontalDrag: onWishSuggestionHorizontalDrag
+                        onWishSuggestionHorizontalDrag: onWishSuggestionHorizontalDrag,
+                        showsWishEntry: showsWishEntry,
+                        showsListingEntry: showsListingEntry,
+                        onOpenWishPicker: onOpenWishPicker,
+                        onOpenListingPicker: onOpenListingPicker
                     )
                 }
             }

@@ -7,9 +7,33 @@ struct SearchSuggestionSectionsView: View {
     var selectedActions: Set<SearchSuggestionAction>
     var onSelect: (SearchSuggestionAction) -> Void
     var onWishSuggestionHorizontalDrag: () -> Void
+    var showsWishEntry = false
+    var showsListingEntry = false
+    var onOpenWishPicker: () -> Void = {}
+    var onOpenListingPicker: () -> Void = {}
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
+            // 入口行：詳細な選択は専用画面へ（検索画面はシンプルに保つ）
+            VStack(spacing: 10) {
+                if showsWishEntry {
+                    SearchEntryRow(
+                        title: "ほしいものから探す",
+                        systemImageName: "heart.fill",
+                        tint: MegrumTheme.pink,
+                        action: onOpenWishPicker
+                    )
+                }
+                if showsListingEntry {
+                    SearchEntryRow(
+                        title: "個別募集から探す",
+                        systemImageName: "bookmark.fill",
+                        tint: MegrumTheme.lavender,
+                        action: onOpenListingPicker
+                    )
+                }
+            }
+
             ForEach(sections) { section in
                 SearchSuggestionSectionView(
                     section: section,

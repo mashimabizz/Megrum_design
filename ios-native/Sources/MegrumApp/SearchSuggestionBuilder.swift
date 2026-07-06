@@ -55,20 +55,6 @@ enum SearchSuggestionBuilder {
                 )
             ),
             SearchSuggestionSection(
-                id: "wish",
-                title: "ほしいものから探す",
-                systemImageName: "heart.fill",
-                tintRole: .pink,
-                items: wishItems(wishes: wishes)
-            ),
-            SearchSuggestionSection(
-                id: "listing",
-                title: "個別募集から探す",
-                systemImageName: "bookmark.fill",
-                tintRole: .lavender,
-                items: listingItems(listings: listings, inventory: inventory)
-            ),
-            SearchSuggestionSection(
                 id: "tag",
                 title: "シリーズから探す",
                 systemImageName: "tag.fill",
@@ -81,23 +67,6 @@ enum SearchSuggestionBuilder {
                 )
             )
         ].filter { !$0.isEmpty }
-    }
-
-    /// 自分の公開中の個別募集を検索の起点にする。
-    private static func listingItems(
-        listings: [IndividualListing],
-        inventory: [GoodsItem]
-    ) -> [SearchSuggestionItem] {
-        listings
-            .filter { $0.status == .active }
-            .prefix(10)
-            .map { listing in
-                SearchSuggestionItem(
-                    id: "listing-\(listing.id.uuidString.lowercased())",
-                    title: ListingSearchCriteriaBuilder.title(for: listing, inventory: inventory),
-                    action: .listing(listing.id)
-                )
-            }
     }
 
     private static func oshiItems(
@@ -178,8 +147,8 @@ enum SearchSuggestionBuilder {
         return Array(items.prefix(20))
     }
 
-    private static func wishItems(wishes: [WishItem]) -> [SearchSuggestionItem] {
-        wishes.prefix(10).map { wish in
+    static func wishItems(wishes: [WishItem]) -> [SearchSuggestionItem] {
+        wishes.map { wish in
             SearchSuggestionItem(
                 id: "wish-\(wish.id.uuidString)",
                 title: wish.title,

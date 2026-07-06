@@ -26,8 +26,10 @@ extension SearchScreen {
         // VisualQA（search ルート）ではタップ操作なしで結果＋広告行を確認できるよう、
         // 初期条件が無い時にクエリを補って自動検索する。
         var effectiveInitialCriteria = initialCriteria
+        let environment = ProcessInfo.processInfo.environment
         if effectiveInitialCriteria == nil,
-           VisualQAPreviewMode.initialScreen(environment: ProcessInfo.processInfo.environment) == .search {
+           VisualQAPreviewMode.initialScreen(environment: environment) == .search,
+           environment["MEGRUM_VISUAL_QA_SEARCH_BROWSE"] != "1" {
             effectiveInitialCriteria = SearchInitialCriteria(query: "トレカ")
         }
         let didApplyInitialCriteria = presentationState.applyInitialCriteriaIfNeeded(

@@ -4,6 +4,59 @@
 
 ---
 
+## イテレーション1226.315：検索ブラウズ再構成（入口行＋ほしいもの/個別募集ピッカー）
+
+### 背景・問題意識
+iter1226.314 で「個別募集から探す」をブラウズ画面のインラインチップとして追加したが、オーナーから「タグだけではどの募集のどの選択肢か分からない」「検索画面に詳細を出すと Too much」との指摘。最終指定の構成は：
+
+```
+ほしいものから探す　＞      ← 入口行（タップで選択画面）
+個別募集から探す　＞        ← 入口行（タップで選択画面）
+推しから探す                ← インラインチップ（従来通り）
+シリーズから探す            ← インラインチップ（従来通り）
+```
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/SearchPickerSheets.swift`（新規）
+- `SearchEntryRow`：白カード＋アイコン＋シェブロンの入口行
+- `SearchWishPickerSheet`：ほしいものを3列画像グリッドで選ぶシート（タップで `SearchSuggestionAction` を適用して即検索）
+- `SearchListingPickerSheet`：公開中の個別募集（最大5件）を「1募集=1カード」で表示
+  - カードヘッダー＝譲サムネ（最大2枚）＋「譲: グッズ名 ほかn点」→タップで全選択肢まとめて検索
+  - 選択肢行＝「求: <要約>」（wish型/条件指定型/定価型）＋wishサムネ→タップでその選択肢だけで検索
+
+#### `ios-native/Sources/MegrumApp/SearchSuggestionBuilder.swift`
+- `sections()` は「推しから探す」「シリーズから探す」のみ返す（wish/listing のインラインセクション廃止）
+- `wishItems(wishes:)` を internal 化してピッカーから再利用
+
+#### `ios-native/Sources/MegrumApp/ListingSearchCriteriaBuilder.swift`
+- `criteria(for option:wishes:)` を追加（選択肢1つだけの検索条件変換）。`merge` に共通化
+
+#### `ios-native/Sources/MegrumApp/SearchSuggestionViews.swift` / `SearchDisplayViews.swift` / `SearchScreen.swift`
+- ブラウズ最上部に入口行2つを表示（ほしいもの/公開中募集が存在する時のみ）
+- `.sheet` でピッカー2種を表示、`applyListingSearchCriteria` で filterDraft（グループ/メンバー/種別/シリーズ/定価OK）へ反映して即検索
+
+#### `ios-native/Sources/MegrumApp/SearchScreenSearchActions.swift`
+- VisualQA 用：`MEGRUM_VISUAL_QA_SEARCH_BROWSE=1` で自動検索を抑止しブラウズ状態を確認可能に
+
+### 影響範囲
+- 検索ブラウズ画面（構成変更）、検索ピッカー（新規2画面）
+
+### 確認方法
+- シミュレータ：`SIMCTL_CHILD_MEGRUM_VISUAL_QA_INITIAL_SCREEN=search SIMCTL_CHILD_MEGRUM_VISUAL_QA_SEARCH_BROWSE=1` で起動→入口行2つ＋チップ2セクションを確認済み
+- swift test 1486件 0失敗
+
+### セルフレビュー結果
+- ✅ ブランドカラー直書きなし（MegrumTheme.pink / lavender 使用）
+- ✅ 状態名は snake_case（listing status `.active` フィルタ）
+- ✅ テスト更新（SearchScreenTests：wishセクション廃止を反映、ListingSearchCriteriaBuilderTests 3件パス）
+- ⚠️ ピッカーシート内のタップ操作はVisualQAで自動検証不可（実機で要確認）
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/SearchPickerSheets.swift`
+
+---
+
 ## イテレーション1226.310：管理者トップの件数集計500修正
 
 ### 背景・問題意識

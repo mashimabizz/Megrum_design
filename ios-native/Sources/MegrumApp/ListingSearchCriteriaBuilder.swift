@@ -22,9 +22,27 @@ struct ListingSearchCriteria: Equatable {
 enum ListingSearchCriteriaBuilder {
     static func criteria(for listing: IndividualListing, wishes: [WishItem]) -> ListingSearchCriteria {
         var criteria = ListingSearchCriteria()
+        for option in listing.options {
+            merge(option: option, wishes: wishes, into: &criteria)
+        }
+        return criteria
+    }
+
+    /// 1つの選択肢だけを検索条件へ変換する。
+    static func criteria(for option: IndividualListingWishOption, wishes: [WishItem]) -> ListingSearchCriteria {
+        var criteria = ListingSearchCriteria()
+        merge(option: option, wishes: wishes, into: &criteria)
+        return criteria
+    }
+
+    private static func merge(
+        option: IndividualListingWishOption,
+        wishes: [WishItem],
+        into criteria: inout ListingSearchCriteria
+    ) {
         let wishByID = Dictionary(wishes.map { ($0.id, $0) }) { first, _ in first }
 
-        for option in listing.options {
+        for option in [option] {
             if option.isCashOffer || option.cashAmount != nil {
                 criteria.wantsCashOK = true
                 continue
@@ -70,7 +88,6 @@ enum ListingSearchCriteriaBuilder {
                 criteria.goodsTypeIDs.insert(goodsTypeID)
             }
         }
-        return criteria
     }
 
     /// 検索画面のチップに出す募集タイトル：「譲るグッズ名（ほかn点）」。

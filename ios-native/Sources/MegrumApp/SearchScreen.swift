@@ -23,6 +23,8 @@ struct SearchScreen: View {
     @State var searchTask: Task<Void, Never>?
     @State var proposalTargetItem: GoodsItem?
     @State var profileRoute: PublicProfileRoute?
+    @State var showsWishPicker = false
+    @State var showsListingPicker = false
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -46,6 +48,14 @@ struct SearchScreen: View {
                 onRemoveActiveCriteria: removeActiveCriteria,
                 onFilterTap: {
                     presentationState.showFilters()
+                },
+                showsWishEntry: !appState.wishes.isEmpty,
+                showsListingEntry: appState.listings.contains { $0.status == .active },
+                onOpenWishPicker: {
+                    showsWishPicker = true
+                },
+                onOpenListingPicker: {
+                    showsListingPicker = true
                 },
                 onSelectSuggestion: applySuggestion,
                 onWishSuggestionHorizontalDrag: markWishSuggestionHorizontalScroll,
@@ -94,6 +104,26 @@ struct SearchScreen: View {
         }
         .onDisappear {
             searchTask?.cancel()
+        }
+        .sheet(isPresented: $showsWishPicker) {
+            SearchWishPickerSheet(wishes: appState.wishes) { action in
+                applySuggestion(action)
+            }
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $showsListingPicker) {
+            SearchListingPickerSheet(
+                listings: appState.listings,
+                wishes: appState.wishes,
+                inventory: appState.inventory,
+                groups: appState.oshiGroups,
+                goodsTypes: appState.goodsTypes,
+                characters: appState.oshiCharacters,
+                onSelect: applyListingSearchCriteria
+            )
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
         }
         .megrumSlideItemPresentation(item: $proposalTargetItem) { item, _ in
             NavigationStack {
