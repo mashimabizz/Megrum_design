@@ -79,8 +79,8 @@ enum IndividualListingSelectionFilterChoices {
     static func tagNames(items: [GoodsItem], filter: IndividualListingSelectionFilter, limit: Int = 20) -> [String] {
         GoodsCollectionFilterChoices.tagNames(
             items: items,
-            selectedGroupID: filter.groupID,
-            selectedGoodsTypeID: filter.goodsTypeID,
+            selectedGroupIDs: filter.groupID.map { Set([$0]) } ?? [],
+            selectedGoodsTypeIDs: filter.goodsTypeID.map { Set([$0]) } ?? [],
             limit: limit
         )
     }

@@ -2,8 +2,9 @@ import SwiftUI
 
 extension GoodsCollectionScreen {
     func resetFilters() {
-        selectedGroupID = nil
-        selectedGoodsTypeID = nil
+        selectedGroupIDs = []
+        selectedMemberIDs = []
+        selectedGoodsTypeIDs = []
         selectedTagNames = []
     }
 
@@ -13,16 +14,26 @@ extension GoodsCollectionScreen {
     }
 
     func reconcileSelectedFilters() {
-        if let selectedGroupID,
-           appState?.isLoadingOshiGroups != true,
-           !availableGroups.contains(where: { $0.id == selectedGroupID }) {
-            self.selectedGroupID = nil
-            self.selectedMemberID = nil
+        if appState?.isLoadingOshiGroups != true {
+            let availableGroupIDs = Set(availableGroups.map(\.id))
+            let nextGroupIDs = selectedGroupIDs.intersection(availableGroupIDs)
+            if nextGroupIDs != selectedGroupIDs {
+                selectedGroupIDs = nextGroupIDs
+            }
         }
-        if let selectedGoodsTypeID,
-           appState?.isLoadingGoodsTypes != true,
-           !availableGoodsTypes.contains(where: { $0.id == selectedGoodsTypeID }) {
-            self.selectedGoodsTypeID = nil
+        let availableMemberIDs = Set(
+            GoodsCollectionFilterChoices.members(items: filterBaseItems, selectedGroupIDs: selectedGroupIDs).map(\.id)
+        )
+        let nextMemberIDs = selectedMemberIDs.intersection(availableMemberIDs)
+        if nextMemberIDs != selectedMemberIDs {
+            selectedMemberIDs = nextMemberIDs
+        }
+        if appState?.isLoadingGoodsTypes != true {
+            let availableGoodsTypeIDs = Set(availableGoodsTypes.map(\.id))
+            let nextGoodsTypeIDs = selectedGoodsTypeIDs.intersection(availableGoodsTypeIDs)
+            if nextGoodsTypeIDs != selectedGoodsTypeIDs {
+                selectedGoodsTypeIDs = nextGoodsTypeIDs
+            }
         }
         reconcileSelectedTags()
     }

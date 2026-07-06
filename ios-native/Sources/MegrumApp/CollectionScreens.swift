@@ -20,9 +20,9 @@ struct GoodsCollectionScreen: View {
     @State var editorRoute: GoodsEditorRoute?
     @State var isShowingUnavailableAlert = false
     @State var listingSeedWish: GoodsItem?
-    @State var selectedGroupID: UUID?
-    @State var selectedMemberID: UUID?
-    @State var selectedGoodsTypeID: UUID?
+    @State var selectedGroupIDs: Set<UUID> = []
+    @State var selectedMemberIDs: Set<UUID> = []
+    @State var selectedGoodsTypeIDs: Set<UUID> = []
     @State var selectedTagNames: Set<String> = []
     @State var isShowingFilterSheet = false
     @State var selectedInventoryStatus: GoodsEntryStatus = .active

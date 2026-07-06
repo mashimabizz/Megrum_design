@@ -135,6 +135,37 @@
 
 ---
 
+## イテレーション1226.297：一覧絞り込みを複数選択・OR・適用ボタン方式に
+
+### 背景・問題意識
+オーナー指摘。マイグッズ/ほしいものの絞り込みシートで（1）「追加リクエスト」表示は不要、（2）変更した瞬間の即時適用ではなく「フィルターを適用」ボタンで反映、（3）各項目は複数選択でき項目内は OR（グループで TWICE と BTS を選んだらどちらかに合致すればOK）。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/GoodsCollectionConfiguration.swift`
+- `GoodsCollectionFilter` を複数選択対応（groupIDs/memberIDs/goodsTypeIDs/tagNames の Set）に変更。項目内 OR・項目間 AND。シリーズも従来の AND（subset）から OR（intersection）へ
+- `GoodsCollectionFilterChoices.members(items:selectedGroupIDs:)` 追加（一覧内のメンバーから候補生成）、`tagNames` を Set 引数に
+
+#### `ios-native/Sources/MegrumApp/GoodsCollectionFilterSheet.swift`
+- SearchOfferedGoodsFilterSection の再利用をやめ、チップ複数選択の専用シートに全面書き換え（推しマスタシートを開かないため「追加リクエスト」は表示されない）
+- 選択は下書き（draft）に保持し、下部固定の「フィルターを適用（N件）」ボタンで一覧へ反映して閉じる。その上に説明文、下に「条件をリセット」
+- グループ変更時は対象外になったメンバー・シリーズの下書きを自動整理
+
+#### その他
+- `CollectionScreens` の選択状態を Set 化、`GoodsCollectionFilterActions` の reconcile を Set ベースに
+- `IndividualListingSelectionFilter.tagNames` の呼び出しを新シグネチャに追随（挙動不変）
+
+### 影響範囲
+マイグッズ / ほしいもの一覧の絞り込み
+
+### 確認方法
+- `swift test` 1471件 0 failures（OR 条件のユニットテスト追加）
+
+### セルフレビュー結果
+- ✅ 追加リクエスト表示なし（推しマスタシート非使用）
+- ✅ 適用ボタンを押すまで一覧は変わらない（draft 方式）
+- ✅ OR 条件をテストで検証（グループ複数選択・シリーズ交差判定）
+
 ## イテレーション1226.296：ホーム復帰時ローディング抑制
 
 ### 背景・問題意識

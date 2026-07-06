@@ -74,22 +74,19 @@ extension GoodsCollectionScreen {
         )
         .animation(.spring(response: 0.34, dampingFraction: 0.86), value: selectedItemIDs)
         .sheet(isPresented: $isShowingFilterSheet) {
-            if let appState {
-                NavigationStack {
-                    GoodsCollectionFilterSheet(
-                        appState: appState,
-                        selectedGroupID: $selectedGroupID,
-                        selectedMemberID: $selectedMemberID,
-                        selectedGoodsTypeID: $selectedGoodsTypeID,
-                        selectedTagNames: $selectedTagNames,
-                        availableGroups: availableGroups,
-                        availableGoodsTypes: availableGoodsTypes,
-                        availableTagNames: availableTagNames
-                    )
-                }
-                .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
+            NavigationStack {
+                GoodsCollectionFilterSheet(
+                    items: filterBaseItems,
+                    availableGroups: availableGroups,
+                    availableGoodsTypes: availableGoodsTypes,
+                    selectedGroupIDs: $selectedGroupIDs,
+                    selectedMemberIDs: $selectedMemberIDs,
+                    selectedGoodsTypeIDs: $selectedGoodsTypeIDs,
+                    selectedTagNames: $selectedTagNames
+                )
             }
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
         }
         .sheet(item: $editorRoute) { route in
             if let appState {
@@ -159,13 +156,10 @@ extension GoodsCollectionScreen {
                 await loadCollectionCharactersIfNeeded()
             }
         }
-        .onChange(of: selectedGroupID) { _, newValue in
-            if newValue == nil {
-                selectedMemberID = nil
-            }
-            reconcileSelectedTags()
+        .onChange(of: selectedGroupIDs) { _, _ in
+            reconcileSelectedFilters()
         }
-        .onChange(of: selectedGoodsTypeID) { _, _ in
+        .onChange(of: selectedGoodsTypeIDs) { _, _ in
             reconcileSelectedTags()
         }
         .onChange(of: selectedInventoryStatus) { _, _ in

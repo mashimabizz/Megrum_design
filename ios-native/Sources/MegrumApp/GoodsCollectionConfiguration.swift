@@ -1,38 +1,41 @@
 import MegrumCore
 import SwiftUI
 
+/// マイグッズ/ほしいもの一覧の絞り込み。各項目は複数選択でき、
+/// 項目内は OR（TWICE と BTS を選んだらどちらかに合致すればOK）、項目間は AND。
 struct GoodsCollectionFilter: Equatable {
-    var groupID: UUID?
-    var memberID: UUID?
-    var goodsTypeID: UUID?
+    var groupIDs: Set<UUID> = []
+    var memberIDs: Set<UUID> = []
+    var goodsTypeIDs: Set<UUID> = []
     var tagNames: Set<String> = []
 
     var isActive: Bool {
-        groupID != nil || memberID != nil || goodsTypeID != nil || !tagNames.isEmpty
+        !groupIDs.isEmpty || !memberIDs.isEmpty || !goodsTypeIDs.isEmpty || !tagNames.isEmpty
     }
 
     var activeCount: Int {
-        var count = 0
-        if groupID != nil { count += 1 }
-        if memberID != nil { count += 1 }
-        if goodsTypeID != nil { count += 1 }
-        count += tagNames.count
-        return count
+        groupIDs.count + memberIDs.count + goodsTypeIDs.count + tagNames.count
     }
 
     func matches(_ item: GoodsItem) -> Bool {
-        if let groupID, item.groupID != groupID {
-            return false
+        if !groupIDs.isEmpty {
+            guard let groupID = item.groupID, groupIDs.contains(groupID) else {
+                return false
+            }
         }
-        if let memberID, item.memberID != memberID {
-            return false
+        if !memberIDs.isEmpty {
+            guard let memberID = item.memberID, memberIDs.contains(memberID) else {
+                return false
+            }
         }
-        if let goodsTypeID, item.goodsTypeID != goodsTypeID {
-            return false
+        if !goodsTypeIDs.isEmpty {
+            guard let goodsTypeID = item.goodsTypeID, goodsTypeIDs.contains(goodsTypeID) else {
+                return false
+            }
         }
         if !tagNames.isEmpty {
             let itemTagNames = Set(item.tags.map(\.name))
-            if !tagNames.isSubset(of: itemTagNames) {
+            if tagNames.isDisjoint(with: itemTagNames) {
                 return false
             }
         }
@@ -51,15 +54,36 @@ struct GoodsCollectionFilterChoices {
         return allGoodsTypes.filter { usedGoodsTypeIDs.contains($0.id) }
     }
 
+    /// 一覧の中で使われているメンバー（選択中グループがあればそのグループのものだけ）。
+    static func members(items: [GoodsItem], selectedGroupIDs: Set<UUID> = []) -> [(id: UUID, name: String)] {
+        var seen: Set<UUID> = []
+        var result: [(id: UUID, name: String)] = []
+        for item in items {
+            guard let memberID = item.memberID else {
+                continue
+            }
+            if !selectedGroupIDs.isEmpty {
+                guard let groupID = item.groupID, selectedGroupIDs.contains(groupID) else {
+                    continue
+                }
+            }
+            guard seen.insert(memberID).inserted else {
+                continue
+            }
+            result.append((id: memberID, name: item.memberName?.nilIfBlank ?? "メンバー"))
+        }
+        return result.sorted { $0.name < $1.name }
+    }
+
     static func tagNames(
         items: [GoodsItem],
-        selectedGroupID: UUID?,
-        selectedGoodsTypeID: UUID?,
+        selectedGroupIDs: Set<UUID> = [],
+        selectedGoodsTypeIDs: Set<UUID> = [],
         limit: Int = 20
     ) -> [String] {
         let structuralFilter = GoodsCollectionFilter(
-            groupID: selectedGroupID,
-            goodsTypeID: selectedGoodsTypeID
+            groupIDs: selectedGroupIDs,
+            goodsTypeIDs: selectedGoodsTypeIDs
         )
         let names = items
             .filter(structuralFilter.matches)

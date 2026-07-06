@@ -525,16 +525,22 @@ final class GoodsGridLayoutTests: XCTestCase {
             tags: [GoodsTag(id: UUID(), name: "会場限定")]
         )
         let filter = GoodsCollectionFilter(
-            groupID: groupID,
-            goodsTypeID: goodsTypeID,
+            groupIDs: [groupID],
+            goodsTypeIDs: [goodsTypeID],
             tagNames: ["会場限定", "未開封"]
         )
 
         XCTAssertTrue(filter.matches(matching))
+        // シリーズは OR 条件（どれか1つ合致すればOK）
         XCTAssertFalse(filter.matches(wrongTag))
         XCTAssertFalse(filter.matches(wrongGroup))
         XCTAssertTrue(filter.isActive)
         XCTAssertEqual(filter.activeCount, 4)
+
+        // グループ複数選択は OR：どちらかのグループなら合致
+        let orFilter = GoodsCollectionFilter(groupIDs: [groupID, wrongGroup.groupID!])
+        XCTAssertTrue(orFilter.matches(matching))
+        XCTAssertTrue(orFilter.matches(wrongGroup))
     }
 
     func testCollectionFilterChoicesOnlyIncludeValuesUsedByItems() {
@@ -611,8 +617,8 @@ final class GoodsGridLayoutTests: XCTestCase {
 
         let tagNames = GoodsCollectionFilterChoices.tagNames(
             items: items,
-            selectedGroupID: groupA,
-            selectedGoodsTypeID: cardType
+            selectedGroupIDs: [groupA],
+            selectedGoodsTypeIDs: [cardType]
         )
 
         XCTAssertEqual(tagNames, ["2026 LIVE", "aespa"])

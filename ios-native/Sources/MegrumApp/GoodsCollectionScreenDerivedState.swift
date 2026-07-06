@@ -4,9 +4,9 @@ import SwiftUI
 extension GoodsCollectionScreen {
     var activeFilter: GoodsCollectionFilter {
         GoodsCollectionFilter(
-            groupID: selectedGroupID,
-            memberID: selectedMemberID,
-            goodsTypeID: selectedGoodsTypeID,
+            groupIDs: selectedGroupIDs,
+            memberIDs: selectedMemberIDs,
+            goodsTypeIDs: selectedGoodsTypeIDs,
             tagNames: selectedTagNames
         )
     }
@@ -87,8 +87,8 @@ extension GoodsCollectionScreen {
     var availableTagNames: [String] {
         GoodsCollectionFilterChoices.tagNames(
             items: filterBaseItems,
-            selectedGroupID: selectedGroupID,
-            selectedGoodsTypeID: selectedGoodsTypeID
+            selectedGroupIDs: selectedGroupIDs,
+            selectedGoodsTypeIDs: selectedGoodsTypeIDs
         )
     }
 
