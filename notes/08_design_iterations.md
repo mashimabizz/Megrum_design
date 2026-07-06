@@ -4,6 +4,41 @@
 
 ---
 
+## イテレーション1226.340：通知一覧の自動既読（閲覧済みめぐりメッセージ・チャットルーム）
+
+### 背景・問題意識
+オーナーFB：「ドロワーの通知一覧で、めぐりメッセージや対象のチャットルームをすでに見ていたら、その通知は勝手に既読になってほしい」。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/BoardThreadVisitStore.swift`（新規）
+- チャットルームを開いた時刻をUserDefaultsへviewer別に記録（上限200件・古い順に間引き）＋ユニットテスト2件
+
+#### `ios-native/Sources/MegrumApp/MegrumAppStateNotificationAutoRead.swift`（新規）
+- `autoMarkViewedNotificationsRead()`：未読通知のうち、
+  - めぐりメッセージ系（meguri_message / groom_reply）→ 該当相手からの未読メッセージが残っていなければ既読化
+  - チャットルーム系（meguri_board_*）→ 通知作成より後にそのルームを開いた記録があれば既読化
+  ローカル即時反映＋サーバーへはベストエフォートで反映
+- `recordBoardThreadVisit(_:)`：訪問記録＋スイープ起動
+
+#### 配線
+- `loadNotifications` 成功後にスイープ（ドロワー・通知一覧・起動時に自動適用）
+- `markMeguriMessagesRead` 成功後にスイープ（スレッドを読んだ直後に通知も消える）
+- `BoardThreadDetailScreen`：開いた時と閉じた時に訪問記録（表示中に届いた分も既読対象）
+
+### 影響範囲
+- ドロワーの通知一覧・未読通知数
+
+### 確認方法
+- swift test: 1491件＋新規Storeテスト2件、0 failures
+
+### セルフレビュー結果
+- ✅ 判定は通知のlinkPath（NotificationRouteIntent）ベースで、対象外の通知（取引等）は触らない
+- ✅ サーバー反映失敗時もローカル既読は維持し、次回ロードで再判定
+- ⚠️ チャットルームの「見た」判定は端末ローカル記録のため、別端末で見た分は既読化されない
+
+---
+
 ## イテレーション1226.339：アプリアイコンバッジ＝タブ合計＋評価済み分の起動時過計上を解消
 
 ### 背景・問題意識

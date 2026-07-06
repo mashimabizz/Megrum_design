@@ -217,6 +217,8 @@ extension MegrumAppState {
                 meguriMessages,
                 updated: updated
             )
+            // 読んだメッセージに対応する通知一覧の通知も自動で既読にする。
+            await autoMarkViewedNotificationsRead()
         } catch {
             meguriMessages = previous
             errorMessage = "めぐりメッセージを既読にできませんでした"
