@@ -55,6 +55,7 @@ struct ProposalCreateFlow: View {
     @State var submittedSummary: ProposalSubmittedSummary?
     @State var initialStateFlags = ProposalCreateInitialStateFlags()
     @State var showsAddressSettings = false
+    @State var showsPartnerScheduleCalendar = false
     @State var shippingFee: IndividualListingShippingFeeDraft = .negotiate
     @State var shippingDays: IndividualListingShippingDaysDraft = .twoToFourDays
     @StateObject var locationState = MegrumLocationState()

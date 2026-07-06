@@ -4,6 +4,32 @@
 
 ---
 
+## イテレーション1226.348：現地条件の相手行に「＞」→相手の交換カレンダー
+
+### 背景・問題意識
+オーナーFB：「打診の現地交換の条件で、相手の行の右端に『＞』を置き、押したら相手の現地交換カレンダーが出るようにしてほしい」。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateConditionSteps.swift`
+- `ProposalMutualConditionCard` に `onPartnerDetail` を追加。「相手」行のみ右端にシェブロンを表示し、行全体をボタン化
+- `ProposalMeetupConditionStep` に `onOpenPartnerCalendar` を追加して相互条件カードへ配線
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlow*.swift`
+- `showsPartnerScheduleCalendar` state 追加。シェブロンで `ProfileScheduleScreen`（プロフィールの交換カレンダーと同一画面）を相手ユーザーIDでシート表示
+
+### 影響範囲
+- 打診3/3 現地交換の条件セクション
+
+### 確認方法
+- swift test: 1491件 0 failures
+
+### セルフレビュー結果
+- ✅ カレンダーはプロフィールの「交換カレンダー」と同一コンポーネントを再利用
+- ✅ 郵送側の相互条件カードには導線を付けない（現地のみ）
+
+---
+
 ## イテレーション1226.347：3/3交換手段を個別募集カードUIに＋1/3は「この内容で次へ」
 
 ### 背景・問題意識

@@ -102,6 +102,17 @@ extension ProposalCreateFlow {
         .task {
             await loadPaymentSettingsIfNeeded()
         }
+        .sheet(isPresented: $showsPartnerScheduleCalendar) {
+            NavigationStack {
+                ProfileScheduleScreen(
+                    appState: appState,
+                    userID: targetItem.ownerID,
+                    displayName: "@\(partnerHandle)"
+                ) {
+                    showsPartnerScheduleCalendar = false
+                }
+            }
+        }
         .sheet(isPresented: $showsAddressSettings) {
             NavigationStack {
                 AddressSettingsScreen(

@@ -70,7 +70,10 @@ extension ProposalCreateFlow {
             placeMemo: $meetupPlaceMemo,
             scheduleDate: $meetupStartAt,
             viewerConditionText: viewerLocalConditionText,
-            partnerConditionText: partnerLocalConditionText
+            partnerConditionText: partnerLocalConditionText,
+            onOpenPartnerCalendar: {
+                showsPartnerScheduleCalendar = true
+            }
         )
     }
 

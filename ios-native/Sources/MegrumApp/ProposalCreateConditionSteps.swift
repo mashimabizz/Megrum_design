@@ -8,6 +8,7 @@ struct ProposalMeetupConditionStep: View {
     @Binding var scheduleDate: Date
     var viewerConditionText: String
     var partnerConditionText: String
+    var onOpenPartnerCalendar: (() -> Void)?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -58,7 +59,8 @@ struct ProposalMeetupConditionStep: View {
                 rows: [
                     ProposalMutualConditionRowData(label: "自分", value: viewerConditionText),
                     ProposalMutualConditionRowData(label: "相手", value: partnerConditionText)
-                ]
+                ],
+                onPartnerDetail: onOpenPartnerCalendar
             )
         }
     }
@@ -116,26 +118,51 @@ struct ProposalMutualConditionRowData: Equatable {
 struct ProposalMutualConditionCard: View {
     var title: String
     var rows: [ProposalMutualConditionRowData]
+    /// 「相手」行の右端の「＞」から開く詳細（相手の交換カレンダー等）。
+    var onPartnerDetail: (() -> Void)?
 
     var body: some View {
         ProposalCardSection(title: title) {
             VStack(spacing: 9) {
                 ForEach(rows, id: \.label) { row in
-                    HStack(alignment: .top, spacing: 12) {
-                        Text(row.label)
-                            .font(.system(size: 12, weight: .black, design: .rounded))
-                            .foregroundStyle(MegrumTheme.lavender)
-                            .frame(width: 38, alignment: .leading)
-                        Text(row.value)
-                            .font(.system(size: 13, weight: .bold, design: .rounded))
-                            .foregroundStyle(MegrumTheme.ink)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    .padding(11)
-                    .background(Color.white.opacity(0.72), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    rowView(row)
                 }
             }
+        }
+    }
+
+    @ViewBuilder
+    private func rowView(_ row: ProposalMutualConditionRowData) -> some View {
+        let content = HStack(alignment: .top, spacing: 12) {
+            Text(row.label)
+                .font(.system(size: 12, weight: .black, design: .rounded))
+                .foregroundStyle(MegrumTheme.lavender)
+                .frame(width: 38, alignment: .leading)
+            Text(row.value)
+                .font(.system(size: 13, weight: .bold, design: .rounded))
+                .foregroundStyle(MegrumTheme.ink)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .fixedSize(horizontal: false, vertical: true)
+            if row.label == "相手", onPartnerDetail != nil {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .black))
+                    .foregroundStyle(MegrumTheme.muted)
+                    .frame(maxHeight: .infinity, alignment: .center)
+            }
+        }
+        .padding(11)
+        .background(Color.white.opacity(0.72), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+
+        if row.label == "相手", let onPartnerDetail {
+            Button {
+                MegrumHaptics.performButtonTap(onPartnerDetail)
+            } label: {
+                content
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("相手の現地交換カレンダーを開く")
+        } else {
+            content
         }
     }
 }
