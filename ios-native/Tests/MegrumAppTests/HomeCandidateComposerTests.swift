@@ -1761,6 +1761,68 @@ final class HomeCandidateComposerTests: XCTestCase {
         XCTAssertNil(sections.conditionSignalsByItemID[UUID(uuidString: "10000000-0000-0000-0000-000000000052")!])
     }
 
+    func testComposerBuildsNamedPairingsForNamedOption() throws {
+        let viewerRM = "10000000-0000-0000-0000-0000000000b1"
+        let viewerJin = "10000000-0000-0000-0000-0000000000b2"
+        let partnerHaveID = "10000000-0000-0000-0000-0000000000b3"
+        let partnerWishRM = "10000000-0000-0000-0000-0000000000b4"
+        let partnerWishJin = "10000000-0000-0000-0000-0000000000b5"
+        let listingID = "10000000-0000-0000-0000-0000000000b6"
+        let bts = "20000000-0000-0000-0000-0000000000b0"
+        let tore = "30000000-0000-0000-0000-0000000000b0"
+        let rmChar = "40000000-0000-0000-0000-0000000000b1"
+        let jinChar = "40000000-0000-0000-0000-0000000000b2"
+        let viewer = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+        let partner = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+
+        let composition = SupabaseHomeComposition(
+            localMode: nil,
+            viewerInventory: [
+                try goodsRow(id: viewerRM, userID: viewer, groupID: bts, characterID: rmChar, goodsTypeID: tore, title: "自分のRM"),
+                try goodsRow(id: viewerJin, userID: viewer, groupID: bts, characterID: jinChar, goodsTypeID: tore, title: "自分のジン")
+            ],
+            viewerWishes: [],
+            viewerListings: [],
+            partnerInventory: [
+                try goodsRow(id: partnerHaveID, userID: partner, groupID: bts, characterID: rmChar, goodsTypeID: tore, title: "相手の譲")
+            ],
+            partnerWishes: [
+                try goodsRow(id: partnerWishRM, userID: partner, groupID: bts, characterID: rmChar, goodsTypeID: tore, title: "相手ほしいRM", photoURLs: ["https://example.com/rm.jpg"]),
+                try goodsRow(id: partnerWishJin, userID: partner, groupID: bts, characterID: jinChar, goodsTypeID: tore, title: "相手ほしいジン", photoURLs: ["https://example.com/jin.jpg"])
+            ],
+            partnerUsers: [],
+            partnerListings: [
+                try listingRow(id: listingID, userID: partner, haveIDs: [partnerHaveID], haveGroupID: nil, haveGoodsTypeID: nil, haveLogic: "or")
+            ],
+            listingWishOptions: [
+                try listingWishOptionRow(
+                    id: "10000000-0000-0000-0000-0000000000b7",
+                    listingID: listingID,
+                    wishIDs: [partnerWishRM, partnerWishJin],
+                    wishGroupID: nil,
+                    wishGoodsTypeID: nil,
+                    logic: "and"
+                )
+            ],
+            viewerActivityWindows: [],
+            partnerActivityWindows: [],
+            inventoryTags: [],
+            unreadNotificationIDs: []
+        )
+
+        let sections = HomeCandidateComposer.sections(from: composition)
+        let signals = try XCTUnwrap(sections.conditionSignalsByItemID[UUID(uuidString: partnerHaveID)!])
+        let option = try XCTUnwrap(signals.individualListingSelection?.detail?.wantedOptions.first)
+
+        XCTAssertEqual(option.kind, .goods)
+        XCTAssertEqual(option.namedPairings.count, 2)
+        let byID = Dictionary(uniqueKeysWithValues: option.namedPairings.map { ($0.id, $0) })
+        // 相手ほしいものRM ← 自分RM、相手ほしいものジン ← 自分ジン、とメンバー単位で1対1に紐づく。
+        XCTAssertEqual(byID[UUID(uuidString: partnerWishRM)!]?.candidateGoodsIDs, [UUID(uuidString: viewerRM)!])
+        XCTAssertEqual(byID[UUID(uuidString: partnerWishJin)!]?.candidateGoodsIDs, [UUID(uuidString: viewerJin)!])
+        XCTAssertEqual(byID[UUID(uuidString: partnerWishRM)!]?.imageURL?.absoluteString, "https://example.com/rm.jpg")
+    }
+
     private func goodsRow(
         id: String,
         userID: String,

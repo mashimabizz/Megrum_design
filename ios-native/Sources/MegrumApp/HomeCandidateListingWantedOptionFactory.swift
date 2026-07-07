@@ -49,7 +49,9 @@ enum HomeCandidateListingWantedOptionFactory {
                 matchingItems: matchingItems,
                 previewInventory: previewInventory,
                 tagsByInventoryID: tagsByInventoryID
-            )
+            ),
+            wantedRowsByID: rowsByID,
+            tagsByInventoryID: tagsByInventoryID
         )
     }
 
@@ -97,7 +99,9 @@ enum HomeCandidateListingWantedOptionFactory {
             ),
             titlePreviewItems: previews,
             previewItems: previews,
-            subtitleMatchingCount: max(matchingItems.count, previews.count)
+            subtitleMatchingCount: max(matchingItems.count, previews.count),
+            wantedRowsByID: rowsByID,
+            tagsByInventoryID: tagsByInventoryID
         )
     }
 
@@ -147,7 +151,9 @@ enum HomeCandidateListingWantedOptionFactory {
         tentativeGoodsIDs: [UUID] = [],
         titlePreviewItems: [HomeIndividualListingWantedPreviewItem],
         previewItems: [HomeIndividualListingWantedPreviewItem],
-        subtitleMatchingCount: Int? = nil
+        subtitleMatchingCount: Int? = nil,
+        wantedRowsByID: [UUID: SupabaseHomeGoodsRow] = [:],
+        tagsByInventoryID: [UUID: [SupabaseHomeInventoryTagRow]] = [:]
     ) -> HomeIndividualListingWantedOption {
         let kind: HomeIndividualListingWantedOption.Kind = option.wishIds.isEmpty ? .condition : .goods
         return HomeIndividualListingWantedOption(
@@ -174,8 +180,47 @@ enum HomeCandidateListingWantedOptionFactory {
             goodsTypeID: option.wishGoodsTypeId,
             conditionSummary: kind == .condition
                 ? Self.conditionSummary(option: option, matchingItems: matchingItems)
-                : nil
+                : nil,
+            namedPairings: kind == .goods
+                ? Self.namedPairings(
+                    option: option,
+                    matchingItems: matchingItems,
+                    wantedRowsByID: wantedRowsByID,
+                    tagsByInventoryID: tagsByInventoryID
+                )
+                : []
         )
+    }
+
+    /// 指名オプションの「相手のほしいもの1件 → 充てられる自分の候補」対応。iter1226.373。
+    /// 相手のほしいもの画像（相手自身のほしいもの行）と、それを満たせる自分のマッチ済みグッズをメンバー等で紐づける。
+    private static func namedPairings(
+        option: SupabaseHomeListingWishOptionRow,
+        matchingItems: [SupabaseHomeGoodsRow],
+        wantedRowsByID: [UUID: SupabaseHomeGoodsRow],
+        tagsByInventoryID: [UUID: [SupabaseHomeInventoryTagRow]]
+    ) -> [HomeWantedNamedPairing] {
+        option.wishIds.compactMap { wishID -> HomeWantedNamedPairing? in
+            guard let wanted = wantedRowsByID[wishID] else {
+                return nil
+            }
+            let candidateIDs = matchingItems
+                .filter { item in
+                    HomeMutualMatchListingEvaluator.wishGoodsConfidence(
+                        wish: wanted,
+                        item: item,
+                        tagsByInventoryID: tagsByInventoryID
+                    ) != nil
+                }
+                .map(\.id)
+            return HomeWantedNamedPairing(
+                id: wanted.id,
+                title: wanted.title,
+                imageURL: GoodsPhotoURLResolver.displayURL(from: wanted.photoUrls),
+                characterID: wanted.characterId,
+                candidateGoodsIDs: candidateIDs
+            )
+        }
     }
 
     /// 条件指定型の選択肢を「TWICE / トレカ / メンバー / #シリーズ」の1文字列にする。
