@@ -5,13 +5,17 @@ import SwiftUI
 struct HomeCashAmountEntryCard: View {
     @Binding var amountText: String
     var suggestedAmount: Int?
+    /// 相手の指定（「定価」または「〇〇円」）。候補シート再設計で入力欄の下に表示。iter1226.375。
+    var partnerDesignationText: String? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HomeSheetSectionTitle(
                 systemName: "yensign.circle",
                 title: "渡す金額を入力",
-                trailing: suggestedAmount.map { TradeAmountFormatter.fixedPrice(amount: $0) }
+                trailing: partnerDesignationText == nil
+                    ? suggestedAmount.map { TradeAmountFormatter.fixedPrice(amount: $0) }
+                    : nil
             )
 
             HStack(spacing: 10) {
@@ -26,6 +30,12 @@ struct HomeCashAmountEntryCard: View {
             .overlay {
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .stroke(MegrumTheme.lavender.opacity(0.2), lineWidth: 1)
+            }
+
+            if let partnerDesignationText {
+                Text(partnerDesignationText)
+                    .font(.system(size: 12.5, weight: .bold, design: .rounded))
+                    .foregroundStyle(MegrumTheme.muted)
             }
         }
     }
