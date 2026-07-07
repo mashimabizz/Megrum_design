@@ -17,15 +17,17 @@ final class HomeCandidateDemandPolicyTests: XCTestCase {
         XCTAssertEqual(HomeCandidateDemandPolicy.demandRank(for: signals), 4)
     }
 
-    func testConditionOptionMatchIsDemand() {
+    func testConditionOptionMatchIsHotDemand() {
+        // iter1226.362：個別募集の条件選択肢を満たせる場合も激求（指名と同じ扱い）。
         let goodsID = UUID()
         let signals = makeSignals(
             wantedOptions: [makeOption(kind: .condition, matchingGoodsIDs: [goodsID])]
         )
         XCTAssertEqual(
             HomeCandidateDemandPolicy.demandLine(for: signals),
-            .demand(goodsIDs: [goodsID])
+            .hotDemand(goodsIDs: [goodsID])
         )
+        XCTAssertEqual(HomeCandidateDemandPolicy.demandRank(for: signals), 4)
     }
 
     func testWishMatchWithoutListingIsDemand() {
@@ -37,7 +39,8 @@ final class HomeCandidateDemandPolicyTests: XCTestCase {
         )
     }
 
-    func testHotDemandBeatsConditionAndCash() {
+    func testListingOptionsAreHotDemandAndBeatCash() {
+        // 個別募集の選択肢（指名・条件どちらも）は激求で、定価より優先。
         let designatedID = UUID()
         let conditionID = UUID()
         let signals = makeSignals(
@@ -49,7 +52,7 @@ final class HomeCandidateDemandPolicyTests: XCTestCase {
         )
         XCTAssertEqual(
             HomeCandidateDemandPolicy.demandLine(for: signals),
-            .hotDemand(goodsIDs: [designatedID])
+            .hotDemand(goodsIDs: [conditionID, designatedID])
         )
     }
 
@@ -78,16 +81,33 @@ final class HomeCandidateDemandPolicyTests: XCTestCase {
         XCTAssertEqual(HomeCandidateDemandPolicy.demandRank(for: signals), 0)
     }
 
-    func testDemandGoodsIDsAreUniquedAcrossOptionsAndWish() {
+    func testHotDemandGoodsIDsAreUniquedAcrossListingOptions() {
+        // 激求のグッズIDは複数の個別募集選択肢を横断して重複排除される。
         let sharedID = UUID()
         let otherID = UUID()
         let signals = makeSignals(
-            wantedOptions: [makeOption(kind: .condition, matchingGoodsIDs: [sharedID, otherID])],
-            wishMatchedOfferGoodsIDs: [sharedID]
+            wantedOptions: [
+                makeOption(kind: .condition, matchingGoodsIDs: [sharedID]),
+                makeOption(kind: .goods, matchingGoodsIDs: [sharedID, otherID])
+            ]
         )
         XCTAssertEqual(
             HomeCandidateDemandPolicy.demandLine(for: signals),
-            .demand(goodsIDs: [sharedID, otherID])
+            .hotDemand(goodsIDs: [sharedID, otherID])
+        )
+    }
+
+    func testListingHotDemandBeatsWishDemand() {
+        // 個別募集ヒット（激求）は、ほしいものヒット（求）より優先される。
+        let listingID = UUID()
+        let wishID = UUID()
+        let signals = makeSignals(
+            wantedOptions: [makeOption(kind: .condition, matchingGoodsIDs: [listingID])],
+            wishMatchedOfferGoodsIDs: [wishID]
+        )
+        XCTAssertEqual(
+            HomeCandidateDemandPolicy.demandLine(for: signals),
+            .hotDemand(goodsIDs: [listingID])
         )
     }
 

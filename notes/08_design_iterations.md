@@ -4,6 +4,41 @@
 
 ---
 
+## イテレーション1226.362：激求！の定義変更（個別募集=激求／ほしいもの=求）＋需要仕様の言語化
+
+### 背景・問題意識
+オーナーとの対話で需要行ロジックを全面的に言語化（notes/18 新設）。その中で確定した仕様変更：
+- **条件選択肢のヒットも激求！にしたい**（従来は 指名=激求／条件=求）。
+- 併せて `logic` のUI実態を整理（ほしいもの指定側は「すべて／N個以上」の2択で `.one` は出ない、等）。
+- オーナー選択（AskUserQuestion）：**激求＝個別募集の選択肢（指名・条件どちらも）を満たせた／求＝相手のほしいもの（単独リスト）にヒット**。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeCandidateDemandPolicy.swift`
+- `demandLine`：
+  - 旧：`goods` 満たせる→激求／`condition` 満たせる or ほしいもの→求。
+  - 新：**`goods` または `condition` の満たせる個別募集選択肢→激求**／**`wishMatchedOfferGoodsIDs`（ほしいもの由来）→求**。
+- `isOfferSatisfiable`（必要提示数を満たすか）は据え置き（激求・求どちらも「満たせない選択肢は数えない」を継続）。
+
+#### `notes/18_demand_matching_logic.md`（新設・iter1226.361で作成、本iterで更新）
+- 需要行ロジック全体の決定版仕様書。`logic` のUI実態、激求/求の新定義（旧→新）を追記。
+
+#### `ios-native/Tests/MegrumAppTests/HomeCandidateDemandPolicyTests.swift`
+- 条件選択肢→激求、個別募集は激求でほしいもの（求）より優先、激求IDの横断重複排除、を検証するようテスト更新。
+
+### 影響範囲
+- ホーム候補の需要行（激求！/求！のバッジ・並び順）。条件マッチが激求に格上げされる。
+
+### 確認方法
+- `HomeCandidateDemandPolicyTests`（swift test）で新定義を担保。
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/HomeCandidateDemandPolicy.swift`
+- `notes/18_demand_matching_logic.md`
+- `ios-native/Tests/MegrumAppTests/HomeCandidateDemandPolicyTests.swift`
+
+---
+
 ## イテレーション1226.361：提示物選択のUI微調整3件＋激求は満たせる選択肢のみに
 
 ### 背景・問題意識

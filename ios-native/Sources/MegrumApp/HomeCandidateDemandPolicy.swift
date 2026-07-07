@@ -34,22 +34,23 @@ enum HomeCandidateDemandPolicy {
     static func demandLine(for signals: HomeCandidateConditionSignals) -> HomeCandidateDemandLine {
         let options = signals.individualListingSelection?.wantedOptions ?? []
 
-        // 相手の選択肢が要求する数（すべて／n個以上）を、自分が手持ちで満たせる選択肢だけを
-        // 需要として扱う。例：2つを全て希望する選択肢で自分が1つしか譲れない場合は、
-        // その選択肢では打診が完結しないため「激求」にも「求」にも数えない（iter1226.361）。
-        let designatedIDs = orderedUnique(
-            options.filter { $0.kind == .goods && isOfferSatisfiable($0) }.flatMap(\.matchingGoodsIDs)
+        // 激求！＝相手の「個別募集の選択肢」（指名 goods でも条件 condition でも）を、
+        // 自分が手持ちで満たせるもの（iter1226.362）。
+        // 相手の選択肢が要求する数（すべて／n個以上）を満たせない選択肢は、
+        // その選択肢では打診が完結しないため需要に数えない（iter1226.361）。
+        let listingMatchedIDs = orderedUnique(
+            options
+                .filter { ($0.kind == .goods || $0.kind == .condition) && isOfferSatisfiable($0) }
+                .flatMap(\.matchingGoodsIDs)
         )
-        if !designatedIDs.isEmpty {
-            return .hotDemand(goodsIDs: designatedIDs)
+        if !listingMatchedIDs.isEmpty {
+            return .hotDemand(goodsIDs: listingMatchedIDs)
         }
 
-        let conditionMatchedIDs = orderedUnique(
-            options.filter { $0.kind == .condition && isOfferSatisfiable($0) }.flatMap(\.matchingGoodsIDs)
-                + signals.wishMatchedOfferGoodsIDs
-        )
-        if !conditionMatchedIDs.isEmpty {
-            return .demand(goodsIDs: conditionMatchedIDs)
+        // 求！＝相手の「ほしいもの」（個別募集に紐づかない単独リスト）にヒット（iter1226.362）。
+        let wishMatchedIDs = orderedUnique(signals.wishMatchedOfferGoodsIDs)
+        if !wishMatchedIDs.isEmpty {
+            return .demand(goodsIDs: wishMatchedIDs)
         }
 
         if let cashOption = options.first(where: { $0.kind == .cash }) {
