@@ -13,19 +13,34 @@ struct CandidateSheetVisualQAPreview: View {
     }
 
     var body: some View {
-        HomeGoodsHitDetailSheet(
-            selection: CandidateSheetVisualQASample.payload(variant: variant),
-            viewerOfferGoods: CandidateSheetVisualQASample.viewerOfferGoods(variant: variant),
-            addedExtraCandidateIDs: [],
-            showsOtherExchangeRows: false,
-            bottomButtonTitle: "この内容で打診に進む",
-            preselectPreferredOffer: true,
-            onOpenOwnerProfile: { _ in },
-            onOpenNestedSheet: { _ in },
-            onStartProposal: { _ in },
-            onCopyToWish: { _ in },
-            isWishCopyInProgress: false
-        )
+        if variant == .wish {
+            HomeWishHitDetailSheet(
+                selection: CandidateSheetVisualQASample.wishPayload,
+                viewerOfferGoods: CandidateSheetVisualQASample.viewerOfferGoods(variant: .named),
+                addedExtraCandidateIDs: [],
+                showsOtherExchangeRows: false,
+                bottomButtonTitle: "この内容で打診に進む",
+                onOpenOwnerProfile: { _ in },
+                onOpenNestedSheet: { _ in },
+                onStartProposal: { _ in },
+                onCopyToWish: { _ in },
+                isWishCopyInProgress: false
+            )
+        } else {
+            HomeGoodsHitDetailSheet(
+                selection: CandidateSheetVisualQASample.payload(variant: variant),
+                viewerOfferGoods: CandidateSheetVisualQASample.viewerOfferGoods(variant: variant),
+                addedExtraCandidateIDs: [],
+                showsOtherExchangeRows: false,
+                bottomButtonTitle: "この内容で打診に進む",
+                preselectPreferredOffer: true,
+                onOpenOwnerProfile: { _ in },
+                onOpenNestedSheet: { _ in },
+                onStartProposal: { _ in },
+                onCopyToWish: { _ in },
+                isWishCopyInProgress: false
+            )
+        }
     }
 }
 
@@ -36,6 +51,7 @@ enum CandidateSheetVisualQASample {
         case conditionRef
         case cash
         case crowded
+        case wish
     }
 
     // HomeMockGoods.make が使うプレフィックスと一致させ、matchingGoodsIDs と手持ちIDを噛み合わせる。
@@ -256,7 +272,7 @@ enum CandidateSheetVisualQASample {
         // named は3選択肢を持たせて選択肢ピルも検証する。crowded は多数の畳み方を検証する。
         let ordered: [HomeIndividualListingWantedOption]
         switch variant {
-        case .named:
+        case .named, .wish:
             ordered = [namedOption, conditionOption, cashOption]
         case .condition:
             ordered = [conditionOption]
@@ -277,6 +293,18 @@ enum CandidateSheetVisualQASample {
         )
         var signals = HomeCandidateConditionSignalDefaults.noEvidence
         signals.individualListingSelection = selection
+        return HomeDiscoverySheetPayload(
+            goods: partnerGoods,
+            signals: signals,
+            preferredOfferGoodsID: myRMID
+        )
+    }
+
+    /// 求！（相手が自分のグッズを求めるwishマッチ）→ HomeWishHitDetailSheet の統一ヘッダー検証。
+    static var wishPayload: HomeDiscoverySheetPayload {
+        var signals = HomeCandidateConditionSignalDefaults.noEvidence
+        signals.wishMatchedOfferGoodsIDs = [myRMID, myJinID]
+        signals.matchesViewerWish = true
         return HomeDiscoverySheetPayload(
             goods: partnerGoods,
             signals: signals,

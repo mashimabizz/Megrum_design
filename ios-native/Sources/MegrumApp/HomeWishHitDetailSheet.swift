@@ -30,21 +30,11 @@ struct HomeWishHitDetailSheet: View {
             bottomButtonDisabled: hasOfferCandidates ? !presentationState.canStartProposal : false,
             bottomButtonAction: startProposal
         ) {
-            HomeSelectedGoodsHeader(
-                goods: selection.goods,
-                conditionTags: selection.conditionTags,
-                exchangeSummary: HomeDiscoveryOwnerExchangeSummary.fromCandidateSignals(selection.signals),
-                conditionVerdict: HomeConditionVerdictPolicy.make(
-                    from: selection.signals,
-                    partnerPaymentNote: selection.goods.ownerPaymentNote
-                ),
-                exchangeCalendarContext: HomePartnerExchangeCalendarContext.from(
-                    signals: selection.signals,
-                    ownerName: selection.goods.ownerSummary?.displayName
-                ),
-                listingNote: selection.individualListingSelection.listingNote,
-                listingDetail: selection.individualListingSelection.detail,
-                listingUpdatedAt: selection.individualListingSelection.listingUpdatedAt,
+            // 候補シート再設計と統一：名前＋評価＋需要チップのみ（大画像・判定羅列は撤去）。iter1226.375。
+            HomeCandidateSheetHeader(
+                owner: selection.goods.ownerSummary,
+                fallbackName: selection.goods.ownerDisplayName?.nilIfBlank ?? "ユーザー",
+                demand: HomeCandidateDemandPolicy.demandLine(for: selection.signals),
                 onOpenOwnerProfile: onOpenOwnerProfile
             )
 
@@ -100,6 +90,22 @@ struct HomeWishHitDetailSheet: View {
                     onSelect: { presentationState.selectOffer(at: $0 + matchedOfferGoods.count) }
                 )
             }
+
+            HomeCandidateDealAboutSection(
+                verdict: HomeConditionVerdictPolicy.make(
+                    from: selection.signals,
+                    partnerPaymentNote: selection.goods.ownerPaymentNote
+                ),
+                exchangeSummary: HomeDiscoveryOwnerExchangeSummary.fromCandidateSignals(selection.signals),
+                paymentSummaryText: selection.goods.ownerPaymentSummaryText,
+                exchangeCalendarContext: HomePartnerExchangeCalendarContext.from(
+                    signals: selection.signals,
+                    ownerName: selection.goods.ownerSummary?.displayName
+                ),
+                listingNote: selection.individualListingSelection.listingNote,
+                listingUpdatedAt: selection.individualListingSelection.listingUpdatedAt,
+                goodsUpdatedAt: selection.goods.updatedAt
+            )
 
             if showsOtherExchangeRows {
                 HomeOtherExchangeRows(
