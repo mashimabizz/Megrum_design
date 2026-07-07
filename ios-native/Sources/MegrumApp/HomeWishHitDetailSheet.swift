@@ -34,7 +34,6 @@ struct HomeWishHitDetailSheet: View {
             HomeCandidateSheetHeader(
                 owner: selection.goods.ownerSummary,
                 fallbackName: selection.goods.ownerDisplayName?.nilIfBlank ?? "ユーザー",
-                demand: HomeCandidateDemandPolicy.demandLine(for: selection.signals),
                 onOpenOwnerProfile: onOpenOwnerProfile
             )
 

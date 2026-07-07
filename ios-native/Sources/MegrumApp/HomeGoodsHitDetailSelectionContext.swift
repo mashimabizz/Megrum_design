@@ -375,9 +375,21 @@ extension HomeGoodsHitDetailSelectionContext {
         )
     }
 
+    /// 取引ブロックの列見出し用の短い数量ラベル（すべて／N個以上／単一は無し）。iter1226.376。
+    private func shortQtyLabel(logic: ListingLogic, minimumCount: Int) -> String? {
+        switch logic {
+        case .all:
+            return "すべて"
+        case .atLeast:
+            return "\(minimumCount)個以上"
+        case .one:
+            return nil
+        }
+    }
+
     private func receiveColumnModel() -> HomeDealReceiveColumn {
         let all = receiveGoods
-        let qty = all.count > 1 ? receiveRequirementLabel : nil
+        let qty = all.count > 1 ? shortQtyLabel(logic: receiveLogic, minimumCount: receiveMinimumCount) : nil
         if showsReceiveSelection {
             let cells = all.enumerated().map { index, goods in
                 HomeDealGoodsCell(
@@ -438,7 +450,7 @@ extension HomeGoodsHitDetailSelectionContext {
         let goods = offerGoods
         let indexByID = Dictionary(goods.enumerated().map { ($0.element.id, $0.offset) }, uniquingKeysWith: { first, _ in first })
         let tentative = Set(option.tentativeGoodsIDs)
-        let qty = (offerRequiredCount > 1 || goods.count > 1) ? offerRequirementLabel : nil
+        let qty = (offerRequiredCount > 1 || goods.count > 1) ? shortQtyLabel(logic: offerLogic, minimumCount: offerMinimumCount) : nil
 
         func cell(_ index: Int) -> HomeDealGoodsCell {
             let item = goods[index]
@@ -453,17 +465,20 @@ extension HomeGoodsHitDetailSelectionContext {
             )
         }
 
+        let flatCells = goods.indices.map(cell)
         if option.kind == .goods, !option.namedPairings.isEmpty {
             let rows = option.namedPairings.map { pairing -> HomeDealOfferRow in
                 let indices = pairing.candidateGoodsIDs.compactMap { indexByID[$0] }.sorted()
                 return HomeDealOfferRow(id: pairing.id, cells: indices.map(cell))
             }
-            return HomeDealOfferColumn(qtyLabel: qty, isNamed: true, rows: rows)
+            return HomeDealOfferColumn(qtyLabel: qty, isNamed: true, rows: rows, flatCells: flatCells, requiredCount: offerRequiredCount)
         }
         return HomeDealOfferColumn(
             qtyLabel: qty,
             isNamed: false,
-            rows: [HomeDealOfferRow(id: option.id, cells: goods.indices.map(cell))]
+            rows: [HomeDealOfferRow(id: option.id, cells: flatCells)],
+            flatCells: flatCells,
+            requiredCount: offerRequiredCount
         )
     }
 
@@ -497,13 +512,14 @@ extension HomeGoodsHitDetailSelectionContext {
             : URL(string: "https://www.google.com/search?tbm=isch&q=" +
                 (query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""))
         return HomeConditionSeriesCheckModel(
+            conditionText: option.conditionSummary?.nilIfBlank ?? option.title,
             referenceImageURLs: referenceImages,
             searchQuery: query,
             searchURL: searchURL
         )
     }
 
-    /// 「グループ メンバー #シリーズ」の画像検索クエリ。メンバーは選択中の自分グッズ優先。
+    /// 「グループ メンバー グッズ種別 #シリーズ」の画像検索クエリ。メンバー・種別は選択中の自分グッズ優先。iter1226.376。
     private func conditionSearchQuery(option: HomeIndividualListingWantedOption) -> String {
         let summaryParts = (option.conditionSummary ?? "")
             .components(separatedBy: " / ")
@@ -514,9 +530,11 @@ extension HomeGoodsHitDetailSelectionContext {
         let group = firstOffer?.groupName?.nilIfBlank
             ?? summaryParts.first { !$0.hasPrefix("#") }
         let member = firstOffer?.memberName?.nilIfBlank
+        let goodsType = firstOffer?.goodsTypeName?.nilIfBlank
         var tokens: [String] = []
         if let group { tokens.append(group) }
         if let member { tokens.append(member) }
+        if let goodsType { tokens.append(goodsType) }
         tokens.append(contentsOf: seriesTokens)
         return tokens.joined(separator: " ")
     }

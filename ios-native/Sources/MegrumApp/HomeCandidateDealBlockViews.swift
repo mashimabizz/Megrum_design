@@ -2,29 +2,29 @@ import Foundation
 import MegrumDesign
 import SwiftUI
 
-/// 取引ブロック（3列：受け取る｜相手希望｜譲る）。notes/19 候補シート再設計・iter1226.374。
-/// 相手希望は表示専用（選択肢ピルで切替）。操作するのは「ゆずる」列（＋受け取り選択がある時のみ受け取る列）。
+/// 取引ブロック（3列：受け取る｜相手希望｜譲る）。notes/19 候補シート再設計・iter1226.374/376。
+/// 相手希望は表示専用（選択肢ピルで切替）。ゆずるはポップアップ一覧で選ぶ。
 struct HomeDealBlockView: View {
     var model: HomeDealBlockModel
     var onToggleReceive: (Int) -> Void
     var onToggleOffer: (Int) -> Void
 
     private let thumbSide: CGFloat = 58
-    /// 折りたたみ表示の上限（これを超えたら「+N」タイル／「他N件を見る」に畳む）。notes/19 の多数（4枚超）対策。
     private let receiveCollapsedCount = 2
-    private let offerCollapsedCount = 3
-    @State private var offerExpanded = false
     @State private var showsReceiveList = false
+    @State private var showsOfferPicker = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .top, spacing: 8) {
+            HStack(alignment: .top, spacing: 4) {
                 dealColumn(title: "うけとる", qty: model.receive.qtyLabel) {
                     receiveColumn
                 }
+                dealArrow("arrow.left.arrow.right")
                 dealColumn(title: "相手希望", qty: nil) {
                     partnerColumn
                 }
+                dealArrow("arrow.right")
                 dealColumn(title: "ゆずる", qty: model.offer.qtyLabel) {
                     offerColumn
                 }
@@ -45,6 +45,15 @@ struct HomeDealBlockView: View {
                 cells: model.receive.cells,
                 selectable: model.receive.selectable,
                 onToggle: onToggleReceive
+            )
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $showsOfferPicker) {
+            HomeOfferGoodsPickerSheet(
+                requirementText: model.offer.qtyLabel,
+                cells: model.offer.flatCells,
+                onToggle: onToggleOffer
             )
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
@@ -76,7 +85,7 @@ struct HomeDealBlockView: View {
         HomeDealThumb(
             cell: cell,
             side: thumbSide,
-            onTap: model.receive.selectable ? { onToggleReceive(cell.index) } : nil
+            onTap: model.receive.selectable ? { showsReceiveList = true } : nil
         )
     }
 
@@ -96,88 +105,32 @@ struct HomeDealBlockView: View {
                 }
             }
         case .condition:
-            if let tile = model.partner.conditionTile {
-                HomeDealConditionTileView(tile: tile)
-            }
+            // 条件は相手希望列ではアイコンのみ。条件文・確認・検索はブロック下の確認セクションへ。iter1226.376。
+            HomeDealConditionIcon(side: thumbSide, tentative: model.partner.conditionTile?.tentative ?? false)
         case .cash:
             EmptyView()
         }
     }
 
-    // MARK: - ゆずる
+    // MARK: - ゆずる（ポップアップ一覧で選ぶ）
 
     @ViewBuilder
     private var offerColumn: some View {
-        if model.offer.isNamed {
-            VStack(alignment: .leading, spacing: 8) {
-                ForEach(model.offer.rows) { row in
-                    offerRow(row)
-                }
-            }
-        } else {
-            offerFlatColumn
-        }
-    }
-
-    /// 条件パターンのゆずる列。多数（4枚超）は未選択優先で3件＋「他N件を見る」で縦に展開。
-    @ViewBuilder
-    private var offerFlatColumn: some View {
-        let cells = orderedOfferCells
         VStack(alignment: .leading, spacing: 8) {
-            if cells.isEmpty {
+            if model.offer.flatCells.isEmpty {
                 HomeDealEmptyCell(side: thumbSide, label: "候補なし")
-            } else if cells.count > offerCollapsedCount + 1, !offerExpanded {
-                ForEach(cells.prefix(offerCollapsedCount)) { cell in
-                    HomeDealThumb(cell: cell, side: thumbSide, onTap: { onToggleOffer(cell.index) })
-                }
-                HomeDealMoreButton(label: "他\(cells.count - offerCollapsedCount)件を見る") {
-                    offerExpanded = true
-                }
             } else {
-                ForEach(cells) { cell in
-                    HomeDealThumb(cell: cell, side: thumbSide, onTap: { onToggleOffer(cell.index) })
+                ForEach(model.offer.selectedCells) { cell in
+                    HomeDealThumb(cell: cell, side: thumbSide, onTap: { showsOfferPicker = true })
                 }
-                if cells.count > offerCollapsedCount + 1 {
-                    HomeDealMoreButton(label: "閉じる", systemName: "chevron.up") {
-                        offerExpanded = false
-                    }
+                if model.offer.selectedCells.count < model.offer.requiredCount {
+                    HomeDealPickTile(side: thumbSide) { showsOfferPicker = true }
                 }
             }
         }
     }
 
-    /// 未選択優先の並び（選ぶべき候補を上に）。index は保持したまま。
-    private var orderedOfferCells: [HomeDealGoodsCell] {
-        let cells = model.offer.rows.first?.cells ?? []
-        return cells.enumerated()
-            .sorted { lhs, rhs in
-                if lhs.element.selected != rhs.element.selected {
-                    return !lhs.element.selected && rhs.element.selected
-                }
-                return lhs.offset < rhs.offset
-            }
-            .map(\.element)
-    }
-
-    @ViewBuilder
-    private func offerRow(_ row: HomeDealOfferRow) -> some View {
-        if row.cells.isEmpty {
-            HomeDealEmptyCell(side: thumbSide, label: "候補なし")
-        } else if row.cells.count == 1, let cell = row.cells.first {
-            HomeDealThumb(cell: cell, side: thumbSide, onTap: { onToggleOffer(cell.index) })
-        } else {
-            // 相手のほしいもの1件に対して複数候補 → 横スクロールで切り替え選択。
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 6) {
-                    ForEach(row.cells) { cell in
-                        HomeDealThumb(cell: cell, side: thumbSide - 6, onTap: { onToggleOffer(cell.index) })
-                    }
-                }
-            }
-        }
-    }
-
-    // MARK: - 列の器
+    // MARK: - 列の器・矢印
 
     private func dealColumn<Content: View>(
         title: String,
@@ -189,6 +142,7 @@ struct HomeDealBlockView: View {
                 Text(title)
                     .font(.system(size: 12.5, weight: .black, design: .rounded))
                     .foregroundStyle(MegrumTheme.ink.opacity(0.82))
+                    .fixedSize()
                 if let qty {
                     Text("(\(qty))")
                         .font(.system(size: 9.5, weight: .bold, design: .rounded))
@@ -197,9 +151,22 @@ struct HomeDealBlockView: View {
                         .minimumScaleFactor(0.7)
                 }
             }
+            .lineLimit(1)
             content()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func dealArrow(_ systemName: String) -> some View {
+        VStack(spacing: 0) {
+            Color.clear.frame(height: 20)
+            Image(systemName: systemName)
+                .font(.system(size: 12, weight: .black))
+                .foregroundStyle(MegrumTheme.ink.opacity(0.3))
+                .frame(height: thumbSide)
+        }
+        .frame(width: 14)
+        .accessibilityHidden(true)
     }
 }
 
@@ -223,41 +190,34 @@ struct HomeDealThumb: View {
         .accessibilityAddTraits(cell.selected ? [.isSelected] : [])
     }
 
+    // グッズ名は出さず画像のみ。チェック/?は枠からはみ出す位置に。iter1226.376。
     private var thumb: some View {
-        VStack(spacing: 4) {
-            ZStack(alignment: .topLeading) {
-                ListingGoodsImage(url: cell.imageURL, title: cell.title, cornerRadius: 12)
-                    .frame(width: side, height: side)
-                indicator
-                    .padding(4)
+        ListingGoodsImage(url: cell.imageURL, title: cell.title, cornerRadius: 12)
+            .frame(width: side, height: side)
+            .overlay(alignment: .topLeading) {
+                indicator.offset(x: -7, y: -7)
+            }
+            .overlay(alignment: .topTrailing) {
                 if cell.tentative {
                     Text("?")
                         .font(.system(size: 11, weight: .black, design: .rounded))
                         .foregroundStyle(.white)
-                        .frame(width: 18, height: 18)
-                        .background(MegrumTheme.conditionExact.opacity(0.9), in: Circle())
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-                        .padding(4)
+                        .frame(width: 20, height: 20)
+                        .background(MegrumTheme.conditionExact.opacity(0.95), in: Circle())
+                        .overlay { Circle().strokeBorder(.white, lineWidth: 1.5) }
+                        .offset(x: 7, y: -7)
                 }
             }
-            .frame(width: side, height: side)
-
-            Text(cell.title)
-                .font(.system(size: 9, weight: .semibold, design: .rounded))
-                .foregroundStyle(MegrumTheme.ink.opacity(0.7))
-                .lineLimit(1)
-                .frame(width: side)
-        }
     }
 
     @ViewBuilder
     private var indicator: some View {
         if cell.selected {
             Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 19, weight: .black))
+                .font(.system(size: 21, weight: .black))
                 .foregroundStyle(HomeDealGradient.selection)
                 .background(Circle().fill(.white).padding(2))
-                .shadow(color: .black.opacity(0.18), radius: 3, y: 1)
+                .shadow(color: .black.opacity(0.22), radius: 3, y: 1)
         } else if onTap != nil {
             ZStack {
                 Circle()
@@ -265,66 +225,87 @@ struct HomeDealThumb: View {
                         MegrumTheme.ink.opacity(0.3),
                         style: StrokeStyle(lineWidth: 1.6, dash: [3, 2.4])
                     )
-                    .background(Circle().fill(.white.opacity(0.86)))
+                    .background(Circle().fill(.white.opacity(0.9)))
                 Image(systemName: "plus")
                     .font(.system(size: 10, weight: .black))
                     .foregroundStyle(MegrumTheme.ink.opacity(0.42))
             }
-            .frame(width: 19, height: 19)
+            .frame(width: 20, height: 20)
         }
     }
 }
 
-/// 相手のほしいもの画像（相手希望・指名）。選択なし表示専用。
+/// 相手のほしいもの画像（相手希望・指名）。選択なし表示専用。グッズ名は出さない。
 struct HomeDealWishThumb: View {
     var item: HomeDealWishCell
     var side: CGFloat
 
     var body: some View {
-        VStack(spacing: 4) {
-            ListingGoodsImage(url: item.imageURL, title: item.title, cornerRadius: 12)
-                .frame(width: side, height: side)
-            Text(item.title)
-                .font(.system(size: 9, weight: .semibold, design: .rounded))
-                .foregroundStyle(MegrumTheme.ink.opacity(0.7))
-                .lineLimit(1)
-                .frame(width: side)
-        }
-        .accessibilityLabel("相手のほしいもの \(item.title)")
+        ListingGoodsImage(url: item.imageURL, title: item.title, cornerRadius: 12)
+            .frame(width: side, height: side)
+            .accessibilityLabel("相手のほしいもの \(item.title)")
     }
 }
 
-/// 条件タイル（相手希望・条件指定）。スライダーアイコン＋不確定なら「?」＋条件文。
-struct HomeDealConditionTileView: View {
-    var tile: HomeDealConditionTile
+/// 条件指定の相手希望アイコン（スライダー＋不確定なら「?」）。条件文はブロック下の確認セクションへ。iter1226.376。
+struct HomeDealConditionIcon: View {
+    var side: CGFloat
+    var tentative: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            HStack(spacing: 4) {
+        RoundedRectangle(cornerRadius: 12, style: .continuous)
+            .fill(MegrumTheme.lavender.opacity(0.10))
+            .frame(width: side, height: side)
+            .overlay {
                 Image(systemName: "slider.horizontal.3")
-                    .font(.system(size: 11, weight: .heavy))
-                Text(tile.tentative ? "条件（？）" : "条件")
-                    .font(.system(size: 11, weight: .black, design: .rounded))
+                    .font(.system(size: 22, weight: .heavy))
+                    .foregroundStyle(MegrumTheme.lavender)
             }
-            .foregroundStyle(MegrumTheme.lavender)
+            .overlay {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .strokeBorder(MegrumTheme.lavender.opacity(0.28), lineWidth: 1)
+            }
+            .overlay(alignment: .topTrailing) {
+                if tentative {
+                    Text("?")
+                        .font(.system(size: 11, weight: .black, design: .rounded))
+                        .foregroundStyle(.white)
+                        .frame(width: 20, height: 20)
+                        .background(MegrumTheme.conditionExact.opacity(0.95), in: Circle())
+                        .overlay { Circle().strokeBorder(.white, lineWidth: 1.5) }
+                        .offset(x: 7, y: -7)
+                }
+            }
+            .accessibilityLabel(tentative ? "条件（要確認）" : "条件")
+    }
+}
 
-            ForEach(Array(tile.tokens.prefix(3).enumerated()), id: \.offset) { _, token in
-                Text(token)
-                    .font(.system(size: 11.5, weight: .black, design: .rounded))
-                    .foregroundStyle(MegrumTheme.ink)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.72)
-                    .multilineTextAlignment(.leading)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(9)
-        .background(MegrumTheme.lavender.opacity(0.07), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay {
+/// ゆずるの「選ぶ」タイル（タップで候補ポップアップを開く）。iter1226.376。
+struct HomeDealPickTile: View {
+    var side: CGFloat
+    var action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(MegrumTheme.lavender.opacity(0.22), lineWidth: 1)
+                .strokeBorder(
+                    MegrumTheme.lavender.opacity(0.5),
+                    style: StrokeStyle(lineWidth: 1.6, dash: [4, 3])
+                )
+                .background(MegrumTheme.lavender.opacity(0.06))
+                .frame(width: side, height: side)
+                .overlay {
+                    VStack(spacing: 2) {
+                        Image(systemName: "plus")
+                            .font(.system(size: 15, weight: .black))
+                        Text("選ぶ")
+                            .font(.system(size: 10, weight: .black, design: .rounded))
+                    }
+                    .foregroundStyle(MegrumTheme.lavender)
+                }
         }
-        .accessibilityLabel("相手の希望条件 " + tile.tokens.joined(separator: "、"))
+        .buttonStyle(.plain)
+        .accessibilityLabel("譲るグッズを選ぶ")
     }
 }
 
@@ -498,16 +479,112 @@ struct HomeReceiveGoodsListSheet: View {
     }
 }
 
-/// 条件パターンの「条件のグッズを確認！」セクション。notes/19 Phase4・iter1226.375。
-/// ①参考画像2枚があれば並べ、②無ければ「グループ メンバー #シリーズ」でGoogle画像検索ボタン。
+/// ゆずる候補ポップアップ。相手希望（条件/指名）に合致する手持ちを一覧で出して選ぶ。iter1226.376。
+struct HomeOfferGoodsPickerSheet: View {
+    var requirementText: String?
+    var cells: [HomeDealGoodsCell]
+    var onToggle: (Int) -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    private var selectedCount: Int { cells.filter(\.selected).count }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 3) {
+                HStack {
+                    Text("譲るグッズを選ぶ")
+                        .font(.system(size: 17, weight: .black, design: .rounded))
+                        .foregroundStyle(MegrumTheme.ink)
+                    Spacer()
+                    Text("\(selectedCount)件選択中")
+                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .foregroundStyle(MegrumTheme.lavender)
+                }
+                if let requirementText {
+                    Text("相手の希望：\(requirementText)")
+                        .font(.system(size: 12.5, weight: .bold, design: .rounded))
+                        .foregroundStyle(MegrumTheme.muted)
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 22)
+            .padding(.bottom, 14)
+
+            ScrollView {
+                VStack(spacing: 10) {
+                    ForEach(cells) { cell in
+                        row(cell)
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 20)
+            }
+
+            Button {
+                dismiss()
+            } label: {
+                Text("決定")
+                    .font(.system(size: 17, weight: .black, design: .rounded))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 15)
+                    .background(MegrumTheme.lavender, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, 20)
+            .padding(.top, 8)
+            .padding(.bottom, 16)
+            .background(.ultraThinMaterial)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(MegrumTheme.canvas)
+    }
+
+    private func row(_ cell: HomeDealGoodsCell) -> some View {
+        Button {
+            onToggle(cell.index)
+        } label: {
+            HStack(spacing: 12) {
+                ListingGoodsImage(url: cell.imageURL, title: cell.title, cornerRadius: 10)
+                    .frame(width: 52, height: 52)
+                Text(cell.title)
+                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .foregroundStyle(MegrumTheme.ink)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                Spacer(minLength: 0)
+                Image(systemName: cell.selected ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 24, weight: .black))
+                    .foregroundStyle(cell.selected ? AnyShapeStyle(HomeDealGradient.selection) : AnyShapeStyle(MegrumTheme.ink.opacity(0.24)))
+            }
+            .padding(10)
+            .background(
+                (cell.selected ? MegrumTheme.lavender.opacity(0.10) : MegrumTheme.ink.opacity(0.035)),
+                in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(cell.title)
+        .accessibilityAddTraits(cell.selected ? [.isSelected] : [])
+    }
+}
+
+/// 条件パターンの「条件のグッズを確認！」セクション。notes/19 Phase4・iter1226.375/376。
+/// 条件文＋①参考画像2枚 or ②「グループ メンバー 種別 #シリーズ」でGoogle画像検索ボタン。
 struct HomeConditionSeriesCheckSection: View {
     var model: HomeConditionSeriesCheckModel
     @Environment(\.openURL) private var openURL
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
+            if !model.conditionText.isEmpty {
+                (Text("条件：").foregroundStyle(MegrumTheme.muted) + Text(model.conditionText).foregroundStyle(MegrumTheme.ink))
+                    .font(.system(size: 13, weight: .black, design: .rounded))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
             HStack(spacing: 7) {
-                Image(systemName: "checkmark.seal")
+                Image(systemName: "eye")
                     .font(.system(size: 14, weight: .bold))
                 Text("条件のグッズを確認！")
                     .font(.system(size: 14.5, weight: .black, design: .rounded))

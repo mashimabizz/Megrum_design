@@ -26,11 +26,18 @@ struct HomeDealPartnerColumn: Equatable {
     var conditionTile: HomeDealConditionTile?
 }
 
-/// 譲る列（自分の候補）。指名は行が namedItems と1対1、条件は1行にフラット表示。
+/// 譲る列（自分の候補）。ゆずるはポップアップ一覧で選ぶ（iter1226.376）。
+/// flatCells＝条件に合致する手持ち全件（選択済みフラグ付き）。requiredCount＝必要選択数。
 struct HomeDealOfferColumn: Equatable {
     var qtyLabel: String?
     var isNamed: Bool
     var rows: [HomeDealOfferRow]
+    var flatCells: [HomeDealGoodsCell]
+    var requiredCount: Int
+
+    var selectedCells: [HomeDealGoodsCell] {
+        flatCells.filter(\.selected)
+    }
 }
 
 struct HomeDealOfferRow: Equatable, Identifiable {
@@ -74,9 +81,11 @@ struct HomeDealAchievement: Equatable {
 /// 条件パターンの「条件のグッズを確認！」セクション。notes/19 Phase4。
 /// ①参考画像2枚があればそれを、②無ければ「グループ メンバー #シリーズ」でGoogle画像検索。①②は排他。
 struct HomeConditionSeriesCheckModel: Equatable {
+    /// 条件文（例「TWICE / トレカ / #DICON D'FESTA」）。セクション先頭に「条件：…」で出す。
+    var conditionText: String
     /// ① 参考グッズ画像（この推し×シリーズ）。2枚以上あれば①、無ければ②。
     var referenceImageURLs: [URL]
-    /// ② Google画像検索クエリ（例「BTS RM #DICON D'FESTA」）。
+    /// ② Google画像検索クエリ（例「TWICE チェヨン トレカ #DICON D'FESTA」）。
     var searchQuery: String
     /// ② 検索URL。
     var searchURL: URL?
