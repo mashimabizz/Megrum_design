@@ -4,6 +4,30 @@
 
 ---
 
+## イテレーション1226.363：無記載は不確定「？」＋激求→超求リネーム（超求めてる？/求めてる？）
+
+### 背景・問題意識
+オーナーとの認識合わせで確定：メンバー・種別・シリーズが「相手指定あり・自分無記載」のケースは、断定せず不確定「？」表記にしたい。別シリーズ（両方記載・不一致）は非マッチ。表示は激求→**超求**へリネーム、助詞「が」→「を」。
+
+### 変更内容
+- **確度の導入**（`HomeCandidateMatchConfidence` 新設）：軸ごとに ok/不確定/不一致 → 統合で 確定/不確定/非マッチ。相手指定ありで自分が無記載＝不確定、別値＝非マッチ。
+- `HomeMutualMatchListingEvaluator`：`mutualOptionMatchConfidence`／`wishGoodsConfidence` を追加（条件・指名・ほしいものを確度付きで判定）。`mutualOptionWantsCounterpartGoods` は確度≠nil のラッパに。指名経路もシリーズを見るように統一。
+- `HomeIndividualListingWantedOption` に `tentativeGoodsIDs`、`HomeCandidateConditionSignals` に `wishTentativeOfferGoodsIDs` を追加し、確度をホームまで伝搬。
+- `HomeCandidateDemandPolicy.demandLine`：**8段階**に（超求！/超求めてる？/求！/求めてる？/定価/探し中/相談）。確定満たせる=超求！、不確定含む=超求めてる？、ほしもの確定=求！、不確定=求めてる？。ランク6..0。副次ソートは rank≥4。
+- 表示（`HomeDiscoveryCandidateSummaryRow`）：「を超求！」「を超求めてる？」「を求！」「を求めてる？」。？系はピンク/ラベンダーの淡いトーン。
+- `notes/18` を最終仕様に更新。テスト（DemandPolicy/Composer）を確度・8段階に合わせて更新。
+
+### 影響範囲
+- ホーム候補の需要行（バッジ・色・並び順）。マッチ判定（`mutualOptionWantsCounterpartGoods` は不確定も true になる＝無記載も一致扱いに拡大、別シリーズは除外）。
+
+### 確認方法
+- swift test 1517件 green（軸ごと確度・8段階・別シリーズ非マッチを担保）。sim ホームで「を求！」表記・クラッシュ無しを確認。
+
+### 関連ファイル
+- `HomeCandidateMatchConfidence.swift` / `HomeMutualMatchListingEvaluation.swift` / `HomeCandidateDemandPolicy.swift` / `HomeDiscoveryCandidateSummaryRow.swift` / `notes/18_demand_matching_logic.md`
+
+---
+
 ## イテレーション1226.362：激求！の定義変更（個別募集=激求／ほしいもの=求）＋需要仕様の言語化
 
 ### 背景・問題意識

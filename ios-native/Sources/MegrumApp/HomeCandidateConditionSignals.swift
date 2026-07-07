@@ -155,6 +155,8 @@ public struct HomeCandidateConditionSignals: Equatable, Sendable {
     public var linkCounts: HomeCandidateLinkCounts
     public var individualListingSelection: HomeIndividualListingSelectionContext?
     public var wishMatchedOfferGoodsIDs: [UUID]
+    /// wishMatchedOfferGoodsIDs のうち、シリーズ等が無記載で「確定」できない（＝不確定「？」）分。iter1226.363。
+    public var wishTentativeOfferGoodsIDs: [UUID]
     public var wishMatchedPartnerUserIDs: [UUID]
     public var matchesViewerWish: Bool
     public var matchesViewerWishCharacter: Bool
@@ -170,6 +172,7 @@ public struct HomeCandidateConditionSignals: Equatable, Sendable {
         linkCounts: HomeCandidateLinkCounts = .zero,
         individualListingSelection: HomeIndividualListingSelectionContext? = nil,
         wishMatchedOfferGoodsIDs: [UUID] = [],
+        wishTentativeOfferGoodsIDs: [UUID] = [],
         wishMatchedPartnerUserIDs: [UUID] = [],
         matchesViewerWish: Bool = false,
         matchesViewerWishCharacter: Bool = false,
@@ -183,6 +186,7 @@ public struct HomeCandidateConditionSignals: Equatable, Sendable {
         self.linkCounts = linkCounts
         self.individualListingSelection = individualListingSelection
         self.wishMatchedOfferGoodsIDs = Self.orderedUnique(wishMatchedOfferGoodsIDs)
+        self.wishTentativeOfferGoodsIDs = Self.orderedUnique(wishTentativeOfferGoodsIDs)
         self.wishMatchedPartnerUserIDs = Self.orderedUnique(wishMatchedPartnerUserIDs)
         self.matchesViewerWish = matchesViewerWish
         self.matchesViewerWishCharacter = matchesViewerWishCharacter

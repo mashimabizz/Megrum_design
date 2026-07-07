@@ -246,60 +246,88 @@ enum HomeMutualMatchListingEvaluator {
         rowsByID: [UUID: SupabaseHomeGoodsRow],
         tagsByInventoryID: [UUID: [SupabaseHomeInventoryTagRow]] = [:]
     ) -> Bool {
-        guard option.isCashOffer != true else {
-            return false
-        }
-        if option.wishIds.contains(counterpartItem.id) {
-            return true
-        }
+        mutualOptionMatchConfidence(
+            option,
+            counterpartItem: counterpartItem,
+            rowsByID: rowsByID,
+            tagsByInventoryID: tagsByInventoryID
+        ) != nil
+    }
 
+    /// 相手の選択肢と自分のグッズの一致確度（確定/不確定/非マッチ）。iter1226.363。
+    /// メンバー・種別・シリーズは、相手が指定していて自分が無記載なら「不確定」、別値なら非マッチ。
+    static func mutualOptionMatchConfidence(
+        _ option: SupabaseHomeListingWishOptionRow,
+        counterpartItem: SupabaseHomeGoodsRow,
+        rowsByID: [UUID: SupabaseHomeGoodsRow],
+        tagsByInventoryID: [UUID: [SupabaseHomeInventoryTagRow]] = [:]
+    ) -> HomeCandidateMatchConfidence? {
+        guard option.isCashOffer != true else {
+            return nil
+        }
+        // 1. 現物IDを直接指名しているケース（確定）。
+        if option.wishIds.contains(counterpartItem.id) {
+            return .confirmed
+        }
+        // 2. 指名グッズ（相手のほしいもの行）と軸判定。最良の確度を採用。
         let wantedRows = option.wishIds.compactMap { rowsByID[$0] }
         if !wantedRows.isEmpty {
-            return wantedRows.contains {
-                HomeCandidateGoodsMatchPolicy.wishRow($0, matches: counterpartItem)
-            }
-        }
-
-        guard option.wishGroupId != nil || option.wishGoodsTypeId != nil else {
-            return false
-        }
-        guard HomeCandidateGoodsMatchPolicy.fieldMatches(option.wishGroupId, counterpartItem.groupId),
-              HomeCandidateGoodsMatchPolicy.fieldMatches(option.wishGoodsTypeId, counterpartItem.goodsTypeId)
-        else {
-            return false
-        }
-
-        // メンバー指定：指定ありなら一致必須、除外なら指定メンバーは対象外。
-        if !option.wishMemberIds.isEmpty {
-            let matchesMember = counterpartItem.characterId.map(option.wishMemberIds.contains) ?? false
-            if option.excludesWishMembers {
-                if matchesMember {
-                    return false
+            var best: HomeCandidateMatchConfidence?
+            for wish in wantedRows {
+                if let confidence = wishGoodsConfidence(
+                    wish: wish,
+                    item: counterpartItem,
+                    tagsByInventoryID: tagsByInventoryID
+                ) {
+                    best = HomeCandidateMatchConfidencePolicy.better(best, confidence)
                 }
-            } else if !matchesMember {
-                return false
             }
+            return best
         }
-
-        // シリーズ指定：相手グッズのタグに指定シリーズが1つでも含まれること。
-        if !option.wishSeriesNames.isEmpty {
-            let wantedSeries = Set(option.wishSeriesNames.compactMap(HomeCandidateTagMatcher.normalizedName))
-            let itemTags = HomeCandidateTagMatcher.normalizedSet(tagsByInventoryID[counterpartItem.id] ?? [])
-            if !wantedSeries.isEmpty, wantedSeries.isDisjoint(with: itemTags) {
-                return false
-            }
+        // 3. 条件指定（グループ/種別＋メンバー/シリーズ/数量）。
+        guard option.wishGroupId != nil || option.wishGoodsTypeId != nil else {
+            return nil
         }
-
-        // 数量指定：相手が出せる数量（在庫）を満たしていること。
+        // 数量はハード条件（満たせなければ非マッチ）。
         if option.wishQuantity > 1 {
             let availableQuantity = counterpartItem.marketAvailableQty
                 ?? counterpartItem.quantity
                 ?? 1
             if availableQuantity < option.wishQuantity {
-                return false
+                return nil
             }
         }
+        let series = HomeCandidateMatchConfidencePolicy.seriesAxis(
+            wanted: Set(option.wishSeriesNames.compactMap(HomeCandidateTagMatcher.normalizedName)),
+            itemTags: HomeCandidateTagMatcher.normalizedSet(tagsByInventoryID[counterpartItem.id] ?? [])
+        )
+        return HomeCandidateMatchConfidencePolicy.combine([
+            HomeCandidateMatchConfidencePolicy.idAxis(expected: option.wishGroupId, actual: counterpartItem.groupId),
+            HomeCandidateMatchConfidencePolicy.idAxis(expected: option.wishGoodsTypeId, actual: counterpartItem.goodsTypeId),
+            HomeCandidateMatchConfidencePolicy.memberAxis(
+                wishMemberIds: option.wishMemberIds,
+                excludes: option.excludesWishMembers,
+                actual: counterpartItem.characterId
+            ),
+            series
+        ])
+    }
 
-        return true
+    /// 相手のほしいもの1件（指名グッズ）と自分のグッズの軸判定（グループ・メンバー・種別・シリーズ）。
+    static func wishGoodsConfidence(
+        wish: SupabaseHomeGoodsRow,
+        item: SupabaseHomeGoodsRow,
+        tagsByInventoryID: [UUID: [SupabaseHomeInventoryTagRow]] = [:]
+    ) -> HomeCandidateMatchConfidence? {
+        let series = HomeCandidateMatchConfidencePolicy.seriesAxis(
+            wanted: HomeCandidateTagMatcher.normalizedSet(tagsByInventoryID[wish.id] ?? []),
+            itemTags: HomeCandidateTagMatcher.normalizedSet(tagsByInventoryID[item.id] ?? [])
+        )
+        return HomeCandidateMatchConfidencePolicy.combine([
+            HomeCandidateMatchConfidencePolicy.idAxis(expected: wish.groupId, actual: item.groupId),
+            HomeCandidateMatchConfidencePolicy.idAxis(expected: wish.characterId, actual: item.characterId),
+            HomeCandidateMatchConfidencePolicy.idAxis(expected: wish.goodsTypeId, actual: item.goodsTypeId),
+            series
+        ])
     }
 }

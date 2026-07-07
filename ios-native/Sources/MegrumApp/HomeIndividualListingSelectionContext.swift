@@ -125,6 +125,8 @@ public struct HomeIndividualListingWantedOption: Identifiable, Equatable, Sendab
     public var kind: Kind
     public var goodsIDs: [UUID]
     public var matchingGoodsIDs: [UUID]
+    /// matchingGoodsIDs のうち、シリーズ等が無記載で「確定」できない（＝不確定「？」）分。iter1226.363。
+    public var tentativeGoodsIDs: [UUID]
     public var previewItems: [HomeIndividualListingWantedPreviewItem]
     public var groupID: UUID?
     public var goodsTypeID: UUID?
@@ -141,6 +143,7 @@ public struct HomeIndividualListingWantedOption: Identifiable, Equatable, Sendab
         kind: Kind,
         goodsIDs: [UUID] = [],
         matchingGoodsIDs: [UUID] = [],
+        tentativeGoodsIDs: [UUID] = [],
         previewItems: [HomeIndividualListingWantedPreviewItem] = [],
         groupID: UUID? = nil,
         goodsTypeID: UUID? = nil,
@@ -156,6 +159,7 @@ public struct HomeIndividualListingWantedOption: Identifiable, Equatable, Sendab
         self.kind = kind
         self.goodsIDs = goodsIDs
         self.matchingGoodsIDs = matchingGoodsIDs
+        self.tentativeGoodsIDs = tentativeGoodsIDs
         self.previewItems = previewItems
         self.groupID = groupID
         self.goodsTypeID = goodsTypeID

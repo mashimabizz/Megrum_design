@@ -163,9 +163,13 @@ struct HomeDiscoveryCandidateSummaryRow: View {
     private func demandAccessibilityText(_ demand: HomeCandidateDemandLine) -> String {
         switch demand {
         case .hotDemand(let ids):
-            ids.count > 1 ? "あなたのグッズ他\(ids.count - 1)点が激求" : "あなたのグッズが激求"
+            ids.count > 1 ? "あなたのグッズ他\(ids.count - 1)点を超求" : "あなたのグッズを超求"
+        case .hotDemandTentative(let ids):
+            ids.count > 1 ? "あなたのグッズ他\(ids.count - 1)点を超求めてる？" : "あなたのグッズを超求めてる？"
         case .demand(let ids):
-            ids.count > 1 ? "あなたのグッズ他\(ids.count - 1)点が求" : "あなたのグッズが求"
+            ids.count > 1 ? "あなたのグッズ他\(ids.count - 1)点を求" : "あなたのグッズを求"
+        case .demandTentative(let ids):
+            ids.count > 1 ? "あなたのグッズ他\(ids.count - 1)点を求めてる？" : "あなたのグッズを求めてる？"
         case .cash(let amount):
             amount.map { "定価（¥\($0.formatted())）と交換OK" } ?? "定価と交換OK"
         case .lookingFor(let text):
@@ -186,7 +190,7 @@ struct HomeCandidateDemandLineView: View {
         case .hotDemand(let goodsIDs):
             demandText(
                 goodsIDs: goodsIDs,
-                suffixBase: "が激求！",
+                suffixBase: "を超求！",
                 suffixStyle: AnyShapeStyle(
                     LinearGradient(
                         colors: [MegrumTheme.pink, Color(red: 0.94, green: 0.35, blue: 0.55)],
@@ -195,11 +199,25 @@ struct HomeCandidateDemandLineView: View {
                     )
                 )
             )
+        case .hotDemandTentative(let goodsIDs):
+            // 不確定＝ピンク系の淡いトーン＋末尾「？」（iter1226.363）。
+            demandText(
+                goodsIDs: goodsIDs,
+                suffixBase: "を超求めてる？",
+                suffixStyle: AnyShapeStyle(Color(red: 0.94, green: 0.35, blue: 0.55).opacity(0.5))
+            )
         case .demand(let goodsIDs):
             demandText(
                 goodsIDs: goodsIDs,
-                suffixBase: "が求！",
+                suffixBase: "を求！",
                 suffixStyle: AnyShapeStyle(MegrumTheme.lavender)
+            )
+        case .demandTentative(let goodsIDs):
+            // 不確定＝ラベンダー系の淡いトーン＋末尾「？」（iter1226.363）。
+            demandText(
+                goodsIDs: goodsIDs,
+                suffixBase: "を求めてる？",
+                suffixStyle: AnyShapeStyle(MegrumTheme.lavender.opacity(0.5))
             )
         case .cash(let amount):
             Text(amount.map { "定価（¥\($0.formatted())）と交換OK" } ?? "定価と交換OK")

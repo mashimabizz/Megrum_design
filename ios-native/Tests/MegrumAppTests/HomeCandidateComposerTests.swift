@@ -1985,21 +1985,39 @@ final class HomeCandidateComposerTests: XCTestCase {
             tagID: "ffffffff-0000-0000-0000-000000000001",
             label: "#map of the soul"
         )
+        let differentTag = try inventoryTagRow(
+            inventoryID: itemID,
+            tagID: "ffffffff-0000-0000-0000-000000000002",
+            label: "#persona"
+        )
 
-        XCTAssertTrue(
-            HomeMutualMatchListingEvaluator.mutualOptionWantsCounterpartGoods(
+        // 一致シリーズ → 確定マッチ。
+        XCTAssertEqual(
+            HomeMutualMatchListingEvaluator.mutualOptionMatchConfidence(
                 option,
                 counterpartItem: item,
                 rowsByID: [:],
                 tagsByInventoryID: [item.id: [matchingTag]]
-            )
+            ),
+            .confirmed
         )
-        XCTAssertFalse(
-            HomeMutualMatchListingEvaluator.mutualOptionWantsCounterpartGoods(
+        // シリーズ無記載 → 不確定マッチ（iter1226.363）。
+        XCTAssertEqual(
+            HomeMutualMatchListingEvaluator.mutualOptionMatchConfidence(
                 option,
                 counterpartItem: item,
                 rowsByID: [:],
                 tagsByInventoryID: [:]
+            ),
+            .tentative
+        )
+        // 別シリーズ（記載あり・不一致）→ 非マッチ。
+        XCTAssertNil(
+            HomeMutualMatchListingEvaluator.mutualOptionMatchConfidence(
+                option,
+                counterpartItem: item,
+                rowsByID: [:],
+                tagsByInventoryID: [item.id: [differentTag]]
             )
         )
     }

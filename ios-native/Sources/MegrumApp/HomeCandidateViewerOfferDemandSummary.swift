@@ -5,6 +5,8 @@ struct HomeCandidateViewerOfferDemandSummary {
     let wishHitCount: Int
     let listingHitCount: Int
     let wishMatchedOfferGoodsIDs: [UUID]
+    /// ほしいもの一致のうち、シリーズ等が無記載で確定できない（＝不確定「？」）分。iter1226.363。
+    let wishTentativeOfferGoodsIDs: [UUID]
     let wishMatchedPartnerUserIDs: [UUID]
     let orderedPartnerIDs: [UUID]
     let partnerAllowsMail: Bool
@@ -33,9 +35,19 @@ struct HomeCandidateViewerOfferDemandSummary {
     }
 
     init(viewerItem: SupabaseHomeGoodsRow, context: HomeCandidateCompositionContext) {
-        let matchingPartnerWishes = context.partnerScope.wishes.filter { partnerWish in
-            HomeCandidateComposer.wishRow(partnerWish, matches: viewerItem)
+        // ほしいもの一致は確度（確定/不確定）付きで評価。メンバー・種別・シリーズが無記載なら不確定。iter1226.363。
+        let wishMatches = context.partnerScope.wishes.compactMap { partnerWish -> (SupabaseHomeGoodsRow, HomeCandidateMatchConfidence)? in
+            guard let confidence = HomeMutualMatchListingEvaluator.wishGoodsConfidence(
+                wish: partnerWish,
+                item: viewerItem,
+                tagsByInventoryID: context.tagsByInventoryID
+            ) else {
+                return nil
+            }
+            return (partnerWish, confidence)
         }
+        let matchingPartnerWishes = wishMatches.map(\.0)
+        let hasConfirmedWish = wishMatches.contains { $0.1 == .confirmed }
         let partnerWishRowsByID = Dictionary(
             context.partnerScope.wishes.map { ($0.id, $0) },
             uniquingKeysWith: { first, _ in first }
@@ -63,6 +75,8 @@ struct HomeCandidateViewerOfferDemandSummary {
         wishHitCount = matchingPartnerWishes.count
         listingHitCount = matchingPartnerListings.count
         wishMatchedOfferGoodsIDs = matchingPartnerWishes.isEmpty ? [] : [viewerItem.id]
+        // 一致はあるが確定ほしいもの一致が無い＝不確定「？」。
+        wishTentativeOfferGoodsIDs = (!matchingPartnerWishes.isEmpty && !hasConfirmedWish) ? [viewerItem.id] : []
         wishMatchedPartnerUserIDs = HomeCandidateComposer.orderedUnique(matchingPartnerWishes.map(\.userId))
         orderedPartnerIDs = HomeCandidateComposer.orderedUnique(
             matchingPartnerWishes.map(\.userId) + matchingPartnerListings.map(\.userId)

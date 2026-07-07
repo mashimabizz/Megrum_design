@@ -31,6 +31,7 @@ enum HomeCandidateViewerOfferSignalsBuilder {
             linkCounts: partnerDemand.linkCounts,
             individualListingSelection: partnerDemand.individualListingSelection,
             wishMatchedOfferGoodsIDs: partnerDemand.wishMatchedOfferGoodsIDs,
+            wishTentativeOfferGoodsIDs: partnerDemand.wishTentativeOfferGoodsIDs,
             wishMatchedPartnerUserIDs: partnerDemand.wishMatchedPartnerUserIDs,
             tagMatchCount: partnerDemand.tagMatchCount
         )

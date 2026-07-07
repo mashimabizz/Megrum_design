@@ -18,10 +18,11 @@ enum HomeCandidateListingWantedOptionFactory {
             return cashWantedOption(option: option, logic: logic)
         }
 
+        let rowsByID = Self.rowsByID(previewInventory)
         let matchingItems = HomeCandidateListingWantedOptionMatchPolicy.matchingItems(
             for: option,
             in: viewerInventory,
-            wantedRowsByID: Self.rowsByID(previewInventory),
+            wantedRowsByID: rowsByID,
             tagsByInventoryID: tagsByInventoryID
         )
         guard HomeCandidateListingWantedOptionMatchPolicy.isSelectable(
@@ -36,6 +37,12 @@ enum HomeCandidateListingWantedOptionFactory {
             option: option,
             logic: logic,
             matchingItems: matchingItems,
+            tentativeGoodsIDs: Self.tentativeGoodsIDs(
+                option: option,
+                matchingItems: matchingItems,
+                rowsByID: rowsByID,
+                tagsByInventoryID: tagsByInventoryID
+            ),
             titlePreviewItems: [],
             previewItems: HomeCandidateListingWantedOptionPreviewBuilder.previewItems(
                 for: option,
@@ -61,10 +68,11 @@ enum HomeCandidateListingWantedOptionFactory {
             return cashWantedOption(option: option, logic: logic)
         }
 
+        let rowsByID = Self.rowsByID(previewInventory)
         let matchingItems = HomeCandidateListingWantedOptionMatchPolicy.matchingItems(
             for: option,
             in: viewerInventory,
-            wantedRowsByID: Self.rowsByID(previewInventory),
+            wantedRowsByID: rowsByID,
             tagsByInventoryID: tagsByInventoryID
         )
         let previews = HomeCandidateListingWantedOptionPreviewBuilder.previewItems(
@@ -81,10 +89,35 @@ enum HomeCandidateListingWantedOptionFactory {
             option: option,
             logic: logic,
             matchingItems: matchingItems,
+            tentativeGoodsIDs: Self.tentativeGoodsIDs(
+                option: option,
+                matchingItems: matchingItems,
+                rowsByID: rowsByID,
+                tagsByInventoryID: tagsByInventoryID
+            ),
             titlePreviewItems: previews,
             previewItems: previews,
             subtitleMatchingCount: max(matchingItems.count, previews.count)
         )
+    }
+
+    /// matchingItems のうち、確度が不確定（メンバー・種別・シリーズが無記載）な分のID。iter1226.363。
+    private static func tentativeGoodsIDs(
+        option: SupabaseHomeListingWishOptionRow,
+        matchingItems: [SupabaseHomeGoodsRow],
+        rowsByID: [UUID: SupabaseHomeGoodsRow],
+        tagsByInventoryID: [UUID: [SupabaseHomeInventoryTagRow]]
+    ) -> [UUID] {
+        matchingItems
+            .filter { item in
+                HomeMutualMatchListingEvaluator.mutualOptionMatchConfidence(
+                    option,
+                    counterpartItem: item,
+                    rowsByID: rowsByID,
+                    tagsByInventoryID: tagsByInventoryID
+                ) == .tentative
+            }
+            .map(\.id)
     }
 
     private static func rowsByID(_ rows: [SupabaseHomeGoodsRow]) -> [UUID: SupabaseHomeGoodsRow] {
@@ -111,6 +144,7 @@ enum HomeCandidateListingWantedOptionFactory {
         option: SupabaseHomeListingWishOptionRow,
         logic: ListingLogic,
         matchingItems: [SupabaseHomeGoodsRow],
+        tentativeGoodsIDs: [UUID] = [],
         titlePreviewItems: [HomeIndividualListingWantedPreviewItem],
         previewItems: [HomeIndividualListingWantedPreviewItem],
         subtitleMatchingCount: Int? = nil
@@ -134,6 +168,7 @@ enum HomeCandidateListingWantedOptionFactory {
             kind: kind,
             goodsIDs: option.wishIds,
             matchingGoodsIDs: matchingItems.map(\.id),
+            tentativeGoodsIDs: tentativeGoodsIDs,
             previewItems: previewItems,
             groupID: option.wishGroupId,
             goodsTypeID: option.wishGoodsTypeId

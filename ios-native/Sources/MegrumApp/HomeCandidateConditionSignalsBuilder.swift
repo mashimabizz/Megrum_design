@@ -19,6 +19,7 @@ enum HomeCandidateConditionSignalsBuilder {
         linkCounts: HomeCandidateLinkCounts,
         individualListingSelection: HomeIndividualListingSelectionContext?,
         wishMatchedOfferGoodsIDs: [UUID],
+        wishTentativeOfferGoodsIDs: [UUID] = [],
         wishMatchedPartnerUserIDs: [UUID],
         ownerHasMegrumPlus: Bool,
         partnerLookingForText: String? = nil
@@ -67,6 +68,7 @@ enum HomeCandidateConditionSignalsBuilder {
             linkCounts: linkCounts,
             individualListingSelection: individualListingSelection,
             wishMatchedOfferGoodsIDs: wishMatchedOfferGoodsIDs,
+            wishTentativeOfferGoodsIDs: wishTentativeOfferGoodsIDs,
             wishMatchedPartnerUserIDs: wishMatchedPartnerUserIDs,
             matchesViewerWish: matchesViewerWish,
             matchesViewerWishCharacter: matchesViewerWishCharacter,

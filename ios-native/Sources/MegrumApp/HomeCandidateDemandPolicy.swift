@@ -4,10 +4,14 @@ import Foundation
 /// 激求（指名）＞求（条件一致）＞定価＞探し中＞相談（iter1226.292 で合意した仕様）。
 /// 否定文は使わない。
 enum HomeCandidateDemandLine: Equatable, Sendable {
-    /// 相手があなたの具体グッズを指名（個別募集の「このグッズ」選択肢に合致）
+    /// 超求！＝相手の個別募集の選択肢（指名・条件）を、無記載なしで確定的に満たせる
     case hotDemand(goodsIDs: [UUID])
-    /// あなたのグッズが相手の条件（条件選択肢・ほしいもの）に一致
+    /// 超求めてる？＝個別募集を満たせるが、メンバー/種別/シリーズが無記載で確定できない（iter1226.363）
+    case hotDemandTentative(goodsIDs: [UUID])
+    /// 求！＝あなたのグッズが相手のほしいものに確定一致
     case demand(goodsIDs: [UUID])
+    /// 求めてる？＝ほしいものに当たるが無記載で確定できない（iter1226.363）
+    case demandTentative(goodsIDs: [UUID])
     /// 定価交換の選択肢あり
     case cash(amount: Int?)
     /// 合致なしだが相手の探し物が分かる
@@ -17,8 +21,10 @@ enum HomeCandidateDemandLine: Equatable, Sendable {
 
     var rank: Int {
         switch self {
-        case .hotDemand: 4
-        case .demand: 3
+        case .hotDemand: 6
+        case .hotDemandTentative: 5
+        case .demand: 4
+        case .demandTentative: 3
         case .cash: 2
         case .lookingFor: 1
         case .discuss: 0
@@ -33,24 +39,41 @@ enum HomeCandidateDemandPolicy {
 
     static func demandLine(for signals: HomeCandidateConditionSignals) -> HomeCandidateDemandLine {
         let options = signals.individualListingSelection?.wantedOptions ?? []
+        let listingOptions = options.filter { $0.kind == .goods || $0.kind == .condition }
 
-        // 激求！＝相手の「個別募集の選択肢」（指名 goods でも条件 condition でも）を、
-        // 自分が手持ちで満たせるもの（iter1226.362）。
-        // 相手の選択肢が要求する数（すべて／n個以上）を満たせない選択肢は、
-        // その選択肢では打診が完結しないため需要に数えない（iter1226.361）。
-        let listingMatchedIDs = orderedUnique(
-            options
-                .filter { ($0.kind == .goods || $0.kind == .condition) && isOfferSatisfiable($0) }
-                .flatMap(\.matchingGoodsIDs)
+        // 超求！＝個別募集の選択肢（指名・条件）を、無記載なしで確定的に満たせる（iter1226.363）。
+        let confirmedListingIDs = orderedUnique(
+            listingOptions
+                .filter { isConfirmedSatisfiable($0) }
+                .flatMap { confirmedGoodsIDs(of: $0) }
         )
-        if !listingMatchedIDs.isEmpty {
-            return .hotDemand(goodsIDs: listingMatchedIDs)
+        if !confirmedListingIDs.isEmpty {
+            return .hotDemand(goodsIDs: confirmedListingIDs)
         }
 
-        // 求！＝相手の「ほしいもの」（個別募集に紐づかない単独リスト）にヒット（iter1226.362）。
-        let wishMatchedIDs = orderedUnique(signals.wishMatchedOfferGoodsIDs)
-        if !wishMatchedIDs.isEmpty {
-            return .demand(goodsIDs: wishMatchedIDs)
+        // 超求めてる？＝個別募集を満たせるが、無記載を含み確定できない。
+        let tentativeListingIDs = orderedUnique(
+            listingOptions
+                .filter { isOfferSatisfiable($0) }
+                .flatMap(\.matchingGoodsIDs)
+        )
+        if !tentativeListingIDs.isEmpty {
+            return .hotDemandTentative(goodsIDs: tentativeListingIDs)
+        }
+
+        // 求！＝相手のほしいもの（単独リスト）に確定一致。
+        let wishTentative = Set(signals.wishTentativeOfferGoodsIDs)
+        let wishConfirmedIDs = orderedUnique(
+            signals.wishMatchedOfferGoodsIDs.filter { !wishTentative.contains($0) }
+        )
+        if !wishConfirmedIDs.isEmpty {
+            return .demand(goodsIDs: wishConfirmedIDs)
+        }
+
+        // 求めてる？＝ほしいものに当たるが無記載で確定できない。
+        let wishAllIDs = orderedUnique(signals.wishMatchedOfferGoodsIDs)
+        if !wishAllIDs.isEmpty {
+            return .demandTentative(goodsIDs: wishAllIDs)
         }
 
         if let cashOption = options.first(where: { $0.kind == .cash }) {
@@ -118,7 +141,8 @@ enum HomeCandidateDemandPolicy {
     static func sortKey(for candidate: HomeDiscoveryCandidate) -> (Int, Int) {
         let ranks = goodsDemandRanks(of: candidate)
         let bestRank = ranks.max() ?? 0
-        let demandCount = ranks.filter { $0 >= 3 }.count
+        // 確定した需要（求！＝rank4 以上）のグッズ数で副次ソート。
+        let demandCount = ranks.filter { $0 >= 4 }.count
         return (bestRank, demandCount)
     }
 
@@ -153,15 +177,29 @@ enum HomeCandidateDemandPolicy {
 
     // MARK: - Helpers
 
-    /// 相手の選択肢が要求する数（すべて＝指定グッズ数／n個以上＝n）を、自分の手持ち一致数で
-    /// 満たせるか。満たせない選択肢は打診が完結しないため需要に数えない（iter1226.361）。
-    private static func isOfferSatisfiable(_ option: HomeIndividualListingWantedOption) -> Bool {
-        let required = HomeListingSelectionPolicy.requiredOfferCount(
+    /// 相手の選択肢が要求する必要提示数（すべて＝指定グッズ数／n個以上＝n）。
+    private static func requiredOfferCount(of option: HomeIndividualListingWantedOption) -> Int {
+        HomeListingSelectionPolicy.requiredOfferCount(
             logic: option.logic,
             designatedCount: option.goodsIDs.count,
             minimumCount: option.minimumCount
         )
-        return option.matchingGoodsIDs.count >= required
+    }
+
+    /// matchingGoodsIDs のうち、確定（無記載なし）分。iter1226.363。
+    private static func confirmedGoodsIDs(of option: HomeIndividualListingWantedOption) -> [UUID] {
+        let tentative = Set(option.tentativeGoodsIDs)
+        return option.matchingGoodsIDs.filter { !tentative.contains($0) }
+    }
+
+    /// 全一致（確定＋不確定）で必要数を満たせるか。満たせない選択肢は需要に数えない（iter1226.361）。
+    private static func isOfferSatisfiable(_ option: HomeIndividualListingWantedOption) -> Bool {
+        option.matchingGoodsIDs.count >= requiredOfferCount(of: option)
+    }
+
+    /// 確定一致だけで必要数を満たせるか（＝超求！／求！の断定条件）。iter1226.363。
+    private static func isConfirmedSatisfiable(_ option: HomeIndividualListingWantedOption) -> Bool {
+        confirmedGoodsIDs(of: option).count >= requiredOfferCount(of: option)
     }
 
     private static func goodsDemandRanks(of candidate: HomeDiscoveryCandidate) -> [Int] {
