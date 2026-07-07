@@ -4,6 +4,47 @@
 
 ---
 
+## イテレーション1226.374/375：ホーム候補シートを「打診の組み立て」に振り切る再設計
+
+### 背景・問題意識
+オーナーとモック往復で確定（`notes/19_candidate_sheet_redesign.md`）。従来シートは「①相手が信頼できるか ②なぜマッチか ③打診の組み立て」を1画面で兼務し、一番大きい要素（グッズ画像）が判断の主役でなかった。→ ③に振り切り、①②は折りたたみへ降格。装飾色はやめ、意味のある色（需要チップ＝ピンク/ラベンダー、CTA、選択済み＝水色→紫グラデ）だけ残す。
+
+### 変更内容（Phase 1〜6）
+#### 新規ファイル
+- `HomeCandidateSheetHeaderViews.swift`：`HomeCandidateSheetHeader`（名前＋評価＋需要チップのみ、大画像・判定羅列を撤去）＋`HomeCandidateDemandChip`（超求！/超求めてる？/求！/求めてる？/定価/探し中/相談）。
+- `HomeCandidateDealAboutSection.swift`：「この取引について」iOS標準 DisclosureGroup（既定閉じ）。現地/日程・支払い（`HomeConditionVerdictBlock` 再利用）＋メモ・更新日。
+- `HomeCandidateDealBlockModel.swift`：取引ブロック（3列）＋条件シリーズ確認の描画モデル（純粋データ）。
+- `HomeCandidateDealBlockViews.swift`：`HomeDealBlockView`（受け取る｜相手希望｜譲る）／`HomeWantedOptionPills`（選択肢ピル常時表示）／`HomeReceiveGoodsListSheet`（受け取る一覧ポップアップ）／`HomeConditionSeriesCheckSection`（条件のグッズを確認！）。
+- `CandidateSheetVisualQAPreview.swift`：`candidate-sheet` VisualQA画面（`MEGRUM_VISUAL_QA_CANDIDATE_VARIANT=named/condition/conditionRef/cash/crowded/wish`）。
+
+#### 主な挙動
+- **3列取引ブロック**：数量ラベル（すべて/N個以上）を受け取る・譲る両方に。達成カウンタ（例「すべて：1/2 選択済み・あと1つで成立」）をブロック直下固定。選択済み＝水色→紫グラデチェック、未選択＝破線＋。
+- **指名**：相手のほしいもの画像↔自分の候補を1対1（相手RM→あなたのRM）。データは `HomeWantedNamedPairing`（iter1226.373）を factory で算出。
+- **条件**：条件タイル（スライダー＋不確定なら「?」）＋条件文。取引ブロック下に「条件のグッズを確認！」＝①参考画像2枚（自分の手持ち以外）or ②「グループ メンバー #シリーズ」でGoogle画像検索。①②排他。
+- **定価**：金額入力（¥）＋「相手の指定：定価 or 〇〇円」。差額/もらうトグル無し。
+- **多数（4枚超）**：受け取る＝サムネ2枚＋「+N すべて見る」→一覧ポップアップ。譲る＝未選択優先3件＋「他N件を見る」で列を縦展開。
+- **選択肢ピル**を常時表示にし旧「他の選択肢」を廃止。初期表示で先頭の相手希望を自動選択し組み立て可能状態にする。
+- **wishHit（求！/求めてる？）**：goodsHit と割れないよう、ヘッダー＋折りたたみだけ統一（本体グリッドは据え置き）。
+
+### 影響範囲
+- ホーム「推しでマッチ」候補の詳細シート（`HomeGoodsHitDetailSheet` = 超求/超求めてる/定価、`HomeWishHitDetailSheet` = 求/求めてる）。打診の組み立て・確認フローは不変（既存の選択状態・`proposalSelection()` を再利用）。
+- 個別募集の選択肢が無い候補は旧UIにフォールバック。
+
+### 確認方法
+- VisualQA：`SIMCTL_CHILD_MEGRUM_VISUAL_QA_PREVIEW_AUTH=1 SIMCTL_CHILD_MEGRUM_VISUAL_QA_INITIAL_SCREEN=candidate-sheet SIMCTL_CHILD_MEGRUM_VISUAL_QA_CANDIDATE_VARIANT=<named|condition|conditionRef|cash|crowded|wish> xcrun simctl launch <UDID> tokyo.megrum.native.preview`。named/condition/conditionRef/cash/crowded/wish の各パターンをスクショ確認済み。
+- swift test 1528件 green（`HomeCandidateComposerTests/testComposerBuildsNamedPairingsForNamedOption` 追加）。
+- 実機：michilion 5段階検証データ（iter1226.370）で確認（要オーナー確認）。
+
+### 関連ファイル
+- `notes/19_candidate_sheet_redesign.md`（確定仕様＋実装計画）
+- `HomeDiscoveryHitDetailSheets.swift` / `HomeGoodsHitDetailSelectionContext.swift` / `HomeCandidateListingWantedOptionFactory.swift` / `HomeWishHitDetailSheet.swift`
+
+### 未確定・要オーナー確認
+- CTA は選択未充足時は無効化のまま（notes/19 の「CTAは無効化しない」は、無効タップが無反応になるのを避け安全側を採用。counter で案内）。要否確認。
+- 条件①参考画像の実データ経路（現状は自分の手持ち以外のプレビューが無いと②検索にフォールバック）。シリーズ参考画像のマスタ経路が要れば①が常時出せる。
+
+---
+
 ## イテレーション1226.372：ホーム候補シート「相手の希望」を選択肢1件なら文脈行に
 
 ### 背景・問題意識
