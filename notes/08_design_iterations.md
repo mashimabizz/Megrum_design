@@ -4,6 +4,26 @@
 
 ---
 
+## イテレーション1226.367：交換条件でデフォルト都道府県を設定していれば左ドロワーの「要設定」を出さない
+
+### 背景・問題意識
+オーナー指摘：交換条件の設定でデフォルト都道府県を設定していても、左ドロワーの「交換条件の設定」に「要設定」バッジが出てしまう。直近の現地交換日程が無いと要設定扱いになっていたため。
+
+### 変更内容
+#### `ios-native/Sources/MegrumApp/HomeExchangeConditionSettings.swift`
+- `HomeDefaultExchangeSettings.needsConfiguration`：現地を受け付ける設定でも、判定を「デフォルト都道府県が空か」だけに変更（直近日程 `hasUsableDate` の必須条件を撤去）。都道府県を設定していれば要設定にしない。
+
+### 影響範囲
+- 左ドロワーの「交換条件の設定」バッジ。都道府県設定済みなら「要設定」が消える。郵送のみ設定は従来どおり要設定にしない。未保存は要設定。
+
+### 確認方法
+- swift test（`needsConfiguration`／`exchangeBadgeText` テストを新仕様に更新、1517件 green）。
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/HomeExchangeConditionSettings.swift`
+
+---
+
 ## イテレーション1226.366：ホーム候補（相手側）のほしいもの判定も確度付き（求めてる？対応）
 
 ### 背景・問題意識

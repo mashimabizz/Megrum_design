@@ -1290,20 +1290,33 @@ final class HomeDiscoveryMatchPolicyTests: XCTestCase {
         )
     }
 
-    func testDefaultExchangeSettingsNeedsConfigurationWhenUnsetOrLocalDatesExpired() {
+    func testDefaultExchangeSettingsNeedsConfigurationDependsOnDefaultPrefecture() {
         let calendar = Calendar.current
         let yesterday = calendar.date(byAdding: .day, value: -1, to: Date()) ?? Date()
         let yesterdayKey = HomeExchangeDateKey.key(for: yesterday, calendar: calendar)
-        let expiredLocal = HomeDefaultExchangeSettings(
+        // iter1226.367：デフォルト都道府県を設定していれば、直近日程が無くても「要設定」を出さない。
+        let prefectureOnly = HomeDefaultExchangeSettings(
             preference: .both,
             localPrefecture: "東京都",
             localDateKeys: [yesterdayKey]
         )
 
+        // 未設定（未保存）は要設定。
         XCTAssertTrue(
             HomeDefaultExchangeSettings.standard.needsConfiguration(isExplicitlyConfigured: false)
         )
-        XCTAssertTrue(expiredLocal.needsConfiguration(isExplicitlyConfigured: true))
+        // 都道府県ありなら要設定にしない。
+        XCTAssertFalse(prefectureOnly.needsConfiguration(isExplicitlyConfigured: true))
+        // 現地を受け付ける設定で都道府県が空なら要設定。
+        XCTAssertTrue(
+            HomeDefaultExchangeSettings(
+                preference: .both,
+                localPrefecture: "",
+                localDateKeys: []
+            )
+            .needsConfiguration(isExplicitlyConfigured: true)
+        )
+        // 郵送のみなら都道府県が空でも要設定にしない。
         XCTAssertFalse(
             HomeDefaultExchangeSettings(
                 preference: .mail,
