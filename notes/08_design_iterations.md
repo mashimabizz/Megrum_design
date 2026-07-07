@@ -4,6 +4,29 @@
 
 ---
 
+## イテレーション1226.365：求の詳細で譲れる候補が無くても「交換内容を決める」で1/3へ進める
+
+### 背景・問題意識
+オーナー指摘：ホームの「求」詳細シート（HomeWishHitDetailSheet）で「あなたが譲れる相手のほしいもの」が「一致する候補はまだありません」の場合、下の「交換内容を確認する」ボタンが無効で打診に進めなかった。候補が無くても打診に進めるようにしたい。文言は「交換内容を決める」、まず1/3へ。
+
+### 変更内容
+#### `ios-native/Sources/MegrumApp/HomeWishHitDetailSheet.swift`
+- `hasOfferCandidates`（offerGoodsが空でない）を追加。
+- 候補なし時：ボタン文言を「交換内容を決める」、`bottomButtonDisabled=false`（常時有効）。
+- `startProposal()`：候補なし時は提示物未選択のまま `HomeDiscoveryProposalSelection(exchangeMethod: nil)` で `onStartProposal` を直接呼ぶ。`HomeDiscoveryProposalRouteResolver.initialStep(for: nil)=.give` により打診1/3（譲るものを選ぶ）から開始。
+- 候補あり時は従来どおり（プレビュー→3/3）。
+
+### 影響範囲
+- ホーム「求」詳細シートの下部ボタン（候補なしケース）。
+
+### 確認方法
+- swift test 1517件 green。sim/実機でホームの求候補（譲れる候補なし）→ボタン有効・1/3へ。
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/HomeWishHitDetailSheet.swift`
+
+---
+
 ## イテレーション1226.364：チャットルーム入力文字を黒/非太字＋グルームアーカイブは自分の失効投稿も表示
 
 ### 背景・問題意識

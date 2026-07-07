@@ -22,11 +22,12 @@ struct HomeWishHitDetailSheet: View {
 
     var body: some View {
         HomeSheetScaffold(
-            bottomButton: bottomButtonTitle,
+            // 譲れる候補が無くても打診に進める。文言は「交換内容を決める」で、1/3から手動で選ぶ（iter1226.365）。
+            bottomButton: hasOfferCandidates ? bottomButtonTitle : "交換内容を決める",
             showsWishCopyButton: false,
             wishCopyButtonDisabled: isWishCopyInProgress,
             wishCopyButtonAction: { onCopyToWish(selection.goods) },
-            bottomButtonDisabled: !presentationState.canStartProposal,
+            bottomButtonDisabled: hasOfferCandidates ? !presentationState.canStartProposal : false,
             bottomButtonAction: startProposal
         ) {
             HomeSelectedGoodsHeader(
@@ -137,6 +138,11 @@ struct HomeWishHitDetailSheet: View {
         showsNonOshiOfferSection ? matchedOfferGoods + otherOfferGoods : matchedOfferGoods
     }
 
+    /// 譲れる候補があるか。無ければ「交換内容を決める」で1/3から手動選択に進む（iter1226.365）。
+    private var hasOfferCandidates: Bool {
+        !offerGoods.isEmpty
+    }
+
     private func prepareInitialSelection() {
         presentationState.prepareInitialSelection(
             preselectFirstOffer: preselectFirstOffer,
@@ -145,6 +151,22 @@ struct HomeWishHitDetailSheet: View {
     }
 
     private func startProposal() {
+        // 譲れる候補が無い場合は、提示物未選択のまま打診フロー1/3へ直行する（iter1226.365）。
+        // exchangeMethod=nil → HomeDiscoveryProposalRouteResolver が initialStep=.give を選ぶ。
+        guard hasOfferCandidates else {
+            onStartProposal(
+                HomeDiscoveryProposalSelection(
+                    receiverGoodsID: selection.goods.id,
+                    senderGoodsIDs: [],
+                    matchType: .forward,
+                    receiverGoods: selection.goods,
+                    senderGoods: [],
+                    exchangeMethod: nil
+                )
+            )
+            return
+        }
+
         guard let proposalSelection = presentationState.proposalSelection(
             selection: selection,
             offerGoods: offerGoods
