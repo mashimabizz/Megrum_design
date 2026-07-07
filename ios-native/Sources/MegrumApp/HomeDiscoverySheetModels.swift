@@ -21,6 +21,18 @@ enum HomeDiscoverySheet: Identifiable, Sendable {
             "extra-wish-hit-\(payload.id)"
         }
     }
+
+    /// 候補シートの主対象グッズ（相手の在庫）。「他にも交換できそうなもの」を相手軸で組む時に使う。iter1226.383。
+    var primaryGoods: HomeMockGoods? {
+        switch self {
+        case .goodsHit(let payload), .wishHit(let payload):
+            return payload.goods
+        case .extraListingHit(let payload), .extraWishHit(let payload):
+            return payload.goods
+        case .havesLookup:
+            return nil
+        }
+    }
 }
 
 struct HomeDiscoverySheetPayload: Identifiable, Equatable, Sendable {

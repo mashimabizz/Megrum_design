@@ -4,6 +4,36 @@
 
 ---
 
+## イテレーション1226.383：候補シートの「他にも交換できそうなもの」を同じ相手のホーム構造一覧に（FB6-1）
+
+### 背景・問題意識
+オーナーFB（FB6-1）：候補シート下部の「他にも交換できそうなもの」がいま機能しておらず、常に「他に交換できそうなものはありません」だった（payload 未配線）。同じユーザーというくくりで、ホーム画面と同じ構造（「推し×シリーズでマッチ」「推しでマッチ」の2セクション）で一覧を出したい。ただしそこでグッズ画像をタップして開いた先の画面では、このセクションは出さない。
+
+### 変更内容
+- 新規 `HomeSamePartnerExchangeSection`＋`HomeOtherExchangeCandidateGroups`：同じ相手の他候補を、ホームと同じ `HomeDiscoverySection`（summaryRows）で「推し×シリーズでマッチ」（.memberTag）／「推しでマッチ」（.member）の2セクションに並べる。候補タップは `onOpenNestedSheet` で入れ子シートを開く。
+- `HomeDiscoveryExperienceDerivedState` に owner スコープの候補ビルダーを追加：`sameOwnerExchangeCandidateGroups(ownerID:excludingGoodsID:)`。ホームと同じ eligibility（`isMemberTagMatchEligible`/`isMemberMatchEligible`）・`HomeDiscoveryCandidateFactory`・並び順（`HomeCandidateDemandPolicy`）を使い、`matchedItems + possibleItems` を相手ID一致＋現在のグッズ除外でスコープ。`otherExchangeGroups(for sheet:)` で開くシートの primaryGoods から相手を特定。
+- `HomeDiscoverySheet.primaryGoods` を追加（相手在庫の主対象グッズ）。
+- 配線：`HomeDiscoveryExperience` の `.sheet` で groups を計算 → `HomeDiscoverySheetView` → `HomeDiscoverySheetContent` → `HomeGoodsHitDetailSheet`/`HomeWishHitDetailSheet` に `otherExchangeCandidates` を渡す。両シートの旧・空の `HomeOtherExchangeRows` を `HomeSamePartnerExchangeSection` に置換。
+- 「グッズ画像タップ後の画面では非表示」は既存の仕組みで担保：入れ子は `presentationContext == .additionalCandidate` で `showsOtherExchangeRows == false`、かつ入れ子には groups を渡さない（`.empty`）。
+
+### 影響範囲
+- ホーム候補の超求（`HomeGoodsHitDetailSheet`）／求（`HomeWishHitDetailSheet`）シート下部。`HomeMutualMatchDetailSheet` の `HomeOtherExchangeRows` は不変。
+
+### 確認方法
+- `swift build` / `swift test` 1533件 green。
+- 実機（michilion 実データ）で、同じ相手が複数の候補グッズを持つケースを開き、「他にも交換できそうなもの」に推し×シリーズ／推しの2セクションが出ること、タップで入れ子シートが開きそこでは同セクションが出ないことを確認。
+- ※ セクションは「同じ相手の他候補が存在する時のみ」表示（無ければ非表示）。VisualQA ハーネスは `showsOtherExchangeRows=false` のため直接は映らない。
+
+### セルフレビュー結果
+- ✅ ホームの eligibility / factory / 並び順を再利用（分類ロジックの二重化なし）。
+- ✅ 入れ子非表示は既存の presentationContext で担保（新フラグ追加なし）。
+- ⚠️ セクションの候補タップは既存の「このグッズも追加する」（additionalCandidate）動線に接続。閲覧のみにしたい要望が出たら別途調整。
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/HomeSamePartnerExchangeSection.swift`（新規）/ `HomeDiscoverySheetModels.swift` / `HomeDiscoveryExperienceDerivedState.swift` / `HomeDiscoveryExperience.swift` / `HomeDiscoverySheets.swift` / `HomeDiscoverySheetContent.swift` / `HomeDiscoveryHitDetailSheets.swift` / `HomeWishHitDetailSheet.swift`
+
+---
+
 ## イテレーション1226.382：評価表記を黄色星に統一＋候補ヘッダーにアイコン＋プレミアム広告非表示＋ゆずる間隔（FB6の一部）
 
 ### 背景・問題意識

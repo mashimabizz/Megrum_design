@@ -205,6 +205,7 @@ struct HomeDiscoveryExperience: View {
                 sheet: sheet,
                 appState: appState,
                 viewerOfferGoods: viewerOfferGoods,
+                otherExchangeCandidates: otherExchangeGroups(for: sheet),
                 onOpenOwnerProfile: requestProfilePresentation,
                 onStartProposal: requestProposalPresentation
             )

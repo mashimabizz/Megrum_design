@@ -7,6 +7,8 @@ struct HomeDiscoverySheetView: View {
     var sheet: HomeDiscoverySheet
     var appState: MegrumAppState?
     var viewerOfferGoods: [HomeMockGoods] = []
+    /// 「他にも交換できそうなもの」用の同じ相手の他候補（primaryのみ。入れ子は付けない）。iter1226.383 / FB6-1。
+    var otherExchangeCandidates: HomeOtherExchangeCandidateGroups = .empty
     var presentationContext: HomeDiscoverySheetPresentationContext = .primary
     /// 「求められているグッズ」画像タップ経由の画面（とその入れ子）でのみ
     /// 推し以外でマッチ を表示する。
@@ -32,6 +34,7 @@ struct HomeDiscoverySheetView: View {
             sheet: sheet,
             viewerOfferGoods: viewerOfferGoods,
             addedExtraCandidateIDs: addedExtraCandidateIDs,
+            otherExchangeCandidates: otherExchangeCandidates,
             presentationContext: presentationContext,
             allowsNonOshiOfferSection: allowsNonOshiOfferSection || sheetIsHavesLookup,
             copyingWishGoodsID: presentationState.copyingWishGoodsID,

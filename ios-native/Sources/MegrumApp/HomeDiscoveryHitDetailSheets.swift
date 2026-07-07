@@ -8,6 +8,8 @@ struct HomeGoodsHitDetailSheet: View {
     var viewerOfferGoods: [HomeMockGoods]
     var addedExtraCandidateIDs: Set<UUID>
     var showsOtherExchangeRows: Bool = true
+    /// 「他にも交換できそうなもの」に出す同じ相手の他候補（ホーム構造）。iter1226.383 / FB6-1。
+    var otherExchangeCandidates: HomeOtherExchangeCandidateGroups = .empty
     var bottomButtonTitle: String = "交換内容を確認する"
     var preselectPreferredOffer: Bool = true
     /// ガイドツアーのデモ用：選択済み状態を注入して「実際の画面状態」を再現する（通常は nil）。
@@ -89,9 +91,8 @@ struct HomeGoodsHitDetailSheet: View {
             )
 
             if showsOtherExchangeRows {
-                HomeOtherExchangeRows(
-                    addedCandidateIDs: addedExtraCandidateIDs,
-                    excludedGoodsIDs: [selection.goods.id],
+                HomeSamePartnerExchangeSection(
+                    groups: otherExchangeCandidates,
                     onOpenNestedSheet: onOpenNestedSheet
                 )
             }
