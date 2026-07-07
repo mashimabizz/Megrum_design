@@ -12,6 +12,8 @@ struct HomeDiscoveryProposalSelection: Equatable, Sendable {
     var cashAmount: Int?
     var initialShippingFee: IndividualListingShippingFeeDraft?
     var initialShippingDays: IndividualListingShippingDaysDraft?
+    /// 判定から自動生成した打診メッセージの下書き（未決項目の相談文）。
+    var suggestedMessage: String?
 
     init(
         receiverGoodsID: UUID,
@@ -23,7 +25,8 @@ struct HomeDiscoveryProposalSelection: Equatable, Sendable {
         exchangeMethod: ExchangeMethod? = nil,
         cashAmount: Int? = nil,
         initialShippingFee: IndividualListingShippingFeeDraft? = nil,
-        initialShippingDays: IndividualListingShippingDaysDraft? = nil
+        initialShippingDays: IndividualListingShippingDaysDraft? = nil,
+        suggestedMessage: String? = nil
     ) {
         self.receiverGoodsID = receiverGoodsID
         self.receiverGoodsIDs = Self.orderedUnique(receiverGoodsIDs ?? [receiverGoodsID])
@@ -35,6 +38,7 @@ struct HomeDiscoveryProposalSelection: Equatable, Sendable {
         self.cashAmount = cashAmount.map { max(0, $0) }
         self.initialShippingFee = initialShippingFee
         self.initialShippingDays = initialShippingDays
+        self.suggestedMessage = suggestedMessage
     }
 
     func includingExtraSelections(_ extras: [HomeDiscoveryProposalSelection]) -> HomeDiscoveryProposalSelection {

@@ -4,6 +4,7 @@ import MegrumCore
 extension ProposalCreateFlow {
     func prepareInitialProposalState() {
         applyInitialExchangeMethodIfNeeded()
+        applyInitialMessageIfNeeded()
         applyInitialCashAmountIfNeeded()
         seedDefaultSenderSelection()
         seedDefaultReceiverSelection()
@@ -109,6 +110,20 @@ extension ProposalCreateFlow {
             return
         }
         exchangeMethod = initialExchangeMethod
+    }
+
+    /// 判定から生成した相談文を、ユーザーが未入力の時だけ下書きとして入れる。
+    func applyInitialMessageIfNeeded() {
+        guard initialStateFlags.claimInitialMessageApplication() else {
+            return
+        }
+        guard let initialMessage = initialMessage?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !initialMessage.isEmpty,
+              message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        else {
+            return
+        }
+        message = String(initialMessage.prefix(Self.messageLimit))
     }
 
     func applyVisualQAStateIfNeeded() {

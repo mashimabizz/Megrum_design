@@ -2,6 +2,24 @@ import Foundation
 import MegrumDesign
 import SwiftUI
 
+/// 相手の希望が「条件指定」の選択肢のとき、条件を1枚のカードで見せるためのモデル。iter1226.371。
+struct HomeWantedConditionCardModel: Equatable {
+    var tokens: [String]
+    var isTentative: Bool
+    var isSelected: Bool
+
+    static func tokens(from option: HomeIndividualListingWantedOption) -> [String] {
+        // 条件指定はマッチしたグッズ名ではなく募集の条件そのものを見せる。iter1226.371。
+        var tokens = [option.conditionSummary?.nilIfBlank ?? option.title]
+        if let subtitle = option.subtitle?.nilIfBlank,
+           !subtitle.localizedCaseInsensitiveContains("該当するグッズ"),
+           subtitle != option.title {
+            tokens.append(subtitle)
+        }
+        return tokens.filter { !$0.isEmpty }
+    }
+}
+
 struct HomeGoodsHitWantedSelectionRail: View {
     var usesListingWantedOptions: Bool
     var wantedOptionPreviewGoods: [HomeMockGoods]
@@ -10,11 +28,16 @@ struct HomeGoodsHitWantedSelectionRail: View {
     var wantedGoods: [HomeMockGoods]
     var selectedWantedIndices: Set<Int>
     var cardSize: HomeGoodsImagePanelCardSize
+    /// 条件指定の選択肢の場合はマッチしたグッズ列ではなく条件カードを1枚出す。iter1226.371。
+    var conditionCard: HomeWantedConditionCardModel? = nil
     var onSelectWantedOptionPreviewGoods: (Int) -> Void
     var onSelectWantedGoods: (Int) -> Void
+    var onToggleConditionCard: () -> Void = {}
 
     var body: some View {
-        if usesListingWantedOptions, !wantedOptionPreviewGoods.isEmpty {
+        if let conditionCard {
+            HomeWantedConditionCard(model: conditionCard, cardSize: cardSize, onToggle: onToggleConditionCard)
+        } else if usesListingWantedOptions, !wantedOptionPreviewGoods.isEmpty {
             HomeGoodsImagePanelRail(
                 goods: wantedOptionPreviewGoods,
                 selectedIndices: selectedWantedOptionPreviewIndices,
@@ -30,6 +53,58 @@ struct HomeGoodsHitWantedSelectionRail: View {
                 onSelect: onSelectWantedGoods
             )
         }
+    }
+}
+
+private struct HomeWantedConditionCard: View {
+    var model: HomeWantedConditionCardModel
+    var cardSize: HomeGoodsImagePanelCardSize
+    var onToggle: () -> Void
+
+    var body: some View {
+        Button(action: onToggle) {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 5) {
+                    Image(systemName: model.isSelected ? "checkmark.circle.fill" : "circle")
+                        .font(.system(size: 16, weight: .black))
+                        .foregroundStyle(model.isSelected ? MegrumTheme.lavender : MegrumTheme.ink.opacity(0.28))
+                        .symbolRenderingMode(.hierarchical)
+                    Image(systemName: "slider.horizontal.3")
+                        .font(.system(size: 11, weight: .heavy))
+                        .foregroundStyle(MegrumTheme.lavender)
+                    Text(model.isTentative ? "条件（？）" : "条件")
+                        .font(.system(size: 11, weight: .black, design: .rounded))
+                        .foregroundStyle(MegrumTheme.lavender)
+                    Spacer(minLength: 0)
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(model.tokens.prefix(3), id: \.self) { token in
+                        Text(token)
+                            .font(.system(size: 12, weight: .black, design: .rounded))
+                            .foregroundStyle(MegrumTheme.ink)
+                            .lineLimit(2)
+                            .minimumScaleFactor(0.7)
+                            .multilineTextAlignment(.leading)
+                    }
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(11)
+            .frame(width: max(cardSize.width * 2.1, 190), alignment: .leading)
+            .frame(minHeight: cardSize.height + 24, alignment: .topLeading)
+            .background(MegrumTheme.lavender.opacity(model.isSelected ? 0.12 : 0.06), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .strokeBorder(
+                        model.isSelected ? MegrumTheme.lavender : MegrumTheme.lavender.opacity(0.25),
+                        lineWidth: model.isSelected ? 2.2 : 1
+                    )
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("相手の希望条件 " + model.tokens.joined(separator: "、"))
+        .accessibilityAddTraits(model.isSelected ? [.isSelected] : [])
     }
 }
 

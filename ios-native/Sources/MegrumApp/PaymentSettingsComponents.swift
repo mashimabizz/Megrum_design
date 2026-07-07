@@ -6,26 +6,19 @@ import UIKit
 #endif
 
 enum PaymentSettingsField: Hashable {
-    case bankName
-    case bankBranchName
-    case bankAccountType
-    case bankAccountNumber
-    case bankAccountHolder
     case otherNote
 }
 
 struct PaymentSettingsFormContent: View {
     var draft: PaymentSettingsDraft
     @Binding var otherNote: String
-    @Binding var bankName: String
-    @Binding var bankBranchName: String
-    @Binding var bankAccountType: String
-    @Binding var bankAccountNumber: String
-    @Binding var bankAccountHolder: String
     var focusedField: FocusState<PaymentSettingsField?>.Binding
     var validationMessage: String?
     var appErrorMessage: String?
     var onToggleMethod: (UserPaymentMethod) -> Void
+    var onAddAccount: () -> Void
+    var onEditAccount: (BankReceivingAccount) -> Void
+    var onDeleteAccount: (UUID) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 22) {
@@ -38,14 +31,20 @@ struct PaymentSettingsFormContent: View {
             )
 
             if draft.requiresBankAccountDetails {
-                PaymentSettingsSectionTitle("銀行振込の受け取り口座")
-                PaymentSettingsBankCard(
-                    bankName: $bankName,
-                    bankBranchName: $bankBranchName,
-                    bankAccountType: $bankAccountType,
-                    bankAccountNumber: $bankAccountNumber,
-                    bankAccountHolder: $bankAccountHolder,
-                    focusedField: focusedField
+                VStack(alignment: .leading, spacing: 8) {
+                    PaymentSettingsSectionTitle("銀行振込の受け取り口座")
+                    Text("最大\(BankReceivingAccount.maxCount)件まで登録できます。銀行名は相手にも表示されます（支店・口座番号・名義はあなただけが確認できます）。")
+                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .foregroundStyle(MegrumTheme.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.horizontal, 2)
+                }
+                PaymentSettingsBankAccountsCard(
+                    accounts: draft.accounts,
+                    canAddAccount: draft.canAddAccount,
+                    onAdd: onAddAccount,
+                    onEdit: onEditAccount,
+                    onDelete: onDeleteAccount
                 )
             }
 
@@ -76,61 +75,6 @@ struct PaymentSettingsDivider: View {
     var body: some View {
         Divider()
             .padding(.leading, 104)
-    }
-}
-
-struct PaymentSettingsBankCard: View {
-    @Binding var bankName: String
-    @Binding var bankBranchName: String
-    @Binding var bankAccountType: String
-    @Binding var bankAccountNumber: String
-    @Binding var bankAccountHolder: String
-    var focusedField: FocusState<PaymentSettingsField?>.Binding
-
-    var body: some View {
-        VStack(spacing: 0) {
-            PaymentSettingsTextFieldRow(
-                title: "銀行名",
-                placeholder: "みずほ銀行",
-                text: $bankName,
-                focusedField: focusedField,
-                field: .bankName
-            )
-            PaymentSettingsDivider()
-            PaymentSettingsTextFieldRow(
-                title: "支店名",
-                placeholder: "渋谷支店",
-                text: $bankBranchName,
-                focusedField: focusedField,
-                field: .bankBranchName
-            )
-            PaymentSettingsDivider()
-            PaymentSettingsTextFieldRow(
-                title: "口座種別",
-                placeholder: "普通",
-                text: $bankAccountType,
-                focusedField: focusedField,
-                field: .bankAccountType
-            )
-            PaymentSettingsDivider()
-            PaymentSettingsTextFieldRow(
-                title: "口座番号",
-                placeholder: "1234567",
-                text: $bankAccountNumber,
-                keyboard: .numberPad,
-                focusedField: focusedField,
-                field: .bankAccountNumber
-            )
-            PaymentSettingsDivider()
-            PaymentSettingsTextFieldRow(
-                title: "口座名義",
-                placeholder: "ヤマダ ハナコ",
-                text: $bankAccountHolder,
-                focusedField: focusedField,
-                field: .bankAccountHolder
-            )
-        }
-        .paymentSettingsCardStyle()
     }
 }
 
@@ -192,13 +136,13 @@ struct PaymentSettingsBottomBar: View {
     }
 }
 
-struct PaymentSettingsTextFieldRow: View {
+struct PaymentSettingsTextFieldRow<Field: Hashable>: View {
     var title: String
     var placeholder: String
     @Binding var text: String
     var keyboard: PaymentSettingsKeyboard = .default
-    var focusedField: FocusState<PaymentSettingsField?>.Binding
-    var field: PaymentSettingsField
+    var focusedField: FocusState<Field?>.Binding
+    var field: Field
 
     var body: some View {
         HStack(spacing: 12) {

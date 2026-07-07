@@ -36,6 +36,10 @@ struct HomeGoodsHitDetailSheet: View {
                 goods: selection.goods,
                 conditionTags: selection.conditionTags,
                 exchangeSummary: HomeDiscoveryOwnerExchangeSummary.fromCandidateSignals(selection.signals),
+                conditionVerdict: HomeConditionVerdictPolicy.make(
+                    from: selection.signals,
+                    partnerPaymentNote: selection.goods.ownerPaymentNote
+                ),
                 exchangeCalendarContext: HomePartnerExchangeCalendarContext.from(
                     signals: selection.signals,
                     ownerName: selection.goods.ownerSummary?.displayName
@@ -63,25 +67,32 @@ struct HomeGoodsHitDetailSheet: View {
                 )
             }
 
-            HomeWantedSelectionSectionHeader(
-                systemName: "person",
-                title: "相手の希望から譲るを選ぶ",
-                trailing: selectionContext.wantedRequirementLabel,
-                showsOtherOptionsButton: selectionContext.showsWantedOptionPicker
-                    && selection.individualListingSelection.detail != nil,
-                onOpenOtherOptions: openWantedOptionPicker
-            )
-            HomeGoodsHitWantedSelectionRail(
-                usesListingWantedOptions: selectionContext.usesListingWantedOptions,
-                wantedOptionPreviewGoods: selectionContext.wantedOptionPreviewGoods,
-                selectedWantedOptionPreviewIndices: selectionContext.selectedWantedOptionPreviewIndices,
-                topTrailingBadgeTextByGoodsID: selectionContext.wantedOptionPreviewBadgeTextByGoodsID,
-                wantedGoods: selectionContext.wantedGoods,
-                selectedWantedIndices: selectionState.selectedWantedIndices,
-                cardSize: selectionCardSize,
-                onSelectWantedOptionPreviewGoods: toggleWantedOptionPreviewGoods,
-                onSelectWantedGoods: toggleWantedGoods
-            )
+            if let singleWantedSummary = selectionContext.singleWantedOptionSummary {
+                // 相手の求めるものが1件だけ → 選ぶカードをやめ、1行の文脈で見せてそのまま「譲るグッズを選ぶ」へ。iter1226.372。
+                HomeWantedSingleOptionContextRow(summary: singleWantedSummary)
+            } else {
+                HomeWantedSelectionSectionHeader(
+                    systemName: "person",
+                    title: "相手の希望から譲るを選ぶ",
+                    trailing: selectionContext.wantedRequirementLabel,
+                    showsOtherOptionsButton: selectionContext.showsWantedOptionPicker
+                        && selection.individualListingSelection.detail != nil,
+                    onOpenOtherOptions: openWantedOptionPicker
+                )
+                HomeGoodsHitWantedSelectionRail(
+                    usesListingWantedOptions: selectionContext.usesListingWantedOptions,
+                    wantedOptionPreviewGoods: selectionContext.wantedOptionPreviewGoods,
+                    selectedWantedOptionPreviewIndices: selectionContext.selectedWantedOptionPreviewIndices,
+                    topTrailingBadgeTextByGoodsID: selectionContext.wantedOptionPreviewBadgeTextByGoodsID,
+                    wantedGoods: selectionContext.wantedGoods,
+                    selectedWantedIndices: selectionState.selectedWantedIndices,
+                    cardSize: selectionCardSize,
+                    conditionCard: selectionContext.displayedWantedConditionCard,
+                    onSelectWantedOptionPreviewGoods: toggleWantedOptionPreviewGoods,
+                    onSelectWantedGoods: toggleWantedGoods,
+                    onToggleConditionCard: { toggleWantedOptionPreviewGoods(at: 0) }
+                )
+            }
 
             if !selectionState.selectedWantedIndices.isEmpty {
                 if let selectedCashOption = selectionContext.selectedCashOption {
@@ -261,9 +272,14 @@ struct HomeGoodsHitDetailSheet: View {
     }
 
     private func startProposal() {
-        guard let proposalSelection = selectionContext.proposalSelection() else {
+        guard var proposalSelection = selectionContext.proposalSelection() else {
             return
         }
+        let verdict = HomeConditionVerdictPolicy.make(
+            from: selection.signals,
+            partnerPaymentNote: selection.goods.ownerPaymentNote
+        )
+        proposalSelection.suggestedMessage = ProposalSuggestedMessageBuilder.make(from: verdict)
         proposalConfirmation = HomeProposalStartConfirmationPayload(
             proposalSelection: proposalSelection,
             receiverGoods: confirmationReceiverGoods(for: proposalSelection),

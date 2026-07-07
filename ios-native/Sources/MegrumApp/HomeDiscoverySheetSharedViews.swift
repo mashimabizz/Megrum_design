@@ -7,6 +7,8 @@ struct HomeSelectedGoodsHeader: View {
     var goods: HomeMockGoods
     var conditionTags: HomeConditionTagSet
     var exchangeSummary: HomeDiscoveryOwnerExchangeSummary?
+    /// 判定済みの「どう交換できそう？」ブロック。渡された時は生の条件羅列より優先して表示する。
+    var conditionVerdict: HomeConditionVerdict? = nil
     var exchangeCalendarContext: HomePartnerExchangeCalendarContext? = nil
     var listingNote: String?
     var listingDetail: HomeIndividualListingDetailContext?
@@ -32,21 +34,24 @@ struct HomeSelectedGoodsHeader: View {
                         HomeUserSummary(owner: ownerSummary, onOpenProfile: onOpenOwnerProfile)
                     }
 
-                    if let exchangeSummary {
-                        HomeExchangeMethodBlock(
-                            summary: exchangeSummary,
+                    if let conditionVerdict, !conditionVerdict.isEmpty {
+                        HomeConditionVerdictBlock(
+                            verdict: conditionVerdict,
                             onOpenCalendar: exchangeCalendarContext.map { context in
                                 { presentationState.presentExchangeCalendar(context) }
                             }
                         )
-                    }
-
-                    HomePaymentBox(summaryText: goods.ownerPaymentSummaryText)
-
-                    if let listingDetail {
-                        HomeListingDetailButton {
-                            presentationState.presentListingDetail(listingDetail)
+                    } else {
+                        if let exchangeSummary {
+                            HomeExchangeMethodBlock(
+                                summary: exchangeSummary,
+                                onOpenCalendar: exchangeCalendarContext.map { context in
+                                    { presentationState.presentExchangeCalendar(context) }
+                                }
+                            )
                         }
+
+                        HomePaymentBox(summaryText: goods.ownerPaymentSummaryText)
                     }
                 }
                 .padding(.top, 4)
@@ -54,7 +59,7 @@ struct HomeSelectedGoodsHeader: View {
 
                 VStack(alignment: .leading, spacing: 4) {
                     HomeSelectedGoodsSingleCard(goods: goods, conditionTags: conditionTags)
-                        .frame(width: 136, height: 162)
+                        .frame(width: 108, height: 130)
 
                     // メモが無い時はグッズ画像の左下に日時を出す
                     if listingNote?.nilIfBlank == nil, let timestampText {

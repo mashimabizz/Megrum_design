@@ -68,6 +68,55 @@ struct HomeGoodsHitDetailSelectionContext {
         return wantedOptions.firstIndex { $0.id == option.id }
     }
 
+    /// 相手の個別募集の求めるものが1件だけのとき、選ぶカードではなく1行の文脈で見せる。iter1226.372。
+    /// 2件以上のときは nil（従来どおり選択カード＋「他の選択肢」）。
+    var singleWantedOptionSummary: HomeWantedSingleOptionSummary? {
+        guard usesListingWantedOptions,
+              !showsWantedOptionPicker,
+              let option = displayedWantedOption
+        else {
+            return nil
+        }
+        switch option.kind {
+        case .cash:
+            return HomeWantedSingleOptionSummary(
+                kind: .cash,
+                text: TradeAmountFormatter.fixedPrice(amount: option.cashAmount),
+                imageURL: nil,
+                isTentative: false
+            )
+        case .condition:
+            return HomeWantedSingleOptionSummary(
+                kind: .condition,
+                text: option.conditionSummary?.nilIfBlank ?? option.title,
+                imageURL: nil,
+                isTentative: !option.tentativeGoodsIDs.isEmpty
+            )
+        case .goods:
+            return HomeWantedSingleOptionSummary(
+                kind: .goods,
+                text: option.title,
+                imageURL: option.previewItems.first?.imageURL,
+                isTentative: !option.tentativeGoodsIDs.isEmpty
+            )
+        }
+    }
+
+    /// 表示中の相手希望が「条件指定」ならマッチ済みグッズ列ではなく条件カードを1枚出す。iter1226.371。
+    var displayedWantedConditionCard: HomeWantedConditionCardModel? {
+        guard usesListingWantedOptions,
+              let option = displayedWantedOption,
+              option.kind == .condition
+        else {
+            return nil
+        }
+        return HomeWantedConditionCardModel(
+            tokens: HomeWantedConditionCardModel.tokens(from: option),
+            isTentative: !option.tentativeGoodsIDs.isEmpty,
+            isSelected: !selectionState.selectedWantedIndices.isEmpty
+        )
+    }
+
     var allOfferGoods: [HomeMockGoods] {
         HomeGoodsHitDetailGoodsResolver.allOfferGoods(
             viewerOfferGoods: viewerOfferGoods,

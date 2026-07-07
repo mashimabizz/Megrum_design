@@ -38,8 +38,18 @@ enum HomeCandidateConditionSignalsBuilder {
         )
         let paymentSignals = HomeCandidatePaymentPolicy.signals(
             viewerMethods: viewerUser?.paymentMethods,
-            partnerMethods: partnerUser?.paymentMethods
+            partnerMethods: partnerUser?.paymentMethods,
+            viewerBankNames: viewerUser?.paymentBankNames ?? [],
+            partnerBankNames: partnerUser?.paymentBankNames ?? []
         )
+
+        // 相手の個別募集の note から送料・発送目安を取り出す（郵送行の判定に使う）。
+        let listingExchange = IndividualListingExchangeSummary
+            .extract(from: individualListingSelection?.listingNote)
+            .summary
+        let partnerShippingFeeTitle = listingExchange?.shippingFee.title
+        let partnerShippingDaysTitle = listingExchange?.shippingDays.title
+        let shippingFeeNeedsDiscussion = listingExchange?.shippingFee == .negotiate
 
         return HomeCandidateConditionSignals(
             goods: HomeGoodsConditionSignals(
@@ -51,8 +61,11 @@ enum HomeCandidateConditionSignalsBuilder {
                 localExchangeSelected: candidateAllowsLocal && viewerAllowsLocal,
                 prefectureMatches: hasLocalPlaceHint,
                 dateMatches: hasDateOverlap,
+                shippingFeeNeedsDiscussion: shippingFeeNeedsDiscussion,
                 partnerExchangeMethodTitle: partnerExchangeMethodTitle,
                 partnerLocalConditionText: candidateAllowsLocal ? partnerLocalConditionText : nil,
+                partnerShippingFeeTitle: partnerShippingFeeTitle,
+                partnerShippingDaysTitle: partnerShippingDaysTitle,
                 partnerLocalPrefectures: partnerLocalPrefectures,
                 partnerLocalDateKeys: partnerLocalDateKeys,
                 matchedVenue: HomeCandidateExchangePolicy.matchedVenue(

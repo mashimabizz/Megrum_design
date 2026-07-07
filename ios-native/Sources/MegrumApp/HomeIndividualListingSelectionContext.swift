@@ -131,6 +131,8 @@ public struct HomeIndividualListingWantedOption: Identifiable, Equatable, Sendab
     public var groupID: UUID?
     public var goodsTypeID: UUID?
     public var cashAmount: Int?
+    /// 条件指定型の選択肢の内容（例「TWICE / トレカ / #DICON…」）。マッチしたグッズ名ではなく募集の条件そのもの。iter1226.371。
+    public var conditionSummary: String?
 
     public init(
         id: UUID,
@@ -147,7 +149,8 @@ public struct HomeIndividualListingWantedOption: Identifiable, Equatable, Sendab
         previewItems: [HomeIndividualListingWantedPreviewItem] = [],
         groupID: UUID? = nil,
         goodsTypeID: UUID? = nil,
-        cashAmount: Int? = nil
+        cashAmount: Int? = nil,
+        conditionSummary: String? = nil
     ) {
         self.id = id
         self.listingID = listingID
@@ -164,6 +167,7 @@ public struct HomeIndividualListingWantedOption: Identifiable, Equatable, Sendab
         self.groupID = groupID
         self.goodsTypeID = goodsTypeID
         self.cashAmount = cashAmount.map { max(0, $0) }
+        self.conditionSummary = conditionSummary
     }
 
     public var isCashOffer: Bool {

@@ -66,7 +66,7 @@ final class SupabaseHomeClientTests: XCTestCase {
         let usersQuery = try queryItems(in: usersRequest)
 
         XCTAssertEqual(usersRequest.url?.path, "/rest/v1/users")
-        XCTAssertEqual(usersQuery["select"], "id,handle,display_name,primary_area,avatar_url,gender,age,payment_methods,payment_note,is_test_account")
+        XCTAssertEqual(usersQuery["select"], "id,handle,display_name,primary_area,avatar_url,gender,age,payment_methods,payment_note,payment_bank_names,is_test_account")
         XCTAssertEqual(usersQuery["id"], "neq.11111111-1111-1111-1111-111111111111")
         XCTAssertEqual(usersQuery["limit"], "42")
         XCTAssertNil(usersRequest.httpBody)

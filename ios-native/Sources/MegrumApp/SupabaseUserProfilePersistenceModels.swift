@@ -2,8 +2,8 @@ import Foundation
 import MegrumCore
 
 struct UserRow: Decodable, Sendable {
-    static let select = "id,handle,display_name,bio,avatar_url,gender,primary_area,birth_date,age,payment_methods,payment_note,account_status"
-    static let paymentSummarySelect = "id,handle,display_name,avatar_url,gender,primary_area,age,payment_methods,payment_note,account_status"
+    static let select = "id,handle,display_name,bio,avatar_url,gender,primary_area,birth_date,age,payment_methods,payment_note,payment_bank_names,account_status"
+    static let paymentSummarySelect = "id,handle,display_name,avatar_url,gender,primary_area,age,payment_methods,payment_note,payment_bank_names,account_status"
     static let legacySelect = "id,handle,display_name,avatar_url,gender,primary_area,account_status"
 
     var id: UUID
@@ -17,6 +17,7 @@ struct UserRow: Decodable, Sendable {
     var age: Int?
     var paymentMethods: [UserPaymentMethod]?
     var paymentNote: String?
+    var paymentBankNames: [String]?
     var accountStatus: String?
 
     var profile: UserProfile {
@@ -32,6 +33,7 @@ struct UserRow: Decodable, Sendable {
             age: age,
             paymentMethods: paymentMethods ?? [],
             paymentNote: paymentNote,
+            paymentBankNames: paymentBankNames ?? [],
             accountStatus: AccountStatus(rawValue: accountStatus ?? "") ?? .active
         )
     }
@@ -40,6 +42,7 @@ struct UserRow: Decodable, Sendable {
 struct UserPaymentSummaryUpdatePayload: Encodable, Sendable {
     var paymentMethods: [UserPaymentMethod]
     var paymentNote: String?
+    var paymentBankNames: [String]
 }
 
 struct UserProfileUpdatePayload: Encodable, Sendable {

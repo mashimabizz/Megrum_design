@@ -34,6 +34,10 @@ struct HomeWishHitDetailSheet: View {
                 goods: selection.goods,
                 conditionTags: selection.conditionTags,
                 exchangeSummary: HomeDiscoveryOwnerExchangeSummary.fromCandidateSignals(selection.signals),
+                conditionVerdict: HomeConditionVerdictPolicy.make(
+                    from: selection.signals,
+                    partnerPaymentNote: selection.goods.ownerPaymentNote
+                ),
                 exchangeCalendarContext: HomePartnerExchangeCalendarContext.from(
                     signals: selection.signals,
                     ownerName: selection.goods.ownerSummary?.displayName
@@ -151,6 +155,12 @@ struct HomeWishHitDetailSheet: View {
     }
 
     private func startProposal() {
+        let verdict = HomeConditionVerdictPolicy.make(
+            from: selection.signals,
+            partnerPaymentNote: selection.goods.ownerPaymentNote
+        )
+        let suggestedMessage = ProposalSuggestedMessageBuilder.make(from: verdict)
+
         // 譲れる候補が無い場合は、提示物未選択のまま打診フロー1/3へ直行する（iter1226.365）。
         // exchangeMethod=nil → HomeDiscoveryProposalRouteResolver が initialStep=.give を選ぶ。
         guard hasOfferCandidates else {
@@ -161,18 +171,20 @@ struct HomeWishHitDetailSheet: View {
                     matchType: .forward,
                     receiverGoods: selection.goods,
                     senderGoods: [],
-                    exchangeMethod: nil
+                    exchangeMethod: nil,
+                    suggestedMessage: suggestedMessage
                 )
             )
             return
         }
 
-        guard let proposalSelection = presentationState.proposalSelection(
+        guard var proposalSelection = presentationState.proposalSelection(
             selection: selection,
             offerGoods: offerGoods
         ) else {
             return
         }
+        proposalSelection.suggestedMessage = suggestedMessage
         // 激求（グッズ指定）と同様に、交換内容のプレビューを挟んでから打診へ進む。
         proposalConfirmation = HomeProposalStartConfirmationPayload(
             proposalSelection: proposalSelection,

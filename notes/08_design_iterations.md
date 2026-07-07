@@ -4,6 +4,47 @@
 
 ---
 
+## イテレーション1226.372：ホーム候補シート「相手の希望」を選択肢1件なら文脈行に
+
+### 背景・問題意識
+オーナー指摘（UX相談 B案）：相手の個別募集の求めるものが1件だけのとき、タップ選択させる「選ぶカード」は不要。1行の文脈で見せて、そのまま「譲るグッズを選ぶ」へ進ませたい。
+
+### 変更内容
+- 新規 `HomeWantedSingleOptionViews.swift`：`HomeWantedSingleOptionSummary`＋`HomeWantedSingleOptionContextRow`（相手が求めるものを1行で表示。条件/指名/定価で見せ分け、条件の不確定は「条件（？）」＋「（シリーズ未確認）」）。
+- `HomeGoodsHitDetailSelectionContext.swift`：`singleWantedOptionSummary`（`usesListingWantedOptions && !showsWantedOptionPicker` の1件時のみ non-nil）。
+- `HomeDiscoveryHitDetailSheets.swift`：1件→文脈行／2件以上→従来の選択カード＋「他の選択肢」に分岐。
+
+### 影響範囲
+- 超求！/超求めてる？/求！/求めてる？/定価 の候補詳細シートのうち、相手希望が1件のもの。選択は自動選択のまま、下の「譲るグッズを選ぶ」に直行。
+
+### 確認方法
+- device BUILD SUCCEEDED・実機で ihub「超求めてる？」（条件1件）が文脈行になることを確認。
+
+---
+
+## イテレーション1226.371：ホーム候補シートのヘッダー整理＋条件選択肢を条件文で表示
+
+### 背景・問題意識
+オーナー指摘：(1) 条件指定の選択肢が「相手の希望から譲るを選ぶ」でマッチしたグッズ名（例「ミナ TWICE トレカ」）になっていたが、募集の条件そのもの（TWICE / トレカ / #DICON…）を出すべき。(2) ヘッダーが窮屈。画像を小さく、要相談/OKバッジと文字の中央揃え、「個別募集の詳細を見る」ボタンは不要。
+
+### 変更内容
+- `HomeIndividualListingSelectionContext.swift`：`HomeIndividualListingWantedOption` に `conditionSummary` を追加。
+- `HomeCandidateListingWantedOptionFactory.swift`：条件選択肢の `conditionSummary` を「グループ名/種別名/メンバー名/#シリーズ」でプロフィールと同じ組み立てで生成（名前はマッチ済みグッズ＝同属性から取得）。
+- `HomeGoodsHitWantedSelectionViews.swift`：条件カードは `conditionSummary` を表示。
+- `HomeDiscoverySheetSharedViews.swift`：右のグッズ画像を 136×162→108×130 に縮小、「個別募集の詳細を見る」ボタンを撤去。
+- `HomeConditionVerdictViews.swift`：判定バッジ（要相談/OK）と本文を中央揃え（`.firstTextBaseline`→`.center`）。
+- データ：条件シリーズ名の先頭 `#` を除去（`##DICON` 二重表示の解消。表示側でも二重化ガード）。
+
+### 影響範囲
+- ホーム候補の詳細シート（超求/求/定価）のヘッダーと「相手の希望から譲るを選ぶ」。
+
+### 確認方法
+- device BUILD SUCCEEDED・実機で条件カードが「TWICE / トレカ / #DICON D'FESTA MINI EDITION」表示になることを確認。
+
+> ※ このコミットには、別ワークストリームの進行中変更（`HomeConditionVerdict*`「この人とどう交換できそう？」ブロック、決済/銀行口座まわり、bank_accounts マイグレーション等）も同梱されている（同一ファイルにまたがるため分離不可、オーナー了承のうえ一括コミット）。bank_accounts マイグレーションの `supabase db push` は別作業側の責務。
+
+---
+
 ## イテレーション1226.370：michilion ホームの需要5段階を「正しい経路のみ」の実データで再現
 
 ### 背景・問題意識

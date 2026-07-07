@@ -132,6 +132,7 @@ struct HomeScreen: View {
                         initialSenderGoodsIDs: route.senderGoodsIDs,
                         matchType: route.matchType,
                         initialExchangeMethod: route.initialExchangeMethod,
+                        initialMessage: route.initialMessage,
                         initialCashAmount: route.initialCashAmount,
                         initialShippingFee: route.initialShippingFee,
                         initialShippingDays: route.initialShippingDays,

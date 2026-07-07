@@ -13,6 +13,7 @@ struct ProposalCreateFlow: View {
     var initialSenderGoodsIDs: [UUID] = []
     var matchType: ProposalMatchType = .perfect
     var initialExchangeMethod: ExchangeMethod? = nil
+    var initialMessage: String? = nil
     var initialCashAmount: Int? = nil
     var initialShippingFee: IndividualListingShippingFeeDraft? = nil
     var initialShippingDays: IndividualListingShippingDaysDraft? = nil

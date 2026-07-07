@@ -171,8 +171,48 @@ enum HomeCandidateListingWantedOptionFactory {
             tentativeGoodsIDs: tentativeGoodsIDs,
             previewItems: previewItems,
             groupID: option.wishGroupId,
-            goodsTypeID: option.wishGoodsTypeId
+            goodsTypeID: option.wishGoodsTypeId,
+            conditionSummary: kind == .condition
+                ? Self.conditionSummary(option: option, matchingItems: matchingItems)
+                : nil
         )
+    }
+
+    /// 条件指定型の選択肢を「TWICE / トレカ / メンバー / #シリーズ」の1文字列にする。
+    /// グループ・種別名はマッチしたグッズ（同属性）から取り、シリーズは選択肢に保存された文字列を使う。iter1226.371。
+    private static func conditionSummary(
+        option: SupabaseHomeListingWishOptionRow,
+        matchingItems: [SupabaseHomeGoodsRow]
+    ) -> String? {
+        var parts: [String] = []
+        if let groupID = option.wishGroupId,
+           let name = (matchingItems.first { $0.groupId == groupID }?.groupName
+            ?? matchingItems.first?.groupName)?.nilIfBlank {
+            parts.append(name)
+        }
+        if let goodsTypeID = option.wishGoodsTypeId,
+           let name = (matchingItems.first { $0.goodsTypeId == goodsTypeID }?.goodsTypeName
+            ?? matchingItems.first?.goodsTypeName)?.nilIfBlank {
+            parts.append(name)
+        }
+        if !option.wishMemberIds.isEmpty {
+            let names = option.wishMemberIds.compactMap { memberID in
+                matchingItems.first { $0.characterId == memberID }?.characterName?.nilIfBlank
+            }
+            if !names.isEmpty {
+                parts.append((option.excludesWishMembers ? "以外: " : "") + names.joined(separator: "・"))
+            } else if option.excludesWishMembers {
+                parts.append("一部メンバー除く")
+            }
+        }
+        if !option.wishSeriesNames.isEmpty {
+            let series = option.wishSeriesNames
+                .map { $0.hasPrefix("#") ? String($0.dropFirst()) : $0 }
+                .filter { !$0.isEmpty }
+                .map { "#\($0)" }
+            parts.append(contentsOf: series)
+        }
+        return parts.isEmpty ? nil : parts.joined(separator: " / ")
     }
 
 }

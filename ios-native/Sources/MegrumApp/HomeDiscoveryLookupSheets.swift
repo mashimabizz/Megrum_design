@@ -108,6 +108,10 @@ struct HomeExtraHitDetailSheet: View {
                 goods: payload.goods,
                 conditionTags: payload.conditionTags,
                 exchangeSummary: HomeDiscoveryOwnerExchangeSummary.fromCandidateSignals(payload.signals),
+                conditionVerdict: HomeConditionVerdictPolicy.make(
+                    from: payload.signals,
+                    partnerPaymentNote: payload.goods.ownerPaymentNote
+                ),
                 listingNote: payload.individualListingSelection.listingNote,
                 listingDetail: payload.individualListingSelection.detail,
                 onOpenOwnerProfile: onOpenOwnerProfile
