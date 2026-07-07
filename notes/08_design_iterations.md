@@ -9,22 +9,33 @@
 ### 背景・問題意識
 オーナー要望：michilion のホーム「推しでマッチ」で 超求！/超求めてる？/求！/求めてる？/定価 の各段階を実データで見たい。iter1226.368 で撤去した「別ユーザー間ID直接指名」は使わず、**相手自身のほしいもの（指名）／条件／金額**の正しい経路だけで用意する。
 
-### 用意した実データ（Supabase dev / service_role）
-michilion の active 譲: ジョングク(BTS)/チェヨン(TWICE)/ミナ(TWICE)/松村北斗(SixTONES)。候補は michilion の推しメンバーに一致する相手の for_trade を使用（推し一致でないとホームに出ないため）。
+### ホーム候補が「マッチ」に出る2条件（実データ検証で判明）
+`HomeCandidatePartnerOfferEvaluation` の bucket=.matched は **satisfiesViewerWish && partnerWantsViewerGoods** の両立が必要：
+1. **satisfiesViewerWish**：候補（相手の for_trade）が **viewer の interest に一致**。`HomeCandidateCompositionContext.viewerInterests` は「viewer がほしいものを1件でも持つ場合はほしいもの（グループ＋メンバー＋**種別**）のみ」で構成され、推しは**ほしいもの0件時のフォールバック**。→ 候補は michilion の**アクティブなほしいものとメンバー＋種別まで一致**している必要がある。
+2. **partnerWantsViewerGoods**：相手が michilion の譲を欲しがっている（ほしいもの一致／個別募集選択肢一致／現金選択肢）。
 
-| 段階 | 相手 | 経路 | 需要ターゲット（michilion の譲） |
-|---|---|---|---|
-| 超求！ | cxp_local（候補 SUGA/BTS） | 個別募集・**条件**（グループBTS＋種別トレカ） | ジョングク → 確定 |
-| 超求めてる？ | cxp_both（候補 ジン/BTS） | 個別募集・**条件**（TWICE＋トレカ＋シリーズ指定） | チェヨン/ミナ（シリーズ無記載）→ 不確定 |
-| 定価 | cxp_cash（候補 RM/BTS） | 個別募集・**金額**（¥1,500） | － |
-| 求！ | mashima（候補 モモ/TWICE） | **ほしいもの（指名）** ミナ | ミナ → 確定 |
-| 求めてる？ | ren（候補 モモ/TWICE） | **ほしいもの（指名）** チェヨン＋シリーズタグ | チェヨン（シリーズ無記載）→ 不確定 |
+さらに `HomeCandidatePartnerScope` は **viewer が非テストアカウントの場合、`is_test_account=true` の相手を除外**する。cxp_* はテストアカウントなので michilion には出ない。
 
-wish_ids は全て相手自身のほしいものを指す（別ユーザー間ID一致は不使用）。
+### 用意した実データ（Supabase dev / service_role・全て非テスト相手）
+候補は全て michilion がアクティブにほしがる **BTS トレカ**（RM/V/ジミン/ジョングク）に統一（＝上記条件1を満たす）。需要ターゲットは michilion の active 譲（ジョングク/チェヨン/ミナ）。
+
+| 段階 | 相手 | 候補 | 経路 | ターゲット |
+|---|---|---|---|---|
+| 超求！ | haru | RM トレカ | 個別募集・**条件**（BTS＋トレカ） | ジョングク → 確定 |
+| 超求めてる？ | ihub | V トレカ | 個別募集・**条件**（TWICE＋トレカ＋シリーズ指定） | チェヨン/ミナ（無記載）→ 不確定 |
+| 定価 | ihub | ジミン トレカ | 個別募集・**金額**（¥1,500） | － |
+| 求！ | mashima | ジョングク トレカ | **ほしいもの（指名）** ミナ | ミナ → 確定 |
+| 求めてる？ | ren | V トレカ | **ほしいもの（指名）** チェヨン＋シリーズタグ | チェヨン（無記載）→ 不確定 |
+
+wish_ids/指名は全て相手自身のほしいものを指す（別ユーザー間ID一致は不使用）。
+
+### 検証（実データ probe）
+一時的な probe test（`HomeCandidateComposer.sections` を live fetch で実行、後で削除）で **matchedItems=5・各 bucket=matched・demand が hotDemand/hotDemandTentative/cash/demand/demandTentative** を確認済み。
 
 ### クリーンアップ用ID（不要になったら削除）
-- listings: `12260369-0001-…-001`(cxp_local) / `-0002-…-002`(cxp_both) / `-0003-…-003`(cxp_cash) と各 listing_wish_options（`…-101/-102/-103`）
-- goods_inventory: `12260369-0004-…-004`(mashima ミナ wanted) / `-0005-…-005`(ren チェヨン wanted)＋その goods_inventory_tags
+- goods_inventory 候補: `12260369-0011-…-011`(haru RM) / `-0012-…-012`(ihub V) / `-0013-…-013`(ihub ジミン) / `-0044-…-044`(mashima ジョングク) / `-0055-…-055`(ren V)
+- listings: `12260369-0001-…-001`(haru) / `-0002-…-002`(ihub 超求めてる？) / `-0003-…-003`(ihub 定価) ＋各 options（`…-101/-102/-103`）
+- goods_inventory ほしいもの: `12260369-0004-…-004`(mashima ミナ) / `-0005-…-005`(ren チェヨン)＋その goods_inventory_tags
 
 ### 確認方法
 - michilion 実機でホーム引っ張り更新 → 5段階が並ぶこと。
