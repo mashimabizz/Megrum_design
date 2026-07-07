@@ -9,6 +9,36 @@ enum TradeAgreementDisclosureRoute: String, Identifiable {
     var id: String { rawValue }
 }
 
+/// 成立後の情報開示（郵送先/支払い情報）を、閲覧者の役割で出し分ける判定。iter1226.381。
+/// 郵送でグッズを送る側だけが相手の郵送先を、金額を支払う側だけが相手の支払い先を見る。
+/// 郵送ぶつぶつ交換なら双方がグッズを送るので双方に郵送先が出る。
+struct TradeAgreementDisclosureVisibility {
+    var showsMailingInfo: Bool
+    var showsPaymentInfo: Bool
+
+    var showsAny: Bool { showsMailingInfo || showsPaymentInfo }
+
+    init(proposal: TradeProposal, viewerID: UUID?) {
+        let viewerIsSender = viewerID.map { proposal.isSender($0) } ?? false
+        let supportsMail = proposal.exchangeMethod == .mail || proposal.exchangeMethod == .both
+        // 自分側の提示グッズがある＝相手にグッズを送る側。その側だけ相手の郵送先を知る必要がある。
+        let viewerGivesGoods = viewerIsSender
+            ? !proposal.senderGoodsIDs.isEmpty
+            : !proposal.receiverGoodsIDs.isEmpty
+        showsMailingInfo = supportsMail && viewerGivesGoods
+
+        // 金額を支払う側だけ相手の支払い先を知る必要がある。支払い側不明時は従来通り（安全側）表示。
+        let hasCash = proposal.cashOffer || (proposal.cashAmount ?? 0) > 0
+        if !hasCash {
+            showsPaymentInfo = false
+        } else if let side = proposal.cashAmountSide {
+            showsPaymentInfo = viewerIsSender ? side == .sender : side == .receiver
+        } else {
+            showsPaymentInfo = true
+        }
+    }
+}
+
 struct TradeAgreementDisclosureActionsCard: View {
     var showsMailingInfo: Bool
     var showsPaymentInfo: Bool
@@ -68,6 +98,7 @@ private struct TradeAgreementDisclosureButton: View {
 
 struct TradeAgreementSystemTimeline: View {
     var proposal: TradeProposal
+    var viewerID: UUID?
     var partnerPaymentMethods: [UserPaymentMethod]
     var partnerPaymentNote: String?
     var partnerMailingAddress: TradeMailingAddressSnapshot?
@@ -86,7 +117,7 @@ struct TradeAgreementSystemTimeline: View {
                 timelineDot
             }
 
-            if supportsMailExchange {
+            if disclosure.showsMailingInfo {
                 TradeAgreementTimelineActionRow(
                     title: "郵送先が公開されました",
                     actionTitle: "見る",
@@ -95,12 +126,12 @@ struct TradeAgreementSystemTimeline: View {
                     action: onOpenMailingInfo
                 )
 
-                if showsPaymentInfo {
+                if disclosure.showsPaymentInfo {
                     timelineDot
                 }
             }
 
-            if showsPaymentInfo {
+            if disclosure.showsPaymentInfo {
                 TradeAgreementTimelineActionRow(
                     title: "支払い情報が公開されました",
                     actionTitle: "見る",
@@ -119,16 +150,12 @@ struct TradeAgreementSystemTimeline: View {
         "\(proposal.exchangeMethod.displayName)で取引が成立しました"
     }
 
-    private var supportsMailExchange: Bool {
-        proposal.exchangeMethod == .mail || proposal.exchangeMethod == .both
-    }
-
-    private var showsPaymentInfo: Bool {
-        proposal.cashOffer || !partnerPaymentMethods.isEmpty || partnerPaymentNote.nilIfBlank != nil
+    private var disclosure: TradeAgreementDisclosureVisibility {
+        TradeAgreementDisclosureVisibility(proposal: proposal, viewerID: viewerID)
     }
 
     private var showsAgreementDetails: Bool {
-        supportsMailExchange || showsPaymentInfo
+        disclosure.showsAny
     }
 
     private var timelineDot: some View {

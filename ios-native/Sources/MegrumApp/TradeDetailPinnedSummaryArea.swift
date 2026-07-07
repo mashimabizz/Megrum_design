@@ -69,7 +69,7 @@ struct TradeDetailPinnedSummaryArea: View {
 
             if showsAgreementDisclosureActions {
                 TradeAgreementDisclosureActionsCard(
-                    showsMailingInfo: supportsMailExchange,
+                    showsMailingInfo: showsMailingInfo,
                     showsPaymentInfo: showsPaymentInfo,
                     onOpenMailingInfo: onOpenMailingInfo,
                     onOpenPaymentInfo: onOpenPaymentInfo
@@ -94,17 +94,21 @@ struct TradeDetailPinnedSummaryArea: View {
         }
     }
 
-    private var showsAgreementDisclosureActions: Bool {
-        (proposal.status == .agreed || proposal.status == .completed)
-            && (supportsMailExchange || showsPaymentInfo)
+    /// 役割ベースの情報開示判定（郵送先＝グッズを送る側のみ／支払い情報＝金額を支払う側のみ）。iter1226.381。
+    private var disclosure: TradeAgreementDisclosureVisibility {
+        TradeAgreementDisclosureVisibility(proposal: proposal, viewerID: viewerID)
     }
 
-    private var supportsMailExchange: Bool {
-        proposal.exchangeMethod == .mail || proposal.exchangeMethod == .both
+    private var showsAgreementDisclosureActions: Bool {
+        (proposal.status == .agreed || proposal.status == .completed) && disclosure.showsAny
+    }
+
+    private var showsMailingInfo: Bool {
+        disclosure.showsMailingInfo
     }
 
     private var showsPaymentInfo: Bool {
-        proposal.cashOffer || !partnerPaymentMethods.isEmpty || partnerPaymentNote.nilIfBlank != nil
+        disclosure.showsPaymentInfo
     }
 
     @ViewBuilder

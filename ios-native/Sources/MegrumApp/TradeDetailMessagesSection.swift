@@ -40,6 +40,7 @@ struct TradeDetailMessagesSection: View {
             if showsAgreementSystemTimeline {
                 TradeAgreementSystemTimeline(
                     proposal: proposal,
+                    viewerID: viewerID,
                     partnerPaymentMethods: partnerPaymentMethods,
                     partnerPaymentNote: partnerPaymentNote,
                     partnerMailingAddress: partnerMailingAddress,

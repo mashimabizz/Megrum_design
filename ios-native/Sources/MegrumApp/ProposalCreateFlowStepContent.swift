@@ -57,10 +57,8 @@ extension ProposalCreateFlow {
     var conditionsStep: some View {
         ProposalExchangeConditionsStep(
             exchangeMethod: $exchangeMethod,
-            requiresPaymentSelection: configuration.requiresPaymentSelection,
             meetupContent: { meetupStep },
-            shippingContent: { shippingStep },
-            paymentContent: { paymentStep }
+            shippingContent: { shippingStep }
         )
     }
 

@@ -272,14 +272,13 @@ struct ProposalStepProgressPill: View {
     }
 }
 
-/// 3/3 交換条件：交換手段・現地・郵送・支払をひとつのステップにまとめる。
+/// 3/3 交換条件：交換手段・現地・郵送をひとつのステップにまとめる。
+/// 支払方法は 3/3 の完了後、独立した「支払方法」ステップで選ぶ（金額発生時のみ）。iter1226.381。
 /// 各セクションの下に「お互いの希望条件」（現地/郵送の各サブビューが内包）を表示する。
-struct ProposalExchangeConditionsStep<MeetupContent: View, ShippingContent: View, PaymentContent: View>: View {
+struct ProposalExchangeConditionsStep<MeetupContent: View, ShippingContent: View>: View {
     @Binding var exchangeMethod: ExchangeMethod
-    var requiresPaymentSelection: Bool
     @ViewBuilder var meetupContent: () -> MeetupContent
     @ViewBuilder var shippingContent: () -> ShippingContent
-    @ViewBuilder var paymentContent: () -> PaymentContent
 
     var body: some View {
         VStack(alignment: .leading, spacing: 28) {
@@ -301,13 +300,6 @@ struct ProposalExchangeConditionsStep<MeetupContent: View, ShippingContent: View
                     shippingContent()
                 }
             }
-
-            if requiresPaymentSelection {
-                VStack(alignment: .leading, spacing: 14) {
-                    sectionTitle("\(paymentSectionNumber). 支払方法")
-                    paymentContent()
-                }
-            }
         }
     }
 
@@ -321,17 +313,6 @@ struct ProposalExchangeConditionsStep<MeetupContent: View, ShippingContent: View
 
     private var mailSectionNumber: Int {
         exchangeMethod == .both ? 3 : 2
-    }
-
-    private var paymentSectionNumber: Int {
-        var number = 2
-        if exchangeMethod == .hand || exchangeMethod == .both {
-            number += 1
-        }
-        if exchangeMethod == .mail || exchangeMethod == .both {
-            number += 1
-        }
-        return number
     }
 }
 

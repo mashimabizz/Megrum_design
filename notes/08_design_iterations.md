@@ -4,6 +4,56 @@
 
 ---
 
+## イテレーション1226.381：打診の支払方法を独立ステップ化＋取引チャットの情報開示を役割ベースに＋ロータリー回転のz-order修正（FB5）
+
+### 背景・問題意識
+オーナーFB（3件）：
+1. **FB5-1**：提示物の選択（打診）3/3 に支払い方法の画面が含まれてしまっている。3/3 が終わった後に、独立した1画面で支払い方法を選ばせたい（金額のやりとりが発生する場合のみ）。
+2. **FB5-2**：郵送/現金のやりとりで、**情報を公開すべき側だけ**が公開されるようにしたい。郵送ぶつぶつ交換なら双方が住所開示。片方郵送・片方お金なら、グッズを送られる側が住所を開示し、お金を送られる側は支払い先が表示される。「これは取引チャット内のヘッダー部分のボタンのこと」。
+3. **FB5-3**：グッズ画像をスワイプして回転させるやつで、3枚以上あると左スワイプ時に元々左奥のカードが真ん中のカードを**貫通**して右へ抜けて不自然。貫通ではなく後ろを通るようにしたい。
+
+### 変更内容
+
+#### FB5-1：支払方法を 3/3 の後の独立ステップへ
+- `ProposalExchangeConditionsStep`（3/3 交換条件）から**支払方法セクションを撤去**（`requiresPaymentSelection`/`paymentContent`/generic `PaymentContent` を削除。交換手段・現地・郵送のみ）。
+- `visibleSteps` に、**金額発生時だけ** `.payment` を `.conditions` と `.confirm` の間に挿入（`[.give, .receive, .conditions, .payment, .confirm]`）。`.payment` は元から content route・画面タイトル「支払方法」・フッター「この方法にする」・`canAdvance` が実装済みで、`selectionTabs` からは除外されるため 3/3 ピルは不変。
+- ナビゲーション：`canAdvance(.conditions)` を `targetStatus != nil` のみに（支払要件を外す）。`.conditions` の遷移先は金額発生時 `.payment`、なければ `.confirm`。フッター文言も `.conditions` で「支払方法へ進む」/「次へ：送信確認」。
+- 最終送信要件（`canSubmit`）は従来通り支払選択を要求。`.payment` ステップで選択を強制してから `.confirm` へ。
+
+#### FB5-2：取引チャットの情報開示を役割ベースに
+- 共有判定 `TradeAgreementDisclosureVisibility(proposal:viewerID:)` を新設：
+  - **郵送先（相手の住所）**：郵送/両対応 かつ **閲覧者が相手にグッズを送る側**（自分側の提示グッズがある）のときだけ表示。→ 郵送ぶつぶつは双方、片方お金側は非表示。
+  - **支払い情報（相手の支払い先）**：**閲覧者が金額を支払う側**（`cashAmountSide` が自分側）のときだけ表示。支払い側不明時は安全側で従来通り表示。
+- 取引チャット**ヘッダーの開示ボタン**（`TradeDetailPinnedSummaryArea` → `TradeAgreementDisclosureActionsCard`）と、成立タイムライン（`TradeAgreementSystemTimeline`）の両方をこの判定に統一（`viewerID` を渡す）。
+
+#### FB5-3：ロータリー回転の貫通を後ろ通しへ
+- `HomeDiscoveryRotaryCard.visibleEntries` を、位置順ではなく **index 固定の宣言順**で並べるよう変更。位置順で並べ替えると回転アニメ中に ZStack の宣言順が入れ替わり、奥のカードが一瞬手前に描画されて貫通して見えていた。宣言順を安定させ、前後は `zIndex`（`20 - distance`）だけで決めることで奥を通るように。
+
+### 影響範囲
+- 打診作成フロー（`ProposalCreateFlow`：3/3 と支払方法）。金額なしの打診はステップ数不変。
+- 取引チャット詳細（`TradeDetailContentView` 配下のヘッダー開示ボタン＋成立タイムライン）。
+- ホーム候補シートのロータリー画像（超求/求 両方）。
+
+### 確認方法
+- `swift test`：1533件 green（0 failures）。
+  - FB5-2：`TradeAgreementDisclosureVisibility`（郵送ぶつぶつ＝双方郵送先／片方郵送片方お金＝送る側だけ郵送先・払う側だけ支払い情報／現地手渡し金額なし＝双方非表示）を新規4ケースで固定。
+  - FB5-1：`ProposalCreateSheetTests` に、`.conditions` が支払未選択でも進める・金額有なら遷移先 `.payment`・金額無なら `.confirm`・`.payment`→`.confirm`・フッター文言、の5ケースを追加。
+- FB5-3 は回転アニメ中の見え方のため静的スクショでは判定不可（実機スワイプで確認）。
+
+### セルフレビュー結果
+- ✅ 開示ロジックを1つの `TradeAgreementDisclosureVisibility` に集約し、ヘッダーとタイムラインで再利用（二重定義解消）。
+- ✅ 支払方法ステップは既存の `.payment` 資産（title/フッター/canAdvance/content route）を再利用。新規UIなし。
+- ✅ iOS標準のステップ遷移・ZStack z-index の範囲内（独自アニメの新規追加なし）。
+- ⚠️ `ProposalInitialStepResolver.normalized` は `.payment→.conditions` の旧読み替えを残置（実使用の initialStep は 3/3=`.conditions` までで、支払を直接初期表示する経路は無いため）。
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/ProposalCreateConditionSteps.swift` / `ProposalCreateFlowStepContent.swift` / `ProposalCreateFlowDerivedState.swift` / `ProposalCreateNavigationPolicy.swift`
+- `ios-native/Sources/MegrumApp/TradeAgreementAfterDealViews.swift` / `TradeDetailPinnedSummaryArea.swift` / `TradeDetailMessagesSection.swift`
+- `ios-native/Sources/MegrumApp/HomeDiscoveryRotaryCard.swift`
+- `ios-native/Tests/MegrumAppTests/TradeAgreementDisclosureVisibilityTests.swift` / `ProposalCreateSheetTests.swift`
+
+---
+
 ## イテレーション1226.380：求！/求めてる？シートを超求と同じ「うけとる ⇄ ゆずる」取引ブロックに統一
 
 > ※ 実装コミットは `[iter1226.379]`（e1177589a）だが、同番号が別作業（定価⇄ゆずる化）と衝突したため、記録上は 380 に採番し直した。

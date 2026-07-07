@@ -20,7 +20,8 @@ enum ProposalCreateBottomBarCopy {
         case .receive:
             return nextStepTitle(configuration: configuration)
         case .conditions:
-            return "次へ：送信確認"
+            // 金額が発生する時は次が支払方法ステップになる（iter1226.381）。
+            return configuration.requiresPaymentSelection ? "支払方法へ進む" : "次へ：送信確認"
         case .meetup:
             if configuration.requiresShippingBeforeSubmit {
                 return "送料へ進む"
@@ -56,6 +57,10 @@ enum ProposalCreatePrimaryStepDestination {
         case .receive:
             return nextMajorStep(configuration: configuration, visibleSteps: visibleSteps)
         case .conditions:
+            // 金額が発生する時は 3/3 の後に独立した支払方法ステップへ（iter1226.381）。
+            if configuration.requiresPaymentSelection, visibleSteps.contains(.payment) {
+                return .payment
+            }
             return visibleSteps.contains(.confirm) ? .confirm : nil
         case .meetup:
             if configuration.requiresShippingBeforeSubmit, visibleSteps.contains(.shipping) {
@@ -181,7 +186,8 @@ extension ProposalCreateConfiguration {
         case .receive:
             hasReceiverSelection
         case .conditions:
-            targetStatus != nil && (!requiresPaymentSelection || hasSelectedPaymentMethod)
+            // 支払方法は独立ステップに移動したので、3/3 完了条件からは外す（iter1226.381）。
+            targetStatus != nil
         case .meetup:
             targetStatus != nil
         case .shipping:
