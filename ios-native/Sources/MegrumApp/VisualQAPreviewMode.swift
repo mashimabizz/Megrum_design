@@ -6,6 +6,7 @@ enum VisualQAInitialScreen: String, Equatable {
     case homeHavesLookup = "home-haves-lookup"
     case matchRelation = "match-relation"
     case matchRelationCandidates = "match-relation-candidates"
+    case candidateSheet = "candidate-sheet"
     case proposalGive = "proposal-give"
     case proposalReceive = "proposal-receive"
     case proposalMeetup = "proposal-meetup"
