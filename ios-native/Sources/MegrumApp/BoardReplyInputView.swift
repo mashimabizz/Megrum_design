@@ -37,7 +37,9 @@ struct BoardReplyInput: View {
             .opacity(isDisabled ? 0.45 : 1)
 
             TextField("メッセージ", text: $text, axis: .vertical)
-                .font(.system(size: 14, weight: .heavy, design: .rounded))
+                .font(.system(size: 14, weight: .regular, design: .rounded))
+                .foregroundStyle(MegrumTheme.ink)
+                .tint(MegrumTheme.lavender)
                 .lineLimit(1...3)
                 .submitLabel(.send)
                 .padding(.horizontal, 16)

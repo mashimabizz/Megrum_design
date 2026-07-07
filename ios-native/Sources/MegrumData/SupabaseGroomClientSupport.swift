@@ -72,9 +72,11 @@ extension SupabaseGroomClient {
     }
 
     func ownGroomArchiveQueryItems(userID: UUID, limit: Int) -> [URLQueryItem] {
+        // 自分のグルームアーカイブは、24時間で expired になった自分の投稿も表示する
+        // （published だけだと1日で消えてしまう）。iter1226.364。
         [
             URLQueryItem(name: "user_id", value: "eq.\(userID.uuidString.lowercased())"),
-            URLQueryItem(name: "status", value: "eq.published"),
+            URLQueryItem(name: "status", value: "in.(published,expired)"),
             URLQueryItem(name: "order", value: "published_at.desc.nullslast,created_at.desc"),
             URLQueryItem(name: "limit", value: "\(max(1, min(limit, 300)))")
         ]

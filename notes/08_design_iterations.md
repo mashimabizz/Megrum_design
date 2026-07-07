@@ -4,6 +4,33 @@
 
 ---
 
+## イテレーション1226.364：チャットルーム入力文字を黒/非太字＋グルームアーカイブは自分の失効投稿も表示
+
+### 背景・問題意識
+オーナー指摘2件：
+1. めぐりチャットルームの入力欄の文字が紫の太字 → 黒・非太字にしたい。
+2. グルームアーカイブが1日で消える（自分の投稿も）→ 自分の投稿は失効後も見れるように。無料10件・プレミアム無制限。
+
+### 変更内容
+#### `ios-native/Sources/MegrumApp/BoardReplyInputView.swift`
+- 入力 TextField の親HStackが `.foregroundStyle(lavender)` を持ち、TextFieldが継承して紫＋`weight: .heavy`（太字）だった。TextField に `.foregroundStyle(MegrumTheme.ink)`（黒）＋`weight: .regular`（非太字）を明示。カーソルは `.tint(lavender)` でブランド色を維持。
+
+#### `ios-native/Sources/MegrumData/SupabaseGroomClientSupport.swift`
+- `ownGroomArchiveQueryItems` の `status=eq.published` → `status=in.(published,expired)`。DBは24hで status を expired にするため、published だけだと自分の投稿が1日で消えていた。owner の RLS（`auth.uid() = user_id`）は全statusを読めるので、失効投稿も自分は取得可。
+- 無料10件/プレミアム無制限は既存（`MegrumPlusAccessPolicy.groomArchiveRequestLimit` が free を `freeGroomArchiveLimit=10` にクランプ、premium は無制限）。マイグレーション不要。
+
+### 影響範囲
+- めぐりチャットルームの入力欄表示。グルームアーカイブの取得（自分の失効グルームが残る）。
+
+### 確認方法
+- swift test（archive query URL が `status=in.(published,expired)` を検証）。sim ホーム/チャットは既存動作維持。
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/BoardReplyInputView.swift`
+- `ios-native/Sources/MegrumData/SupabaseGroomClientSupport.swift`
+
+---
+
 ## イテレーション1226.363：無記載は不確定「？」＋激求→超求リネーム（超求めてる？/求めてる？）
 
 ### 背景・問題意識
