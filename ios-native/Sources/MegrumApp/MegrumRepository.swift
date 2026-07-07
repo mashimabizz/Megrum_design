@@ -1,5 +1,6 @@
 import Foundation
 import MegrumCore
+import MegrumData
 
 public struct MegrumAppSnapshot: Sendable {
     public var viewer: UserProfile
@@ -161,6 +162,7 @@ public protocol MegrumRepository: Sendable {
     func loadPublicWishes(userID: UUID) async throws -> [WishItem]
     func freshGroomImageURL(storagePath: String) async -> URL?
     func loadPublicUserProfile(userID: UUID) async throws -> PublicUserProfile?
+    func loadUserActivityWindows(userID: UUID) async throws -> [SupabaseActivityWindow]
     func loadUserEvaluations(userID: UUID, limit: Int) async throws -> [UserEvaluation]
     func loadGroomLikeCount(userID: UUID) async throws -> Int
     func createProposal(_ input: ProposalCreateInput) async throws -> TradeProposal

@@ -111,7 +111,7 @@ extension ProposalCreateFlow {
             } else {
                 HomePartnerExchangeCalendarSheet(
                     context: HomePartnerExchangeCalendarContext(
-                        ownerName: "@\(partnerHandle)",
+                        ownerName: partnerDisplayName,
                         methodTitle: "現地交換の条件",
                         dateDetails: [:],
                         fallbackPrefecture: nil,

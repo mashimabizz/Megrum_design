@@ -57,6 +57,8 @@ public final class MegrumAppState: ObservableObject {
     @Published public internal(set) var publicListingsByUserID: [UUID: [IndividualListing]] = [:]
     /// 他人プロフィールのほしいもの（userIDごと）。
     @Published public internal(set) var publicWishesByUserID: [UUID: [WishItem]] = [:]
+    /// 相手（打診対象）の現地交換カレンダー用：日付キー→会場名。相手のAWから生成。
+    @Published public internal(set) var partnerActivityWindowVenuesByUserID: [UUID: [String: String]] = [:]
     @Published public internal(set) var publicExchangeSettingsByUserID: [UUID: HomeDefaultExchangeSettings] = [:]
     @Published public internal(set) var userEvaluationsByUserID: [UUID: [UserEvaluation]] = [:]
     @Published public internal(set) var groomLikeCountByUserID: [UUID: Int] = [:]

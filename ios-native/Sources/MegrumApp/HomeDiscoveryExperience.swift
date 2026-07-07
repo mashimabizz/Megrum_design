@@ -31,6 +31,8 @@ struct HomeDiscoveryExperience: View {
     var tutorialFocusAnchor: TutorialAnchorID? = nil
     /// 「最初の3ステップ」ミッションカードを出す対象画面か（ホームタブのみ true）。
     var starterMissionEnabled: Bool = false
+    /// QA/デモ確認用：非nilの時は実データに関わらずこの達成状況でミッションカードを強制表示する。
+    var starterMissionForcedState: HomeStarterMissionState? = nil
     var onOpenInventory: () -> Void = {}
 
     @AppStorage(HomeExchangeSettingsStorageKeys.preference) var exchangePreferenceRawValue = HomeDefaultExchangeSettings.standard.preference.rawValue
@@ -300,7 +302,10 @@ struct HomeDiscoveryExperience: View {
 
 extension HomeDiscoveryExperience {
     var starterMissionState: HomeStarterMissionState {
-        HomeStarterMissionState.evaluate(
+        if let starterMissionForcedState {
+            return starterMissionForcedState
+        }
+        return HomeStarterMissionState.evaluate(
             inventory: appState?.inventory ?? [],
             wishes: appState?.wishes ?? [],
             listings: appState?.listings ?? []
@@ -308,6 +313,10 @@ extension HomeDiscoveryExperience {
     }
 
     var showsStarterMissionCard: Bool {
+        // QA/デモ用の強制表示：完了フラグ・全達成判定を無視して必ず出す。
+        if starterMissionForcedState != nil {
+            return !starterMissionCompleted
+        }
         guard starterMissionEnabled, viewer != nil, !starterMissionCompleted else {
             return false
         }
@@ -316,6 +325,11 @@ extension HomeDiscoveryExperience {
     }
 
     private func refreshStarterMissionCompletion() {
+        // QA/デモ強制表示中は毎回まっさらな状態から出す（過去のクローズを引き継がない）。
+        if starterMissionForcedState != nil {
+            starterMissionCompleted = false
+            return
+        }
         guard let userID = viewer?.id else {
             starterMissionCompleted = false
             return

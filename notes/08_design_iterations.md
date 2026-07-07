@@ -4,6 +4,39 @@
 
 ---
 
+## イテレーション1226.356：打診の相手カレンダーが空・「@相手さん」表記になる問題を修正
+
+### 背景・問題意識
+オーナー指摘：3/3現地条件の「＞」で開く相手カレンダーが空で、サブタイトルも「@相手さん」の仮名。iter1226.351 の実装が相手の交換日程を `publicExchangeSettingsByUserID`（＝閲覧者のローカルモード設定。相手では空）から取っていたのが原因。相手の現地交換日程の実体は相手の**アクティビティウィンドウ（AW）**、都道府県は個別募集の現地条件、表示名は相手プロフィールにある。
+
+### 変更内容
+
+#### データ層
+- `MegrumRepository.loadUserActivityWindows(userID:)` 新設（default `[]`、Supabase実装は `SupabaseActivityWindowClient.loadActivityWindows(status:.enabled)` で相手の有効AWを取得）
+- `HomeCandidateExchangePolicy.localDateKeys(fromStartEndPairs:)` 公開ヘルパー追加
+
+#### `MegrumAppState`
+- `partnerActivityWindowVenuesByUserID`（日付キー→会場名）＋ `loadPartnerActivityWindows(userID:)`（相手AWを日付キーへ展開）
+
+#### 打診フロー
+- `loadTargetOwnerExchangeContent` で相手プロフィール・交換設定・AWを読み込み
+- `partnerExchangeCalendarContext` を再構築：日程は相手AW（無ければ現地条件テキスト「5/5他」等を解析してフォールバック）、都道府県は個別募集の `localPrefecture`、名前は `partnerDisplayName`（表示名→handle→「相手」）
+- カレンダーのサブタイトルが「◯◯さんの現地交換の条件」になる
+
+### 影響範囲
+- 打診3/3 相手カレンダーシート
+
+### 確認方法
+- swift test: 1513件 0 failures
+- REST: 相手の有効AW（venue・start/end）がRLSで読めることを確認
+
+### セルフレビュー結果
+- ✅ ホームの「相手の交換条件」と同一シート（HomePartnerExchangeCalendarSheet）を継続利用
+- ✅ AWが無い相手でも現地条件テキストの日付解析でフォールバック表示
+- ⚠️ 相手が日程を全く設定していない場合はカレンダー空（データ無しのため妥当）
+
+---
+
 ## イテレーション1226.355：ガイドツアー見直し3周目（修正確認＋章別再生の実機検証）
 
 ### 背景・問題意識

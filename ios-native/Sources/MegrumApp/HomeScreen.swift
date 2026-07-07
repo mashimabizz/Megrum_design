@@ -33,6 +33,13 @@ struct HomeScreen: View {
     var inventoryItemsOverride: [GoodsItem]? = nil
     var visualQAInitialScreen: VisualQAInitialScreen? = nil
 
+    /// QA/デモ確認用：`starter-mission` 起動時は実データに関わらずミッションカードを強制表示する。
+    /// マイグッズ済み・ほしいもの/個別募集は未達成のリアルな途中状態を見せる。
+    private var starterMissionForcedState: HomeStarterMissionState? {
+        guard visualQAInitialScreen == .starterMission else { return nil }
+        return HomeStarterMissionState(inventoryDone: true, wishDone: false, listingDone: false)
+    }
+
     @AppStorage("megrum.home.localMode.activityWindowID") var localModeActivityWindowID = ""
     @AppStorage("megrum.home.localMode.enabled") var localModeEnabled = false
     @AppStorage("megrum.home.localMode.venue") var localModeVenue = ""
@@ -84,6 +91,7 @@ struct HomeScreen: View {
             tutorialSampleActive: tutorialSampleActive,
             tutorialFocusAnchor: tutorialFocusAnchor,
             starterMissionEnabled: starterMissionEnabled,
+            starterMissionForcedState: starterMissionForcedState,
             onOpenInventory: onOpenInventory
         )
         .background(MegrumTheme.canvas.ignoresSafeArea())

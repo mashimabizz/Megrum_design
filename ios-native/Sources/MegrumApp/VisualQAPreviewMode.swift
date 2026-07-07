@@ -39,6 +39,8 @@ enum VisualQAInitialScreen: String, Equatable {
     case search
     case profileProposal = "profile-proposal"
     case tutorial
+    /// ホーム最上部に「最初の3ステップ」ミッションカードを強制表示する（QA/デモ確認用）。
+    case starterMission = "starter-mission"
 
     var isAuthRoute: Bool {
         switch self {
