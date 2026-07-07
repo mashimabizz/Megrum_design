@@ -4,6 +4,46 @@
 
 ---
 
+## イテレーション1226.361：提示物選択のUI微調整3件＋激求は満たせる選択肢のみに
+
+### 背景・問題意識
+オーナー要望4件（うち1件は既にiter1226.360で対応済みの自分カレンダー系の続き）：
+1. 提示物の選択・現地交換条件で「都道府県」の文字色が青いので黒にしたい。
+2. その下の行が項目名なし入力欄のみ→「メモ」という項目名＋右横に自由入力に。
+3. 郵送交換の条件のボタン（送料/発送目安）の紫がダサい→紫×水色グラデに（既存の送信確認ボタンと同じ）。
+4. 激求！のグッズをタップ→相手の希望から譲を選ぶで、相手が2つ全て希望していて自分は1つしか譲れず打診に進めないケースは激求に合致しないでほしい。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateConditionSteps.swift`
+- 待ち合わせカードを再構成：
+  - 「都道府県」ラベルを黒（`MegrumTheme.ink`）に。Picker(.navigationLink)はリンク色（青）になるため、ラベル＋右側 Menu（選択値＋chevron.up.chevron.down）の自前行に変更。
+  - 「メモ」行に項目名「メモ」を追加し、その右横に自由入力（trailing寄せ TextField）。
+  - 日程 DatePicker の tint を lavender に。
+
+#### `ios-native/Sources/MegrumApp/ProposalConditionSegmentRow.swift`
+- 選択中セグメントの背景を solid lavender → `[lavender, sky]` の LinearGradient（送信確認ボタンと同じ）に。
+
+#### `ios-native/Sources/MegrumApp/HomeCandidateDemandPolicy.swift`
+- `demandLine`：goods/condition 選択肢を「自分が手持ちで満たせる（一致数 ≥ requiredOfferCount）」ものだけ需要に数えるよう `isOfferSatisfiable` フィルタを追加。相手が2つ全て希望で自分が1つしか譲れない選択肢は、激求・求のどちらにも数えない。
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlowInitialStateActions.swift`
+- （検証用フックの微調整のみ。iter1226.360 の proposal-meetup シードを流用）
+
+### 影響範囲
+- 打診3/3 現地/郵送の条件UI。ホーム候補の需要行分類（激求/求）と並び順。
+
+### 確認方法
+- sim（proposal-meetup）で 都道府県ラベル黒／メモ項目名＋入力／郵送セグメントのグラデを確認済み。
+- 激求判定は HomeCandidateDemandPolicy のユニットテストで担保。
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/ProposalCreateConditionSteps.swift`
+- `ios-native/Sources/MegrumApp/ProposalConditionSegmentRow.swift`
+- `ios-native/Sources/MegrumApp/HomeCandidateDemandPolicy.swift`
+
+---
+
 ## イテレーション1226.360：提示物の選択で「自分の希望条件」も相手と同ロジック表示＋「＞」で自分のカレンダー
 
 ### 背景・問題意識

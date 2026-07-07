@@ -15,26 +15,48 @@ struct ProposalMeetupConditionStep: View {
         VStack(alignment: .leading, spacing: 14) {
             ProposalCardSection(title: "待ち合わせ") {
                 VStack(spacing: 0) {
-                    Picker("都道府県", selection: $prefecture) {
-                        Text("未設定").tag("")
-                        ForEach(OwnProfileEditValidation.japanPrefectures, id: \.self) { prefecture in
-                            Text(prefecture).tag(prefecture)
+                    // 都道府県：ラベルは黒（青リンク色にしない）＋右に選択値。
+                    HStack(spacing: 12) {
+                        Text("都道府県")
+                            .font(.system(size: 15, weight: .bold, design: .rounded))
+                            .foregroundStyle(MegrumTheme.ink)
+                        Spacer(minLength: 8)
+                        Menu {
+                            Picker("都道府県", selection: $prefecture) {
+                                Text("未設定").tag("")
+                                ForEach(OwnProfileEditValidation.japanPrefectures, id: \.self) { prefecture in
+                                    Text(prefecture).tag(prefecture)
+                                }
+                            }
+                        } label: {
+                            HStack(spacing: 4) {
+                                Text(prefecture.isBlank ? "未設定" : prefecture)
+                                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                                    .foregroundStyle(prefecture.isBlank ? MegrumTheme.muted : MegrumTheme.ink)
+                                Image(systemName: "chevron.up.chevron.down")
+                                    .font(.system(size: 12, weight: .bold))
+                                    .foregroundStyle(MegrumTheme.muted)
+                            }
                         }
                     }
-                    .font(.system(size: 15, weight: .bold, design: .rounded))
                     .padding(.vertical, ProposalMeetupConditionMetrics.rowVerticalPadding)
                     .frame(minHeight: ProposalMeetupConditionMetrics.rowMinHeight)
-                    #if os(iOS)
-                    .pickerStyle(.navigationLink)
-                    #endif
 
                     Divider()
 
-                    TextField("メモ（例：駅周辺、会場入口付近）", text: $placeMemo, axis: .vertical)
-                        .font(.system(size: 15, weight: .semibold, design: .rounded))
-                        .lineLimit(1...3)
-                        .padding(.vertical, 12)
-                        .frame(minHeight: ProposalMeetupConditionMetrics.rowMinHeight)
+                    // メモ：ラベル「メモ」＋その右横に自由入力。
+                    HStack(alignment: .center, spacing: 12) {
+                        Text("メモ")
+                            .font(.system(size: 15, weight: .bold, design: .rounded))
+                            .foregroundStyle(MegrumTheme.ink)
+                        TextField("例：駅周辺、会場入口付近", text: $placeMemo, axis: .vertical)
+                            .font(.system(size: 15, weight: .semibold, design: .rounded))
+                            .multilineTextAlignment(.trailing)
+                            .lineLimit(1...3)
+                            .frame(maxWidth: .infinity, alignment: .trailing)
+                    }
+                    .padding(.vertical, 12)
+                    .frame(minHeight: ProposalMeetupConditionMetrics.rowMinHeight)
 
                     Divider()
 
@@ -44,6 +66,7 @@ struct ProposalMeetupConditionStep: View {
                         displayedComponents: [.date]
                     )
                     .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .tint(MegrumTheme.lavender)
                     .padding(.vertical, 10)
                     .frame(minHeight: ProposalMeetupConditionMetrics.rowMinHeight)
                 }

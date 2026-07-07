@@ -34,15 +34,18 @@ enum HomeCandidateDemandPolicy {
     static func demandLine(for signals: HomeCandidateConditionSignals) -> HomeCandidateDemandLine {
         let options = signals.individualListingSelection?.wantedOptions ?? []
 
+        // 相手の選択肢が要求する数（すべて／n個以上）を、自分が手持ちで満たせる選択肢だけを
+        // 需要として扱う。例：2つを全て希望する選択肢で自分が1つしか譲れない場合は、
+        // その選択肢では打診が完結しないため「激求」にも「求」にも数えない（iter1226.361）。
         let designatedIDs = orderedUnique(
-            options.filter { $0.kind == .goods }.flatMap(\.matchingGoodsIDs)
+            options.filter { $0.kind == .goods && isOfferSatisfiable($0) }.flatMap(\.matchingGoodsIDs)
         )
         if !designatedIDs.isEmpty {
             return .hotDemand(goodsIDs: designatedIDs)
         }
 
         let conditionMatchedIDs = orderedUnique(
-            options.filter { $0.kind == .condition }.flatMap(\.matchingGoodsIDs)
+            options.filter { $0.kind == .condition && isOfferSatisfiable($0) }.flatMap(\.matchingGoodsIDs)
                 + signals.wishMatchedOfferGoodsIDs
         )
         if !conditionMatchedIDs.isEmpty {
@@ -148,6 +151,17 @@ enum HomeCandidateDemandPolicy {
     }
 
     // MARK: - Helpers
+
+    /// 相手の選択肢が要求する数（すべて＝指定グッズ数／n個以上＝n）を、自分の手持ち一致数で
+    /// 満たせるか。満たせない選択肢は打診が完結しないため需要に数えない（iter1226.361）。
+    private static func isOfferSatisfiable(_ option: HomeIndividualListingWantedOption) -> Bool {
+        let required = HomeListingSelectionPolicy.requiredOfferCount(
+            logic: option.logic,
+            designatedCount: option.goodsIDs.count,
+            minimumCount: option.minimumCount
+        )
+        return option.matchingGoodsIDs.count >= required
+    }
 
     private static func goodsDemandRanks(of candidate: HomeDiscoveryCandidate) -> [Int] {
         guard !candidate.goods.isEmpty else {
