@@ -4,6 +4,40 @@
 
 ---
 
+## イテレーション1226.382：評価表記を黄色星に統一＋候補ヘッダーにアイコン＋プレミアム広告非表示＋ゆずる間隔（FB6の一部）
+
+### 背景・問題意識
+オーナーFB（FB6バッチのうち3件）：
+- **FB6-2**：Megrumプレミアムの紹介画面に「広告の非表示」を追加。
+- **FB6-3**：候補シートのゆずる候補が近接し「＋」が窮屈 → サムネ間隔を少し広げる。
+- **FB6-4**：候補シート最上部のユーザー名/性別行の左にユーザーアイコンを表示。評価表記を「評価X件 平均評価X.X」から、やりとり一覧と同じ「★ X.X（X件）」に統一。★はやりとり一覧・候補シート・評価入力・取引チャットヘッダーすべてで黄色の星アイコンに。取引チャットのヘッダーにも同じ評価表記を出す。
+
+### 変更内容
+- **FB6-2**：`SubscriptionComparisonRow.rows`（プレミアム「できること」表）に「広告の非表示」行を追加（無料×／プレミアム○、アイコン `nosign`）。
+- **FB6-3**：`HomeWishHitDetailSheet.offerRail` の `HStack(spacing: 8→12)`。
+- **FB6-4**：
+  - 共通部品 `MegrumRatingLabel`／`MegrumRating`（黄色星色＋「X.X（X件）」文言）を新設。評価表記をここに集約。
+  - `HomeCandidateSheetHeader`：左に `ProfileVisualAvatar`（44）、右に名前＋性別＋`MegrumRatingLabel`。旧 `profileMetaText`（評価X件 平均評価X.X）を廃止。
+  - やりとり一覧（`TradeCardPresentation`/`TradeCardComponents`）：`partnerAverageStars`/`partnerEvaluationCount` を追加し、テキスト★を `MegrumRatingLabel`（黄色星）に置換。
+  - 取引チャットヘッダー（`TradeDetailHeroPresentation`/`TradeDetailHeroView`）：相手の評価を `MegrumRatingLabel` で表示（@handle・関係性の下）。
+  - 評価入力（`TradeEvaluationSheet`）：星の色を lavender → `MegrumRating.starColor`（選択=黄色／未選択=グレー）。
+
+### 影響範囲
+- 候補シート（超求/求）ヘッダー、やりとり一覧カード、取引チャットヘッダー、評価送信シート、プレミアム紹介画面。
+
+### 確認方法
+- `swift test` 1533件 green（0 failures）。実機で候補シートヘッダー・やりとり一覧・取引チャットヘッダー・評価シート・プレミアム表を目視。
+
+### セルフレビュー結果
+- ✅ 評価表記・星色を `MegrumRatingLabel`/`MegrumRating` に一元化（4画面で再利用）。
+- ✅ ブランドカラー直書きは星の黄色のみ（意味色として `MegrumRating.starColor` に定義）。
+- ⚠️ FB6-1（「他にも交換できそうなもの」のホーム構造化）は別iterで対応。
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/MegrumRatingLabel.swift`（新規）/ `HomeCandidateSheetHeaderViews.swift` / `TradeCardPresentation.swift` / `TradeCardComponents.swift` / `TradeDetailHeroPresentation.swift` / `TradeDetailHeroView.swift` / `TradeEvaluationSheet.swift` / `SubscriptionPremiumPlanCatalog.swift` / `HomeWishHitDetailSheet.swift`
+
+---
+
 ## イテレーション1226.381：打診の支払方法を独立ステップ化＋取引チャットの情報開示を役割ベースに＋ロータリー回転のz-order修正（FB5）
 
 ### 背景・問題意識

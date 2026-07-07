@@ -23,7 +23,8 @@ struct TradeEvaluationSheet: View {
                     } label: {
                         Image(systemName: value <= draftState.stars ? "star.fill" : "star")
                             .font(.system(size: 30, weight: .bold))
-                            .foregroundStyle(MegrumTheme.lavender)
+                            // 評価の星は候補シート・やりとり一覧と同じ黄色に統一（iter1226.382 / FB6-4）。
+                            .foregroundStyle(value <= draftState.stars ? MegrumRating.starColor : MegrumTheme.muted.opacity(0.4))
                     }
                     .buttonStyle(.plain)
                 }

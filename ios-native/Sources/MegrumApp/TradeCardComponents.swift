@@ -90,8 +90,14 @@ struct TradeCardHeader: View {
                 TradePartnerMetaText(demographicText)
             }
 
-            if let ratingText = presentation.partnerRatingText {
-                TradePartnerMetaText(ratingText)
+            if let evaluationCount = presentation.partnerEvaluationCount {
+                // 評価は黄色い星アイコン＋「X.X（X件）」で統一（iter1226.382 / FB6-4）。
+                MegrumRatingLabel(
+                    averageStars: presentation.partnerAverageStars,
+                    evaluationCount: evaluationCount,
+                    starSize: 11,
+                    fontSize: 12
+                )
             }
 
             Spacer(minLength: 6)

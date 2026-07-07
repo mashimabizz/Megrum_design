@@ -2,8 +2,8 @@ import Foundation
 import MegrumDesign
 import SwiftUI
 
-/// 候補シート再設計（notes/19）のヘッダー。見出し文・大画像・需要チップを撤去し、
-/// 名前＋評価（プロフメタ）のみに簡素化。タップで相手プロフィールへ。iter1226.374/376。
+/// 候補シート再設計（notes/19）のヘッダー。左にユーザーアイコン、右に名前＋性別＋評価。
+/// 評価はやりとり一覧と同じ「★ X.X（X件）」（黄色星）で表示。タップで相手プロフィールへ。iter1226.374/376/382。
 struct HomeCandidateSheetHeader: View {
     var owner: HomeDiscoveryGoodsOwnerSummary?
     var fallbackName: String
@@ -14,40 +14,54 @@ struct HomeCandidateSheetHeader: View {
             Button {
                 onOpenOwnerProfile(owner.id)
             } label: {
-                content(name: owner.displayName, meta: owner.profileMetaText, tappable: true)
+                content(owner: owner, name: owner.displayName, tappable: true)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("\(owner.displayName)のプロフィールを開く。\(owner.profileMetaText)")
+            .accessibilityLabel("\(owner.displayName)のプロフィールを開く")
         } else {
-            content(name: fallbackName, meta: nil, tappable: false)
+            content(owner: nil, name: fallbackName, tappable: false)
         }
     }
 
-    private func content(name: String, meta: String?, tappable: Bool) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(alignment: .center, spacing: 8) {
-                Text(name)
-                    .font(.system(size: 17, weight: .black, design: .rounded))
-                    .foregroundStyle(MegrumTheme.ink)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-                    .layoutPriority(1)
+    private func content(owner: HomeDiscoveryGoodsOwnerSummary?, name: String, tappable: Bool) -> some View {
+        HStack(alignment: .center, spacing: 10) {
+            ProfileVisualAvatar(
+                url: owner?.avatarURL,
+                fallback: owner?.initial ?? String(name.prefix(1)).uppercased(),
+                size: 44
+            )
 
-                Spacer(minLength: 0)
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(alignment: .center, spacing: 8) {
+                    Text(name)
+                        .font(.system(size: 17, weight: .black, design: .rounded))
+                        .foregroundStyle(MegrumTheme.ink)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                        .layoutPriority(1)
 
-                if tappable {
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 12.5, weight: .black, design: .rounded))
-                        .foregroundStyle(MegrumTheme.lavender.opacity(0.74))
+                    Spacer(minLength: 0)
+
+                    if tappable {
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 12.5, weight: .black, design: .rounded))
+                            .foregroundStyle(MegrumTheme.lavender.opacity(0.74))
+                    }
                 }
-            }
 
-            if let meta {
-                Text(meta)
-                    .font(.system(size: 12.2, weight: .semibold, design: .rounded))
-                    .foregroundStyle(MegrumTheme.muted)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
+                if let owner {
+                    HStack(spacing: 8) {
+                        Text(owner.genderText)
+                            .font(.system(size: 12.2, weight: .semibold, design: .rounded))
+                            .foregroundStyle(MegrumTheme.muted)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                        MegrumRatingLabel(
+                            averageStars: owner.averageStars,
+                            evaluationCount: owner.evaluationCount ?? 0
+                        )
+                    }
+                }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

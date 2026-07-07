@@ -149,7 +149,8 @@ struct HomeWishHitDetailSheet: View {
     /// 選択は単一（selectedOfferIndex）で、推しマッチ＋推し以外を連結した通し index で扱う。
     private func offerRail(goods: [HomeMockGoods], indexOffset: Int) -> some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
+            // ゆずる候補が近接し「＋」が窮屈になるのでサムネ間隔を少し広げる（iter1226.382 / FB6-3）。
+            HStack(spacing: 12) {
                 ForEach(Array(goods.enumerated()), id: \.element.id) { position, item in
                     let index = indexOffset + position
                     HomeDealThumb(

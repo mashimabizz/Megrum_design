@@ -7,6 +7,8 @@ struct TradeDetailHeroPresentation: Equatable, Sendable {
     var partnerInitial: String
     var partnerAvatarURL: URL?
     var partnerMetaText: String
+    var partnerAverageStars: Double?
+    var partnerEvaluationCount: Int?
     var relationText: String
     var statusLabel: String
     var agreementLabel: String
@@ -26,7 +28,8 @@ struct TradeDetailHeroPresentation: Equatable, Sendable {
     ) {
         let partnerID = viewerID.flatMap { proposal.partnerID(for: $0) }
             ?? proposal.receiverID
-        let profile = profilesByUserID[partnerID]?.profile
+        let publicProfile = profilesByUserID[partnerID]
+        let profile = publicProfile?.profile
         let handle = profile?.handle
             ?? "user_\(partnerID.uuidString.prefix(4).lowercased())"
         self.partnerDisplayName = (profile?.displayName).nilIfBlank ?? handle
@@ -35,6 +38,8 @@ struct TradeDetailHeroPresentation: Equatable, Sendable {
         self.partnerAvatarURL = profile?.avatarURL
         self.exchangeMethodText = proposal.exchangeMethod.displayName
         self.partnerMetaText = Self.partnerMetaText(for: profile)
+        self.partnerAverageStars = publicProfile?.averageStars
+        self.partnerEvaluationCount = publicProfile.map(\.evaluationCount)
 
         let isSender = viewerID.map { proposal.senderID == $0 } ?? false
         let isReceiver = viewerID.map { proposal.receiverID == $0 } ?? false

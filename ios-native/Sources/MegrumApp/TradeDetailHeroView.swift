@@ -28,6 +28,16 @@ struct TradeDetailHero: View {
                             .lineLimit(1)
                             .minimumScaleFactor(0.72)
                     }
+                    if let evaluationCount = presentation.partnerEvaluationCount {
+                        // 相手の評価を候補シート・やりとり一覧と同じ黄色星表記で表示（iter1226.382 / FB6-4）。
+                        MegrumRatingLabel(
+                            averageStars: presentation.partnerAverageStars,
+                            evaluationCount: evaluationCount,
+                            starSize: 11,
+                            fontSize: 11.5,
+                            fontWeight: .heavy
+                        )
+                    }
                 }
 
                 Spacer(minLength: 8)

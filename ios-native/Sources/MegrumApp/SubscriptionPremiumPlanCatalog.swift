@@ -88,6 +88,13 @@ struct SubscriptionComparisonRow: Identifiable, Equatable, Sendable {
             systemImage: "arrow.up.forward.circle.fill"
         ),
         SubscriptionComparisonRow(
+            title: "広告の非表示",
+            freeText: "×",
+            premiumText: "○",
+            freeIsAvailable: false,
+            systemImage: "nosign"
+        ),
+        SubscriptionComparisonRow(
             title: "グルームアーカイブ",
             freeText: "10件まで",
             premiumText: "無制限",
