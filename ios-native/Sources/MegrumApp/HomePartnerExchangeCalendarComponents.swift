@@ -59,31 +59,38 @@ struct HomePartnerExchangeCalendarCard: View {
     }
 
     private var header: some View {
-        HStack(spacing: 8) {
-            VStack(alignment: .leading, spacing: 2) {
+        HStack(alignment: .top, spacing: 8) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text("現地交換可能な場所と日程")
                     .font(.caption.weight(.black))
                     .foregroundStyle(MegrumTheme.muted)
 
-                Text(monthTitle)
-                    .font(.headline.weight(.black))
-                    .foregroundStyle(MegrumTheme.ink)
+                // 月表示の右横に月切り替えの矢印を並べる（自分の交換設定カレンダーと同じ配置）。
+                HStack(spacing: 6) {
+                    Text(monthTitle)
+                        .font(.headline.weight(.black))
+                        .foregroundStyle(MegrumTheme.ink)
+
+                    Button("前の月", systemImage: "chevron.left", action: previousMonth)
+                        .labelStyle(.iconOnly)
+                        .font(.subheadline.weight(.black))
+                        .foregroundStyle(MegrumTheme.ink)
+                        .frame(width: 32, height: 32)
+                        .background(MegrumTheme.ink.opacity(0.05), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+
+                    Button("次の月", systemImage: "chevron.right", action: nextMonth)
+                        .labelStyle(.iconOnly)
+                        .font(.subheadline.weight(.black))
+                        .foregroundStyle(MegrumTheme.ink)
+                        .frame(width: 32, height: 32)
+                        .background(MegrumTheme.ink.opacity(0.05), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
 
-            Button("前の月", systemImage: "chevron.left", action: previousMonth)
-                .labelStyle(.iconOnly)
-                .font(.subheadline.weight(.black))
-                .foregroundStyle(MegrumTheme.ink)
-                .frame(width: 34, height: 34)
-                .background(MegrumTheme.ink.opacity(0.05), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+            Spacer(minLength: 4)
 
-            Button("次の月", systemImage: "chevron.right", action: nextMonth)
-                .labelStyle(.iconOnly)
-                .font(.subheadline.weight(.black))
-                .foregroundStyle(MegrumTheme.ink)
-                .frame(width: 34, height: 34)
-                .background(MegrumTheme.ink.opacity(0.05), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+            // カレンダー右上に相手のデフォルト（既定）交換都道府県を表示（読み取り専用）。
+            HomePartnerDefaultPrefectureChip(prefecture: context.fallbackPrefecture)
         }
     }
 
@@ -225,6 +232,41 @@ struct HomePartnerExchangeCalendarCard: View {
             baseColor = MegrumTheme.ink
         }
         return isCurrentMonth ? baseColor : MegrumTheme.muted.opacity(0.58)
+    }
+}
+
+/// 相手のデフォルト（既定）交換都道府県を表示する読み取り専用チップ。
+/// 自分の交換設定カレンダー右上の「既定 ◯◯」チップと同じ見た目に揃える。
+struct HomePartnerDefaultPrefectureChip: View {
+    var prefecture: String?
+
+    var body: some View {
+        HStack(spacing: 5) {
+            Text("既定")
+                .foregroundStyle(MegrumTheme.lavender)
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
+            Text(displayPrefecture)
+                .foregroundStyle(MegrumTheme.ink)
+                .lineLimit(1)
+                .minimumScaleFactor(0.76)
+        }
+        .font(.caption.weight(.black))
+        .padding(.horizontal, 10)
+        .frame(minHeight: 32)
+        .background(Color.white.opacity(0.82), in: Capsule())
+        .overlay {
+            Capsule()
+                .stroke(MegrumTheme.lavender.opacity(0.34), lineWidth: 1.2)
+        }
+        .accessibilityLabel("相手のデフォルトの都道府県、\(prefecture?.nilIfBlank ?? "未設定")")
+    }
+
+    private var displayPrefecture: String {
+        guard let prefecture = prefecture?.nilIfBlank else {
+            return "未設定"
+        }
+        return HomePartnerExchangePrefecturePresentation.shortName(prefecture)
     }
 }
 

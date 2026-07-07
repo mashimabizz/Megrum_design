@@ -114,6 +114,10 @@ struct PublicUserProfileScreen: View {
                presentationState.proposalTargetItem == nil {
                 startPrimaryProposal()
             }
+            // VisualQA：相手の交換条件カレンダーをタップ操作なしで検証する。
+            if ProcessInfo.processInfo.environment["MEGRUM_VISUAL_QA_OPEN_EXCHANGE_CONDITIONS"] != nil {
+                presentationState.isExchangeConditionsPresented = true
+            }
         }
         .sheet(isPresented: $presentationState.isEvaluationListPresented) {
             UserEvaluationListSheet(

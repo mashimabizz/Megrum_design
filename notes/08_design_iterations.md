@@ -4,6 +4,34 @@
 
 ---
 
+## イテレーション1226.359：相手の交換条件カレンダー右上にデフォルト都道府県を表示・矢印を月表示横へ
+
+### 背景・問題意識
+オーナー要望：相手の交換条件シート（HomePartnerExchangeCalendarSheet）に、相手のデフォルト（既定）交換都道府県も表示したい。自分の交換設定カレンダーと同じく「カレンダー右上」に出すイメージ。あわせて月切り替えの矢印は「月表示の右横」に置いてほしい。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomePartnerExchangeCalendarComponents.swift`
+- `HomePartnerExchangeCalendarCard.header` を再構成：
+  - 左：キャプション「現地交換可能な場所と日程」＋その下に `月表示 + <前月> + <次月>` を横並び（矢印を月表示の右横へ）。
+  - 右上：`HomePartnerDefaultPrefectureChip`（読み取り専用チップ）でデフォルト都道府県を表示。
+- 新規 `HomePartnerDefaultPrefectureChip`：自分の交換設定カレンダー右上の「既定 ◯◯」チップと同じ見た目（白カプセル＋lavender枠）。`context.fallbackPrefecture` を `HomePartnerExchangePrefecturePresentation.shortName` で短縮表示。nil のときは「未設定」。編集用のメニュー/シェブロンは持たない。
+
+#### `ios-native/Sources/MegrumApp/PublicUserProfileScreen.swift`
+- VisualQA 検証用フック追加：環境変数 `MEGRUM_VISUAL_QA_OPEN_EXCHANGE_CONDITIONS` があればプロフィール読み込み後に交換条件シートを自動オープン（タップ操作なしで検証可能）。
+
+### 影響範囲
+- 相手の交換条件カレンダーシート（打診フローの「＞」・相手プロフィールの「交換条件」の両方で共通表示）。
+
+### 確認方法
+- sim（public-profile / michi1 / OPEN_EXCHANGE_CONDITIONS=1）で、右上に「既定 北海道」、月表示「2026年5月」の右横に `<` `>`、サブタイトル「みちさんの現地交換の条件」を確認済み。
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/HomePartnerExchangeCalendarComponents.swift`
+- `ios-native/Sources/MegrumApp/PublicUserProfileScreen.swift`
+
+---
+
 ## イテレーション1226.358：相手プロフィールの「交換条件」を打診フローと同じカレンダーシートに
 
 ### 背景・問題意識
