@@ -4,6 +4,30 @@
 
 ---
 
+## イテレーション1226.369：ホーム候補シートのヘッダーで画像と交換条件ブロックの左右を入れ替え
+
+### 背景・問題意識
+オーナー要望：ホーム候補の詳細シート（超求！/求！等）で、上側のグッズ画像（左）と、交換条件・支払い条件・「個別募集の詳細を見る」ボタン（右）の**左右の位置を逆に**したい。
+
+### 変更内容
+#### `ios-native/Sources/MegrumApp/HomeDiscoverySheetSharedViews.swift`
+- `HomeSelectedGoodsHeader` の `HStack` 内の2カラムの順序を入れ替え。
+  - 左：交換条件（`HomeExchangeMethodBlock`）＋支払い条件（`HomePaymentBox`）＋個別募集の詳細ボタン（`HomeListingDetailButton`）。`.frame(maxWidth: .infinity, alignment: .leading)` で横幅を占有。
+  - 右：グッズ画像（`HomeSelectedGoodsSingleCard` 136×162）＋メモ無し時の日時。
+- 共有ヘッダーのため、超求/求のヒット詳細（`HomeGoodsHitDetailSheet` / `HomeWishHitDetailSheet`）と「求められているグッズ」ルックアップ（`HomeDiscoveryLookupSheets`）の全てに一貫適用。
+
+### 影響範囲
+- ホーム候補の詳細シート全種のヘッダー。ロジック・データは不変（レイアウトのみ）。
+
+### 確認方法
+- シミュレータ VisualQA（tutorial 章 proposal / step 7-5）で `HomeSelectedGoodsHeader` を描画し、画像＝右・交換条件/支払い/詳細＝左に入れ替わっていることをスクショ確認。
+- swift test 1517件 green。
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/HomeDiscoverySheetSharedViews.swift`
+
+---
+
 ## イテレーション1226.368：個別募集マッチから「別ユーザー間ID直接指名」ロジックを撤去
 
 ### 背景・問題意識

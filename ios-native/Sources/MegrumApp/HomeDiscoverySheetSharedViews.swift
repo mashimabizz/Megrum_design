@@ -26,18 +26,7 @@ struct HomeSelectedGoodsHeader: View {
             }
 
             HStack(alignment: .top, spacing: 20) {
-                VStack(alignment: .leading, spacing: 4) {
-                    HomeSelectedGoodsSingleCard(goods: goods, conditionTags: conditionTags)
-                        .frame(width: 136, height: 162)
-
-                    // メモが無い時はグッズ画像の左下に日時を出す
-                    if listingNote?.nilIfBlank == nil, let timestampText {
-                        Text(timestampText)
-                            .font(.system(size: 9.5, weight: .semibold, design: .rounded))
-                            .foregroundStyle(MegrumTheme.muted.opacity(0.85))
-                    }
-                }
-
+                // 交換条件・支払い条件・個別募集の詳細を左側に配置（グッズ画像は右側）
                 VStack(alignment: .leading, spacing: 10) {
                     if !usesOwnerSummaryAsHeader, let ownerSummary = goods.ownerSummary {
                         HomeUserSummary(owner: ownerSummary, onOpenProfile: onOpenOwnerProfile)
@@ -62,6 +51,18 @@ struct HomeSelectedGoodsHeader: View {
                 }
                 .padding(.top, 4)
                 .frame(maxWidth: .infinity, alignment: .leading)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    HomeSelectedGoodsSingleCard(goods: goods, conditionTags: conditionTags)
+                        .frame(width: 136, height: 162)
+
+                    // メモが無い時はグッズ画像の左下に日時を出す
+                    if listingNote?.nilIfBlank == nil, let timestampText {
+                        Text(timestampText)
+                            .font(.system(size: 9.5, weight: .semibold, design: .rounded))
+                            .foregroundStyle(MegrumTheme.muted.opacity(0.85))
+                    }
+                }
             }
 
             if let listingNote = listingNote?.nilIfBlank {
