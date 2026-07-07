@@ -8,6 +8,7 @@ struct ProposalMeetupConditionStep: View {
     @Binding var scheduleDate: Date
     var viewerConditionText: String
     var partnerConditionText: String
+    var onOpenViewerCalendar: (() -> Void)?
     var onOpenPartnerCalendar: (() -> Void)?
 
     var body: some View {
@@ -60,6 +61,7 @@ struct ProposalMeetupConditionStep: View {
                     ProposalMutualConditionRowData(label: "自分", value: viewerConditionText),
                     ProposalMutualConditionRowData(label: "相手", value: partnerConditionText)
                 ],
+                onViewerDetail: onOpenViewerCalendar,
                 onPartnerDetail: onOpenPartnerCalendar
             )
         }
@@ -118,7 +120,9 @@ struct ProposalMutualConditionRowData: Equatable {
 struct ProposalMutualConditionCard: View {
     var title: String
     var rows: [ProposalMutualConditionRowData]
-    /// 「相手」行の右端の「＞」から開く詳細（相手の交換カレンダー等）。
+    /// 「自分」行の右端の「＞」から開く詳細（自分の交換カレンダー）。
+    var onViewerDetail: (() -> Void)?
+    /// 「相手」行の右端の「＞」から開く詳細（相手の交換カレンダー）。
     var onPartnerDetail: (() -> Void)?
 
     var body: some View {
@@ -131,8 +135,18 @@ struct ProposalMutualConditionCard: View {
         }
     }
 
+    /// 各行の「＞」で開く詳細アクション（自分＝onViewerDetail / 相手＝onPartnerDetail）。
+    private func detailAction(for row: ProposalMutualConditionRowData) -> (() -> Void)? {
+        switch row.label {
+        case "自分": return onViewerDetail
+        case "相手": return onPartnerDetail
+        default: return nil
+        }
+    }
+
     @ViewBuilder
     private func rowView(_ row: ProposalMutualConditionRowData) -> some View {
+        let action = detailAction(for: row)
         let content = HStack(alignment: .top, spacing: 12) {
             Text(row.label)
                 .font(.system(size: 12, weight: .black, design: .rounded))
@@ -143,7 +157,7 @@ struct ProposalMutualConditionCard: View {
                 .foregroundStyle(MegrumTheme.ink)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .fixedSize(horizontal: false, vertical: true)
-            if row.label == "相手", onPartnerDetail != nil {
+            if action != nil {
                 Image(systemName: "chevron.right")
                     .font(.system(size: 13, weight: .black))
                     .foregroundStyle(MegrumTheme.muted)
@@ -153,14 +167,14 @@ struct ProposalMutualConditionCard: View {
         .padding(11)
         .background(Color.white.opacity(0.72), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
 
-        if row.label == "相手", let onPartnerDetail {
+        if let action {
             Button {
-                MegrumHaptics.performButtonTap(onPartnerDetail)
+                MegrumHaptics.performButtonTap(action)
             } label: {
                 content
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("相手の現地交換カレンダーを開く")
+            .accessibilityLabel("\(row.label)の現地交換カレンダーを開く")
         } else {
             content
         }

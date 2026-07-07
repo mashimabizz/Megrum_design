@@ -8,14 +8,15 @@ enum PartnerExchangeCalendarContextBuilder {
     @MainActor
     static func context(
         appState: MegrumAppState,
-        userID: UUID,
+        userID: UUID?,
         listingLocalPrefecture: String?,
         listingLocalMemo: String?,
         conditionText: String?,
-        displayName: String
+        displayName: String,
+        headerTitle: String = "相手の交換条件"
     ) -> HomePartnerExchangeCalendarContext {
-        let dateVenues = appState.partnerActivityWindowVenuesByUserID[userID] ?? [:]
-        let settings = appState.publicExchangeSettingsByUserID[userID]
+        let dateVenues = userID.flatMap { appState.partnerActivityWindowVenuesByUserID[$0] } ?? [:]
+        let settings = userID.flatMap { appState.publicExchangeSettingsByUserID[$0] }
         let parsed = HomePartnerExchangeCalendarTextParser.parse(conditionText)
         let fallbackPrefecture = listingLocalPrefecture?.nilIfBlank
             ?? settings?.localPrefecture.nilIfBlank
@@ -51,11 +52,12 @@ enum PartnerExchangeCalendarContextBuilder {
         }
 
         return HomePartnerExchangeCalendarContext(
-            ownerName: displayName,
+            ownerName: displayName.nilIfBlank,
             methodTitle: "現地交換の条件",
             dateDetails: dateDetails,
             fallbackPrefecture: fallbackPrefecture,
-            fallbackMemo: listingLocalMemo?.nilIfBlank ?? parsed.memo
+            fallbackMemo: listingLocalMemo?.nilIfBlank ?? parsed.memo,
+            headerTitle: headerTitle
         )
     }
 }

@@ -8,9 +8,12 @@ struct HomePartnerExchangeCalendarContext: Identifiable, Equatable, Sendable {
     var dateDetails: [String: HomeExchangeLocalDateDetail]
     var fallbackPrefecture: String?
     var fallbackMemo: String?
+    /// シート上部の大見出し。相手＝「相手の交換条件」、自分＝「あなたの交換条件」。
+    var headerTitle: String = "相手の交換条件"
 
     var id: String {
         [
+            headerTitle,
             ownerName ?? "",
             methodTitle,
             dateDetails.keys.sorted().joined(separator: ","),
@@ -109,7 +112,7 @@ struct HomePartnerExchangeCalendarSheet: View {
         HomeSheetScaffold(bottomButton: nil) {
             VStack(alignment: .leading, spacing: 15) {
                 VStack(alignment: .leading, spacing: 7) {
-                    Text("相手の交換条件")
+                    Text(context.headerTitle)
                         .font(.system(size: 21, weight: .black, design: .rounded))
                         .foregroundStyle(MegrumTheme.ink)
 

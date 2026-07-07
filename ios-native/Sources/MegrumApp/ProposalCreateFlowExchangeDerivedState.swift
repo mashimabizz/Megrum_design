@@ -92,14 +92,13 @@ extension ProposalCreateFlow {
             }
     }
 
-    var viewerLocalConditionText: String {
-        viewerListingExchangeSummary?.localDetailTextForProposalDisplay ?? "未設定"
-    }
+    // MARK: - 現地交換条件テキスト（自分・相手で共通ロジック）
 
-    /// 相手の現地交換の日付キー（当日以降・直近順）。AW＋デフォルト交換設定の両方から。
-    var partnerUpcomingLocalDateKeys: [String] {
-        let settings = appState.publicExchangeSettingsByUserID[targetItem.ownerID]
-        let awKeys = Set(appState.partnerActivityWindowVenuesByUserID[targetItem.ownerID]?.keys ?? [:].keys)
+    /// 指定ユーザーの現地交換の日付キー（当日以降・直近順）。AW＋デフォルト交換設定の両方から。
+    func upcomingLocalDateKeys(userID: UUID?, settings: HomeDefaultExchangeSettings?) -> [String] {
+        let awKeys: Set<String> = userID
+            .flatMap { appState.partnerActivityWindowVenuesByUserID[$0] }
+            .map { Set($0.keys) } ?? []
         let settingsKeys = Set(settings?.localDateKeys ?? [])
         return awKeys.union(settingsKeys)
             .filter { HomeExchangeDateKey.isOnOrAfterToday($0) }
@@ -111,15 +110,15 @@ extension ProposalCreateFlow {
             .map(\.0)
     }
 
-    /// 相手の現地交換条件の表示テキスト。
+    /// 現地交換条件の表示テキスト（自分・相手で共通）。
     /// - 当日以降の直近日があれば「都道府県 / メモ / 7/21他」
     /// - 個別募集に現地条件（都道府県）があれば「都道府県 / メモ」
     /// - どちらも無ければデフォルト交換設定の都道府県「大阪府（デフォルト設定）」
-    var partnerLocalConditionText: String {
-        let settings = appState.publicExchangeSettingsByUserID[targetItem.ownerID]
-        let summary = partnerExchangeSummary
-        let upcomingKeys = partnerUpcomingLocalDateKeys
-
+    func localConditionText(
+        settings: HomeDefaultExchangeSettings?,
+        summary: IndividualListingExchangeSummary?,
+        upcomingKeys: [String]
+    ) -> String {
         if let nearestKey = upcomingKeys.first {
             let detail = settings?.localDateDetails[nearestKey]
             let prefecture = detail?.prefecture.nilIfBlank
@@ -148,6 +147,61 @@ extension ProposalCreateFlow {
         }
 
         return "未設定"
+    }
+
+    // MARK: 自分
+
+    /// 自分（打診者）のデフォルト交換設定。map に無ければ自身の保存済み設定にフォールバック。
+    var viewerExchangeSettings: HomeDefaultExchangeSettings? {
+        if let id = appState.viewer?.id,
+           let settings = appState.publicExchangeSettingsByUserID[id] {
+            return settings
+        }
+        return appState.exchangeSettings
+    }
+
+    var viewerUpcomingLocalDateKeys: [String] {
+        upcomingLocalDateKeys(userID: appState.viewer?.id, settings: viewerExchangeSettings)
+    }
+
+    var viewerLocalConditionText: String {
+        localConditionText(
+            settings: viewerExchangeSettings,
+            summary: viewerListingExchangeSummary,
+            upcomingKeys: viewerUpcomingLocalDateKeys
+        )
+    }
+
+    /// 自分の「交換条件カレンダー」シート用コンテキスト（相手と同一モジュール）。
+    var viewerExchangeCalendarContext: HomePartnerExchangeCalendarContext {
+        PartnerExchangeCalendarContextBuilder.context(
+            appState: appState,
+            userID: appState.viewer?.id,
+            listingLocalPrefecture: viewerListingExchangeSummary?.localPrefecture,
+            listingLocalMemo: viewerListingExchangeSummary?.localPlaceMemo,
+            conditionText: viewerLocalConditionText,
+            displayName: "",
+            headerTitle: "あなたの交換条件"
+        )
+    }
+
+    // MARK: 相手
+
+    /// 相手の現地交換の日付キー（当日以降・直近順）。AW＋デフォルト交換設定の両方から。
+    var partnerUpcomingLocalDateKeys: [String] {
+        upcomingLocalDateKeys(
+            userID: targetItem.ownerID,
+            settings: appState.publicExchangeSettingsByUserID[targetItem.ownerID]
+        )
+    }
+
+    /// 相手の現地交換条件の表示テキスト。
+    var partnerLocalConditionText: String {
+        localConditionText(
+            settings: appState.publicExchangeSettingsByUserID[targetItem.ownerID],
+            summary: partnerExchangeSummary,
+            upcomingKeys: partnerUpcomingLocalDateKeys
+        )
     }
 
     var viewerShippingConditionText: String {

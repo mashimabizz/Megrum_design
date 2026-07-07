@@ -71,6 +71,9 @@ extension ProposalCreateFlow {
             scheduleDate: $meetupStartAt,
             viewerConditionText: viewerLocalConditionText,
             partnerConditionText: partnerLocalConditionText,
+            onOpenViewerCalendar: {
+                showsViewerScheduleCalendar = true
+            },
             onOpenPartnerCalendar: {
                 showsPartnerScheduleCalendar = true
             }

@@ -4,6 +4,46 @@
 
 ---
 
+## イテレーション1226.360：提示物の選択で「自分の希望条件」も相手と同ロジック表示＋「＞」で自分のカレンダー
+
+### 背景・問題意識
+オーナー要望：提示物の選択（打診3/3「お互いの希望条件」）で、自分の希望条件も相手と同じロジックで表示してほしい。また「＞」で自分の交換条件カレンダーも開けるようにしたい。従来 自分行は個別募集の現地条件テキストのみ・「＞」なしだった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlowExchangeDerivedState.swift`
+- 現地交換条件テキストのロジックを自分・相手で共通化：`upcomingLocalDateKeys(userID:settings:)` と `localConditionText(settings:summary:upcomingKeys:)` を新設。相手（partnerLocalConditionText/partnerUpcomingLocalDateKeys）はこれを呼ぶだけに。
+- 自分用を追加：`viewerExchangeSettings`（map になければ `appState.exchangeSettings` にフォールバック）、`viewerUpcomingLocalDateKeys`、`viewerLocalConditionText`（3段階＝直近日／個別募集現地／「◯◯（デフォルト設定）」／未設定）、`viewerExchangeCalendarContext`（headerTitle「あなたの交換条件」）。
+
+#### `ios-native/Sources/MegrumApp/HomePartnerExchangeCalendarSheet.swift`
+- `HomePartnerExchangeCalendarContext` に `headerTitle`（既定「相手の交換条件」）を追加。シート大見出しをこの値に。自分は「あなたの交換条件」。
+
+#### `ios-native/Sources/MegrumApp/PartnerExchangeCalendarContextBuilder.swift`
+- `userID: UUID?` に変更（自分＝viewer.id、相手＝ownerID を同一経路で扱う）。`headerTitle` 引数追加。`ownerName` は `displayName.nilIfBlank`（自分は空→サブタイトルが「現地交換の条件」のみ）。
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateConditionSteps.swift`
+- `ProposalMutualConditionCard` に `onViewerDetail` を追加し、行ラベルに応じて自分＝onViewerDetail／相手＝onPartnerDetail で「＞」を出す。
+- `ProposalMeetupConditionStep` に `onOpenViewerCalendar` を追加。
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlow*.swift`
+- `showsViewerScheduleCalendar` 状態＋自分カレンダーの `.sheet` を追加。meetupStep で自分行「＞」→表示。
+- `loadTargetOwnerExchangeContent`：自分（viewer.id）の交換設定・AW も読み込み（相手と同一表示に必要）。
+- VisualQA：`proposal-meetup` ルートで提示物・受け取りを1件ずつシードして3/3へ到達可能に。`MEGRUM_VISUAL_QA_OPEN_VIEWER_CALENDAR` で自分カレンダーを自動オープン。
+
+### 影響範囲
+- 打診フロー3/3「お互いの希望条件」（自分行の表示テキスト＋「＞」）。相手行・カレンダーモジュールは既存のまま流用。
+
+### 確認方法
+- sim（proposal-meetup）で 自分＝「東京都（デフォルト設定）」＋「＞」、タップで「あなたの交換条件」カレンダー（既定 東京・矢印は月表示横）を確認済み。
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/ProposalCreateFlowExchangeDerivedState.swift`
+- `ios-native/Sources/MegrumApp/ProposalCreateConditionSteps.swift`
+- `ios-native/Sources/MegrumApp/HomePartnerExchangeCalendarSheet.swift`
+- `ios-native/Sources/MegrumApp/PartnerExchangeCalendarContextBuilder.swift`
+
+---
+
 ## イテレーション1226.359：相手の交換条件カレンダー右上にデフォルト都道府県を表示・矢印を月表示横へ
 
 ### 背景・問題意識

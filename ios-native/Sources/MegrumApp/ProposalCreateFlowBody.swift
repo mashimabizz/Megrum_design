@@ -108,6 +108,12 @@ extension ProposalCreateFlow {
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
         }
+        .sheet(isPresented: $showsViewerScheduleCalendar) {
+            // 自分の交換条件も相手と同じカレンダーモジュールで表示する。
+            HomePartnerExchangeCalendarSheet(context: viewerExchangeCalendarContext)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+        }
         .sheet(isPresented: $showsAddressSettings) {
             NavigationStack {
                 AddressSettingsScreen(
