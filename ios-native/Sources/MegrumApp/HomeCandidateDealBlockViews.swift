@@ -257,6 +257,121 @@ struct HomeDealOfferPickerContext: Identifiable {
     let requirementText: String?
 }
 
+/// 定価選択時の取引ブロック（うけとる ⇄ ゆずる＝金額入力）。他選択肢と同じ左右構造を守る。iter1226.379。
+struct HomeDealCashBlockView: View {
+    var model: HomeDealCashBlockModel
+    @Binding var amountText: String
+    var onToggleReceive: (Int) -> Void
+
+    private let thumbSide: CGFloat = 58
+    private let receiveColumnWidth: CGFloat = 82
+    private let arrowWidth: CGFloat = 16
+    private let tier1Height: CGFloat = 19
+    @State private var showsReceiveList = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                tierLabel("うけとる", qty: model.receive.qtyLabel)
+                    .frame(width: receiveColumnWidth, alignment: .leading)
+                Color.clear.frame(width: arrowWidth)
+                tierLabel("ゆずる", qty: nil, alignment: .center)
+                    .frame(maxWidth: .infinity)
+            }
+
+            HStack(alignment: .top, spacing: 6) {
+                receiveColumn
+                    .frame(width: receiveColumnWidth, alignment: .leading)
+                Image(systemName: "arrow.left.arrow.right")
+                    .font(.system(size: 12, weight: .black))
+                    .foregroundStyle(MegrumTheme.ink.opacity(0.3))
+                    .frame(width: arrowWidth, height: thumbSide)
+                VStack(alignment: .leading, spacing: 6) {
+                    amountField
+                    Text(model.designationText)
+                        .font(.system(size: 12.5, weight: .bold, design: .rounded))
+                        .foregroundStyle(MegrumTheme.muted)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .sheet(isPresented: $showsReceiveList) {
+            HomeReceiveGoodsListSheet(
+                cells: model.receive.cells,
+                selectable: model.receive.selectable,
+                onToggle: onToggleReceive
+            )
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+        }
+    }
+
+    @ViewBuilder
+    private var receiveColumn: some View {
+        let cells = model.receive.cells
+        VStack(alignment: .leading, spacing: 8) {
+            if cells.count > 3 {
+                ForEach(cells.prefix(2)) { cell in
+                    HomeDealThumb(cell: cell, side: thumbSide, onTap: model.receive.selectable ? { showsReceiveList = true } : nil)
+                }
+                HomeDealCountTile(side: thumbSide, label: "+\(cells.count - 2)", caption: "すべて見る") { showsReceiveList = true }
+            } else {
+                ForEach(cells) { cell in
+                    HomeDealThumb(cell: cell, side: thumbSide, onTap: model.receive.selectable ? { showsReceiveList = true } : nil)
+                }
+            }
+        }
+    }
+
+    private var amountField: some View {
+        HStack(spacing: 10) {
+            Text("¥")
+                .font(.system(size: 20, weight: .black, design: .rounded))
+                .foregroundStyle(MegrumTheme.lavender)
+            field
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(.white.opacity(0.82), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(MegrumTheme.lavender.opacity(0.2), lineWidth: 1)
+        }
+    }
+
+    @ViewBuilder
+    private var field: some View {
+        let base = TextField("金額を入力", text: $amountText)
+            .font(.system(size: 18, weight: .black, design: .rounded))
+            .foregroundStyle(MegrumTheme.ink)
+            .onChange(of: amountText) { _, newValue in
+                let normalized = TradeAmountFormatter.cashInputText(from: newValue)
+                if normalized != amountText { amountText = normalized }
+            }
+        #if os(iOS)
+        base.keyboardType(.numberPad)
+        #else
+        base
+        #endif
+    }
+
+    private func tierLabel(_ title: String, qty: String?, alignment: Alignment = .leading) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 3) {
+            Text(title)
+                .font(.system(size: 12.5, weight: .black, design: .rounded))
+                .foregroundStyle(MegrumTheme.ink.opacity(0.82))
+                .fixedSize()
+            if let qty {
+                Text("(\(qty))")
+                    .font(.system(size: 9.5, weight: .bold, design: .rounded))
+                    .foregroundStyle(MegrumTheme.muted)
+            }
+        }
+        .frame(height: tier1Height)
+        .frame(maxWidth: .infinity, alignment: alignment)
+    }
+}
+
 /// 選択式サムネ（ゆずる・受け取る）。選択済み＝水色→紫グラデチェック、未選択＝破線＋。
 struct HomeDealThumb: View {
     var cell: HomeDealGoodsCell
@@ -785,7 +900,7 @@ struct HomeWantedOptionPills: View {
         return options.map { option in
             switch option.kind {
             case .cash:
-                return (option, "定価")
+                return (option, "金額")
             case .goods, .condition:
                 goodsIndex += 1
                 return (option, "選択肢\(goodsIndex)")

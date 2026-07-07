@@ -78,6 +78,13 @@ struct HomeDealAchievement: Equatable {
     var satisfied: Bool
 }
 
+/// 定価選択時の取引ブロック（うけとる ⇄ ゆずる＝金額入力）。iter1226.379。
+struct HomeDealCashBlockModel: Equatable {
+    var receive: HomeDealReceiveColumn
+    /// 相手の指定（「相手の指定：定価」または「相手の指定：〇〇円」）。入力欄の下に出す。
+    var designationText: String
+}
+
 /// 条件パターンの「条件のグッズを確認！」セクション。notes/19 Phase4。
 /// ①参考画像2枚があればそれを、②無ければ「グループ メンバー #シリーズ」でGoogle画像検索。①②は排他。
 struct HomeConditionSeriesCheckModel: Equatable {

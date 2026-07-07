@@ -404,6 +404,23 @@ extension HomeGoodsHitDetailSelectionContext {
         }
     }
 
+    /// 定価選択時の取引ブロック（うけとる ⇄ ゆずる＝金額入力）。iter1226.379。
+    func cashBlockModel() -> HomeDealCashBlockModel? {
+        guard usesListingWantedOptions,
+              let option = displayedWantedOption,
+              option.kind == .cash
+        else {
+            return nil
+        }
+        let designation: String
+        if let amount = option.cashAmount, amount > 0 {
+            designation = "相手の指定：\(amount.formatted())円"
+        } else {
+            designation = "相手の指定：定価"
+        }
+        return HomeDealCashBlockModel(receive: receiveColumnModel(), designationText: designation)
+    }
+
     private func receiveColumnModel() -> HomeDealReceiveColumn {
         let all = receiveGoods
         let qty = all.count > 1 ? shortQtyLabel(logic: receiveLogic, minimumCount: receiveMinimumCount) : nil

@@ -49,11 +49,12 @@ struct HomeGoodsHitDetailSheet: View {
                 )
             }
 
-            if let selectedCashOption = selectionContext.selectedCashOption {
-                HomeCashAmountEntryCard(
+            if selectionContext.selectedCashOption != nil, let cashModel = selectionContext.cashBlockModel() {
+                // 定価も他選択肢と同じ左右構造（うけとる ⇄ ゆずる＝金額入力）。iter1226.379。
+                HomeDealCashBlockView(
+                    model: cashModel,
                     amountText: $selectionState.cashAmountText,
-                    suggestedAmount: selectedCashOption.cashAmount,
-                    partnerDesignationText: cashDesignationText(for: selectedCashOption)
+                    onToggleReceive: toggleReceiveGoods
                 )
             } else if let dealModel = selectionContext.dealBlockModel() {
                 // 取引ブロック（3列：受け取る｜相手希望｜譲る）。notes/19 候補シート再設計。
@@ -190,14 +191,6 @@ struct HomeGoodsHitDetailSheet: View {
         }
     }
 
-    /// 定価の「相手の指定」文言（定価 or 具体的な金額）。notes/19 Phase5。
-    private func cashDesignationText(for option: HomeIndividualListingWantedOption) -> String {
-        if let amount = option.cashAmount, amount > 0 {
-            return "相手の指定：\(amount.formatted())円"
-        }
-        return "相手の指定：定価"
-    }
-
     /// 選択肢ピルで相手希望を切替。旧「他の選択肢」ポップアップの選択と同じ挙動。iter1226.374。
     private func selectWantedOption(_ id: UUID) {
         guard let option = selectionContext.wantedOption(withID: id) else {
@@ -263,10 +256,10 @@ struct HomeGoodsHitDetailSheet: View {
             logic: context.wantedLogic
         )
         selectionState.selectedReceiveIndices = context.initialReceiveIndices
-        if selectionState.selectedWantedIndices.isEmpty {
-            // 選択肢ピル前提：初期で先頭の相手希望を選び、取引ブロックを組み立て可能な状態にする。iter1226.374。
-            autoSelectFirstWantedOptionIfNeeded()
-        } else {
+        if context.usesListingWantedOptions {
+            // 候補シートの相手希望は必ず「選択肢1つ」を表示する。複数選択肢で全部選択され定価が混ざる不具合を防ぐ。iter1226.379。
+            selectFirstWantedOption()
+        } else if !selectionState.selectedWantedIndices.isEmpty {
             fillSuggestedCashAmountIfNeeded()
             if preselectPreferredOffer {
                 selectPreferredOfferIfNeeded()
@@ -274,12 +267,9 @@ struct HomeGoodsHitDetailSheet: View {
         }
     }
 
-    private func autoSelectFirstWantedOptionIfNeeded() {
-        let context = selectionContext
-        guard context.usesListingWantedOptions,
-              selectionState.selectedWantedIndices.isEmpty,
-              let first = context.pillWantedOptions.first
-        else {
+    private func selectFirstWantedOption() {
+        guard let first = selectionContext.pillWantedOptions.first else {
+            selectionState.selectedWantedIndices = []
             return
         }
         focusedWantedOptionID = first.id
