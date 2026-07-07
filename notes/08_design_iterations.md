@@ -4,6 +4,34 @@
 
 ---
 
+## イテレーション1226.376：候補シート再設計の実機FB反映＋指名候補データ整備
+
+### 背景・問題意識
+iter1226.374/375 を実機で確認したオーナーからのFB（実データ「ihub 超求めてる？」で確認）。
+
+### 変更内容（UI）
+- **需要チップ撤去**：ヘッダーの「超求めてる？」等を削除（名前＋評価のみ）。`HomeCandidateSheetHeader` から `demand` と `HomeCandidateDemandChip` を撤去。
+- **サムネ整理**：取引ブロック各サムネ下のグッズ名を撤去。うけとる等のチェック/?を枠からはみ出す位置（左上/右上オフセット）に。
+- **条件パターンの相手希望＝アイコンのみ**：`HomeDealConditionIcon`（スライダー＋不確定「?」）。条件文「条件：…」＋「条件のグッズを確認！」＋検索ボタンを取引ブロック下の確認セクションにデザイン通り集約。列間に ⇄/→ の矢印。
+- **ゆずるをポップアップ選択に**：`HomeOfferGoodsPickerSheet`。ゆずる列は選択済み＋「選ぶ」タイル、タップで条件に合致する手持ちを一覧選択。
+- **画像検索クエリにグッズ種別追加**：`グループ メンバー 種別 #シリーズ`（例「BTS RM トレカ #DICON D'FESTA」）。
+- 列見出しの数量ラベルを短縮（すべて／N個以上／単一は無し）。
+
+### 変更内容（データ：指名候補整備）
+michilion のホームに「相手希望＝指名（欲しいものから選ぶ／画像）」の候補が出るよう Supabase 実データを整備（開発DB kwpnlcojzseicqbxefih、`web/.env.local` の service key）。
+- 非テスト相手 `ren`（指名2件：ジョングク＋ミナ／譲=V）、`mmm0113`（指名5件：JK/CY/MINA/松村北斗/JIMIN／譲=RM）、`kty`（指名2件＋条件＋定価の複数選択肢／譲=ニンニン）に、ほしいもの（指名対象）＋提示グッズ＋個別募集＋wish_options を作成。
+- 制約メモ：`listings` は無料プラン3件/人まで（room のある相手を使う）。`listing_wish_options.min_count` は logic=and/or では 1 必須（「すべてN件」は logic=and で表現、min_count は at_least 専用）。混在グループの指名は可。
+- **デモ行の目印**：ID に `4fbd`、listing.note に「🔧FB指名…」。cleanup 用スクリプトは scratchpad（`fbdemo-cleanup.py` 相当）。
+
+### 影響範囲
+- ホーム候補シート（goodsHit/wishHit）。打診の組み立て・確認は不変。
+
+### 確認方法
+- VisualQA `candidate-sheet`（named/condition/crowded/cash/conditionRef/wish）で各見た目を確認。
+- 実機：michilion で ren/mmm0113/kty の指名候補（2件/5件/複数選択肢）を確認（要オーナー確認）。
+
+---
+
 ## イテレーション1226.374/375：ホーム候補シートを「打診の組み立て」に振り切る再設計
 
 ### 背景・問題意識
