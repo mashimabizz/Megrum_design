@@ -96,10 +96,57 @@ extension ProposalCreateFlow {
         viewerListingExchangeSummary?.localDetailTextForProposalDisplay ?? "未設定"
     }
 
+    /// 相手の現地交換の日付キー（当日以降・直近順）。AW＋デフォルト交換設定の両方から。
+    var partnerUpcomingLocalDateKeys: [String] {
+        let settings = appState.publicExchangeSettingsByUserID[targetItem.ownerID]
+        let awKeys = Set(appState.partnerActivityWindowVenuesByUserID[targetItem.ownerID]?.keys ?? [:].keys)
+        let settingsKeys = Set(settings?.localDateKeys ?? [])
+        return awKeys.union(settingsKeys)
+            .filter { HomeExchangeDateKey.isOnOrAfterToday($0) }
+            .compactMap { key -> (String, Date)? in
+                guard let date = HomeExchangeDateKey.date(from: key) else { return nil }
+                return (key, date)
+            }
+            .sorted { $0.1 < $1.1 }
+            .map(\.0)
+    }
+
+    /// 相手の現地交換条件の表示テキスト。
+    /// - 当日以降の直近日があれば「都道府県 / メモ / 7/21他」
+    /// - 個別募集に現地条件（都道府県）があれば「都道府県 / メモ」
+    /// - どちらも無ければデフォルト交換設定の都道府県「大阪府（デフォルト設定）」
     var partnerLocalConditionText: String {
-        if let text = partnerExchangeSummary?.localDetailTextForProposalDisplay {
-            return text
+        let settings = appState.publicExchangeSettingsByUserID[targetItem.ownerID]
+        let summary = partnerExchangeSummary
+        let upcomingKeys = partnerUpcomingLocalDateKeys
+
+        if let nearestKey = upcomingKeys.first {
+            let detail = settings?.localDateDetails[nearestKey]
+            let prefecture = detail?.prefecture.nilIfBlank
+                ?? settings?.localPrefecture.nilIfBlank
+                ?? summary?.localPrefecture.nilIfBlank
+            let memo = detail?.memo.nilIfBlank ?? summary?.localPlaceMemo.nilIfBlank
+            let dateText = HomeExchangeDateKey.compactDisplayText(for: nearestKey)
+                + (upcomingKeys.count > 1 ? "他" : "")
+            var parts: [String] = []
+            if let prefecture { parts.append(prefecture) }
+            if let memo { parts.append(memo) }
+            parts.append(dateText)
+            return parts.joined(separator: " / ")
         }
+
+        if let summary, summary.includesLocal, let prefecture = summary.localPrefecture.nilIfBlank {
+            var parts = [prefecture]
+            if let memo = summary.localPlaceMemo.nilIfBlank {
+                parts.append(memo)
+            }
+            return parts.joined(separator: " / ")
+        }
+
+        if let defaultPrefecture = settings?.localPrefecture.nilIfBlank {
+            return "\(defaultPrefecture)（デフォルト設定）"
+        }
+
         return "未設定"
     }
 
@@ -126,7 +173,18 @@ extension ProposalCreateFlow {
         let fallbackPrefecture = listingPrefecture ?? parsed.prefecture
 
         var dateDetails: [String: HomeExchangeLocalDateDetail] = [:]
-        for (key, venue) in dateVenues {
+        // デフォルト交換設定に日付ごとの都道府県・メモがあれば優先的に採用。
+        if let settings = appState.publicExchangeSettingsByUserID[targetItem.ownerID] {
+            for key in settings.localDateKeys {
+                let detail = settings.localDateDetails[key]
+                dateDetails[key] = HomeExchangeLocalDateDetail(
+                    prefecture: detail?.prefecture.nilIfBlank ?? settings.localPrefecture.nilIfBlank ?? fallbackPrefecture ?? "",
+                    memo: detail?.memo.nilIfBlank ?? listingMemo ?? ""
+                )
+            }
+        }
+        // AW由来の日付（会場名つき）を補完。
+        for (key, venue) in dateVenues where dateDetails[key] == nil {
             dateDetails[key] = HomeExchangeLocalDateDetail(
                 prefecture: fallbackPrefecture ?? "",
                 memo: venue.nilIfBlank ?? listingMemo ?? ""
