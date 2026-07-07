@@ -4,6 +4,30 @@
 
 ---
 
+## イテレーション1226.366：ホーム候補（相手側）のほしいもの判定も確度付き（求めてる？対応）
+
+### 背景・問題意識
+iter1226.363 で確度（確定/不確定）を導入したが、ホーム「推しでマッチ」の相手候補の需要は `HomeCandidatePartnerDemandSummary` → `HomeCandidateConditionSignalsBuilder` 経由で、`wishTentativeOfferGoodsIDs` が伝搬されておらず、相手候補では「求めてる？」（ほしいもの不確定）が出せなかった。実データ検証（michilionのホームで4段階を見る）で判明。
+
+### 変更内容
+#### `ios-native/Sources/MegrumApp/HomeCandidatePartnerDemandSummary.swift`
+- ほしいもの一致を `HomeCandidateComposer.wishRow`（グループ+メンバー+種別）→ `HomeMutualMatchListingEvaluator.wishGoodsConfidence`（＋シリーズ、無記載は不確定）に置換。`wishMatchedOfferGoodsIDs`＋`wishTentativeOfferGoodsIDs` を確度付きで算出。
+
+#### `ios-native/Sources/MegrumApp/HomeCandidatePartnerOfferEvaluation.swift`
+- `HomeCandidateConditionSignalsBuilder.signals(...)` に `wishTentativeOfferGoodsIDs: partnerDemand.wishTentativeOfferGoodsIDs` を渡す。
+
+### 影響範囲
+- ホーム「推しでマッチ」の相手候補の需要行。相手のほしいものがシリーズ指定で自分側が無記載の場合、「求めてる？」表示になる（iter1226.363 の仕様を相手候補側にも適用）。
+
+### 確認方法
+- swift test green。michilion アカウントのホームで 超求！/求！/求めてる？ を実データで確認（テスト用データを Supabase に投入）。
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/HomeCandidatePartnerDemandSummary.swift`
+- `ios-native/Sources/MegrumApp/HomeCandidatePartnerOfferEvaluation.swift`
+
+---
+
 ## イテレーション1226.365：求の詳細で譲れる候補が無くても「交換内容を決める」で1/3へ進める
 
 ### 背景・問題意識

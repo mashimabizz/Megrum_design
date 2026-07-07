@@ -5,6 +5,8 @@ struct HomeCandidatePartnerDemandSummary {
     let wishHitCount: Int
     let listingHitCount: Int
     let wishMatchedOfferGoodsIDs: [UUID]
+    /// wishMatchedOfferGoodsIDs のうち、シリーズ等が無記載で確定できない（＝不確定「？」）分。iter1226.366。
+    let wishTentativeOfferGoodsIDs: [UUID]
     let individualListingSelection: HomeIndividualListingSelectionContext?
     /// 相手の探し物（合致なし時の需要行「〜を探し中」用）。相手のほしいもの先頭から生成。
     let partnerLookingForText: String?
@@ -38,20 +40,26 @@ struct HomeCandidatePartnerDemandSummary {
         partnerUserID = candidate.userId
 
         let partnerWishesForCandidate = context.partnerScope.wishesByUser[candidate.userId, default: []]
-        let partnerWishHitRows = partnerWishesForCandidate.filter { partnerWish in
-            context.availableViewerInventory.contains { viewerItem in
-                HomeCandidateComposer.wishRow(partnerWish, matches: viewerItem)
+        // 相手のほしいものと自分の在庫を確度付き（確定/不確定）で評価。
+        // メンバー・種別・シリーズが無記載なら不確定「？」（iter1226.366）。
+        let partnerWishMatches = context.availableViewerInventory.compactMap { viewerItem -> (UUID, HomeCandidateMatchConfidence)? in
+            var best: HomeCandidateMatchConfidence?
+            for partnerWish in partnerWishesForCandidate {
+                if let confidence = HomeMutualMatchListingEvaluator.wishGoodsConfidence(
+                    wish: partnerWish,
+                    item: viewerItem,
+                    tagsByInventoryID: context.tagsByInventoryID
+                ) {
+                    best = best.map { HomeCandidateMatchConfidencePolicy.better($0, confidence) } ?? confidence
+                }
             }
-        }
-        let partnerWishMatchedOfferItems = context.availableViewerInventory.filter { viewerItem in
-            partnerWishesForCandidate.contains { partnerWish in
-                HomeCandidateComposer.wishRow(partnerWish, matches: viewerItem)
-            }
+            return best.map { (viewerItem.id, $0) }
         }
         let partnerListingsForCandidate = context.partnerScope.listingsByUser[candidate.userId, default: []]
 
-        wishHitCount = partnerWishHitRows.count
-        wishMatchedOfferGoodsIDs = partnerWishMatchedOfferItems.map(\.id)
+        wishHitCount = partnerWishMatches.count
+        wishMatchedOfferGoodsIDs = partnerWishMatches.map(\.0)
+        wishTentativeOfferGoodsIDs = partnerWishMatches.filter { $0.1 == .tentative }.map(\.0)
         let partnerWishRowsByID = Dictionary(
             partnerWishesForCandidate.map { ($0.id, $0) },
             uniquingKeysWith: { first, _ in first }
