@@ -344,3 +344,151 @@ struct HomeGoodsHitDetailSelectionContext {
         )
     }
 }
+
+// MARK: - 取引ブロック（3列）モデル（notes/19 候補シート再設計）
+
+extension HomeGoodsHitDetailSelectionContext {
+    /// 選択肢ピルに並べる相手希望オプション（優先順ソート済み・全件）。notes/19 の常時表示ピル用。iter1226.374。
+    var pillWantedOptions: [HomeIndividualListingWantedOption] {
+        prioritizedWantedOptions(availableWantedOptions)
+    }
+
+    /// 選択肢ピルで選ばれた ID からオプションを引く。
+    func wantedOption(withID id: UUID) -> HomeIndividualListingWantedOption? {
+        availableWantedOptions.first { $0.id == id }
+    }
+
+    /// 取引ブロック（受け取る｜相手希望｜譲る）の描画モデル。
+    /// 現金選択時・個別募集の選択肢が無い時は nil（それぞれ金額入力／旧フォールバックへ）。iter1226.374。
+    func dealBlockModel() -> HomeDealBlockModel? {
+        guard usesListingWantedOptions,
+              let option = displayedWantedOption,
+              option.kind != .cash
+        else {
+            return nil
+        }
+        return HomeDealBlockModel(
+            receive: receiveColumnModel(),
+            partner: partnerColumnModel(option: option),
+            offer: offerColumnModel(option: option),
+            achievement: achievementModel(option: option)
+        )
+    }
+
+    private func receiveColumnModel() -> HomeDealReceiveColumn {
+        let all = receiveGoods
+        let qty = all.count > 1 ? receiveRequirementLabel : nil
+        if showsReceiveSelection {
+            let cells = all.enumerated().map { index, goods in
+                HomeDealGoodsCell(
+                    id: goods.id,
+                    index: index,
+                    imageURL: goods.imageURL,
+                    title: goods.title,
+                    selected: selectionState.selectedReceiveIndices.contains(index),
+                    selectable: true,
+                    tentative: false
+                )
+            }
+            return HomeDealReceiveColumn(qtyLabel: qty, selectable: true, cells: cells)
+        }
+        // 自動確定：受け取り確定分（未確定なら全件）を固定表示。
+        let selected = selectionState.selectedReceiveIndices
+        let cells = all.enumerated()
+            .filter { selected.isEmpty || selected.contains($0.offset) }
+            .map { index, goods in
+                HomeDealGoodsCell(
+                    id: goods.id,
+                    index: index,
+                    imageURL: goods.imageURL,
+                    title: goods.title,
+                    selected: true,
+                    selectable: false,
+                    tentative: false
+                )
+            }
+        return HomeDealReceiveColumn(qtyLabel: cells.count > 1 ? qty : nil, selectable: false, cells: cells)
+    }
+
+    private func partnerColumnModel(option: HomeIndividualListingWantedOption) -> HomeDealPartnerColumn {
+        switch option.kind {
+        case .goods:
+            let named = option.namedPairings.map { pairing in
+                HomeDealWishCell(id: pairing.id, imageURL: pairing.imageURL, title: pairing.title)
+            }
+            // namedPairings が空（相手ほしいもの行が取れない）ときはプレビュー画像で代替。
+            let items = named.isEmpty
+                ? option.previewItems.map { HomeDealWishCell(id: $0.id, imageURL: $0.imageURL, title: $0.title) }
+                : named
+            return HomeDealPartnerColumn(kind: .goods, namedItems: items, conditionTile: nil)
+        case .condition:
+            let tile = HomeDealConditionTile(
+                tokens: HomeWantedConditionCardModel.tokens(from: option),
+                tentative: !option.tentativeGoodsIDs.isEmpty,
+                selected: !selectionState.selectedWantedIndices.isEmpty,
+                wantedOptionIndex: displayedWantedOptionIndex
+            )
+            return HomeDealPartnerColumn(kind: .condition, namedItems: [], conditionTile: tile)
+        case .cash:
+            return HomeDealPartnerColumn(kind: .cash, namedItems: [], conditionTile: nil)
+        }
+    }
+
+    private func offerColumnModel(option: HomeIndividualListingWantedOption) -> HomeDealOfferColumn {
+        let goods = offerGoods
+        let indexByID = Dictionary(goods.enumerated().map { ($0.element.id, $0.offset) }, uniquingKeysWith: { first, _ in first })
+        let tentative = Set(option.tentativeGoodsIDs)
+        let qty = (offerRequiredCount > 1 || goods.count > 1) ? offerRequirementLabel : nil
+
+        func cell(_ index: Int) -> HomeDealGoodsCell {
+            let item = goods[index]
+            return HomeDealGoodsCell(
+                id: item.id,
+                index: index,
+                imageURL: item.imageURL,
+                title: item.title,
+                selected: selectionState.selectedOfferIndices.contains(index),
+                selectable: true,
+                tentative: tentative.contains(item.id)
+            )
+        }
+
+        if option.kind == .goods, !option.namedPairings.isEmpty {
+            let rows = option.namedPairings.map { pairing -> HomeDealOfferRow in
+                let indices = pairing.candidateGoodsIDs.compactMap { indexByID[$0] }.sorted()
+                return HomeDealOfferRow(id: pairing.id, cells: indices.map(cell))
+            }
+            return HomeDealOfferColumn(qtyLabel: qty, isNamed: true, rows: rows)
+        }
+        return HomeDealOfferColumn(
+            qtyLabel: qty,
+            isNamed: false,
+            rows: [HomeDealOfferRow(id: option.id, cells: goods.indices.map(cell))]
+        )
+    }
+
+    private func achievementModel(option: HomeIndividualListingWantedOption) -> HomeDealAchievement? {
+        let required = offerRequiredCount
+        guard required > 1 else {
+            return nil
+        }
+        let goods = offerGoods
+        guard goods.count >= required else {
+            return HomeDealAchievement(text: "条件に合う手持ちが \(goods.count)/\(required) 点", satisfied: false)
+        }
+        let selectedCount = selectionState.selectedOfferIndices.count
+        let satisfied = selectedCount >= required
+        let prefix: String
+        switch offerLogic {
+        case .all:
+            prefix = "すべて"
+        case .atLeast:
+            prefix = "\(required)個以上"
+        case .one:
+            prefix = ""
+        }
+        let base = "\(prefix)：\(min(selectedCount, required))/\(required) 選択済み"
+        let suffix = satisfied ? "・成立OK" : "・あと\(max(0, required - selectedCount))つで成立"
+        return HomeDealAchievement(text: base + suffix, satisfied: satisfied)
+    }
+}
