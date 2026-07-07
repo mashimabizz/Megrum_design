@@ -4,6 +4,46 @@
 
 ---
 
+## イテレーション1226.379：求！/求めてる？シートを超求と同じ「うけとる ⇄ ゆずる」取引ブロックに統一
+
+### 背景・問題意識
+オーナー指摘：求！/求めてる？（wishマッチ）の詳細シートが、超求（個別募集マッチ）の再設計に比べてイマイチ。単一グリッド＋「これを譲る」紫バナー＋浮いた「N件の候補」ピル＋大きな空白で、超求と「別画面」に見えていた。
+
+### 気づき（重要）
+`HomeWishHitDetailPresentationState.proposalSelection` は元々 `receiverGoods: selection.goods` を設定していた＝「受け取るもの」はデータ上は常に確定していたのに、旧UIは画面に出していなかった。求は「片側だけ」ではなく、**うけとる（相手グッズ）⇄ ゆずる（相手が求める自分のグッズ1件）**の両側を出せる。
+
+### 変更内容
+#### `HomeWishHitDetailSheet.swift`（本体を全面書き換え、打診ロジックは不変）
+- 本体を超求（`HomeDealBlockView`）と同じ文法の**2列取引ブロック**に：
+  - **うけとる**：`selection.goods`（＝打診の receiverGoods）を固定表示（グラデチェック）。サブラベル「打診で相談」。
+  - **⇄**：`arrow.left.arrow.right`（超求と同じ位置・寸法）。
+  - **ゆずる**：相手が求める自分のグッズを横スクロール列で1件選ぶ。サブラベル「相手が求めてる · N件」。
+- 選択作法を超求と統一：`HomeDealThumb`（選択済み＝水色→紫グラデチェック／未選択＝破線＋）を再利用。紫「これを譲る」バナーを撤去。
+- 浮いた「N件の候補」ピルを撤去し、件数を「ゆずる」段ラベルに吸収。
+- 達成カウンタ `HomeDealAchievementBar` を追加（選択済み「1件選択済み・このまま打診に進めます」／未選択「譲るグッズを1件選んでください」）。
+- 段ラベル・矢印は超求 `HomeDealBlockView` の private 実装と同じ見た目・寸法（thumbSide 58 等）でローカル定義。`HomeDealThumb`/`HomeDealGoodsCell`/`HomeDealAchievement(Bar)` は再利用。
+- 「推し以外でマッチ」も同じグラデチェック列に統一（通し index で単一選択を共有）。
+- ヘッダー・「交換の方法について」折りたたみ・打診生成/確認・空候補フォールバック（「交換内容を決める」）は不変。
+
+### 影響範囲
+- ホーム候補の求！/求めてる？詳細シート（`HomeWishHitDetailSheet`）。超求（`HomeGoodsHitDetailSheet`）は不変。打診の組み立て・確認フローは不変。
+
+### 確認方法
+- VisualQA：`SIMCTL_CHILD_MEGRUM_VISUAL_QA_CANDIDATE_VARIANT=wish`（求）と `=named`（超求）を並べてスクショ比較。うけとる ⇄ ゆずる・グラデチェック・達成カウンタが超求と一体化し「別画面」感が解消。求で従来隠れていた「受け取るもの」も可視化。
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'platform=iOS Simulator,id=C70DDDBB-2602-49E0-8F95-1F043BCCED76' -derivedDataPath /tmp/megrum-native-xcodebuild CODE_SIGNING_ALLOWED=NO build` → BUILD SUCCEEDED。
+
+### セルフレビュー結果
+- ✅ ブランドカラー直書きなし（`MegrumTheme` 経由、選択チェックは `HomeDealGradient.selection` 再利用）。
+- ✅ 共通部品 `HomeDealThumb`/`HomeDealAchievementBar` を再利用（新規は段ラベル・矢印のみ、超求と同寸法）。
+- ✅ notes/19 の「装飾色なし・意味色のみ」に沿って紫バナー撤去。
+- ⚠️ 直接マウントの VisualQA では下部空白が大きめ。実シートの detent では詰まる想定（要実機確認）。
+- ⚠️ `HomeDealThumb` 等は別セッションが編集中の `HomeCandidateDealBlockViews.swift` の型。再利用のため同ファイルのAPI変更時は追従が必要。
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/HomeWishHitDetailSheet.swift` / `HomeCandidateDealBlockViews.swift`（再利用）/ `notes/19_candidate_sheet_redesign.md`
+
+---
+
 ## イテレーション1226.378：条件確認セクションの表示条件＋検索ワード調整
 
 ### 背景・問題意識
