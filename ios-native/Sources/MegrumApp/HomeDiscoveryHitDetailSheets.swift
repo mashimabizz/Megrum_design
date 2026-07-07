@@ -62,6 +62,11 @@ struct HomeGoodsHitDetailSheet: View {
                     onToggleReceive: toggleReceiveGoods,
                     onToggleOffer: toggleOfferGoods
                 )
+
+                // 条件パターンは「条件のグッズを確認！」（参考画像 or 画像検索）を続けて出す。
+                if let seriesCheck = selectionContext.conditionSeriesCheckModel() {
+                    HomeConditionSeriesCheckSection(model: seriesCheck)
+                }
             } else {
                 legacyDealSelection
             }

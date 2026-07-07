@@ -467,6 +467,60 @@ extension HomeGoodsHitDetailSelectionContext {
         )
     }
 
+    /// 選択中の譲るグッズ。
+    var selectedOfferGoods: [HomeMockGoods] {
+        selectionState.selectedOfferIndices
+            .sorted()
+            .compactMap { offerGoods.indices.contains($0) ? offerGoods[$0] : nil }
+    }
+
+    /// 条件パターンの「条件のグッズを確認！」モデル。表示中が条件指定のときのみ。iter1226.375。
+    func conditionSeriesCheckModel() -> HomeConditionSeriesCheckModel? {
+        guard usesListingWantedOptions,
+              let option = displayedWantedOption,
+              option.kind == .condition
+        else {
+            return nil
+        }
+        // 参考画像は「自分の手持ちではない」プレビュー（＝シリーズの参考画像）に限る。
+        // 実データの条件プレビューはマッチした自分グッズなので除外され、②検索フォールバックになる。
+        let ownIDs = Set(allOfferGoods.map(\.id))
+        let referenceImages = Array(
+            option.previewItems
+                .filter { !ownIDs.contains($0.id) }
+                .compactMap(\.imageURL)
+                .prefix(2)
+        )
+        let query = conditionSearchQuery(option: option)
+        let searchURL = query.isEmpty
+            ? nil
+            : URL(string: "https://www.google.com/search?tbm=isch&q=" +
+                (query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""))
+        return HomeConditionSeriesCheckModel(
+            referenceImageURLs: referenceImages,
+            searchQuery: query,
+            searchURL: searchURL
+        )
+    }
+
+    /// 「グループ メンバー #シリーズ」の画像検索クエリ。メンバーは選択中の自分グッズ優先。
+    private func conditionSearchQuery(option: HomeIndividualListingWantedOption) -> String {
+        let summaryParts = (option.conditionSummary ?? "")
+            .components(separatedBy: " / ")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+        let seriesTokens = summaryParts.filter { $0.hasPrefix("#") }
+        let firstOffer = selectedOfferGoods.first ?? offerGoods.first
+        let group = firstOffer?.groupName?.nilIfBlank
+            ?? summaryParts.first { !$0.hasPrefix("#") }
+        let member = firstOffer?.memberName?.nilIfBlank
+        var tokens: [String] = []
+        if let group { tokens.append(group) }
+        if let member { tokens.append(member) }
+        tokens.append(contentsOf: seriesTokens)
+        return tokens.joined(separator: " ")
+    }
+
     private func achievementModel(option: HomeIndividualListingWantedOption) -> HomeDealAchievement? {
         let required = offerRequiredCount
         guard required > 1 else {

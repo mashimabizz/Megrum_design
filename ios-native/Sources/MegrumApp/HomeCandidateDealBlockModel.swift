@@ -70,3 +70,18 @@ struct HomeDealAchievement: Equatable {
     var text: String
     var satisfied: Bool
 }
+
+/// 条件パターンの「条件のグッズを確認！」セクション。notes/19 Phase4。
+/// ①参考画像2枚があればそれを、②無ければ「グループ メンバー #シリーズ」でGoogle画像検索。①②は排他。
+struct HomeConditionSeriesCheckModel: Equatable {
+    /// ① 参考グッズ画像（この推し×シリーズ）。2枚以上あれば①、無ければ②。
+    var referenceImageURLs: [URL]
+    /// ② Google画像検索クエリ（例「BTS RM #DICON D'FESTA」）。
+    var searchQuery: String
+    /// ② 検索URL。
+    var searchURL: URL?
+
+    var usesReferenceImages: Bool {
+        referenceImageURLs.count >= 2
+    }
+}

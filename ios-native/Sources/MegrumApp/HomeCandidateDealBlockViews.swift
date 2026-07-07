@@ -498,6 +498,80 @@ struct HomeReceiveGoodsListSheet: View {
     }
 }
 
+/// 条件パターンの「条件のグッズを確認！」セクション。notes/19 Phase4・iter1226.375。
+/// ①参考画像2枚があれば並べ、②無ければ「グループ メンバー #シリーズ」でGoogle画像検索ボタン。
+struct HomeConditionSeriesCheckSection: View {
+    var model: HomeConditionSeriesCheckModel
+    @Environment(\.openURL) private var openURL
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 7) {
+                Image(systemName: "checkmark.seal")
+                    .font(.system(size: 14, weight: .bold))
+                Text("条件のグッズを確認！")
+                    .font(.system(size: 14.5, weight: .black, design: .rounded))
+            }
+            .foregroundStyle(MegrumTheme.ink)
+
+            Text("シリーズが合えばマッチ確定。手持ちが条件のグッズか確かめましょう。")
+                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                .foregroundStyle(MegrumTheme.muted)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if model.usesReferenceImages {
+                HStack(spacing: 10) {
+                    ForEach(Array(model.referenceImageURLs.prefix(2).enumerated()), id: \.offset) { _, url in
+                        VStack(spacing: 4) {
+                            ListingGoodsImage(url: url, title: "参考", cornerRadius: 12)
+                                .frame(width: 92, height: 92)
+                            Text("参考画像")
+                                .font(.system(size: 9.5, weight: .bold, design: .rounded))
+                                .foregroundStyle(MegrumTheme.muted)
+                        }
+                    }
+                    Spacer(minLength: 0)
+                }
+            } else if let searchURL = model.searchURL {
+                Button {
+                    openURL(searchURL)
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: 13, weight: .black))
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text("画像で検索して確認")
+                                .font(.system(size: 13, weight: .black, design: .rounded))
+                            Text(model.searchQuery)
+                                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                                .foregroundStyle(MegrumTheme.lavender.opacity(0.8))
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.7)
+                        }
+                        Spacer(minLength: 0)
+                        Image(systemName: "arrow.up.right")
+                            .font(.system(size: 11, weight: .black))
+                    }
+                    .foregroundStyle(MegrumTheme.lavender)
+                    .padding(.horizontal, 13)
+                    .padding(.vertical, 11)
+                    .frame(maxWidth: .infinity)
+                    .background(MegrumTheme.lavender.opacity(0.10), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .strokeBorder(MegrumTheme.lavender.opacity(0.22), lineWidth: 1)
+                    }
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("画像で検索して確認、\(model.searchQuery)")
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(14)
+        .background(MegrumTheme.sky.opacity(0.08), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+}
+
 /// 選択済みチェックの水色→紫グラデ（notes/19 で唯一の意味色の一つ）。
 enum HomeDealGradient {
     static let selection = LinearGradient(

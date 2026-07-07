@@ -33,6 +33,7 @@ enum CandidateSheetVisualQASample {
     enum Variant: String {
         case named
         case condition
+        case conditionRef
         case cash
         case crowded
     }
@@ -181,6 +182,27 @@ enum CandidateSheetVisualQASample {
         )
     }
 
+    /// 参考画像2枚を持つ条件オプション（Phase4 ①パターン検証）。
+    private static var conditionRefOption: HomeIndividualListingWantedOption {
+        HomeIndividualListingWantedOption(
+            id: uuid("000000000405"),
+            listingID: listingID,
+            position: 1,
+            title: "条件",
+            subtitle: "条件に合うもの",
+            logic: .one,
+            minimumCount: 1,
+            kind: .condition,
+            matchingGoodsIDs: [myRMID],
+            previewItems: [
+                HomeIndividualListingWantedPreviewItem(id: uuid("000000000601"), title: "参考1", imageURL: image("twice_sana_1")),
+                HomeIndividualListingWantedPreviewItem(id: uuid("000000000602"), title: "参考2", imageURL: image("aespa_ningning")),
+            ],
+            groupID: uuid("000000000501"),
+            conditionSummary: "BTS / トレカ / #DICON D'FESTA"
+        )
+    }
+
     private static var cashOption: HomeIndividualListingWantedOption {
         HomeIndividualListingWantedOption(
             id: uuid("000000000403"),
@@ -238,6 +260,8 @@ enum CandidateSheetVisualQASample {
             ordered = [namedOption, conditionOption, cashOption]
         case .condition:
             ordered = [conditionOption]
+        case .conditionRef:
+            ordered = [conditionRefOption]
         case .cash:
             ordered = [cashOption]
         case .crowded:
