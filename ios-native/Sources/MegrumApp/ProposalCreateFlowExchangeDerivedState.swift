@@ -162,53 +162,15 @@ extension ProposalCreateFlow {
             ?? "相手"
     }
 
-    /// 相手の「交換条件カレンダー」シート用コンテキスト（ホームの相手交換条件と同一モジュール）。
-    /// 日程は相手のアクティビティウィンドウ（現地交換可能日）から、都道府県は個別募集の
-    /// 現地交換条件から取得する。
-    var partnerExchangeCalendarContext: HomePartnerExchangeCalendarContext? {
-        let dateVenues = appState.partnerActivityWindowVenuesByUserID[targetItem.ownerID] ?? [:]
-        let parsed = HomePartnerExchangeCalendarTextParser.parse(partnerLocalConditionText)
-        let listingPrefecture = partnerExchangeSummary?.localPrefecture.nilIfBlank
-        let listingMemo = partnerExchangeSummary?.localPlaceMemo.nilIfBlank
-        let fallbackPrefecture = listingPrefecture ?? parsed.prefecture
-
-        var dateDetails: [String: HomeExchangeLocalDateDetail] = [:]
-        // デフォルト交換設定に日付ごとの都道府県・メモがあれば優先的に採用。
-        if let settings = appState.publicExchangeSettingsByUserID[targetItem.ownerID] {
-            for key in settings.localDateKeys {
-                let detail = settings.localDateDetails[key]
-                dateDetails[key] = HomeExchangeLocalDateDetail(
-                    prefecture: detail?.prefecture.nilIfBlank ?? settings.localPrefecture.nilIfBlank ?? fallbackPrefecture ?? "",
-                    memo: detail?.memo.nilIfBlank ?? listingMemo ?? ""
-                )
-            }
-        }
-        // AW由来の日付（会場名つき）を補完。
-        for (key, venue) in dateVenues where dateDetails[key] == nil {
-            dateDetails[key] = HomeExchangeLocalDateDetail(
-                prefecture: fallbackPrefecture ?? "",
-                memo: venue.nilIfBlank ?? listingMemo ?? ""
-            )
-        }
-        // AWが取れない場合は、相手の現地交換条件テキストの日付解析でフォールバック。
-        if dateDetails.isEmpty {
-            let detail = HomeExchangeLocalDateDetail(
-                prefecture: fallbackPrefecture ?? "",
-                memo: listingMemo ?? parsed.memo ?? ""
-            )
-            for key in HomePartnerExchangeCalendarTextParser.dateKeys(in: partnerLocalConditionText) {
-                dateDetails[key] = detail
-            }
-        }
-        guard !dateDetails.isEmpty || fallbackPrefecture != nil else {
-            return nil
-        }
-        return HomePartnerExchangeCalendarContext(
-            ownerName: partnerDisplayName,
-            methodTitle: "現地交換の条件",
-            dateDetails: dateDetails,
-            fallbackPrefecture: fallbackPrefecture,
-            fallbackMemo: listingMemo ?? parsed.memo
+    /// 相手の「交換条件カレンダー」シート用コンテキスト（ホーム・プロフィールと同一モジュール）。
+    var partnerExchangeCalendarContext: HomePartnerExchangeCalendarContext {
+        PartnerExchangeCalendarContextBuilder.context(
+            appState: appState,
+            userID: targetItem.ownerID,
+            listingLocalPrefecture: partnerExchangeSummary?.localPrefecture,
+            listingLocalMemo: partnerExchangeSummary?.localPlaceMemo,
+            conditionText: partnerLocalConditionText,
+            displayName: partnerDisplayName
         )
     }
 

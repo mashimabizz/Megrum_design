@@ -4,6 +4,38 @@
 
 ---
 
+## イテレーション1226.358：相手プロフィールの「交換条件」を打診フローと同じカレンダーシートに
+
+### 背景・問題意識
+オーナー要望：相手プロフィールの「交換条件」を押すと「交換条件はまだ公開されていません」が出るが、公開可否の設定は廃止済み（全員一律閲覧）。打診の「＞」で開く相手の交換条件カレンダー（HomePartnerExchangeCalendarSheet）と同じシートを出したい。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/PartnerExchangeCalendarContextBuilder.swift`（新規）
+- 相手のAW・デフォルト交換設定・個別募集の現地条件からカレンダーコンテキストを組み立てる共通ビルダー（@MainActor）。打診フローとプロフィール両方から使用
+
+#### `ProposalCreateFlowExchangeDerivedState.swift` / `ProposalCreateFlowBody.swift`
+- 打診フローの `partnerExchangeCalendarContext` を共通ビルダー利用に置換（非optional化してbodyのelse分岐を撤去）
+
+#### `PublicUserProfileScreen.swift` / `PublicUserProfileScreenDerivedState.swift`
+- 「交換条件」シートを `PublicExchangeConditionsScreen`（公開/非公開表示）から `HomePartnerExchangeCalendarSheet` に差し替え
+- プロフィール .task に `loadPartnerActivityWindows(userID:)` を追加（カレンダー日程用）
+- プロフィール用 `partnerExchangeCalendarContext` を追加（現地条件を持つ最初のactive個別募集から都道府県/メモを解決）
+
+### 影響範囲
+- 相手プロフィールの「交換条件」ボタン、打診3/3の「＞」（共通化）
+
+### 確認方法
+- swift test: 1513件 0 failures
+- シミュレータ: 相手プロフィール（みち @michi1）が正しく表示され「交換条件」ボタンあり
+
+### セルフレビュー結果
+- ✅ 打診フローとプロフィールで同一シート・同一ビルダー
+- ✅ 「公開されていません」画面は使わない（PublicExchangeConditionsScreen は未参照になるが残置）
+- ⚠️ 相手が日程を全く設定していない場合はカレンダー空（データ無しのため妥当）
+
+---
+
 ## イテレーション1226.357：相手の現地交換条件テキストを「直近日つき／未設定はデフォルト設定」に
 
 ### 背景・問題意識
