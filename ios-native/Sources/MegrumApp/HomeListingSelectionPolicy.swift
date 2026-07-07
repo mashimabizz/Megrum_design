@@ -81,6 +81,23 @@ enum HomeListingSelectionPolicy {
         }
     }
 
+    /// 譲る側の必要選択数。相手の選択肢が「すべて」なら指定グッズ数ぶん、
+    /// 「n個以上」なら n ぶんを、手持ち数でクランプせずに要求する（iter1226.349）。
+    static func requiredOfferCount(
+        logic: ListingLogic,
+        designatedCount: Int,
+        minimumCount: Int
+    ) -> Int {
+        switch logic {
+        case .all:
+            return max(designatedCount, 1)
+        case .one:
+            return 1
+        case .atLeast:
+            return max(1, minimumCount)
+        }
+    }
+
     static func isSatisfied(
         selectedCount: Int,
         itemCount: Int,

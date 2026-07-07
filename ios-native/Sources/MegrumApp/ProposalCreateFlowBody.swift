@@ -31,7 +31,7 @@ extension ProposalCreateFlow {
                             .simultaneousGesture(stepSwipeGesture)
                     },
                     meetupContent: {
-                        meetupStep
+                        conditionsStep
                     },
                     shippingContent: {
                         shippingStep
@@ -70,7 +70,8 @@ extension ProposalCreateFlow {
                     configuration: configuration,
                     meetupHasTimeDraft: meetupInput != nil,
                     isCreating: appState.isCreatingProposal,
-                    onPrimary: primaryAction
+                    onPrimary: primaryAction,
+                    onBack: handleHeaderLeadingAction
                 )
             }
         }
@@ -100,6 +101,26 @@ extension ProposalCreateFlow {
         }
         .task {
             await loadPaymentSettingsIfNeeded()
+        }
+        .sheet(isPresented: $showsPartnerScheduleCalendar) {
+            // ホームの「相手の交換条件」カレンダーと同一モジュールを呼び出す。
+            if let context = partnerExchangeCalendarContext {
+                HomePartnerExchangeCalendarSheet(context: context)
+                    .presentationDetents([.medium, .large])
+                    .presentationDragIndicator(.visible)
+            } else {
+                HomePartnerExchangeCalendarSheet(
+                    context: HomePartnerExchangeCalendarContext(
+                        ownerName: "@\(partnerHandle)",
+                        methodTitle: "現地交換の条件",
+                        dateDetails: [:],
+                        fallbackPrefecture: nil,
+                        fallbackMemo: nil
+                    )
+                )
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+            }
         }
         .sheet(isPresented: $showsAddressSettings) {
             NavigationStack {

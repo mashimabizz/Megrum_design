@@ -31,13 +31,14 @@ final class ProposalCreateFlowTests: XCTestCase {
     func testProposalCreateStepsStayInVisibleParityOrder() {
         XCTAssertEqual(
             ProposalCreateStep.allCases.map(\.title),
-            ["出すもの", "受け取る", "待ち合わせ", "送料", "支払方法", "確認"]
+            ["出すもの", "受け取る", "交換条件", "待ち合わせ", "送料", "支払方法", "確認"]
         )
     }
 
     func testProposalHeaderLeadingActionResolverKeepsBackOrDismissBehavior() {
         XCTAssertEqual(ProposalHeaderLeadingActionResolver.action(for: .give), .dismiss)
-        XCTAssertEqual(ProposalHeaderLeadingActionResolver.action(for: .receive), .dismiss)
+        XCTAssertEqual(ProposalHeaderLeadingActionResolver.action(for: .receive), .previousStep)
+        XCTAssertEqual(ProposalHeaderLeadingActionResolver.action(for: .conditions), .previousStep)
         XCTAssertEqual(ProposalHeaderLeadingActionResolver.action(for: .meetup), .dismiss)
         XCTAssertEqual(ProposalHeaderLeadingActionResolver.action(for: .shipping), .dismiss)
         XCTAssertEqual(ProposalHeaderLeadingActionResolver.action(for: .payment), .previousStep)
@@ -956,7 +957,7 @@ final class ProposalCreateFlowTests: XCTestCase {
                 configuration: readyHand,
                 meetupHasTimeDraft: false
             ),
-            "待ち合わせへ進む"
+            "この内容で次へ"
         )
         XCTAssertEqual(
             ProposalCreateBottomBarCopy.primaryTitle(
@@ -973,7 +974,7 @@ final class ProposalCreateFlowTests: XCTestCase {
                 ),
                 meetupHasTimeDraft: false
             ),
-            "受け取るものへ進む"
+            "この内容で次へ"
         )
         XCTAssertEqual(
             ProposalCreateBottomBarCopy.primaryTitle(
@@ -981,7 +982,7 @@ final class ProposalCreateFlowTests: XCTestCase {
                 configuration: readyHand,
                 meetupHasTimeDraft: false
             ),
-            "待ち合わせへ進む"
+            "交換条件へ進む"
         )
         XCTAssertEqual(
             ProposalCreateBottomBarCopy.primaryTitle(
@@ -989,7 +990,7 @@ final class ProposalCreateFlowTests: XCTestCase {
                 configuration: readyMail,
                 meetupHasTimeDraft: false
             ),
-            "送料へ進む"
+            "交換条件へ進む"
         )
         let paymentReady = ProposalCreateConfiguration(
             exchangeMethod: .mail,
@@ -1093,23 +1094,23 @@ final class ProposalCreateFlowTests: XCTestCase {
             ProposalCreatePrimaryStepDestination.destination(
                 from: .give,
                 configuration: readyHand,
-                visibleSteps: [.give, .receive, .meetup, .confirm]
+                visibleSteps: [.give, .receive, .conditions, .confirm]
             ),
-            .meetup
+            .receive
         )
         XCTAssertEqual(
             ProposalCreatePrimaryStepDestination.destination(
                 from: .give,
                 configuration: readyMail,
-                visibleSteps: [.give, .receive, .shipping, .confirm]
+                visibleSteps: [.give, .receive, .conditions, .confirm]
             ),
-            .shipping
+            .receive
         )
         XCTAssertEqual(
             ProposalCreatePrimaryStepDestination.destination(
                 from: .give,
                 configuration: noReceiverYet,
-                visibleSteps: [.give, .receive, .meetup, .confirm]
+                visibleSteps: [.give, .receive, .conditions, .confirm]
             ),
             .receive
         )
@@ -1117,47 +1118,47 @@ final class ProposalCreateFlowTests: XCTestCase {
             ProposalCreatePrimaryStepDestination.destination(
                 from: .receive,
                 configuration: readyHand,
-                visibleSteps: [.give, .receive, .meetup, .confirm]
+                visibleSteps: [.give, .receive, .conditions, .confirm]
             ),
-            .meetup
+            .conditions
         )
         XCTAssertEqual(
             ProposalCreatePrimaryStepDestination.destination(
                 from: .receive,
                 configuration: readyMail,
-                visibleSteps: [.give, .receive, .shipping, .confirm]
+                visibleSteps: [.give, .receive, .conditions, .confirm]
             ),
-            .shipping
+            .conditions
         )
         XCTAssertEqual(
             ProposalCreatePrimaryStepDestination.destination(
-                from: .meetup,
+                from: .conditions,
                 configuration: readyHand,
-                visibleSteps: [.give, .receive, .meetup, .confirm]
+                visibleSteps: [.give, .receive, .conditions, .confirm]
             ),
             .confirm
         )
         XCTAssertEqual(
             ProposalCreatePrimaryStepDestination.destination(
-                from: .shipping,
+                from: .conditions,
                 configuration: readyMail,
-                visibleSteps: [.give, .receive, .shipping, .confirm]
+                visibleSteps: [.give, .receive, .conditions, .confirm]
             ),
             .confirm
         )
         XCTAssertEqual(
             ProposalCreatePrimaryStepDestination.destination(
-                from: .shipping,
+                from: .conditions,
                 configuration: paymentReady,
-                visibleSteps: [.give, .receive, .shipping, .payment, .confirm]
+                visibleSteps: [.give, .receive, .conditions, .confirm]
             ),
-            .payment
+            .confirm
         )
         XCTAssertEqual(
             ProposalCreatePrimaryStepDestination.destination(
-                from: .payment,
+                from: .conditions,
                 configuration: paymentReady,
-                visibleSteps: [.give, .receive, .shipping, .payment, .confirm]
+                visibleSteps: [.give, .receive, .conditions, .confirm]
             ),
             .confirm
         )
@@ -1198,15 +1199,15 @@ final class ProposalCreateFlowTests: XCTestCase {
         XCTAssertEqual(
             ProposalInitialStepResolver.resolution(
                 initialStep: .meetup,
-                visibleSteps: [.give, .receive, .meetup, .confirm],
+                visibleSteps: [.give, .receive, .conditions, .confirm],
                 configuration: readyHand
             ),
-            .apply(.meetup)
+            .apply(.conditions)
         )
         XCTAssertEqual(
             ProposalInitialStepResolver.resolution(
                 initialStep: .meetup,
-                visibleSteps: [.give, .receive, .meetup, .confirm],
+                visibleSteps: [.give, .receive, .conditions, .confirm],
                 configuration: missingReceiver
             ),
             .wait
@@ -1214,10 +1215,10 @@ final class ProposalCreateFlowTests: XCTestCase {
         XCTAssertEqual(
             ProposalInitialStepResolver.resolution(
                 initialStep: .meetup,
-                visibleSteps: [.give, .receive, .shipping, .confirm],
+                visibleSteps: [.give, .receive, .conditions, .confirm],
                 configuration: mailOnly
             ),
-            .markApplied
+            .apply(.conditions)
         )
     }
 

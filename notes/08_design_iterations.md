@@ -274,6 +274,233 @@ v3.1 スクショレビューのFB10点（1〜10枚目）を反映。
 - `ios-native/Sources/MegrumApp/TutorialSampleHomeData.swift`（ホーム/めぐりフィクスチャ）
 - `ios-native/Sources/MegrumApp/MeguriScreen.swift` / `MegrumAppState.swift` / `WishCollectionScreen.swift`（セグメントアンカー）
 - `notes/77_onboarding_tutorial_implementation_plan.md`（v3.1追記）
+## イテレーション1226.351：相手の「＞」で開くカレンダーをホームの相手交換条件モジュールに差し替え
+
+### 背景・問題意識
+オーナー指摘：iter1226.348 で付けた相手行の「＞」から開くのは、プロフィールのスケジュール画面ではなく、ホームの「相手の交換条件」シート（現地交換可能な場所と日程の月カレンダー・都道府県チップ付き）とのこと。「このモジュールをそのまま呼び出してもらえればOK」。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlowBody.swift`
+- シートを `ProfileScheduleScreen` → `HomePartnerExchangeCalendarSheet`（ホームと同一モジュール）に差し替え。medium/large detents
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlowExchangeDerivedState.swift`
+- `partnerExchangeCalendarContext` 新設：相手の交換設定（`publicExchangeSettingsByUserID` の localDateDetails/localDateKeys/localPrefecture）を優先し、無ければ相手の現地条件テキストの解析（既存パーサ）でフォールバック
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlowInitialStateActions.swift`
+- `loadTargetOwnerExchangeContent` で `loadPublicExchangeSettings(userID:)` も読み込み
+
+### 影響範囲
+- 打診3/3 現地条件の相手カレンダー
+
+### 確認方法
+- swift test: 1491件 0 failures
+
+### セルフレビュー結果
+- ✅ ホームの「相手の交換条件」と同一コンポーネント（HomePartnerExchangeCalendarSheet）を再利用
+- ✅ 設定未取得でもテキスト解析でフォールバック表示
+
+---
+
+## イテレーション1226.350：ホーム打診シートの譲グッズ選択を選択肢の数量・条件どおりに必須化
+
+### 背景・問題意識
+オーナーFB：「個別募集の選択肢が複数・n個以上・すべてを要求している場合、その数のぶん譲るグッズを選ばないと打診できないように。グループ・メンバー・種別・シリーズ指定に合うグッズしか選べないように（ホーム画像タップ後のシート）」。従来は必要数が手持ち数でクランプされ、例えば「3個以上」でも手持ち2個なら2個で打診できてしまった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeListingSelectionPolicy.swift`
+- `requiredOfferCount(logic:designatedCount:minimumCount:)` 新設：すべて→指定グッズ数、n個以上→n（クランプなし）、どれか1つ→1 ＋ユニットテスト3件
+
+#### `ios-native/Sources/MegrumApp/HomeGoodsHitDetailSelectionContext.swift`
+- 譲側の充足判定を必要数ベースに変更。条件に合う手持ちが必要数未満なら打診ボタンを無効化
+- 選択可能プールは従来どおり選択肢の `matchingGoodsIDs`（iter1226.338 の厳密マッチ＝グループ・メンバー・種別・シリーズ・数量準拠）に限定
+
+### 影響範囲
+- ホームの激求/求 画像タップ後の打診シート
+
+### 確認方法
+- swift test: 1491件＋新規3件 0 failures
+
+### セルフレビュー結果
+- ✅ プール制限は既存の厳密マッチャー（.338）に委譲しており二重実装なし
+- ⚠️ 「すべて」の判定は個数ベース（wish 1件ごとの対応付けまでは行わない）
+
+---
+
+## イテレーション1226.348：現地条件の相手行に「＞」→相手の交換カレンダー
+
+### 背景・問題意識
+オーナーFB：「打診の現地交換の条件で、相手の行の右端に『＞』を置き、押したら相手の現地交換カレンダーが出るようにしてほしい」。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateConditionSteps.swift`
+- `ProposalMutualConditionCard` に `onPartnerDetail` を追加。「相手」行のみ右端にシェブロンを表示し、行全体をボタン化
+- `ProposalMeetupConditionStep` に `onOpenPartnerCalendar` を追加して相互条件カードへ配線
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlow*.swift`
+- `showsPartnerScheduleCalendar` state 追加。シェブロンで `ProfileScheduleScreen`（プロフィールの交換カレンダーと同一画面）を相手ユーザーIDでシート表示
+
+### 影響範囲
+- 打診3/3 現地交換の条件セクション
+
+### 確認方法
+- swift test: 1491件 0 failures
+
+### セルフレビュー結果
+- ✅ カレンダーはプロフィールの「交換カレンダー」と同一コンポーネントを再利用
+- ✅ 郵送側の相互条件カードには導線を付けない（現地のみ）
+
+---
+
+## イテレーション1226.347：3/3交換手段を個別募集カードUIに＋1/3は「この内容で次へ」
+
+### 背景・問題意識
+オーナーFB：①3/3の交換手段セレクタも個別募集のUI（アイコンカード3枚）と同じにしてほしい ②譲るものを選ぶ（1/3）のフッターは「この内容で次へ」で、受け取るもの選択へ進むようにしてほしい。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateConditionSteps.swift`
+- `ProposalExchangeMethodCards` 新設：個別募集の交換手段カードと同一UI（56pt丸アイコン・郵送はピンク・両方は2アイコン・選択でラベンダー枠1.6pt・高さ108）を `ExchangeMethod` バインドで実装し、3/3セクション1の旧セグメントセレクタを置換
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateNavigationPolicy.swift`
+- 1/3の主ボタンを常に「この内容で次へ」・遷移先を常に受け取るもの選択（2/3）に変更
+  （従来は受け取るもの選択済みだと2/3を飛ばして交換条件へ進んでいた）
+
+### 影響範囲
+- 打診作成フロー 1/3のフッター文言・遷移、3/3の交換手段UI
+
+### 確認方法
+- swift test: 1491件 0 failures（フロー系テスト更新）
+
+### セルフレビュー結果
+- ✅ カードの寸法・色・アイコンは個別募集実装の値をそのまま使用
+- ✅ 激求/求からの3/3直行（initialStep=.conditions）は影響なし
+
+---
+
+## イテレーション1226.346：打診1/3・2/3を個別募集と同じ4列画像グリッドに
+
+### 背景・問題意識
+オーナーFB：「譲から選ぶも受け取るものを選ぶも、個別募集の作成画面のように画像4列で表示してほしい」。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateSelectionSteps.swift`
+- 行リスト（ProposalSelectableGoodsRow）を廃止し、個別募集エディタと同じ4列グリッド
+  （`GridItem(.flexible(), spacing: 10) ×4`・spacing 12・`ListingSelectableImageTile`＝選択でチェック＋ラベンダー枠）へ変更
+- 譲（1/3）・受け取る（2/3）の両ステップに適用（`ProposalSelectableGoodsGrid` として共通化）
+
+#### 付随（QA環境）
+- `App/MegrumNativeApp.swift`（main側）: VisualQA起動時の通知許可ダイアログ抑制＋DEBUG自動サインインの常時入り直しを反映（フィーチャーブランチのみに存在していたものをmainへ）
+
+### 影響範囲
+- 打診作成フロー 1/3・2/3 のグッズ選択UI
+
+### 確認方法
+- swift test: 1491件 0 failures
+- シミュレータ実データ: 1/3が4列タイル表示・選択チェックが機能することをスクショ確認
+
+### セルフレビュー結果
+- ✅ タイル・列間隔は個別募集エディタの実装値と同一
+- ✅ 金額指定タブ・フィルタ・空状態はそのまま
+
+---
+
+## イテレーション1226.345：打診フローに個別募集と同じ進捗ピル＋フッターを適用
+
+### 背景・問題意識
+オーナーFB：「提示物の選択画面の一番上に、個別募集の作成画面と同じ進捗表示（1/3＋ドット）を付けてほしい。フッターも同じ感じにしてほしい」。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateConditionSteps.swift`
+- `ProposalStepProgressPill` 新設：個別募集エディタと同一デザイン（「n /3」＋ドット3つ・白カプセル・影）。ドットタップで前のステップへは自由に、先へは前提（canAdvance）を満たす時のみ移動
+- `ProposalStepProgressTitle` から「1/3」kicker を削除（進捗はピルに一本化）
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlowContentViews.swift`
+- ヘッダー直下・中央にピルを配置（支払/送信確認では非表示）
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateBottomBarViews.swift` / `ProposalCreateFlowBody.swift`
+- フッターを個別募集エディタ準拠に：白い上丸角22のバー＋上向きシャドウ、主ボタンはラベンダー→スカイのグラデ（高さ56・角丸15・無効時opacity 0.46）
+- 1/3以外では「戻る」ボタン（白地・ラベンダー枠 132×58）を主ボタン左に併置（戻る動作は既存の前ステップ解決を使用）
+
+### 影響範囲
+- 打診作成フロー全ステップのクローム
+
+### 確認方法
+- swift test: 1491件 0 failures
+- シミュレータ実データ: 1/3画面のピル・フッターをスクショ確認（個別募集と同一の見た目）
+
+### セルフレビュー結果
+- ✅ ピル・ボタンのサイズ/色/影は個別募集エディタの実装値をそのまま使用
+- ✅ ドットの先進みは前提チェック付き（未選択のまま条件へ飛べない）
+
+---
+
+## イテレーション1226.344：打診フローを個別募集エディタ準拠の1/3〜3/3へ刷新
+
+### 背景・問題意識
+オーナーFB：①「あなたの◯◯を求！」の詳細で「交換内容を確認する」を押しても激求のような交換内容プレビューが出ない ②提示物の選択〜送信内容の確認までを、UIが優れている個別募集エディタ（1/3〜3/3）を踏襲して作り直したい ③激求/求のプレビューから「打診に進む」で3/3へ直行したい。
+
+### 変更内容
+
+#### ①求！にも交換内容プレビュー
+- `HomeWishHitDetailSheet`：「交換内容を確認する」→ 激求と同じ `HomeProposalStartConfirmationSheet`（この内容で打診しますか？＋交換プレビュー＋打診に進む）を挟むように変更
+
+#### ②打診フローの段階UI化（`ProposalCreateStep.conditions` 新設）
+- ステップ構成を `[譲るもの 1/3, 受け取るもの 2/3, 交換条件 3/3, 送信確認]` に再編
+- 3/3「交換条件」は 1.交換手段 → 2.現地交換の条件 → 3.郵送交換の条件 →（必要時）支払方法 を1画面に統合。現地/郵送の各セクション直下に**お互いの希望条件**カードを表示（既存サブビューが内包）
+- 上部の交換手段セレクタ＋タブ式ステップヘッダーを廃止し、個別募集エディタ準拠の大見出し（`ProposalStepProgressTitle`：1/3〜3/3＋タイトル）に変更
+- 2/3 受け取るものは従来どおりグッズ選択のみ（条件から選ぶタブ・選択肢追加は元々なし＝要件どおり）
+- 条件外の打診/その他要望のセクションは打診フローには追加しない（個別募集専用のまま）
+- 戻る挙動：1/3のみ閉じる、以降は前のステップへ（`ProposalHeaderLeadingActionResolver`）
+- 旧ステップ指定（meetup/shipping/payment）は `.conditions` に正規化（`ProposalInitialStepResolver.normalized`）
+
+#### ③激求/求 →「打診に進む」で3/3直行
+- `HomeScreenRoutes.initialStep(for:)`：交換手段が既知なら `.conditions` を返す（譲/受は選択済みのため）
+
+### 影響範囲
+- 打診作成フロー全体（ホーム激求/求・プロフィール・検索経由）
+
+### 確認方法
+- swift test: 1491件 0 failures（フロー系テストは新仕様に更新）
+- シミュレータ実データ: 1/3画面（大見出し・譲から選ぶ/金額指定・フィルタ・行リスト）をスクショ確認
+
+### セルフレビュー結果
+- ✅ 既存の meetup/shipping/payment ビューは 3/3 内のセクションとして再利用（機能欠落なし）
+- ✅ 送信確認（confirm）は従来のまま
+- ⚠️ 3/3画面の実機での見え方（セクション間隔等）は次回オーナー確認で微調整前提
+
+---
+
+## イテレーション1226.343：失効グルームの返信カードは枠ごと非表示に
+
+### 背景・問題意識
+オーナーFB：「24時間すぎたら、返信したグルームの画像はそもそも表示不要。枠として表示する必要がない」。iter1226.342 では失効時にエラー表示（画像を読み込めませんでした）が残っていた。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/GroomContextCardPolicy.swift`（新規）
+- `isCertainlyExpired(messageCreatedAt:now:)`：グルーム寿命は公開から24時間のため、メッセージ送信から24時間を超えていれば失効確定（ネットワーク不要で判定）＋テスト2件
+
+#### `ios-native/Sources/MegrumApp/MeguriMessageConversationViews.swift`
+- `MeguriGroomReplyContextCard`：①メッセージが24時間超 → 枠ごと非表示 ②24時間以内でも再署名不可（ゲートにより失効グルームは署名できない）→ 枠ごと非表示。表示するのは解決済みURLがある時だけ
+
+#### `ios-native/Sources/MegrumApp/MeguriMessageViews.swift`
+- メッセージ一覧のピル：最終メッセージが24時間超ならサムネイルを出さない（タイトルのみ）
+
+### 影響範囲
+- めぐりメッセージ（会話・一覧）のグルーム文脈カード
+
+### 確認方法
+- swift test: 1491件＋policy/extractor等9件、0 failures
+
+### セルフレビュー結果
+- ✅ 24時間超は端末内判定のみで非表示（無駄な署名リクエストなし）
+- ✅ 24時間以内に失効した場合も署名失敗検知で非表示（エラー枠は出ない）
+- ⚠️ グルーム投稿者本人は失効後も署名可能なため、本人側のみ短時間カードが残る場合がある（相手側には出ない）
 
 ---
 

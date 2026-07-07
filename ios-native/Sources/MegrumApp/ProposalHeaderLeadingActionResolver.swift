@@ -8,9 +8,10 @@ enum ProposalHeaderLeadingAction: Equatable {
 enum ProposalHeaderLeadingActionResolver {
     static func action(for step: ProposalCreateStep) -> ProposalHeaderLeadingAction {
         switch step {
-        case .payment, .confirm:
+        // 個別募集エディタ準拠：1/3以外は戻るで前のステップへ（iter1226.344）。
+        case .receive, .conditions, .payment, .confirm:
             .previousStep
-        case .give, .receive, .meetup, .shipping:
+        case .give, .meetup, .shipping:
             .dismiss
         }
     }

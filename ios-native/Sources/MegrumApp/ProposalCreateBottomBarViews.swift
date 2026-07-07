@@ -9,8 +9,14 @@ struct ProposalFlowBottomBar: View {
     var isInline = false
     var onPrimary: () -> Void
 
+    var onBack: (() -> Void)?
+
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 15) {
+            // 個別募集エディタ準拠：1/3以外は「戻る」を併置（iter1226.345）。
+            if let onBack, selectedStep != .give {
+                IndividualListingEditorBackBottomBarButton(action: onBack)
+            }
             ProposalFlowBottomBarPrimaryButton(
                 title: primaryTitle,
                 isCreating: isCreating,
@@ -18,9 +24,9 @@ struct ProposalFlowBottomBar: View {
                 action: onPrimary
             )
         }
-        .padding(.horizontal, isInline ? 0 : ProposalFlowBottomBarMetrics.horizontalPadding)
-        .padding(.top, isInline ? ProposalFlowBottomBarMetrics.inlineTopPadding : ProposalFlowBottomBarMetrics.topPadding)
-        .padding(.bottom, isInline ? ProposalFlowBottomBarMetrics.inlineBottomPadding : ProposalFlowBottomBarMetrics.bottomPadding)
+        .padding(.horizontal, isInline ? 0 : 20)
+        .padding(.top, isInline ? ProposalFlowBottomBarMetrics.inlineTopPadding : 12)
+        .padding(.bottom, isInline ? ProposalFlowBottomBarMetrics.inlineBottomPadding : 14)
         .background(ProposalFlowBottomBarBackground(isInline: isInline))
     }
 
@@ -57,23 +63,19 @@ private struct ProposalFlowBottomBarPrimaryButton: View {
             .font(.system(size: 17, weight: .heavy, design: .rounded))
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity)
-            .frame(minHeight: ProposalFlowBottomBarMetrics.buttonMinHeight)
+            .frame(height: 56)
             .background(
                 LinearGradient(
-                    colors: [
-                        MegrumTheme.lavender,
-                        MegrumTheme.lavender.opacity(0.88)
-                    ],
+                    colors: [MegrumTheme.lavender, MegrumTheme.sky],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 ),
-                in: RoundedRectangle(cornerRadius: ProposalFlowBottomBarMetrics.buttonCornerRadius, style: .continuous)
+                in: RoundedRectangle(cornerRadius: 15, style: .continuous)
             )
-            .shadow(color: MegrumTheme.lavender.opacity(isEnabled ? 0.28 : 0), radius: 14, y: 8)
         }
         .buttonStyle(.plain)
         .disabled(!isEnabled)
-        .opacity(isEnabled ? 1 : 0.48)
+        .opacity(isEnabled ? 1 : 0.46)
     }
 }
 
@@ -84,7 +86,10 @@ private struct ProposalFlowBottomBarBackground: View {
         if isInline {
             Color.clear
         } else {
-            MegrumTheme.canvas.ignoresSafeArea(edges: .bottom)
+            UnevenRoundedRectangle(topLeadingRadius: 22, topTrailingRadius: 22, style: .continuous)
+                .fill(.white.opacity(0.92))
+                .shadow(color: MegrumTheme.ink.opacity(0.08), radius: 18, y: -4)
+                .ignoresSafeArea(edges: .bottom)
         }
     }
 }

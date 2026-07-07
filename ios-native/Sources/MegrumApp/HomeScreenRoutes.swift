@@ -140,11 +140,10 @@ enum HomeDiscoveryProposalRouteResolver {
     }
 
     private static func initialStep(for exchangeMethod: ExchangeMethod?) -> ProposalCreateStep {
+        // 激求/求のプレビューから「打診に進む」→ 3/3（交換条件）へ直行（iter1226.344）。
         switch exchangeMethod {
-        case .hand, .both:
-            return .meetup
-        case .mail:
-            return .shipping
+        case .hand, .both, .mail:
+            return .conditions
         case nil:
             return .give
         }

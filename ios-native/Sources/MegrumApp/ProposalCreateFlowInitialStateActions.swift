@@ -17,6 +17,8 @@ extension ProposalCreateFlow {
 
     func loadTargetOwnerExchangeContent() async {
         await appState.loadPublicExchangeContent(userID: targetItem.ownerID)
+        // 相手の交換カレンダー（現地交換可能な場所と日程）表示用。
+        await appState.loadPublicExchangeSettings(userID: targetItem.ownerID)
         syncPaymentSelectionIfNeeded()
     }
 

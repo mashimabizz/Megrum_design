@@ -192,7 +192,8 @@ private struct MeguriMessageThreadRow: View {
                     if let contextTitle {
                         MeguriMessageThreadContextPill(
                             title: contextTitle,
-                            imageURL: thread.sourceGroomImageURL
+                            imageURL: thread.sourceGroomImageURL,
+                            messageCreatedAt: thread.lastMessage.createdAt
                         )
                     }
 
@@ -253,10 +254,19 @@ private struct MeguriMessageThreadRow: View {
 private struct MeguriMessageThreadContextPill: View {
     var title: String
     var imageURL: URL?
+    var messageCreatedAt: Date?
+
+    /// グルーム失効後（メッセージから24時間超）はサムネイルを出さない。
+    private var isImageUnavailable: Bool {
+        guard let messageCreatedAt else {
+            return false
+        }
+        return GroomContextCardPolicy.isCertainlyExpired(messageCreatedAt: messageCreatedAt)
+    }
 
     var body: some View {
         HStack(spacing: 6) {
-            if let imageURL {
+            if let imageURL, !isImageUnavailable {
                 GroomContextResolvedImage(staleURL: imageURL) { phase in
                     switch phase {
                     case .success(let image):

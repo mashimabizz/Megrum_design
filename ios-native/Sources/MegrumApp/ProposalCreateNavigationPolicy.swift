@@ -15,12 +15,12 @@ enum ProposalCreateBottomBarCopy {
 
         switch selectedStep {
         case .give:
-            if configuration.hasReceiverSelection {
-                return nextStepTitle(configuration: configuration)
-            }
-            return "受け取るものへ進む"
+            // 個別募集の1/3と同じ文言。押下で常に受け取るもの選択（2/3）へ。
+            return "この内容で次へ"
         case .receive:
             return nextStepTitle(configuration: configuration)
+        case .conditions:
+            return "次へ：送信確認"
         case .meetup:
             if configuration.requiresShippingBeforeSubmit {
                 return "送料へ進む"
@@ -35,17 +35,8 @@ enum ProposalCreateBottomBarCopy {
         }
     }
 
-    private static func nextStepTitle(configuration: ProposalCreateConfiguration) -> String {
-        if configuration.requiresMeetupBeforeSubmit {
-            return "待ち合わせへ進む"
-        }
-        if configuration.requiresShippingBeforeSubmit {
-            return "送料へ進む"
-        }
-        if configuration.requiresPaymentSelection {
-            return "支払方法へ進む"
-        }
-        return "次へ：送信確認"
+    private static func nextStepTitle(configuration _: ProposalCreateConfiguration) -> String {
+        "交換条件へ進む"
     }
 }
 
@@ -61,12 +52,11 @@ enum ProposalCreatePrimaryStepDestination {
 
         switch selectedStep {
         case .give:
-            if configuration.hasReceiverSelection {
-                return nextMajorStep(configuration: configuration, visibleSteps: visibleSteps)
-            }
             return adjacentStep(after: selectedStep, visibleSteps: visibleSteps)
         case .receive:
             return nextMajorStep(configuration: configuration, visibleSteps: visibleSteps)
+        case .conditions:
+            return visibleSteps.contains(.confirm) ? .confirm : nil
         case .meetup:
             if configuration.requiresShippingBeforeSubmit, visibleSteps.contains(.shipping) {
                 return .shipping
@@ -88,17 +78,11 @@ enum ProposalCreatePrimaryStepDestination {
     }
 
     private static func nextMajorStep(
-        configuration: ProposalCreateConfiguration,
+        configuration _: ProposalCreateConfiguration,
         visibleSteps: [ProposalCreateStep]
     ) -> ProposalCreateStep? {
-        if configuration.requiresMeetupBeforeSubmit, visibleSteps.contains(.meetup) {
-            return .meetup
-        }
-        if configuration.requiresShippingBeforeSubmit, visibleSteps.contains(.shipping) {
-            return .shipping
-        }
-        if configuration.requiresPaymentSelection, visibleSteps.contains(.payment) {
-            return .payment
+        if visibleSteps.contains(.conditions) {
+            return .conditions
         }
         return visibleSteps.contains(.confirm) ? .confirm : nil
     }
@@ -135,11 +119,22 @@ enum ProposalInitialStepResolution: Equatable {
 }
 
 enum ProposalInitialStepResolver {
+    /// 旧ステップ指定（待ち合わせ/送料/支払）は統合先の「交換条件」に読み替える。
+    static func normalized(_ step: ProposalCreateStep) -> ProposalCreateStep {
+        switch step {
+        case .meetup, .shipping, .payment:
+            .conditions
+        default:
+            step
+        }
+    }
+
     static func resolution(
-        initialStep: ProposalCreateStep,
+        initialStep rawInitialStep: ProposalCreateStep,
         visibleSteps: [ProposalCreateStep],
         configuration: ProposalCreateConfiguration
     ) -> ProposalInitialStepResolution {
+        let initialStep = normalized(rawInitialStep)
         guard visibleSteps.contains(initialStep) else {
             return .markApplied
         }
@@ -164,7 +159,7 @@ enum ProposalFlowScreenCopy {
             "支払方法"
         case .confirm:
             "送信確認"
-        case .give, .receive, .meetup, .shipping:
+        case .give, .receive, .conditions, .meetup, .shipping:
             "提示物の選択"
         }
     }
@@ -185,6 +180,8 @@ extension ProposalCreateConfiguration {
             hasSenderSelection
         case .receive:
             hasReceiverSelection
+        case .conditions:
+            targetStatus != nil && (!requiresPaymentSelection || hasSelectedPaymentMethod)
         case .meetup:
             targetStatus != nil
         case .shipping:
@@ -202,7 +199,7 @@ extension ProposalCreateConfiguration {
             "出すものを選択してください"
         case .receive:
             "受け取るものを確認してください"
-        case .meetup, .shipping, .confirm:
+        case .conditions, .meetup, .shipping, .confirm:
             submitTitle
         case .payment:
             "支払方法を選択してください"

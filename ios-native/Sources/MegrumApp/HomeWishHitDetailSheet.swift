@@ -18,6 +18,7 @@ struct HomeWishHitDetailSheet: View {
     var onCopyToWish: (HomeMockGoods) -> Void
     var isWishCopyInProgress: Bool
     @State private var presentationState = HomeWishHitDetailPresentationState()
+    @State private var proposalConfirmation: HomeProposalStartConfirmationPayload?
 
     var body: some View {
         HomeSheetScaffold(
@@ -107,6 +108,14 @@ struct HomeWishHitDetailSheet: View {
         .onChange(of: selection.id) { _, _ in
             prepareInitialSelection()
         }
+        .sheet(item: $proposalConfirmation) { confirmation in
+            HomeProposalStartConfirmationSheet(
+                payload: confirmation,
+                onConfirm: confirmProposalStart
+            )
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+        }
     }
 
     private var matchedOfferGoods: [HomeMockGoods] {
@@ -142,7 +151,18 @@ struct HomeWishHitDetailSheet: View {
         ) else {
             return
         }
-        onStartProposal(proposalSelection)
+        // 激求（グッズ指定）と同様に、交換内容のプレビューを挟んでから打診へ進む。
+        proposalConfirmation = HomeProposalStartConfirmationPayload(
+            proposalSelection: proposalSelection,
+            receiverGoods: [selection.goods],
+            senderGoods: proposalSelection.senderGoods,
+            senderCashAmount: proposalSelection.cashAmount
+        )
+    }
+
+    private func confirmProposalStart(_ confirmedSelection: HomeDiscoveryProposalSelection) {
+        proposalConfirmation = nil
+        onStartProposal(confirmedSelection)
     }
 }
 

@@ -65,6 +65,25 @@ struct ProposalCreateActiveContent<GiveContent: View, ReceiveContent: View, Meet
         self.confirmContent = confirmContent
     }
 
+    private func selectStepFromPill(_ step: ProposalCreateStep) {
+        let order: [ProposalCreateStep] = [.give, .receive, .conditions]
+        guard let targetIndex = order.firstIndex(of: step),
+              let currentIndex = order.firstIndex(of: selectedStep)
+        else {
+            return
+        }
+        if targetIndex <= currentIndex {
+            selectedStep = step
+            return
+        }
+        // 先のステップへは、間のステップの前提を満たしている時だけ進める。
+        let priorSteps = order.prefix(targetIndex)
+        guard priorSteps.allSatisfy({ configuration.canAdvance(from: $0) }) else {
+            return
+        }
+        selectedStep = step
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             ProposalFlowScreenHeader(
@@ -76,20 +95,18 @@ struct ProposalCreateActiveContent<GiveContent: View, ReceiveContent: View, Meet
             .padding(.top, 8)
             .padding(.bottom, 6)
 
+            // 個別募集エディタと同じ進捗ピル（送信確認では出さない）。
+            if selectedStep != .payment && selectedStep != .confirm {
+                ProposalStepProgressPill(step: selectedStep, onSelectStep: selectStepFromPill)
+                    .padding(.bottom, 8)
+            }
+
             ScrollView {
                 VStack(alignment: .leading, spacing: contentSpacing) {
+                    // 個別募集エディタ準拠：ステップ大見出し（1/3〜3/3）。
+                    // 交換手段の選択は 3/3「交換条件」内へ移動した（iter1226.344）。
                     if selectedStep != .payment && selectedStep != .confirm {
-                        ProposalExchangeMethodSelector(
-                            exchangeMethod: $exchangeMethod
-                        )
-
-                        ProposalStepHeader(
-                            selectedStep: $selectedStep,
-                            steps: selectionTabs,
-                            configuration: configuration,
-                            senderCount: senderCount,
-                            receiverCount: receiverCount
-                        )
+                        ProposalStepProgressTitle(step: selectedStep)
                     }
 
                     ProposalCreateActiveStepContent(
@@ -164,7 +181,8 @@ private struct ProposalCreateActiveStepContent<GiveContent: View, ReceiveContent
             giveContent()
         case .receive:
             receiveContent()
-        case .meetup:
+        case .conditions, .meetup:
+            // .conditions は結合ステップ（呼び出し側が meetupContent スロットで渡す）。
             meetupContent()
         case .shipping:
             shippingContent()

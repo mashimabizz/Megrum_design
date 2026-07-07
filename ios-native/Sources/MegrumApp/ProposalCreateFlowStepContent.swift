@@ -54,13 +54,26 @@ extension ProposalCreateFlow {
         )
     }
 
+    var conditionsStep: some View {
+        ProposalExchangeConditionsStep(
+            exchangeMethod: $exchangeMethod,
+            requiresPaymentSelection: configuration.requiresPaymentSelection,
+            meetupContent: { meetupStep },
+            shippingContent: { shippingStep },
+            paymentContent: { paymentStep }
+        )
+    }
+
     var meetupStep: some View {
         ProposalMeetupConditionStep(
             prefecture: $meetupPrefecture,
             placeMemo: $meetupPlaceMemo,
             scheduleDate: $meetupStartAt,
             viewerConditionText: viewerLocalConditionText,
-            partnerConditionText: partnerLocalConditionText
+            partnerConditionText: partnerLocalConditionText,
+            onOpenPartnerCalendar: {
+                showsPartnerScheduleCalendar = true
+            }
         )
     }
 

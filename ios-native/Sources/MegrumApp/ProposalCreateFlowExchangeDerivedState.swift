@@ -107,6 +107,33 @@ extension ProposalCreateFlow {
         viewerListingExchangeSummary?.mailDetailText ?? "未設定"
     }
 
+    /// 相手の「交換条件カレンダー」シート用コンテキスト（ホームの相手の交換条件と同一モジュール）。
+    var partnerExchangeCalendarContext: HomePartnerExchangeCalendarContext? {
+        let settings = appState.publicExchangeSettingsByUserID[targetItem.ownerID]
+        let parsed = HomePartnerExchangeCalendarTextParser.parse(partnerLocalConditionText)
+        var dateDetails = settings?.localDateDetails ?? [:]
+        if dateDetails.isEmpty {
+            let keys = (settings?.localDateKeys ?? [])
+                + Array(HomePartnerExchangeCalendarTextParser.dateKeys(in: partnerLocalConditionText))
+            let fallbackDetail = HomeExchangeLocalDateDetail(
+                prefecture: parsed.prefecture ?? settings?.localPrefecture ?? "",
+                memo: parsed.memo ?? ""
+            )
+            dateDetails = Dictionary(uniqueKeysWithValues: Set(keys).sorted().map { ($0, fallbackDetail) })
+        }
+        let fallbackPrefecture = settings?.localPrefecture.nilIfBlank ?? parsed.prefecture
+        guard !dateDetails.isEmpty || fallbackPrefecture != nil else {
+            return nil
+        }
+        return HomePartnerExchangeCalendarContext(
+            ownerName: "@\(partnerHandle)",
+            methodTitle: "現地交換の条件",
+            dateDetails: dateDetails,
+            fallbackPrefecture: fallbackPrefecture,
+            fallbackMemo: parsed.memo
+        )
+    }
+
     var partnerShippingConditionText: String {
         partnerExchangeSummary?.mailDetailText ?? "未設定"
     }

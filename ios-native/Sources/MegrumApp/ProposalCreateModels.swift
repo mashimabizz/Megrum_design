@@ -4,6 +4,8 @@ import SwiftUI
 enum ProposalCreateStep: String, CaseIterable, Identifiable, Equatable {
     case give
     case receive
+    /// 3/3 交換条件（交換手段＋現地＋郵送＋支払をまとめた新ステップ）
+    case conditions
     case meetup
     case shipping
     case payment
@@ -17,6 +19,8 @@ enum ProposalCreateStep: String, CaseIterable, Identifiable, Equatable {
             "出すもの"
         case .receive:
             "受け取る"
+        case .conditions:
+            "交換条件"
         case .meetup:
             "待ち合わせ"
         case .shipping:
@@ -34,6 +38,8 @@ enum ProposalCreateStep: String, CaseIterable, Identifiable, Equatable {
             "譲"
         case .receive:
             "受"
+        case .conditions:
+            "条件"
         case .meetup:
             "会う"
         case .shipping:
@@ -51,6 +57,8 @@ enum ProposalCreateStep: String, CaseIterable, Identifiable, Equatable {
             "shippingbox.fill"
         case .receive:
             "sparkles"
+        case .conditions:
+            "slider.horizontal.3"
         case .meetup:
             "mappin.and.ellipse"
         case .shipping:
