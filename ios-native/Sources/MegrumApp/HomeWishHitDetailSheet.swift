@@ -46,7 +46,7 @@ struct HomeWishHitDetailSheet: View {
             Divider().opacity(0.55)
 
             // 求（wishマッチ）は個別募集が無いので、うけとる＝相手グッズ（確定 receiverGoods）／
-            // ゆずる＝相手が求めるあなたのグッズ（1件選ぶ）の2列で、超求と同じ取引ブロックに揃える。iter1226.379。
+            // ゆずる＝相手が求めるあなたのグッズ（1件選ぶ）の2列で、超求と同じ取引ブロックに揃える。iter1226.380。
             if matchedOfferGoods.isEmpty {
                 HomeNoMatchingOfferGoodsPanel()
             } else {
