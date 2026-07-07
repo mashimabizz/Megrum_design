@@ -49,7 +49,7 @@ struct HomeCandidateDealAboutSection: View {
             HStack(spacing: 7) {
                 Image(systemName: "info.circle")
                     .font(.system(size: 14, weight: .bold))
-                Text("この取引について")
+                Text("交換の方法について")
                     .font(.system(size: 13.5, weight: .black, design: .rounded))
             }
             .foregroundStyle(MegrumTheme.ink.opacity(0.82))

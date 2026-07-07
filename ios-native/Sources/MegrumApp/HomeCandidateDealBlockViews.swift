@@ -2,8 +2,9 @@ import Foundation
 import MegrumDesign
 import SwiftUI
 
-/// 取引ブロック（3列：受け取る｜相手希望｜譲る）。notes/19 候補シート再設計・iter1226.374/376。
-/// 相手希望は表示専用（選択肢ピルで切替）。ゆずるはポップアップ一覧で選ぶ。
+/// 取引ブロック（うけとる ⇄ [相手希望 → マイグッズ]）。notes/19・iter1226.377。
+/// 大枠なし。「ゆずる」は相手希望とマイグッズの中間上、「うけとる」と同じ段。
+/// 指名は相手希望ごとに →候補スロット（タップでその画像に合う候補ポップアップ）。相手希望3件以上は折りたたむ。
 struct HomeDealBlockView: View {
     var model: HomeDealBlockModel
     var onToggleReceive: (Int) -> Void
@@ -11,34 +12,58 @@ struct HomeDealBlockView: View {
 
     private let thumbSide: CGFloat = 58
     private let receiveCollapsedCount = 2
+    private let partnerCollapsedCount = 2
+    private let arrowWidth: CGFloat = 16
+    private let tier1Height: CGFloat = 19
+    private let tier2Height: CGFloat = 15
     @State private var showsReceiveList = false
-    @State private var showsOfferPicker = false
+    @State private var partnerExpanded = false
+    @State private var offerPicker: HomeDealOfferPickerContext?
+
+    // 二段目のコンテンツ（サムネ）が始まる位置に⇄矢印を合わせる（tier2ラベル＋spacing分下げる）。
+    private var contentTopInset: CGFloat { tier2Height + 6 }
+
+    private let receiveColumnWidth: CGFloat = 82
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .top, spacing: 4) {
-                dealColumn(title: "うけとる", qty: model.receive.qtyLabel) {
-                    receiveColumn
+        VStack(alignment: .leading, spacing: 8) {
+            // 見出し（本文と分離して確実に揃える）
+            VStack(spacing: 3) {
+                // 一段目：うけとる ／ ゆずる（相手希望とマイグッズの中間上）
+                HStack(spacing: 6) {
+                    tierLabel("うけとる", qty: model.receive.qtyLabel, height: tier1Height)
+                        .frame(width: receiveColumnWidth, alignment: .leading)
+                    Color.clear.frame(width: arrowWidth)
+                    tierLabel("ゆずる", qty: nil, height: tier1Height, alignment: .center)
+                        .frame(maxWidth: .infinity)
                 }
-                dealArrow("arrow.left.arrow.right")
-                dealColumn(title: "相手希望", qty: nil) {
-                    partnerColumn
+                // 二段目：相手希望 ／ マイグッズ（うけとる列の下は空）
+                HStack(spacing: 6) {
+                    Color.clear.frame(width: receiveColumnWidth, height: tier2Height)
+                    Color.clear.frame(width: arrowWidth)
+                    HStack(spacing: 4) {
+                        tierLabel("相手希望", qty: nil, height: tier2Height, alignment: .center, small: true)
+                            .frame(maxWidth: .infinity)
+                        Color.clear.frame(width: arrowWidth)
+                        tierLabel("マイグッズ", qty: model.offer.qtyLabel, height: tier2Height, alignment: .center, small: true)
+                            .frame(maxWidth: .infinity)
+                    }
+                    .frame(maxWidth: .infinity)
                 }
-                dealArrow("arrow.right")
-                dealColumn(title: "ゆずる", qty: model.offer.qtyLabel) {
-                    offerColumn
-                }
+            }
+
+            // 本文：うけとる列 ⇄ [相手希望 → マイグッズ]
+            HStack(alignment: .top, spacing: 6) {
+                receiveColumn
+                    .frame(width: receiveColumnWidth, alignment: .leading)
+                connectorArrow("arrow.left.arrow.right")
+                giveRows
+                    .frame(maxWidth: .infinity)
             }
 
             if let achievement = model.achievement {
                 HomeDealAchievementBar(achievement: achievement)
             }
-        }
-        .padding(14)
-        .background(MegrumTheme.canvas, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .strokeBorder(MegrumTheme.ink.opacity(0.08), lineWidth: 1)
         }
         .sheet(isPresented: $showsReceiveList) {
             HomeReceiveGoodsListSheet(
@@ -49,10 +74,10 @@ struct HomeDealBlockView: View {
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
         }
-        .sheet(isPresented: $showsOfferPicker) {
+        .sheet(item: $offerPicker) { ctx in
             HomeOfferGoodsPickerSheet(
-                requirementText: model.offer.qtyLabel,
-                cells: model.offer.flatCells,
+                requirementText: ctx.requirementText,
+                cells: ctx.cells,
                 onToggle: onToggleOffer
             )
             .presentationDetents([.medium, .large])
@@ -60,7 +85,7 @@ struct HomeDealBlockView: View {
         }
     }
 
-    // MARK: - 受け取る（多数はサムネ2枚＋「+N」→一覧ポップアップ）
+    // MARK: - うけとる列
 
     @ViewBuilder
     private var receiveColumn: some View {
@@ -89,85 +114,147 @@ struct HomeDealBlockView: View {
         )
     }
 
-    // MARK: - 相手希望
+    // MARK: - 相手希望 → マイグッズ の行
 
     @ViewBuilder
-    private var partnerColumn: some View {
+    private var giveRows: some View {
         switch model.partner.kind {
         case .goods:
-            VStack(alignment: .leading, spacing: 8) {
-                if model.partner.namedItems.isEmpty {
-                    HomeDealEmptyCell(side: thumbSide, label: "相手希望")
-                } else {
-                    ForEach(model.partner.namedItems) { item in
-                        HomeDealWishThumb(item: item, side: thumbSide)
-                    }
-                }
-            }
+            namedRows
         case .condition:
-            // 条件は相手希望列ではアイコンのみ。条件文・確認・検索はブロック下の確認セクションへ。iter1226.376。
-            HomeDealConditionIcon(side: thumbSide, tentative: model.partner.conditionTile?.tentative ?? false)
+            conditionRow
         case .cash:
             EmptyView()
         }
     }
 
-    // MARK: - ゆずる（ポップアップ一覧で選ぶ）
-
+    // 指名：相手希望画像ごとに →候補スロット。3件以上は折りたたみ。
     @ViewBuilder
-    private var offerColumn: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            if model.offer.flatCells.isEmpty {
-                HomeDealEmptyCell(side: thumbSide, label: "候補なし")
-            } else {
-                ForEach(model.offer.selectedCells) { cell in
-                    HomeDealThumb(cell: cell, side: thumbSide, onTap: { showsOfferPicker = true })
+    private var namedRows: some View {
+        let pairings = Array(zip(model.partner.namedItems, offerRowsForNamed).enumerated())
+        let collapse = pairings.count > partnerCollapsedCount + 1 && !partnerExpanded
+        let visible = collapse ? Array(pairings.prefix(partnerCollapsedCount)) : pairings
+        VStack(spacing: 8) {
+            ForEach(visible, id: \.offset) { _, pair in
+                pairRow(wish: pair.0, row: pair.1)
+            }
+            if collapse {
+                HomeDealMoreButton(label: "他\(pairings.count - partnerCollapsedCount)件を見る") {
+                    partnerExpanded = true
                 }
-                if model.offer.selectedCells.count < model.offer.requiredCount {
-                    HomeDealPickTile(side: thumbSide) { showsOfferPicker = true }
+            } else if pairings.count > partnerCollapsedCount + 1 {
+                HomeDealMoreButton(label: "閉じる", systemName: "chevron.up") {
+                    partnerExpanded = false
                 }
             }
         }
     }
 
-    // MARK: - 列の器・矢印
-
-    private func dealColumn<Content: View>(
-        title: String,
-        qty: String?,
-        @ViewBuilder content: () -> Content
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .firstTextBaseline, spacing: 3) {
-                Text(title)
-                    .font(.system(size: 12.5, weight: .black, design: .rounded))
-                    .foregroundStyle(MegrumTheme.ink.opacity(0.82))
-                    .fixedSize()
-                if let qty {
-                    Text("(\(qty))")
-                        .font(.system(size: 9.5, weight: .bold, design: .rounded))
-                        .foregroundStyle(MegrumTheme.muted)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
-                }
-            }
-            .lineLimit(1)
-            content()
+    /// namedItems と対応する offer 行（無ければ空行で穴埋め）。
+    private var offerRowsForNamed: [HomeDealOfferRow] {
+        let rows = model.offer.rows
+        return model.partner.namedItems.indices.map { i in
+            rows.indices.contains(i) ? rows[i] : HomeDealOfferRow(id: model.partner.namedItems[i].id, cells: [])
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func dealArrow(_ systemName: String) -> some View {
-        VStack(spacing: 0) {
-            Color.clear.frame(height: 20)
-            Image(systemName: systemName)
+    private func pairRow(wish: HomeDealWishCell, row: HomeDealOfferRow) -> some View {
+        HStack(alignment: .center, spacing: 4) {
+            HomeDealWishThumb(item: wish, side: thumbSide)
+                .frame(maxWidth: .infinity, alignment: .center)
+            Image(systemName: "arrow.right")
                 .font(.system(size: 12, weight: .black))
                 .foregroundStyle(MegrumTheme.ink.opacity(0.3))
-                .frame(height: thumbSide)
+                .frame(width: arrowWidth)
+            offerSlot(row: row, requirement: "「\(wish.title)」に合う候補")
+                .frame(maxWidth: .infinity, alignment: .center)
         }
-        .frame(width: 14)
-        .accessibilityHidden(true)
     }
+
+    // 条件：アイコン → 候補スロット（数量ぶん）。ポップアップは合致する全候補。
+    private var conditionRow: some View {
+        HStack(alignment: .top, spacing: 4) {
+            HomeDealConditionIcon(side: thumbSide, tentative: model.partner.conditionTile?.tentative ?? false)
+                .frame(maxWidth: .infinity, alignment: .center)
+            Image(systemName: "arrow.right")
+                .font(.system(size: 12, weight: .black))
+                .foregroundStyle(MegrumTheme.ink.opacity(0.3))
+                .frame(width: arrowWidth)
+                .padding(.top, (thumbSide - 12) / 2)
+            conditionSlots
+                .frame(maxWidth: .infinity, alignment: .center)
+        }
+    }
+
+    @ViewBuilder
+    private var conditionSlots: some View {
+        let cells = model.offer.flatCells
+        let requirement = model.offer.qtyLabel
+        VStack(spacing: 8) {
+            if cells.isEmpty {
+                HomeDealEmptyCell(side: thumbSide, label: "候補なし")
+            } else {
+                ForEach(cells.filter(\.selected)) { cell in
+                    HomeDealThumb(cell: cell, side: thumbSide, onTap: { openPicker(cells: cells, requirement: requirement) })
+                }
+                if cells.filter(\.selected).count < model.offer.requiredCount {
+                    HomeDealPickTile(side: thumbSide) { openPicker(cells: cells, requirement: requirement) }
+                }
+            }
+        }
+    }
+
+    // 指名の1スロット：選択済みなら候補サムネ、無ければ「選ぶ」タイル。タップでその希望に合う候補ポップアップ。
+    @ViewBuilder
+    private func offerSlot(row: HomeDealOfferRow, requirement: String) -> some View {
+        if row.cells.isEmpty {
+            HomeDealEmptyCell(side: thumbSide, label: "候補なし")
+        } else if let selected = row.cells.first(where: { $0.selected }) {
+            HomeDealThumb(cell: selected, side: thumbSide, onTap: { openPicker(cells: row.cells, requirement: requirement) })
+        } else {
+            HomeDealPickTile(side: thumbSide) { openPicker(cells: row.cells, requirement: requirement) }
+        }
+    }
+
+    private func openPicker(cells: [HomeDealGoodsCell], requirement: String?) {
+        offerPicker = HomeDealOfferPickerContext(cells: cells, requirementText: requirement)
+    }
+
+    // MARK: - 見出し・矢印
+
+    @ViewBuilder
+    private func tierLabel(_ title: String, qty: String?, height: CGFloat, alignment: Alignment = .leading, small: Bool = false) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 3) {
+            Text(title)
+                .font(.system(size: small ? 11 : 12.5, weight: .black, design: .rounded))
+                .foregroundStyle(MegrumTheme.ink.opacity(small ? 0.6 : 0.82))
+                .fixedSize()
+            if let qty {
+                Text("(\(qty))")
+                    .font(.system(size: 9.5, weight: .bold, design: .rounded))
+                    .foregroundStyle(MegrumTheme.muted)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            }
+        }
+        .frame(height: height)
+        .frame(maxWidth: .infinity, alignment: alignment)
+    }
+
+    private func connectorArrow(_ systemName: String) -> some View {
+        Image(systemName: systemName)
+            .font(.system(size: 12, weight: .black))
+            .foregroundStyle(MegrumTheme.ink.opacity(0.3))
+            .frame(width: arrowWidth, height: thumbSide)
+            .accessibilityHidden(true)
+    }
+}
+
+/// ゆずる候補ポップアップの提示コンテキスト（sheet(item:) 用）。iter1226.377。
+struct HomeDealOfferPickerContext: Identifiable {
+    let id = UUID()
+    let cells: [HomeDealGoodsCell]
+    let requirementText: String?
 }
 
 /// 選択式サムネ（ゆずる・受け取る）。選択済み＝水色→紫グラデチェック、未選択＝破線＋。
@@ -573,7 +660,7 @@ struct HomeOfferGoodsPickerSheet: View {
 /// 条件文＋①参考画像2枚 or ②「グループ メンバー 種別 #シリーズ」でGoogle画像検索ボタン。
 struct HomeConditionSeriesCheckSection: View {
     var model: HomeConditionSeriesCheckModel
-    @Environment(\.openURL) private var openURL
+    @State private var browserLink: MegrumBrowserLink?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -591,11 +678,6 @@ struct HomeConditionSeriesCheckSection: View {
             }
             .foregroundStyle(MegrumTheme.ink)
 
-            Text("シリーズが合えばマッチ確定。手持ちが条件のグッズか確かめましょう。")
-                .font(.system(size: 12, weight: .semibold, design: .rounded))
-                .foregroundStyle(MegrumTheme.muted)
-                .fixedSize(horizontal: false, vertical: true)
-
             if model.usesReferenceImages {
                 HStack(spacing: 10) {
                     ForEach(Array(model.referenceImageURLs.prefix(2).enumerated()), id: \.offset) { _, url in
@@ -611,7 +693,7 @@ struct HomeConditionSeriesCheckSection: View {
                 }
             } else if let searchURL = model.searchURL {
                 Button {
-                    openURL(searchURL)
+                    browserLink = MegrumBrowserLink(url: searchURL)
                 } label: {
                     HStack(spacing: 8) {
                         Image(systemName: "magnifyingglass")
@@ -626,7 +708,7 @@ struct HomeConditionSeriesCheckSection: View {
                                 .minimumScaleFactor(0.7)
                         }
                         Spacer(minLength: 0)
-                        Image(systemName: "arrow.up.right")
+                        Image(systemName: "chevron.right")
                             .font(.system(size: 11, weight: .black))
                     }
                     .foregroundStyle(MegrumTheme.lavender)
@@ -646,6 +728,12 @@ struct HomeConditionSeriesCheckSection: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(14)
         .background(MegrumTheme.sky.opacity(0.08), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .sheet(item: $browserLink) { link in
+            #if os(iOS)
+            MegrumSafariView(url: link.url)
+                .ignoresSafeArea()
+            #endif
+        }
     }
 }
 

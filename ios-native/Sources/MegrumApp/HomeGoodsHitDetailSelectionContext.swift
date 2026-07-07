@@ -269,12 +269,29 @@ struct HomeGoodsHitDetailSelectionContext {
     }
 
     /// 相手の選択肢が要求する譲るグッズの数（手持ち数でクランプしない）。
+    /// 条件指定は合致する全部ではなく「決まった数量（wish_quantity）」を要求する。iter1226.377。
     var offerRequiredCount: Int {
-        HomeListingSelectionPolicy.requiredOfferCount(
+        if let option = displayedWantedOptionForDeal, option.kind == .condition {
+            return max(1, option.quantity)
+        }
+        return HomeListingSelectionPolicy.requiredOfferCount(
             logic: offerLogic,
             designatedCount: offerDesignatedCount,
             minimumCount: offerMinimumCount
         )
+    }
+
+    /// 取引ブロックの数量ラベル（マイグッズ列）。条件は「Q個以上」、指名は logic に従う。
+    var offerRequirementShortLabel: String? {
+        if let option = displayedWantedOptionForDeal, option.kind == .condition {
+            let q = max(1, option.quantity)
+            return q > 1 ? "\(q)個以上" : nil
+        }
+        return shortQtyLabel(logic: offerLogic, minimumCount: offerMinimumCount)
+    }
+
+    private var displayedWantedOptionForDeal: HomeIndividualListingWantedOption? {
+        displayedWantedOption
     }
 
     private var offerDesignatedCount: Int {
@@ -450,7 +467,7 @@ extension HomeGoodsHitDetailSelectionContext {
         let goods = offerGoods
         let indexByID = Dictionary(goods.enumerated().map { ($0.element.id, $0.offset) }, uniquingKeysWith: { first, _ in first })
         let tentative = Set(option.tentativeGoodsIDs)
-        let qty = (offerRequiredCount > 1 || goods.count > 1) ? shortQtyLabel(logic: offerLogic, minimumCount: offerMinimumCount) : nil
+        let qty = offerRequirementShortLabel
 
         func cell(_ index: Int) -> HomeDealGoodsCell {
             let item = goods[index]
@@ -519,23 +536,30 @@ extension HomeGoodsHitDetailSelectionContext {
         )
     }
 
-    /// 「グループ メンバー グッズ種別 #シリーズ」の画像検索クエリ。メンバー・種別は選択中の自分グッズ優先。iter1226.376。
+    /// 「グループ メンバー グッズ種別 #シリーズ」の画像検索クエリ。iter1226.377。
+    /// グループ・種別は条件文（conditionSummary）の非#トークンから確実に拾い、メンバーは選択中の自分グッズから足す。
     private func conditionSearchQuery(option: HomeIndividualListingWantedOption) -> String {
         let summaryParts = (option.conditionSummary ?? "")
             .components(separatedBy: " / ")
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
         let seriesTokens = summaryParts.filter { $0.hasPrefix("#") }
+        let baseTokens = summaryParts.filter { !$0.hasPrefix("#") } // グループ・種別（・記載メンバー）
         let firstOffer = selectedOfferGoods.first ?? offerGoods.first
-        let group = firstOffer?.groupName?.nilIfBlank
-            ?? summaryParts.first { !$0.hasPrefix("#") }
+        // 種別が条件文に無いケースの保険として選択中グッズの種別も足す。
+        let offerType = firstOffer?.goodsTypeName?.nilIfBlank
         let member = firstOffer?.memberName?.nilIfBlank
-        let goodsType = firstOffer?.goodsTypeName?.nilIfBlank
+
         var tokens: [String] = []
-        if let group { tokens.append(group) }
-        if let member { tokens.append(member) }
-        if let goodsType { tokens.append(goodsType) }
-        tokens.append(contentsOf: seriesTokens)
+        var seen = Set<String>()
+        func add(_ t: String?) {
+            guard let t, !t.isEmpty, seen.insert(t).inserted else { return }
+            tokens.append(t)
+        }
+        baseTokens.forEach(add)
+        add(member)
+        add(offerType)
+        seriesTokens.forEach(add)
         return tokens.joined(separator: " ")
     }
 
@@ -551,15 +575,22 @@ extension HomeGoodsHitDetailSelectionContext {
         let selectedCount = selectionState.selectedOfferIndices.count
         let satisfied = selectedCount >= required
         let prefix: String
-        switch offerLogic {
-        case .all:
-            prefix = "すべて"
-        case .atLeast:
+        if option.kind == .condition {
+            // 条件は「数量以上」を要求する。iter1226.377。
             prefix = "\(required)個以上"
-        case .one:
-            prefix = ""
+        } else {
+            switch offerLogic {
+            case .all:
+                prefix = "すべて"
+            case .atLeast:
+                prefix = "\(required)個以上"
+            case .one:
+                prefix = ""
+            }
         }
-        let base = "\(prefix)：\(min(selectedCount, required))/\(required) 選択済み"
+        let base = prefix.isEmpty
+            ? "\(min(selectedCount, required))/\(required) 選択済み"
+            : "\(prefix)：\(min(selectedCount, required))/\(required) 選択済み"
         let suffix = satisfied ? "・成立OK" : "・あと\(max(0, required - selectedCount))つで成立"
         return HomeDealAchievement(text: base + suffix, satisfied: satisfied)
     }

@@ -161,6 +161,8 @@ public struct HomeIndividualListingWantedOption: Identifiable, Equatable, Sendab
     public var conditionSummary: String?
     /// 指名オプションの「相手のほしいもの1件 → 自分の候補」対応。条件/現金では空。iter1226.373。
     public var namedPairings: [HomeWantedNamedPairing]
+    /// 条件指定型の希望数量（wish_quantity）。条件は「この数以上」を要求する。iter1226.377。
+    public var quantity: Int
 
     public init(
         id: UUID,
@@ -179,7 +181,8 @@ public struct HomeIndividualListingWantedOption: Identifiable, Equatable, Sendab
         goodsTypeID: UUID? = nil,
         cashAmount: Int? = nil,
         conditionSummary: String? = nil,
-        namedPairings: [HomeWantedNamedPairing] = []
+        namedPairings: [HomeWantedNamedPairing] = [],
+        quantity: Int = 1
     ) {
         self.id = id
         self.listingID = listingID
@@ -198,6 +201,7 @@ public struct HomeIndividualListingWantedOption: Identifiable, Equatable, Sendab
         self.cashAmount = cashAmount.map { max(0, $0) }
         self.conditionSummary = conditionSummary
         self.namedPairings = namedPairings
+        self.quantity = max(1, quantity)
     }
 
     public var isCashOffer: Bool {

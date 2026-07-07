@@ -188,7 +188,8 @@ enum HomeCandidateListingWantedOptionFactory {
                     wantedRowsByID: wantedRowsByID,
                     tagsByInventoryID: tagsByInventoryID
                 )
-                : []
+                : [],
+            quantity: option.wishQuantity
         )
     }
 

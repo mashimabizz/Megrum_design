@@ -244,7 +244,8 @@ enum CandidateSheetVisualQASample {
             kind: .condition,
             matchingGoodsIDs: (0..<6).map { uuid("00000000011\($0)") },
             groupID: uuid("000000000501"),
-            conditionSummary: "BTS / トレカ / #DICON D'FESTA"
+            conditionSummary: "BTS / トレカ / #DICON D'FESTA",
+            quantity: 3
         )
     }
 
