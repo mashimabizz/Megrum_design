@@ -265,11 +265,10 @@ enum HomeMutualMatchListingEvaluator {
         guard option.isCashOffer != true else {
             return nil
         }
-        // 1. 現物IDを直接指名しているケース（確定）。
-        if option.wishIds.contains(counterpartItem.id) {
-            return .confirmed
-        }
-        // 2. 指名グッズ（相手のほしいもの行）と軸判定。最良の確度を採用。
+        // 個別募集の「求めるもの（指名）」は相手自身のほしいものを指す。相手のほしいものの
+        // 属性（グループ・メンバー・種別・シリーズ）と自分のグッズを突き合わせて判定する。
+        // ※ 相手のほしいものIDと自分の在庫IDが一致するか、という別ユーザー間のID比較はしない
+        //   （そもそも別ユーザーの行なので一致し得ず、意味も無い）。iter1226.368。
         let wantedRows = option.wishIds.compactMap { rowsByID[$0] }
         if !wantedRows.isEmpty {
             var best: HomeCandidateMatchConfidence?

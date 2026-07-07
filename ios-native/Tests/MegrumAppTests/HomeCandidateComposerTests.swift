@@ -936,12 +936,15 @@ final class HomeCandidateComposerTests: XCTestCase {
                 )
             ],
             listingWishOptions: [
+                // 個別募集の選択肢は「相手自身のほしいもの／条件／現金」のいずれか。
+                // ここは条件指定（グループ＋種別）で、viewer の在庫がその条件を満たすケース。
+                // 別ユーザー間の wishIDs 直接指名（自分の在庫IDを相手が指名）という経路は存在しない。iter1226.368。
                 try listingWishOptionRow(
                     id: "10000000-0000-0000-0000-000000000025",
                     listingID: listingID,
-                    wishIDs: [viewerHaveID],
-                    wishGroupID: nil,
-                    wishGoodsTypeID: nil,
+                    wishIDs: [],
+                    wishGroupID: "20000000-0000-0000-0000-000000000021",
+                    wishGoodsTypeID: "30000000-0000-0000-0000-000000000021",
                     logic: "and"
                 )
             ],
@@ -986,6 +989,9 @@ final class HomeCandidateComposerTests: XCTestCase {
         let partnerHaveID = "10000000-0000-0000-0000-000000000064"
         let partnerSecondHaveID = "10000000-0000-0000-0000-000000000069"
         let partnerWishOnlyID = "10000000-0000-0000-0000-000000000070"
+        // 指名オプションが参照するのは「相手自身のほしいもの」。viewer の在庫と同じ属性を持たせ、
+        // viewer がその指名を満たせる（＝相手のほしいものに合致する）ケースを表す。iter1226.368。
+        let partnerWishForExactID = "10000000-0000-0000-0000-0000000000a1"
         let listingID = "10000000-0000-0000-0000-000000000065"
         let conditionGroupID = "20000000-0000-0000-0000-000000000062"
         let conditionGoodsTypeID = "30000000-0000-0000-0000-000000000062"
@@ -1042,6 +1048,15 @@ final class HomeCandidateComposerTests: XCTestCase {
                     goodsTypeID: "30000000-0000-0000-0000-000000000070",
                     title: "相手が登録したWish画像",
                     photoURLs: ["https://example.com/partner-wish.jpg"]
+                ),
+                // option[0] が指名する「相手自身のほしいもの」。viewerExactID と同属性なので viewer が満たせる。
+                try goodsRow(
+                    id: partnerWishForExactID,
+                    userID: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+                    groupID: "20000000-0000-0000-0000-000000000061",
+                    goodsTypeID: "30000000-0000-0000-0000-000000000061",
+                    title: "相手が指名するほしいもの",
+                    photoURLs: ["https://example.com/partner-exact-wish.jpg"]
                 )
             ],
             partnerUsers: [],
@@ -1065,7 +1080,7 @@ final class HomeCandidateComposerTests: XCTestCase {
                     id: "10000000-0000-0000-0000-000000000066",
                     listingID: listingID,
                     position: 1,
-                    wishIDs: [viewerExactID],
+                    wishIDs: [partnerWishForExactID],
                     wishGroupID: nil,
                     wishGoodsTypeID: nil
                 ),
@@ -1105,6 +1120,11 @@ final class HomeCandidateComposerTests: XCTestCase {
                     label: "ライブ2026"
                 ),
                 try inventoryTagRow(
+                    inventoryID: partnerWishForExactID,
+                    tagID: "40000000-0000-0000-0000-0000000000a1",
+                    label: "ライブ2026"
+                ),
+                try inventoryTagRow(
                     inventoryID: partnerWishOnlyID,
                     tagID: "40000000-0000-0000-0000-000000000071",
                     label: "会場限定"
@@ -1130,7 +1150,8 @@ final class HomeCandidateComposerTests: XCTestCase {
         XCTAssertEqual(partnerDetail.offeredItems.map(\.title), ["相手が譲るグッズ", "相手が譲る別グッズ"])
         XCTAssertEqual(partnerDetail.offeredItems.map(\.quantity), [2, 1])
         XCTAssertEqual(partnerDetail.wantedOptions.map(\.kind), [.goods, .condition, .cash, .goods])
-        XCTAssertEqual(partnerDetail.wantedOptions[0].previewItems.map(\.imageURL?.absoluteString), ["https://example.com/viewer-exact.jpg"])
+        // 指名オプションのプレビューは相手自身のほしいもの画像（partnerWishForExactID）を表示する。iter1226.368。
+        XCTAssertEqual(partnerDetail.wantedOptions[0].previewItems.map(\.imageURL?.absoluteString), ["https://example.com/partner-exact-wish.jpg"])
         XCTAssertEqual(partnerDetail.wantedOptions[0].previewItems.map(\.rawTagNames), [["ライブ2026"]])
         XCTAssertEqual(partnerDetail.wantedOptions[3].previewItems.map(\.imageURL?.absoluteString), ["https://example.com/partner-wish.jpg"])
         XCTAssertEqual(partnerDetail.wantedOptions[3].previewItems.map(\.rawTagNames), [["会場限定"]])

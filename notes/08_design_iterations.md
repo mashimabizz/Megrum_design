@@ -4,6 +4,41 @@
 
 ---
 
+## イテレーション1226.368：個別募集マッチから「別ユーザー間ID直接指名」ロジックを撤去
+
+### 背景・問題意識
+オーナー指摘：iter1226.366 で用意した検証データがおかしい。「個別募集で相手のほしいもの選択肢が、自分（viewer）の『ほしいもの』を指定できる」経路は存在しない。個別募集の選択肢が求めるものは **①相手自身のほしいもの（指名）／②条件／③金額** のいずれかだけ。「自分のほしいものと相手の欲しいもの選択肢のIDが一致していればOK」というロジックを無くしてほしい。
+
+該当していたのは以前の説明の **1.「選択肢がそのグッズIDを直接指名していれば合致」**（別ユーザー間の `wishIds.contains(counterpartItem.id)` によるID一致マッチ）。これは相手の選択肢が「自分の在庫ID」を直接指名しているケースを合致扱いにしていた。別ユーザーの行なので本来一致し得ず、意味も無い。
+
+### 変更内容
+#### `ios-native/Sources/MegrumApp/HomeMutualMatchListingEvaluation.swift`
+- `mutualOptionMatchConfidence` から **1.（`option.wishIds.contains(counterpartItem.id)` → `.confirmed`）を削除**。
+- 残す判定は、
+  - 指名（`wishIds` → 相手自身のほしいもの行）を**属性（グループ・メンバー・種別・シリーズ）**で `wishGoodsConfidence` により突き合わせ、
+  - 条件（`wishGroupId`/`wishGoodsTypeId`＋メンバー/シリーズ/数量）で判定、
+  - 現金（`isCashOffer`）は非対象。
+- ※ `wishIds` は常に「募集オーナー自身のほしいもの（kind=wanted）」を指す。別ユーザー間のID比較はしない旨をコメントで明示。
+
+#### `ios-native/Tests/MegrumAppTests/HomeCandidateComposerTests.swift`
+- 撤去した「別ユーザー間ID直接指名」を前提にしていた2テストのフィクスチャを正しいモデルに修正。
+  - `testComposerMarksIndividualListingHitAsGoodsConditionDirect`：選択肢を **条件指定（グループ＋種別）** に変更（viewer在庫がその条件を満たす形）。
+  - `testComposerPassesIndividualListingWantedOptionsToHomeSheetContext`：option[0] を **相手自身のほしいもの（同属性）を指名** する形に変更（`partnerWishForExactID` を partnerWishes に追加）。指名オプションのプレビューは相手のほしいもの画像を表示する仕様に合わせ、画像アサーションを更新。
+
+### 影響範囲
+- ホーム「推しでマッチ」の個別募集マッチ（超求！/超求めてる？）。実データでは選択肢の `wishIds` はオーナー自身のほしいものを指すため挙動不変。撤去したのは、フィクスチャ／不正データ経由でのみ発火し得た別ユーザー間ID一致の誤マッチ。
+
+### 確認方法
+- swift test 1517件 green（3 skipped, 0 failures）。
+- sim/実機でホーム候補のマッチ表示にリグレッションが無いこと。
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/HomeMutualMatchListingEvaluation.swift`
+- `ios-native/Tests/MegrumAppTests/HomeCandidateComposerTests.swift`
+- `notes/18_demand_matching_logic.md`
+
+---
+
 ## イテレーション1226.367：交換条件でデフォルト都道府県を設定していれば左ドロワーの「要設定」を出さない
 
 ### 背景・問題意識
