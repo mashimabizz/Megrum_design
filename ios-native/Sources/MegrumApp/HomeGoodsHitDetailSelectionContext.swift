@@ -523,6 +523,9 @@ extension HomeGoodsHitDetailSelectionContext {
                 .compactMap(\.imageURL)
                 .prefix(2)
         )
+        let hasSeries = (option.conditionSummary ?? "")
+            .components(separatedBy: " / ")
+            .contains { $0.trimmingCharacters(in: .whitespaces).hasPrefix("#") }
         let query = conditionSearchQuery(option: option)
         let searchURL = query.isEmpty
             ? nil
@@ -530,6 +533,7 @@ extension HomeGoodsHitDetailSelectionContext {
                 (query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""))
         return HomeConditionSeriesCheckModel(
             conditionText: option.conditionSummary?.nilIfBlank ?? option.title,
+            hasSeries: hasSeries,
             referenceImageURLs: referenceImages,
             searchQuery: query,
             searchURL: searchURL
@@ -543,7 +547,10 @@ extension HomeGoodsHitDetailSelectionContext {
             .components(separatedBy: " / ")
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
-        let seriesTokens = summaryParts.filter { $0.hasPrefix("#") }
+        // シリーズは検索ワードに # を含めない（#DICON D'FESTA → DICON D'FESTA）。iter1226.378。
+        let seriesTokens = summaryParts
+            .filter { $0.hasPrefix("#") }
+            .map { String($0.dropFirst()).trimmingCharacters(in: .whitespaces) }
         let baseTokens = summaryParts.filter { !$0.hasPrefix("#") } // グループ・種別（・記載メンバー）
         let firstOffer = selectedOfferGoods.first ?? offerGoods.first
         // 種別が条件文に無いケースの保険として選択中グッズの種別も足す。

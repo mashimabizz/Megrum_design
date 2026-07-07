@@ -663,11 +663,25 @@ struct HomeConditionSeriesCheckSection: View {
     @State private var browserLink: MegrumBrowserLink?
 
     var body: some View {
+        // シリーズ指定が無ければ「条件のグッズを確認！」は不要。条件文だけ1行で出す。iter1226.378。
+        if model.hasSeries {
+            checkBox
+        } else if !model.conditionText.isEmpty {
+            conditionTextLine
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private var conditionTextLine: some View {
+        (Text("条件：").foregroundStyle(MegrumTheme.muted) + Text(model.conditionText).foregroundStyle(MegrumTheme.ink))
+            .font(.system(size: 13, weight: .black, design: .rounded))
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private var checkBox: some View {
         VStack(alignment: .leading, spacing: 10) {
             if !model.conditionText.isEmpty {
-                (Text("条件：").foregroundStyle(MegrumTheme.muted) + Text(model.conditionText).foregroundStyle(MegrumTheme.ink))
-                    .font(.system(size: 13, weight: .black, design: .rounded))
-                    .fixedSize(horizontal: false, vertical: true)
+                conditionTextLine
             }
 
             HStack(spacing: 7) {

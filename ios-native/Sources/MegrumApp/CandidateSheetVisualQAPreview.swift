@@ -49,6 +49,7 @@ enum CandidateSheetVisualQASample {
         case named
         case condition
         case conditionRef
+        case conditionNoSeries
         case cash
         case crowded
         case wish
@@ -219,6 +220,24 @@ enum CandidateSheetVisualQASample {
         )
     }
 
+    /// シリーズ指定なしの条件（確認セクションが出ないことの検証）。iter1226.378。
+    private static var conditionNoSeriesOption: HomeIndividualListingWantedOption {
+        HomeIndividualListingWantedOption(
+            id: uuid("000000000406"),
+            listingID: listingID,
+            position: 1,
+            title: "条件",
+            subtitle: "条件に合うもの",
+            logic: .one,
+            minimumCount: 1,
+            kind: .condition,
+            matchingGoodsIDs: [myRMID],
+            groupID: uuid("000000000501"),
+            conditionSummary: "BTS / トレカ",
+            quantity: 1
+        )
+    }
+
     private static var cashOption: HomeIndividualListingWantedOption {
         HomeIndividualListingWantedOption(
             id: uuid("000000000403"),
@@ -279,6 +298,8 @@ enum CandidateSheetVisualQASample {
             ordered = [conditionOption]
         case .conditionRef:
             ordered = [conditionRefOption]
+        case .conditionNoSeries:
+            ordered = [conditionNoSeriesOption]
         case .cash:
             ordered = [cashOption]
         case .crowded:

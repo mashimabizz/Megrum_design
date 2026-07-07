@@ -83,6 +83,8 @@ struct HomeDealAchievement: Equatable {
 struct HomeConditionSeriesCheckModel: Equatable {
     /// 条件文（例「TWICE / トレカ / #DICON D'FESTA」）。セクション先頭に「条件：…」で出す。
     var conditionText: String
+    /// シリーズ指定があるか。無ければ「条件のグッズを確認！」以下（参考画像/検索）は出さない。iter1226.378。
+    var hasSeries: Bool
     /// ① 参考グッズ画像（この推し×シリーズ）。2枚以上あれば①、無ければ②。
     var referenceImageURLs: [URL]
     /// ② Google画像検索クエリ（例「TWICE チェヨン トレカ #DICON D'FESTA」）。
