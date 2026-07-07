@@ -15,7 +15,7 @@ struct CandidateSheetVisualQAPreview: View {
     var body: some View {
         HomeGoodsHitDetailSheet(
             selection: CandidateSheetVisualQASample.payload(variant: variant),
-            viewerOfferGoods: CandidateSheetVisualQASample.viewerOfferGoods,
+            viewerOfferGoods: CandidateSheetVisualQASample.viewerOfferGoods(variant: variant),
             addedExtraCandidateIDs: [],
             showsOtherExchangeRows: false,
             bottomButtonTitle: "この内容で打診に進む",
@@ -34,6 +34,7 @@ enum CandidateSheetVisualQASample {
         case named
         case condition
         case cash
+        case crowded
     }
 
     // HomeMockGoods.make が使うプレフィックスと一致させ、matchingGoodsIDs と手持ちIDを噛み合わせる。
@@ -55,6 +56,32 @@ enum CandidateSheetVisualQASample {
     private static let myJinID = uuid("000000000102")
     private static let partnerWishRMID = uuid("000000000301")
     private static let partnerWishJinID = uuid("000000000302")
+
+    private static let crowdedImageNames = ["twice_momo_1", "twice_dahyun_1", "bts_v", "twice_sana_1", "aespa_ningning", "twice_momo_1"]
+    private static let crowdedMembers = ["RM", "ジン", "SUGA", "j-hope", "ジミン", "ユンギ"]
+
+    /// crowded 用：条件に合う手持ち候補6件（ゆずる列の「他N件を見る」検証）。
+    private static var crowdedViewerGoods: [HomeMockGoods] {
+        (0..<6).map { i in
+            HomeMockGoods.make(
+                "00000000011\(i)",
+                title: "\(crowdedMembers[i]) トレカ（自分）",
+                subtitle: "BTS / トレカ",
+                memberID: uuid("00000000031\(i)"),
+                groupName: "BTS",
+                memberName: crowdedMembers[i],
+                goodsTypeName: "トレカ",
+                shape: .portrait,
+                palette: [],
+                symbol: String(crowdedMembers[i].prefix(1)),
+                imageURL: image(crowdedImageNames[i])
+            )
+        }
+    }
+
+    static func viewerOfferGoods(variant: Variant = .named) -> [HomeMockGoods] {
+        variant == .crowded ? crowdedViewerGoods : viewerOfferGoods
+    }
 
     /// 自分の手持ち候補（譲る側）。指名の相手ほしいものに1対1で充てられる。
     static var viewerOfferGoods: [HomeMockGoods] {
@@ -167,9 +194,44 @@ enum CandidateSheetVisualQASample {
         )
     }
 
+    private static var crowdedConditionOption: HomeIndividualListingWantedOption {
+        HomeIndividualListingWantedOption(
+            id: uuid("000000000404"),
+            listingID: listingID,
+            position: 0,
+            title: "条件",
+            subtitle: "条件に合うもの",
+            logic: .one,
+            minimumCount: 1,
+            kind: .condition,
+            matchingGoodsIDs: (0..<6).map { uuid("00000000011\($0)") },
+            groupID: uuid("000000000501"),
+            conditionSummary: "BTS / トレカ / #DICON D'FESTA"
+        )
+    }
+
+    /// crowded 用：相手が渡す（受け取る）グッズ5件。うけとる列の「+N」→一覧ポップアップ検証。
+    private static var crowdedDetail: HomeIndividualListingDetailContext {
+        let items = (0..<5).map { i in
+            HomeIndividualListingOfferedItem(
+                id: uuid("00000000012\(i)"),
+                title: "\(crowdedMembers[i]) フォト",
+                imageURL: image(crowdedImageNames[i]),
+                quantity: 1
+            )
+        }
+        return HomeIndividualListingDetailContext(
+            listingID: listingID,
+            wantedLogic: .one,
+            offeredLogic: .all,
+            wantedOptions: [crowdedConditionOption],
+            offeredItems: items
+        )
+    }
+
     static func payload(variant: Variant = .named) -> HomeDiscoverySheetPayload {
         // 条件/定価は単独選択肢で確実に自動選択させ、その相手希望・金額入力を検証する。
-        // named は3選択肢を持たせて選択肢ピルも検証する。
+        // named は3選択肢を持たせて選択肢ピルも検証する。crowded は多数の畳み方を検証する。
         let ordered: [HomeIndividualListingWantedOption]
         switch variant {
         case .named:
@@ -178,12 +240,15 @@ enum CandidateSheetVisualQASample {
             ordered = [conditionOption]
         case .cash:
             ordered = [cashOption]
+        case .crowded:
+            ordered = [crowdedConditionOption]
         }
         let selection = HomeIndividualListingSelectionContext(
             wantedLogic: .one,
             offeredLogic: .all,
             wantedOptions: ordered,
             listingNote: "現地で当日交換できる方を優先します。",
+            detail: variant == .crowded ? crowdedDetail : nil,
             listingUpdatedAt: nil
         )
         var signals = HomeCandidateConditionSignalDefaults.noEvidence
