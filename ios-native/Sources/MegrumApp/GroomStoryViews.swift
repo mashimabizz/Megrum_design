@@ -36,7 +36,7 @@ struct GroomStrip: View {
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(alignment: .top, spacing: 22) {
+            HStack(alignment: .top, spacing: GroomStoryMetrics.itemSpacing) {
                 GroomMyStoryTile(
                     viewer: viewer,
                     isLoading: isCreating,
@@ -62,7 +62,7 @@ struct GroomStrip: View {
                     .id(groom.id)
                 }
             }
-            .padding(.vertical, 4)
+            .padding(.vertical, 8)
         }
     }
 

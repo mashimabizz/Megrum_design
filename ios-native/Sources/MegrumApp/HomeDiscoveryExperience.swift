@@ -89,7 +89,7 @@ struct HomeDiscoveryExperience: View {
                             onAdd: onAddGroom,
                             onSelect: onOpenGroom
                         )
-                        .padding(.leading, 16)
+                        .padding(.leading, 12)
                     }
 
                     if showsStarterMissionCard {

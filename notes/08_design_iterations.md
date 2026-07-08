@@ -4,6 +4,49 @@
 
 ---
 
+## イテレーション1226.389：ホームのグルーム列を Instagram ストーリー列と同寸・同色に（枠の色づきアニメ付き）
+
+### 背景・問題意識
+オーナーFB（IGスクショ添付）：「ホームのグルームのデザインをこの画像のストーリーと全く同じ大きさ・色に。グラデーションの色だけは今と同じでOK。ストーリーズのラベルは『グルーム』。既読の枠は一番左のストーリーの枠（薄グレー）と同じ。自分がグルームをあげたときに枠が色づく動きもインスタを模倣（わからなければ調べて）。」
+
+### 調査（ワークフローで並行リサーチ）
+IG ストーリートレイの実寸（2024-25）＝ 外枠 約64pt／線 約2pt（細い）／アバター 約56pt／枠-アバター間 約2.5pt／タイル間 約12pt／ラベル 11pt regular（未読 #262626・既読 #8E8E8E）／既読リング #C7C7C7／「+」バッジ #0095F6・20pt。色づきアニメ＝アップロード中は色を抑えた短い弧が時計回りに回転、完了時に上（12時）から時計回りにグラデが一周（`Circle().trim` を 0→1、easeOut ~0.42s）＋小さなスプリングのポップ。
+
+### 変更内容
+
+#### `Sources/MegrumApp/GroomStoryTileViews.swift`（全面刷新）
+- `GroomStoryMetrics`：IG準拠の寸法・色を集約（ring64/stroke2/avatar56/spacing12/label11、seen #C7C7C7、addBadge #0095F6、labelUnseen #262626/labelSeen #8E8E8E、未読グラデは現状どおり 水色→紫）。
+- リングを IG同寸の細枠（`strokeBorder` lineWidth2）に。未読＝水色→紫グラデ／既読＝薄グレー。旧5ptチャンキー枠・影・アバター減光を撤去。
+- ラベルを 11pt regular・省略1行・IG色に。
+- `GroomMyStoryTile`：自分タイルにラベル「グルーム」を追加。アイドル時は薄グレー枠＋青「+」バッジ。
+- `GroomMyStoryAvatar`：投稿の「色づき」アニメを実装（idle/uploading/celebrating）。アップロード中は回転する短い弧、完了で `trim 0→1` の一周スイープ＋スプリングのポップ、その後アイドルへ戻す。
+
+#### `Sources/MegrumApp/GroomStoryViews.swift`
+- `GroomStrip` の HStack spacing 22→12（`GroomStoryMetrics.itemSpacing`）、縦padding 4→8。
+
+#### `Sources/MegrumApp/HomeDiscoveryExperience.swift`
+- 列の leading padding 16→12（IG寄せ）。
+
+### 影響範囲
+ホーム最上部のグルーム列（表示のみ）。ロジック・データは不変。
+
+### 確認方法
+- `ImageRenderer` による静止画スナップショット（scratchpad/groom-rail.png）で目視：細枠・未読グラデ・既読グレー・「グルーム」＋青バッジ・小ラベルを確認（確認後スナップショットテストは削除）。
+- `swift test`：XCTest 1536＋Swift Testing 21 すべて緑。
+- 実機（feat/candidate-sheet-redesign）。
+
+### セルフレビュー結果
+- ✅ IG同寸（64/2/56/12/11）
+- ✅ 未読グラデは現状色（水色→紫）維持
+- ✅ 既読＝一番左（自分）の枠と同じ薄グレー #C7C7C7
+- ✅ 「グルーム」ラベル＋IG青の「+」バッジ
+- ✅ 投稿時の枠の色づきアニメ（回転→一周スイープ＋ポップ）を IG リサーチに沿って実装
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/GroomStoryTileViews.swift`, `GroomStoryViews.swift`, `HomeDiscoveryExperience.swift`
+
+---
+
 ## イテレーション1226.388：圏外グルームは通知が飛んだものだけプレミアム閲覧＋通知は圏内同一推しのみ＋推しごと通知設定（FB8-7）
 
 ### 背景・問題意識
