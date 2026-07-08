@@ -4,6 +4,30 @@
 
 ---
 
+## イテレーション1226.386：推し種別に「アクティビティ」を追加（FB8-10 種別追加のみ）
+
+### 背景・問題意識
+オーナーFB（FB8-10）。確認の結果、今回のスコープは「**種別追加のみ**（マスタ登録は後日／「Me」への改名は保留）」。
+
+### 変更内容
+- `OshiRequestKind` に `.activity`（displayName「アクティビティ」、`supportsMemberSelection = false`＝ソロ同様の単体扱い）を追加。推し追加リクエストの種別セレクタは `OshiRequestKind.allCases` を回すため、UIに自動でチップが追加される。
+- DBマイグレーション `20260708140000_add_activity_oshi_kind.sql`：`groups_master.kind` と `oshi_requests.requested_kind` の CHECK 制約を `('group','work','solo','activity')` に張り替え。`supabase db push` 適用済み。
+
+### 保留（オーナー指示）
+- 「趣味」カテゴリ（genre）とアクティビティのマスタ登録は後日（管理画面から追加する想定）。
+- 「推しを追加→『Me』を登録」の改名は保留（趣味/アクティビティが揃ってから）。
+
+### 影響範囲
+- 推し追加リクエストの種別選択。既存 group/work/solo は不変。
+
+### 確認方法
+- `swift build` OK。`supabase db push` 適用済み（`20260708140000`）。
+
+### 関連ファイル
+- `ios-native/Sources/MegrumCore/OshiModels.swift` / `supabase/migrations/20260708140000_add_activity_oshi_kind.sql`
+
+---
+
 ## イテレーション1226.385：グッズ種別に最近使った5件＋マイグッズ/ほしいものフッターを右・文字付きに（FB8-8/9）
 
 ### 背景・問題意識

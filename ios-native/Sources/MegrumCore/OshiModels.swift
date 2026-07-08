@@ -12,6 +12,8 @@ public enum OshiRequestKind: String, Codable, Sendable, CaseIterable, Identifiab
     case group
     case work
     case solo
+    /// 趣味・活動（スポーツ観戦、舞台、ゲーム 等）。iter1226.386 / FB8-10。
+    case activity
 
     public var id: String { rawValue }
 
@@ -23,6 +25,8 @@ public enum OshiRequestKind: String, Codable, Sendable, CaseIterable, Identifiab
             "作品"
         case .solo:
             "ソロ活動"
+        case .activity:
+            "アクティビティ"
         }
     }
 
@@ -30,7 +34,7 @@ public enum OshiRequestKind: String, Codable, Sendable, CaseIterable, Identifiab
         switch self {
         case .group, .work:
             true
-        case .solo:
+        case .solo, .activity:
             false
         }
     }
