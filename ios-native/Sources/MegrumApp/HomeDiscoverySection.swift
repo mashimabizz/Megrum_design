@@ -20,6 +20,8 @@ struct HomeDiscoverySection: View {
     var displayLimit: Int? = nil
     /// 需要行のサムネイル用：自分のグッズID→画像URL。
     var viewerGoodsImageURLByID: [UUID: URL] = [:]
+    /// 「他にも交換できそうなもの」で既に交換に追加済みの候補（グッズID）。行にバッジを出す。iter1226.384 / FB7-1。
+    var addedCandidateIDs: Set<UUID> = []
     /// タイトル横に出す小バッジ（ガイドツアー中の「サンプル」表示に使う）。
     var badgeText: String? = nil
     var onSelect: (HomeDiscoverySheet) -> Void
@@ -75,6 +77,7 @@ struct HomeDiscoverySection: View {
                             candidate: candidate,
                             titleStyle: cardTitleStyle,
                             viewerGoodsImageURLByID: viewerGoodsImageURLByID,
+                            isAdded: isCandidateAdded(candidate),
                             onSelect: onSelect,
                             onSearch: onSearchCandidate
                         )
@@ -91,6 +94,17 @@ struct HomeDiscoverySection: View {
             return candidates
         }
         return Array(candidates.prefix(displayLimit))
+    }
+
+    /// 候補の束ねるどれかのグッズが追加済みなら true。iter1226.384 / FB7-1。
+    private func isCandidateAdded(_ candidate: HomeDiscoveryCandidate) -> Bool {
+        guard !addedCandidateIDs.isEmpty else {
+            return false
+        }
+        if addedCandidateIDs.contains(candidate.id) {
+            return true
+        }
+        return candidate.goods.contains { addedCandidateIDs.contains($0.id) }
     }
 
     private var sectionSpacing: CGFloat {

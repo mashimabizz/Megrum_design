@@ -77,7 +77,9 @@ struct HomeDealBlockView: View {
         .sheet(item: $offerPicker) { ctx in
             HomeOfferGoodsPickerSheet(
                 requirementText: ctx.requirementText,
-                cells: ctx.cells,
+                // ctx.cells は開いた瞬間のスナップショットなので、選択トグル後もチェックが更新されない。
+                // 毎回ライブの model から選択状態を引き直す（iter1226.384 / FB7-2）。
+                cells: liveOfferCells(for: ctx),
                 onToggle: onToggleOffer
             )
             .presentationDetents([.medium, .large])
@@ -218,6 +220,16 @@ struct HomeDealBlockView: View {
 
     private func openPicker(cells: [HomeDealGoodsCell], requirement: String?) {
         offerPicker = HomeDealOfferPickerContext(cells: cells, requirementText: requirement)
+    }
+
+    /// ピッカーに渡すセルを、開いた時のスナップショットではなくライブの model から引き直す。
+    /// これでトグル直後にチェックマークが確実に反映される（iter1226.384 / FB7-2）。
+    private func liveOfferCells(for ctx: HomeDealOfferPickerContext) -> [HomeDealGoodsCell] {
+        let liveByID = Dictionary(
+            (model.offer.flatCells + model.offer.rows.flatMap(\.cells)).map { ($0.id, $0) },
+            uniquingKeysWith: { first, _ in first }
+        )
+        return ctx.cells.map { liveByID[$0.id] ?? $0 }
     }
 
     // MARK: - 見出し・矢印

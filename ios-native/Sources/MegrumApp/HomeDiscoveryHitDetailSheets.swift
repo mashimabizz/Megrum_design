@@ -10,6 +10,8 @@ struct HomeGoodsHitDetailSheet: View {
     var showsOtherExchangeRows: Bool = true
     /// 「他にも交換できそうなもの」に出す同じ相手の他候補（ホーム構造）。iter1226.383 / FB6-1。
     var otherExchangeCandidates: HomeOtherExchangeCandidateGroups = .empty
+    /// 「他にも交換できそうなもの」で追加済みの選択。確認画面・最終打診に含める。iter1226.384 / FB7-1。
+    var addedExtraSelections: [HomeDiscoveryProposalSelection] = []
     var bottomButtonTitle: String = "交換内容を確認する"
     var preselectPreferredOffer: Bool = true
     /// ガイドツアーのデモ用：選択済み状態を注入して「実際の画面状態」を再現する（通常は nil）。
@@ -87,12 +89,14 @@ struct HomeGoodsHitDetailSheet: View {
                 ),
                 listingNote: selection.individualListingSelection.listingNote,
                 listingUpdatedAt: selection.individualListingSelection.listingUpdatedAt,
-                goodsUpdatedAt: selection.goods.updatedAt
+                goodsUpdatedAt: selection.goods.updatedAt,
+                isReadyToConfirm: selectionContext.canStartProposal
             )
 
             if showsOtherExchangeRows {
                 HomeSamePartnerExchangeSection(
                     groups: otherExchangeCandidates,
+                    addedCandidateIDs: addedExtraCandidateIDs,
                     onOpenNestedSheet: onOpenNestedSheet
                 )
             }
@@ -332,11 +336,17 @@ struct HomeGoodsHitDetailSheet: View {
             partnerPaymentNote: selection.goods.ownerPaymentNote
         )
         proposalSelection.suggestedMessage = ProposalSuggestedMessageBuilder.make(from: verdict)
+        // 「他にも交換できそうなもの」で追加した候補も含めて確認・打診する（iter1226.384 / FB7-1）。
+        // includingExtraSelections はID重複を除くので、後段の primaryProposalSelection で再マージしても二重にならない。
+        let merged = proposalSelection.includingExtraSelections(addedExtraSelections)
+        let receiverGoods = HomeMockGoods.orderedUniqueByID(
+            confirmationReceiverGoods(for: proposalSelection) + addedExtraSelections.compactMap(\.receiverGoods)
+        )
         proposalConfirmation = HomeProposalStartConfirmationPayload(
-            proposalSelection: proposalSelection,
-            receiverGoods: confirmationReceiverGoods(for: proposalSelection),
-            senderGoods: selectionContext.selectedCashOption == nil ? proposalSelection.senderGoods : [],
-            senderCashAmount: proposalSelection.cashAmount
+            proposalSelection: merged,
+            receiverGoods: receiverGoods,
+            senderGoods: selectionContext.selectedCashOption == nil ? merged.senderGoods : [],
+            senderCashAmount: merged.cashAmount
         )
     }
 

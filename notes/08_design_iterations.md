@@ -4,6 +4,40 @@
 
 ---
 
+## イテレーション1226.384：他にも交換の追加候補を確認/打診に反映＋追加済みバッジ＋ゆずる選択マーク修正＋交換方法の自動展開（FB7）
+
+### 背景・問題意識
+オーナーFB（3件）：
+- **FB7-1**：「他にも交換できそうなもの」で画像タップ→入れ子で交換内容が決まったら元シートに戻り、そのパネルに「交換に含む」と分かる簡単なアイコン表示がほしい。元シートの「交換内容を確認する」で、追加したものも含めて何を交換するか最終的に決まるようにしたい（確認画面に反映）。
+- **FB7-2**：ゆずるのマイグッズ選択ポップアップで、選択肢をタップしても行右側の丸に選択マークが付かないことがある。
+- **FB7-3**：「交換の方法について」を、「交換内容を確認する」ボタンが有効になった瞬間に自動展開したい。
+
+### 変更内容
+- **FB7-1**：
+  - 追加済みバッジ：`HomeDiscoveryCandidateSummaryRow` に `isAdded`、`HomeDiscoverySection`/`HomeSamePartnerExchangeSection` に `addedCandidateIDs` を追加。追加済み候補の行右上に「✓ 交換に追加済み」バッジ。追加状態は `presentationState.addedExtraCandidateIDs`（＝追加済み選択の receiverGoodsIDs）から判定。
+  - 確認画面に反映：`addedExtraSelections` を `HomeDiscoverySheetView → Content → 両ヒットシート` に配線。`startProposal()` で `proposalSelection.includingExtraSelections(addedExtraSelections)` を確認ペイロードに使い、受け取り一覧も追加分の相手グッズを合流（ID重複除去）。`includingExtraSelections` はID重複を除くため、後段 `submitSelection`→`primaryProposalSelection` の再マージでも二重にならない（冪等）。
+- **FB7-2**：`HomeOfferGoodsPickerSheet` に渡すセルを、開いた瞬間のスナップショット（`ctx.cells`）ではなく毎回ライブの `model.offer`（flatCells＋rows）から `liveOfferCells(for:)` で引き直すよう変更。トグル直後にチェックマークが確実に反映される。
+- **FB7-3**：`HomeCandidateDealAboutSection` に `isReadyToConfirm` を追加。`onAppear`（既に成立可能なら初期展開）＋`onChange`（false→true になった瞬間に `withAnimation` で展開）。両ヒットシートから `canStartProposal` を渡す。ユーザーが後から畳むのは自由。
+
+### 影響範囲
+- ホーム候補の超求/求シート下部「他にも交換できそうなもの」＋確認画面、ゆずる選択ポップアップ、「交換の方法について」折りたたみ。`HomeDiscoverySection`/`HomeDiscoveryCandidateSummaryRow` はホーム本体でも使うが、`addedCandidateIDs`/`isAdded` は既定 empty/false で挙動不変。
+
+### 確認方法
+- `swift build` / `swift test` 1533件 green。
+- 実機：他にも交換パネルの候補をタップ→入れ子で追加→戻ると行にバッジ、確認画面に受け取り分が合流。ゆずるポップアップでタップ即チェック。成立可能になった瞬間に交換方法が展開。
+
+### セルフレビュー結果
+- ✅ 追加候補の合流は `includingExtraSelections`（既存・冪等）を再利用。二重加算なし（確認・submitSelectionの両方でID重複除去）。
+- ✅ ピッカーのライブ引き直しで状態源を一本化（スナップショット依存を解消）。
+- ✅ 自動展開は onChange のみで強制せず、ユーザー操作を尊重。
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/HomeDiscoveryCandidateSummaryRow.swift` / `HomeDiscoverySection.swift` / `HomeSamePartnerExchangeSection.swift`
+- `ios-native/Sources/MegrumApp/HomeDiscoveryHitDetailSheets.swift` / `HomeWishHitDetailSheet.swift` / `HomeDiscoverySheetContent.swift` / `HomeDiscoverySheets.swift`
+- `ios-native/Sources/MegrumApp/HomeCandidateDealBlockViews.swift`（FB7-2）/ `HomeCandidateDealAboutSection.swift`（FB7-3）/ `HomeMockGoodsModels.swift`（dedup helper）
+
+---
+
 ## イテレーション1226.383：候補シートの「他にも交換できそうなもの」を同じ相手のホーム構造一覧に（FB6-1）
 
 ### 背景・問題意識

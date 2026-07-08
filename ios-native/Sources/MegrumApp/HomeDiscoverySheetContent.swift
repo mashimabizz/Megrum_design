@@ -6,6 +6,8 @@ struct HomeDiscoverySheetContent: View {
     let sheet: HomeDiscoverySheet
     let viewerOfferGoods: [HomeMockGoods]
     let addedExtraCandidateIDs: Set<UUID>
+    /// 「他にも交換できそうなもの」で追加済みの選択（確認画面・最終打診に含める）。iter1226.384 / FB7-1。
+    var addedExtraSelections: [HomeDiscoveryProposalSelection] = []
     /// 「他にも交換できそうなもの」用の同じ相手の他候補（primaryシートのみ／入れ子は .empty）。iter1226.383 / FB6-1。
     var otherExchangeCandidates: HomeOtherExchangeCandidateGroups = .empty
     let presentationContext: HomeDiscoverySheetPresentationContext
@@ -28,6 +30,7 @@ struct HomeDiscoverySheetContent: View {
                 addedExtraCandidateIDs: addedExtraCandidateIDs,
                 showsOtherExchangeRows: presentationContext.showsOtherExchangeRows,
                 otherExchangeCandidates: otherExchangeCandidates,
+                addedExtraSelections: addedExtraSelections,
                 bottomButtonTitle: presentationContext.bottomButtonTitle,
                 preselectPreferredOffer: presentationContext.preselectPreferredOffer,
                 initialSelectionState: initialGoodsHitSelectionState,
@@ -45,6 +48,7 @@ struct HomeDiscoverySheetContent: View {
                 addedExtraCandidateIDs: addedExtraCandidateIDs,
                 showsOtherExchangeRows: presentationContext.showsOtherExchangeRows,
                 otherExchangeCandidates: otherExchangeCandidates,
+                addedExtraSelections: addedExtraSelections,
                 bottomButtonTitle: presentationContext.bottomButtonTitle,
                 preselectFirstOffer: presentationContext.preselectPreferredOffer,
                 onOpenOwnerProfile: onOpenOwnerProfile,

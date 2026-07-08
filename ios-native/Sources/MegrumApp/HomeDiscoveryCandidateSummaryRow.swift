@@ -17,6 +17,8 @@ struct HomeDiscoveryCandidateSummaryRow: View {
     var titleStyle: HomeDiscoveryCardTitleStyle
     /// 需要行のサムネイル用：自分のグッズID→画像URL。
     var viewerGoodsImageURLByID: [UUID: URL] = [:]
+    /// この候補が「他にも交換できそうなもの」から既に交換に追加済みか。追加済みなら行にバッジを出す。iter1226.384 / FB7-1。
+    var isAdded: Bool = false
     var onSelect: (HomeDiscoverySheet) -> Void
     var onSearch: (HomeDiscoveryCandidate, HomeMockGoods?) -> Void
 
@@ -49,6 +51,11 @@ struct HomeDiscoveryCandidateSummaryRow: View {
                 infoColumn
             }
             .contentShape(Rectangle())
+            .overlay(alignment: .topTrailing) {
+                if isAdded {
+                    addedBadge
+                }
+            }
         }
         .buttonStyle(MegrumPressHighlightButtonStyle(
             highlightOpacity: 0.06,
@@ -61,6 +68,21 @@ struct HomeDiscoveryCandidateSummaryRow: View {
         .onChange(of: candidate.goods.map(\.id)) { _, _ in
             presentationState.resetSelection(goods: orderedGoods)
         }
+    }
+
+    private var addedBadge: some View {
+        HStack(spacing: 3) {
+            Image(systemName: "checkmark.circle.fill")
+            Text("交換に追加済み")
+        }
+        .font(.system(size: 10.5, weight: .black, design: .rounded))
+        .foregroundStyle(.white)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(MegrumTheme.lavender, in: Capsule(style: .continuous))
+        .shadow(color: MegrumTheme.lavender.opacity(0.35), radius: 4, y: 2)
+        .padding(.top, 2)
+        .accessibilityLabel("交換に追加済み")
     }
 
     private var labelButton: some View {

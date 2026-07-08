@@ -13,6 +13,8 @@ struct HomeCandidateDealAboutSection: View {
     var listingNote: String?
     var listingUpdatedAt: Date?
     var goodsUpdatedAt: Date?
+    /// 「交換内容を確認する」が有効になったか。true になった瞬間に自動展開する（iter1226.384 / FB7-3）。
+    var isReadyToConfirm: Bool = false
     @State private var expanded = false
     @State private var presentedCalendar: HomePartnerExchangeCalendarContext?
 
@@ -58,6 +60,20 @@ struct HomeCandidateDealAboutSection: View {
         .padding(.horizontal, 13)
         .padding(.vertical, 12)
         .background(MegrumTheme.ink.opacity(0.035), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .onAppear {
+            // 開いた時点で既に成立可能なら（先頭候補が自動選択済み等）最初から展開しておく。
+            if isReadyToConfirm {
+                expanded = true
+            }
+        }
+        .onChange(of: isReadyToConfirm) { _, ready in
+            // 成立可能になった瞬間に自動展開（ユーザーが後から畳むのは自由）。iter1226.384 / FB7-3。
+            if ready {
+                withAnimation(.snappy(duration: 0.28)) {
+                    expanded = true
+                }
+            }
+        }
         .sheet(item: $presentedCalendar) { context in
             HomePartnerExchangeCalendarSheet(context: context)
                 .presentationDetents([.medium, .large])

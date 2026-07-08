@@ -34,6 +34,7 @@ struct HomeDiscoverySheetView: View {
             sheet: sheet,
             viewerOfferGoods: viewerOfferGoods,
             addedExtraCandidateIDs: addedExtraCandidateIDs,
+            addedExtraSelections: presentationState.addedExtraSelections,
             otherExchangeCandidates: otherExchangeCandidates,
             presentationContext: presentationContext,
             allowsNonOshiOfferSection: allowsNonOshiOfferSection || sheetIsHavesLookup,

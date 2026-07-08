@@ -23,6 +23,8 @@ struct HomeOtherExchangeCandidateGroups {
 /// 候補タップは onOpenNestedSheet で入れ子シートを開く（そこではこのセクションは出さない）。
 struct HomeSamePartnerExchangeSection: View {
     var groups: HomeOtherExchangeCandidateGroups
+    /// 既に交換に追加済みの候補（グッズID）。行に「交換に追加済み」バッジを出す。iter1226.384 / FB7-1。
+    var addedCandidateIDs: Set<UUID> = []
     var onOpenNestedSheet: (HomeDiscoverySheet) -> Void
 
     var body: some View {
@@ -41,6 +43,7 @@ struct HomeSamePartnerExchangeSection: View {
                         showsSeeAllButton: false,
                         displayLimit: HomeDiscoverySummarySectionMetrics.displayLimit,
                         viewerGoodsImageURLByID: groups.viewerGoodsImageURLByID,
+                        addedCandidateIDs: addedCandidateIDs,
                         onSelect: onOpenNestedSheet
                     )
                 }
@@ -54,6 +57,7 @@ struct HomeSamePartnerExchangeSection: View {
                         showsSeeAllButton: false,
                         displayLimit: HomeDiscoverySummarySectionMetrics.displayLimit,
                         viewerGoodsImageURLByID: groups.viewerGoodsImageURLByID,
+                        addedCandidateIDs: addedCandidateIDs,
                         onSelect: onOpenNestedSheet
                     )
                 }

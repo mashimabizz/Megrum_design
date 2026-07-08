@@ -12,6 +12,8 @@ struct HomeWishHitDetailSheet: View {
     var showsOtherExchangeRows: Bool = true
     /// 「他にも交換できそうなもの」に出す同じ相手の他候補（ホーム構造）。iter1226.383 / FB6-1。
     var otherExchangeCandidates: HomeOtherExchangeCandidateGroups = .empty
+    /// 「他にも交換できそうなもの」で追加済みの選択。確認画面・最終打診に含める。iter1226.384 / FB7-1。
+    var addedExtraSelections: [HomeDiscoveryProposalSelection] = []
     var bottomButtonTitle: String = "交換内容を確認する"
     var preselectFirstOffer: Bool = true
     var onOpenOwnerProfile: (UUID) -> Void
@@ -74,12 +76,14 @@ struct HomeWishHitDetailSheet: View {
                 ),
                 listingNote: selection.individualListingSelection.listingNote,
                 listingUpdatedAt: selection.individualListingSelection.listingUpdatedAt,
-                goodsUpdatedAt: selection.goods.updatedAt
+                goodsUpdatedAt: selection.goods.updatedAt,
+                isReadyToConfirm: presentationState.canStartProposal
             )
 
             if showsOtherExchangeRows {
                 HomeSamePartnerExchangeSection(
                     groups: otherExchangeCandidates,
+                    addedCandidateIDs: addedExtraCandidateIDs,
                     onOpenNestedSheet: onOpenNestedSheet
                 )
             }
@@ -276,12 +280,17 @@ struct HomeWishHitDetailSheet: View {
             return
         }
         proposalSelection.suggestedMessage = suggestedMessage
+        // 「他にも交換できそうなもの」で追加した候補も含めて確認・打診する（iter1226.384 / FB7-1）。
+        let merged = proposalSelection.includingExtraSelections(addedExtraSelections)
+        let receiverGoods = HomeMockGoods.orderedUniqueByID(
+            [selection.goods] + addedExtraSelections.compactMap(\.receiverGoods)
+        )
         // 激求（グッズ指定）と同様に、交換内容のプレビューを挟んでから打診へ進む。
         proposalConfirmation = HomeProposalStartConfirmationPayload(
-            proposalSelection: proposalSelection,
-            receiverGoods: [selection.goods],
-            senderGoods: proposalSelection.senderGoods,
-            senderCashAmount: proposalSelection.cashAmount
+            proposalSelection: merged,
+            receiverGoods: receiverGoods,
+            senderGoods: merged.senderGoods,
+            senderCashAmount: merged.cashAmount
         )
     }
 
