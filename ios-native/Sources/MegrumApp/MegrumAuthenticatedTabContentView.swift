@@ -312,6 +312,9 @@ struct MegrumAuthenticatedTabContentView: View {
                     requestedTradesStage = nil
                     selectedTab = .inventory
                 },
+                onOpenGroom: { groom in
+                    openMeguriGroomViewer(groom, sourceAnchor: .center)
+                },
                 tutorialSampleActive: tutorialSampleActive,
                 tutorialFocusAnchor: tutorialCoordinator.currentBeat?.homeFocusAnchor,
                 starterMissionEnabled: !tutorialSampleActive,

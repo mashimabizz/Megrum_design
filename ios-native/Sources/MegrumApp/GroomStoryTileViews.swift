@@ -117,15 +117,12 @@ private struct GroomStoryRing: View {
             .stroke(
                 isRead
                     ? AnyShapeStyle(MegrumTheme.muted.opacity(0.22))
+                    // 未読は水色→紫のブランドグラデ（iter1226.387 / FB8-6）。
                     : AnyShapeStyle(
-                        AngularGradient(
-                            colors: [
-                                Color(red: 1.0, green: 0.07, blue: 0.45),
-                                Color(red: 0.82, green: 0.03, blue: 0.88),
-                                Color(red: 1.0, green: 0.50, blue: 0.0),
-                                Color(red: 1.0, green: 0.07, blue: 0.45)
-                            ],
-                            center: .center
+                        LinearGradient(
+                            colors: [MegrumTheme.sky, MegrumTheme.lavender],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
                         )
                     ),
                 lineWidth: isRead ? 2 : 5

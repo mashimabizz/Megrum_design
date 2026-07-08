@@ -4,6 +4,37 @@
 
 ---
 
+## イテレーション1226.387：ホーム上部に圏内グルームのストーリー列（その場で閲覧・投稿）（FB8-6）
+
+### 背景・問題意識
+オーナーFB（FB8-6）：ホーム画面の上に、インスタのストーリー一覧のように圏内グルームを横並び。既読=グレー枠／未読=水色→紫グラデ枠で区別し未読を前に。左端は自分アイコン＋右下に＋（グルーム投稿）。確認の結果、閲覧・投稿とも「**ホーム上でそのまま開く**」。
+
+### 変更内容
+- **部品流用**：`GroomStrip`（自分ストーリー＋「＋」タイル・未読先頭ソート `GroomFeedOrdering`・`GroomStoryTile`＋`GroomStoryRing`）は元から存在し未使用だったので、これをホーム上部に配置。
+- **未読リング色**：`GroomStoryRing` の未読を IGレインボー→**水色→紫のブランドグラデ**（`MegrumTheme.sky→lavender`）に変更。既読はグレーのまま。めぐり側の表示にも反映（ブランド統一）。
+- **その場投稿コンポーザ**：`GroomComposerContainer`（新規・自己完結）を追加。めぐり画面の状態機械には手を入れず、下書き状態＋写真/カメラ/投稿処理を内包し `MeguriGroomComposerPresentationModifier` を適用。ホーム側でこれをラップし「＋」でその場表示。投稿後は `loadGroomMapPosts(force:)` で列を更新。
+- **その場閲覧**：タブ上位（`MegrumAuthenticatedTabContentView`）に既存のイマーシブ・グルームビューア（`meguriGroomViewerPost`）があるので、ホームの `onOpenGroom` → `openMeguriGroomViewer` で全タブ上に表示。`GroomViewerScreen` は initialGroom が list に無くても先頭に差し込む実装なので、`groomMapPosts` 由来のグルームでも安全。
+- **データ/位置**：`HomeScreen` に `MegrumLocationState` を持たせ、出現時に現在地取得→`appState.loadGroomMapPosts(lat,long)`（約3km＝圏内）＋著者プロフィール読み込み。列は `groomMapPosts`／既読 `viewedGroomIDs`／プロフィール `publicProfilesByUserID` を渡す。ガイドツアー中は非表示。
+
+### 影響範囲
+- ホームタブ上部（新規のグルーム列）。めぐりタブのグルーム機能は不変（状態機械に触れていない）。`GroomStoryRing` の未読色はめぐり側にも反映。
+
+### 確認方法
+- `swift build` / `swift test` 1536件 green（`OshiRequestKind` allCases のテストも アクティビティ 込みに更新）。
+- 実機：現在地の約3km圏内にグルームがある状態でホーム上部に列が出ること、未読が水色→紫枠で先頭、既読がグレー、タップでその場閲覧、「＋」でその場投稿できることを確認（要位置情報許可）。
+
+### セルフレビュー結果
+- ✅ めぐりの状態機械を触らず、投稿は独立した `GroomComposerContainer` に隔離（回帰リスク低）。
+- ✅ 閲覧は既存のタブ上位ビューアを再利用。
+- ⚠️ ホーム出現時に位置情報を要求するようになる（圏内グルーム表示に必須のため）。
+- ⚠️ FB8-7（圏外グルームのプレミアム制限＋通知）は別途バックエンド設計。
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/GroomComposerContainer.swift`（新規）/ `GroomStoryTileViews.swift` / `HomeDiscoveryExperience.swift` / `HomeScreen.swift` / `MegrumAuthenticatedTabContentView.swift`
+- `ios-native/Tests/MegrumCoreTests/MegrumCoreTests.swift`（アクティビティ種別のテスト更新）
+
+---
+
 ## イテレーション1226.386：推し種別に「アクティビティ」を追加（FB8-10 種別追加のみ）
 
 ### 背景・問題意識

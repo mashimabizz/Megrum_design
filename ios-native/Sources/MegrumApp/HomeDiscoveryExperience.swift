@@ -34,6 +34,15 @@ struct HomeDiscoveryExperience: View {
     /// QA/デモ確認用：非nilの時は実データに関わらずこの達成状況でミッションカードを強制表示する。
     var starterMissionForcedState: HomeStarterMissionState? = nil
     var onOpenInventory: () -> Void = {}
+    // FB8-6：ホーム上部の圏内グルーム・ストーリー列。iter1226.387。
+    var showsGroomRail: Bool = false
+    var groomRailGrooms: [GroomPost] = []
+    var groomRailViewer: UserProfile? = nil
+    var groomRailProfiles: [UUID: PublicUserProfile] = [:]
+    var groomRailViewedIDs: Set<UUID> = []
+    var isGroomComposerCreating: Bool = false
+    var onOpenGroom: (GroomPost) -> Void = { _ in }
+    var onAddGroom: () -> Void = {}
 
     @AppStorage(HomeExchangeSettingsStorageKeys.preference) var exchangePreferenceRawValue = HomeDefaultExchangeSettings.standard.preference.rawValue
     @AppStorage(HomeExchangeSettingsStorageKeys.requiresSamePrefecture) var exchangeRequiresSamePrefecture = HomeDefaultExchangeSettings.standard.requiresSamePrefecture
@@ -69,6 +78,20 @@ struct HomeDiscoveryExperience: View {
                 onRefresh: onRefresh
             ) {
                 VStack(alignment: .leading, spacing: 14) {
+                    if showsGroomRail {
+                        // FB8-6：圏内グルームのストーリー横並び（自分アイコン＋＋、未読先頭、水色→紫/グレー枠）。
+                        GroomStrip(
+                            grooms: groomRailGrooms,
+                            viewer: groomRailViewer,
+                            publicProfilesByUserID: groomRailProfiles,
+                            viewedGroomIDs: groomRailViewedIDs,
+                            isCreating: isGroomComposerCreating,
+                            onAdd: onAddGroom,
+                            onSelect: onOpenGroom
+                        )
+                        .padding(.leading, 16)
+                    }
+
                     if showsStarterMissionCard {
                         HomeStarterMissionCard(
                             state: starterMissionState,

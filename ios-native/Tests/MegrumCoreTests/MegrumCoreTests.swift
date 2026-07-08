@@ -26,7 +26,8 @@ final class MegrumCoreTests: XCTestCase {
         XCTAssertTrue(OshiRequestKind.group.supportsMemberSelection)
         XCTAssertTrue(OshiRequestKind.work.supportsMemberSelection)
         XCTAssertFalse(OshiRequestKind.solo.supportsMemberSelection)
-        XCTAssertEqual(OshiRequestKind.allCases.map(\.displayName), ["グループ", "作品", "ソロ活動"])
+        XCTAssertFalse(OshiRequestKind.activity.supportsMemberSelection)
+        XCTAssertEqual(OshiRequestKind.allCases.map(\.displayName), ["グループ", "作品", "ソロ活動", "アクティビティ"])
 
         XCTAssertTrue(OshiGroup(id: UUID(), name: "TWICE", kind: .group).supportsMemberSelection)
         XCTAssertTrue(OshiGroup(id: UUID(), name: "呪術廻戦", kind: .work).supportsMemberSelection)

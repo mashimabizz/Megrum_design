@@ -24,6 +24,8 @@ struct HomeScreen: View {
     var onOpenMeguri: (() -> Void)? = nil
     var onOpenTrades: (() -> Void)? = nil
     var onOpenInventory: () -> Void = {}
+    /// FB8-6：ホーム上部の圏内グルーム・ストーリー列からグルームを開く（タブ上位のイマーシブ表示へ）。iter1226.387。
+    var onOpenGroom: (GroomPost) -> Void = { _ in }
     var tutorialSampleActive: Bool = false
     var tutorialFocusAnchor: TutorialAnchorID? = nil
     var starterMissionEnabled: Bool = false
@@ -54,8 +56,54 @@ struct HomeScreen: View {
     @State var relationRoute: HomeRelationRoute?
     @State var proposalRoute: HomeProposalRoute?
     @State var didOpenVisualQAInitialRoute = false
+    // FB8-6：圏内グルーム列＋その場投稿コンポーザ用の状態。iter1226.387。
+    @StateObject private var groomLocationState = MegrumLocationState()
+    @State private var isGroomComposerPresented = false
+
+    /// 実データのホーム（ガイドツアー以外）でグルーム列を出す。
+    private var showsGroomRail: Bool {
+        appState != nil && !tutorialSampleActive
+    }
 
     var body: some View {
+        groomComposerWrapped
+            .task(id: groomLocationState.coordinate?.latitude) {
+                await loadNearbyGroomsIfPossible()
+            }
+            .onAppear {
+                if showsGroomRail, groomLocationState.coordinate == nil {
+                    groomLocationState.requestCurrentLocation()
+                }
+            }
+    }
+
+    @ViewBuilder
+    private var groomComposerWrapped: some View {
+        if let appState, showsGroomRail {
+            GroomComposerContainer(
+                appState: appState,
+                locationState: groomLocationState,
+                isPresented: $isGroomComposerPresented
+            ) {
+                homeBody
+            }
+        } else {
+            homeBody
+        }
+    }
+
+    private func loadNearbyGroomsIfPossible() async {
+        guard showsGroomRail, let appState, let coordinate = groomLocationState.coordinate else {
+            return
+        }
+        await appState.loadGroomMapPosts(latitude: coordinate.latitude, longitude: coordinate.longitude)
+        await appState.loadMeguriProfiles(
+            userIDs: Set(appState.groomMapPosts.map(\.authorID)),
+            reportsFailure: false
+        )
+    }
+
+    private var homeBody: some View {
         HomeDiscoveryExperience(
             appState: appState,
             viewer: viewer,
@@ -92,7 +140,14 @@ struct HomeScreen: View {
             tutorialFocusAnchor: tutorialFocusAnchor,
             starterMissionEnabled: starterMissionEnabled,
             starterMissionForcedState: starterMissionForcedState,
-            onOpenInventory: onOpenInventory
+            onOpenInventory: onOpenInventory,
+            showsGroomRail: showsGroomRail,
+            groomRailGrooms: appState?.groomMapPosts ?? [],
+            groomRailViewer: appState?.viewer ?? viewer,
+            groomRailProfiles: appState?.publicProfilesByUserID ?? [:],
+            groomRailViewedIDs: appState?.viewedGroomIDs ?? [],
+            onOpenGroom: onOpenGroom,
+            onAddGroom: { isGroomComposerPresented = true }
         )
         .background(MegrumTheme.canvas.ignoresSafeArea())
         .megrumHiddenNavigationBar()
