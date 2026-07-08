@@ -15,6 +15,8 @@ struct GoodsTypeSelectSheet: View {
     var multiSelection: Binding<Set<UUID>>?
 
     @State private var searchText = ""
+    /// 最近使ったグッズ種別（最大5件、最近順）。単一選択の登録フローで上部に出す。iter1226.385 / FB8-8。
+    @AppStorage(GoodsTypeRecentSelection.storageKey) private var recentGoodsTypeIDsRaw = ""
 
     init(
         goodsTypes: [GoodsType],
@@ -41,6 +43,15 @@ struct GoodsTypeSelectSheet: View {
         GoodsTypeSelectFilter.filtered(goodsTypes, searchText: searchText)
     }
 
+    /// 最近使った種別（登録フロー＝単一選択かつ未検索のときだけ、上部に最大5件表示）。iter1226.385 / FB8-8。
+    private var recentGoodsTypes: [GoodsType] {
+        guard multiSelection == nil, searchText.isEmpty else {
+            return []
+        }
+        let byID = Dictionary(goodsTypes.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        return GoodsTypeRecentSelection.recentIDs(from: recentGoodsTypeIDsRaw).compactMap { byID[$0] }
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             header
@@ -49,19 +60,16 @@ struct GoodsTypeSelectSheet: View {
                 if filteredGoodsTypes.isEmpty {
                     emptyResult
                 } else {
-                    WrappingTagFlow(
-                        spacing: OshiMasterSelectLayoutMetrics.candidateTagSpacing,
-                        rowSpacing: OshiMasterSelectLayoutMetrics.candidateTagRowSpacing
-                    ) {
-                        ForEach(filteredGoodsTypes) { goodsType in
-                            OshiMasterCandidateTag(
-                                title: goodsType.name,
-                                isSelected: isSelected(goodsType),
-                                action: { handleTap(goodsType) }
-                            )
+                    VStack(alignment: .leading, spacing: 18) {
+                        if !recentGoodsTypes.isEmpty {
+                            typeSection(title: "最近使った", types: recentGoodsTypes)
+                            Divider().opacity(0.4).padding(.horizontal, 18)
+                            typeSection(title: "すべて", types: filteredGoodsTypes)
+                        } else {
+                            typeSection(title: nil, types: filteredGoodsTypes)
                         }
                     }
-                    .padding(.horizontal, 18)
+                    .padding(.top, 4)
                 }
             }
         }
@@ -78,6 +86,31 @@ struct GoodsTypeSelectSheet: View {
         return goodsType.id == selectedGoodsTypeID
     }
 
+    @ViewBuilder
+    private func typeSection(title: String?, types: [GoodsType]) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if let title {
+                Text(title)
+                    .font(.system(size: 13, weight: .black, design: .rounded))
+                    .foregroundStyle(MegrumTheme.muted)
+                    .padding(.horizontal, 18)
+            }
+            WrappingTagFlow(
+                spacing: OshiMasterSelectLayoutMetrics.candidateTagSpacing,
+                rowSpacing: OshiMasterSelectLayoutMetrics.candidateTagRowSpacing
+            ) {
+                ForEach(types) { goodsType in
+                    OshiMasterCandidateTag(
+                        title: goodsType.name,
+                        isSelected: isSelected(goodsType),
+                        action: { handleTap(goodsType) }
+                    )
+                }
+            }
+            .padding(.horizontal, 18)
+        }
+    }
+
     private func handleTap(_ goodsType: GoodsType) {
         if let multiSelection {
             if multiSelection.wrappedValue.contains(goodsType.id) {
@@ -86,6 +119,8 @@ struct GoodsTypeSelectSheet: View {
                 multiSelection.wrappedValue.insert(goodsType.id)
             }
         } else {
+            // 最近使った種別として記録（最大5件、最近順）。iter1226.385 / FB8-8。
+            recentGoodsTypeIDsRaw = GoodsTypeRecentSelection.updatedRaw(recording: goodsType.id, into: recentGoodsTypeIDsRaw)
             onSelect(goodsType)
         }
     }

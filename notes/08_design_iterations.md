@@ -4,6 +4,29 @@
 
 ---
 
+## イテレーション1226.385：グッズ種別に最近使った5件＋マイグッズ/ほしいものフッターを右・文字付きに（FB8-8/9）
+
+### 背景・問題意識
+オーナーFB（FB8の一部）：
+- **FB8-8**：マイグッズ/ほしいものでグッズ種別を選ぶとき、登録履歴が5個まで残って上に表示されてほしい。
+- **FB8-9**：マイグッズ/ほしいもののフッターのアイコン位置を左右逆に。「グッズを追加」「ほしいものを追加」の文字を書く。
+
+### 変更内容
+- **FB8-8**：`GoodsTypeRecentSelection`（UserDefaults に UUID をカンマ区切り、最大5件・最近順・重複排除）を新設。`GoodsTypeSelectSheet`（単一選択の登録フロー・未検索時のみ）で上部に「最近使った」セクションを追加し、選択時に記録。複数選択（フィルター）モードでは出さない。
+- **FB8-9**：`AddGoodsButton` を丸FABから「＋ グッズを追加／＋ ほしいものを追加」の文字付きカプセルに変更。フッターの配置を入れ替え（追加ボタン＝右下、フィルタ＝左下）。追加ボタンの文字は `addButtonTitle`（inventory=「グッズを追加」/ wish=「ほしいものを追加」）。
+
+### 影響範囲
+- マイグッズ/ほしいもの一覧のフッター、グッズ種別選択シート（登録・編集から呼ばれる）。
+
+### 確認方法
+- `swift test` 1536件 green（`GoodsTypeRecentSelection` の 最近順/重複/上限5/不正値無視 を3ケースで固定）。
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/GoodsTypeRecentSelection.swift`（新規）/ `GoodsTypeSelectSheet.swift` / `GoodsCollectionDisplayViews.swift` / `GoodsCollectionActionViews.swift` / `GoodsCollectionScreenBody.swift` / `GoodsCollectionScreenDerivedState.swift`
+- `ios-native/Tests/MegrumAppTests/GoodsTypeRecentSelectionTests.swift`（新規）
+
+---
+
 ## イテレーション1226.384：他にも交換の追加候補を確認/打診に反映＋追加済みバッジ＋ゆずる選択マーク修正＋交換方法の自動展開（FB7）
 
 ### 背景・問題意識

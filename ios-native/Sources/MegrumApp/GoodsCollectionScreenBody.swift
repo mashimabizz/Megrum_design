@@ -9,6 +9,7 @@ extension GoodsCollectionScreen {
 
             GoodsCollectionFloatingControls(
                 showsAddButton: showsAddButton,
+                addButtonTitle: addButtonTitle,
                 addButtonLabel: addButtonLabel,
                 addButtonHint: addButtonHint,
                 tutorialAnchorID: entryKind == .wish ? .wishAddButton : .inventoryAddButton,
@@ -35,11 +36,12 @@ extension GoodsCollectionScreen {
             )
 
             if appState != nil, !isSelectionMode, quickActionItem == nil {
+                // FB8-9：フィルタは左下へ（追加ボタンと位置を入れ替え）。iter1226.385。
                 GoodsCollectionFilterFloatingButton(activeFilterCount: activeFilter.activeCount) {
                     isShowingFilterSheet = true
                 }
-                .frame(maxWidth: .infinity, alignment: .trailing)
-                .padding(.trailing, FloatingActionLayoutMetrics.leadingPadding)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.leading, FloatingActionLayoutMetrics.leadingPadding)
                 .padding(.bottom, FloatingActionLayoutMetrics.addButtonBottomPadding)
             }
 
