@@ -4,6 +4,53 @@
 
 ---
 
+## イテレーション1226.390：グルーム通知を「現在地1km圏内×同一推し」のリアルタイム化＋遭遇プレミアム閲覧＋メンバー個別選択＋プッシュ直接ディープリンク（FB）
+
+### 背景・問題意識
+オーナーFB：
+1. プッシュタップで特定グルームを直接開けるように（前回は /meguri 止まり）。
+2. 推しごと通知の「登録メンバーのみ」がONにできない＋どのメンバーを通知対象にするか個別選択したい。
+3. 通知条件は「最後に開いた場所から3km」ではなく「**現在地のリアルタイム1km圏内**」が正。位置情報が常に許可ならリアルタイム通知、アプリ内のみなら**アプリ内でiOS標準の通知（画面上部バナー）**を出す。
+4. アプリ内通知はiOS標準のバナー風に。
+5. 圏外プレミアム閲覧の条件を「通知が飛んだもの」ではなく「**一度でも自分の1km圏内に入り、その時自分の推しに紐づいていたグルーム**」に（通知の有無は不問）。
+6. これをMegrumプレミアムの説明に含める。
+
+### 変更内容
+
+#### バックエンド（migration 20260709120000・push済み）
+- `groom_encounters(user_id, groom_post_id)`：1km圏内×推し一致の遭遇記録（RLS本人）。
+- 推しごと通知に `notify_all_members` / `member_character_ids` を追加（`members_only` は廃止扱い）。
+- 投稿時サーバファンアウト `notify_groom_post_published` を**無効化**（検知はクライアント側リアルタイムへ移行）。
+- フィードRPC `list_groom_feed_nearby` に `viewer_encountered` を追加。
+- 単一グルーム取得 `get_groom_feed_item(p_groom_id)`（プッシュのディープリンク用・距離条件なし）。
+
+#### クライアント
+- 圏外ゲートを「通知済み」→「**遭遇済み(encountered)×プレミアム**」へ（`GroomPost.encounteredInRange`／`MeguriAccessPolicy.canOpenGroom(hasEncountered:)`／全呼び出し配線）。
+- リアルタイム近接検知：`GroomProximityEvaluator`（純粋・テスト済み）＋`MegrumAppState.evaluateGroomProximity`。1km圏内×推し一致の新規グルームを遭遇記録し、設定合致時に**ローカル通知（iOS標準）**を発行。フォアグラウンドは willPresent が `.banner` を返すため画面上部バナーで表示（item4をiOS標準で満たす）。ホーム・めぐり地図のグルーム読み込み後に評価。
+- 推しごと通知UIを刷新：グループON/OFF＋「全メンバー」トグル＋メンバー個別チェックで通知対象を選択（`GroomNotifyPref{enabled, notifyAllMembers, memberCharacterIDs}`）。
+- プッシュのディープリンク：`groom_posted` は `/grooms/{id}` → `NotificationRouteIntent.groomDetail` → めぐりで取得＋ゲート付き表示（`loadGroomPost`／`get_groom_feed_item`）。
+- プレミアム説明に「出会った推しグルームを圏外でも閲覧」行を追加。
+
+### 影響範囲
+めぐり通知・グルーム閲覧ゲート・プッシュ導線・推しごと通知設定・プレミアム説明。
+
+### 確認方法
+- `swift test`（XCTest 1536＋Swift Testing 24：新規 `GroomProximityEvaluatorTests` 3件＋ゲート5件、すべて緑）。実機。
+
+### セルフレビュー結果
+- ✅ 圏外閲覧は「遭遇済み×プレミアム」（通知不問）
+- ✅ 通知は現在地リアルタイム1km×同一推し＋推しごと（メンバー個別選択）
+- ✅ アプリ内はiOS標準バナー（willPresent .banner）
+- ✅ プッシュ→特定グルームのゲート付きディープリンク
+- ⚠️ **バックグラウンド（アプリ非表示/終了時）のプッシュは未配線**。現状はフォアグラウンド（アプリ内バナー）＋位置更新時に発火。常時位置でのバックグラウンド通知は、アプリレベルの位置サービス（significant-change / region monitoring）が必要で実機検証前提のため次段で対応予定。
+
+### 関連ファイル
+- `supabase/migrations/20260709120000_groom_encounters_and_realtime_notify.sql`
+- `ios-native/Sources/MegrumApp/GroomProximityMonitor.swift`, `MegrumAppStateGroomProximity.swift`, `MeguriGroomOshiNotifySettingsScreen.swift`, `NotificationRouteIntent.swift`, `MeguriAccessPolicy.swift`
+- `ios-native/Sources/MegrumCore/GroomNotifyPref.swift`, `GroomModels.swift`
+
+---
+
 ## イテレーション1226.389：ホームのグルーム列を Instagram ストーリー列と同寸・同色に（枠の色づきアニメ付き）
 
 ### 背景・問題意識

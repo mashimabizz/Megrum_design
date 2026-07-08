@@ -200,7 +200,7 @@ struct MeguriHomeMapBackdrop: View {
                                                         groom,
                                                         currentCoordinate: currentCoordinate,
                                                         viewerID: viewerID,
-                                                        wasNotified: groom.wasNotified,
+                                                        hasEncountered: groom.encounteredInRange,
                                                         subscriptionState: subscriptionState
                                                     )
                                                 )

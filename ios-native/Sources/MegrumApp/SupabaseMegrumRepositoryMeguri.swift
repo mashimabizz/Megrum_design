@@ -19,6 +19,10 @@ public extension SupabaseMegrumRepository {
         )
     }
 
+    func loadGroomPost(id: UUID) async throws -> GroomPost? {
+        try await groomClient.loadGroomPost(id: id)
+    }
+
     func loadOwnGroomArchive(limit: Int) async throws -> [GroomPost] {
         try await groomClient.loadOwnGroomArchive(userID: viewerID, limit: limit)
     }

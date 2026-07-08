@@ -261,22 +261,34 @@ extension MegrumAppState {
                 prefs.map { ($0.groupID, $0) },
                 uniquingKeysWith: { _, latest in latest }
             )
+            hasLoadedGroomNotifyPrefs = true
         } catch {
             // 読み込み失敗時は既定（ON・全メンバー）にフォールバックするため、状態は触らない。
         }
     }
 
-    /// FB8-7: 推し(L1)ごとの圏内グルーム通知設定を保存する（楽観更新）。iter1226.388。
+    /// FB(iter1226.390): 推し(L1)ごとの圏内グルーム通知設定を保存する（楽観更新・メンバー個別選択対応）。
     @discardableResult
-    public func setGroomNotifyPref(groupID: UUID, enabled: Bool, membersOnly: Bool) async -> Bool {
+    public func setGroomNotifyPref(
+        groupID: UUID,
+        enabled: Bool,
+        notifyAllMembers: Bool,
+        memberCharacterIDs: [UUID]
+    ) async -> Bool {
         let previous = groomNotifyPrefsByGroupID[groupID]
-        let optimistic = GroomNotifyPref(groupID: groupID, enabled: enabled, membersOnly: membersOnly)
+        let optimistic = GroomNotifyPref(
+            groupID: groupID,
+            enabled: enabled,
+            notifyAllMembers: notifyAllMembers,
+            memberCharacterIDs: memberCharacterIDs
+        )
         groomNotifyPrefsByGroupID[groupID] = optimistic
         do {
             let saved = try await repository.setGroomNotifyPref(
                 groupID: groupID,
                 enabled: enabled,
-                membersOnly: membersOnly
+                notifyAllMembers: notifyAllMembers,
+                memberCharacterIDs: memberCharacterIDs
             )
             groomNotifyPrefsByGroupID[groupID] = saved
             return true

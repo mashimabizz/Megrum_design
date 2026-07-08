@@ -364,10 +364,42 @@ struct MeguriScreen: View {
     }
 
     private func handlePendingNotificationRouteIntent(_ intent: NotificationRouteIntent?) {
+        if case .groomDetail(let idString) = intent {
+            openGroomDetailFromNotification(idString: idString)
+            return
+        }
         guard case .ownGroom(let postIDString) = intent else {
             return
         }
         openOwnGroomFromNotification(postIDString: postIDString)
+    }
+
+    /// FB(iter1226.390): プッシュから特定グルームを開く。圏外は遭遇済み×プレミアムのゲートで判定する。
+    private func openGroomDetailFromNotification(idString: String) {
+        guard let id = UUID(uuidString: idString) else {
+            pendingNotificationRouteIntent = nil
+            return
+        }
+        if locationState.coordinate == nil {
+            locationState.startUpdatingCurrentLocation()
+        }
+        Task {
+            let existing = appState.groomMapPosts.first { $0.id == id }
+                ?? appState.grooms.first { $0.id == id }
+            let groom: GroomPost?
+            if let existing {
+                groom = existing
+            } else {
+                groom = await appState.loadGroomPost(id: id)
+            }
+            pendingNotificationRouteIntent = nil
+            guard let groom else {
+                showToast("グルームが見つかりませんでした")
+                return
+            }
+            // ゲート付きで開く（圏内=無料／圏外=遭遇済み×プレミアムのみ／それ以外はメッセージ）。
+            openGroomFromStrip(groom, sourceAnchor: .center)
+        }
     }
 
     private func openOwnGroomFromNotification(postIDString: String?) {

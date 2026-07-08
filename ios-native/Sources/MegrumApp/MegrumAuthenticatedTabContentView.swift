@@ -515,7 +515,8 @@ struct MegrumAuthenticatedTabContentView: View {
                 }
             }
             pendingNotificationRouteIntent = nil
-        case .ownGroom:
+        case .ownGroom, .groomDetail:
+            // めぐりタブへ切替。詳細（取得＋ゲート＋表示）は MeguriScreen 側で処理するため pending は残す。
             requestedTradesStage = nil
             selectedTab = .meguri
         case .tab, .tradeDetail, .tradeEvidenceCapture, .tradeEvidenceApproval,

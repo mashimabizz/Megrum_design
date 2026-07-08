@@ -9,14 +9,14 @@ struct MeguriAccessPolicyGroomGateTests {
     private let authorID = UUID(uuidString: "00000000-0000-0000-0000-0000000000BB")!
     private let viewerCoordinate = MegrumLocationCoordinate(latitude: 35.0, longitude: 139.0)
 
-    private func groom(latitude: Double, wasNotified: Bool = false) -> GroomPost {
+    private func groom(latitude: Double, encountered: Bool = false) -> GroomPost {
         GroomPost(
             id: UUID(),
             authorID: authorID,
             imageURL: URL(string: "https://example.com/g.jpg")!,
             latitude: latitude,
             longitude: 139.0,
-            wasNotified: wasNotified
+            encounteredInRange: encountered
         )
     }
 
@@ -56,10 +56,10 @@ struct MeguriAccessPolicyGroomGateTests {
     @Test("圏外・非通知は開けない")
     func outOfRangeNotNotifiedBlocked() {
         #expect(!MeguriAccessPolicy.canOpenGroom(
-            groom(latitude: 35.02, wasNotified: false),
+            groom(latitude: 35.02, encountered: false),
             currentCoordinate: viewerCoordinate,
             viewerID: viewerID,
-            wasNotified: false,
+            hasEncountered: false,
             subscriptionState: premium
         ))
     }
@@ -67,10 +67,10 @@ struct MeguriAccessPolicyGroomGateTests {
     @Test("圏外・通知済み・非プレミアムは開けない")
     func outOfRangeNotifiedNonPremiumBlocked() {
         #expect(!MeguriAccessPolicy.canOpenGroom(
-            groom(latitude: 35.02, wasNotified: true),
+            groom(latitude: 35.02, encountered: true),
             currentCoordinate: viewerCoordinate,
             viewerID: viewerID,
-            wasNotified: true,
+            hasEncountered: true,
             subscriptionState: .free
         ))
     }
@@ -78,10 +78,10 @@ struct MeguriAccessPolicyGroomGateTests {
     @Test("圏外・通知済み・プレミアムは開ける")
     func outOfRangeNotifiedPremiumOpens() {
         #expect(MeguriAccessPolicy.canOpenGroom(
-            groom(latitude: 35.02, wasNotified: true),
+            groom(latitude: 35.02, encountered: true),
             currentCoordinate: viewerCoordinate,
             viewerID: viewerID,
-            wasNotified: true,
+            hasEncountered: true,
             subscriptionState: premium
         ))
     }

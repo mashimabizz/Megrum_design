@@ -33,6 +33,8 @@ struct GroomFeedRow: Decodable, Sendable {
     var viewerHasLiked: Bool?
     /// FB8-7: このグルームについて自分に通知が飛んだか（フィードRPCが返す）。iter1226.388。
     var viewerWasNotified: Bool?
+    /// FB(iter1226.390): 自分の1km圏内で推し一致して遭遇済みか（フィードRPCが返す）。
+    var viewerEncountered: Bool?
     /// アーカイブ取得（テーブル直読み）用の埋め込みリアクション。
     var groomReactions: [GroomReactionLiteRow]?
 
@@ -58,7 +60,7 @@ struct GroomFeedRow: Decodable, Sendable {
             expiresAt: expiresAt,
             likeCount: max(0, likeCount ?? embeddedLikeReactions?.count ?? 0),
             liked: resolvedViewerHasLiked(viewerID: viewerID),
-            wasNotified: viewerWasNotified ?? false
+            encounteredInRange: viewerEncountered ?? false
         )
     }
 

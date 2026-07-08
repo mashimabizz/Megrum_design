@@ -76,7 +76,7 @@ struct HomeScreen: View {
                 groom,
                 currentCoordinate: coordinate,
                 viewerID: viewerID,
-                wasNotified: groom.wasNotified,
+                hasEncountered: groom.encounteredInRange,
                 subscriptionState: appState.subscriptionState
             )
         }
@@ -117,6 +117,11 @@ struct HomeScreen: View {
         await appState.loadMeguriProfiles(
             userIDs: Set(appState.groomMapPosts.map(\.authorID)),
             reportsFailure: false
+        )
+        // FB(iter1226.390): 現在地1km圏内の推しグルームを検出して遭遇記録＋通知。
+        await appState.evaluateGroomProximity(
+            latitude: coordinate.latitude,
+            longitude: coordinate.longitude
         )
     }
 

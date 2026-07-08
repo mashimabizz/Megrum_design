@@ -98,7 +98,7 @@ struct MegrumRootDrawerDestinationSheet: View {
             }
         case .tab, .tradeDetail, .tradeEvidenceCapture, .tradeEvidenceApproval,
              .tradeEvaluation, .tradeAssistance, .disputeDetail,
-             .meguriBoardThread, .meguriMessages, .ownGroom, .unknown:
+             .meguriBoardThread, .meguriMessages, .ownGroom, .groomDetail, .unknown:
             break
         }
         return true

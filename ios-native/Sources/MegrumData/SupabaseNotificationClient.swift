@@ -164,7 +164,8 @@ public final class SupabaseNotificationClient: @unchecked Sendable {
         userID: UUID,
         groupID: UUID,
         enabled: Bool,
-        membersOnly: Bool,
+        notifyAllMembers: Bool,
+        memberCharacterIDs: [UUID],
         updatedAt: Date = .now
     ) async throws -> GroomNotifyPref {
         let rows: [GroomNotifyPrefRow] = try await client.upsertRows(
@@ -174,14 +175,32 @@ public final class SupabaseNotificationClient: @unchecked Sendable {
                     userID: userID,
                     groupID: groupID,
                     enabled: enabled,
-                    membersOnly: membersOnly,
+                    notifyAllMembers: notifyAllMembers,
+                    memberCharacterIDs: memberCharacterIDs,
                     updatedAt: notificationISOTimestamp(updatedAt)
                 )
             ],
             select: GroomNotifyPrefRow.select,
             onConflict: "user_id,group_id"
         )
-        return rows.first?.pref ?? GroomNotifyPref(groupID: groupID, enabled: enabled, membersOnly: membersOnly)
+        return rows.first?.pref ?? GroomNotifyPref(
+            groupID: groupID,
+            enabled: enabled,
+            notifyAllMembers: notifyAllMembers,
+            memberCharacterIDs: memberCharacterIDs
+        )
+    }
+
+    /// FB(iter1226.390): 1km圏内で推し一致したグルームを遭遇として記録する（プレミアム圏外閲覧用）。
+    public func recordGroomEncounters(userID: UUID, groomPostIDs: [UUID]) async throws {
+        guard !groomPostIDs.isEmpty else { return }
+        let payloads = groomPostIDs.map { GroomEncounterPayload(userID: userID, groomPostID: $0) }
+        let _: [GroomEncounterRow] = try await client.upsertRows(
+            into: "groom_encounters",
+            values: payloads,
+            select: GroomEncounterRow.select,
+            onConflict: "user_id,groom_post_id"
+        )
     }
 
     @discardableResult

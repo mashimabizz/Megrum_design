@@ -1,6 +1,11 @@
 import Foundation
 import MegrumCore
 
+/// FB(iter1226.390): get_groom_feed_item(p_groom_id) 用ペイロード。
+struct GroomFeedItemPayload: Encodable, Sendable {
+    var pGroomId: UUID
+}
+
 struct GroomFeedPayload: Encodable, Sendable {
     var pViewerLat: Double?
     var pViewerLng: Double?

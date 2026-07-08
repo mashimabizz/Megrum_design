@@ -93,6 +93,11 @@ extension MeguriMapScreen {
                 scope: mapBoardScope
             )
         }
+
+        // FB(iter1226.390): 地図の現在地1km圏内の推しグルームを検出して遭遇記録＋通知。
+        if let latitude, let longitude, kind == .all || kind == .grooms {
+            await appState.evaluateGroomProximity(latitude: latitude, longitude: longitude)
+        }
     }
 
     func openGroomIfInRange(_ groom: GroomPost) {
@@ -118,7 +123,7 @@ extension MeguriMapScreen {
                     groom,
                     currentCoordinate: locationState.coordinate,
                     viewerID: appState.viewer?.id,
-                    wasNotified: groom.wasNotified,
+                    hasEncountered: groom.encounteredInRange,
                     subscriptionState: appState.subscriptionState
                 )
             )
@@ -188,7 +193,7 @@ extension MeguriMapScreen {
             groom,
             currentCoordinate: locationState.coordinate,
             viewerID: appState.viewer?.id,
-            wasNotified: groom.wasNotified,
+            hasEncountered: groom.encounteredInRange,
             subscriptionState: appState.subscriptionState
         )
     }
@@ -207,7 +212,7 @@ extension MeguriMapScreen {
             groom,
             currentCoordinate: locationState.coordinate,
             viewerID: appState.viewer?.id,
-            wasNotified: groom.wasNotified,
+            hasEncountered: groom.encounteredInRange,
             subscriptionState: appState.subscriptionState
         )
     }
@@ -226,7 +231,7 @@ extension MeguriMapScreen {
             groom,
             currentCoordinate: locationState.coordinate,
             viewerID: appState.viewer?.id,
-            wasNotified: groom.wasNotified,
+            hasEncountered: groom.encounteredInRange,
             subscriptionState: appState.subscriptionState
         )
     }

@@ -114,6 +114,13 @@ struct SubscriptionComparisonRow: Identifiable, Equatable, Sendable {
             premiumText: "○",
             freeIsAvailable: false,
             systemImage: "map.fill"
+        ),
+        SubscriptionComparisonRow(
+            title: "出会った推しグルームを圏外でも閲覧",
+            freeText: "圏内のみ",
+            premiumText: "○",
+            freeIsAvailable: false,
+            systemImage: "location.circle.fill"
         )
     ]
 }

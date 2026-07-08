@@ -79,6 +79,10 @@ public final class MegrumAppState: ObservableObject {
     @Published public internal(set) var chatroomNearbyPushNotificationsEnabled = false
     /// FB8-7: 推し(L1)ごとの圏内グルーム通知設定。groupID -> 設定。未収載は既定（ON・全メンバー）。iter1226.388。
     @Published public internal(set) var groomNotifyPrefsByGroupID: [UUID: GroomNotifyPref] = [:]
+    /// 通知設定を一度でも読み込んだか（近接検知で毎回読まないためのガード）。iter1226.390。
+    @Published public internal(set) var hasLoadedGroomNotifyPrefs = false
+    /// FB(iter1226.390): 近接検知でこのセッション中に既に通知/遭遇処理したグルームID（連続発火の抑制）。
+    @Published public internal(set) var processedProximityGroomIDs: Set<UUID> = []
     @Published public internal(set) var isLoading = false
     @Published public internal(set) var isLoadingOshiGroups = false
     @Published public internal(set) var isLoadingOshiCharacters = false

@@ -13,8 +13,9 @@ public struct GroomPost: Identifiable, Codable, Hashable, Sendable {
     public var expiresAt: Date?
     public var likeCount: Int
     public var liked: Bool
-    /// FB8-7: このグルームについて自分に通知が飛んだか（圏外でもプレミアムで閲覧可の判定に使う）。iter1226.388。
-    public var wasNotified: Bool
+    /// FB(iter1226.390): 自分の1km圏内で自分の推しに一致して「遭遇済み」か。
+    /// 圏外でもプレミアムなら閲覧可の判定に使う（通知の有無に関わらない）。
+    public var encounteredInRange: Bool
 
     public init(
         id: UUID,
@@ -29,7 +30,7 @@ public struct GroomPost: Identifiable, Codable, Hashable, Sendable {
         expiresAt: Date? = nil,
         likeCount: Int = 0,
         liked: Bool = false,
-        wasNotified: Bool = false
+        encounteredInRange: Bool = false
     ) {
         self.id = id
         self.authorID = authorID
@@ -43,7 +44,7 @@ public struct GroomPost: Identifiable, Codable, Hashable, Sendable {
         self.expiresAt = expiresAt
         self.likeCount = likeCount
         self.liked = liked
-        self.wasNotified = wasNotified
+        self.encounteredInRange = encounteredInRange
     }
 }
 

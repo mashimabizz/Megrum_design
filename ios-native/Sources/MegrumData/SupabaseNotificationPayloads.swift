@@ -77,11 +77,18 @@ struct NativePushDevicePayload: Encodable, Sendable {
     }
 }
 
-/// FB8-7: 推し(L1)ごとの圏内グルーム通知設定 upsert ペイロード。iter1226.388。
+/// FB(iter1226.390): 推し(L1)ごとの圏内グルーム通知設定 upsert ペイロード。
 struct GroomNotifyPrefPayload: Encodable, Sendable {
     var userID: UUID
     var groupID: UUID
     var enabled: Bool
-    var membersOnly: Bool
+    var notifyAllMembers: Bool
+    var memberCharacterIDs: [UUID]
     var updatedAt: String
+}
+
+/// FB(iter1226.390): グルーム遭遇記録 upsert ペイロード。
+struct GroomEncounterPayload: Encodable, Sendable {
+    var userID: UUID
+    var groomPostID: UUID
 }

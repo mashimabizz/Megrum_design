@@ -70,6 +70,16 @@ public final class SupabaseGroomClient: @unchecked Sendable {
         return rows.compactMap { $0.post(signedURLs: signedURLs) }
     }
 
+    /// FB(iter1226.390): 単一グルーム取得（プッシュのディープリンク用・距離条件なし）。
+    public func loadGroomPost(id: UUID) async throws -> GroomPost? {
+        let rows: [GroomFeedRow] = try await client.rpcRows(
+            function: "get_groom_feed_item",
+            payload: GroomFeedItemPayload(pGroomId: id)
+        )
+        let signedURLs = await signedURLMap(for: rows)
+        return rows.compactMap { $0.post(signedURLs: signedURLs) }.first
+    }
+
     public func loadOwnGroomArchive(userID: UUID, limit: Int = 120) async throws -> [GroomPost] {
         let rows: [GroomFeedRow] = try await client.fetchRows(
             from: "groom_posts",

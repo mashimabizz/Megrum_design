@@ -164,7 +164,7 @@ extension MeguriScreen {
             groom,
             currentCoordinate: locationState.coordinate,
             viewerID: appState.viewer?.id,
-            wasNotified: groom.wasNotified,
+            hasEncountered: groom.encounteredInRange,
             subscriptionState: appState.subscriptionState
         ) else {
             if locationState.coordinate == nil {
@@ -175,7 +175,7 @@ extension MeguriScreen {
                     groom,
                     currentCoordinate: locationState.coordinate,
                     viewerID: appState.viewer?.id,
-                    wasNotified: groom.wasNotified,
+                    hasEncountered: groom.encounteredInRange,
                     subscriptionState: appState.subscriptionState
                 )
             )

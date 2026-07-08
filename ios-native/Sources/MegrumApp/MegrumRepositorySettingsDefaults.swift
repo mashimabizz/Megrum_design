@@ -81,8 +81,24 @@ public extension MegrumRepository {
         []
     }
 
-    func setGroomNotifyPref(groupID: UUID, enabled: Bool, membersOnly: Bool) async throws -> GroomNotifyPref {
-        GroomNotifyPref(groupID: groupID, enabled: enabled, membersOnly: membersOnly)
+    func setGroomNotifyPref(
+        groupID: UUID,
+        enabled: Bool,
+        notifyAllMembers: Bool,
+        memberCharacterIDs: [UUID]
+    ) async throws -> GroomNotifyPref {
+        GroomNotifyPref(
+            groupID: groupID,
+            enabled: enabled,
+            notifyAllMembers: notifyAllMembers,
+            memberCharacterIDs: memberCharacterIDs
+        )
+    }
+
+    func recordGroomEncounters(groomPostIDs _: [UUID]) async throws {}
+
+    func loadGroomPost(id _: UUID) async throws -> GroomPost? {
+        nil
     }
 
     func updatePushNotificationLocation(latitude: Double, longitude: Double) async throws {}

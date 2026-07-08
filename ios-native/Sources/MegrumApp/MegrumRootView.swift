@@ -384,7 +384,7 @@ public struct MegrumRootView: View {
     private func applyNotificationRouteIntent(_ intent: NotificationRouteIntent) {
         selectedTab = intent.fallbackTab
         switch intent {
-        case .meguriMessages, .ownGroom:
+        case .meguriMessages, .ownGroom, .groomDetail:
             pendingNotificationRouteIntent = intent
         case .userProfile(let id), .userEvaluations(let id):
             guard let userID = UUID(uuidString: id) else {

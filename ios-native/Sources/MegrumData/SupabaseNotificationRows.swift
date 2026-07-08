@@ -55,14 +55,26 @@ struct NotificationDeviceRow: Decodable, Sendable {
     var id: UUID
 }
 
-/// FB8-7: 推し(L1)ごとの圏内グルーム通知設定行。iter1226.388。
+/// FB(iter1226.390): 推し(L1)ごとの圏内グルーム通知設定行。
 struct GroomNotifyPrefRow: Decodable, Sendable {
-    static let select = "group_id,enabled,members_only"
+    static let select = "group_id,enabled,notify_all_members,member_character_ids"
     var groupID: UUID
     var enabled: Bool
-    var membersOnly: Bool
+    var notifyAllMembers: Bool?
+    var memberCharacterIDs: [UUID]?
 
     var pref: GroomNotifyPref {
-        GroomNotifyPref(groupID: groupID, enabled: enabled, membersOnly: membersOnly)
+        GroomNotifyPref(
+            groupID: groupID,
+            enabled: enabled,
+            notifyAllMembers: notifyAllMembers ?? true,
+            memberCharacterIDs: memberCharacterIDs ?? []
+        )
     }
+}
+
+/// FB(iter1226.390): グルーム遭遇記録行。
+struct GroomEncounterRow: Decodable, Sendable {
+    static let select = "groom_post_id"
+    var groomPostID: UUID
 }
