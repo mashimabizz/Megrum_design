@@ -64,18 +64,27 @@ enum MeguriAccessPolicy {
         return currentLocation.distance(from: selectedLocation)
     }
 
+    /// FB8-7: 圏内グルームは無料で閲覧可。圏外グルームは「通知が飛んだもの」だけ、
+    /// プレミアム加入で閲覧できる。それ以外の圏外グルームは従来どおり閲覧不可。iter1226.388。
     static func canOpenGroom(
         _ groom: GroomPost,
         currentCoordinate: MegrumLocationCoordinate?,
-        viewerID: UUID?
+        viewerID: UUID?,
+        wasNotified: Bool = false,
+        subscriptionState: UserSubscriptionState = .free
     ) -> Bool {
         if groom.authorID == viewerID {
             return true
         }
-        guard let distance = distanceMeters(from: currentCoordinate, to: groom) else {
-            return false
+        if let distance = distanceMeters(from: currentCoordinate, to: groom),
+           distance <= groomOpenRadiusMeters {
+            return true
         }
-        return distance <= groomOpenRadiusMeters
+        // 圏外（または現在地未取得）：通知済みグルームのみ、プレミアムで閲覧できる。
+        if wasNotified, subscriptionState.hasMeguriGroomExtendedAccess {
+            return true
+        }
+        return false
     }
 
     static func canOpenBoard(
@@ -112,13 +121,25 @@ enum MeguriAccessPolicy {
     static func groomAccessMessage(
         _ groom: GroomPost,
         currentCoordinate: MegrumLocationCoordinate?,
-        viewerID: UUID?
+        viewerID: UUID?,
+        wasNotified: Bool = false,
+        subscriptionState: UserSubscriptionState = .free
     ) -> String {
         if groom.authorID == viewerID {
             return ""
         }
         guard let distance = distanceMeters(from: currentCoordinate, to: groom) else {
             return "現在地取得後にグルームを開けます"
+        }
+        if distance <= groomOpenRadiusMeters {
+            return ""
+        }
+        // 圏外：通知が飛んだグルームだけ、プレミアムで閲覧できる。
+        if wasNotified {
+            if subscriptionState.hasMeguriGroomExtendedAccess {
+                return ""
+            }
+            return "圏外のグルームです。通知が届いたグルームはMegrumプレミアムで閲覧できます"
         }
         return "現在地から\(distance.meguriDistanceText)。1km圏外のグルームは見ることができません"
     }

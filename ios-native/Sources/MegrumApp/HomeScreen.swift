@@ -65,6 +65,23 @@ struct HomeScreen: View {
         appState != nil && !tutorialSampleActive
     }
 
+    /// FB8-7：ホーム上部の列は「開けるグルームだけ」を並べる。
+    /// 圏内・自分の投稿・（通知済み×プレミアム）のみ表示し、圏外の非通知グルームは出さない。iter1226.388。
+    private var groomRailOpenableGrooms: [GroomPost] {
+        guard let appState else { return [] }
+        let coordinate = groomLocationState.coordinate
+        let viewerID = (appState.viewer ?? viewer)?.id
+        return appState.groomMapPosts.filter { groom in
+            MeguriAccessPolicy.canOpenGroom(
+                groom,
+                currentCoordinate: coordinate,
+                viewerID: viewerID,
+                wasNotified: groom.wasNotified,
+                subscriptionState: appState.subscriptionState
+            )
+        }
+    }
+
     var body: some View {
         groomComposerWrapped
             .task(id: groomLocationState.coordinate?.latitude) {
@@ -142,7 +159,7 @@ struct HomeScreen: View {
             starterMissionForcedState: starterMissionForcedState,
             onOpenInventory: onOpenInventory,
             showsGroomRail: showsGroomRail,
-            groomRailGrooms: appState?.groomMapPosts ?? [],
+            groomRailGrooms: groomRailOpenableGrooms,
             groomRailViewer: appState?.viewer ?? viewer,
             groomRailProfiles: appState?.publicProfilesByUserID ?? [:],
             groomRailViewedIDs: appState?.viewedGroomIDs ?? [],

@@ -76,3 +76,12 @@ struct NativePushDevicePayload: Encodable, Sendable {
         try container.encodeNil(forKey: .revokedAt)
     }
 }
+
+/// FB8-7: 推し(L1)ごとの圏内グルーム通知設定 upsert ペイロード。iter1226.388。
+struct GroomNotifyPrefPayload: Encodable, Sendable {
+    var userID: UUID
+    var groupID: UUID
+    var enabled: Bool
+    var membersOnly: Bool
+    var updatedAt: String
+}

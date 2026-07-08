@@ -117,7 +117,9 @@ extension MeguriMapScreen {
                 MeguriAccessPolicy.groomAccessMessage(
                     groom,
                     currentCoordinate: locationState.coordinate,
-                    viewerID: appState.viewer?.id
+                    viewerID: appState.viewer?.id,
+                    wasNotified: groom.wasNotified,
+                    subscriptionState: appState.subscriptionState
                 )
             )
             return
@@ -185,7 +187,9 @@ extension MeguriMapScreen {
         !MeguriAccessPolicy.canOpenGroom(
             groom,
             currentCoordinate: locationState.coordinate,
-            viewerID: appState.viewer?.id
+            viewerID: appState.viewer?.id,
+            wasNotified: groom.wasNotified,
+            subscriptionState: appState.subscriptionState
         )
     }
 
@@ -202,7 +206,9 @@ extension MeguriMapScreen {
         MeguriAccessPolicy.canOpenGroom(
             groom,
             currentCoordinate: locationState.coordinate,
-            viewerID: appState.viewer?.id
+            viewerID: appState.viewer?.id,
+            wasNotified: groom.wasNotified,
+            subscriptionState: appState.subscriptionState
         )
     }
 
@@ -219,7 +225,9 @@ extension MeguriMapScreen {
         MeguriAccessPolicy.groomAccessMessage(
             groom,
             currentCoordinate: locationState.coordinate,
-            viewerID: appState.viewer?.id
+            viewerID: appState.viewer?.id,
+            wasNotified: groom.wasNotified,
+            subscriptionState: appState.subscriptionState
         )
     }
 

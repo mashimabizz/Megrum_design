@@ -31,6 +31,8 @@ struct GroomFeedRow: Decodable, Sendable {
     var seriesName: String?
     var likeCount: Int?
     var viewerHasLiked: Bool?
+    /// FB8-7: このグルームについて自分に通知が飛んだか（フィードRPCが返す）。iter1226.388。
+    var viewerWasNotified: Bool?
     /// アーカイブ取得（テーブル直読み）用の埋め込みリアクション。
     var groomReactions: [GroomReactionLiteRow]?
 
@@ -55,7 +57,8 @@ struct GroomFeedRow: Decodable, Sendable {
             createdAt: publishedAt ?? createdAt ?? .now,
             expiresAt: expiresAt,
             likeCount: max(0, likeCount ?? embeddedLikeReactions?.count ?? 0),
-            liked: resolvedViewerHasLiked(viewerID: viewerID)
+            liked: resolvedViewerHasLiked(viewerID: viewerID),
+            wasNotified: viewerWasNotified ?? false
         )
     }
 

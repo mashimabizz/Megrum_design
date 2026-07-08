@@ -77,6 +77,14 @@ public extension MegrumRepository {
         )
     }
 
+    func loadGroomNotifyPrefs() async throws -> [GroomNotifyPref] {
+        []
+    }
+
+    func setGroomNotifyPref(groupID: UUID, enabled: Bool, membersOnly: Bool) async throws -> GroomNotifyPref {
+        GroomNotifyPref(groupID: groupID, enabled: enabled, membersOnly: membersOnly)
+    }
+
     func updatePushNotificationLocation(latitude: Double, longitude: Double) async throws {}
 
     func registerNativePushDeviceToken(_ token: String, appVersion: String?) async throws {}

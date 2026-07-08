@@ -147,6 +147,43 @@ public final class SupabaseNotificationClient: @unchecked Sendable {
         )
     }
 
+    /// FB8-7: 推し(L1)ごとの圏内グルーム通知設定を読む。行が無ければ既定（通知ON・全メンバー）。iter1226.388。
+    public func loadGroomNotifyPrefs(userID: UUID) async throws -> [GroomNotifyPref] {
+        let rows: [GroomNotifyPrefRow] = try await client.fetchRows(
+            from: "user_groom_notify_prefs",
+            select: GroomNotifyPrefRow.select,
+            queryItems: [
+                URLQueryItem(name: "user_id", value: "eq.\(userID.uuidString.lowercased())")
+            ]
+        )
+        return rows.map(\.pref)
+    }
+
+    @discardableResult
+    public func setGroomNotifyPref(
+        userID: UUID,
+        groupID: UUID,
+        enabled: Bool,
+        membersOnly: Bool,
+        updatedAt: Date = .now
+    ) async throws -> GroomNotifyPref {
+        let rows: [GroomNotifyPrefRow] = try await client.upsertRows(
+            into: "user_groom_notify_prefs",
+            values: [
+                GroomNotifyPrefPayload(
+                    userID: userID,
+                    groupID: groupID,
+                    enabled: enabled,
+                    membersOnly: membersOnly,
+                    updatedAt: notificationISOTimestamp(updatedAt)
+                )
+            ],
+            select: GroomNotifyPrefRow.select,
+            onConflict: "user_id,group_id"
+        )
+        return rows.first?.pref ?? GroomNotifyPref(groupID: groupID, enabled: enabled, membersOnly: membersOnly)
+    }
+
     @discardableResult
     public func registerNativePushDevice(
         userID: UUID,

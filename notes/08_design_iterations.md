@@ -4,6 +4,55 @@
 
 ---
 
+## イテレーション1226.388：圏外グルームは通知が飛んだものだけプレミアム閲覧＋通知は圏内同一推しのみ＋推しごと通知設定（FB8-7）
+
+### 背景・問題意識
+オーナーFB（FB8-7）：「圏内のグルームなら見れるけど、圏外のグルームなら、通知が飛んだものだけ、プレミアムに入らないと見れないようにしてほしい。通知が飛ぶものは、圏内の同じ推しに設定しているグルームのみ。」追加要望：推し（L1グループ）ごとに圏内グルーム通知のON/OFFを制御したい（＋メンバー絞り込み、既定OFF）。めぐりホームの通知アイコンから設定。マッチはグループ単位（モモ紐づけグルーム＋TWICE推し設定→モモ未登録でも通知）。オーナー指示：「バックエンドのプッシュ送信もあなたの方でしてください。Aで（アプリ側先行）」。
+
+### 前提の再確認（既存バックエンド）
+`20260704120000_add_meguri_subscription_push_settings.sql` が既に多くを実装済み：`user_notification_settings` に `groom_oshi_push_enabled`/`groom_nearby_push_enabled`/`push_location_lat|lng|updated_at`、`notifications.groom_post_id`＋kind `groom_posted`、ファンアウト `notify_groom_post_published()`（当時は「推し一致 OR 圏内」の論理和）。位置はオプトインでサーバ保存済み。
+
+### 変更内容
+
+#### バックエンド（2 migration・push 済み）
+`supabase/migrations/20260708160000_groom_oshi_nearby_notify_prefs.sql`
+- `user_groom_notify_prefs(user_id, group_id, enabled, members_only)`（RLS 本人のみ、既定＝通知ON・全メンバー）
+- `notify_groom_post_published()` を「**圏内 かつ 同一推し ＋ 推しごと設定**」の論理積に張り替え。グルームの所属グループは `group_id` 無しでも character から解決。`members_only=true` は登録メンバー(L2)一致を要求。
+- `groom_viewer_was_notified(uuid)`：圏外グルームのプレミアム閲覧判定用ヘルパー。
+
+`supabase/migrations/20260708170000_groom_feed_viewer_was_notified.sql`
+- `list_groom_feed_nearby` に `viewer_was_notified` を追加（20260706210000 本体を踏襲）。
+- `groom_posted` 通知リンクを `/meguri` に（特定グルームへのディープリンクは未実装のため、めぐりマップ経由で開かせる）。
+
+#### クライアント
+- `SubscriptionModels.swift`：`hasMeguriGroomExtendedAccess`（プレミアム条件）。
+- `MeguriAccessPolicy.swift`：`canOpenGroom`/`groomAccessMessage` に `wasNotified`＋`subscriptionState`。圏内＝無料、圏外＝通知済み×プレミアムのみ、それ以外の圏外は従来どおり不可。
+- `GroomModels.swift`：`GroomPost.wasNotified`。`SupabaseGroomRows.swift`：`viewer_was_notified` をデコードして反映。
+- 全グルーム開閉呼び出し（strip/map/backdrop/rangeNotice）に `wasNotified`＋`subscriptionState` を配線。`HomeScreen.swift`：ホーム上部の列を「開けるグルームだけ」にフィルタ（FB8-6 の圏内意図とも整合）。
+- 推しごと通知設定の縦スライス：`GroomNotifyPref`（Core）→ `SupabaseNotificationClient`（Row/Payload/load/set）→ `MegrumRepository`（protocol/defaults/Supabase）→ `MegrumAppState`（`groomNotifyPrefsByGroupID`＋load/set/楽観更新）→ `MeguriGroomOshiNotifySettingsScreen`（L1ごとON/OFF＋登録メンバーのみ）。
+- `MeguriNotificationSettingsSheet.swift`：グルーム欄を「圏内の推しグルーム通知（親スイッチ）」＋「推しごとの通知設定（NavigationLink）」に再構成。親ON時は現在地を基準位置として保存。
+
+### 影響範囲
+めぐり（グルーム閲覧の圏内/圏外/プレミアム判定）、めぐり通知設定、ホーム上部グルーム列、通知ファンアウト。
+
+### 確認方法
+- `swift test`（XCTest 1536＋Swift Testing 21：新規 `MeguriAccessPolicyGroomGateTests` 5件含む、すべて緑）
+- 実機（feat/candidate-sheet-redesign）
+
+### セルフレビュー結果
+- ✅ 圏内=無料／圏外=通知済み×プレミアムのみ（テストで固定）
+- ✅ 通知は「圏内 かつ 同一推し ＋ 推しごと設定」の論理積（従来の論理和から張替え）
+- ✅ グループ単位マッチ（character から所属グループ解決）
+- ✅ 既存呼び出しはデフォルト引数で挙動不変（後方互換）
+- ⚠️ 特定グルームへのプッシュ・ディープリンクは未実装（通知は /meguri へ。圏外通知済みグルームはマップ経由でプレミアム閲覧）。フォローアップ候補。
+
+### 関連ファイル
+- `supabase/migrations/20260708160000_*.sql`, `supabase/migrations/20260708170000_*.sql`
+- `ios-native/Sources/MegrumApp/MeguriAccessPolicy.swift`, `MeguriGroomOshiNotifySettingsScreen.swift`, `MeguriNotificationSettingsSheet.swift`, `HomeScreen.swift`
+- `ios-native/Sources/MegrumCore/GroomNotifyPref.swift`, `SubscriptionModels.swift`, `GroomModels.swift`
+
+---
+
 ## イテレーション1226.387：ホーム上部に圏内グルームのストーリー列（その場で閲覧・投稿）（FB8-6）
 
 ### 背景・問題意識

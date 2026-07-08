@@ -116,6 +116,19 @@ public extension SupabaseMegrumRepository {
         try await notificationClient.setMeguriSubscriptionPushSettings(userID: viewerID, input: input)
     }
 
+    func loadGroomNotifyPrefs() async throws -> [GroomNotifyPref] {
+        try await notificationClient.loadGroomNotifyPrefs(userID: viewerID)
+    }
+
+    func setGroomNotifyPref(groupID: UUID, enabled: Bool, membersOnly: Bool) async throws -> GroomNotifyPref {
+        try await notificationClient.setGroomNotifyPref(
+            userID: viewerID,
+            groupID: groupID,
+            enabled: enabled,
+            membersOnly: membersOnly
+        )
+    }
+
     func updatePushNotificationLocation(latitude: Double, longitude: Double) async throws {
         try await notificationClient.updatePushNotificationLocation(
             userID: viewerID,

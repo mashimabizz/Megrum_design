@@ -163,7 +163,9 @@ extension MeguriScreen {
         guard MeguriAccessPolicy.canOpenGroom(
             groom,
             currentCoordinate: locationState.coordinate,
-            viewerID: appState.viewer?.id
+            viewerID: appState.viewer?.id,
+            wasNotified: groom.wasNotified,
+            subscriptionState: appState.subscriptionState
         ) else {
             if locationState.coordinate == nil {
                 locationState.startUpdatingCurrentLocation()
@@ -172,7 +174,9 @@ extension MeguriScreen {
                 MeguriAccessPolicy.groomAccessMessage(
                     groom,
                     currentCoordinate: locationState.coordinate,
-                    viewerID: appState.viewer?.id
+                    viewerID: appState.viewer?.id,
+                    wasNotified: groom.wasNotified,
+                    subscriptionState: appState.subscriptionState
                 )
             )
             return

@@ -199,7 +199,9 @@ struct MeguriHomeMapBackdrop: View {
                                                     isOutOfRange: !MeguriAccessPolicy.canOpenGroom(
                                                         groom,
                                                         currentCoordinate: currentCoordinate,
-                                                        viewerID: viewerID
+                                                        viewerID: viewerID,
+                                                        wasNotified: groom.wasNotified,
+                                                        subscriptionState: subscriptionState
                                                     )
                                                 )
                                             }

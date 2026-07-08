@@ -244,6 +244,8 @@ public protocol MegrumRepository: Sendable {
     func setGroomActivityPushNotificationsEnabled(_ enabled: Bool) async throws -> UserNotificationSettings
     func setChatroomActivityPushNotificationsEnabled(_ enabled: Bool) async throws -> UserNotificationSettings
     func setMeguriSubscriptionPushSettings(_ input: MeguriSubscriptionPushSettingsInput) async throws -> UserNotificationSettings
+    func loadGroomNotifyPrefs() async throws -> [GroomNotifyPref]
+    func setGroomNotifyPref(groupID: UUID, enabled: Bool, membersOnly: Bool) async throws -> GroomNotifyPref
     func updatePushNotificationLocation(latitude: Double, longitude: Double) async throws
     func registerNativePushDeviceToken(_ token: String, appVersion: String?) async throws
     func revokeNativePushDeviceToken(_ token: String, revokedAt: Date) async throws

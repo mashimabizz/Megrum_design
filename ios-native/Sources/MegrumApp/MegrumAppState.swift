@@ -77,6 +77,8 @@ public final class MegrumAppState: ObservableObject {
     @Published public internal(set) var groomNearbyPushNotificationsEnabled = false
     @Published public internal(set) var chatroomOshiPushNotificationsEnabled = false
     @Published public internal(set) var chatroomNearbyPushNotificationsEnabled = false
+    /// FB8-7: 推し(L1)ごとの圏内グルーム通知設定。groupID -> 設定。未収載は既定（ON・全メンバー）。iter1226.388。
+    @Published public internal(set) var groomNotifyPrefsByGroupID: [UUID: GroomNotifyPref] = [:]
     @Published public internal(set) var isLoading = false
     @Published public internal(set) var isLoadingOshiGroups = false
     @Published public internal(set) var isLoadingOshiCharacters = false
