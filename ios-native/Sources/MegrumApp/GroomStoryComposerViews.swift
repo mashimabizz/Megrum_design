@@ -32,6 +32,8 @@ struct GroomStoryComposerScreen: View {
     @State private var presentationState = GroomStoryComposerPresentationState()
     @State private var metadataDraft = MeguriContentMetadataDraft()
     @State private var isShowingMetadataPrompt = false
+    /// FB(iter1226.391)：ホーム等（場所未確定）からの投稿で最後に地図で場所を選ぶステップ。
+    @State private var isShowingLocationStep = false
 
     private var hasPhotoDraft: Bool {
         draftPhotoData != nil
@@ -58,7 +60,7 @@ struct GroomStoryComposerScreen: View {
                     textOverlays: $presentationState.textOverlays,
                     isCreating: isCreating,
                     onClose: returnToPhotoSelection,
-                    onPublish: presentMetadataPrompt
+                    onPublish: beginPublishFlow
                 )
             } else {
                 VStack(spacing: 0) {
@@ -84,6 +86,32 @@ struct GroomStoryComposerScreen: View {
 
                     GroomStoryComposerPrivacyFooter()
                 }
+            }
+
+            if isShowingLocationStep {
+                GroomStoryLocationStepView(
+                    photoData: draftPhotoData,
+                    caption: presentationState.captionForPublish,
+                    selectedCoordinate: $selectedCreationCoordinate,
+                    currentCoordinate: currentCoordinate,
+                    isRequestingLocation: isRequestingLocation,
+                    canConfirm: canCreateAtSelectedLocation,
+                    onRequestLocation: onRequestLocation,
+                    onOutOfRange: { showToast($0) },
+                    onCancel: {
+                        withAnimation(.smooth(duration: 0.2)) {
+                            isShowingLocationStep = false
+                        }
+                    },
+                    onConfirm: {
+                        withAnimation(.smooth(duration: 0.2)) {
+                            isShowingLocationStep = false
+                        }
+                        presentMetadataPrompt()
+                    }
+                )
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .zIndex(1)
             }
 
             GroomStoryComposerToastOverlay(message: presentationState.toastMessage)
@@ -147,6 +175,28 @@ struct GroomStoryComposerScreen: View {
             return
         }
         onOpenCamera()
+    }
+
+    /// 写真編集の「投稿」から呼ばれる。場所が地図で確定していない導線（ホーム等）は先に地図ステップを挟む。
+    private func beginPublishFlow() {
+        guard draftPhotoData != nil else {
+            showToast("投稿する写真を選択してください")
+            return
+        }
+        // めぐり地図経由（場所を先に決めて locks=true）はそのまま。ホーム等は最後に地図で場所を選ぶ。
+        if locksCreationCoordinate {
+            presentMetadataPrompt()
+            return
+        }
+        if currentCoordinate == nil {
+            onRequestLocation()
+        }
+        if selectedCreationCoordinate == nil {
+            selectedCreationCoordinate = currentCoordinate
+        }
+        withAnimation(.smooth(duration: 0.2)) {
+            isShowingLocationStep = true
+        }
     }
 
     private func presentMetadataPrompt() {

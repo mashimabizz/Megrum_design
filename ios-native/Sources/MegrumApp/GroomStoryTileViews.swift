@@ -79,7 +79,7 @@ private struct GroomMyStoryAvatar: View {
     }
 
     var body: some View {
-        ZStack(alignment: .bottomTrailing) {
+        ZStack {
             ring
                 .scaleEffect(pop)
 
@@ -90,12 +90,14 @@ private struct GroomMyStoryAvatar: View {
                 backgroundOpacity: 0.92
             )
             .scaleEffect(pop)
-
+        }
+        .frame(width: GroomStoryMetrics.ringDiameter, height: GroomStoryMetrics.ringDiameter)
+        // ＋バッジだけ右下に重ねる（リングとアバターは中央合わせのままにする）。
+        .overlay(alignment: .bottomTrailing) {
             if phase == .idle {
                 addBadge
             }
         }
-        .frame(width: GroomStoryMetrics.ringDiameter, height: GroomStoryMetrics.ringDiameter)
         .onAppear {
             if isLoading { startUploading() }
         }

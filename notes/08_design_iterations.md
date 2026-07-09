@@ -4,6 +4,27 @@
 
 ---
 
+## イテレーション1226.391：自分グルームタイルの枠ずれ修正＋ホーム投稿に地図で場所を選ぶステップを追加（FB）
+
+### 背景・問題意識
+オーナーFB：(1) ホーム上部の一番左「自分のグルーム」タイルで、グレー枠と内側の丸がずれている。ずれないでほしい。(2) このホーム経由でグルーム投稿する時「最後に位置を決めてください」と出て投稿できない。最後に地図が出て、どこに投稿するか決めるステップを挟んでほしい。
+
+### 変更内容
+- `GroomStoryTileViews.swift`：`GroomMyStoryAvatar` の `ZStack(alignment: .bottomTrailing)` が枠とアバターまで右下寄せにしていた。中央合わせの `ZStack` に戻し、「＋」バッジのみ `.overlay(alignment: .bottomTrailing)` で右下に重ねる（枠とアバターは同心円）。
+- `GroomStoryLocationStepView.swift`（新規）：写真編集の後に地図で投稿場所を選ぶステップ（既存 `MeguriCreationLocationPicker` を使用・現在地から半径1km以内）。
+- `GroomStoryComposerViews.swift`：写真編集の「投稿」を `beginPublishFlow` に変更。めぐり地図経由（場所を先に決めた locks=true）はそのまま、ホーム等（場所未確定）は地図ステップ→「この場所にする」→トピック/シリーズ→投稿の順に。
+
+### 影響範囲
+ホーム上部グルーム列の自分タイル表示、ホーム経由のグルーム投稿フロー（めぐり経由は不変）。
+
+### 確認方法
+- `ImageRenderer` スナップショットで自分タイルの同心円＋右下バッジを確認。`swift test`（XCTest 1536＋Swift Testing 24）緑。実機。
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/GroomStoryTileViews.swift`, `GroomStoryLocationStepView.swift`, `GroomStoryComposerViews.swift`
+
+---
+
 ## イテレーション1226.390：グルーム通知を「現在地1km圏内×同一推し」のリアルタイム化＋遭遇プレミアム閲覧＋メンバー個別選択＋プッシュ直接ディープリンク（FB）
 
 ### 背景・問題意識
