@@ -90,6 +90,8 @@ struct GroomStoryEditorView: View {
             }
             .animation(.smooth(duration: 0.18), value: isTextInputPresented)
             .animation(.smooth(duration: 0.18), value: draggingOverlayID)
+            // キーボード表示時に背景グルームが押し上げられて移動/縮小しないようにする。
+            .ignoresSafeArea(.keyboard, edges: .bottom)
         }
         .safeAreaInset(edge: .bottom) {
             if isTextInputPresented {
@@ -236,94 +238,220 @@ private struct GroomStoryEditableTextOverlay: View {
     var onDelete: (UUID) -> Void
     var onEdit: (GroomStoryTextOverlay) -> Void
 
-    @State private var dragStartPosition: CGPoint?
-    @State private var scaleStart: CGFloat = 1
-    @State private var rotationStartDegrees: Double = 0
-    @State private var isMagnifying = false
-    @State private var isRotating = false
-    @State private var hasExceededDragThreshold = false
-
     var body: some View {
         GroomStoryOverlayText(
             overlay: overlay,
             canvasSize: canvasSize
+        )
+        .modifier(
+            GroomStoryTextManipulationModifier(
+                canvasSize: canvasSize,
+                overlay: $overlay,
+                draggingOverlayID: $draggingOverlayID,
+                isHoveringDeleteTarget: $isHoveringDeleteTarget,
+                onDelete: onDelete,
+                onEdit: onEdit
+            )
         )
         .position(
             x: overlay.normalizedPosition.x * canvasSize.width,
             y: overlay.normalizedPosition.y * canvasSize.height
         )
         .scaleEffect(draggingOverlayID == overlay.id ? 1.04 : 1)
-        .gesture(dragGesture)
-        .simultaneousGesture(magnificationGesture)
-        .simultaneousGesture(rotationGesture)
-    }
-
-    private var dragGesture: some Gesture {
-        DragGesture(minimumDistance: 0, coordinateSpace: .named(GroomStoryCanvasCoordinateSpace.name))
-            .onChanged { value in
-                if dragStartPosition == nil {
-                    dragStartPosition = overlay.normalizedPosition
-                    hasExceededDragThreshold = false
-                }
-                let distance = hypot(value.translation.width, value.translation.height)
-                guard distance > 6 || hasExceededDragThreshold else {
-                    return
-                }
-                hasExceededDragThreshold = true
-                draggingOverlayID = overlay.id
-                let basePosition = dragStartPosition ?? overlay.normalizedPosition
-                overlay.normalizedPosition = CGPoint(
-                    x: basePosition.x + value.translation.width / max(canvasSize.width, 1),
-                    y: basePosition.y + value.translation.height / max(canvasSize.height, 1)
-                )
-                .groomStoryClamped
-                isHoveringDeleteTarget = overlay.normalizedPosition.y > 0.84
-            }
-            .onEnded { _ in
-                let shouldEdit = !hasExceededDragThreshold
-                let shouldDelete = overlay.normalizedPosition.y > 0.84
-                dragStartPosition = nil
-                draggingOverlayID = nil
-                isHoveringDeleteTarget = false
-                hasExceededDragThreshold = false
-                if shouldDelete {
-                    onDelete(overlay.id)
-                } else if shouldEdit {
-                    onEdit(overlay)
-                }
-            }
-    }
-
-    private var magnificationGesture: some Gesture {
-        MagnificationGesture()
-            .onChanged { value in
-                if !isMagnifying {
-                    scaleStart = overlay.scale
-                    isMagnifying = true
-                }
-                overlay.scale = min(max(scaleStart * value, 0.55), 2.6)
-            }
-            .onEnded { _ in
-                scaleStart = overlay.scale
-                isMagnifying = false
-            }
-    }
-
-    private var rotationGesture: some Gesture {
-        RotationGesture()
-            .onChanged { value in
-                if !isRotating {
-                    rotationStartDegrees = overlay.rotationDegrees
-                    isRotating = true
-                }
-                overlay.rotationDegrees = rotationStartDegrees + value.degrees
-            }
-            .onEnded { _ in
-                rotationStartDegrees = overlay.rotationDegrees
-                isRotating = false
-            }
     }
 }
+
+/// 文字オーバーレイの移動/拡大縮小/回転を担う。iOSではUIKitのジェスチャ認識器を同時認識で束ね、
+/// インスタのストーリー編集と同じく「1本目で移動 → 途中で2本目を置くとそのままピンチ/回転もできる」
+/// 操作感にする。UIKitが無い環境（テストホスト等）では操作なしのフォールバック。
+private struct GroomStoryTextManipulationModifier: ViewModifier {
+    var canvasSize: CGSize
+    @Binding var overlay: GroomStoryTextOverlay
+    @Binding var draggingOverlayID: UUID?
+    @Binding var isHoveringDeleteTarget: Bool
+    var onDelete: (UUID) -> Void
+    var onEdit: (GroomStoryTextOverlay) -> Void
+
+    func body(content: Content) -> some View {
+        #if canImport(UIKit)
+        content.overlay {
+            GroomStoryTextGestureSurface(
+                canvasSize: canvasSize,
+                overlay: $overlay,
+                draggingOverlayID: $draggingOverlayID,
+                isHoveringDeleteTarget: $isHoveringDeleteTarget,
+                onDelete: onDelete,
+                onEdit: onEdit
+            )
+        }
+        #else
+        content
+        #endif
+    }
+}
+
+#if canImport(UIKit)
+private struct GroomStoryTextGestureSurface: UIViewRepresentable {
+    var canvasSize: CGSize
+    @Binding var overlay: GroomStoryTextOverlay
+    @Binding var draggingOverlayID: UUID?
+    @Binding var isHoveringDeleteTarget: Bool
+    var onDelete: (UUID) -> Void
+    var onEdit: (GroomStoryTextOverlay) -> Void
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+
+    func makeUIView(context: Context) -> UIView {
+        let view = UIView()
+        view.backgroundColor = .clear
+        view.isMultipleTouchEnabled = true
+
+        let pan = UIPanGestureRecognizer(
+            target: context.coordinator,
+            action: #selector(Coordinator.handlePan(_:))
+        )
+        pan.maximumNumberOfTouches = 2
+        pan.delegate = context.coordinator
+
+        let pinch = UIPinchGestureRecognizer(
+            target: context.coordinator,
+            action: #selector(Coordinator.handlePinch(_:))
+        )
+        pinch.delegate = context.coordinator
+
+        let rotation = UIRotationGestureRecognizer(
+            target: context.coordinator,
+            action: #selector(Coordinator.handleRotation(_:))
+        )
+        rotation.delegate = context.coordinator
+
+        let tap = UITapGestureRecognizer(
+            target: context.coordinator,
+            action: #selector(Coordinator.handleTap(_:))
+        )
+        tap.delegate = context.coordinator
+
+        view.addGestureRecognizer(pan)
+        view.addGestureRecognizer(pinch)
+        view.addGestureRecognizer(rotation)
+        view.addGestureRecognizer(tap)
+        return view
+    }
+
+    func updateUIView(_ uiView: UIView, context: Context) {
+        context.coordinator.parent = self
+    }
+
+    final class Coordinator: NSObject, UIGestureRecognizerDelegate {
+        var parent: GroomStoryTextGestureSurface
+        private var activeManipulations = 0
+        private var lastPanTouchCount = 0
+
+        init(_ parent: GroomStoryTextGestureSurface) {
+            self.parent = parent
+        }
+
+        func gestureRecognizer(
+            _ gesture: UIGestureRecognizer,
+            shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer
+        ) -> Bool {
+            // 移動・拡大縮小・回転は同時に効かせる。タップ（＝編集を開く）だけは他と同時にしない。
+            if gesture is UITapGestureRecognizer || other is UITapGestureRecognizer {
+                return false
+            }
+            return true
+        }
+
+        private func beginManipulation() {
+            if activeManipulations == 0 {
+                parent.draggingOverlayID = parent.overlay.id
+            }
+            activeManipulations += 1
+        }
+
+        private func endManipulation() {
+            activeManipulations = max(0, activeManipulations - 1)
+            if activeManipulations == 0 {
+                parent.draggingOverlayID = nil
+                parent.isHoveringDeleteTarget = false
+            }
+        }
+
+        @objc func handlePan(_ gesture: UIPanGestureRecognizer) {
+            guard let host = gesture.view else { return }
+            // 端末回転で座標系が傾かないよう、常にwindow基準の移動量を使う。
+            let reference = host.window ?? host
+            switch gesture.state {
+            case .began:
+                beginManipulation()
+                lastPanTouchCount = gesture.numberOfTouches
+                gesture.setTranslation(.zero, in: reference)
+            case .changed:
+                if gesture.numberOfTouches != lastPanTouchCount {
+                    // 指を足す/離すと重心が飛ぶので、その1フレームは移動を無視して基準を取り直す。
+                    lastPanTouchCount = gesture.numberOfTouches
+                    gesture.setTranslation(.zero, in: reference)
+                    return
+                }
+                let translation = gesture.translation(in: reference)
+                gesture.setTranslation(.zero, in: reference)
+                let width = max(parent.canvasSize.width, 1)
+                let height = max(parent.canvasSize.height, 1)
+                var position = parent.overlay.normalizedPosition
+                position.x += translation.x / width
+                position.y += translation.y / height
+                parent.overlay.normalizedPosition = position.groomStoryClamped
+                parent.isHoveringDeleteTarget = parent.overlay.normalizedPosition.y > 0.84
+            case .ended, .cancelled, .failed:
+                let shouldDelete = parent.overlay.normalizedPosition.y > 0.84
+                let overlayID = parent.overlay.id
+                endManipulation()
+                lastPanTouchCount = 0
+                if shouldDelete {
+                    parent.onDelete(overlayID)
+                }
+            default:
+                break
+            }
+        }
+
+        @objc func handlePinch(_ gesture: UIPinchGestureRecognizer) {
+            switch gesture.state {
+            case .began:
+                beginManipulation()
+            case .changed:
+                let next = parent.overlay.scale * gesture.scale
+                gesture.scale = 1
+                parent.overlay.scale = min(max(next, 0.55), 2.6)
+            case .ended, .cancelled, .failed:
+                endManipulation()
+            default:
+                break
+            }
+        }
+
+        @objc func handleRotation(_ gesture: UIRotationGestureRecognizer) {
+            switch gesture.state {
+            case .began:
+                beginManipulation()
+            case .changed:
+                parent.overlay.rotationDegrees += Double(gesture.rotation) * 180 / .pi
+                gesture.rotation = 0
+            case .ended, .cancelled, .failed:
+                endManipulation()
+            default:
+                break
+            }
+        }
+
+        @objc func handleTap(_ gesture: UITapGestureRecognizer) {
+            parent.onEdit(parent.overlay)
+        }
+    }
+}
+#endif
 
 private struct GroomStoryTextInputLayer: View {
     var canvasFrame: CGRect
@@ -337,8 +465,11 @@ private struct GroomStoryTextInputLayer: View {
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
+            // 文字以外をタップしたら（キーボードを下げるだけでなく）「完了」と同じく確定する。
             Color.black.opacity(0.28)
                 .ignoresSafeArea()
+                .contentShape(Rectangle())
+                .onTapGesture(perform: onCommit)
 
             inputField
 

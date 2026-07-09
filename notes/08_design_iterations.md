@@ -34,6 +34,42 @@
 
 ---
 
+## イテレーション1226.398：グルーム文字編集を刷新（背景固定・外側タップで確定・IG風の2本指操作）（FB）
+
+### 背景・問題意識
+オーナーFB（3点）：
+1. 文字入力中に背景のグルームが移動・縮小しないでほしい（キーボードで押し上げられていた）。
+2. 入力中に文字以外をタップするとキーボードが下がるが、それだけでなく「完了」を押したのと同じ挙動（＝入力を確定してオーバーレイ化）にしてほしい。
+3. 文字の拡大縮小/回転が2本指でできるが、インスタのストーリー編集と同じく「1本目で文字をタップして移動させている途中に2本目を置いたら、そこから拡大縮小・回転・移動が同時にできる」操作感にしてほしい。
+
+### 変更内容（`GroomStoryEditorView.swift`）
+1. **背景固定**：エディタ本体の ZStack に `.ignoresSafeArea(.keyboard, edges: .bottom)` を付与。キーボード表示でも背景グルーム（写真キャンバス）が押し上げ・縮小しなくなった。カラーツールバー（`safeAreaInset(.bottom)`）は従来どおりキーボード上に浮く。
+2. **外側タップ＝完了**：入力レイヤーの暗幕 `Color.black.opacity(0.28)` に `.contentShape(Rectangle()).onTapGesture(perform: onCommit)` を追加。文字以外をタップすると `commitDraftText`（＝「完了」と同一処理）が走り、入力が確定してオーバーレイになる。
+3. **IG風の複合ジェスチャ**：SwiftUIの `DragGesture`/`MagnificationGesture`/`RotationGesture` の同時付与をやめ、UIKitの `UIPanGestureRecognizer`＋`UIPinchGestureRecognizer`＋`UIRotationGestureRecognizer`＋`UITapGestureRecognizer` を `UIViewRepresentable`（`GroomStoryTextGestureSurface`）で束ねた。
+   - `UIGestureRecognizerDelegate.shouldRecognizeSimultaneouslyWith` で pan/pinch/rotation を相互に同時認識（タップだけは非同時）。→ 1本目で移動中に2本目を足すと、そのまま拡大縮小・回転・移動が同時にできる。
+   - pan は window 基準の移動量を毎フレーム `setTranslation(.zero)` して増分適用。指の増減時は重心ジャンプを1フレーム吸収。移動量を正規化座標へ換算し、`y > 0.84` でゴミ箱ホバー→離すと削除（従来仕様を踏襲）。
+   - pinch は `scale` を毎回1にリセットして 0.55〜2.6 にクランプ。rotation は増分角度を度に変換して加算。
+   - タップ＝`onEdit`（編集を開く）。移動/拡大/回転の稼働数を数え、全終了で `draggingOverlayID`/`isHoveringDeleteTarget` を解除。
+   - `#if canImport(UIKit)` でiOSのみUIKit実装、テストホスト等は操作なしのフォールバック。
+
+### 影響範囲
+- グルーム作成の文字オーバーレイ編集画面（`GroomStoryEditorView`）のみ。データモデル・状態遷移に変更なし。
+
+### 確認方法
+- `swift build`（macOS, フォールバック経路）成功、`swift test` グリーン（XCTest 1536 / 0 failures、Swift Testing 24）。
+- iOS device build（UIKit経路）**BUILD SUCCEEDED**。
+- 触覚/マルチタッチは実機でのみ検証可能 → device build + install。
+
+### セルフレビュー結果
+- ✅ iOS標準のジェスチャ認識器（Pan/Pinch/Rotation/Tap）を使用し、同時認識で自然な複合操作を実現（独自の物理演算は書いていない）。
+- ✅ 削除ゾーン・タップ編集の既存挙動を維持。
+- ⚠️ 文字の当たり判定はレイアウト枠（横約0.82×キャンバス幅）で従来と同等。極端な回転時に当たり判定が視覚とわずかにずれるが従来同等。
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/GroomStoryEditorView.swift`
+
+---
+
 ## イテレーション1226.397：左ドロワーのスワイプ触覚を「指が離れ開閉確定した瞬間」に＋閉じる時は微弱化（FB）
 
 ### 背景・問題意識
