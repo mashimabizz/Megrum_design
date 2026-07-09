@@ -231,15 +231,18 @@ struct AppDrawerInteractiveHost<Content: View>: View {
                     return
                 }
 
-                // 端スワイプで開き「終えた」瞬間に触覚フィードバック（閉じる/開いたままは対象外）。iter1226.393。
-                let didOpenViaSwipe = targetVisibility && !showsDrawer
-                withAnimation(AppDrawerInteractiveMetrics.animation, completionCriteria: .logicallyComplete) {
+                // スワイプの指が離れ「開閉が確定した瞬間」に触覚フィードバック（開くアニメの完了待ちはしない）。
+                // 開く時は buttonTap、閉じる時はほんの少しだけ弱い drawerClose。iter1226.397。
+                let willOpenViaSwipe = targetVisibility && !showsDrawer
+                let willCloseViaSwipe = !targetVisibility && showsDrawer
+                if willOpenViaSwipe {
+                    MegrumHaptics.buttonTap()
+                } else if willCloseViaSwipe {
+                    MegrumHaptics.drawerClose()
+                }
+                withAnimation(AppDrawerInteractiveMetrics.animation) {
                     showsDrawer = targetVisibility
                     dragTranslation = 0
-                } completion: {
-                    if didOpenViaSwipe {
-                        MegrumHaptics.buttonTap()
-                    }
                 }
             }
     }

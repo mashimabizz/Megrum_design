@@ -34,6 +34,36 @@
 
 ---
 
+## イテレーション1226.397：左ドロワーのスワイプ触覚を「指が離れ開閉確定した瞬間」に＋閉じる時は微弱化（FB）
+
+### 背景・問題意識
+オーナーFB：左ドロワーをスワイプで開いた時の触覚は、開き終わった直後ではなく「開くためのスワイプの指が離れた瞬間」に鳴らしてほしい。閉じる時も同様に指が離れた瞬間に。かつ閉じる時はほんの少しだけ弱い触覚に。
+
+### 変更内容（`MegrumInteractionFeedback.swift`, `MegrumAuthenticatedTabsView.swift`）
+- `MegrumHaptics.drawerClose()` を追加（`.light` / intensity 0.42、開く `buttonTap` の 0.58 より微弱）。
+- `drawerPanGesture` の `.onEnded`：従来は `withAnimation(..., completionCriteria:.logicallyComplete){} completion:{ buttonTap }` で「開き終えた瞬間」に鳴らしていたのを廃止。指が離れて開閉が確定した `.onEnded` の時点で即発火に変更：
+  - 開く方向へ確定（`targetVisibility && !showsDrawer`）→ `buttonTap()`
+  - 閉じる方向へ確定（`!targetVisibility && showsDrawer`）→ `drawerClose()`（微弱）
+- アニメーションは `completion:` を外した通常の `withAnimation` に戻した（触覚はアニメ完了と切り離し）。
+- タップでの開閉（`openDrawer`/ボタン閉じ）は従来どおり即時 `buttonTap`（スワイプ限定の要望のため据え置き）。
+
+### 影響範囲
+- 左ドロワー（AppDrawer）を端スワイプで開閉する操作の触覚タイミングと強さ。
+
+### 確認方法
+- `swift build` 成功、`swift test` グリーン（XCTest 1536 / 0 failures、Swift Testing 24）。
+- 触覚は実機でのみ体感可能 → device build + install で確認。
+
+### セルフレビュー結果
+- ✅ 開く=buttonTap / 閉じる=drawerClose の2段強度。指が離れた瞬間（`.onEnded`）に発火。
+- ✅ 「開いたまま/閉じたまま」に確定した場合（スナップバック）は無音のまま。
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/MegrumInteractionFeedback.swift`
+- `ios-native/Sources/MegrumApp/MegrumAuthenticatedTabsView.swift`
+
+---
+
 ## イテレーション1226.395：自分グルーム削除で前後へ遷移／枠グラデは「有効かつ未読」／活性化アニメは列が見えた後／タイル拡大（約3.8個）（FB）
 
 ### 背景・問題意識
