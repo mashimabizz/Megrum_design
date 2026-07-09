@@ -78,12 +78,14 @@ struct NativePushDevicePayload: Encodable, Sendable {
 }
 
 /// FB(iter1226.390): 推し(L1)ごとの圏内グルーム通知設定 upsert ペイロード。
+/// 注意：`memberCharacterIDs` は convertToSnakeCase で `member_character_i_ds` になり列不一致で
+/// 保存に失敗する。`memberCharacterIds`（末尾小文字d）にすると `member_character_ids` に正しく変換される。iter1226.393。
 struct GroomNotifyPrefPayload: Encodable, Sendable {
     var userID: UUID
     var groupID: UUID
     var enabled: Bool
     var notifyAllMembers: Bool
-    var memberCharacterIDs: [UUID]
+    var memberCharacterIds: [UUID]
     var updatedAt: String
 }
 

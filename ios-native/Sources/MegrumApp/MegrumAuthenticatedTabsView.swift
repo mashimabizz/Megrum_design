@@ -231,9 +231,15 @@ struct AppDrawerInteractiveHost<Content: View>: View {
                     return
                 }
 
-                withAnimation(AppDrawerInteractiveMetrics.animation) {
+                // 端スワイプで開き「終えた」瞬間に触覚フィードバック（閉じる/開いたままは対象外）。iter1226.393。
+                let didOpenViaSwipe = targetVisibility && !showsDrawer
+                withAnimation(AppDrawerInteractiveMetrics.animation, completionCriteria: .logicallyComplete) {
                     showsDrawer = targetVisibility
                     dragTranslation = 0
+                } completion: {
+                    if didOpenViaSwipe {
+                        MegrumHaptics.buttonTap()
+                    }
                 }
             }
     }

@@ -4,6 +4,25 @@
 
 ---
 
+## イテレーション1226.393：推しごと通知の保存失敗を修正（snake_case変換の不一致）＋端スワイプで開き終えた瞬間に触覚（FB）
+
+### 背景・問題意識
+オーナーFB：(1) めぐりの推しごと通知設定で「全メンバーを通知」トグルがオフにできない／めぐりホームに戻ると「通知設定を保存できませんでした」エラー。(2) 左ドロワーを画面端スワイプで開き終えた瞬間にも触覚フィードバックを出したい。
+
+### 原因と修正
+(1) **snake_case変換のプロパティ名不一致**：Foundation の `convertToSnakeCase("memberCharacterIDs")` は `member_character_i_ds`（「IDs」の分割ミス）となり、存在しない列名で upsert → PostgREST が拒否 → 毎回保存失敗（楽観更新が巻き戻り「オフにできない」ように見えた）。加えて `convertFromSnakeCase("group_id")` は `groupId` なのに Row 側が `groupID` で復号も失敗していた。
+- `GroomNotifyPrefPayload.memberCharacterIDs` → `memberCharacterIds`、`GroomNotifyPrefRow.groupID/memberCharacterIDs` → `groupId/memberCharacterIds` に修正。エンコード/デコードのラウンドトリップを Swift で実測確認（`member_character_ids`）。
+
+(2) **端スワイプの開き完了で触覚**：`MegrumAuthenticatedTabsView.drawerPanGesture` の `.onEnded` で、閉→開に確定した時だけ `withAnimation(..., completionCriteria: .logicallyComplete){...} completion: { MegrumHaptics.buttonTap() }` を呼び、開き「終えた」瞬間に触覚を出す（閉じる/開いたままは対象外。ボタン開きは従来どおり）。
+
+### 確認方法
+- Swift スニペットで convertToSnakeCase/FromSnakeCase のラウンドトリップ確認。`swift test`（XCTest 1536＋Swift Testing 24）緑。実機。
+
+### 関連ファイル
+- `ios-native/Sources/MegrumData/SupabaseNotificationRows.swift`, `SupabaseNotificationPayloads.swift`, `SupabaseNotificationClient.swift`, `MegrumAuthenticatedTabsView.swift`
+
+---
+
 ## イテレーション1226.392：ホーム投稿を「種別→全画面地図」順に＋自分グルームが地図に出るよう修正＋出会ったグルームをロック付きで表示＋空吹き出し撤去（FB）
 
 ### 背景・問題意識

@@ -176,7 +176,7 @@ public final class SupabaseNotificationClient: @unchecked Sendable {
                     groupID: groupID,
                     enabled: enabled,
                     notifyAllMembers: notifyAllMembers,
-                    memberCharacterIDs: memberCharacterIDs,
+                    memberCharacterIds: memberCharacterIDs,
                     updatedAt: notificationISOTimestamp(updatedAt)
                 )
             ],

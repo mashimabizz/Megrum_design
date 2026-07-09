@@ -56,19 +56,21 @@ struct NotificationDeviceRow: Decodable, Sendable {
 }
 
 /// FB(iter1226.390): 推し(L1)ごとの圏内グルーム通知設定行。
+/// 注意：プロパティ名は convertFromSnakeCase の変換結果に合わせる（group_id→groupId,
+/// member_character_ids→memberCharacterIds）。`groupID`/`memberCharacterIDs` にすると復号に失敗する。iter1226.393。
 struct GroomNotifyPrefRow: Decodable, Sendable {
     static let select = "group_id,enabled,notify_all_members,member_character_ids"
-    var groupID: UUID
+    var groupId: UUID
     var enabled: Bool
     var notifyAllMembers: Bool?
-    var memberCharacterIDs: [UUID]?
+    var memberCharacterIds: [UUID]?
 
     var pref: GroomNotifyPref {
         GroomNotifyPref(
-            groupID: groupID,
+            groupID: groupId,
             enabled: enabled,
             notifyAllMembers: notifyAllMembers ?? true,
-            memberCharacterIDs: memberCharacterIDs ?? []
+            memberCharacterIDs: memberCharacterIds ?? []
         )
     }
 }
