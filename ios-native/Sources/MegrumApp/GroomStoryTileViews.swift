@@ -38,24 +38,60 @@ enum GroomStoryMetrics {
 struct GroomMyStoryTile: View {
     var viewer: UserProfile?
     var isLoading: Bool
+    /// FB(iter1226.394)：自分の有効なグルームがある時は枠を水色→紫グラデ（未読ストーリー相当）にする。
+    var hasActiveGroom: Bool = false
     var onAdd: () -> Void
+    /// FB(iter1226.394)：＋以外（アバター）タップで自分のグルームを見る。
+    var onViewOwn: () -> Void = {}
 
     var body: some View {
-        Button(action: onAdd) {
-            VStack(spacing: GroomStoryMetrics.labelSpacing) {
-                GroomMyStoryAvatar(viewer: viewer, isLoading: isLoading)
-                    .frame(width: GroomStoryMetrics.ringDiameter, height: GroomStoryMetrics.ringDiameter)
+        VStack(spacing: GroomStoryMetrics.labelSpacing) {
+            ZStack(alignment: .bottomTrailing) {
+                Button {
+                    if hasActiveGroom { onViewOwn() } else { onAdd() }
+                } label: {
+                    GroomMyStoryAvatar(
+                        viewer: viewer,
+                        isLoading: isLoading,
+                        hasActiveGroom: hasActiveGroom
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(isLoading)
+                .accessibilityLabel(hasActiveGroom ? "自分のグルームを見る" : "グルームを追加")
 
-                Text("グルーム")
-                    .font(.system(size: 11))
-                    .foregroundStyle(GroomStoryMetrics.labelUnseen)
-                    .lineLimit(1)
-                    .frame(width: GroomStoryMetrics.labelWidth)
+                // ＋バッジは独立したタップ領域（投稿コンポーザを開く）。
+                if !isLoading {
+                    Button(action: onAdd) {
+                        GroomMyStoryAddBadge()
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("グルームを追加")
+                }
             }
+            .frame(width: GroomStoryMetrics.ringDiameter, height: GroomStoryMetrics.ringDiameter)
+
+            Text("グルーム")
+                .font(.system(size: 11))
+                .foregroundStyle(GroomStoryMetrics.labelUnseen)
+                .lineLimit(1)
+                .frame(width: GroomStoryMetrics.labelWidth)
         }
-        .buttonStyle(.plain)
-        .disabled(isLoading)
-        .accessibilityLabel("グルームを追加")
+    }
+}
+
+/// 自分タイルの右下「＋」バッジ（IGのアクションブルー）。
+private struct GroomMyStoryAddBadge: View {
+    var body: some View {
+        Image(systemName: "plus")
+            .font(.system(size: 13, weight: .bold))
+            .foregroundStyle(.white)
+            .frame(width: 20, height: 20)
+            .background(GroomStoryMetrics.addBadgeBlue, in: Circle())
+            .overlay {
+                Circle().stroke(MegrumTheme.canvas, lineWidth: 2)
+            }
+            .offset(x: 2, y: 2)
     }
 }
 
@@ -68,6 +104,8 @@ private enum GroomMyStoryRingPhase {
 private struct GroomMyStoryAvatar: View {
     var viewer: UserProfile?
     var isLoading: Bool
+    /// 自分の有効なグルームがある時は idle 枠を水色→紫グラデにする（投稿後もグラデが残る）。
+    var hasActiveGroom: Bool
 
     @State private var phase: GroomMyStoryRingPhase = .idle
     @State private var spin: Double = 0
@@ -92,12 +130,6 @@ private struct GroomMyStoryAvatar: View {
             .scaleEffect(pop)
         }
         .frame(width: GroomStoryMetrics.ringDiameter, height: GroomStoryMetrics.ringDiameter)
-        // ＋バッジだけ右下に重ねる（リングとアバターは中央合わせのままにする）。
-        .overlay(alignment: .bottomTrailing) {
-            if phase == .idle {
-                addBadge
-            }
-        }
         .onAppear {
             if isLoading { startUploading() }
         }
@@ -114,9 +146,16 @@ private struct GroomMyStoryAvatar: View {
     private var ring: some View {
         switch phase {
         case .idle:
-            Circle()
-                .strokeBorder(GroomStoryMetrics.seenRing, lineWidth: GroomStoryMetrics.ringLineWidth)
-                .frame(width: GroomStoryMetrics.ringDiameter, height: GroomStoryMetrics.ringDiameter)
+            // 自分のグルームがあれば水色→紫グラデ（未読ストーリー相当）、なければ薄グレー。
+            if hasActiveGroom {
+                Circle()
+                    .strokeBorder(GroomStoryMetrics.unseenGradient, lineWidth: GroomStoryMetrics.ringLineWidth)
+                    .frame(width: GroomStoryMetrics.ringDiameter, height: GroomStoryMetrics.ringDiameter)
+            } else {
+                Circle()
+                    .strokeBorder(GroomStoryMetrics.seenRing, lineWidth: GroomStoryMetrics.ringLineWidth)
+                    .frame(width: GroomStoryMetrics.ringDiameter, height: GroomStoryMetrics.ringDiameter)
+            }
         case .uploading:
             // アップロード中：色を控えめにした短い弧が時計回りに回り続ける（IG のスピナー相当）。
             Circle()
@@ -139,18 +178,6 @@ private struct GroomMyStoryAvatar: View {
                 .rotationEffect(.degrees(-90))
                 .frame(width: GroomStoryMetrics.ringDiameter - 2, height: GroomStoryMetrics.ringDiameter - 2)
         }
-    }
-
-    private var addBadge: some View {
-        Image(systemName: "plus")
-            .font(.system(size: 13, weight: .bold))
-            .foregroundStyle(.white)
-            .frame(width: 20, height: 20)
-            .background(GroomStoryMetrics.addBadgeBlue, in: Circle())
-            .overlay {
-                Circle().stroke(MegrumTheme.canvas, lineWidth: 2)
-            }
-            .offset(x: 2, y: 2)
     }
 
     private func startUploading() {

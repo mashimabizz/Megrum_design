@@ -29,7 +29,10 @@ struct GroomStrip: View {
     var publicProfilesByUserID: [UUID: PublicUserProfile]
     var viewedGroomIDs: Set<UUID>
     var isCreating: Bool
+    /// FB(iter1226.394)：自分の有効なグルームがある時、自分タイルの枠をグラデにする＆タップで閲覧できる。
+    var hasOwnActiveGroom: Bool = false
     var onAdd: () -> Void
+    var onViewOwn: () -> Void = {}
     var onSelect: (GroomPost) -> Void
 
     private var displayGrooms: [GroomPost] {
@@ -42,7 +45,9 @@ struct GroomStrip: View {
                 GroomMyStoryTile(
                     viewer: viewer,
                     isLoading: isCreating,
-                    onAdd: onAdd
+                    hasActiveGroom: hasOwnActiveGroom,
+                    onAdd: onAdd,
+                    onViewOwn: onViewOwn
                 )
 
                 ForEach(displayGrooms) { groom in

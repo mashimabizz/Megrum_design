@@ -109,6 +109,19 @@ struct HomeScreen: View {
         )
     }
 
+    /// FB(iter1226.394)：自分の有効なグルーム（新しい順）。自分タイルの枠グラデ＆閲覧に使う。
+    private var myActiveGrooms: [GroomPost] {
+        guard let appState, let viewerID = (appState.viewer ?? viewer)?.id else { return [] }
+        return appState.groomMapPosts
+            .filter { $0.authorID == viewerID }
+            .sorted { $0.createdAt > $1.createdAt }
+    }
+
+    private func viewOwnGroom() {
+        guard let groom = myActiveGrooms.first else { return }
+        onOpenGroom(groom)
+    }
+
     private func handleGroomRailTap(_ groom: GroomPost) {
         guard let appState else {
             onOpenGroom(groom)
@@ -214,11 +227,13 @@ struct HomeScreen: View {
             showsGroomRail: showsGroomRail,
             groomRailGrooms: groomRailItems,
             groomRailLockedIDs: groomRailLockedIDs,
+            groomRailHasOwnActiveGroom: !myActiveGrooms.isEmpty,
             groomRailViewer: appState?.viewer ?? viewer,
             groomRailProfiles: appState?.publicProfilesByUserID ?? [:],
             groomRailViewedIDs: appState?.viewedGroomIDs ?? [],
             onOpenGroom: handleGroomRailTap,
-            onAddGroom: { isGroomComposerPresented = true }
+            onAddGroom: { isGroomComposerPresented = true },
+            onViewOwnGroom: viewOwnGroom
         )
         .background(MegrumTheme.canvas.ignoresSafeArea())
         .megrumHiddenNavigationBar()

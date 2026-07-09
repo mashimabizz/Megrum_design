@@ -38,12 +38,14 @@ struct HomeDiscoveryExperience: View {
     var showsGroomRail: Bool = false
     var groomRailGrooms: [GroomPost] = []
     var groomRailLockedIDs: Set<UUID> = []
+    var groomRailHasOwnActiveGroom: Bool = false
     var groomRailViewer: UserProfile? = nil
     var groomRailProfiles: [UUID: PublicUserProfile] = [:]
     var groomRailViewedIDs: Set<UUID> = []
     var isGroomComposerCreating: Bool = false
     var onOpenGroom: (GroomPost) -> Void = { _ in }
     var onAddGroom: () -> Void = {}
+    var onViewOwnGroom: () -> Void = {}
 
     @AppStorage(HomeExchangeSettingsStorageKeys.preference) var exchangePreferenceRawValue = HomeDefaultExchangeSettings.standard.preference.rawValue
     @AppStorage(HomeExchangeSettingsStorageKeys.requiresSamePrefecture) var exchangeRequiresSamePrefecture = HomeDefaultExchangeSettings.standard.requiresSamePrefecture
@@ -88,7 +90,9 @@ struct HomeDiscoveryExperience: View {
                             publicProfilesByUserID: groomRailProfiles,
                             viewedGroomIDs: groomRailViewedIDs,
                             isCreating: isGroomComposerCreating,
+                            hasOwnActiveGroom: groomRailHasOwnActiveGroom,
                             onAdd: onAddGroom,
+                            onViewOwn: onViewOwnGroom,
                             onSelect: onOpenGroom
                         )
                         .padding(.leading, 12)

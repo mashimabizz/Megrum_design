@@ -4,6 +4,24 @@
 
 ---
 
+## イテレーション1226.394：自分グルーム投稿後は自分タイル枠を水色→紫グラデに活性化（IG風スイープ）＋アバタータップで自分のグルーム閲覧（FB）
+
+### 背景・問題意識
+オーナーFB：(1) 自分のグルームを投稿したら、ホームの自分アイコンの枠が水色→紫グラデ（未読ストーリー相当）に活性化してほしい。アニメーションもインスタ風に「おしゃれにぐるっと枠が活性化」。(2) 自分アイコンの右下「＋」以外（アバター）をタップしたら自分のグルームを見られるように。
+
+### 変更内容（`GroomStoryTileViews.swift`, `GroomStoryViews.swift`, `HomeDiscoveryExperience.swift`, `HomeScreen.swift`）
+- `GroomMyStoryAvatar` に `hasActiveGroom` を追加。idle枠を「有効な自分グルームあり＝水色→紫グラデ／なし＝薄グレー」に。投稿完了時の celebrate()（12時から時計回りに一周スイープ＋スプリング）はそのまま、着地先が idle=グラデになったので投稿後もグラデが残る（IG風の活性化）。
+- 自分タイルのタップを分割：アバター＝（自分グルームあれば）閲覧 / なければ投稿、右下「＋」＝常に投稿。ZStack内の独立ボタン2つで実装（＋バッジは `GroomMyStoryAddBadge` に切り出し）。
+- `hasOwnActiveGroom`/`onViewOwn` を GroomStrip→HomeDiscoveryExperience→HomeScreen に配線。HomeScreen は `myActiveGrooms`（groomMapPosts の自分投稿・新しい順）から算出し、閲覧は最新の自分グルームを開く。
+
+### 確認方法
+- `ImageRenderer` スナップショットで idle（グレー）/活性（グラデ）＋＋バッジを確認。`swift test`（XCTest 1536＋Swift Testing 24）緑。実機。
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/GroomStoryTileViews.swift`, `GroomStoryViews.swift`, `HomeDiscoveryExperience.swift`, `HomeScreen.swift`
+
+---
+
 ## イテレーション1226.393：推しごと通知の保存失敗を修正（snake_case変換の不一致）＋端スワイプで開き終えた瞬間に触覚（FB）
 
 ### 背景・問題意識
