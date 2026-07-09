@@ -72,16 +72,18 @@ struct GroomViewerScreen: View {
         onOpenMeguriUserProfile: @escaping (UUID) -> Void = { _ in },
         closeAnchor: UnitPoint = .center
     ) {
-        let fallbackGrooms = grooms.contains(where: { $0.id == initialGroom.id })
+        let base = grooms.contains(where: { $0.id == initialGroom.id })
             ? grooms
             : [initialGroom] + grooms
-        _grooms = State(initialValue: fallbackGrooms)
+        // FB(iter1226.402)：古い→新しい順（左が古い、右タップで次に新しいものへ）。地図/アーカイブでも同仕様。
+        let ordered = base.sorted { $0.createdAt < $1.createdAt }
+        _grooms = State(initialValue: ordered)
         self.initialGroom = initialGroom
         self.appState = appState
         self.onDismiss = onDismiss
         self.onOpenMeguriUserProfile = onOpenMeguriUserProfile
         self.closeAnchor = closeAnchor
-        _currentIndex = State(initialValue: fallbackGrooms.firstIndex(where: { $0.id == initialGroom.id }) ?? 0)
+        _currentIndex = State(initialValue: ordered.firstIndex(where: { $0.id == initialGroom.id }) ?? 0)
     }
 
     private var currentGroom: GroomPost {

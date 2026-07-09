@@ -29,8 +29,10 @@ struct GroomStrip: View {
     var publicProfilesByUserID: [UUID: PublicUserProfile]
     var viewedGroomIDs: Set<UUID>
     var isCreating: Bool
-    /// FB(iter1226.394/395)：自分の有効かつ未読のグルームがある時、自分タイルの枠をグラデにする＆タップで閲覧できる。
+    /// FB(iter1226.394/395)：自分の有効かつ未読のグルームがある時、自分タイルの枠をグラデにする。
     var hasOwnActiveGroom: Bool = false
+    /// FB(iter1226.402)：既読でも自分のグルームがあればタップで閲覧できる（枠グラデは未読のみ）。
+    var hasAnyOwnGroom: Bool = false
     /// FB(iter1226.395)：この値変化で自分タイルの活性化アニメを発火（グルーム列が見えたタイミング）。
     var activationSignal: Int = 0
     var onAdd: () -> Void
@@ -48,6 +50,7 @@ struct GroomStrip: View {
                     viewer: viewer,
                     isLoading: isCreating,
                     hasActiveGroom: hasOwnActiveGroom,
+                    hasAnyOwnGroom: hasAnyOwnGroom,
                     activationSignal: activationSignal,
                     onAdd: onAdd,
                     onViewOwn: onViewOwn

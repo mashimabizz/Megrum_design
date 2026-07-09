@@ -26,6 +26,8 @@ struct HomeScreen: View {
     var onOpenInventory: () -> Void = {}
     /// FB8-6：ホーム上部の圏内グルーム・ストーリー列からグルームを開く（タブ上位のイマーシブ表示へ）。iter1226.387。
     var onOpenGroom: (GroomPost) -> Void = { _ in }
+    /// FB(iter1226.402)：自分のグルームは「自分のグルームだけ」を古い→新しい順で開く（先頭=最古の未読）。
+    var onOpenOwnGrooms: ([GroomPost], GroomPost) -> Void = { _, _ in }
     var tutorialSampleActive: Bool = false
     var tutorialFocusAnchor: TutorialAnchorID? = nil
     var starterMissionEnabled: Bool = false
@@ -129,9 +131,13 @@ struct HomeScreen: View {
     }
 
     private func viewOwnGroom() {
-        // 未読があればそこから、無ければ最新から開く（開いた瞬間 markGroomViewed で既読化 → グラデ解除）。
-        guard let groom = myActiveUnreadGrooms.first ?? myActiveGrooms.first else { return }
-        onOpenGroom(groom)
+        // FB(iter1226.402)：自分のグルームだけを古い→新しい順に。最古の未読から開き、右タップで新しい方へ。
+        // 未読が無い（＝全部既読）でも、最古から開く。
+        let ordered = myActiveGrooms.sorted { $0.createdAt < $1.createdAt }
+        guard !ordered.isEmpty else { return }
+        let viewed = appState?.viewedGroomIDs ?? []
+        let initial = ordered.first(where: { !viewed.contains($0.id) }) ?? ordered.first!
+        onOpenOwnGrooms(ordered, initial)
     }
 
     private func handleGroomRailTap(_ groom: GroomPost) {
@@ -249,6 +255,7 @@ struct HomeScreen: View {
             groomRailGrooms: groomRailItems,
             groomRailLockedIDs: groomRailLockedIDs,
             groomRailHasOwnActiveGroom: !myActiveUnreadGrooms.isEmpty,
+            groomRailHasAnyOwnGroom: !myActiveGrooms.isEmpty,
             groomRailActivationSignal: groomActivationSignal,
             groomRailViewer: appState?.viewer ?? viewer,
             groomRailProfiles: appState?.publicProfilesByUserID ?? [:],

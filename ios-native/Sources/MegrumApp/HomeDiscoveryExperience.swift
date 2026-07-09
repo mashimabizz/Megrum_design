@@ -39,6 +39,7 @@ struct HomeDiscoveryExperience: View {
     var groomRailGrooms: [GroomPost] = []
     var groomRailLockedIDs: Set<UUID> = []
     var groomRailHasOwnActiveGroom: Bool = false
+    var groomRailHasAnyOwnGroom: Bool = false
     var groomRailActivationSignal: Int = 0
     var groomRailViewer: UserProfile? = nil
     var groomRailProfiles: [UUID: PublicUserProfile] = [:]
@@ -92,6 +93,7 @@ struct HomeDiscoveryExperience: View {
                             viewedGroomIDs: groomRailViewedIDs,
                             isCreating: isGroomComposerCreating,
                             hasOwnActiveGroom: groomRailHasOwnActiveGroom,
+                            hasAnyOwnGroom: groomRailHasAnyOwnGroom,
                             activationSignal: groomRailActivationSignal,
                             onAdd: onAddGroom,
                             onViewOwn: onViewOwnGroom,

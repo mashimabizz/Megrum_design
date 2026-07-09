@@ -4,6 +4,48 @@
 
 ---
 
+## イテレーション1226.402：グルーム枠を太く鮮やかに＋自分/地図/アーカイブのビューア順を古い→新しい（右タップで新しい方へ）＋既読でも自分グルーム閲覧可（FB）
+
+### 背景・問題意識
+オーナーFB（3点）：
+1. グルームの枠線をもっと太く、グラデーションをもっと鮮やかに。
+2. 自分のグルームを見ている時、右タップで「古い方」へ進むのが逆。古いものを左に並べ、右タップで「次に新しい」グルームへ。かつ自分のグルームが既読でもアバタータップで閲覧できるように。
+3. 上記の並び順（古い→新しい、右タップで新しい方へ）は、めぐり地図・グルームアーカイブで見る時も同じに。
+
+### 変更内容
+
+#### 1. 枠を太く・鮮やかに（`GroomStoryTileViews.swift`）
+- `GroomStoryMetrics.ringLineWidth` 2.5→3.5。
+- `unseenGradient` を彩度高めの3色（鮮やかな水色→紫→ピンク）に更新。自分タイル枠・ストーリー枠の両方に反映。
+
+#### 2/3. ビューアの並び順を統一（`GroomViewerScreen.swift`, `MegrumAuthenticatedTabContentView.swift`, `HomeScreen.swift`, 各所）
+- `GroomViewerScreen.init` で辿る配列を **createdAt 昇順（古い→新しい）** にソート。左が最古、右タップ（delta +1）で次に新しいものへ。ストーリー自動送りも +1（＝新しい方）で末尾（最新）到達時に閉じる＝IG準拠。この1か所の変更で **ホーム/めぐり地図/アーカイブすべて同仕様** になる。
+- 自分のグルーム閲覧を「自分のグルームだけ」の列に：`HomeScreen.onOpenOwnGrooms([GroomPost], GroomPost)` を新設し、`viewOwnGroom()` は自分グルームを昇順に並べ「最古の未読（無ければ最古）」を初期表示にして開く。タブ側 `openMeguriGroomViewer(_, sourceAnchor:, sequence:)` に列上書き（`meguriGroomViewerSequence`）を追加し、ビューアは `sequence` があればそれを、無ければ従来どおり `appState.grooms` を辿る。
+- 既読でも閲覧可：自分タイルのアバタータップ条件を「未読あり(hasActiveGroom)」から「自分グルームが1件でもある(hasAnyOwnGroom=!myActiveGrooms.isEmpty)」に変更。枠グラデは従来どおり未読のみ。`GroomMyStoryTile`/`GroomStrip`/`HomeDiscoveryExperience` に `hasAnyOwnGroom` を配線。
+
+### 影響範囲
+- ホーム上部グルーム列の枠見た目、グルームビューア（ホーム/めぐり地図/アーカイブ）のページ送り順、自分タイルのタップ挙動。
+
+### 確認方法
+- `swift build`／`swift test` グリーン（XCTest 1536・0 failures、Swift Testing 24）。iOS device build 予定。
+- 実機で①枠の太さ/鮮やかさ②自分グルームを古い→新しい順に右送り＋既読でも開ける③地図/アーカイブでも同順、を確認。
+
+### セルフレビュー結果
+- ✅ ビューア順は init の1か所ソートで全経路統一（地図・アーカイブ含む）。自動送りも新しい方向へ整合。
+- ✅ 自分閲覧は自分グルームだけの列に限定（他人グルームへ流れない）。
+- ✅ 既読でもタップで閲覧（枠グラデは未読限定を維持）。
+- ⚠️ 鮮やかグラデはブランドのパステルより彩度を上げた独自3色（オーナー「もっと鮮やかでOK」の指示に沿う）。
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/GroomStoryTileViews.swift`
+- `ios-native/Sources/MegrumApp/GroomStoryViews.swift`
+- `ios-native/Sources/MegrumApp/HomeDiscoveryExperience.swift`
+- `ios-native/Sources/MegrumApp/HomeScreen.swift`
+- `ios-native/Sources/MegrumApp/GroomViewerScreen.swift`
+- `ios-native/Sources/MegrumApp/MegrumAuthenticatedTabContentView.swift`
+
+---
+
 ## イテレーション1226.401：グルーム文字編集の再修正（背景固定・完了ボタン廃止・2本指を全画面ジェスチャ化・ゴミ箱の引っ込み）＋投稿コンポーザ左スライド＋ビューア閉じで一覧へ縮小（FB再対応）
 
 ### 背景・問題意識

@@ -7,8 +7,8 @@ import SwiftUI
 enum GroomStoryMetrics {
     /// 外枠（リング）直径。最初の画面で約3.8個見える大きさに拡大。iter1226.395。
     static let ringDiameter: CGFloat = 84
-    /// リングの線幅（拡大に合わせて少し太く）。
-    static let ringLineWidth: CGFloat = 2.5
+    /// リングの線幅。FB(iter1226.402)：もっと太く。
+    static let ringLineWidth: CGFloat = 3.5
     /// 内側アバター直径。リングとの間に約2.5ptの余白ができる。
     static let avatarDiameter: CGFloat = 74
     /// ラベル幅（1行・省略）。
@@ -27,9 +27,13 @@ enum GroomStoryMetrics {
     /// 既読ラベル色（IG の #8E8E8E）。
     static let labelSeen = Color(red: 0.557, green: 0.557, blue: 0.557)
 
-    /// 未読リングのグラデ（色は現状どおり 水色→紫）。
+    /// 未読リングのグラデ。FB(iter1226.402)：もっと鮮やかに。水色→紫→ピンクの彩度高めブランドグラデ。
     static let unseenGradient = LinearGradient(
-        colors: [MegrumTheme.sky, MegrumTheme.lavender],
+        colors: [
+            Color(red: 0.24, green: 0.68, blue: 0.96),
+            Color(red: 0.52, green: 0.38, blue: 0.95),
+            Color(red: 0.97, green: 0.44, blue: 0.74)
+        ],
         startPoint: .topLeading,
         endPoint: .bottomTrailing
     )
@@ -40,6 +44,8 @@ struct GroomMyStoryTile: View {
     var isLoading: Bool
     /// FB(iter1226.394)：自分の有効かつ未読のグルームがある時は枠を水色→紫グラデ（未読ストーリー相当）にする。
     var hasActiveGroom: Bool = false
+    /// FB(iter1226.402)：既読でも自分のグルームがあればアバタータップで閲覧できる（枠グラデは未読のみ）。
+    var hasAnyOwnGroom: Bool = false
     /// FB(iter1226.395)：この値変化で活性化アニメを発火（グルーム列が見えたタイミング）。
     var activationSignal: Int = 0
     var onAdd: () -> Void
@@ -50,7 +56,7 @@ struct GroomMyStoryTile: View {
         VStack(spacing: GroomStoryMetrics.labelSpacing) {
             ZStack(alignment: .bottomTrailing) {
                 Button {
-                    if hasActiveGroom { onViewOwn() } else { onAdd() }
+                    if hasAnyOwnGroom { onViewOwn() } else { onAdd() }
                 } label: {
                     GroomMyStoryAvatar(
                         viewer: viewer,
@@ -61,7 +67,7 @@ struct GroomMyStoryTile: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(isLoading)
-                .accessibilityLabel(hasActiveGroom ? "自分のグルームを見る" : "グルームを追加")
+                .accessibilityLabel(hasAnyOwnGroom ? "自分のグルームを見る" : "グルームを追加")
 
                 // ＋バッジは独立したタップ領域（投稿コンポーザを開く）。
                 if !isLoading {

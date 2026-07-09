@@ -30,6 +30,8 @@ struct MegrumAuthenticatedTabContentView: View {
     @State private var didOpenVisualQAMeguriMessages = false
     @State private var meguriGroomViewerPost: GroomPost?
     @State private var meguriGroomViewerSourceAnchor: UnitPoint = .center
+    /// FB(iter1226.402)：ビューアで辿るグルーム列の上書き（自分のグルーム閲覧は自分のグルームだけを渡す）。空なら appState.grooms。
+    @State private var meguriGroomViewerSequence: [GroomPost] = []
 
     var body: some View {
         ZStack {
@@ -217,7 +219,7 @@ struct MegrumAuthenticatedTabContentView: View {
             onDismiss: dismissMeguriGroomViewer
         ) { groom, dismiss in
             GroomViewerScreen(
-                grooms: appState.grooms,
+                grooms: meguriGroomViewerSequence.isEmpty ? appState.grooms : meguriGroomViewerSequence,
                 initialGroom: groom,
                 appState: appState,
                 onDismiss: dismiss,
@@ -317,6 +319,10 @@ struct MegrumAuthenticatedTabContentView: View {
                     // FB(iter1226.401)：ホームのグルーム一覧（上部）へ縮んでいくよう、開閉の基点を上寄せにする。
                     openMeguriGroomViewer(groom, sourceAnchor: UnitPoint(x: 0.5, y: 0.12))
                 },
+                onOpenOwnGrooms: { ownGrooms, initial in
+                    // FB(iter1226.402)：自分のグルームは「自分のグルームだけ」を古い→新しい順で辿る。
+                    openMeguriGroomViewer(initial, sourceAnchor: UnitPoint(x: 0.5, y: 0.12), sequence: ownGrooms)
+                },
                 tutorialSampleActive: tutorialSampleActive,
                 tutorialFocusAnchor: tutorialCoordinator.currentBeat?.homeFocusAnchor,
                 starterMissionEnabled: !tutorialSampleActive,
@@ -392,7 +398,7 @@ struct MegrumAuthenticatedTabContentView: View {
                     onOpenMessages: openMeguriMessageInbox,
                     onOpenBoardThread: openMeguriBoardThread,
                     onOpenMeguriUserProfile: openMeguriUserProfile,
-                    onOpenGroomViewer: openMeguriGroomViewer
+                    onOpenGroomViewer: { groom, anchor in openMeguriGroomViewer(groom, sourceAnchor: anchor) }
                 )
             }
         }
@@ -445,14 +451,16 @@ struct MegrumAuthenticatedTabContentView: View {
         }
     }
 
-    private func openMeguriGroomViewer(_ groom: GroomPost, sourceAnchor: UnitPoint) {
+    private func openMeguriGroomViewer(_ groom: GroomPost, sourceAnchor: UnitPoint, sequence: [GroomPost] = []) {
         meguriGroomViewerSourceAnchor = sourceAnchor
+        meguriGroomViewerSequence = sequence
         isGroomViewerPresented = true
         meguriGroomViewerPost = groom
     }
 
     private func dismissMeguriGroomViewer() {
         meguriGroomViewerPost = nil
+        meguriGroomViewerSequence = []
         isGroomViewerPresented = false
     }
 
