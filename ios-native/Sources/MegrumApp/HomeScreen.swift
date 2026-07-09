@@ -61,11 +61,11 @@ struct HomeScreen: View {
     @State private var isGroomComposerPresented = false
     /// FB(iter1226.392)：ロックされた（圏外×無料）遭遇グルームをタップした時のプレミアム案内。
     @State private var isShowingGroomLockPremium = false
-    /// FB(iter1226.395)：自分タイルの「枠がぐるっと活性化」アニメの発火トリガ。
-    /// 投稿中はコンポーザが列を覆っていて見えないので、コンポーザを閉じて列が見えた後に +1 する。
+    /// FB(iter1226.395/399)：自分タイルの「枠がぐるっと活性化」アニメの発火トリガ。
+    /// 投稿はバックグラウンド実行なので、投稿が着地して自分グルーム件数が増えた時に +1 する。
     @State private var groomActivationSignal = 0
-    /// コンポーザを開いた時点の自分の有効グルーム件数（閉じた後に増えていれば「新規投稿された」と判定）。
-    @State private var ownGroomCountAtComposerOpen = 0
+    /// バックグラウンド投稿を開始した＝これから自分グルームが1件増えたら活性化アニメを出す、という予約フラグ。
+    @State private var expectsGroomActivation = false
 
     /// 実データのホーム（ガイドツアー以外）でグルーム列を出す。
     private var showsGroomRail: Bool {
@@ -163,16 +163,12 @@ struct HomeScreen: View {
                     groomLocationState.requestCurrentLocation()
                 }
             }
-            .onChange(of: isGroomComposerPresented) { wasPresented, nowPresented in
-                if nowPresented {
-                    // コンポーザを開いた瞬間の件数を控えておく。
-                    ownGroomCountAtComposerOpen = myActiveGrooms.count
-                } else if wasPresented {
-                    // 閉じた＝列が再び見える。新規投稿があった時だけ、少し遅らせて活性化アニメを発火。
-                    guard myActiveGrooms.count > ownGroomCountAtComposerOpen else { return }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
-                        groomActivationSignal += 1
-                    }
+            .onChange(of: myActiveGrooms.count) { oldCount, newCount in
+                // バックグラウンド投稿が着地して自分グルームが増えたら、列が見える状態で活性化アニメを発火。
+                guard expectsGroomActivation, newCount > oldCount else { return }
+                expectsGroomActivation = false
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+                    groomActivationSignal += 1
                 }
             }
     }
@@ -183,7 +179,8 @@ struct HomeScreen: View {
             GroomComposerContainer(
                 appState: appState,
                 locationState: groomLocationState,
-                isPresented: $isGroomComposerPresented
+                isPresented: $isGroomComposerPresented,
+                onGroomPublishStarted: { expectsGroomActivation = true }
             ) {
                 homeBody
             }

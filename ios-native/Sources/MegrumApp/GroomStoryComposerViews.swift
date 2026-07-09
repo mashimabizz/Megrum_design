@@ -27,6 +27,8 @@ struct GroomStoryComposerScreen: View {
     var onLoadCharacters: (OshiGroup?) async -> Void
     var onLoadUserOshiSelections: () async -> Void
     var onPublish: (Data, String, String?, MegrumLocationCoordinate, MeguriContentMetadataDraft) async -> Bool
+    /// FB(iter1226.399)：ホーム経由の「この場所にする」用。投稿はバックグラウンドで実行し、即ホームへ戻す。
+    var onPublishInBackground: (Data, String, String?, MegrumLocationCoordinate, MeguriContentMetadataDraft) -> Void = { _, _, _, _, _ in }
     var onDiscard: () -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var presentationState = GroomStoryComposerPresentationState()
@@ -103,12 +105,7 @@ struct GroomStoryComposerScreen: View {
                             isShowingLocationStep = false
                         }
                     },
-                    onConfirm: {
-                        withAnimation(.smooth(duration: 0.2)) {
-                            isShowingLocationStep = false
-                        }
-                        publishDraftPhoto()
-                    }
+                    onConfirm: publishDraftPhotoInBackground
                 )
                 .transition(.move(edge: .bottom).combined(with: .opacity))
                 .zIndex(2)
@@ -268,6 +265,49 @@ struct GroomStoryComposerScreen: View {
             onDiscard()
             dismiss()
         }
+    }
+
+    /// FB(iter1226.399)：ホーム経由の「この場所にする」。写真を書き出したら即コンポーザを閉じてホームへ戻り、
+    /// 実際の投稿はコンテナ側のバックグラウンドタスクに委ねる（自分アイコンの枠活性化アニメが見えるようにする）。
+    private func publishDraftPhotoInBackground() {
+        guard let draftPhotoData else {
+            showToast("投稿する写真を選択してください")
+            return
+        }
+        guard let selectedCreationCoordinate else {
+            if currentCoordinate == nil {
+                onRequestLocation()
+            }
+            showToast("最後に地図上でピンを立ててください")
+            return
+        }
+        if currentCoordinate == nil {
+            onRequestLocation()
+        }
+        guard canCreateAtSelectedLocation else {
+            showToast(
+                MeguriAccessPolicy.creationLocationMessage(
+                    selectedCoordinate: selectedCreationCoordinate,
+                    currentCoordinate: effectiveCurrentCoordinate
+                )
+            )
+            return
+        }
+        guard let photoUpload = renderedGroomPhotoUpload(from: draftPhotoData) else {
+            showToast("編集した写真を作成できませんでした")
+            return
+        }
+        onPublishInBackground(
+            photoUpload.data,
+            photoUpload.contentType,
+            presentationState.captionForPublish,
+            selectedCreationCoordinate,
+            metadataDraft
+        )
+        isShowingLocationStep = false
+        isShowingMetadataPrompt = false
+        onDiscard()
+        dismiss()
     }
 
     @MainActor

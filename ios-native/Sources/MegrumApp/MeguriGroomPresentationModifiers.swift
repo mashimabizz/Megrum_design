@@ -24,6 +24,8 @@ struct MeguriGroomComposerPresentationModifier: ViewModifier {
     var onCapturePhoto: (Data) -> Void
     var onCameraFailure: (String) -> Void
     var onPublish: (Data, String, String?, MegrumLocationCoordinate, MeguriContentMetadataDraft) async -> Bool
+    /// FB(iter1226.399)：ホーム経由「この場所にする」用のバックグラウンド投稿。既定は何もしない。
+    var onPublishInBackground: (Data, String, String?, MegrumLocationCoordinate, MeguriContentMetadataDraft) -> Void = { _, _, _, _, _ in }
     var onDiscard: () -> Void
 
     func body(content: Content) -> some View {
@@ -59,6 +61,7 @@ struct MeguriGroomComposerPresentationModifier: ViewModifier {
                     await appState.loadUserOshiSelections()
                 },
                 onPublish: onPublish,
+                onPublishInBackground: onPublishInBackground,
                 onDiscard: onDiscard
             )
             .groomCameraPresentation(
@@ -101,6 +104,7 @@ private extension View {
         onLoadCharacters: @escaping (OshiGroup?) async -> Void,
         onLoadUserOshiSelections: @escaping () async -> Void,
         onPublish: @escaping (Data, String, String?, MegrumLocationCoordinate, MeguriContentMetadataDraft) async -> Bool,
+        onPublishInBackground: @escaping (Data, String, String?, MegrumLocationCoordinate, MeguriContentMetadataDraft) -> Void,
         onDiscard: @escaping () -> Void
     ) -> some View {
         #if os(iOS)
@@ -129,6 +133,7 @@ private extension View {
                 onLoadCharacters: onLoadCharacters,
                 onLoadUserOshiSelections: onLoadUserOshiSelections,
                 onPublish: onPublish,
+                onPublishInBackground: onPublishInBackground,
                 onDiscard: onDiscard
             )
         }
@@ -158,6 +163,7 @@ private extension View {
                 onLoadCharacters: onLoadCharacters,
                 onLoadUserOshiSelections: onLoadUserOshiSelections,
                 onPublish: onPublish,
+                onPublishInBackground: onPublishInBackground,
                 onDiscard: onDiscard
             )
         }

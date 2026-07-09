@@ -4,6 +4,52 @@
 
 ---
 
+## イテレーション1226.400：ホーム経由グルーム投稿の場所選択を全画面地図＋降下ピンに／確定で即ホーム＆背後投稿／＋バッジ黒く大きく（FB）
+
+### 背景・問題意識
+オーナーFB（3点）：
+1. 投稿する場所を選ぶ画面を、めぐりホームのように画面いっぱいの地図にしてほしい。ヘッダーも背景は地図。タップした時は「前に実装したピンが上から降りてくる」UIで、ピンのアイコンは自分が投稿するグルーム画像（文字は不要）。「現在地からXX」表記も不要。
+2. 「この場所にする」を押したら前の画面ではなく即ホームへ戻り、自分アイコンの枠がぐるっと活性化するアニメが見えるようにしてほしい。投稿処理はバックグラウンドで。
+3. グルーム一覧の自分タイル右下の「＋」アイコンは青ではなく黒、少し大きく。
+
+### 変更内容
+
+#### 1. 全画面地図の場所選択（`GroomStoryLocationStepView.swift` 全面書き換え）
+- 共有カード型 `MeguriCreationLocationPicker` の利用をやめ、専用の全画面 `Map`（`MeguriMapVisualStyle.quietStandard`＋ブランドトーンoverlay）に。`ZStack` で地図を `ignoresSafeArea` して画面いっぱいに広げ、ヘッダー（戻る＋タイトル）は地図の上に透過ピル配置。
+- タップ地点のピンを `GroomLocationDropPin` に。作成プロンプトと同じ `MeguriMapCreationPromptPresentationState` の降下アニメ（上から spring で降りてくる）を流用し、`Annotation(anchor: .bottom)` ＋ 選択座標の `.id()` で毎タップ再生。アイコンは投稿するグルーム画像を円形表示、文字・吹き出しは無し。
+- 「現在地からXX」距離キャプションを撤去。範囲判定（`MeguriAccessPolicy.canCreateAt`／圏外メッセージ）は維持。
+
+#### 2. 確定で即ホーム＋背後投稿＋枠活性化（`GroomStoryComposerViews.swift`, `GroomComposerContainer.swift`, `MeguriGroomPresentationModifiers.swift`, `HomeScreen.swift`）
+- `GroomStoryComposerScreen` に `onPublishInBackground`（既定no-op）を追加。「この場所にする」は `publishDraftPhotoInBackground()` を呼ぶ：写真を書き出したら `onPublishInBackground` に渡し、即 `onDiscard()`＋`dismiss()` でホームへ戻す（投稿完了を待たない）。
+- `GroomComposerContainer.publishInBackground`：`onGroomPublishStarted()` を通知後、`Task` で `createGroomPost` → 成功時 `loadGroomMapPosts(force:)`。写真データ・座標は値渡しで捕捉済みなので、コンポーザ破棄と競合しない。
+- `HomeScreen`：`expectsGroomActivation` フラグを新設。`onGroomPublishStarted` で true。活性化トリガを「コンポーザdismiss時の件数比較」から「`myActiveGrooms.count` の増加（＝背後投稿が着地）」に変更。増えた瞬間 0.45s 後に `groomActivationSignal += 1`（列が見える状態で枠がぐるっと）。アプリ起動時の 0→N はフラグ false のため発火しない。
+
+#### 3. ＋バッジを黒く大きく（`GroomStoryTileViews.swift`）
+- `addBadgeBlue`（IG青 #0095F6）→ `addBadgeFill`（黒 rgb 0.09,0.09,0.11）。サイズ 20→26、＋記号 13→16pt、白縁 2→2.5、offset 2→3。
+
+### 影響範囲
+- ホーム経由グルーム投稿の「場所選択」ステップと投稿完了フロー、ホーム上部グルーム列の自分タイル＋バッジ。めぐり地図経由の投稿（locksCreationCoordinate=true）は従来どおり awaited publish（onPublishInBackground は既定no-op）。
+
+### 確認方法
+- `swift build`／`swift test` グリーン（XCTest 1536・0 failures、Swift Testing 24）。iOS device build **BUILD SUCCEEDED**。
+- 地図・降下ピン・背後投稿・枠活性化は実機でのみ検証可能 → device build + install。ImageRenderer は MapKit を描画できないためスナップショット非適用。
+
+### セルフレビュー結果
+- ✅ 全画面地図はめぐり系と同じ `MeguriMapVisualStyle.quietStandard`＋ブランドトーンを使用（iOS標準 Map）。
+- ✅ 降下アニメは既存 `MeguriMapCreationPromptPresentationState` を流用（新規物理演算なし）。
+- ✅ 投稿失敗時は expectsGroomActivation が残るが、発火は自分グルーム件数の増加時のみ＝他人グルームでは誤発火しない。
+- ⚠️ 背後投稿が失敗してもホームには戻る（トーストは出ない）。失敗時のリトライ導線は今後の課題。
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/GroomStoryLocationStepView.swift`
+- `ios-native/Sources/MegrumApp/GroomStoryComposerViews.swift`
+- `ios-native/Sources/MegrumApp/GroomComposerContainer.swift`
+- `ios-native/Sources/MegrumApp/MeguriGroomPresentationModifiers.swift`
+- `ios-native/Sources/MegrumApp/HomeScreen.swift`
+- `ios-native/Sources/MegrumApp/GroomStoryTileViews.swift`
+
+---
+
 ## イテレーション1226.399：マーケ計画を関西拠点版v2へ全面改訂＋実行トラッカー・コピーキット・管理体制の整備（FB）
 
 ### 背景・問題意識

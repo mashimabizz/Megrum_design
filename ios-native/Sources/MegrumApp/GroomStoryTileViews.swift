@@ -20,8 +20,8 @@ enum GroomStoryMetrics {
 
     /// 既読／自分のストーリーの薄いグレー枠（IG の #C7C7C7）。
     static let seenRing = Color(red: 0.78, green: 0.78, blue: 0.78)
-    /// 追加バッジの青（IG のアクションブルー #0095F6）。
-    static let addBadgeBlue = Color(red: 0.0, green: 0.584, blue: 0.965)
+    /// 追加バッジの色。FB(iter1226.399)：青ではなく黒。
+    static let addBadgeFill = Color(red: 0.09, green: 0.09, blue: 0.11)
     /// 未読ラベル色（IG の #262626）。
     static let labelUnseen = Color(red: 0.149, green: 0.149, blue: 0.149)
     /// 既読ラベル色（IG の #8E8E8E）。
@@ -83,18 +83,18 @@ struct GroomMyStoryTile: View {
     }
 }
 
-/// 自分タイルの右下「＋」バッジ（IGのアクションブルー）。
+/// 自分タイルの右下「＋」バッジ。FB(iter1226.399)：黒で少し大きめ。
 private struct GroomMyStoryAddBadge: View {
     var body: some View {
         Image(systemName: "plus")
-            .font(.system(size: 13, weight: .bold))
+            .font(.system(size: 16, weight: .bold))
             .foregroundStyle(.white)
-            .frame(width: 20, height: 20)
-            .background(GroomStoryMetrics.addBadgeBlue, in: Circle())
+            .frame(width: 26, height: 26)
+            .background(GroomStoryMetrics.addBadgeFill, in: Circle())
             .overlay {
-                Circle().stroke(MegrumTheme.canvas, lineWidth: 2)
+                Circle().stroke(MegrumTheme.canvas, lineWidth: 2.5)
             }
-            .offset(x: 2, y: 2)
+            .offset(x: 3, y: 3)
     }
 }
 

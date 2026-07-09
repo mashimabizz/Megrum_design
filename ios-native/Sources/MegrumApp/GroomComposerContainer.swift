@@ -9,6 +9,8 @@ struct GroomComposerContainer<Content: View>: View {
     @ObservedObject var appState: MegrumAppState
     @ObservedObject var locationState: MegrumLocationState
     @Binding var isPresented: Bool
+    /// FB(iter1226.399)：バックグラウンド投稿を開始した時にホーム側へ通知（自分アイコンの枠活性化アニメ準備）。
+    var onGroomPublishStarted: () -> Void = {}
     @ViewBuilder var content: () -> Content
 
     @State private var selectedPhotoItem: PhotosPickerItem?
@@ -42,6 +44,7 @@ struct GroomComposerContainer<Content: View>: View {
                     onCapturePhoto: handleCapturedPhoto,
                     onCameraFailure: { _ in },
                     onPublish: publish,
+                    onPublishInBackground: publishInBackground,
                     onDiscard: {
                         resetDraft()
                         isPresented = false
@@ -132,6 +135,36 @@ struct GroomComposerContainer<Content: View>: View {
             return true
         }
         return false
+    }
+
+    /// FB(iter1226.399)：ホーム経由「この場所にする」用。コンポーザは即閉じ、投稿はここで背後に実行する。
+    /// 成功したら地図データを再取得 → ホームの自分グルーム件数が増え、枠活性化アニメが走る。
+    private func publishInBackground(
+        data: Data,
+        imageContentType: String,
+        caption: String?,
+        coordinate: MegrumLocationCoordinate,
+        metadata: MeguriContentMetadataDraft
+    ) {
+        onGroomPublishStarted()
+        Task {
+            let created = await appState.createGroomPost(
+                imageData: data,
+                imageContentType: imageContentType,
+                caption: caption,
+                latitude: coordinate.latitude,
+                longitude: coordinate.longitude,
+                groupID: metadata.groupID,
+                characterID: metadata.characterID,
+                seriesName: metadata.normalizedSeriesName
+            )
+            guard created else { return }
+            await appState.loadGroomMapPosts(
+                latitude: coordinate.latitude,
+                longitude: coordinate.longitude,
+                force: true
+            )
+        }
     }
 
     private func resetDraft() {
