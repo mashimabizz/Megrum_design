@@ -26,6 +26,8 @@ struct MeguriGroomComposerPresentationModifier: ViewModifier {
     var onPublish: (Data, String, String?, MegrumLocationCoordinate, MeguriContentMetadataDraft) async -> Bool
     /// FB(iter1226.399)：ホーム経由「この場所にする」用のバックグラウンド投稿。既定は何もしない。
     var onPublishInBackground: (Data, String, String?, MegrumLocationCoordinate, MeguriContentMetadataDraft) -> Void = { _, _, _, _, _ in }
+    /// FB(iter1226.401)：ホーム経由は左からスライドイン。
+    var presentsFromLeading: Bool = false
     var onDiscard: () -> Void
 
     func body(content: Content) -> some View {
@@ -62,6 +64,7 @@ struct MeguriGroomComposerPresentationModifier: ViewModifier {
                 },
                 onPublish: onPublish,
                 onPublishInBackground: onPublishInBackground,
+                presentsFromLeading: presentsFromLeading,
                 onDiscard: onDiscard
             )
             .groomCameraPresentation(
@@ -105,6 +108,7 @@ private extension View {
         onLoadUserOshiSelections: @escaping () async -> Void,
         onPublish: @escaping (Data, String, String?, MegrumLocationCoordinate, MeguriContentMetadataDraft) async -> Bool,
         onPublishInBackground: @escaping (Data, String, String?, MegrumLocationCoordinate, MeguriContentMetadataDraft) -> Void,
+        presentsFromLeading: Bool,
         onDiscard: @escaping () -> Void
     ) -> some View {
         #if os(iOS)
@@ -134,6 +138,7 @@ private extension View {
                 onLoadUserOshiSelections: onLoadUserOshiSelections,
                 onPublish: onPublish,
                 onPublishInBackground: onPublishInBackground,
+                presentsFromLeading: presentsFromLeading,
                 onDiscard: onDiscard
             )
         }
@@ -164,6 +169,7 @@ private extension View {
                 onLoadUserOshiSelections: onLoadUserOshiSelections,
                 onPublish: onPublish,
                 onPublishInBackground: onPublishInBackground,
+                presentsFromLeading: presentsFromLeading,
                 onDiscard: onDiscard
             )
         }

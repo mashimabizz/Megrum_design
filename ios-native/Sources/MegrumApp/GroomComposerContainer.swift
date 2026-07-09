@@ -45,6 +45,7 @@ struct GroomComposerContainer<Content: View>: View {
                     onCameraFailure: { _ in },
                     onPublish: publish,
                     onPublishInBackground: publishInBackground,
+                    presentsFromLeading: true,
                     onDiscard: {
                         resetDraft()
                         isPresented = false

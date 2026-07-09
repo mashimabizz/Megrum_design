@@ -254,7 +254,12 @@ struct HomeScreen: View {
             groomRailProfiles: appState?.publicProfilesByUserID ?? [:],
             groomRailViewedIDs: appState?.viewedGroomIDs ?? [],
             onOpenGroom: handleGroomRailTap,
-            onAddGroom: { isGroomComposerPresented = true },
+            onAddGroom: {
+                // FB(iter1226.401)：fullScreenCover 既定の「下から」を止め、コンポーザ側の左スライドだけで見せる。
+                var transaction = Transaction()
+                transaction.disablesAnimations = true
+                withTransaction(transaction) { isGroomComposerPresented = true }
+            },
             onViewOwnGroom: viewOwnGroom
         )
         .background(MegrumTheme.canvas.ignoresSafeArea())

@@ -29,6 +29,8 @@ struct GroomStoryComposerScreen: View {
     var onPublish: (Data, String, String?, MegrumLocationCoordinate, MeguriContentMetadataDraft) async -> Bool
     /// FB(iter1226.399)：ホーム経由の「この場所にする」用。投稿はバックグラウンドで実行し、即ホームへ戻す。
     var onPublishInBackground: (Data, String, String?, MegrumLocationCoordinate, MeguriContentMetadataDraft) -> Void = { _, _, _, _, _ in }
+    /// FB(iter1226.401)：ホーム経由の起動は下からではなく左からスライドイン＋触覚。
+    var presentsFromLeading: Bool = false
     var onDiscard: () -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var presentationState = GroomStoryComposerPresentationState()
@@ -53,6 +55,11 @@ struct GroomStoryComposerScreen: View {
     }
 
     var body: some View {
+        composerContent
+            .modifier(GroomComposerLeadingSlideModifier(active: presentsFromLeading))
+    }
+
+    private var composerContent: some View {
         ZStack {
             Color.black.ignoresSafeArea()
 
@@ -376,6 +383,32 @@ struct GroomStoryComposerScreen: View {
             withAnimation(.smooth(duration: 0.18)) {
                 presentationState.clearToast(ifMatching: toastID)
             }
+        }
+    }
+}
+
+/// FB(iter1226.401)：ホーム経由のグルーム投稿を、下からではなく左からスライドインさせる（＋触覚）。
+/// fullScreenCover 自体のアニメーションは呼び出し側で無効化し、中身のこのオフセットだけで動かす。
+private struct GroomComposerLeadingSlideModifier: ViewModifier {
+    var active: Bool
+    @State private var shown = false
+
+    func body(content: Content) -> some View {
+        if active {
+            GeometryReader { proxy in
+                content
+                    .frame(width: proxy.size.width, height: proxy.size.height)
+                    .offset(x: shown ? 0 : -proxy.size.width)
+            }
+            .ignoresSafeArea()
+            .onAppear {
+                MegrumHaptics.buttonTap()
+                withAnimation(.spring(response: 0.36, dampingFraction: 0.9)) {
+                    shown = true
+                }
+            }
+        } else {
+            content
         }
     }
 }

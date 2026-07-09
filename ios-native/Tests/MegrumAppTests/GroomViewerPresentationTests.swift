@@ -12,8 +12,10 @@ final class GroomViewerPresentationTests: XCTestCase {
         // 見た目のオフセットはラバーバンドで実移動より小さくなる。
         XCTAssertLessThan(state.verticalOffset, 160)
         XCTAssertGreaterThan(state.verticalOffset, 0)
-        XCTAssertEqual(state.scale, 1, accuracy: 0.0001)
-        XCTAssertEqual(state.cornerRadius, 0, accuracy: 0.0001)
+        // FB(iter1226.401)：引くほど一覧へ縮んでいく（scale が下がり角丸が付く）。
+        XCTAssertLessThan(state.scale, 1)
+        XCTAssertGreaterThan(state.scale, 0.6)
+        XCTAssertGreaterThan(state.cornerRadius, 0)
         XCTAssertFalse(state.shouldDismiss(for: CGSize(width: 0, height: 130)))
         XCTAssertTrue(state.shouldDismiss(for: CGSize(width: 0, height: 131)))
 
@@ -33,12 +35,13 @@ final class GroomViewerPresentationTests: XCTestCase {
 
         // 横方向は無視され、下方向のみ反映される。
         XCTAssertEqual(state.translation.width, 0, accuracy: 0.0001)
-        // 見た目のオフセットは画面1/10相当（84pt）へラバーバンドで漸近し、超えない。
-        XCTAssertLessThan(state.verticalOffset, 84)
-        XCTAssertGreaterThan(state.verticalOffset, 70)
-        // 縮小・角丸の演出は無し。
-        XCTAssertEqual(state.scale, 1, accuracy: 0.0001)
-        XCTAssertEqual(state.cornerRadius, 0, accuracy: 0.0001)
+        // FB(iter1226.401)：追従量の見た目上限（120pt）へラバーバンドで漸近し、超えない。
+        XCTAssertLessThan(state.verticalOffset, 120)
+        XCTAssertGreaterThan(state.verticalOffset, 100)
+        // 引くほど縮小（約0.8→さらに小さく）＋角丸が付く。
+        XCTAssertLessThan(state.scale, 0.8)
+        XCTAssertGreaterThan(state.scale, 0.6)
+        XCTAssertGreaterThan(state.cornerRadius, 20)
     }
 
     func testRelativeTimeFormatterUsesCompactJapaneseLabels() {

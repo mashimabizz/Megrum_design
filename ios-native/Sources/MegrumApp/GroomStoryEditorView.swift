@@ -21,6 +21,8 @@ struct GroomStoryEditorView: View {
     @State private var editingOverlayID: UUID?
     @State private var draggingOverlayID: UUID?
     @State private var isHoveringDeleteTarget = false
+    /// キーボードの高さ。背景を動かさずにカラーツールバー/入力欄だけをキーボードの上に置くために使う。
+    @State private var keyboardHeight: CGFloat = 0
 
     var body: some View {
         GeometryReader { proxy in
@@ -51,6 +53,7 @@ struct GroomStoryEditorView: View {
                     GroomStoryTextInputLayer(
                         canvasFrame: canvasFrame,
                         safeAreaInsets: proxy.safeAreaInsets,
+                        keyboardHeight: keyboardHeight,
                         text: $draftText,
                         selectedColor: selectedTextColor,
                         textScale: $draftTextScale,
@@ -87,20 +90,25 @@ struct GroomStoryEditorView: View {
                     )
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
+
+                if isTextInputPresented {
+                    // カラーツールバーはキーボードの上に浮かせる（背景グルームは動かさない）。
+                    VStack {
+                        Spacer()
+                        GroomStoryTextColorToolbar(selectedColor: $selectedTextColor)
+                            .padding(.horizontal, 22)
+                            .padding(.bottom, keyboardHeight + 10)
+                    }
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
             }
             .animation(.smooth(duration: 0.18), value: isTextInputPresented)
             .animation(.smooth(duration: 0.18), value: draggingOverlayID)
-            // キーボード表示時に背景グルームが押し上げられて移動/縮小しないようにする。
-            .ignoresSafeArea(.keyboard, edges: .bottom)
+            .animation(.easeOut(duration: 0.22), value: keyboardHeight)
         }
-        .safeAreaInset(edge: .bottom) {
-            if isTextInputPresented {
-                GroomStoryTextColorToolbar(selectedColor: $selectedTextColor)
-                .padding(.horizontal, 22)
-                .padding(.bottom, 8)
-                .transition(.move(edge: .bottom).combined(with: .opacity))
-            }
-        }
+        // GeometryReader全体でキーボード回避を無効化 → proxy.size が縮まず、背景が移動/縮小しない。
+        .ignoresSafeArea(.keyboard, edges: .bottom)
+        .modifier(GroomKeyboardHeightObserver(height: $keyboardHeight))
     }
 
     private func beginTextInput(at location: CGPoint, in canvasSize: CGSize) {
@@ -190,6 +198,13 @@ private enum GroomStoryEditorLayout {
     }
 }
 
+private struct GroomOverlayFramesKey: PreferenceKey {
+    static let defaultValue: [UUID: CGRect] = [:]
+    static func reduce(value: inout [UUID: CGRect], nextValue: () -> [UUID: CGRect]) {
+        value.merge(nextValue()) { _, new in new }
+    }
+}
+
 private struct GroomStoryEditableCanvas: View {
     var photoData: Data
     @Binding var textOverlays: [GroomStoryTextOverlay]
@@ -200,104 +215,77 @@ private struct GroomStoryEditableCanvas: View {
     var onEdit: (GroomStoryTextOverlay) -> Void
     var onTapCanvas: (CGPoint, CGSize) -> Void
 
+    @State private var overlayFrames: [UUID: CGRect] = [:]
+
     var body: some View {
         GeometryReader { proxy in
             ZStack {
                 GroomStoryPhotoCanvas(photoData: photoData)
 
-                ForEach($textOverlays) { $overlay in
+                ForEach(textOverlays) { overlay in
                     if overlay.id != editingOverlayID {
-                        GroomStoryEditableTextOverlay(
-                            overlay: $overlay,
-                            canvasSize: proxy.size,
-                            draggingOverlayID: $draggingOverlayID,
-                            isHoveringDeleteTarget: $isHoveringDeleteTarget,
-                            onDelete: onDelete,
-                            onEdit: onEdit
-                        )
+                        GroomStoryOverlayText(overlay: overlay, canvasSize: proxy.size)
+                            .background(
+                                GeometryReader { frameProxy in
+                                    Color.clear.preference(
+                                        key: GroomOverlayFramesKey.self,
+                                        value: [overlay.id: frameProxy.frame(in: .named(GroomStoryCanvasCoordinateSpace.name))]
+                                    )
+                                }
+                            )
+                            .position(
+                                x: overlay.normalizedPosition.x * proxy.size.width,
+                                y: overlay.normalizedPosition.y * proxy.size.height
+                            )
+                            .scaleEffect(draggingOverlayID == overlay.id ? 1.04 : 1)
+                            .animation(.smooth(duration: 0.12), value: draggingOverlayID == overlay.id)
                     }
                 }
+
+                #if canImport(UIKit)
+                // 移動/拡大縮小/回転のジェスチャは「文字の小さな枠」ではなく画面いっぱいのこの1枚で受ける。
+                // こうすると、1本目で文字を掴んだあと2本目を画面のどこに置いても2本指操作が成立する（インスタ同様）。
+                GroomStoryCanvasGestureView(
+                    canvasSize: proxy.size,
+                    overlayFrames: overlayFrames,
+                    orderedOverlayIDs: textOverlays.map(\.id),
+                    editingOverlayID: editingOverlayID,
+                    textOverlays: $textOverlays,
+                    draggingOverlayID: $draggingOverlayID,
+                    isHoveringDeleteTarget: $isHoveringDeleteTarget,
+                    onDelete: onDelete,
+                    onEdit: onEdit,
+                    onTapEmpty: { location in onTapCanvas(location, proxy.size) }
+                )
+                #else
+                Color.clear
+                    .contentShape(Rectangle())
+                    .gesture(
+                        SpatialTapGesture()
+                            .onEnded { value in onTapCanvas(value.location, proxy.size) }
+                    )
+                #endif
             }
             .coordinateSpace(name: GroomStoryCanvasCoordinateSpace.name)
-            .contentShape(Rectangle())
-            .gesture(
-                SpatialTapGesture()
-                    .onEnded { value in
-                        onTapCanvas(value.location, proxy.size)
-                    }
-            )
+            .onPreferenceChange(GroomOverlayFramesKey.self) { overlayFrames = $0 }
         }
-    }
-}
-
-private struct GroomStoryEditableTextOverlay: View {
-    @Binding var overlay: GroomStoryTextOverlay
-    var canvasSize: CGSize
-    @Binding var draggingOverlayID: UUID?
-    @Binding var isHoveringDeleteTarget: Bool
-    var onDelete: (UUID) -> Void
-    var onEdit: (GroomStoryTextOverlay) -> Void
-
-    var body: some View {
-        GroomStoryOverlayText(
-            overlay: overlay,
-            canvasSize: canvasSize
-        )
-        .modifier(
-            GroomStoryTextManipulationModifier(
-                canvasSize: canvasSize,
-                overlay: $overlay,
-                draggingOverlayID: $draggingOverlayID,
-                isHoveringDeleteTarget: $isHoveringDeleteTarget,
-                onDelete: onDelete,
-                onEdit: onEdit
-            )
-        )
-        .position(
-            x: overlay.normalizedPosition.x * canvasSize.width,
-            y: overlay.normalizedPosition.y * canvasSize.height
-        )
-        .scaleEffect(draggingOverlayID == overlay.id ? 1.04 : 1)
-    }
-}
-
-/// 文字オーバーレイの移動/拡大縮小/回転を担う。iOSではUIKitのジェスチャ認識器を同時認識で束ね、
-/// インスタのストーリー編集と同じく「1本目で移動 → 途中で2本目を置くとそのままピンチ/回転もできる」
-/// 操作感にする。UIKitが無い環境（テストホスト等）では操作なしのフォールバック。
-private struct GroomStoryTextManipulationModifier: ViewModifier {
-    var canvasSize: CGSize
-    @Binding var overlay: GroomStoryTextOverlay
-    @Binding var draggingOverlayID: UUID?
-    @Binding var isHoveringDeleteTarget: Bool
-    var onDelete: (UUID) -> Void
-    var onEdit: (GroomStoryTextOverlay) -> Void
-
-    func body(content: Content) -> some View {
-        #if canImport(UIKit)
-        content.overlay {
-            GroomStoryTextGestureSurface(
-                canvasSize: canvasSize,
-                overlay: $overlay,
-                draggingOverlayID: $draggingOverlayID,
-                isHoveringDeleteTarget: $isHoveringDeleteTarget,
-                onDelete: onDelete,
-                onEdit: onEdit
-            )
-        }
-        #else
-        content
-        #endif
     }
 }
 
 #if canImport(UIKit)
-private struct GroomStoryTextGestureSurface: UIViewRepresentable {
+/// 文字オーバーレイの移動/拡大縮小/回転を、画面いっぱいの1枚で受けるジェスチャ面。
+/// ジェスチャ開始位置から当たり判定で対象オーバーレイを決め、以後の pan/pinch/rotation を同時にそれへ適用する。
+private struct GroomStoryCanvasGestureView: UIViewRepresentable {
     var canvasSize: CGSize
-    @Binding var overlay: GroomStoryTextOverlay
+    var overlayFrames: [UUID: CGRect]
+    var orderedOverlayIDs: [UUID]
+    var editingOverlayID: UUID?
+    @Binding var textOverlays: [GroomStoryTextOverlay]
     @Binding var draggingOverlayID: UUID?
     @Binding var isHoveringDeleteTarget: Bool
     var onDelete: (UUID) -> Void
     var onEdit: (GroomStoryTextOverlay) -> Void
+    var onTapEmpty: (CGPoint) -> Void
 
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
@@ -345,11 +333,12 @@ private struct GroomStoryTextGestureSurface: UIViewRepresentable {
     }
 
     final class Coordinator: NSObject, UIGestureRecognizerDelegate {
-        var parent: GroomStoryTextGestureSurface
-        private var activeManipulations = 0
+        var parent: GroomStoryCanvasGestureView
+        private var activeID: UUID?
+        private var activeCount = 0
         private var lastPanTouchCount = 0
 
-        init(_ parent: GroomStoryTextGestureSurface) {
+        init(_ parent: GroomStoryCanvasGestureView) {
             self.parent = parent
         }
 
@@ -357,74 +346,95 @@ private struct GroomStoryTextGestureSurface: UIViewRepresentable {
             _ gesture: UIGestureRecognizer,
             shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer
         ) -> Bool {
-            // 移動・拡大縮小・回転は同時に効かせる。タップ（＝編集を開く）だけは他と同時にしない。
+            // 移動・拡大縮小・回転は同時に。タップ（編集を開く）だけは他と同時にしない。
             if gesture is UITapGestureRecognizer || other is UITapGestureRecognizer {
                 return false
             }
             return true
         }
 
-        private func beginManipulation() {
-            if activeManipulations == 0 {
-                parent.draggingOverlayID = parent.overlay.id
+        private func overlayID(at point: CGPoint) -> UUID? {
+            // 手前（配列末尾）から当たり判定。掴みやすいよう少しだけ判定を広げる。
+            for id in parent.orderedOverlayIDs.reversed() {
+                if id == parent.editingOverlayID { continue }
+                if let rect = parent.overlayFrames[id], rect.insetBy(dx: -16, dy: -16).contains(point) {
+                    return id
+                }
             }
-            activeManipulations += 1
+            return nil
+        }
+
+        private func index(of id: UUID) -> Int? {
+            parent.textOverlays.firstIndex(where: { $0.id == id })
+        }
+
+        private func beginManipulation(at point: CGPoint) {
+            if activeCount == 0 {
+                activeID = overlayID(at: point)
+                if let activeID {
+                    parent.draggingOverlayID = activeID
+                }
+            }
+            activeCount += 1
         }
 
         private func endManipulation() {
-            activeManipulations = max(0, activeManipulations - 1)
-            if activeManipulations == 0 {
-                parent.draggingOverlayID = nil
-                parent.isHoveringDeleteTarget = false
+            activeCount = max(0, activeCount - 1)
+            guard activeCount == 0 else { return }
+            let finishedID = activeID
+            let shouldDelete = finishedID
+                .flatMap { index(of: $0) }
+                .map { parent.textOverlays[$0].normalizedPosition.y > 0.84 } ?? false
+            parent.draggingOverlayID = nil
+            parent.isHoveringDeleteTarget = false
+            activeID = nil
+            lastPanTouchCount = 0
+            if let finishedID, shouldDelete {
+                parent.onDelete(finishedID)
             }
         }
 
         @objc func handlePan(_ gesture: UIPanGestureRecognizer) {
             guard let host = gesture.view else { return }
-            // 端末回転で座標系が傾かないよう、常にwindow基準の移動量を使う。
-            let reference = host.window ?? host
             switch gesture.state {
             case .began:
-                beginManipulation()
+                beginManipulation(at: gesture.location(in: host))
                 lastPanTouchCount = gesture.numberOfTouches
-                gesture.setTranslation(.zero, in: reference)
+                gesture.setTranslation(.zero, in: host)
             case .changed:
+                guard let activeID, let idx = index(of: activeID) else { return }
                 if gesture.numberOfTouches != lastPanTouchCount {
-                    // 指を足す/離すと重心が飛ぶので、その1フレームは移動を無視して基準を取り直す。
+                    // 指の増減で重心が飛ぶフレームは無視して基準を取り直す。
                     lastPanTouchCount = gesture.numberOfTouches
-                    gesture.setTranslation(.zero, in: reference)
+                    gesture.setTranslation(.zero, in: host)
                     return
                 }
-                let translation = gesture.translation(in: reference)
-                gesture.setTranslation(.zero, in: reference)
+                let translation = gesture.translation(in: host)
+                gesture.setTranslation(.zero, in: host)
                 let width = max(parent.canvasSize.width, 1)
                 let height = max(parent.canvasSize.height, 1)
-                var position = parent.overlay.normalizedPosition
+                var position = parent.textOverlays[idx].normalizedPosition
                 position.x += translation.x / width
                 position.y += translation.y / height
-                parent.overlay.normalizedPosition = position.groomStoryClamped
-                parent.isHoveringDeleteTarget = parent.overlay.normalizedPosition.y > 0.84
+                parent.textOverlays[idx].normalizedPosition = position.groomStoryClamped
+                parent.isHoveringDeleteTarget = parent.textOverlays[idx].normalizedPosition.y > 0.84
             case .ended, .cancelled, .failed:
-                let shouldDelete = parent.overlay.normalizedPosition.y > 0.84
-                let overlayID = parent.overlay.id
                 endManipulation()
-                lastPanTouchCount = 0
-                if shouldDelete {
-                    parent.onDelete(overlayID)
-                }
             default:
                 break
             }
         }
 
         @objc func handlePinch(_ gesture: UIPinchGestureRecognizer) {
+            guard let host = gesture.view else { return }
             switch gesture.state {
             case .began:
-                beginManipulation()
+                beginManipulation(at: gesture.location(in: host))
             case .changed:
-                let next = parent.overlay.scale * gesture.scale
+                guard let activeID, let idx = index(of: activeID) else { return }
+                let next = parent.textOverlays[idx].scale * gesture.scale
                 gesture.scale = 1
-                parent.overlay.scale = min(max(next, 0.55), 2.6)
+                parent.textOverlays[idx].scale = min(max(next, 0.55), 2.6)
             case .ended, .cancelled, .failed:
                 endManipulation()
             default:
@@ -433,11 +443,13 @@ private struct GroomStoryTextGestureSurface: UIViewRepresentable {
         }
 
         @objc func handleRotation(_ gesture: UIRotationGestureRecognizer) {
+            guard let host = gesture.view else { return }
             switch gesture.state {
             case .began:
-                beginManipulation()
+                beginManipulation(at: gesture.location(in: host))
             case .changed:
-                parent.overlay.rotationDegrees += Double(gesture.rotation) * 180 / .pi
+                guard let activeID, let idx = index(of: activeID) else { return }
+                parent.textOverlays[idx].rotationDegrees += Double(gesture.rotation) * 180 / .pi
                 gesture.rotation = 0
             case .ended, .cancelled, .failed:
                 endManipulation()
@@ -447,7 +459,12 @@ private struct GroomStoryTextGestureSurface: UIViewRepresentable {
         }
 
         @objc func handleTap(_ gesture: UITapGestureRecognizer) {
-            parent.onEdit(parent.overlay)
+            let point = gesture.location(in: gesture.view)
+            if let id = overlayID(at: point), let idx = index(of: id) {
+                parent.onEdit(parent.textOverlays[idx])
+            } else {
+                parent.onTapEmpty(point)
+            }
         }
     }
 }
@@ -456,6 +473,7 @@ private struct GroomStoryTextGestureSurface: UIViewRepresentable {
 private struct GroomStoryTextInputLayer: View {
     var canvasFrame: CGRect
     var safeAreaInsets: EdgeInsets
+    var keyboardHeight: CGFloat
     @Binding var text: String
     var selectedColor: GroomStoryTextColor
     @Binding var textScale: CGFloat
@@ -465,7 +483,7 @@ private struct GroomStoryTextInputLayer: View {
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
-            // 文字以外をタップしたら（キーボードを下げるだけでなく）「完了」と同じく確定する。
+            // 文字以外をタップしたら（キーボードを下げるだけでなく）「完了」と同じく確定する。「完了」ボタンは廃止。
             Color.black.opacity(0.28)
                 .ignoresSafeArea()
                 .contentShape(Rectangle())
@@ -479,15 +497,6 @@ private struct GroomStoryTextInputLayer: View {
                     x: canvasFrame.minX + safeAreaInsets.leading + 34,
                     y: canvasFrame.midY
                 )
-
-            Button("完了", action: onCommit)
-                .font(.system(size: 18, weight: .heavy, design: .rounded))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 22)
-                .padding(.vertical, 12)
-                .contentShape(Capsule())
-                .padding(.top, safeAreaInsets.top + 12)
-                .padding(.trailing, 22)
         }
     }
 
@@ -510,10 +519,10 @@ private struct GroomStoryTextInputLayer: View {
     }
 
     private var inputFieldPosition: CGPoint {
-        CGPoint(
-            x: canvasFrame.midX,
-            y: canvasFrame.minY + position.y * canvasFrame.height
-        )
+        // タップ位置に置くが、キーボードで隠れないよう上限をキーボード上端の少し上までにクランプする。
+        let tappedY = canvasFrame.minY + position.y * canvasFrame.height
+        let maxY = canvasFrame.maxY - keyboardHeight - 96
+        return CGPoint(x: canvasFrame.midX, y: min(tappedY, max(canvasFrame.minY + 120, maxY)))
     }
 
     private var inputFontSize: CGFloat {
@@ -701,3 +710,38 @@ private struct GroomStoryDeleteTarget: View {
 private enum GroomStoryCanvasCoordinateSpace {
     static let name = "groom-story-canvas"
 }
+
+/// キーボードの高さ（画面下からの重なり量）を監視して binding に反映する。
+/// これでエディタ本体は `.ignoresSafeArea(.keyboard)` で固定したまま、ツールバーだけキーボード上に置ける。
+private struct GroomKeyboardHeightObserver: ViewModifier {
+    @Binding var height: CGFloat
+
+    func body(content: Content) -> some View {
+        #if canImport(UIKit)
+        content
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) { note in
+                guard
+                    let frame = note.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect,
+                    let screen = UIApplication.groomKeyWindow?.bounds.height
+                else { return }
+                height = max(0, screen - frame.minY)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
+                height = 0
+            }
+        #else
+        content
+        #endif
+    }
+}
+
+#if canImport(UIKit)
+private extension UIApplication {
+    static var groomKeyWindow: UIWindow? {
+        shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap(\.windows)
+            .first(where: \.isKeyWindow)
+    }
+}
+#endif

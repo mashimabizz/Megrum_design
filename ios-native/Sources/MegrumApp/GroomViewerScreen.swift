@@ -43,6 +43,8 @@ struct GroomViewerScreen: View {
     @ObservedObject var appState: MegrumAppState
     var onDismiss: (() -> Void)?
     var onOpenMeguriUserProfile: (UUID) -> Void = { _ in }
+    /// FB(iter1226.401)：閉じる時に縮んでいく先（グルーム一覧のタイル位置など）。下スワイプ縮小の基点に使う。
+    var closeAnchor: UnitPoint = .center
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     static let doubleTapSpaceName = "groom-viewer-double-tap"
@@ -67,7 +69,8 @@ struct GroomViewerScreen: View {
         initialGroom: GroomPost,
         appState: MegrumAppState,
         onDismiss: (() -> Void)? = nil,
-        onOpenMeguriUserProfile: @escaping (UUID) -> Void = { _ in }
+        onOpenMeguriUserProfile: @escaping (UUID) -> Void = { _ in },
+        closeAnchor: UnitPoint = .center
     ) {
         let fallbackGrooms = grooms.contains(where: { $0.id == initialGroom.id })
             ? grooms
@@ -77,6 +80,7 @@ struct GroomViewerScreen: View {
         self.appState = appState
         self.onDismiss = onDismiss
         self.onOpenMeguriUserProfile = onOpenMeguriUserProfile
+        self.closeAnchor = closeAnchor
         _currentIndex = State(initialValue: fallbackGrooms.firstIndex(where: { $0.id == initialGroom.id }) ?? 0)
     }
 
@@ -179,8 +183,8 @@ struct GroomViewerScreen: View {
                 .ignoresSafeArea(.container, edges: .top)
 
             viewerSurface
+                .scaleEffect(viewerScale, anchor: closeAnchor)
                 .offset(y: viewerVerticalOffset)
-                .scaleEffect(viewerScale)
                 .clipShape(RoundedRectangle(cornerRadius: viewerCornerRadius, style: .continuous))
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

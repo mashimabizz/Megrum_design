@@ -4,6 +4,62 @@
 
 ---
 
+## イテレーション1226.401：グルーム文字編集の再修正（背景固定・完了ボタン廃止・2本指を全画面ジェスチャ化・ゴミ箱の引っ込み）＋投稿コンポーザ左スライド＋ビューア閉じで一覧へ縮小（FB再対応）
+
+### 背景・問題意識
+iter1226.398 のFB再指摘：(1) 文字入力中に背景グルームがキーボードで押し上げられる問題が直っていない。(2) 文字以外タップ＝完了はOKだが「完了」ボタン自体を無くしたい。(3) 2本指の拡大/縮小/回転がインスタ風に（1本目移動中に2本目追加で）効かない＝直っていない。追加で (4) 文字ドラッグ中に出るゴミ箱は指を離したら下へ引っ込んでほしい。(5) ホーム経由のグルーム投稿は下からでなく左からスライドイン＋触覚。(6) グルームを下スワイプで閉じる時、グルーム一覧の場所へ画面が縮小されていく感じにしてほしい。
+
+### 変更内容
+
+#### 1. 背景固定（`GroomStoryEditorView.swift`）
+- 原因：エディタの `GeometryReader` がキーボード回避コンテキスト内にあり `proxy.size` が縮む → canvasFrame も縮み背景が移動。
+- 対処：GeometryReader 全体に `.ignoresSafeArea(.keyboard, edges: .bottom)` を付け proxy を固定。カラーツールバーは `safeAreaInset` をやめ、`GroomKeyboardHeightObserver`（keyboardWillChangeFrame 監視）で得た高さ分だけ底上げして手動でキーボード上に浮かせる。入力欄もキーボードに隠れないよう Y をクランプ。
+
+#### 2. 「完了」ボタン廃止（`GroomStoryEditorView.swift`）
+- `GroomStoryTextInputLayer` から「完了」ボタンを削除。確定は「文字以外タップ（暗幕 onTapGesture→onCommit）」と「改行/onSubmit」で行う。
+
+#### 3. 2本指操作を全画面ジェスチャ面へ（`GroomStoryEditorView.swift`）
+- 真因：従来は各文字の小さな `.overlay` UIView に pan/pinch/rotation を付けていたため、2本目の指が文字枠の外に落ちると pinch/rotation が touches を拾えず発火しなかった（＝1本指移動でゴミ箱は出るが2本指が効かない現象）。
+- 対処：`GroomStoryCanvasGestureView`（画面いっぱいの1枚の UIView）に pan/pinch/rotation/tap を集約し、同時認識で束ねる。各文字の実フレームは `GroomOverlayFramesKey`（PreferenceKey）で収集し、ジェスチャ開始位置から当たり判定で対象オーバーレイを決定。以後の2本指はどこに置いても対象へ適用（インスタ同様）。tap は当たれば編集、外れれば新規作成。
+
+#### 4. ゴミ箱の引っ込み（`GroomStoryEditorView.swift`）
+- 新ジェスチャ面は pan/pinch/rotation の稼働数が 0 になった時に `draggingOverlayID = nil`。エディタ側は `.animation(value: draggingOverlayID)` ＋ `.transition(.move(edge:.bottom))` で、指を離すとゴミ箱が下へスッと引っ込む。
+
+#### 5. 投稿コンポーザの左スライドイン＋触覚（`GroomStoryComposerViews.swift`, `MeguriGroomPresentationModifiers.swift`, `GroomComposerContainer.swift`, `HomeScreen.swift`）
+- `GroomStoryComposerScreen` に `presentsFromLeading` を追加。`GroomComposerLeadingSlideModifier` で中身を `-画面幅→0` にスライドイン、onAppear で `MegrumHaptics.buttonTap()`。
+- HomeScreen の `onAddGroom` は `Transaction.disablesAnimations` で fullScreenCover 既定の「下から」を無効化し、中身の左スライドだけで見せる。ホーム経由（`GroomComposerContainer`）のみ `presentsFromLeading: true`。
+
+#### 6. ビューア閉じで一覧へ縮小（`GroomViewerDragPresentationState.swift`, `GroomViewerScreen.swift`, `MegrumAuthenticatedTabContentView.swift`）
+- `GroomViewerDragPresentationState`：下スワイプで scale が 1→約0.8 へ縮小、角丸が付き、下方向に追従（縮小演出を復活）。
+- `GroomViewerScreen` に `closeAnchor` を追加し、下スワイプの `scaleEffect(anchor:)` の基点に使用。既存の `groomViewerImmersiveOverlay` の scale-to-anchor（removal）と合わせ、離した後も同じ基点へ吸い込まれる。
+- ホームのグルーム一覧から開く時の `sourceAnchor`/`closeAnchor` を `.center` → `UnitPoint(0.5, 0.12)`（上部の一覧付近）に。閉じると一覧の場所へ縮んでいく。
+- 既存テスト（`GroomViewerPresentationTests`）を新挙動（scale<1・角丸>0・追従上限120pt）に更新。
+
+### 影響範囲
+- グルーム文字編集画面、ホーム経由グルーム投稿の登場アニメ、グルームビューアの閉じ演出。めぐり地図経由の投稿は従来どおり（`presentsFromLeading` 既定 false）。
+
+### 確認方法
+- `swift build`／`swift test` グリーン（XCTest 1536・0 failures、Swift Testing 24）。iOS device build **BUILD SUCCEEDED**。
+- マルチタッチ・キーボード・スライド・地図/縮小演出は実機でのみ検証可能 → device build + install。
+
+### セルフレビュー結果
+- ✅ 2本指の真因（小さな当たり判定）を全画面ジェスチャ面＋フレーム当たり判定で解消。
+- ✅ 背景固定は proxy.size を縮ませない方式に変更（前回の ZStack だけの ignoresSafeArea では不十分だった）。
+- ✅ iOS標準の Pan/Pinch/Rotation/Tap 認識器を同時認識で使用。左スライドは fullScreenCover の既定アニメを無効化して二重アニメを回避。
+- ⚠️ 左スライドの「戻り」は既定 dismiss（下方向）のまま。ビューアの「離した後に一覧へ飛ぶ」最終段は overlay の scale-to-anchor に委譲（正確なタイル座標ではなく上部固定アンカー近似）。
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/GroomStoryEditorView.swift`
+- `ios-native/Sources/MegrumApp/GroomStoryComposerViews.swift`
+- `ios-native/Sources/MegrumApp/MeguriGroomPresentationModifiers.swift`
+- `ios-native/Sources/MegrumApp/GroomComposerContainer.swift`
+- `ios-native/Sources/MegrumApp/HomeScreen.swift`
+- `ios-native/Sources/MegrumApp/GroomViewerDragPresentationState.swift`
+- `ios-native/Sources/MegrumApp/GroomViewerScreen.swift`
+- `ios-native/Sources/MegrumApp/MegrumAuthenticatedTabContentView.swift`
+
+---
+
 ## イテレーション1226.400：ホーム経由グルーム投稿の場所選択を全画面地図＋降下ピンに／確定で即ホーム＆背後投稿／＋バッジ黒く大きく（FB）
 
 ### 背景・問題意識

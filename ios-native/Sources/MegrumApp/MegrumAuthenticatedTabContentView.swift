@@ -221,7 +221,8 @@ struct MegrumAuthenticatedTabContentView: View {
                 initialGroom: groom,
                 appState: appState,
                 onDismiss: dismiss,
-                onOpenMeguriUserProfile: openMeguriUserProfileFromGroomViewer
+                onOpenMeguriUserProfile: openMeguriUserProfileFromGroomViewer,
+                closeAnchor: meguriGroomViewerSourceAnchor
             )
         }
     }
@@ -313,7 +314,8 @@ struct MegrumAuthenticatedTabContentView: View {
                     selectedTab = .inventory
                 },
                 onOpenGroom: { groom in
-                    openMeguriGroomViewer(groom, sourceAnchor: .center)
+                    // FB(iter1226.401)：ホームのグルーム一覧（上部）へ縮んでいくよう、開閉の基点を上寄せにする。
+                    openMeguriGroomViewer(groom, sourceAnchor: UnitPoint(x: 0.5, y: 0.12))
                 },
                 tutorialSampleActive: tutorialSampleActive,
                 tutorialFocusAnchor: tutorialCoordinator.currentBeat?.homeFocusAnchor,
