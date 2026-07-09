@@ -37,6 +37,7 @@ struct HomeDiscoveryExperience: View {
     // FB8-6：ホーム上部の圏内グルーム・ストーリー列。iter1226.387。
     var showsGroomRail: Bool = false
     var groomRailGrooms: [GroomPost] = []
+    var groomRailLockedIDs: Set<UUID> = []
     var groomRailViewer: UserProfile? = nil
     var groomRailProfiles: [UUID: PublicUserProfile] = [:]
     var groomRailViewedIDs: Set<UUID> = []
@@ -82,6 +83,7 @@ struct HomeDiscoveryExperience: View {
                         // FB8-6：圏内グルームのストーリー横並び（自分アイコン＋＋、未読先頭、水色→紫/グレー枠）。
                         GroomStrip(
                             grooms: groomRailGrooms,
+                            lockedGroomIDs: groomRailLockedIDs,
                             viewer: groomRailViewer,
                             publicProfilesByUserID: groomRailProfiles,
                             viewedGroomIDs: groomRailViewedIDs,

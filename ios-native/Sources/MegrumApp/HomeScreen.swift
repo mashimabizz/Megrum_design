@@ -59,19 +59,21 @@ struct HomeScreen: View {
     // FB8-6：圏内グルーム列＋その場投稿コンポーザ用の状態。iter1226.387。
     @StateObject private var groomLocationState = MegrumLocationState()
     @State private var isGroomComposerPresented = false
+    /// FB(iter1226.392)：ロックされた（圏外×無料）遭遇グルームをタップした時のプレミアム案内。
+    @State private var isShowingGroomLockPremium = false
 
     /// 実データのホーム（ガイドツアー以外）でグルーム列を出す。
     private var showsGroomRail: Bool {
         appState != nil && !tutorialSampleActive
     }
 
-    /// FB8-7：ホーム上部の列は「開けるグルームだけ」を並べる。
-    /// 圏内・自分の投稿・（通知済み×プレミアム）のみ表示し、圏外の非通知グルームは出さない。iter1226.388。
-    private var groomRailOpenableGrooms: [GroomPost] {
+    /// FB(iter1226.392)：ホーム上部の列は「圏内で開けるグルーム」＋「出会った(遭遇済み)グルーム」を並べる。
+    /// 遭遇済みでも圏外・無料だと開けない → ロックアイコン付きで表示（タップでプレミアム案内）。
+    private var groomRailItems: [GroomPost] {
         guard let appState else { return [] }
         let coordinate = groomLocationState.coordinate
         let viewerID = (appState.viewer ?? viewer)?.id
-        return appState.groomMapPosts.filter { groom in
+        let openable = appState.groomMapPosts.filter { groom in
             MeguriAccessPolicy.canOpenGroom(
                 groom,
                 currentCoordinate: coordinate,
@@ -79,6 +81,50 @@ struct HomeScreen: View {
                 hasEncountered: groom.encounteredInRange,
                 subscriptionState: appState.subscriptionState
             )
+        }
+        var seen = Set(openable.map(\.id))
+        var result = openable
+        for groom in appState.encounteredGrooms where !seen.contains(groom.id) {
+            seen.insert(groom.id)
+            result.append(groom)
+        }
+        return result
+    }
+
+    /// 上記のうち、いま開けない（圏外×無料などで）グルームID。ロックアイコン表示に使う。
+    private var groomRailLockedIDs: Set<UUID> {
+        guard let appState else { return [] }
+        let coordinate = groomLocationState.coordinate
+        let viewerID = (appState.viewer ?? viewer)?.id
+        return Set(
+            groomRailItems.filter { groom in
+                !MeguriAccessPolicy.canOpenGroom(
+                    groom,
+                    currentCoordinate: coordinate,
+                    viewerID: viewerID,
+                    hasEncountered: groom.encounteredInRange,
+                    subscriptionState: appState.subscriptionState
+                )
+            }.map(\.id)
+        )
+    }
+
+    private func handleGroomRailTap(_ groom: GroomPost) {
+        guard let appState else {
+            onOpenGroom(groom)
+            return
+        }
+        let canOpen = MeguriAccessPolicy.canOpenGroom(
+            groom,
+            currentCoordinate: groomLocationState.coordinate,
+            viewerID: (appState.viewer ?? viewer)?.id,
+            hasEncountered: groom.encounteredInRange,
+            subscriptionState: appState.subscriptionState
+        )
+        if canOpen {
+            onOpenGroom(groom)
+        } else {
+            isShowingGroomLockPremium = true
         }
     }
 
@@ -114,8 +160,10 @@ struct HomeScreen: View {
             return
         }
         await appState.loadGroomMapPosts(latitude: coordinate.latitude, longitude: coordinate.longitude)
+        // FB(iter1226.392): 出会った(遭遇済み)グルームも取得（近くに無くても列に出す）。
+        await appState.loadEncounteredGrooms(latitude: coordinate.latitude, longitude: coordinate.longitude)
         await appState.loadMeguriProfiles(
-            userIDs: Set(appState.groomMapPosts.map(\.authorID)),
+            userIDs: Set(appState.groomMapPosts.map(\.authorID)).union(appState.encounteredGrooms.map(\.authorID)),
             reportsFailure: false
         )
         // FB(iter1226.390): 現在地1km圏内の推しグルームを検出して遭遇記録＋通知。
@@ -164,11 +212,12 @@ struct HomeScreen: View {
             starterMissionForcedState: starterMissionForcedState,
             onOpenInventory: onOpenInventory,
             showsGroomRail: showsGroomRail,
-            groomRailGrooms: groomRailOpenableGrooms,
+            groomRailGrooms: groomRailItems,
+            groomRailLockedIDs: groomRailLockedIDs,
             groomRailViewer: appState?.viewer ?? viewer,
             groomRailProfiles: appState?.publicProfilesByUserID ?? [:],
             groomRailViewedIDs: appState?.viewedGroomIDs ?? [],
-            onOpenGroom: onOpenGroom,
+            onOpenGroom: handleGroomRailTap,
             onAddGroom: { isGroomComposerPresented = true }
         )
         .background(MegrumTheme.canvas.ignoresSafeArea())
@@ -180,6 +229,13 @@ struct HomeScreen: View {
                 carryingCandidates: localCarryingCandidates,
                 onSave: saveLocalActivitySettings
             )
+        }
+        .sheet(isPresented: $isShowingGroomLockPremium) {
+            if let appState {
+                NavigationStack {
+                    SubscriptionSettingsScreen(appState: appState)
+                }
+            }
         }
         .homeRelationPresentation(item: $relationRoute) { route in
             if let relationState = localModeState {

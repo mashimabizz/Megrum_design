@@ -23,6 +23,8 @@ struct GroomFeedOrdering {
 
 struct GroomStrip: View {
     var grooms: [GroomPost]
+    /// FB(iter1226.392)：いま開けない（圏外×無料の遭遇済み）グルームID。ロックアイコン表示に使う。
+    var lockedGroomIDs: Set<UUID> = []
     var viewer: UserProfile?
     var publicProfilesByUserID: [UUID: PublicUserProfile]
     var viewedGroomIDs: Set<UUID>
@@ -43,10 +45,6 @@ struct GroomStrip: View {
                     onAdd: onAdd
                 )
 
-                if displayGrooms.isEmpty {
-                    GroomEmptyStoryHint()
-                }
-
                 ForEach(displayGrooms) { groom in
                     Button {
                         onSelect(groom)
@@ -54,7 +52,8 @@ struct GroomStrip: View {
                         GroomStoryTile(
                             groom: groom,
                             profile: publicProfilesByUserID[groom.authorID]?.profile,
-                            isRead: viewedGroomIDs.contains(groom.id)
+                            isRead: viewedGroomIDs.contains(groom.id),
+                            isLocked: lockedGroomIDs.contains(groom.id)
                         )
                     }
                     .buttonStyle(.plain)

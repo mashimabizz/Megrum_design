@@ -6,6 +6,31 @@ struct GroomFeedItemPayload: Encodable, Sendable {
     var pGroomId: UUID
 }
 
+/// FB(iter1226.392): list_encountered_grooms(p_viewer_lat, p_viewer_lng) 用ペイロード。
+struct GroomEncounteredFeedPayload: Encodable, Sendable {
+    var pViewerLat: Double?
+    var pViewerLng: Double?
+
+    enum CodingKeys: String, CodingKey {
+        case pViewerLat
+        case pViewerLng
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        if let pViewerLat {
+            try container.encode(pViewerLat, forKey: .pViewerLat)
+        } else {
+            try container.encodeNil(forKey: .pViewerLat)
+        }
+        if let pViewerLng {
+            try container.encode(pViewerLng, forKey: .pViewerLng)
+        } else {
+            try container.encodeNil(forKey: .pViewerLng)
+        }
+    }
+}
+
 struct GroomFeedPayload: Encodable, Sendable {
     var pViewerLat: Double?
     var pViewerLng: Double?

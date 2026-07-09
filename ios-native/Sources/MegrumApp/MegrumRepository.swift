@@ -253,6 +253,7 @@ public protocol MegrumRepository: Sendable {
     ) async throws -> GroomNotifyPref
     func recordGroomEncounters(groomPostIDs: [UUID]) async throws
     func loadGroomPost(id: UUID) async throws -> GroomPost?
+    func loadEncounteredGrooms(latitude: Double?, longitude: Double?) async throws -> [GroomPost]
     func updatePushNotificationLocation(latitude: Double, longitude: Double) async throws
     func registerNativePushDeviceToken(_ token: String, appVersion: String?) async throws
     func revokeNativePushDeviceToken(_ token: String, revokedAt: Date) async throws

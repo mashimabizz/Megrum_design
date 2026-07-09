@@ -101,6 +101,10 @@ public extension MegrumRepository {
         nil
     }
 
+    func loadEncounteredGrooms(latitude _: Double?, longitude _: Double?) async throws -> [GroomPost] {
+        []
+    }
+
     func updatePushNotificationLocation(latitude: Double, longitude: Double) async throws {}
 
     func registerNativePushDeviceToken(_ token: String, appVersion: String?) async throws {}

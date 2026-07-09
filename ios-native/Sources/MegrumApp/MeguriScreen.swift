@@ -88,8 +88,13 @@ struct MeguriScreen: View {
         }
     }
 
+    /// 自分の投稿はフィルタ・推し設定に関わらず常に見せる（自分のグルームが地図/一覧から消えないように）。iter1226.392。
+    private func isOwnOrMatchesFilter(_ groom: GroomPost) -> Bool {
+        groom.authorID == appState.viewer?.id || contentFilter.matches(groom: groom)
+    }
+
     var visibleGrooms: [GroomPost] {
-        appState.grooms.filter { contentFilter.matches(groom: $0) }
+        appState.grooms.filter(isOwnOrMatchesFilter)
     }
 
     var visibleMapGrooms: [GroomPost] {
@@ -98,7 +103,7 @@ struct MeguriScreen: View {
             return TutorialSampleMeguriData.grooms
         }
         return (appState.groomMapPosts.isEmpty ? appState.grooms : appState.groomMapPosts)
-            .filter { contentFilter.matches(groom: $0) }
+            .filter(isOwnOrMatchesFilter)
     }
 
     var visibleThreads: [BoardThread] {

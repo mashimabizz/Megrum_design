@@ -83,6 +83,8 @@ public final class MegrumAppState: ObservableObject {
     @Published public internal(set) var hasLoadedGroomNotifyPrefs = false
     /// FB(iter1226.390): 近接検知でこのセッション中に既に通知/遭遇処理したグルームID（連続発火の抑制）。
     @Published public internal(set) var processedProximityGroomIDs: Set<UUID> = []
+    /// FB(iter1226.392): 出会った(遭遇済み)グルーム。ホーム列で近くに無くても表示する（無料はロック）。
+    @Published public internal(set) var encounteredGrooms: [GroomPost] = []
     @Published public internal(set) var isLoading = false
     @Published public internal(set) var isLoadingOshiGroups = false
     @Published public internal(set) var isLoadingOshiCharacters = false

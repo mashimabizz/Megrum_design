@@ -70,6 +70,16 @@ public final class SupabaseGroomClient: @unchecked Sendable {
         return rows.compactMap { $0.post(signedURLs: signedURLs) }
     }
 
+    /// FB(iter1226.392): 出会った(遭遇済み)グルームを距離条件なしで取得（ホーム列で圏外でも表示）。
+    public func loadEncounteredGrooms(latitude: Double?, longitude: Double?) async throws -> [GroomPost] {
+        let rows: [GroomFeedRow] = try await client.rpcRows(
+            function: "list_encountered_grooms",
+            payload: GroomEncounteredFeedPayload(pViewerLat: latitude, pViewerLng: longitude)
+        )
+        let signedURLs = await signedURLMap(for: rows)
+        return rows.compactMap { $0.post(signedURLs: signedURLs) }
+    }
+
     /// FB(iter1226.390): 単一グルーム取得（プッシュのディープリンク用・距離条件なし）。
     public func loadGroomPost(id: UUID) async throws -> GroomPost? {
         let rows: [GroomFeedRow] = try await client.rpcRows(

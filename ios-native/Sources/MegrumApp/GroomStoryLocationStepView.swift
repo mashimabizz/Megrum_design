@@ -2,8 +2,8 @@ import MegrumCore
 import MegrumDesign
 import SwiftUI
 
-/// FB(iter1226.391)：ホーム等からのグルーム投稿で、写真編集の後に「投稿する場所を地図で選ぶ」ステップ。
-/// めぐり地図経由（場所を先に決める）と違い、こちらは最後に地図でピンを立てて場所を決める。
+/// FB(iter1226.391/392)：ホーム等からのグルーム投稿で、トピック/シリーズ確定の後に
+/// 「投稿する場所を地図で選ぶ」全画面ステップ。地図を画面いっぱいに出して最後に場所を決める。
 struct GroomStoryLocationStepView: View {
     var photoData: Data?
     var caption: String?
@@ -17,9 +17,7 @@ struct GroomStoryLocationStepView: View {
     var onConfirm: () -> Void
 
     var body: some View {
-        ZStack {
-            Color.black.opacity(0.62).ignoresSafeArea()
-
+        GeometryReader { proxy in
             VStack(spacing: 0) {
                 header
 
@@ -30,15 +28,15 @@ struct GroomStoryLocationStepView: View {
                         currentCoordinate: currentCoordinate,
                         isRequestingLocation: isRequestingLocation,
                         preview: photoData.map { .groom(imageData: $0, caption: caption) } ?? .pin,
+                        // 画面いっぱいの地図（ヘッダー/ボタン/キャプション分を差し引いた高さ）。
+                        mapHeight: max(320, proxy.size.height - 240),
                         selectedCoordinate: $selectedCoordinate,
                         onRequestLocation: onRequestLocation,
                         onOutOfRange: onOutOfRange
                     )
-                    .padding(14)
-                    .background(.white.opacity(0.96), in: RoundedRectangle(cornerRadius: 26, style: .continuous))
                     .padding(.horizontal, 16)
-                    .padding(.top, 12)
-                    .padding(.bottom, 24)
+                    .padding(.top, 8)
+                    .padding(.bottom, 20)
                 }
 
                 confirmButton
@@ -64,7 +62,8 @@ struct GroomStoryLocationStepView: View {
             Color.clear.frame(width: 40, height: 40)
         }
         .padding(.horizontal, 8)
-        .padding(.top, 8)
+        .padding(.top, 10)
+        .background(MegrumTheme.canvas)
     }
 
     private var confirmButton: some View {
@@ -89,5 +88,6 @@ struct GroomStoryLocationStepView: View {
         .padding(.horizontal, 16)
         .padding(.top, 8)
         .padding(.bottom, 14)
+        .background(MegrumTheme.canvas)
     }
 }

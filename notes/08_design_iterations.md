@@ -4,6 +4,26 @@
 
 ---
 
+## イテレーション1226.392：ホーム投稿を「種別→全画面地図」順に＋自分グルームが地図に出るよう修正＋出会ったグルームをロック付きで表示＋空吹き出し撤去（FB）
+
+### 背景・問題意識
+オーナーFB：(1) ホーム経由投稿は「トピック/シリーズのポップアップ→全画面の地図で場所決定」の順にしたい。(2) そのフローで投稿しても自分のグルームがめぐり地図に出ない、ちゃんと投稿できるように。(3) ホームのグルーム列は、近くに無くても「出会った(遭遇済み)」グルームも表示。ただし無料会員は開けないので右下にうすい鍵アイコン。(4) 列が0件でも「近くのグルームはまだありません」の吹き出しは不要。
+
+### 変更内容
+- **投稿フロー順の変更**（`GroomStoryComposerViews.swift`）：写真編集→トピック/シリーズのポップアップ→（ホーム等）全画面地図で場所選択→投稿。めぐり地図経由（場所確定済み）はポップアップ後そのまま投稿。地図ステップ `GroomStoryLocationStepView` を全画面化（`MeguriCreationLocationPicker` に `mapHeight` 追加）。
+- **自分グルームが地図に出ない不具合**（`MeguriScreen.swift`）：DBには正しく保存されていた（座標・published）。原因はコンテンツフィルタが未タグ(group_id null)の自分投稿を除外していた。自分の投稿はフィルタ・推し設定に関わらず常に表示するよう `isOwnOrMatchesFilter` を導入。
+- **出会ったグルームをロック付きで表示**：`list_encountered_grooms` RPC（距離条件なし）追加。`appState.encounteredGrooms` を読み込み、ホーム列に「開けるグルーム＋遭遇済み」をマージ。開けないものは `GroomStoryTile` の右下にうすい鍵アイコン、タップでプレミアム案内シート。
+- **空吹き出し撤去**（`GroomStoryViews.swift`）：`GroomEmptyStoryHint` の表示を削除。
+
+### 確認方法
+- `ImageRenderer` スナップショットでロック鍵・同心円・空吹き出し無しを確認。`swift test`（XCTest 1536＋Swift Testing 24）緑。実機。
+
+### 関連ファイル
+- `supabase/migrations/20260710120000_list_encountered_grooms.sql`
+- `ios-native/Sources/MegrumApp/GroomStoryComposerViews.swift`, `GroomStoryLocationStepView.swift`, `MeguriCreationLocationPicker.swift`, `MeguriScreen.swift`, `HomeScreen.swift`, `HomeDiscoveryExperience.swift`, `GroomStoryViews.swift`, `GroomStoryTileViews.swift`, `MegrumAppStateGroomProximity.swift`
+
+---
+
 ## イテレーション1226.391：自分グルームタイルの枠ずれ修正＋ホーム投稿に地図で場所を選ぶステップを追加（FB）
 
 ### 背景・問題意識

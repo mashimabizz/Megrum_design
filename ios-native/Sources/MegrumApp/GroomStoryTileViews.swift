@@ -191,6 +191,8 @@ struct GroomStoryTile: View {
     var groom: GroomPost
     var profile: UserProfile?
     var isRead: Bool
+    /// FB(iter1226.392)：無料会員で圏外の遭遇済みグルーム＝いま開けない。うすい鍵アイコンを右下に付ける。
+    var isLocked: Bool = false
 
     private var displayName: String {
         profile?.handle.nilIfBlank ?? profile?.displayName.nilIfBlank ?? "めぐり"
@@ -210,8 +212,14 @@ struct GroomStoryTile: View {
                     size: GroomStoryMetrics.avatarDiameter,
                     backgroundOpacity: 0.94
                 )
+                .opacity(isLocked ? 0.82 : 1)
             }
             .frame(width: GroomStoryMetrics.ringDiameter, height: GroomStoryMetrics.ringDiameter)
+            .overlay(alignment: .bottomTrailing) {
+                if isLocked {
+                    lockBadge
+                }
+            }
 
             Text(displayName)
                 .font(.system(size: 11))
@@ -219,6 +227,19 @@ struct GroomStoryTile: View {
                 .lineLimit(1)
                 .frame(width: GroomStoryMetrics.labelWidth)
         }
+    }
+
+    /// うすい鍵アイコン（右下）。プレミアム限定で開けることを示す。
+    private var lockBadge: some View {
+        Image(systemName: "lock.fill")
+            .font(.system(size: 10, weight: .bold))
+            .foregroundStyle(.white)
+            .frame(width: 20, height: 20)
+            .background(MegrumTheme.ink.opacity(0.55), in: Circle())
+            .overlay {
+                Circle().stroke(MegrumTheme.canvas, lineWidth: 1.5)
+            }
+            .offset(x: 2, y: 2)
     }
 }
 

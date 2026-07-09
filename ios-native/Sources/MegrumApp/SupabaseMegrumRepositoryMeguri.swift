@@ -23,6 +23,10 @@ public extension SupabaseMegrumRepository {
         try await groomClient.loadGroomPost(id: id)
     }
 
+    func loadEncounteredGrooms(latitude: Double?, longitude: Double?) async throws -> [GroomPost] {
+        try await groomClient.loadEncounteredGrooms(latitude: latitude, longitude: longitude)
+    }
+
     func loadOwnGroomArchive(limit: Int) async throws -> [GroomPost] {
         try await groomClient.loadOwnGroomArchive(userID: viewerID, limit: limit)
     }

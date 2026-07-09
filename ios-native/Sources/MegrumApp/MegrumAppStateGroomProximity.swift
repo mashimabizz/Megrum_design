@@ -62,6 +62,14 @@ extension MegrumAppState {
         try? await repository.loadGroomPost(id: id)
     }
 
+    /// FB(iter1226.392): 出会った(遭遇済み)グルームを取得（ホーム列で圏外でも表示）。
+    public func loadEncounteredGrooms(latitude: Double?, longitude: Double?) async {
+        guard viewer != nil else { return }
+        if let grooms = try? await repository.loadEncounteredGrooms(latitude: latitude, longitude: longitude) {
+            encounteredGrooms = grooms
+        }
+    }
+
     /// ローカルの遭遇フラグを立てて、以降の再評価と圏外ゲート判定へ即反映する。
     func markGroomsEncounteredInRange(_ ids: [UUID]) {
         let idSet = Set(ids)

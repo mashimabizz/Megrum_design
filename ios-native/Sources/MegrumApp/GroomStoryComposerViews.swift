@@ -107,11 +107,11 @@ struct GroomStoryComposerScreen: View {
                         withAnimation(.smooth(duration: 0.2)) {
                             isShowingLocationStep = false
                         }
-                        presentMetadataPrompt()
+                        publishDraftPhoto()
                     }
                 )
                 .transition(.move(edge: .bottom).combined(with: .opacity))
-                .zIndex(1)
+                .zIndex(2)
             }
 
             GroomStoryComposerToastOverlay(message: presentationState.toastMessage)
@@ -145,7 +145,7 @@ struct GroomStoryComposerScreen: View {
                             isShowingMetadataPrompt = false
                         }
                     },
-                    onSubmit: publishDraftPhoto
+                    onSubmit: proceedAfterMetadata
                 )
                 .transition(.scale(scale: 0.96).combined(with: .opacity))
             }
@@ -177,50 +177,14 @@ struct GroomStoryComposerScreen: View {
         onOpenCamera()
     }
 
-    /// 写真編集の「投稿」から呼ばれる。場所が地図で確定していない導線（ホーム等）は先に地図ステップを挟む。
+    /// 写真編集の「投稿」から呼ばれる。まずトピック/シリーズのポップアップを出す（場所は次のステップ）。
     private func beginPublishFlow() {
-        guard draftPhotoData != nil else {
-            showToast("投稿する写真を選択してください")
-            return
-        }
-        // めぐり地図経由（場所を先に決めて locks=true）はそのまま。ホーム等は最後に地図で場所を選ぶ。
-        if locksCreationCoordinate {
-            presentMetadataPrompt()
-            return
-        }
-        if currentCoordinate == nil {
-            onRequestLocation()
-        }
-        if selectedCreationCoordinate == nil {
-            selectedCreationCoordinate = currentCoordinate
-        }
-        withAnimation(.smooth(duration: 0.2)) {
-            isShowingLocationStep = true
-        }
+        presentMetadataPrompt()
     }
 
     private func presentMetadataPrompt() {
         guard draftPhotoData != nil else {
             showToast("投稿する写真を選択してください")
-            return
-        }
-        guard let selectedCreationCoordinate else {
-            if currentCoordinate == nil {
-                onRequestLocation()
-            }
-            showToast("最後に地図上でピンを立ててください")
-            return
-        }
-        if currentCoordinate == nil {
-            onRequestLocation()
-        }
-        guard canCreateAtSelectedLocation else {
-            showToast(
-                MeguriAccessPolicy.creationLocationMessage(
-                    selectedCoordinate: selectedCreationCoordinate,
-                    currentCoordinate: effectiveCurrentCoordinate
-                )
-            )
             return
         }
         withAnimation(.smooth(duration: 0.18)) {
@@ -233,6 +197,26 @@ struct GroomStoryComposerScreen: View {
             if let group = groups.first(where: { $0.id == metadataDraft.groupID }) {
                 await onLoadCharacters(group)
             }
+        }
+    }
+
+    /// トピック/シリーズ確定後：めぐり地図経由（場所確定済み）はそのまま投稿、ホーム等は地図で場所を選ぶ。
+    private func proceedAfterMetadata() {
+        withAnimation(.smooth(duration: 0.18)) {
+            isShowingMetadataPrompt = false
+        }
+        if locksCreationCoordinate {
+            publishDraftPhoto()
+            return
+        }
+        if currentCoordinate == nil {
+            onRequestLocation()
+        }
+        if selectedCreationCoordinate == nil {
+            selectedCreationCoordinate = currentCoordinate
+        }
+        withAnimation(.smooth(duration: 0.2)) {
+            isShowingLocationStep = true
         }
     }
 
