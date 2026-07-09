@@ -4,6 +4,57 @@
 
 ---
 
+## イテレーション1226.395：自分グルーム削除で前後へ遷移／枠グラデは「有効かつ未読」／活性化アニメは列が見えた後／タイル拡大（約3.8個）（FB）
+
+### 背景・問題意識
+オーナーFB（4点）：
+1. 自分のグルームを開いている時に削除したら、ビューアを閉じず前後のグルームへ移る。
+2. 枠グラデは「有効なグルームがある間」ではなく「有効かつ未読のものがある場合」に限定。
+3. 活性化アニメが確認できない → 投稿処理中（コンポーザが列を覆う間）に走っている疑い。グルーム列が実際に見えた時に走らせる。
+4. グルームタイルを、最初の画面で約3.8個見える大きさに拡大。
+
+### 変更内容（`GroomViewerScreen.swift`, `GroomStoryTileViews.swift`, `GroomStoryViews.swift`, `HomeDiscoveryExperience.swift`, `HomeScreen.swift`）
+
+#### 1. 削除→前後へ（`GroomViewerScreen.swift`）
+- `grooms` を `let` から `@State` に変更。`deleteCurrentGroom()` を書き換え：`deleteOwnGroom` 成功後、配列から当該グルームを除去し `currentIndex = min(removeAt, count-1)`（前後の残りグルームへ移動）。空になった時のみ `dismissViewer()`。除去はアニメ無効トランザクションで実施。
+- `.task(id: currentGroom.id)` の `markGroomViewed` は自分のグルームでも発火 → 未読/既読判定（#2）を支える。
+
+#### 2. グラデは「有効かつ未読」（`HomeScreen.swift`）
+- `myActiveUnreadGrooms`（= 自分の有効グルームのうち `viewedGroomIDs` に無いもの）を新設。`groomRailHasOwnActiveGroom` へ `!myActiveUnreadGrooms.isEmpty` を渡す。既読化されるとグラデが消えグレーに戻る。
+- `viewOwnGroom()` は未読があればそこから、無ければ最新から開く（開いた瞬間 `markGroomViewed` で既読化 → グラデ解除）。
+
+#### 3. 活性化アニメは列が見えた後（`HomeScreen.swift` → `HomeDiscoveryExperience.swift` → `GroomStoryViews.swift` → `GroomStoryTileViews.swift`）
+- `GroomMyStoryAvatar` の `celebrate()` トリガを `isLoading` の false 遷移から、明示的な `activationSignal: Int` の変化に変更。`isLoading` false 時は `phase = .idle` に戻すだけ。
+- `activationSignal` を `GroomMyStoryTile`→`GroomStrip`→`HomeDiscoveryExperience`（`groomRailActivationSignal`）へ配線。
+- `HomeScreen` で `.onChange(of: isGroomComposerPresented)`：開いた時に自分グルーム件数を控え、閉じた時に件数が増えていれば（新規投稿）0.45秒後に `groomActivationSignal += 1`。コンポーザ／fullScreenCover が消えて列が見えてからスイープが走る。
+
+#### 4. タイル拡大 約3.8個（`GroomStoryTileViews.swift` の `GroomStoryMetrics`）
+- `ringDiameter 64→84`、`ringLineWidth 2→2.5`、`avatarDiameter 56→74`、`labelWidth 66→86`、`itemSpacing 12→14`。1タイル ≈ 86+14=100pt、(393−12 先頭余白)/100 ≈ 3.81 → 最初の画面で約3.8個表示。
+
+### 影響範囲
+- ホーム上部グルーム列（自分タイル＋ストーリータイル）／自分グルームビューア。
+
+### 確認方法
+- `swift build` 成功（`.build/build.db` の disk I/O error は既知の無害エラー、`Build complete!` 出力）。
+- `swift test`：XCTest 1536（3 skipped, 0 failures）＋ Swift Testing 24 tests / 9 suites すべてパス。
+- ImageRenderer スナップショットは `GroomStrip` が水平 `ScrollView` を内包し、tile struct が `private` のため macOS テストホストで中身を捕捉できず（既知の ImageRenderer 制約）→ コードレベル検証＋実機ビルドで確認。
+- 実機（オーナー iPhone）へ device build + install。
+
+### セルフレビュー結果
+- ✅ ブランドカラー直書きなし（グラデは `MegrumTheme.sky→lavender` を既存 `GroomMyStoryAvatar` 経由）。
+- ✅ 用語 OK（グルーム／未読／有効）。廃止用語なし。
+- ✅ 削除→前後遷移は `@State grooms` の局所更新で完結（再フェッチ不要）。
+- ⚠️ バックグラウンドのリアルタイム push は引き続き保留（フォアグラウンドのネイティブバナーは配信済み）。
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/GroomViewerScreen.swift`
+- `ios-native/Sources/MegrumApp/GroomStoryTileViews.swift`
+- `ios-native/Sources/MegrumApp/GroomStoryViews.swift`
+- `ios-native/Sources/MegrumApp/HomeDiscoveryExperience.swift`
+- `ios-native/Sources/MegrumApp/HomeScreen.swift`
+
+---
+
 ## イテレーション1226.394：自分グルーム投稿後は自分タイル枠を水色→紫グラデに活性化（IG風スイープ）＋アバタータップで自分のグルーム閲覧（FB）
 
 ### 背景・問題意識

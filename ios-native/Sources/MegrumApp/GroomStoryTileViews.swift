@@ -5,16 +5,16 @@ import SwiftUI
 /// FB(iter1226.389)：ホーム上部のグルーム列は Instagram のストーリー列と同寸・同色に合わせる。
 /// グラデーションの色だけは Megrum の水色→紫のまま（オーナー指定）。
 enum GroomStoryMetrics {
-    /// 外枠（リング）直径。IG ストーリーは約64pt。
-    static let ringDiameter: CGFloat = 64
-    /// リングの線幅。IG は細い（約2pt）。
-    static let ringLineWidth: CGFloat = 2
-    /// 内側アバター直径。リングとの間に約2ptの余白ができる。
-    static let avatarDiameter: CGFloat = 56
+    /// 外枠（リング）直径。最初の画面で約3.8個見える大きさに拡大。iter1226.395。
+    static let ringDiameter: CGFloat = 84
+    /// リングの線幅（拡大に合わせて少し太く）。
+    static let ringLineWidth: CGFloat = 2.5
+    /// 内側アバター直径。リングとの間に約2.5ptの余白ができる。
+    static let avatarDiameter: CGFloat = 74
     /// ラベル幅（1行・省略）。
-    static let labelWidth: CGFloat = 66
+    static let labelWidth: CGFloat = 86
     /// タイル間の余白。
-    static let itemSpacing: CGFloat = 12
+    static let itemSpacing: CGFloat = 14
     /// アバターとラベルの縦間隔。
     static let labelSpacing: CGFloat = 6
 
@@ -38,8 +38,10 @@ enum GroomStoryMetrics {
 struct GroomMyStoryTile: View {
     var viewer: UserProfile?
     var isLoading: Bool
-    /// FB(iter1226.394)：自分の有効なグルームがある時は枠を水色→紫グラデ（未読ストーリー相当）にする。
+    /// FB(iter1226.394)：自分の有効かつ未読のグルームがある時は枠を水色→紫グラデ（未読ストーリー相当）にする。
     var hasActiveGroom: Bool = false
+    /// FB(iter1226.395)：この値変化で活性化アニメを発火（グルーム列が見えたタイミング）。
+    var activationSignal: Int = 0
     var onAdd: () -> Void
     /// FB(iter1226.394)：＋以外（アバター）タップで自分のグルームを見る。
     var onViewOwn: () -> Void = {}
@@ -53,7 +55,8 @@ struct GroomMyStoryTile: View {
                     GroomMyStoryAvatar(
                         viewer: viewer,
                         isLoading: isLoading,
-                        hasActiveGroom: hasActiveGroom
+                        hasActiveGroom: hasActiveGroom,
+                        activationSignal: activationSignal
                     )
                 }
                 .buttonStyle(.plain)
@@ -104,8 +107,11 @@ private enum GroomMyStoryRingPhase {
 private struct GroomMyStoryAvatar: View {
     var viewer: UserProfile?
     var isLoading: Bool
-    /// 自分の有効なグルームがある時は idle 枠を水色→紫グラデにする（投稿後もグラデが残る）。
+    /// 自分の有効かつ未読のグルームがある時は idle 枠を水色→紫グラデにする（未読ストーリー相当）。
     var hasActiveGroom: Bool
+    /// FB(iter1226.395)：この値が変わった時に「枠がぐるっと活性化」アニメを再生する
+    /// （投稿完了後、グルーム列が実際に見えたタイミングでホーム側から発火する）。
+    var activationSignal: Int
 
     @State private var phase: GroomMyStoryRingPhase = .idle
     @State private var spin: Double = 0
@@ -133,12 +139,16 @@ private struct GroomMyStoryAvatar: View {
         .onAppear {
             if isLoading { startUploading() }
         }
-        .onChange(of: isLoading) { wasLoading, nowLoading in
+        .onChange(of: isLoading) { _, nowLoading in
             if nowLoading {
                 startUploading()
-            } else if wasLoading {
-                celebrate()
+            } else {
+                // アップロード終了時は resting（グラデ/グレー）へ戻す。活性化アニメは activationSignal で発火。
+                phase = .idle
             }
+        }
+        .onChange(of: activationSignal) { _, _ in
+            celebrate()
         }
     }
 

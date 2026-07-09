@@ -37,7 +37,8 @@ struct GroomViewerPresentationModifier: ViewModifier {
 }
 
 struct GroomViewerScreen: View {
-    var grooms: [GroomPost]
+    /// FB(iter1226.395)：削除で前後のグルームへ移れるよう可変にする。
+    @State private var grooms: [GroomPost]
     var initialGroom: GroomPost
     @ObservedObject var appState: MegrumAppState
     var onDismiss: (() -> Void)?
@@ -71,7 +72,7 @@ struct GroomViewerScreen: View {
         let fallbackGrooms = grooms.contains(where: { $0.id == initialGroom.id })
             ? grooms
             : [initialGroom] + grooms
-        self.grooms = fallbackGrooms
+        _grooms = State(initialValue: fallbackGrooms)
         self.initialGroom = initialGroom
         self.appState = appState
         self.onDismiss = onDismiss
@@ -527,10 +528,27 @@ struct GroomViewerScreen: View {
 
     private func deleteCurrentGroom() {
         let target = currentGroom
+        let targetIndex = currentIndex
         Task {
             let deleted = await appState.deleteOwnGroom(target)
-            if deleted {
+            guard deleted else { return }
+            // FB(iter1226.395)：削除しても閉じず、前後のグルームへ移る（無くなったら閉じる）。
+            guard let removeAt = grooms.firstIndex(where: { $0.id == target.id }) ?? Optional(targetIndex),
+                  grooms.indices.contains(removeAt)
+            else {
                 dismissViewer()
+                return
+            }
+            var transaction = Transaction()
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
+                grooms.remove(at: removeAt)
+                if grooms.isEmpty {
+                    dismissViewer()
+                } else {
+                    // 削除位置がそのまま「次のグルーム」を指す。末尾だった場合は1つ前へ。
+                    currentIndex = min(removeAt, grooms.count - 1)
+                }
             }
         }
     }

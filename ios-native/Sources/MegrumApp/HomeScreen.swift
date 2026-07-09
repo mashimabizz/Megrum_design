@@ -61,6 +61,11 @@ struct HomeScreen: View {
     @State private var isGroomComposerPresented = false
     /// FB(iter1226.392)：ロックされた（圏外×無料）遭遇グルームをタップした時のプレミアム案内。
     @State private var isShowingGroomLockPremium = false
+    /// FB(iter1226.395)：自分タイルの「枠がぐるっと活性化」アニメの発火トリガ。
+    /// 投稿中はコンポーザが列を覆っていて見えないので、コンポーザを閉じて列が見えた後に +1 する。
+    @State private var groomActivationSignal = 0
+    /// コンポーザを開いた時点の自分の有効グルーム件数（閉じた後に増えていれば「新規投稿された」と判定）。
+    @State private var ownGroomCountAtComposerOpen = 0
 
     /// 実データのホーム（ガイドツアー以外）でグルーム列を出す。
     private var showsGroomRail: Bool {
@@ -109,7 +114,7 @@ struct HomeScreen: View {
         )
     }
 
-    /// FB(iter1226.394)：自分の有効なグルーム（新しい順）。自分タイルの枠グラデ＆閲覧に使う。
+    /// FB(iter1226.394)：自分の有効なグルーム（新しい順）。自分タイルの閲覧に使う。
     private var myActiveGrooms: [GroomPost] {
         guard let appState, let viewerID = (appState.viewer ?? viewer)?.id else { return [] }
         return appState.groomMapPosts
@@ -117,8 +122,15 @@ struct HomeScreen: View {
             .sorted { $0.createdAt > $1.createdAt }
     }
 
+    /// FB(iter1226.395)：自分の有効かつ未読のグルーム。枠グラデはこれがある時だけ（既読なら消える）。
+    private var myActiveUnreadGrooms: [GroomPost] {
+        let viewed = appState?.viewedGroomIDs ?? []
+        return myActiveGrooms.filter { !viewed.contains($0.id) }
+    }
+
     private func viewOwnGroom() {
-        guard let groom = myActiveGrooms.first else { return }
+        // 未読があればそこから、無ければ最新から開く（開いた瞬間 markGroomViewed で既読化 → グラデ解除）。
+        guard let groom = myActiveUnreadGrooms.first ?? myActiveGrooms.first else { return }
         onOpenGroom(groom)
     }
 
@@ -149,6 +161,18 @@ struct HomeScreen: View {
             .onAppear {
                 if showsGroomRail, groomLocationState.coordinate == nil {
                     groomLocationState.requestCurrentLocation()
+                }
+            }
+            .onChange(of: isGroomComposerPresented) { wasPresented, nowPresented in
+                if nowPresented {
+                    // コンポーザを開いた瞬間の件数を控えておく。
+                    ownGroomCountAtComposerOpen = myActiveGrooms.count
+                } else if wasPresented {
+                    // 閉じた＝列が再び見える。新規投稿があった時だけ、少し遅らせて活性化アニメを発火。
+                    guard myActiveGrooms.count > ownGroomCountAtComposerOpen else { return }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+                        groomActivationSignal += 1
+                    }
                 }
             }
     }
@@ -227,7 +251,8 @@ struct HomeScreen: View {
             showsGroomRail: showsGroomRail,
             groomRailGrooms: groomRailItems,
             groomRailLockedIDs: groomRailLockedIDs,
-            groomRailHasOwnActiveGroom: !myActiveGrooms.isEmpty,
+            groomRailHasOwnActiveGroom: !myActiveUnreadGrooms.isEmpty,
+            groomRailActivationSignal: groomActivationSignal,
             groomRailViewer: appState?.viewer ?? viewer,
             groomRailProfiles: appState?.publicProfilesByUserID ?? [:],
             groomRailViewedIDs: appState?.viewedGroomIDs ?? [],
