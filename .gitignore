@@ -51,3 +51,6 @@ tmp/
 *.tmp
 .vercel
 .env*
+
+# Xcode user state
+ios-native/**/xcuserdata/
