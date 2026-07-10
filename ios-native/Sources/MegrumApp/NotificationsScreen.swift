@@ -24,6 +24,7 @@ struct NotificationCenterScreen: View {
             presentationState: $presentationState,
             isLoading: appState.isLoadingNotifications,
             notifications: appState.notifications,
+            thumbnailURLByID: appState.notificationThumbnailURLByID,
             onSelectNotification: openNotification,
             onSelectLikeGroup: openLikeGroup
         )

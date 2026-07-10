@@ -236,6 +236,8 @@ public protocol MegrumRepository: Sendable {
     func blockUser(_ userID: UUID) async throws -> BlockedUser
     func unblockUser(_ userID: UUID) async throws
     func loadNotifications(limit: Int) async throws -> [MegrumNotification]
+    /// 非公開バケットの通知サムネを表示用の署名URLへ解決する（iter1226.415）。
+    func resolveNotificationThumbnailURL(bucket: String, path: String) async -> URL?
     func markNotificationRead(_ notificationID: UUID) async throws -> MegrumNotification?
     func markAllNotificationsRead() async throws -> [MegrumNotification]
     func loadNotificationSettings() async throws -> UserNotificationSettings

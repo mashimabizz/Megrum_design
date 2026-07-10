@@ -241,6 +241,12 @@ public final class SupabaseNotificationClient: @unchecked Sendable {
         return rows.first?.id
     }
 
+    /// 非公開バケット（groom-posts / meguri-board-media）の通知サムネを署名URLへ解決する。
+    /// 閲覧権限が無い・削除済みなどで失敗した場合は nil（サムネなし表示に退化）。iter1226.415。
+    public func resolveThumbnailURL(bucket: String, path: String) async -> URL? {
+        try? await client.createSignedURL(bucket: bucket, path: path)
+    }
+
     public static func nativeDeviceTokenString(from data: Data) -> String {
         data.map { String(format: "%02x", $0) }.joined()
     }

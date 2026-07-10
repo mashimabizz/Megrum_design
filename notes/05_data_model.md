@@ -4,12 +4,13 @@
 > 実装の正解集。`09_state_machines.md` と完全に整合させ、`10_glossary.md` の用語を使う。
 
 最終更新: 2026-07-10
-ステータス: Draft v2.65（iter1226.413 notifications に行為者スナップショットを追加）
+ステータス: Draft v2.66（iter1226.415 notifications に対象サムネイルを追加）
 
 ## 最新化履歴
 
 | Rev | 日付 | 変更 |
 |---|---|---|
+| **v2.66** | **2026-07-10** | **iter1226.415 反映（`notifications.thumbnail_url` / `thumbnail_bucket` / `thumbnail_path` を追加。公開バケット（goods-photos）の画像はURLを焼き込み、非公開バケット（groom-posts / meguri-board-media）はバケット+パスを保存してアプリが表示時に署名URLへ解決。サムネは中央ヘルパー内で参照ID（proposal_id / groom_reply_id / groom_reaction_id / meguri_message_id / meguri_board_thread_id）から導出し呼び出し側は不変）** |
 | **v2.65** | **2026-07-10** | **iter1226.413 反映（`notifications.actor_user_id` / `actor_display_name` / `actor_avatar_url` を追加。表示名・アバターは挿入時スナップショットとして非正規化し、`create_trade_notification` / `create_meguri_notification` / `notify_groom_post_published` / `notify_meguri_board_thread_posted` が焼き込む。通知センターのアバターファースト表示と groom_liked 集約に使用。運営通知等は null）** |
 | **v2.64** | **2026-07-03** | **iter1226.273 反映（`profile-photos` Storage bucket を追加し、めぐりプロフィール/グッズ交換プロフィールのカスタムアイコンURL保存で使う公開プロフィール画像アップロード先をDB側に用意）** |
 | **v2.63** | **2026-07-01** | **iter1226.258 反映（`meguri_profiles.last_changed_at` と保存RPCの1ヶ月ロック対象を表示名変更に限定し、アイコン変更・`uses_public_profile` 切り替えは保存できるようにした）** |

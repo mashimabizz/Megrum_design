@@ -93,6 +93,12 @@ public struct MegrumNotification: Identifiable, Codable, Hashable, Sendable {
     public var actorDisplayName: String?
     /// 挿入時点の行為者アバターURLスナップショット。
     public var actorAvatarURL: URL?
+    /// 対象コンテンツの公開画像URL（失効しない公開バケット由来）。iter1226.415。
+    public var thumbnailURL: URL?
+    /// 非公開バケット画像のバケットID（表示時に署名URLへ解決する）。
+    public var thumbnailBucket: String?
+    /// 非公開バケット画像のオブジェクトパス。
+    public var thumbnailPath: String?
 
     public init(
         id: UUID,
@@ -104,7 +110,10 @@ public struct MegrumNotification: Identifiable, Codable, Hashable, Sendable {
         createdAt: Date = .now,
         actorUserID: UUID? = nil,
         actorDisplayName: String? = nil,
-        actorAvatarURL: URL? = nil
+        actorAvatarURL: URL? = nil,
+        thumbnailURL: URL? = nil,
+        thumbnailBucket: String? = nil,
+        thumbnailPath: String? = nil
     ) {
         self.id = id
         self.kind = kind
@@ -116,6 +125,9 @@ public struct MegrumNotification: Identifiable, Codable, Hashable, Sendable {
         self.actorUserID = actorUserID
         self.actorDisplayName = actorDisplayName
         self.actorAvatarURL = actorAvatarURL
+        self.thumbnailURL = thumbnailURL
+        self.thumbnailBucket = thumbnailBucket
+        self.thumbnailPath = thumbnailPath
     }
 
     public var isUnread: Bool {

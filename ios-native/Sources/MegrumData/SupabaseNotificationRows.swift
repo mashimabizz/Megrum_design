@@ -3,7 +3,8 @@ import MegrumCore
 
 struct NotificationRow: Decodable, Sendable {
     static let select = "id,kind,title,body,link_path,read_at,created_at,"
-        + "actor_user_id,actor_display_name,actor_avatar_url"
+        + "actor_user_id,actor_display_name,actor_avatar_url,"
+        + "thumbnail_url,thumbnail_bucket,thumbnail_path"
 
     var id: UUID
     var kind: String
@@ -16,6 +17,9 @@ struct NotificationRow: Decodable, Sendable {
     var actorUserId: UUID?
     var actorDisplayName: String?
     var actorAvatarUrl: String?
+    var thumbnailUrl: String?
+    var thumbnailBucket: String?
+    var thumbnailPath: String?
 
     var notification: MegrumNotification {
         MegrumNotification(
@@ -28,7 +32,10 @@ struct NotificationRow: Decodable, Sendable {
             createdAt: createdAt,
             actorUserID: actorUserId,
             actorDisplayName: actorDisplayName,
-            actorAvatarURL: actorAvatarUrl.flatMap(URL.init(string:))
+            actorAvatarURL: actorAvatarUrl.flatMap(URL.init(string:)),
+            thumbnailURL: thumbnailUrl.flatMap(URL.init(string:)),
+            thumbnailBucket: thumbnailBucket,
+            thumbnailPath: thumbnailPath
         )
     }
 }

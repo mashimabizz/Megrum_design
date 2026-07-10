@@ -15,12 +15,43 @@ extension MegrumAppState {
             notifications = try await repository.loadNotifications(limit: 100)
             // すでに見ためぐりメッセージ/チャットルームの通知は自動で既読にする。
             await autoMarkViewedNotificationsRead()
+            await resolveNotificationThumbnails()
         } catch {
             if reportsFailure {
                 errorMessage = "通知を読み込めませんでした"
             }
         }
         isLoadingNotifications = false
+    }
+
+    /// 右端サムネの表示URLを解決する：公開URLはそのまま、非公開バケットは署名URLへ（重複パスは1回だけ解決）。iter1226.415。
+    func resolveNotificationThumbnails() async {
+        var resolved: [UUID: URL] = [:]
+        var signedURLByStorageKey: [String: URL?] = [:]
+        for notification in notifications {
+            if let url = notification.thumbnailURL {
+                resolved[notification.id] = url
+                continue
+            }
+            guard let bucket = notification.thumbnailBucket?.nilIfBlank,
+                  let path = notification.thumbnailPath?.nilIfBlank
+            else {
+                continue
+            }
+            let storageKey = "\(bucket)/\(path)"
+            if let cached = signedURLByStorageKey[storageKey] {
+                if let cached {
+                    resolved[notification.id] = cached
+                }
+                continue
+            }
+            let url = await repository.resolveNotificationThumbnailURL(bucket: bucket, path: path)
+            signedURLByStorageKey[storageKey] = url
+            if let url {
+                resolved[notification.id] = url
+            }
+        }
+        notificationThumbnailURLByID = resolved
     }
 
     public func markNotificationRead(_ notificationID: UUID) async {

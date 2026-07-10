@@ -70,6 +70,8 @@ public final class MegrumAppState: ObservableObject {
     @Published public internal(set) var blockedUsers: [BlockedUser] = []
     @Published public internal(set) var blockedContentUserIDs: Set<UUID> = []
     @Published public internal(set) var notifications: [MegrumNotification] = []
+    /// 通知の右端サムネの表示URL（非公開バケットは署名URLへ解決済み）。iter1226.415。
+    @Published public internal(set) var notificationThumbnailURLByID: [UUID: URL] = [:]
     @Published public internal(set) var pushNotificationsEnabled = true
     @Published public internal(set) var groomActivityPushNotificationsEnabled = true
     @Published public internal(set) var chatroomActivityPushNotificationsEnabled = true

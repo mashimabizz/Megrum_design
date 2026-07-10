@@ -28,6 +28,8 @@ enum NotificationCenterFilter: String, CaseIterable, Identifiable {
 /// 未読チップは廃止（行背景の淡いラベンダーで示す）。打診受信には「確認する」ピルを内蔵。
 struct NotificationCenterRow: View {
     var notification: MegrumNotification
+    /// 対象コンテンツの右端サムネ（Instagramの投稿サムネ位置）。iter1226.415。
+    var thumbnailURL: URL? = nil
     var onTap: () -> Void
 
     var body: some View {
@@ -82,6 +84,10 @@ struct NotificationCenterRow: View {
                             .padding(.top, 3)
                     }
                 }
+
+                if let thumbnailURL {
+                    NotificationThumbnailImage(url: thumbnailURL)
+                }
             }
             .padding(.vertical, 6)
             .contentShape(Rectangle())
@@ -98,6 +104,8 @@ struct NotificationCenterRow: View {
 /// いいね集約行：「◯◯さん、他N人がいいねしました」＋重ねアバター（iter1226.413）。
 struct NotificationCenterLikeGroupRow: View {
     var group: NotificationCenterDisplayItem.GroomLikeGroup
+    /// いいねされたグルームの右端サムネ。iter1226.415。
+    var thumbnailURL: URL? = nil
     var onTap: () -> Void
 
     var body: some View {
@@ -121,6 +129,10 @@ struct NotificationCenterLikeGroupRow: View {
                                 .foregroundStyle(MegrumTheme.muted)
                         }
                     }
+                }
+
+                if let thumbnailURL {
+                    NotificationThumbnailImage(url: thumbnailURL)
                 }
             }
             .padding(.vertical, 6)
@@ -203,6 +215,28 @@ struct NotificationAvatarImage: View {
                 .font(.system(size: side * 0.42, weight: .semibold))
                 .foregroundStyle(MegrumTheme.lavender.opacity(0.7))
         }
+    }
+}
+
+/// 通知の右端サムネ（対象コンテンツの画像・44pt角丸）。
+struct NotificationThumbnailImage: View {
+    var url: URL
+
+    var body: some View {
+        AsyncImage(url: url) { phase in
+            if case .success(let image) = phase {
+                image.resizable().scaledToFill()
+            } else {
+                MegrumTheme.lavender.opacity(0.10)
+            }
+        }
+        .frame(width: 44, height: 44)
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(MegrumTheme.ink.opacity(0.06), lineWidth: 1)
+        }
+        .accessibilityHidden(true)
     }
 }
 

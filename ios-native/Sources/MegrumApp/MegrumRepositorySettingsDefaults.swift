@@ -40,6 +40,10 @@ public extension MegrumRepository {
         []
     }
 
+    func resolveNotificationThumbnailURL(bucket: String, path: String) async -> URL? {
+        nil
+    }
+
     func markNotificationRead(_ notificationID: UUID) async throws -> MegrumNotification? {
         nil
     }

@@ -84,6 +84,10 @@ public extension SupabaseMegrumRepository {
         try await notificationClient.loadNotifications(userID: viewerID, limit: limit)
     }
 
+    func resolveNotificationThumbnailURL(bucket: String, path: String) async -> URL? {
+        await notificationClient.resolveThumbnailURL(bucket: bucket, path: path)
+    }
+
     func markNotificationRead(_ notificationID: UUID) async throws -> MegrumNotification? {
         try await notificationClient.markNotificationRead(userID: viewerID, notificationID: notificationID)
     }

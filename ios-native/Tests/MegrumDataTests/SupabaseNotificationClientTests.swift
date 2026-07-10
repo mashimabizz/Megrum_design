@@ -9,7 +9,7 @@ final class SupabaseNotificationClientTests: XCTestCase {
 
         let request = try client.makeLoadNotificationsRequest(userID: userID, limit: 50)
 
-        XCTAssertEqual(request.url?.absoluteString, "https://example.supabase.co/rest/v1/notifications?select=id,kind,title,body,link_path,read_at,created_at,actor_user_id,actor_display_name,actor_avatar_url&user_id=eq.11111111-1111-1111-1111-111111111111&order=created_at.desc&limit=50")
+        XCTAssertEqual(request.url?.absoluteString, "https://example.supabase.co/rest/v1/notifications?select=id,kind,title,body,link_path,read_at,created_at,actor_user_id,actor_display_name,actor_avatar_url,thumbnail_url,thumbnail_bucket,thumbnail_path&user_id=eq.11111111-1111-1111-1111-111111111111&order=created_at.desc&limit=50")
         XCTAssertEqual(request.httpMethod, "GET")
     }
 
@@ -23,7 +23,7 @@ final class SupabaseNotificationClientTests: XCTestCase {
         let body = try XCTUnwrap(request.httpBody)
         let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
 
-        XCTAssertEqual(request.url?.absoluteString, "https://example.supabase.co/rest/v1/notifications?select=id,kind,title,body,link_path,read_at,created_at,actor_user_id,actor_display_name,actor_avatar_url&id=eq.22222222-2222-2222-2222-222222222222&user_id=eq.11111111-1111-1111-1111-111111111111")
+        XCTAssertEqual(request.url?.absoluteString, "https://example.supabase.co/rest/v1/notifications?select=id,kind,title,body,link_path,read_at,created_at,actor_user_id,actor_display_name,actor_avatar_url,thumbnail_url,thumbnail_bucket,thumbnail_path&id=eq.22222222-2222-2222-2222-222222222222&user_id=eq.11111111-1111-1111-1111-111111111111")
         XCTAssertEqual(request.httpMethod, "PATCH")
         XCTAssertEqual(request.value(forHTTPHeaderField: "Prefer"), "return=representation")
         XCTAssertEqual(json["read_at"] as? String, "2026-05-27T16:40:00Z")
@@ -36,7 +36,7 @@ final class SupabaseNotificationClientTests: XCTestCase {
 
         let request = try client.makeMarkAllReadRequest(userID: userID, readAt: readAt)
 
-        XCTAssertEqual(request.url?.absoluteString, "https://example.supabase.co/rest/v1/notifications?select=id,kind,title,body,link_path,read_at,created_at,actor_user_id,actor_display_name,actor_avatar_url&user_id=eq.11111111-1111-1111-1111-111111111111&read_at=is.null")
+        XCTAssertEqual(request.url?.absoluteString, "https://example.supabase.co/rest/v1/notifications?select=id,kind,title,body,link_path,read_at,created_at,actor_user_id,actor_display_name,actor_avatar_url,thumbnail_url,thumbnail_bucket,thumbnail_path&user_id=eq.11111111-1111-1111-1111-111111111111&read_at=is.null")
         XCTAssertEqual(request.httpMethod, "PATCH")
         XCTAssertEqual(request.value(forHTTPHeaderField: "Prefer"), "return=representation")
     }

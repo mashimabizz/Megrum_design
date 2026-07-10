@@ -4,6 +4,42 @@
 
 ---
 
+## イテレーション1226.415：通知の右端対象サムネ（storageパス保存＋表示時の署名URL解決）
+
+### 背景・問題意識
+
+iter1226.413 で見送った「右端の対象サムネ」をオーナー指示で実装。非公開バケットの署名URLは失効するため、URL焼き込みではなく**パス保存＋表示時解決**方式にする。
+
+### 変更内容
+
+#### `supabase/migrations/20260710170000_add_notification_thumbnail.sql`（新規・**db push 適用済み**）
+- `notifications` に `thumbnail_url`（公開URL用）/ `thumbnail_bucket` + `thumbnail_path`（非公開バケット用）を追加
+- サムネは**中央ヘルパー内で参照IDから導出**（呼び出し側の変更ゼロ）：
+  - 取引系＝proposal → 提示グッズ（receiver_have_ids[1] 優先）の `goods_inventory.photo_urls[1]`（**公開**goods-photos → thumbnail_url 焼き込み）
+  - めぐり系＝groom_reply / groom_reaction / meguri_message（source groom）→ `groom_posts.image_path`、board_thread → `image_paths[1]`（**非公開** groom-posts / meguri-board-media → bucket+path 保存）
+- 直接insertの `notify_groom_post_published` / `notify_meguri_board_thread_posted` も投稿画像を焼き込み
+
+#### Swift
+- `MegrumNotification` に thumbnailURL / thumbnailBucket / thumbnailPath。Row select に3列追加
+- `MegrumRepository.resolveNotificationThumbnailURL(bucket:path:)`（既定 nil / Supabase実装＝`createSignedURL` 1時間）。**通知ロード時に重複パスを1回だけ署名解決**して `notificationThumbnailURLByID` に保持（`MegrumAppState.resolveNotificationThumbnails`）
+- 行UI：右端に44pt角丸サムネ（単独行・いいね集約行とも）。閲覧権限なし・削除済み等で解決失敗した場合はサムネなしに退化
+- プレビューデータにサムネ付き通知を追加（VisualQA検証用）
+
+### 影響範囲
+
+- 通知センターの表示のみ。署名は閲覧者の権限で行われるため、非公開グルームの権限制御は Storage RLS 側で維持される
+
+### 確認方法
+
+- `supabase db push` 適用済み。全1540テストパス（select期待値を更新）。VisualQA `notifications` でサムネ表示を目視確認済み
+
+### セルフレビュー結果
+- ✅ 署名URLの失効問題なし（表示のたびに解決・1時間有効）
+- ✅ 呼び出し側トリガー無変更（中央ヘルパー導出）
+- ⚠️ 既存通知行はサムネ null（本マイグレーション以降の通知から有効）
+
+---
+
 ## イテレーション1226.414：ホーム塊ラベルの検索起動を廃止＋認証メール不達の原因特定（Zoho SMTP認証失敗）
 
 ### 背景・問題意識

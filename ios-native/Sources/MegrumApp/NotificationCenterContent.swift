@@ -8,6 +8,8 @@ struct NotificationCenterContent: View {
     @Binding var presentationState: NotificationCenterPresentationState
     var isLoading: Bool
     var notifications: [MegrumNotification]
+    /// 右端サムネの表示URL（appState側で署名URL解決済み）。iter1226.415。
+    var thumbnailURLByID: [UUID: URL] = [:]
     var onSelectNotification: (MegrumNotification) -> Void
     /// いいね集約行のタップ（束ねた全通知を渡す。既読化は呼び出し側の責務）。iter1226.413。
     var onSelectLikeGroup: ([MegrumNotification]) -> Void = { _ in }
@@ -39,11 +41,17 @@ struct NotificationCenterContent: View {
                             Group {
                                 switch item {
                                 case .single(let notification):
-                                    NotificationCenterRow(notification: notification) {
+                                    NotificationCenterRow(
+                                        notification: notification,
+                                        thumbnailURL: thumbnailURLByID[notification.id]
+                                    ) {
                                         onSelectNotification(notification)
                                     }
                                 case .groomLikeGroup(let group):
-                                    NotificationCenterLikeGroupRow(group: group) {
+                                    NotificationCenterLikeGroupRow(
+                                        group: group,
+                                        thumbnailURL: group.newest.flatMap { thumbnailURLByID[$0.id] }
+                                    ) {
                                         onSelectLikeGroup(group.notifications)
                                     }
                                 }

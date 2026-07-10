@@ -187,7 +187,8 @@ enum NativePreviewData {
             linkPath: "/proposals/preview",
             createdAt: Date(timeIntervalSinceNow: -1_080),
             actorUserID: partnerID,
-            actorDisplayName: "ハナ"
+            actorDisplayName: "ハナ",
+            thumbnailURL: testGoodsImageURL("twice_sana_1")
         ),
         // 同じグルームへのいいね2件＝集約行の検証用（iter1226.413）。
         MegrumNotification(
@@ -197,7 +198,8 @@ enum NativePreviewData {
             linkPath: "/grooms/00000000-0000-0000-0000-0000000000aa",
             createdAt: Date(timeIntervalSinceNow: -600),
             actorUserID: partnerID,
-            actorDisplayName: "ハナ"
+            actorDisplayName: "ハナ",
+            thumbnailURL: testGoodsImageURL("twice_dahyun_1")
         ),
         MegrumNotification(
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000085")!,
