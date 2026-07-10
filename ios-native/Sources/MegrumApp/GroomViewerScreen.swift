@@ -64,6 +64,13 @@ struct GroomViewerScreen: View {
     @State private var cubeProgress: Double = 0
     /// 現在画面に出ている画像（キューブの「出ていく面」用に保持）。
     @State private var displayedImage: UIImage?
+    /// iter1226.437：横スワイプで指に追従して直方体を回すインタラクティブ切替。
+    @State private var cubeDrag: GroomViewerCubeDrag?
+    @State private var cubeDragProgress: Double = 0
+    /// ドラッグ開始時に縦（閉じる）か横（キューブ）かを固定する。
+    @State private var activeDragAxis: GroomViewerDragAxis?
+    /// キューブ計算に使う表示幅（viewerSurface の実測値）。
+    @State private var surfaceWidth: CGFloat = 390
     #endif
 
     init(
@@ -279,9 +286,34 @@ struct GroomViewerScreen: View {
         .gesture(
             DragGesture(minimumDistance: 12)
                 .onChanged { value in
+                    #if canImport(UIKit)
+                    if activeDragAxis == nil {
+                        activeDragAxis = abs(value.translation.width) > abs(value.translation.height)
+                            ? .horizontal
+                            : .vertical
+                    }
+                    switch activeDragAxis {
+                    case .horizontal:
+                        updateCubeDrag(translationX: value.translation.width)
+                    case .vertical, nil:
+                        dragState.update(with: value.translation)
+                    }
+                    #else
                     dragState.update(with: value.translation)
+                    #endif
                 }
                 .onEnded { value in
+                    #if canImport(UIKit)
+                    let axis = activeDragAxis
+                    activeDragAxis = nil
+                    if axis == .horizontal {
+                        finishCubeDrag(
+                            translationX: value.translation.width,
+                            predictedTranslationX: value.predictedEndTranslation.width
+                        )
+                        return
+                    }
+                    #endif
                     if dragState.shouldDismiss(for: value.translation) {
                         dismissViewer()
                     } else {
@@ -292,6 +324,115 @@ struct GroomViewerScreen: View {
                 }
         )
     }
+
+    #if canImport(UIKit)
+    /// 横スワイプ中：指の移動量に合わせて直方体を回す。
+    /// 対象は次/前の投稿者ブロック（インスタと同じ「ユーザー単位」の切替）。
+    private func updateCubeDrag(translationX: CGFloat) {
+        if cubeDrag == nil {
+            guard cubeSpin == nil, isOpeningSettled else {
+                return
+            }
+            let direction = translationX < 0 ? 1 : -1
+            guard let targetIndex = GroomViewerAuthorNavigation.authorSwitchTargetIndex(
+                authorIDs: grooms.map(\.authorID),
+                currentIndex: currentIndex,
+                direction: direction
+            ) else {
+                return
+            }
+            prefetchGroomImage(at: targetIndex)
+            cubeDrag = GroomViewerCubeDrag(direction: direction, targetIndex: targetIndex)
+        }
+        guard let cubeDrag else {
+            return
+        }
+        let progress = GroomViewerCubeGeometry.dragProgress(
+            translationX: translationX,
+            direction: cubeDrag.direction,
+            width: surfaceWidth
+        )
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            cubeDragProgress = reduceMotion ? 0 : progress
+        }
+    }
+
+    /// 指を離した時：しきい値を超えていれば残りを回し切って確定、超えていなければ戻す。
+    private func finishCubeDrag(translationX: CGFloat, predictedTranslationX: CGFloat) {
+        guard let drag = cubeDrag else {
+            return
+        }
+        let progress = GroomViewerCubeGeometry.dragProgress(
+            translationX: translationX,
+            direction: drag.direction,
+            width: surfaceWidth
+        )
+        let predicted = GroomViewerCubeGeometry.dragProgress(
+            translationX: predictedTranslationX,
+            direction: drag.direction,
+            width: surfaceWidth
+        )
+        let commits = progress > GroomViewerCubeGeometry.commitProgressThreshold
+            || predicted > GroomViewerCubeGeometry.commitPredictedThreshold
+
+        if reduceMotion {
+            var transaction = Transaction()
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
+                if commits {
+                    currentIndex = drag.targetIndex
+                }
+                cubeDrag = nil
+                cubeDragProgress = 0
+            }
+            return
+        }
+
+        withAnimation(.easeInOut(duration: GroomViewerCubeGeometry.settleDuration)) {
+            cubeDragProgress = commits ? 1 : 0
+        } completion: {
+            guard cubeDrag?.id == drag.id else {
+                return
+            }
+            var transaction = Transaction()
+            transaction.disablesAnimations = true
+            if commits {
+                withTransaction(transaction) {
+                    currentIndex = drag.targetIndex
+                }
+                // 切替先の面（オーバーレイ）を数フレーム残し、本体の画像読み込みが
+                // 追いつくのを待ってから外す（旧画像が一瞬見えるのを防ぐ）。
+                Task { @MainActor in
+                    try? await Task.sleep(nanoseconds: 140_000_000)
+                    var innerTransaction = Transaction()
+                    innerTransaction.disablesAnimations = true
+                    withTransaction(innerTransaction) {
+                        cubeDrag = nil
+                        cubeDragProgress = 0
+                    }
+                }
+            } else {
+                withTransaction(transaction) {
+                    cubeDrag = nil
+                    cubeDragProgress = 0
+                }
+            }
+        }
+    }
+
+    /// 指定インデックスの画像を先読み（スワイプ開始時の切替先など）。
+    private func prefetchGroomImage(at index: Int) {
+        guard grooms.indices.contains(index) else {
+            return
+        }
+        let url = grooms[index].imageURL
+        Task(priority: .userInitiated) {
+            await GoodsRemoteImageDataLoader.preload(urls: [url])
+        }
+    }
+    #endif
 
     private var viewerSurface: some View {
         GeometryReader { proxy in
@@ -321,18 +462,23 @@ struct GroomViewerScreen: View {
                     onImageChange: { displayedImage = $0 }
                 )
                 .padding(.horizontal, 8)
-                .modifier(
-                    GroomViewerCubeFaceModifier(
-                        transform: cubeSpin.map {
-                            GroomViewerCubeGeometry.incoming(
-                                progress: cubeProgress,
-                                direction: $0.direction,
-                                width: proxy.size.width
+                .modifier(GroomViewerCubeFaceModifier(transform: liveFaceTransform(width: proxy.size.width), shade: liveFaceShade))
+
+                // iter1226.437：横スワイプ中は切替先（次/前の投稿者）の面を指に追従して回し込む。
+                if let cubeDrag {
+                    GroomViewerCubeTargetFace(url: grooms[cubeDrag.targetIndex].imageURL)
+                        .modifier(
+                            GroomViewerCubeFaceModifier(
+                                transform: GroomViewerCubeGeometry.incoming(
+                                    progress: cubeDragProgress,
+                                    direction: cubeDrag.direction,
+                                    width: proxy.size.width
+                                ),
+                                shade: GroomViewerCubeGeometry.incomingShade(progress: cubeDragProgress)
                             )
-                        } ?? GroomViewerCubeGeometry.FaceTransform(offsetX: 0, degrees: 0, anchorX: 0.5),
-                        shade: cubeSpin == nil ? 0 : GroomViewerCubeGeometry.incomingShade(progress: cubeProgress)
-                    )
-                )
+                        )
+                        .allowsHitTesting(false)
+                }
                 #else
                 GroomViewerCachedImage(url: currentGroom.imageURL)
                     .padding(.horizontal, 8)
@@ -421,9 +567,57 @@ struct GroomViewerScreen: View {
                 }
                 .padding(.top, GroomViewerChromeLayout.topPadding(safeAreaTop: proxy.safeAreaInsets.top))
             }
+            #if canImport(UIKit)
+            .onAppear {
+                surfaceWidth = proxy.size.width
+            }
+            .onChange(of: proxy.size.width) { _, width in
+                surfaceWidth = width
+            }
+            #endif
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.black.ignoresSafeArea(.container, edges: .top))
+    }
+
+    #if canImport(UIKit)
+    /// 本体（現在のグルーム画像）に当てるキューブ変換。
+    /// スワイプ中＝出ていく面、タップ/自動送りの回転中＝入ってくる面、通常時＝恒等。
+    private func liveFaceTransform(width: CGFloat) -> GroomViewerCubeGeometry.FaceTransform {
+        if let cubeDrag {
+            return GroomViewerCubeGeometry.outgoing(
+                progress: cubeDragProgress,
+                direction: cubeDrag.direction,
+                width: width
+            )
+        }
+        if let cubeSpin {
+            return GroomViewerCubeGeometry.incoming(
+                progress: cubeProgress,
+                direction: cubeSpin.direction,
+                width: width
+            )
+        }
+        return GroomViewerCubeGeometry.FaceTransform(offsetX: 0, degrees: 0, anchorX: 0.5)
+    }
+
+    private var liveFaceShade: Double {
+        if cubeDrag != nil {
+            return GroomViewerCubeGeometry.outgoingShade(progress: cubeDragProgress)
+        }
+        if cubeSpin != nil {
+            return GroomViewerCubeGeometry.incomingShade(progress: cubeProgress)
+        }
+        return 0
+    }
+    #endif
+
+    private var isCubeDragActive: Bool {
+        #if canImport(UIKit)
+        cubeDrag != nil
+        #else
+        false
+        #endif
     }
 
     private func move(by delta: Int) {
@@ -443,7 +637,7 @@ struct GroomViewerScreen: View {
             currentIndex = nextIndex
         }
         #if canImport(UIKit)
-        if switchesAuthor, !reduceMotion, isOpeningSettled {
+        if switchesAuthor, !reduceMotion, isOpeningSettled, cubeDrag == nil {
             startCubeSpin(direction: delta >= 0 ? 1 : -1)
         }
         #endif
@@ -478,8 +672,8 @@ struct GroomViewerScreen: View {
             if Task.isCancelled || currentGroom.id != groomID {
                 return
             }
-            // コメント・いいね一覧を開いている間は進捗を止める。
-            while isShowingComments || isShowingLikes {
+            // コメント・いいね一覧を開いている間と、スワイプでキューブを回している間は進捗を止める。
+            while isShowingComments || isShowingLikes || isCubeDragActive {
                 try? await Task.sleep(nanoseconds: 100_000_000)
                 if Task.isCancelled || currentGroom.id != groomID {
                     return
@@ -631,6 +825,19 @@ struct GroomViewerCubeSpin {
     var id = UUID()
 }
 
+/// iter1226.437：横スワイプで指に追従して回すキューブの状態。
+struct GroomViewerCubeDrag {
+    var direction: Int
+    var targetIndex: Int
+    var id = UUID()
+}
+
+/// ドラッグの軸ロック（縦=閉じる／横=キューブ回転）。
+enum GroomViewerDragAxis {
+    case horizontal
+    case vertical
+}
+
 /// キューブの「出ていく面」。直前まで表示していた画像のスナップを黒面に載せる。
 private struct GroomViewerCubeFace: View {
     var image: UIImage?
@@ -644,6 +851,20 @@ private struct GroomViewerCubeFace: View {
                     .scaledToFit()
                     .padding(.horizontal, 8)
             }
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+/// iter1226.437：スワイプ中に回り込んでくる「切替先の面」（次/前の投稿者のグルーム画像）。
+private struct GroomViewerCubeTargetFace: View {
+    var url: URL
+
+    var body: some View {
+        ZStack {
+            Color.black
+            GroomViewerCachedImage(url: url)
+                .padding(.horizontal, 8)
         }
         .accessibilityHidden(true)
     }
