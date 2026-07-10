@@ -13,7 +13,26 @@ struct CandidateSheetVisualQAPreview: View {
     }
 
     var body: some View {
-        if variant == .lookingFor {
+        if variant == .wishTentative {
+            // 求めてる？＝3列リッチシートへの合成ルート（iter1226.417）を直接検証。
+            if let richPayload = CandidateSheetVisualQASample.wishTentativePayload.wishTentativeRichPayload {
+                HomeGoodsHitDetailSheet(
+                    selection: richPayload,
+                    viewerOfferGoods: CandidateSheetVisualQASample.viewerOfferGoods(variant: .named),
+                    addedExtraCandidateIDs: [],
+                    showsOtherExchangeRows: false,
+                    bottomButtonTitle: "この内容で打診に進む",
+                    preselectPreferredOffer: true,
+                    onOpenOwnerProfile: { _ in },
+                    onOpenNestedSheet: { _ in },
+                    onStartProposal: { _ in },
+                    onCopyToWish: { _ in },
+                    isWishCopyInProgress: false
+                )
+            } else {
+                Text("wishTentativeRichPayload が生成できません")
+            }
+        } else if variant == .lookingFor {
             HomeLookingForHitDetailSheet(
                 selection: CandidateSheetVisualQASample.lookingForPayload,
                 lookingForText: CandidateSheetVisualQASample.lookingForPayload.lookingForOnlyText ?? "サナのトレカ",
@@ -64,6 +83,7 @@ enum CandidateSheetVisualQASample {
         case cash
         case crowded
         case wish
+        case wishTentative = "wish-tentative"
         case lookingFor = "looking-for"
     }
 
@@ -304,7 +324,7 @@ enum CandidateSheetVisualQASample {
         // named は3選択肢を持たせて選択肢ピルも検証する。crowded は多数の畳み方を検証する。
         let ordered: [HomeIndividualListingWantedOption]
         switch variant {
-        case .named, .wish, .lookingFor:
+        case .named, .wish, .wishTentative, .lookingFor:
             ordered = [namedOption, conditionOption, cashOption]
         case .condition:
             ordered = [conditionOption]
@@ -353,6 +373,32 @@ enum CandidateSheetVisualQASample {
     static var lookingForPayload: HomeDiscoverySheetPayload {
         var signals = HomeCandidateConditionSignalDefaults.noEvidence
         signals.partnerLookingForText = "サナのトレカ"
+        applySampleExchangeSignals(&signals)
+        return HomeDiscoverySheetPayload(
+            goods: partnerGoods,
+            signals: signals
+        )
+    }
+
+    /// 求めてる？（不確定のみのwishマッチ）→ 3列リッチシート合成の検証。iter1226.417。
+    static var wishTentativePayload: HomeDiscoverySheetPayload {
+        var signals = HomeCandidateConditionSignalDefaults.noEvidence
+        signals.wishMatchedOfferGoodsIDs = [myRMID, myJinID]
+        signals.wishTentativeOfferGoodsIDs = [myRMID, myJinID]
+        signals.wishWantedOptions = [
+            HomeIndividualListingWantedOption(
+                id: UUID(uuidString: "00000000-0000-0000-0000-00000000c001")!,
+                listingID: UUID(uuidString: "00000000-0000-0000-0000-00000000c001")!,
+                position: 0,
+                title: "サナのトレカ",
+                kind: .condition,
+                matchingGoodsIDs: [myRMID, myJinID],
+                tentativeGoodsIDs: [myRMID, myJinID],
+                previewItems: [],
+                conditionSummary: "TWICE / サナ / トレカ / #Ready to be",
+                quantity: 1
+            )
+        ]
         applySampleExchangeSignals(&signals)
         return HomeDiscoverySheetPayload(
             goods: partnerGoods,

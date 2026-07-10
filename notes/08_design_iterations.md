@@ -4,6 +4,47 @@
 
 ---
 
+## イテレーション1226.417：「求めてる？」を超求めてる？と同じ3列リッチシートへ＋やりとり一覧の未設定アバター
+
+### 背景・問題意識
+
+オーナー指示：「求めてる？のグッズ（相手のほしいものと自分のマイグッズに不確定要素がある時）も、超求めてる？と同じように相手の条件・条件のグッズ確認・画像検索を出し、相手希望/マイグッズに分けてほしい」「やりとり一覧のアイコン未設定はグレー人型に」。
+求めてる？は従来2列のwishシート（HomeWishHitDetailSheet）に落ち、相手のほしいものの条件が見えず、不確定（？）を自分で確かめる手段が無かった。
+
+### 変更内容
+
+#### `HomeWishWantedOptionFactory.swift`（新規）
+- 相手のほしいもの行（SupabaseHomeGoodsRow）を**条件型の選択肢**（HomeIndividualListingWantedOption / kind=.condition）へ合成：短文タイトル（「サナのトレカ」式）・条件文（TWICE / サナ / トレカ / #シリーズ）・確定/不確定の自分グッズID・ほしいもの写真を参考画像に
+
+#### signals 配線（`HomeCandidateConditionSignals(+Builder)` / `HomeCandidatePartnerDemandSummary` / `HomeCandidatePartnerOfferEvaluation`）
+- `wishWantedOptions` を**個別募集とは別フィールド**で追加。需要判定（超求＝個別募集）には使わないため、ホーム行の「求めてる？」表示は不変
+
+#### `HomeDiscoverySheetPayload.wishTentativeRichPayload` / `HomeDiscoverySheetContent`
+- **不確定のみ**（確定の求！を含まない）wishマッチの場合、合成選択肢を individualListingSelection に載せ替えた goodsHit 相当ペイロードで **HomeGoodsHitDetailSheet を表示**。3列（うけとる｜相手希望（？バッジ）｜マイグッズ）・条件カード・「条件のグッズを確認！」（参考画像/Google画像検索）・選択肢ピル（ほしいもの複数時）がそのまま出る
+- 確定を含む求！は従来の2列wishシートのまま
+
+#### `TradeCardComponents.swift`
+- やりとり一覧の相手アバター未設定時：頭文字ラベンダー地 → **グレー人型（person.fill）**プレースホルダ
+
+#### `CandidateSheetVisualQAPreview.swift`
+- variant `wish-tentative` を追加（条件=TWICE/サナ/トレカ/#Ready to be・不確定2件）
+
+### 影響範囲
+
+- 求めてる？のタップ後のみ。求！・超求系・探し中・ホーム行の需要表示は不変。打診の組み立ては goodsHit と同一機構
+
+### 確認方法
+
+- VisualQA: `candidate-sheet` + `MEGRUM_VISUAL_QA_CANDIDATE_VARIANT=wish-tentative`（3列・？バッジ・条件・画像検索を目視確認済み。`condition` バリアントと挙動一致）
+- 全1540テストパス
+
+### セルフレビュー結果
+- ✅ 需要ランク（超求/求の区別）へ影響なし（別フィールド設計）
+- ✅ 相手希望の？バッジ・マイグッズの畳み（＋選ぶ）は超求めてる？と同一コンポーネント
+- ⚠️ 確定+不確定が混在する求！は従来2列のまま（不確定分の確認導線は次段候補）
+
+---
+
 ## イテレーション1226.416：支払い方法・交換条件・推しを追加シートを新デザイン言語へ刷新
 
 ### 背景・問題意識

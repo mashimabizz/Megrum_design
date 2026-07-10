@@ -59,6 +59,26 @@ struct HomeDiscoverySheetContent: View {
             )
             }
         case .wishHit(let payload):
+            // 求めてる？（不確定のみ）は超求めてる？と同じ3列リッチシートへ。
+            // 相手希望＝合成した条件選択肢、条件のグッズ確認（参考画像/画像検索）も出る（iter1226.417）。
+            if let richPayload = payload.wishTentativeRichPayload {
+                HomeGoodsHitDetailSheet(
+                    selection: richPayload,
+                    viewerOfferGoods: viewerOfferGoods,
+                    addedExtraCandidateIDs: addedExtraCandidateIDs,
+                    showsOtherExchangeRows: presentationContext.showsOtherExchangeRows,
+                    otherExchangeCandidates: otherExchangeCandidates,
+                    addedExtraSelections: addedExtraSelections,
+                    bottomButtonTitle: presentationContext.bottomButtonTitle,
+                    preselectPreferredOffer: presentationContext.preselectPreferredOffer,
+                    showsProposalPreview: presentationContext.showsProposalPreview,
+                    onOpenOwnerProfile: onOpenOwnerProfile,
+                    onOpenNestedSheet: onOpenNestedSheet,
+                    onStartProposal: onStartProposal,
+                    onCopyToWish: onCopyToWish,
+                    isWishCopyInProgress: copyingWishGoodsID == payload.goods.id
+                )
+            } else {
             HomeWishHitDetailSheet(
                 showsNonOshiOfferSection: allowsNonOshiOfferSection,
                 selection: payload,
@@ -76,6 +96,7 @@ struct HomeDiscoverySheetContent: View {
                 onCopyToWish: onCopyToWish,
                 isWishCopyInProgress: copyingWishGoodsID == payload.goods.id
             )
+            }
         case .havesLookup(let payload):
             HomeHavesLookupSheet(
                 payload: payload,

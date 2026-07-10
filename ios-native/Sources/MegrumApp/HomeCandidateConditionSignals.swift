@@ -187,6 +187,9 @@ public struct HomeCandidateConditionSignals: Equatable, Sendable {
     public var payment: HomePaymentConditionSignals
     public var linkCounts: HomeCandidateLinkCounts
     public var individualListingSelection: HomeIndividualListingSelectionContext?
+    /// 「求めてる？」用：相手のほしいものを条件型選択肢へ合成したもの（iter1226.417）。
+    /// 個別募集の選択肢とは別枠で、需要判定（超求）には使わない。
+    public var wishWantedOptions: [HomeIndividualListingWantedOption] = []
     public var wishMatchedOfferGoodsIDs: [UUID]
     /// wishMatchedOfferGoodsIDs のうち、シリーズ等が無記載で「確定」できない（＝不確定「？」）分。iter1226.363。
     public var wishTentativeOfferGoodsIDs: [UUID]
@@ -204,6 +207,7 @@ public struct HomeCandidateConditionSignals: Equatable, Sendable {
         payment: HomePaymentConditionSignals = .none,
         linkCounts: HomeCandidateLinkCounts = .zero,
         individualListingSelection: HomeIndividualListingSelectionContext? = nil,
+        wishWantedOptions: [HomeIndividualListingWantedOption] = [],
         wishMatchedOfferGoodsIDs: [UUID] = [],
         wishTentativeOfferGoodsIDs: [UUID] = [],
         wishMatchedPartnerUserIDs: [UUID] = [],
@@ -218,6 +222,7 @@ public struct HomeCandidateConditionSignals: Equatable, Sendable {
         self.payment = payment
         self.linkCounts = linkCounts
         self.individualListingSelection = individualListingSelection
+        self.wishWantedOptions = wishWantedOptions
         self.wishMatchedOfferGoodsIDs = Self.orderedUnique(wishMatchedOfferGoodsIDs)
         self.wishTentativeOfferGoodsIDs = Self.orderedUnique(wishTentativeOfferGoodsIDs)
         self.wishMatchedPartnerUserIDs = Self.orderedUnique(wishMatchedPartnerUserIDs)

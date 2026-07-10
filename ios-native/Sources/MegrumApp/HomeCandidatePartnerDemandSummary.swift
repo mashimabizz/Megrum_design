@@ -5,6 +5,8 @@ struct HomeCandidatePartnerDemandSummary {
     let wishHitCount: Int
     let listingHitCount: Int
     let wishMatchedOfferGoodsIDs: [UUID]
+    /// 「求めてる？」の3列表示用：相手のほしいものを条件型選択肢へ合成したもの（iter1226.417）。
+    let wishWantedOptions: [HomeIndividualListingWantedOption]
     /// wishMatchedOfferGoodsIDs のうち、シリーズ等が無記載で確定できない（＝不確定「？」）分。iter1226.366。
     let wishTentativeOfferGoodsIDs: [UUID]
     let individualListingSelection: HomeIndividualListingSelectionContext?
@@ -60,6 +62,11 @@ struct HomeCandidatePartnerDemandSummary {
         wishHitCount = partnerWishMatches.count
         wishMatchedOfferGoodsIDs = partnerWishMatches.map(\.0)
         wishTentativeOfferGoodsIDs = partnerWishMatches.filter { $0.1 == .tentative }.map(\.0)
+        wishWantedOptions = HomeWishWantedOptionFactory.wantedOptions(
+            partnerWishes: partnerWishesForCandidate,
+            viewerInventory: context.availableViewerInventory,
+            tagsByInventoryID: context.tagsByInventoryID
+        )
         let partnerWishRowsByID = Dictionary(
             partnerWishesForCandidate.map { ($0.id, $0) },
             uniquingKeysWith: { first, _ in first }
