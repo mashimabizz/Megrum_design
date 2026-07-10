@@ -73,21 +73,39 @@ enum GroomViewerCubeGeometry {
 /// Instagramと同じく、横スワイプは「次/前の投稿者」へ飛ぶ：
 /// 進む＝次の投稿者ブロックの先頭、戻る＝前の投稿者ブロックの先頭。
 enum GroomViewerAuthorNavigation {
-    /// iter1226.438：グルーム列を投稿者ごとの「一連」に並べ替える。
-    /// 従来の時刻順だと複数投稿者が交互に混ざり、タップで一連を見終われなかった。
-    /// 投稿者ブロックは各自の最古グルーム時刻の昇順、ブロック内は古い→新しい（iter1226.402踏襲）。
+    /// iter1226.438/439：グルーム列を投稿者ごとの「一連」に並べ替える。
+    /// 投稿者ブロックの順は**入力の先頭出現順**（＝呼び出し元の並び。ホームのレール順など）を尊重し、
+    /// ブロック内は古い→新しい（iter1226.402踏襲）。
     static func orderedGroupingAuthors(_ grooms: [GroomPost]) -> [GroomPost] {
-        let sorted = grooms.sorted { $0.createdAt < $1.createdAt }
         var blocksByAuthor: [UUID: [GroomPost]] = [:]
         var authorOrder: [UUID] = []
-        for groom in sorted {
+        for groom in grooms {
             if blocksByAuthor[groom.authorID] == nil {
                 authorOrder.append(groom.authorID)
                 blocksByAuthor[groom.authorID] = []
             }
             blocksByAuthor[groom.authorID]?.append(groom)
         }
-        return authorOrder.flatMap { blocksByAuthor[$0] ?? [] }
+        return authorOrder.flatMap { author in
+            (blocksByAuthor[author] ?? []).sorted { $0.createdAt < $1.createdAt }
+        }
+    }
+
+    /// iter1226.439：現在位置が属する投稿者ブロックの範囲（ページ進捗の分母/位置に使う）。
+    static func authorBlockRange(authorIDs: [UUID], currentIndex: Int) -> Range<Int> {
+        guard authorIDs.indices.contains(currentIndex) else {
+            return currentIndex..<(currentIndex + 1)
+        }
+        let author = authorIDs[currentIndex]
+        var start = currentIndex
+        while start > 0, authorIDs[start - 1] == author {
+            start -= 1
+        }
+        var end = currentIndex + 1
+        while end < authorIDs.count, authorIDs[end] == author {
+            end += 1
+        }
+        return start..<end
     }
 
     static func authorSwitchTargetIndex(

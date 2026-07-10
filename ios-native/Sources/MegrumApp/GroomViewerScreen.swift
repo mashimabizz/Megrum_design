@@ -84,7 +84,18 @@ struct GroomViewerScreen: View {
             : [initialGroom] + grooms
         // iter1226.438：投稿者ごとの「一連」にグルーピング（ブロック内は古い→新しい、iter1226.402踏襲）。
         // タップで一連を見終わってから次の投稿者へ移る（境界でキューブ回転）。
-        let ordered = GroomViewerAuthorNavigation.orderedGroupingAuthors(base)
+        let grouped = GroomViewerAuthorNavigation.orderedGroupingAuthors(base)
+        // iter1226.439：他ユーザーの閲覧中に自分のグルームが一連へ混ざらないようにスコープする。
+        // 自分のグルームを開いた時は従来どおり自分の一連だけ（iter1226.402）。
+        let viewerID = appState.viewer?.id
+        let ordered: [GroomPost]
+        if let viewerID, initialGroom.authorID == viewerID {
+            ordered = grouped.filter { $0.authorID == viewerID }
+        } else if let viewerID {
+            ordered = grouped.filter { $0.authorID != viewerID }
+        } else {
+            ordered = grouped
+        }
         _grooms = State(initialValue: ordered)
         self.initialGroom = initialGroom
         self.appState = appState
@@ -568,9 +579,15 @@ struct GroomViewerScreen: View {
             }
 
             VStack(spacing: 0) {
+                // iter1226.439：進捗バーは「その投稿者の一連（この一覧で見られる数）」だけで分割する。
+                let groomIndex = index(of: groom)
+                let blockRange = GroomViewerAuthorNavigation.authorBlockRange(
+                    authorIDs: grooms.map(\.authorID),
+                    currentIndex: groomIndex
+                )
                 GroomViewerPageIndicator(
-                    totalCount: grooms.count,
-                    currentIndex: index(of: groom),
+                    totalCount: blockRange.count,
+                    currentIndex: groomIndex - blockRange.lowerBound,
                     currentProgress: groom.id == currentGroom.id ? storyProgress : 0
                 )
 

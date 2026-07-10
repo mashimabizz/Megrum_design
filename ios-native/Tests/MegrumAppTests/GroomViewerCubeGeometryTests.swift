@@ -128,19 +128,30 @@ final class GroomViewerAuthorGroupingTests: XCTestCase {
     func testOrderingGroupsInterleavedAuthorsIntoBlocks() {
         let a = UUID()
         let b = UUID()
-        // 時刻順だと A, B, A, B と交互になる並び
+        // 入力は B が先頭に現れる交互の並び（レール表示順を想定）
         let grooms = [
-            groom(author: a, minutesAgo: 40),
-            groom(author: b, minutesAgo: 30),
+            groom(author: b, minutesAgo: 10),
             groom(author: a, minutesAgo: 20),
-            groom(author: b, minutesAgo: 10)
+            groom(author: b, minutesAgo: 30),
+            groom(author: a, minutesAgo: 40)
         ]
 
-        let ordered = GroomViewerAuthorNavigation.orderedGroupingAuthors(grooms.shuffled())
+        let ordered = GroomViewerAuthorNavigation.orderedGroupingAuthors(grooms)
 
-        // 投稿者ブロックにまとまり（A の一連 → B の一連）、ブロック内は古い→新しい
-        XCTAssertEqual(ordered.map(\.authorID), [a, a, b, b])
+        // 投稿者ブロックは入力の先頭出現順（B → A）、ブロック内は古い→新しい
+        XCTAssertEqual(ordered.map(\.authorID), [b, b, a, a])
         XCTAssertLessThan(ordered[0].createdAt, ordered[1].createdAt)
         XCTAssertLessThan(ordered[2].createdAt, ordered[3].createdAt)
+    }
+
+    func testAuthorBlockRangeCoversCurrentAuthorRun() {
+        let a = UUID()
+        let b = UUID()
+        let authors = [a, a, b, b, b]
+
+        XCTAssertEqual(GroomViewerAuthorNavigation.authorBlockRange(authorIDs: authors, currentIndex: 0), 0..<2)
+        XCTAssertEqual(GroomViewerAuthorNavigation.authorBlockRange(authorIDs: authors, currentIndex: 3), 2..<5)
+        // 範囲外は現在位置のみの安全な範囲
+        XCTAssertEqual(GroomViewerAuthorNavigation.authorBlockRange(authorIDs: authors, currentIndex: 9), 9..<10)
     }
 }

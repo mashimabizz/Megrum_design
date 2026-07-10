@@ -196,11 +196,25 @@ struct HomeScreen: View {
         let ordered = openable.sorted { $0.createdAt < $1.createdAt }
         let viewed = appState.viewedGroomIDs
         let initial = ordered.first(where: { !viewed.contains($0.id) }) ?? ordered.first!
-        if ordered.count > 1 {
-            onOpenOwnGrooms(ordered, initial, anchor)
-        } else {
-            onOpenGroom(initial, anchor)
+        // iter1226.439：タップしたユーザーだけでなく「レール全体の一連」を渡す。
+        // 以前はユーザー単体の一覧（一連の終端で閉じる・スワイプでユーザー切替不能）と
+        // 全体混在の一覧（自分含む他人へ流れる）の二重構造で、挙動が食い違っていた。
+        // ビューア側が投稿者ブロック化＋自分のグルーム除外を行うため、ここではレール表示順の
+        // 開けるグルーム全体をそのまま渡す。
+        let railSequence = GroomFeedOrdering.sorted(
+            groomRailItems,
+            viewerID: viewerID,
+            viewedIDs: viewed
+        ).filter { groom in
+            MeguriAccessPolicy.canOpenGroom(
+                groom,
+                currentCoordinate: coordinate,
+                viewerID: viewerID,
+                hasEncountered: groom.encounteredInRange,
+                subscriptionState: appState.subscriptionState
+            )
         }
+        onOpenOwnGrooms(railSequence.isEmpty ? ordered : railSequence, initial, anchor)
     }
 
     private func handleGroomRailTap(_ groom: GroomPost, anchor: UnitPoint) {
