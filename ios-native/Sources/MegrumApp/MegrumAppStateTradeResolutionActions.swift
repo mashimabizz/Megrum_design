@@ -1,4 +1,5 @@
 import Foundation
+import MegrumData
 import MegrumCore
 
 extension MegrumAppState {
@@ -29,8 +30,14 @@ extension MegrumAppState {
             persistViewerEvaluatedProposalIDsIfPossible()
             appendLocalEvaluationNoticeIfNeeded(proposalID: proposalID, body: body, evaluation: evaluation)
             return true
+        } catch SupabaseProposalClientError.alreadyEvaluated {
+            // iter1226.423：すでに評価済み＝完了扱いにして画面を閉じる（以前は汎用エラーで詰まっていた）。
+            submittingEvaluationProposalID = nil
+            viewerEvaluatedProposalIDs.insert(proposalID)
+            persistViewerEvaluatedProposalIDsIfPossible()
+            return true
         } catch {
-            errorMessage = "評価を送信できませんでした"
+            errorMessage = Self.tradeEvaluationErrorMessage(from: error)
             submittingEvaluationProposalID = nil
             return false
         }
@@ -38,6 +45,17 @@ extension MegrumAppState {
 
     /// 自分の評価済み proposal ID をサーバーから取得する。
     /// 失敗時は現状維持（メッセージ由来の判定にフォールバック）。
+    /// iter1226.423：評価失敗の原因を出す（サーバー詳細を併記）。
+    static func tradeEvaluationErrorMessage(from error: Error) -> String {
+        if error as? SupabaseProposalClientError == .invalidStatus {
+            return "この取引はまだ評価できません（取引完了後に評価できます）"
+        }
+        if let restError = error as? SupabaseRESTError, let message = restError.serverMessage {
+            return "評価を送信できませんでした（\(message)）"
+        }
+        return "評価を送信できませんでした"
+    }
+
     public func loadViewerEvaluatedProposalIDs() async {
         do {
             // ローカル保存分（直近の送信）はサーバー反映前でも保持する。

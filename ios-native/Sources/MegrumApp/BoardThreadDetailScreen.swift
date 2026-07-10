@@ -23,6 +23,13 @@ struct BoardThreadDetailScreen: View {
     @State private var replyTarget: ChatReplyTarget?
     @State private var reportTargetMessage: BoardThreadChatMessageDisplay?
     @State private var pendingReplyAfterJoin: (() -> Void)?
+    /// iter1226.423：ホーム/一覧経由で座標が渡らなくても自前で現在地を取る
+    /// （圏内なのに「現在地が必要です」と出るバグの保険）。
+    @StateObject private var fallbackLocationState = MegrumLocationState()
+
+    private var effectiveCoordinate: MegrumLocationCoordinate? {
+        coordinate ?? fallbackLocationState.coordinate
+    }
 
     private var currentThread: BoardThread {
         appState.threads.first { $0.id == thread.id } ?? thread
@@ -42,7 +49,11 @@ struct BoardThreadDetailScreen: View {
         }
         return switch replyContextScope {
         case .nearby3km:
-            coordinate == nil ? "このチャットルームへの返信には現在地が必要です" : nil
+            effectiveCoordinate == nil
+                ? (fallbackLocationState.isRequestingLocation
+                    ? "現在地を確認しています…"
+                    : "このチャットルームへの返信には現在地が必要です")
+                : nil
         case .samePrefecture:
             selectedPrefecture.nilIfBlank == nil
                 && (appState.viewer?.prefecture).nilIfBlank == nil
@@ -90,7 +101,6 @@ struct BoardThreadDetailScreen: View {
                         BoardThreadChatTimeline(
                             messages: presentation.chatMessages,
                             isLoadingReplies: appState.loadingBoardRepliesThreadID == currentThread.id,
-                            missingReplyContextMessage: missingReplyContextMessage,
                             onReact: react(to:reaction:),
                             onOpenImage: { url in
                                 photoPresentationState.selectRemoteImage(url)
@@ -225,15 +235,28 @@ struct BoardThreadDetailScreen: View {
                                 self.replyTarget = nil
                             }
                         }
-                        BoardReplyInput(
-                            text: $replyComposerState.draftReply,
-                            isSending: appState.sendingBoardReplyThreadID == currentThread.id,
-                            isDisabled: missingReplyContextMessage != nil,
-                            canUseCamera: canUseCamera,
-                            onOpenCamera: openCamera,
-                            onOpenPhotoLibrary: openPhotoLibrary
-                        ) {
-                            sendReply(proxy: proxy)
+                        // iter1226.423：返信できない理由は入力欄に覆い被せて固定表示する
+                        //（以前はタイムライン最上部で、スクロールしないと気付けなかった）。
+                        ZStack {
+                            BoardReplyInput(
+                                text: $replyComposerState.draftReply,
+                                isSending: appState.sendingBoardReplyThreadID == currentThread.id,
+                                isDisabled: missingReplyContextMessage != nil,
+                                canUseCamera: canUseCamera,
+                                onOpenCamera: openCamera,
+                                onOpenPhotoLibrary: openPhotoLibrary
+                            ) {
+                                sendReply(proxy: proxy)
+                            }
+                            .opacity(missingReplyContextMessage == nil ? 1 : 0.35)
+
+                            if let missingReplyContextMessage {
+                                MeguriNoticeBanner(message: missingReplyContextMessage)
+                                    .padding(.horizontal, 14)
+                                    .padding(.vertical, 8)
+                                    .frame(maxWidth: .infinity)
+                                    .background(.ultraThinMaterial)
+                            }
                         }
                     }
                 }
@@ -327,13 +350,18 @@ struct BoardThreadDetailScreen: View {
                 appState.recordBoardThreadVisit(currentThread.id)
             }
             .task {
+                // 座標未提供＆圏内ルームなら自前で現在地を要求する（iter1226.423）。
+                if coordinate == nil, replyContextScope == .nearby3km,
+                   fallbackLocationState.coordinate == nil {
+                    fallbackLocationState.requestCurrentLocation()
+                }
                 determineRoomEntryPhaseIfNeeded(afterRepliesLoaded: false)
                 // 通知一覧の自動既読用に「このルームを見た」記録を残す。
                 appState.recordBoardThreadVisit(currentThread.id)
                 await appState.loadBoardReplies(
                     threadID: currentThread.id,
-                    latitude: coordinate?.latitude,
-                    longitude: coordinate?.longitude,
+                    latitude: effectiveCoordinate?.latitude,
+                    longitude: effectiveCoordinate?.longitude,
                     prefecture: selectedPrefecture,
                     scope: replyContextScope
                 )
@@ -448,8 +476,8 @@ struct BoardThreadDetailScreen: View {
             let sent = await appState.sendBoardReply(
                 threadID: currentThread.id,
                 body: replyBody,
-                latitude: coordinate?.latitude,
-                longitude: coordinate?.longitude,
+                latitude: effectiveCoordinate?.latitude,
+                longitude: effectiveCoordinate?.longitude,
                 prefecture: selectedPrefecture,
                 scope: replyContextScope,
                 anonymousDisplayName: identity.name,
@@ -536,8 +564,8 @@ struct BoardThreadDetailScreen: View {
             threadID: currentThread.id,
             imageData: data,
             imageContentType: imageContentType,
-            latitude: coordinate?.latitude,
-            longitude: coordinate?.longitude,
+            latitude: effectiveCoordinate?.latitude,
+            longitude: effectiveCoordinate?.longitude,
             prefecture: selectedPrefecture,
             scope: replyContextScope,
             anonymousDisplayName: identity.name,

@@ -13,6 +13,8 @@ struct ProposalCreateFlow: View {
     var initialSenderGoodsIDs: [UUID] = []
     var matchType: ProposalMatchType = .perfect
     var initialExchangeMethod: ExchangeMethod? = nil
+    /// iter1226.423：再打診時に元の待ち合わせを引き継ぐ（手渡しは待ち合わせ必須のため）。
+    var initialMeetup: ProposalMeetupInput? = nil
     var initialMessage: String? = nil
     var initialCashAmount: Int? = nil
     var initialShippingFee: IndividualListingShippingFeeDraft? = nil

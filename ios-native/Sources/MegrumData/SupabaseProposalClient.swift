@@ -215,19 +215,25 @@ public final class SupabaseProposalClient: @unchecked Sendable {
             throw SupabaseProposalClientError.invalidStatus
         }
 
-        let rows: [EvaluationInsertRow] = try await client.insertRows(
-            into: "user_evaluations",
-            values: [
-                EvaluationInsertPayload(
-                    proposalID: input.proposalID,
-                    raterID: userID,
-                    rateeID: rateeID,
-                    stars: input.stars,
-                    comment: SupabaseTextNormalizer.optional(input.comment)
-                )
-            ],
-            select: "id,rater_id,stars,comment,created_at"
-        )
+        let rows: [EvaluationInsertRow]
+        do {
+            rows = try await client.insertRows(
+                into: "user_evaluations",
+                values: [
+                    EvaluationInsertPayload(
+                        proposalID: input.proposalID,
+                        raterID: userID,
+                        rateeID: rateeID,
+                        stars: input.stars,
+                        comment: SupabaseTextNormalizer.optional(input.comment)
+                    )
+                ],
+                select: "id,rater_id,stars,comment,created_at"
+            )
+        } catch let error as SupabaseRESTError where (error.serverMessage ?? "").contains("user_evaluations_proposal_id_rater_id") {
+            // 二重評価（unique違反）は専用エラーへ（呼び出し側で「評価済み」として完了扱いにする）。
+            throw SupabaseProposalClientError.alreadyEvaluated
+        }
         guard let evaluation = rows.first?.evaluation else {
             throw SupabaseProposalClientError.malformedResponse
         }

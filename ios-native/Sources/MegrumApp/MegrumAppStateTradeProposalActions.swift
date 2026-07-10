@@ -61,10 +61,22 @@ extension MegrumAppState {
             await loadMessages(proposalID: proposalID)
             return true
         } catch {
-            errorMessage = "打診を更新できませんでした"
+            errorMessage = Self.proposalReviseErrorMessage(from: error)
             isCreatingProposal = false
             return false
         }
+    }
+
+    /// iter1226.423：再打診失敗の原因を闇落ちさせない（待ち合わせ必須は専用文言）。
+    static func proposalReviseErrorMessage(from error: Error) -> String {
+        if let restError = error as? SupabaseRESTError,
+           let message = restError.serverMessage {
+            if message.contains("meetup_required") {
+                return "手渡し交換は待ち合わせ（日時・場所）の設定が必要です。待ち合わせを設定してから送信してください"
+            }
+            return "打診を更新できませんでした（\(message)）"
+        }
+        return "打診を更新できませんでした"
     }
 
     public func agreeProposal(proposalID: UUID, acceptedExchangeMethod: ExchangeMethod? = nil) async -> Bool {

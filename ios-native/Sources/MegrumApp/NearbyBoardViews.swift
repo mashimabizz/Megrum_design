@@ -2,6 +2,9 @@ import Foundation
 import MegrumCore
 import MegrumDesign
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#endif
 
 // =====================================================================
 // 圏内チャットルームの導線（iter1226.421 / オーナー要望）
@@ -126,12 +129,10 @@ struct NearbyBoardThreadRow: View {
     private var thumbnail: some View {
         Group {
             if let url = thread.imageURLs?.first {
-                AsyncImage(url: url) { phase in
-                    if case .success(let image) = phase {
-                        image.resizable().scaledToFill()
-                    } else {
-                        thumbnailPlaceholder
-                    }
+                // iter1226.423：署名URLはロードのたびにトークンが変わるため、
+                // AsyncImage だと毎回再ダウンロード＆チラつく。パス基準のキャッシュ画像で固定する。
+                NearbyBoardCachedThumbnail(url: url) {
+                    thumbnailPlaceholder
                 }
             } else {
                 thumbnailPlaceholder
@@ -152,6 +153,62 @@ struct NearbyBoardThreadRow: View {
                 .font(.system(size: 18, weight: .semibold))
                 .foregroundStyle(MegrumTheme.sky)
         }
+    }
+}
+
+/// 署名トークンを除いたURL（パスまで）をキーにキャッシュするサムネイル（iter1226.423）。
+/// リスト再取得で署名が変わっても再ダウンロードせず、表示も差し替えない。
+struct NearbyBoardCachedThumbnail<Placeholder: View>: View {
+    var url: URL
+    @ViewBuilder var placeholder: () -> Placeholder
+
+    #if canImport(UIKit)
+    @State private var image: UIImage?
+    #endif
+
+    /// クエリ（署名トークン）を除いた安定キー。
+    private var stableCacheURL: URL {
+        var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        components?.query = nil
+        return components?.url ?? url
+    }
+
+    var body: some View {
+        ZStack {
+            #if canImport(UIKit)
+            if let image {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                placeholder()
+            }
+            #else
+            AsyncImage(url: url) { phase in
+                if case .success(let loaded) = phase {
+                    loaded.resizable().scaledToFill()
+                } else {
+                    placeholder()
+                }
+            }
+            #endif
+        }
+        #if canImport(UIKit)
+        .task(id: stableCacheURL) {
+            if let cached = await GoodsRemoteImageDataCache.shared.data(for: stableCacheURL) {
+                image = UIImage(data: cached)
+                return
+            }
+            guard let data = try? await GoodsRemoteImageDataLoader.loadData(from: url) else {
+                return
+            }
+            await GoodsRemoteImageDataCache.shared.insert(data, for: stableCacheURL)
+            guard !Task.isCancelled else {
+                return
+            }
+            image = UIImage(data: data)
+        }
+        #endif
     }
 }
 
@@ -279,7 +336,7 @@ struct NearbyBoardListScreen: View {
 
     @ObservedObject var appState: MegrumAppState
     var onClose: () -> Void
-    var onOpenThread: (BoardThread) -> Void
+    var onOpenThread: (BoardThread, MegrumLocationCoordinate?) -> Void
     var qaInitialOverlay: QAInitialOverlay?
 
     @StateObject private var locationState = MegrumLocationState()
@@ -339,7 +396,7 @@ struct NearbyBoardListScreen: View {
                                         if lockedIDs.contains(thread.id) {
                                             isShowingLockedPopup = true
                                         } else {
-                                            onOpenThread(thread)
+                                            onOpenThread(thread, locationState.coordinate)
                                         }
                                     }
                                 )

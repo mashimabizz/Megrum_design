@@ -4,6 +4,7 @@ import MegrumCore
 extension ProposalCreateFlow {
     func prepareInitialProposalState() {
         applyInitialExchangeMethodIfNeeded()
+        applyInitialMeetupIfNeeded()
         applyInitialMessageIfNeeded()
         applyInitialCashAmountIfNeeded()
         seedDefaultSenderSelection()
@@ -110,6 +111,33 @@ extension ProposalCreateFlow {
             return
         }
         exchangeMethod = initialExchangeMethod
+    }
+
+    /// iter1226.423：再打診では元の待ち合わせを初期値として引き継ぐ。
+    /// 手渡し/両方はDB制約で待ち合わせ必須のため、空のまま送ると保存が確実に失敗する。
+    func applyInitialMeetupIfNeeded() {
+        guard initialStateFlags.claimInitialMeetupApplication() else {
+            return
+        }
+        guard let initialMeetup else {
+            return
+        }
+        meetupStartAt = initialMeetup.startAt
+        meetupEndAt = initialMeetup.endAt
+        meetupPlaceName = initialMeetup.placeName
+        meetupLatitudeText = String(initialMeetup.latitude)
+        meetupLongitudeText = String(initialMeetup.longitude)
+        meetupCandidateDrafts = [
+            ProposalMeetupCandidateDraft(
+                id: UUID(),
+                startAt: initialMeetup.startAt,
+                endAt: initialMeetup.endAt,
+                placeName: initialMeetup.placeName,
+                latitudeText: String(initialMeetup.latitude),
+                longitudeText: String(initialMeetup.longitude)
+            )
+        ]
+        selectedMeetupCandidateIndex = 0
     }
 
     /// 判定から生成した相談文を、ユーザーが未入力の時だけ下書きとして入れる。

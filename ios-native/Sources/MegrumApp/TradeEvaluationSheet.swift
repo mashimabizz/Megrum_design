@@ -4,6 +4,8 @@ import SwiftUI
 struct TradeEvaluationSheet: View {
     @State private var draftState = TradeEvaluationDraftState()
     var isSubmitting: Bool
+    /// iter1226.423：送信失敗を画面内に表示する（以前は何も出ず詰まって見えた）。
+    var errorMessage: String?
     var onSubmit: (Int, String?) async -> Void
 
     var body: some View {
@@ -36,6 +38,15 @@ struct TradeEvaluationSheet: View {
                 .lineLimit(3...5)
                 .padding(14)
                 .background(.white.opacity(0.78), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+
+            if let errorMessage {
+                Text(errorMessage)
+                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .foregroundStyle(.red)
+                    .padding(14)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(.red.opacity(0.08), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            }
 
             Button {
                 Task {

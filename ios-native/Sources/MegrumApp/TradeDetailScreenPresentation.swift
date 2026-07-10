@@ -202,7 +202,8 @@ extension TradeDetailScreen {
         }
         .navigationDestination(isPresented: $routePresentationState.isShowingEvaluationPage) {
             TradeEvaluationSheet(
-                isSubmitting: appState.submittingEvaluationProposalID == currentProposal.id
+                isSubmitting: appState.submittingEvaluationProposalID == currentProposal.id,
+                errorMessage: appState.errorMessage
             ) { stars, comment in
                 let sent = await appState.submitTradeEvaluation(
                     proposalID: currentProposal.id,
@@ -240,6 +241,7 @@ extension TradeDetailScreen {
                     receiverGoodsIDs: requestedGoodsIDs,
                     initialSenderGoodsIDs: offeredGoodsIDs,
                     initialExchangeMethod: currentProposal.exchangeMethod,
+                    initialMeetup: currentProposal.meetupCandidates?.first,
                     initialStep: .give,
                     submissionStatusOverride: .negotiating,
                     revisingProposalID: currentProposal.id,

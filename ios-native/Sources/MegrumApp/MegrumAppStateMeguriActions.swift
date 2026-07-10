@@ -396,8 +396,30 @@ extension MegrumAppState {
         ) else {
             return
         }
-        homeNearbyBoardThreads = threads.sorted { $0.latestActivityAt > $1.latestActivityAt }
-        await loadBoardReplyPreviews(threadIDs: Array(homeNearbyBoardThreads.prefix(30).map(\.id)))
+        let sorted = threads.sorted { $0.latestActivityAt > $1.latestActivityAt }
+        // iter1226.423：署名URLは取得のたびに変わるため、実質同じ内容なら公開値を触らない
+        //（ホームを開くたびに行が作り直されてサムネイルが更新される問題の防止）。
+        if !Self.homeNearbyBoardContentEquals(homeNearbyBoardThreads, sorted) {
+            homeNearbyBoardThreads = sorted
+        }
+        await loadBoardReplyPreviews(threadIDs: Array(sorted.prefix(30).map(\.id)))
+    }
+
+    /// 署名つき画像URLなどの揮発値を除いた実内容の比較。
+    static func homeNearbyBoardContentEquals(_ lhs: [BoardThread], _ rhs: [BoardThread]) -> Bool {
+        guard lhs.count == rhs.count else {
+            return false
+        }
+        return zip(lhs, rhs).allSatisfy { a, b in
+            a.id == b.id
+                && a.title == b.title
+                && a.body == b.body
+                && a.seriesName == b.seriesName
+                && a.latestActivityAt == b.latestActivityAt
+                && a.replyCount == b.replyCount
+                && a.status == b.status
+                && (a.imagePaths ?? []) == (b.imagePaths ?? [])
+        }
     }
 
     /// 地図に見えているチャットルームの最新メッセージを吹き出し用に読み込む。

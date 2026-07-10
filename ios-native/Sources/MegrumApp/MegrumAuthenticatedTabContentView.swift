@@ -131,9 +131,9 @@ struct MegrumAuthenticatedTabContentView: View {
                         NearbyBoardListScreen(
                             appState: appState,
                             onClose: dismiss,
-                            onOpenThread: { thread in
+                            onOpenThread: { thread, coordinate in
                                 openMeguriBoardThread(
-                                    MeguriBoardThreadRoute(thread: thread, selectedPrefecture: nil, coordinate: nil)
+                                    MeguriBoardThreadRoute(thread: thread, selectedPrefecture: nil, coordinate: coordinate)
                                 )
                             },
                             qaInitialOverlay: {
@@ -374,10 +374,11 @@ struct MegrumAuthenticatedTabContentView: View {
                     // iter1226.420：ホームの紙飛行機/左スワイプからめぐりメッセージ一覧へスライド表示。
                     isShowingMeguriMessageInbox = true
                 },
-                onOpenBoardThread: { thread in
+                onOpenBoardThread: { thread, coordinate in
                     // iter1226.421：ホームの近くのチャットルーム行→スレッド詳細をスライド表示。
+                    // iter1226.423：現在地を添えて「返信には現在地が必要」の誤表示を防ぐ。
                     openMeguriBoardThread(
-                        MeguriBoardThreadRoute(thread: thread, selectedPrefecture: nil, coordinate: nil)
+                        MeguriBoardThreadRoute(thread: thread, selectedPrefecture: nil, coordinate: coordinate)
                     )
                 },
                 onOpenBoardList: {

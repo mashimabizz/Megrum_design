@@ -29,8 +29,8 @@ struct HomeScreen: View {
     var onOpenGroom: (GroomPost, UnitPoint) -> Void = { _, _ in }
     /// iter1226.420：ヘッダー紙飛行機・左スワイプからめぐりメッセージ一覧を開く。
     var onOpenMeguriMessages: () -> Void = {}
-    /// iter1226.421：近くのチャットルーム行→スレッド詳細（スライド表示）。
-    var onOpenBoardThread: (BoardThread) -> Void = { _ in }
+    /// iter1226.421：近くのチャットルーム行→スレッド詳細（スライド表示）。iter1226.423で現在地を添える。
+    var onOpenBoardThread: (BoardThread, MegrumLocationCoordinate?) -> Void = { _, _ in }
     /// iter1226.421：「すべて見る」→圏内チャットルーム一覧。
     var onOpenBoardList: () -> Void = {}
     /// iter1226.422：グルーム作成（左スライドのコンポーザ）をタブ上位のオーバーレイで開く。
@@ -337,7 +337,9 @@ struct HomeScreen: View {
             nearbyBoardThreads: appState?.homeNearbyBoardThreads ?? [],
             boardReplyPreviews: appState?.boardReplyPreviewsByThreadID ?? [:],
             lockedBoardIDs: lockedBoardIDs,
-            onOpenBoardThread: onOpenBoardThread,
+            onOpenBoardThread: { thread in
+                onOpenBoardThread(thread, groomLocationState.coordinate)
+            },
             onOpenLockedBoardThread: { isShowingBoardLockedPopup = true },
             onOpenBoardList: onOpenBoardList,
             onAddGroom: {

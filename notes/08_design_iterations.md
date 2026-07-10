@@ -4,6 +4,56 @@
 
 ---
 
+## イテレーション1226.423：チャットルーム画像キャッシュ・現在地バグ・再打診/評価の詰まり修正（FB4件）
+
+### 背景・問題意識
+
+オーナー報告4件：①ホームの近くのチャットルームが開くたびに画像更新されて重い ②圏内なのにスレッドを開くと「返信には現在地が必要です」エラー＋そのメッセージが最上部でスクロールしないと見えない ③取引チャットの「条件を変えて再打診」が最後送信できない（画面も閉じない）④評価送信しても画面が閉じず完了できない。
+
+### 調査結果（③④は本番E2Eで根本原因を特定）
+
+- **③の正体はDB制約違反の闇落ち**：`proposals_meetup_required`（手渡し/両方は待ち合わせ日時・場所・座標が必須）に対し、再打診フローは待ち合わせが空のまま送信 → PATCH が 400 → 汎用「打診を更新できませんでした」で詰まる。QAユーザー＋実PATCHで再現（待ち合わせなし=400 / あり=200 negotiating で成功）
+- **④の正体は二重評価のunique違反**：`user_evaluations(proposal_id, rater_id)` はユニーク。評価済みの取引で再度送信すると 409 → 汎用エラー（画面に表示なし）で詰まる。E2Eで再現（1回目201 / 2回目409）
+- **②はルート起点の座標欠落**：ホーム/一覧からのスレッドは `coordinate: nil` で開いていた（iter1226.421の実装漏れ）
+- **①は署名URLの揮発**：取得のたびに署名トークンが変わり、URLキーのキャッシュが常にミス → AsyncImage が毎回再ダウンロード＆行の再構築
+
+### 変更内容
+
+#### ①サムネイルの安定キャッシュ（`NearbyBoardViews` / `MegrumAppStateMeguriActions`）
+- `NearbyBoardCachedThumbnail` 新設：**クエリ（署名トークン）を除いたURLをキー**に `GoodsRemoteImageDataCache` へ保存。リスト再取得で署名が変わっても再DLしない・表示も差し替えない
+- `loadHomeNearbyBoardThreads`：実内容（id/タイトル/本文/シリーズ/最新時刻/返信数/imagePaths）が同じなら published 値を更新しない（行の再構築自体を抑止）
+
+#### ②現在地の引き継ぎ＋フォールバック＋固定表示（`HomeScreen` / `NearbyBoardViews` / `MegrumAuthenticatedTabContentView` / `BoardThreadDetailScreen` / `BoardThreadDetailReplyViews`）
+- ホーム/一覧からスレッドを開く時に**現在地座標を添える**
+- `BoardThreadDetailScreen` に自前の `MegrumLocationState` フォールバック：座標未提供の圏内ルームでは自動で現在地を取得（取得中は「現在地を確認しています…」）
+- 「返信には現在地が必要です」等の注意は**タイムライン最上部→入力欄に覆い被せる固定表示**へ（ultraThinMaterial・入力欄は減光）
+
+#### ③再打診（`ProposalCreateFlow/InitialStateActions/InitialStateFlags` / `TradeDetailScreenPresentation` / `MegrumAppStateTradeProposalActions`）
+- 再打診フローに **`initialMeetup`（元の待ち合わせ）をシード**：手渡しのまま条件だけ変えて送っても待ち合わせが保持され、DB制約を満たす
+- 失敗時の文言を専用化：meetup_required →「手渡し交換は待ち合わせ（日時・場所）の設定が必要です…」、その他はサーバーメッセージ併記（確認ステップに表示される）
+
+#### ④評価（`SupabaseProposalClient` / `MegrumAppStateTradeResolutionActions` / `TradeEvaluationSheet`）
+- 二重評価（unique違反）→ 専用エラー `alreadyEvaluated` → **評価済みとして完了扱い**（画面を閉じ、評価済みフラグを永続化。以前は詰まっていた）
+- その他の失敗は原因つき文言（未完了取引→「取引完了後に評価できます」等）を**評価シート内に表示**（以前はどこにも出なかった）
+
+### 影響範囲
+
+- ホームのチャットルームセクション、チャットルーム詳細、取引チャットの再打診・評価。DBスキーマ・API不変
+
+### 確認方法
+
+- 本番E2E（QAユーザー2名＋打診を作成→再打診PATCH/評価INSERTを実行→**全データ削除済み**）で③④の再現と修正条件を確認
+- VisualQA: `home`（セクション表示の回帰なし・サムネ描画OK）
+- `swift test`：1555テスト（+4：`TradeSubmitErrorRecoveryTests`）全パス
+
+### セルフレビュー結果
+- ✅ サムネキャッシュのキーはクエリ除去のみ（パスが変われば正しく再取得）
+- ✅ 評価の「評価済み→完了扱い」はローカルフラグも更新するため評価ボタン自体が消える
+- ✅ 再打診の待ち合わせシードは既存の初期状態適用パターン（claimフラグ）に準拠
+- ⚠️ 再打診で待ち合わせを変えたいケースは既存の待ち合わせステップで編集可能（初期値が入るだけ）
+
+---
+
 ## イテレーション1226.422：スワイプ追従・左スライド修正・ID重複NG・生年月日保存ほか（FB9件）
 
 ### 背景・問題意識
