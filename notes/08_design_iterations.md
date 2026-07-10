@@ -4,6 +4,39 @@
 
 ---
 
+## イテレーション1226.409：「交換の方法について」にヘッダーステータスチップ（畳んだまま成立状況が分かる）
+
+### 背景・問題意識
+
+デザイン刷新FB項目2：「『交換の方法について』をもう少し直感的なデザインにしたい。文字文字している」。折りたたみを開くまで中身が見えず、開いても判定文の羅列だった。
+
+### 変更内容
+
+#### `HomeCandidateDealAboutSection.swift`
+- DisclosureGroupヘッダー右側に**常時表示のステータスチップ列**（`HomeAboutStatusChipRow`）を追加
+- 3チャンネル＝現地（mappin.and.ellipse）/郵送（shippingbox）/支払（yensign）を24ptアイコン円で表示。状態色：**緑=そのままOK（ok）／オレンジ=要相談（needsTalk→conditionPossible）／赤=要確認（check→conditionExact）／グレー=対象外（相手がその方法を選んでいない）**
+- 判定データは既存 `HomeConditionVerdict`（kind+badge）をそのまま利用。支払は判定スキップ時のみチップ省略
+- 当初「アイコン＋短ラベル」カプセルで実装したが、ヘッダー幅でラベルが「…」に潰れたため**アイコンのみ円形**へ（ラベルはaccessibilityLabelで担保）
+- 展開時の内容（判定文・メモ・更新日）は不変
+
+#### `CandidateSheetVisualQAPreview.swift`
+- named/wish 系バリアントに実データ相当の条件シグナル（現地=府一致のみ・郵送OK送料相談・PayPay共通）を追加し、チップを実表示で検証可能に
+
+### 影響範囲
+
+- 候補シート（goodsHit/wishHit/探し中含む）の「交換の方法について」ヘッダーのみ
+
+### 確認方法
+
+- VisualQA: `candidate-sheet` + `MEGRUM_VISUAL_QA_CANDIDATE_VARIANT=named` で目視確認済み（橙mappin・橙box・緑¥）
+
+### セルフレビュー結果
+- ✅ 状態色は既存トークン（ok/conditionPossible/conditionExact）のみ使用
+- ✅ VoiceOver: 各チップに「現地：取引成立までに相談が必要です」等を付与
+- ⚠️ 展開時の判定文のさらなる図解化（行アイコンの状態色化）は次段候補
+
+---
+
 ## イテレーション1226.408：通知センターのX/Instagram風刷新（時系列セクション・未読=背景色・行内アクション）
 
 ### 背景・問題意識

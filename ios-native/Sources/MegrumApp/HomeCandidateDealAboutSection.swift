@@ -51,10 +51,19 @@ struct HomeCandidateDealAboutSection: View {
             HStack(spacing: 7) {
                 Image(systemName: "info.circle")
                     .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(MegrumTheme.ink.opacity(0.82))
                 Text("交換の方法について")
                     .font(.system(size: 13.5, weight: .black, design: .rounded))
+                    .foregroundStyle(MegrumTheme.ink.opacity(0.82))
+
+                Spacer(minLength: 8)
+
+                // 畳んだままでも「現地/郵送/支払」の成立状況が一目で分かるステータスチップ。
+                // 緑=そのままOK・オレンジ=要相談・赤=要確認・グレー=対象外（iter1226.409 / FB項目2）。
+                if let verdict, !verdict.isEmpty {
+                    HomeAboutStatusChipRow(verdict: verdict)
+                }
             }
-            .foregroundStyle(MegrumTheme.ink.opacity(0.82))
         }
         .tint(MegrumTheme.lavender)
         .padding(.horizontal, 13)
@@ -104,6 +113,103 @@ struct HomeCandidateDealAboutSection: View {
         formatter.dateFormat = "yyyy/M/d"
         return formatter
     }()
+}
+
+/// 折りたたみヘッダー右側のステータスチップ列。現地/郵送/支払の3チャンネルを
+/// 「アイコン＋短ラベル」＋状態色で要約する（文字文字した判定文を開かずに把握できる）。
+struct HomeAboutStatusChipRow: View {
+    var verdict: HomeConditionVerdict
+
+    var body: some View {
+        HStack(spacing: 5) {
+            chip(kind: .local, systemName: "mappin.and.ellipse", title: "現地")
+            chip(kind: .mail, systemName: "shippingbox", title: "郵送")
+            if let payment = line(for: .payment) {
+                statusChip(systemName: "yensign", title: "支払", state: state(for: payment.badge))
+            }
+        }
+    }
+
+    private func line(for kind: ConditionVerdictLine.Kind) -> ConditionVerdictLine? {
+        verdict.lines.first { $0.kind == kind }
+    }
+
+    @ViewBuilder
+    private func chip(kind: ConditionVerdictLine.Kind, systemName: String, title: String) -> some View {
+        if let line = line(for: kind) {
+            statusChip(systemName: systemName, title: title, state: state(for: line.badge))
+        } else {
+            // 相手がその方法を選んでいない＝グレーで「対象外」を示す。
+            statusChip(systemName: systemName, title: title, state: .unavailable)
+        }
+    }
+
+    private func state(for badge: ConditionVerdictBadge) -> HomeAboutChipState {
+        switch badge {
+        case .ok:
+            .ok
+        case .needsTalk:
+            .talk
+        case .check:
+            .warn
+        }
+    }
+
+    // ヘッダー幅が限られるためアイコンのみの円形チップにする（ラベルはaccessibilityで担保）。
+    private func statusChip(systemName: String, title: String, state: HomeAboutChipState) -> some View {
+        Image(systemName: systemName)
+            .font(.system(size: 10.5, weight: .bold))
+            .foregroundStyle(state.foreground)
+            .frame(width: 24, height: 24)
+            .background(state.background, in: Circle())
+            .accessibilityLabel("\(title)：\(state.accessibilityText)")
+    }
+}
+
+enum HomeAboutChipState {
+    case ok
+    case talk
+    case warn
+    case unavailable
+
+    var foreground: Color {
+        switch self {
+        case .ok:
+            MegrumTheme.ok
+        case .talk:
+            MegrumTheme.conditionPossible
+        case .warn:
+            MegrumTheme.conditionExact
+        case .unavailable:
+            MegrumTheme.ink.opacity(0.28)
+        }
+    }
+
+    var background: Color {
+        switch self {
+        case .ok:
+            MegrumTheme.ok.opacity(0.11)
+        case .talk:
+            MegrumTheme.conditionPossible.opacity(0.11)
+        case .warn:
+            MegrumTheme.conditionExact.opacity(0.10)
+        case .unavailable:
+            MegrumTheme.ink.opacity(0.045)
+        }
+    }
+
+    var accessibilityText: String {
+        switch self {
+        case .ok:
+            "そのまま成立できます"
+        case .talk:
+            "取引成立までに相談が必要です"
+        case .warn:
+            "条件が合っていないため要確認です"
+        case .unavailable:
+            "この方法は対象外です"
+        }
+    }
 }
 
 private struct HomeCandidateAboutNoteRow: View {

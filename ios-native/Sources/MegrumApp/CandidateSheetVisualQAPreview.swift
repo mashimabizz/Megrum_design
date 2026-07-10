@@ -315,6 +315,7 @@ enum CandidateSheetVisualQASample {
         )
         var signals = HomeCandidateConditionSignalDefaults.noEvidence
         signals.individualListingSelection = selection
+        applySampleExchangeSignals(&signals)
         return HomeDiscoverySheetPayload(
             goods: partnerGoods,
             signals: signals,
@@ -322,11 +323,26 @@ enum CandidateSheetVisualQASample {
         )
     }
 
+    /// 「交換の方法について」のヘッダーチップ（iter1226.409）を実データ相当で検証するための
+    /// サンプル条件：現地=府一致のみ（相談）・郵送=OK（送料相談）・支払=PayPay共通。
+    private static func applySampleExchangeSignals(_ signals: inout HomeCandidateConditionSignals) {
+        signals.exchange.localExchangeSelected = true
+        signals.exchange.prefectureMatches = true
+        signals.exchange.partnerLocalPrefectures = ["大阪府"]
+        signals.exchange.postalAcceptedByBoth = true
+        signals.exchange.shippingFeeNeedsDiscussion = true
+        signals.payment.requiresPayment = true
+        signals.payment.status = .compatible
+        signals.payment.viewerMethods = [.paypay]
+        signals.payment.partnerMethods = [.paypay]
+    }
+
     /// 求！（相手が自分のグッズを求めるwishマッチ）→ HomeWishHitDetailSheet の統一ヘッダー検証。
     static var wishPayload: HomeDiscoverySheetPayload {
         var signals = HomeCandidateConditionSignalDefaults.noEvidence
         signals.wishMatchedOfferGoodsIDs = [myRMID, myJinID]
         signals.matchesViewerWish = true
+        applySampleExchangeSignals(&signals)
         return HomeDiscoverySheetPayload(
             goods: partnerGoods,
             signals: signals,
