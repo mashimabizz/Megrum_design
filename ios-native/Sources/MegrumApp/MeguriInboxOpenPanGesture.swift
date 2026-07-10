@@ -91,10 +91,14 @@ private struct MeguriInboxOpenPanAttachment: UIViewRepresentable {
             }
             let velocity = pan.velocity(in: view)
             let translation = pan.translation(in: view)
-            // 左向き＆明確に水平優位のときだけ開始（縦スクロール・タップは素通し）。
-            let horizontal = min(velocity.x, translation.x * 8)
-            let vertical = max(abs(velocity.y), abs(translation.y) * 8)
-            guard horizontal < -60, abs(horizontal) > vertical * 1.4 else {
+            // iter1226.430：スワイプした瞬間からパネルを出す。UIPan標準の約10pt
+            // ヒステリシス後の初回判定で、左向きかつ水平優位ならすぐ開始する
+            //（しきい値が高いと、判定失敗＝そのタッチでは二度と始まらないため
+            // 「かなりスワイプしないと出ない」ように見えていた）。
+            let isMovingLeft = translation.x < 0 || (translation.x == 0 && velocity.x < 0)
+            let horizontalDominant = abs(translation.x) > abs(translation.y)
+                || (translation == .zero && abs(velocity.x) > abs(velocity.y))
+            guard isMovingLeft, horizontalDominant else {
                 return false
             }
             return MainActor.assumeIsolated { isEnabled() }
