@@ -328,7 +328,10 @@ struct GroomViewerScreen: View {
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
         }
-        .gesture(
+        // iter1226.442：タップゾーン側の DragGesture(minimumDistance:0) が子ビューで先に
+        // タッチを取り、この外側ジェスチャが発火しなくなるため simultaneous で共存させる。
+        // （タップ側は12pt以上動いたら自分を取り消してこちらに譲る）
+        .simultaneousGesture(
             DragGesture(minimumDistance: 12)
                 .onChanged { value in
                     #if canImport(UIKit)
