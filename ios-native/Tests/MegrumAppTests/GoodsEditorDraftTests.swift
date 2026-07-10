@@ -99,6 +99,33 @@ final class GoodsEditorDraftTests: XCTestCase {
         XCTAssertTrue(state.canApply)
     }
 
+    func testGoodsBulkTagSheetStateFiltersCandidatesIncrementally() {
+        var state = GoodsBulkTagSheetState()
+        let candidates = ["会場限定", "ラキドロ", "Ready to be 会場ガチャ"]
+
+        XCTAssertEqual(state.filteredCandidates(from: candidates), candidates)
+
+        state.tagDraft = "会場"
+        XCTAssertEqual(state.filteredCandidates(from: candidates), ["会場限定", "Ready to be 会場ガチャ"])
+
+        // 全滅時は全候補に戻す（選び直しやすさ優先）。
+        state.tagDraft = "存在しない名前"
+        XCTAssertEqual(state.filteredCandidates(from: candidates), candidates)
+    }
+
+    func testGoodsBulkTagSheetStateShowsNewSeriesRowOnlyWhenNoExactMatch() {
+        var state = GoodsBulkTagSheetState()
+        let candidates = ["会場限定", "ラキドロ"]
+
+        XCTAssertFalse(state.showsNewSeriesRow(in: candidates))
+
+        state.tagDraft = "会場限定"
+        XCTAssertFalse(state.showsNewSeriesRow(in: candidates))
+
+        state.tagDraft = "会場限定 A賞"
+        XCTAssertTrue(state.showsNewSeriesRow(in: candidates))
+    }
+
     func testGoodsBulkTagSheetStateTogglesCandidateIntoDraft() {
         var state = GoodsBulkTagSheetState()
 
