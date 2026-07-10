@@ -23,7 +23,6 @@ struct AuthPasswordResetScreen: View {
 
             AuthInputRow(
                 title: "メールアドレス",
-                systemImage: "envelope",
                 text: $email,
                 kind: .email,
                 onChange: onEmailChanged
@@ -59,13 +58,13 @@ private struct AuthPasswordResetIntro: View {
                 .padding(.bottom, 42)
 
             Text("パスワードを再設定")
-                .font(.system(size: 32, weight: .black, design: .rounded))
+                .font(.system(size: 24, weight: .bold, design: .rounded))
                 .foregroundStyle(MegrumTheme.ink)
 
             Text("登録メールアドレスを入力してください")
-                .font(.system(size: 17, weight: .semibold, design: .rounded))
+                .font(.system(size: 15, weight: .medium, design: .rounded))
                 .foregroundStyle(MegrumTheme.muted)
-                .padding(.top, 17)
+                .padding(.top, 12)
         }
     }
 }
@@ -85,7 +84,7 @@ private struct AuthPasswordResetActions: View {
             .padding(.top, 40)
 
             Button("ログインに戻る", action: onLogin)
-                .font(.system(size: 17, weight: .black, design: .rounded))
+                .font(.system(size: 15, weight: .semibold, design: .rounded))
                 .foregroundStyle(MegrumTheme.lavender)
                 .padding(.top, 44)
         }

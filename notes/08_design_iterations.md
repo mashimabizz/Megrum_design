@@ -4,6 +4,51 @@
 
 ---
 
+## イテレーション1226.406：メールログイン/登録画面の刷新（上ラベル入力欄・グラデCTA・リンク整理）
+
+### 背景・問題意識
+
+デザイン刷新FB項目6：「ログイン画面を刷新したい。特にメアドとパスワードの入力画面が洗練されていない」。左アイコン付き70pt白カード入力欄、縦積みリンク4〜5本、独自の濃紫グラデCTAが原因。
+
+### 変更内容
+
+#### `AuthInputRow.swift`（全面書き換え）
+- 左アイコン＋白カード → **上ラベル（12pt semibold muted）＋淡い塗りフィールド**（ink 4.5%・radius12・高さ52pt・枠線なし）
+- **フォーカス時のみラベンダー1.5pt枠**がアニメーション表示（内部 `@FocusState`）。目玉トグルは維持
+- `systemImage` パラメータ廃止（呼び出し側2箇所更新）
+
+#### `AuthEmailScreen.swift`（全面書き換え）
+- **リアルタイムバリデーション**：`MegrumAuthInputValidator` の signIn/signUp 判定が通るまで主CTAを非活性
+- 主CTA：`AuthPrimaryActionButton` 経由で共通 `MegrumPrimaryButtonStyle`（lavender→sky・radius14・高さ56）へ
+- リンク整理：「パスワードを忘れた場合」＝パスワード欄右下13pt／「Apple/Googleに戻る」＝枠線ボタン→テキストリンク／切替＝最下部1行。ボタン数を実質2つに削減
+- 登録側の31pt巨大見出しを削除（トップバーのタイトルと重複）。パスワードヒント「8文字以上で入力してください」を常設
+
+#### `AuthPrimaryActionButton.swift`
+- 独自の濃紫グラデ（AuthVisualStyle.primaryGradient）をやめ `.megrumPrimary(height: 56)` へ。`isDisabled` パラメータ追加。パスワード再設定画面も自動で恩恵
+
+#### `AuthPasswordResetScreen.swift`
+- 見出し32pt black→24pt bold、リンク weight 調整、AuthInputRow 新シグネチャ対応
+
+#### `MegrumLocationState.swift`
+- **VisualQAプレビュー時は位置情報の許可要求をスキップ**（notDetermined時のrequestを抑止）。許可ダイアログが全スクショ検証を阻害していたため。本番挙動には無影響
+
+### 影響範囲
+
+- 認証フロー（メールログイン/登録/パスワード再設定）。AuthChoiceScreen（Apple/Google選択）は不変
+- AuthVisualStyle.primaryGradient は未参照化（定義は残置）
+
+### 確認方法
+
+- VisualQA: `auth-email-sign-in` / `auth-email-sign-up` をシミュレータで目視確認済み（上ラベル・淡い塗り・非活性グラデCTA・リンク配置）
+
+### セルフレビュー結果
+- ✅ 共通 MegrumPrimaryButtonStyle 使用（Web版 PrimaryButton と同一グラデ・radius）
+- ✅ ブランドカラー直書きなし
+- ✅ ラベンダー枠線ボタン2本を廃止（項目10方針）
+- ⚠️ AuthChoiceScreen 側の大型ボタンの統一は項目10の段階適用で後続
+
+---
+
 ## イテレーション1226.405：推し設定画面の刷新（タイポ縮小・…メニュー削除・追加導線2本化）
 
 ### 背景・問題意識

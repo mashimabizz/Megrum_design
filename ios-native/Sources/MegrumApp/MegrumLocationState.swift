@@ -78,6 +78,11 @@ private extension MegrumLocationState {
 
         switch authorizationStatus {
         case .notDetermined:
+            // VisualQAプレビューでは許可ダイアログがスクショ検証を阻害するため要求しない（iter1226.406）。
+            guard !VisualQAPreviewMode.isEnabled(environment: ProcessInfo.processInfo.environment) else {
+                isRequestingLocation = false
+                return
+            }
             isRequestingLocation = true
             #if os(iOS)
             manager.requestWhenInUseAuthorization()

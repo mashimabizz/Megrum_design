@@ -1,6 +1,9 @@
 import MegrumDesign
 import SwiftUI
 
+/// メールでログイン／登録（iter1226.406 刷新）：
+/// 入力欄は上ラベル＋淡い塗り、主CTAは共通グラデボタン、入力が揃うまで非活性。
+/// 縦積みだったリンク類はテキストリンクに整理し、ボタンの数を実質2つに減らす。
 struct AuthEmailScreen: View {
     let mode: AuthScreenMode
     @Binding var email: String
@@ -14,29 +17,49 @@ struct AuthEmailScreen: View {
 
     private var isSignIn: Bool { mode == .signIn }
 
+    /// リアルタイムバリデーション：形式が揃うまで主CTAを非活性にする。
+    private var canSubmit: Bool {
+        if isSignIn {
+            return MegrumAuthInputValidator.signInValidationMessage(email: email, password: password) == nil
+        }
+        return MegrumAuthInputValidator.signUpValidationMessage(email: email, password: password, handle: nil) == nil
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             AuthTopBar(title: isSignIn ? "メールでログイン" : "メールで登録", onBack: onBackToProvider)
 
-            Spacer(minLength: isSignIn ? 48 : 36)
+            Spacer(minLength: 44)
 
-            AuthBrandLockup(
-                style: isSignIn ? .wordmarkOnly : .compactIconAndWordmark,
-                wordmarkWidth: isSignIn ? 142 : 124
-            )
-            .padding(.bottom, isSignIn ? 18 : 44)
+            AuthBrandLockup(style: .wordmarkOnly, wordmarkWidth: 132)
+                .padding(.bottom, 40)
 
-            if !isSignIn {
-                Text("メールアドレスで登録")
-                    .font(.system(size: 31, weight: .black, design: .rounded))
-                    .foregroundStyle(MegrumTheme.ink)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.76)
-                    .frame(maxWidth: .infinity)
+            VStack(spacing: 16) {
+                AuthInputRow(
+                    title: "メールアドレス",
+                    text: $email,
+                    kind: .email
+                )
+
+                VStack(alignment: .trailing, spacing: 10) {
+                    AuthInputRow(
+                        title: "パスワード",
+                        text: $password,
+                        kind: .password
+                    )
+
+                    if isSignIn {
+                        Button("パスワードを忘れた場合", action: onPasswordReset)
+                            .font(.system(size: 13, weight: .semibold, design: .rounded))
+                            .foregroundStyle(MegrumTheme.lavender)
+                    } else {
+                        Text("8文字以上で入力してください")
+                            .font(.system(size: 12, weight: .medium, design: .rounded))
+                            .foregroundStyle(MegrumTheme.muted)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
             }
-
-            AuthEmailCredentialFields(email: $email, password: $password)
-                .padding(.top, isSignIn ? 26 : 50)
 
             if let feedback {
                 AuthVisualFeedbackRow(feedback: feedback)
@@ -46,97 +69,38 @@ struct AuthEmailScreen: View {
             AuthPrimaryActionButton(
                 title: isSignIn ? "ログインする" : "新規登録する",
                 isLoading: isLoading,
+                isDisabled: !canSubmit,
                 action: onSubmit
             )
-            .padding(.top, isSignIn ? 44 : 56)
+            .padding(.top, 28)
 
-            if isSignIn {
-                Button("パスワードを忘れた場合", action: onPasswordReset)
-                    .font(.system(size: 16, weight: .bold, design: .rounded))
-                    .foregroundStyle(MegrumTheme.lavender)
-                    .padding(.top, 30)
+            Button(isSignIn ? "Apple / Googleでログインに戻る" : "Apple / Googleで登録に戻る", action: onBackToProvider)
+                .font(.system(size: 14, weight: .semibold, design: .rounded))
+                .foregroundStyle(MegrumTheme.lavender)
+                .padding(.top, 24)
 
-                Button("Apple / Googleでログインに戻る", action: onBackToProvider)
-                    .font(.system(size: 17, weight: .bold, design: .rounded))
-                    .foregroundStyle(MegrumTheme.lavender)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 66)
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 15, style: .continuous)
-                            .stroke(MegrumTheme.lavender.opacity(0.72), lineWidth: 1.2)
-                    }
-                    .padding(.top, 46)
-            } else {
-                Button("Apple / Googleで登録に戻る", action: onBackToProvider)
-                    .font(.system(size: 17, weight: .bold, design: .rounded))
-                    .foregroundStyle(MegrumTheme.lavender)
-                    .padding(.top, 38)
-                Divider()
-                    .padding(.top, 46)
-                Button(action: onSwitch) {
-                    HStack(spacing: 7) {
-                        Text("すでにアカウントをお持ちの方は")
-                            .foregroundStyle(MegrumTheme.muted)
-                        Text("ログイン")
-                            .fontWeight(.black)
-                            .foregroundStyle(MegrumTheme.lavender)
-                    }
-                    .font(.system(size: 16, weight: .semibold, design: .rounded))
+            Spacer(minLength: 48)
+
+            Button(action: onSwitch) {
+                HStack(spacing: 6) {
+                    Text(isSignIn ? "はじめての方は" : "すでにアカウントをお持ちの方は")
+                        .foregroundStyle(MegrumTheme.muted)
+                    Text(isSignIn ? "新規登録" : "ログイン")
+                        .fontWeight(.bold)
+                        .foregroundStyle(MegrumTheme.lavender)
                 }
-                .buttonStyle(.plain)
-                .padding(.top, 31)
-
-                AuthLegalConsentNotice(fontSize: 11.5)
-                    .padding(.top, 44)
+                .font(.system(size: 15, weight: .medium, design: .rounded))
             }
+            .buttonStyle(.plain)
 
-            if isSignIn {
-                Spacer(minLength: 88)
-                Button(action: onSwitch) {
-                    HStack(spacing: 7) {
-                        Text("はじめての方は")
-                            .foregroundStyle(MegrumTheme.ink.opacity(0.86))
-                        Text("新規登録")
-                            .fontWeight(.black)
-                            .foregroundStyle(MegrumTheme.lavender)
-                    }
-                    .font(.system(size: 16, weight: .semibold, design: .rounded))
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 66)
-                    .background(.white.opacity(0.78), in: RoundedRectangle(cornerRadius: 15, style: .continuous))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 15, style: .continuous)
-                            .stroke(MegrumTheme.ink.opacity(0.08), lineWidth: 1)
-                    }
-                }
-                .buttonStyle(.plain)
+            if !isSignIn {
+                AuthLegalConsentNotice(fontSize: 11.5)
+                    .padding(.top, 20)
             }
 
             Spacer(minLength: 36)
         }
-        .padding(.horizontal, 31)
+        .padding(.horizontal, 28)
         .authVisualBackground()
-    }
-}
-
-private struct AuthEmailCredentialFields: View {
-    @Binding var email: String
-    @Binding var password: String
-
-    var body: some View {
-        VStack(spacing: 18) {
-            AuthInputRow(
-                title: "メールアドレス",
-                systemImage: "envelope",
-                text: $email,
-                kind: .email
-            )
-            AuthInputRow(
-                title: "パスワード",
-                systemImage: "lock",
-                text: $password,
-                kind: .password
-            )
-        }
     }
 }

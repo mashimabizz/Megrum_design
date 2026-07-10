@@ -1,6 +1,8 @@
 import MegrumDesign
 import SwiftUI
 
+/// 認証系の入力欄（iter1226.406 刷新）：
+/// 左アイコンを廃止し「上ラベル＋淡い塗りフィールド」に。フォーカス時のみラベンダー枠が出る。
 struct AuthInputRow: View {
     enum FieldKind {
         case email
@@ -8,50 +10,60 @@ struct AuthInputRow: View {
     }
 
     var title: String
-    var systemImage: String
     @Binding var text: String
     var kind: FieldKind
     var onChange: (() -> Void)?
     @State private var presentationState = AuthInputRowPresentationState()
+    @FocusState private var isFocused: Bool
 
     var body: some View {
-        HStack(spacing: 19) {
-            Image(systemName: systemImage)
-                .font(.system(size: 24, weight: .medium))
-                .foregroundStyle(MegrumTheme.lavender)
-                .frame(width: 31)
+        VStack(alignment: .leading, spacing: 7) {
+            Text(title)
+                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                .foregroundStyle(MegrumTheme.muted)
 
-            Group {
-                if presentationState.usesSecureInput(for: kind) {
-                    SecureField(title, text: $text)
-                } else {
-                    TextField(title, text: $text)
+            HStack(spacing: 10) {
+                Group {
+                    if presentationState.usesSecureInput(for: kind) {
+                        SecureField("", text: $text)
+                    } else {
+                        TextField("", text: $text)
+                    }
+                }
+                .font(.system(size: 17, weight: .medium, design: .rounded))
+                .foregroundStyle(MegrumTheme.ink)
+                .focused($isFocused)
+                #if os(iOS)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .keyboardType(kind == .email ? .emailAddress : .default)
+                .textContentType(kind == .email ? .emailAddress : .password)
+                #endif
+
+                if kind == .password {
+                    Button(action: togglePasswordVisibility) {
+                        Image(systemName: presentationState.passwordVisibilityIconName)
+                            .font(.system(size: 18, weight: .medium))
+                            .foregroundStyle(MegrumTheme.muted.opacity(0.75))
+                    }
+                    .buttonStyle(.plain)
                 }
             }
-            .font(.system(size: 18, weight: .semibold, design: .rounded))
-            .foregroundStyle(MegrumTheme.ink)
-            #if os(iOS)
-            .textInputAutocapitalization(.never)
-            .autocorrectionDisabled()
-            .keyboardType(kind == .email ? .emailAddress : .default)
-            .textContentType(kind == .email ? .emailAddress : .password)
-            #endif
-
-            if kind == .password {
-                Button(action: togglePasswordVisibility) {
-                    Image(systemName: presentationState.passwordVisibilityIconName)
-                        .font(.system(size: 22, weight: .semibold))
-                        .foregroundStyle(MegrumTheme.muted.opacity(0.78))
-                }
-                .buttonStyle(.plain)
+            .padding(.horizontal, 16)
+            .frame(height: 52)
+            .background(MegrumTheme.ink.opacity(0.045), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .strokeBorder(
+                        isFocused ? MegrumTheme.lavender.opacity(0.85) : .clear,
+                        lineWidth: 1.5
+                    )
             }
-        }
-        .padding(.horizontal, 24)
-        .frame(height: 70)
-        .background(.white.opacity(0.86), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(MegrumTheme.ink.opacity(0.13), lineWidth: 1)
+            .animation(.easeOut(duration: 0.15), value: isFocused)
+            .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .onTapGesture {
+                isFocused = true
+            }
         }
         .onChange(of: text) { _, _ in
             onChange?()
