@@ -62,6 +62,18 @@ extension MegrumAppState {
         try? await repository.loadGroomPost(id: id)
     }
 
+    /// iter1226.427：ビューア表示中のグルームを単発で取り直し、各キャッシュへ反映する。
+    /// 他ユーザーからのいいねが自分のグルームの表示数に反映されない問題の対応。
+    public func refreshGroomPostSnapshot(_ postID: UUID) async {
+        guard let fresh = try? await repository.loadGroomPost(id: postID) else {
+            return
+        }
+        grooms = grooms.map { $0.id == postID ? fresh : $0 }
+        groomMapPosts = groomMapPosts.map { $0.id == postID ? fresh : $0 }
+        encounteredGrooms = encounteredGrooms.map { $0.id == postID ? fresh : $0 }
+        syncLikedGroomIDs(with: [fresh])
+    }
+
     /// FB(iter1226.392): 出会った(遭遇済み)グルームを取得（ホーム列で圏外でも表示）。
     public func loadEncounteredGrooms(latitude: Double?, longitude: Double?) async {
         guard viewer != nil else { return }

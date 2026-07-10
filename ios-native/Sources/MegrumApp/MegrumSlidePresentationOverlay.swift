@@ -296,3 +296,21 @@ extension View {
         }
     }
 }
+
+/// めぐりメッセージ一覧のスライド表示ホスト（iter1226.427）。
+/// ドラッグ中のオフセットはこのビューだけが観測して再描画するため、
+/// TabContentView 全体の再評価（カクつき）を起こさない。
+struct MeguriInboxSlideHost<PresentedContent: View>: View {
+    @ObservedObject var model: MeguriInboxOpenDragModel
+    @Binding var isPresented: Bool
+    @ViewBuilder var content: (_ dismiss: @escaping @MainActor @Sendable () -> Void) -> PresentedContent
+
+    var body: some View {
+        MegrumSlideBoolPresentationOverlay(
+            isPresented: $isPresented,
+            backSwipeInteractionScope: .fullScreen,
+            openDragOffset: model.offset,
+            content: content
+        )
+    }
+}

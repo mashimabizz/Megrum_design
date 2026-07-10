@@ -4,6 +4,53 @@
 
 ---
 
+## イテレーション1226.427：左スワイプ品質・いいね数更新・プッシュ通知基盤の開通（FB3件）
+
+### 背景・問題意識
+
+オーナー報告3件：①左スワイプでチャットルーム/グルーム/グッズ画像がタップも同時発火＋スライドがカクつく ②グルームにいいねされても自分のグルームで数が増えない ③いいねのモバイルプッシュが来ない（バックグラウンドでも）。
+
+### 調査結果
+
+- **①タップ同時発火**：SwiftUIの `simultaneousGesture` は認識してもボタンタッチをキャンセルしない。**カクつき**：ドラッグの各フレームで TabContentView の @State を更新→全タブ＋全オーバーレイの body 再評価が毎フレーム走っていた
+- **②**：いいね数は `grooms`/`groomMapPosts` キャッシュの `likeCount` で、ビューア表示時に取り直していなかった（他者のいいねは自分のキャッシュへ反映されない）
+- **③本番調査で確定**：通知insert→プッシュのトリガー（`send_mobile_push_for_notification`）は存在し正しいが、(a) APNs分岐が読む `app.settings.apns_dispatch_url/secret` の**DB設定が未設定**（マネージドPostgresでは `ALTER DATABASE/ROLE ... SET` が permission denied で恒久設定不可）(b) **Edge Function `send-apns-notification` が未デプロイ** (c) APNs鍵などのシークレット未設定——プッシュ基盤は未開通だった。端末トークン登録（`notification_devices`）は正常（オーナー端末のAPNsトークンあり）
+
+### 変更内容
+
+#### ①（`MeguriInboxOpenPanGesture.swift` 新設 / `MegrumSlidePresentationOverlay` / `MegrumAuthenticatedTabContentView`）
+- **UIKitの`UIPanGestureRecognizer`へ置換**：認識開始時にUIKitが配下のタッチをキャンセルするため、行・タイル・画像上をなぞってもタップが発火しない。開始判定は左向き×水平優位（速度ベース）のみで、縦スクロールやタップは素通し
+- オフセットは `MeguriInboxOpenDragModel`（ObservableObject）へ分離し、**観測するのはスライドホスト（`MeguriInboxSlideHost`）だけ**。ドラッグ中の再描画がオーバーレイ局所に限定されカクつき解消
+
+#### ②（`MegrumAppStateGroomProximity` / `GroomViewerScreen`）
+- `refreshGroomPostSnapshot(postID:)` 新設：単発取得して `grooms`/`groomMapPosts`/`encounteredGrooms` へ差し替え。ビューアの `.task(id: currentGroom.id)` で表示のたびに取り直し、いいね数を最新化
+
+#### ③（`supabase/migrations/20260710190000_apns_dispatch_config_table.sql`・**db push適用済み**）
+- **`private.app_config` テーブル新設**（anon/authenticated から revoke、SECURITY DEFINER のトリガー関数のみ読める）。トリガーのGUC読みを `private.app_config_value()` へ差し替え
+- **`send-apns-notification` をデプロイ**し、`MEGRUM_APNS_TEAM_ID(3N67L2WV4F)/BUNDLE_ID(tokyo.megrum.native.preview)/ENVIRONMENT(development)/DISPATCH_SECRET` を設定。dispatch URL/secret を app_config へ投入
+- **配線のE2E検証済み**：テスト通知insert→トリガー→Edge Function到達（500 `missing_configuration`＝**Apple APNs鍵のみ未設定**という想定どおりのエラー）→テスト通知は削除済み
+- **残る唯一の手順（オーナー作業）**：Apple Developer > Certificates, Identifiers & Profiles > **Keys** で APNs キーを作成し `.p8` をダウンロード → リポジトリルートで
+  `supabase secrets set MEGRUM_APNS_KEY_ID=<キーID> MEGRUM_APNS_PRIVATE_KEY="$(cat ~/Downloads/AuthKey_<キーID>.p8)"`
+  を実行。これでいいね/返信/メッセージのプッシュが届く
+
+### 影響範囲
+
+- ホームの左スワイプ、グルームビューア、プッシュ通知基盤。TestFlight/本番ビルド（tokyo.megrum.native・production APNs）は別途 BUNDLE_ID/ENVIRONMENT 切替が必要（ビルド別トピック対応は今後の課題）
+
+### 確認方法
+
+- `swift test`：1556テスト全パス／シミュレータ home 回帰なし
+- プッシュ配線：本番DBで notifications insert→net._http_response にEdge Function応答を確認（実機受信はAPNs鍵設定後にいいね操作で確認）
+- スワイプの触感・タップ非発火は実機確認をオーナーに依頼
+
+### セルフレビュー結果
+- ✅ パン認識はホームタブ活性時のみ有効（isEnabledクロージャ）・縦スクロール/タップに干渉しない開始判定
+- ✅ dispatch secret はソース管理外（app_config直接INSERT＋Edge Function secrets）
+- ✅ テスト通知は検証後に削除済み
+- ⚠️ 横レール上の左スワイプはレールのパンが先に成立すればレール優先（従来どおり）
+
+---
+
 ## イテレーション1226.426：グルーム列「読み込み中が続く」の根本修正（実機コンソールで特定）
 
 ### 背景・問題意識

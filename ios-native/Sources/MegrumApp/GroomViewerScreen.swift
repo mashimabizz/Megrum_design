@@ -197,6 +197,8 @@ struct GroomViewerScreen: View {
             guard !Task.isCancelled else { return }
             prefetchNeighborGroomImages()
             await appState.markGroomViewed(currentGroom.id)
+            // iter1226.427：表示中のグルームを取り直す（他ユーザーからのいいねを数に反映）。
+            await appState.refreshGroomPostSnapshot(currentGroom.id)
             await appState.loadGroomEngagement(postIDs: [currentGroom.id], reportsFailure: false)
             await appState.loadMeguriProfiles(userIDs: [currentGroom.authorID], reportsFailure: false)
             if currentGroom.authorID != appState.viewer?.id,

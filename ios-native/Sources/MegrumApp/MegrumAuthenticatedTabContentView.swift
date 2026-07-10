@@ -24,9 +24,9 @@ struct MegrumAuthenticatedTabContentView: View {
     @State private var tradeDetailRoute: TradeDetailRoute?
     @State private var meguriHomeResetToken = UUID()
     @State private var isShowingMeguriMessageInbox = false
-    /// iter1226.422：ホーム左スワイプの指追従オープン用（画面幅=閉、0=全開。非nilの間だけ有効）。
-    @State private var meguriInboxOpenDragOffset: CGFloat?
-    @State private var isTrackingMeguriInboxOpenDrag = false
+    /// iter1226.427：ホーム左スワイプの指追従オープン。UIKitパン＋局所観測モデル
+    /// （タップ同時発火とTabContentView全体再描画によるカクつきを解消）。
+    @StateObject private var meguriInboxOpenDragModel = MeguriInboxOpenDragModel()
     /// iter1226.422：ホーム経由のグルーム作成（左からスライド）をタブ上位で出す。
     @State private var isShowingHomeGroomComposer = false
     @StateObject private var homeGroomComposerLocationState = MegrumLocationState()
@@ -167,10 +167,9 @@ struct MegrumAuthenticatedTabContentView: View {
             }
             .zIndex(109)
 
-            MegrumSlideBoolPresentationOverlay(
-                isPresented: $isShowingMeguriMessageInbox,
-                backSwipeInteractionScope: .fullScreen,
-                openDragOffset: meguriInboxOpenDragOffset
+            MeguriInboxSlideHost(
+                model: meguriInboxOpenDragModel,
+                isPresented: $isShowingMeguriMessageInbox
             ) { dismiss in
                 MegrumDeferredContent(delayNanoseconds: MegrumDeferredContentDelay.slidePresentation) {
                     MeguriMessageInboxScreen(
@@ -401,76 +400,19 @@ struct MegrumAuthenticatedTabContentView: View {
                 visualQAInitialScreen: visualQAInitialScreen
             )
         }
-        // iter1226.422：左スワイプで指に追従してめぐりメッセージ一覧をスライドイン。
-        // iter1226.424：.gesture だと配下のScrollViewに食われて onChanged が届かず
-        // 「デジタルに切り替わる」ため simultaneous に変更。左向き×水平優位の時だけ
-        // 追従を開始するので、縦スクロールやタップとは衝突しない。
-        .simultaneousGesture(meguriInboxOpenDragGesture)
+        // iter1226.427：左スワイプはUIKitパンで認識（認識開始でタッチがキャンセル
+        // されるため、行・タイル・画像のタップと同時発火しない）。
+        .meguriInboxOpenPanGesture(
+            model: meguriInboxOpenDragModel,
+            isEnabled: { selectedTab == .home && !isShowingMeguriMessageInbox },
+            onCommit: { isShowingMeguriMessageInbox = true }
+        )
         .tag(MegrumTab.home)
         .tabItem {
             Label(MegrumTab.home.title, systemImage: MegrumTab.home.symbolName)
         }
     }
 
-    private var screenWidthForInboxDrag: CGFloat {
-        #if canImport(UIKit)
-        max(UIScreen.main.bounds.width, 320)
-        #else
-        480
-        #endif
-    }
-
-    private var meguriInboxOpenDragGesture: some Gesture {
-        DragGesture(minimumDistance: 16)
-            .onChanged { value in
-                guard !isShowingMeguriMessageInbox else {
-                    return
-                }
-                if !isTrackingMeguriInboxOpenDrag {
-                    // 左向き＆明確に水平優位のドラッグだけ追従を開始する
-                    //（simultaneous なので縦スクロールと同時に流れてくる分は弾く）。
-                    guard value.translation.width < -16,
-                          abs(value.translation.width) > abs(value.translation.height) * 1.4
-                    else {
-                        return
-                    }
-                    isTrackingMeguriInboxOpenDrag = true
-                }
-                let width = screenWidthForInboxDrag
-                let offset = min(max(width + value.translation.width, 0), width)
-                var transaction = Transaction()
-                transaction.disablesAnimations = true
-                withTransaction(transaction) {
-                    meguriInboxOpenDragOffset = offset
-                }
-            }
-            .onEnded { value in
-                guard isTrackingMeguriInboxOpenDrag else {
-                    return
-                }
-                isTrackingMeguriInboxOpenDrag = false
-                let width = screenWidthForInboxDrag
-                let shouldOpen = -value.translation.width > MegrumSlidePresentationMetrics.minimumTranslation
-                    || -value.predictedEndTranslation.width > MegrumSlidePresentationMetrics.minimumPredictedTranslation
-                if shouldOpen {
-                    isShowingMeguriMessageInbox = true
-                    withAnimation(MegrumSlidePresentationMetrics.animation) {
-                        meguriInboxOpenDragOffset = 0
-                    }
-                } else {
-                    withAnimation(MegrumSlidePresentationMetrics.animation) {
-                        meguriInboxOpenDragOffset = width
-                    }
-                }
-                // アニメ完了後にドラッグ用オフセットを解除（以後は isPresented ベースの表示へ）。
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.42) {
-                    guard !isTrackingMeguriInboxOpenDrag else {
-                        return
-                    }
-                    meguriInboxOpenDragOffset = nil
-                }
-            }
-    }
 
     private var inventoryTab: some View {
         NavigationStack {
