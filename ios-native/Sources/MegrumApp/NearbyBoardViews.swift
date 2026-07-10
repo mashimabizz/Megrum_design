@@ -64,11 +64,40 @@ enum NearbyBoardListPolicy {
     }
 }
 
+/// 未読メッセージ件数の判定（純ロジック）。FB(iter1226.424)。
+enum NearbyBoardUnreadPolicy {
+    /// 訪問記録が無ければ「本文＋全リプライ」を未読として数える。
+    /// 訪問済みなら、その時刻より後のリプライだけを数える。
+    static func unreadCount(replyDates: [Date], visitedAt: Date?) -> Int {
+        guard let visitedAt else {
+            return replyDates.count + 1
+        }
+        return replyDates.count { $0 > visitedAt }
+    }
+}
+
+/// 未読件数のグラデバッジ（紫→水色）。FB(iter1226.424)。
+struct NearbyBoardUnreadBadge: View {
+    var count: Int
+
+    var body: some View {
+        Text(count > 99 ? "99+" : "\(count)")
+            .font(.system(size: 11, weight: .bold, design: .rounded))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 6)
+            .frame(minWidth: 20)
+            .frame(height: 20)
+            .background(MegrumTheme.primaryGradient, in: Capsule())
+    }
+}
+
 /// LINEのトーク一覧風の1行：サムネ＋タイトル＋最新メッセージ＋最新投稿日時。
 struct NearbyBoardThreadRow: View {
     var thread: BoardThread
     var latestMessage: String?
     var isLocked: Bool
+    /// FB(iter1226.424)：未読メッセージ件数（右端のグラデバッジ）。0は非表示。
+    var unreadCount: Int = 0
     var onTap: () -> Void
 
     var body: some View {
@@ -100,6 +129,12 @@ struct NearbyBoardThreadRow: View {
                             .font(.system(size: 13, weight: .regular, design: .rounded))
                             .foregroundStyle(MegrumTheme.muted)
                             .lineLimit(1)
+
+                        Spacer(minLength: 6)
+
+                        if unreadCount > 0, !isLocked {
+                            NearbyBoardUnreadBadge(count: unreadCount)
+                        }
                     }
 
                     if let seriesName = thread.seriesName?.nilIfBlank {
@@ -115,7 +150,9 @@ struct NearbyBoardThreadRow: View {
             .opacity(isLocked ? 0.62 : 1)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("\(thread.title)\(isLocked ? "、圏外のためプレミアム限定" : "")")
+        .accessibilityLabel(
+            "\(thread.title)\(isLocked ? "、圏外のためプレミアム限定" : "")\(unreadCount > 0 && !isLocked ? "、未読\(unreadCount)件" : "")"
+        )
     }
 
     private var latestMessageText: String {
@@ -217,11 +254,14 @@ struct HomeNearbyBoardSection: View {
     var threads: [BoardThread]
     var replyPreviews: [UUID: [String]]
     var lockedIDs: Set<UUID>
+    /// FB(iter1226.424)：スレッドごとの未読メッセージ件数。
+    var unreadCounts: [UUID: Int] = [:]
     var onOpenThread: (BoardThread) -> Void
     var onOpenLockedThread: () -> Void
     var onSeeAll: () -> Void
 
-    private static let displayLimit = 3
+    /// FB(iter1226.424)：ホームに出すのは最大2件まで。
+    private static let displayLimit = 2
 
     private var orderedThreads: [BoardThread] {
         NearbyBoardListPolicy.ordered(threads, lockedIDs: lockedIDs)
@@ -261,6 +301,7 @@ struct HomeNearbyBoardSection: View {
                             thread: thread,
                             latestMessage: replyPreviews[thread.id]?.first,
                             isLocked: lockedIDs.contains(thread.id),
+                            unreadCount: unreadCounts[thread.id] ?? 0,
                             onTap: {
                                 if lockedIDs.contains(thread.id) {
                                     onOpenLockedThread()
@@ -392,6 +433,7 @@ struct NearbyBoardListScreen: View {
                                     thread: thread,
                                     latestMessage: appState.boardReplyPreviewsByThreadID[thread.id]?.first,
                                     isLocked: lockedIDs.contains(thread.id),
+                                    unreadCount: appState.homeNearbyBoardUnreadCounts[thread.id] ?? 0,
                                     onTap: {
                                         if lockedIDs.contains(thread.id) {
                                             isShowingLockedPopup = true

@@ -402,7 +402,29 @@ extension MegrumAppState {
         if !Self.homeNearbyBoardContentEquals(homeNearbyBoardThreads, sorted) {
             homeNearbyBoardThreads = sorted
         }
-        await loadBoardReplyPreviews(threadIDs: Array(sorted.prefix(30).map(\.id)))
+        let previewIDs = Array(sorted.prefix(30).map(\.id))
+        await loadBoardReplyPreviews(threadIDs: previewIDs)
+        await refreshHomeNearbyBoardUnreadCounts(threadIDs: previewIDs)
+    }
+
+    /// FB(iter1226.424)：訪問記録（BoardThreadVisitStore）を基準に未読メッセージ数を計算する。
+    func refreshHomeNearbyBoardUnreadCounts(threadIDs: [UUID]) async {
+        guard let viewerID = viewer?.id, !threadIDs.isEmpty else {
+            return
+        }
+        guard let activity = try? await repository.loadBoardReplyActivity(threadIDs: threadIDs) else {
+            return
+        }
+        var counts: [UUID: Int] = [:]
+        for threadID in threadIDs {
+            counts[threadID] = NearbyBoardUnreadPolicy.unreadCount(
+                replyDates: activity[threadID] ?? [],
+                visitedAt: BoardThreadVisitStore.visitedAt(threadID: threadID, viewerID: viewerID)
+            )
+        }
+        if counts != homeNearbyBoardUnreadCounts {
+            homeNearbyBoardUnreadCounts = counts
+        }
     }
 
     /// 署名つき画像URLなどの揮発値を除いた実内容の比較。

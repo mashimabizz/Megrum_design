@@ -221,6 +221,8 @@ public protocol MegrumRepository: Sendable {
     func loadBoardThreads(latitude: Double?, longitude: Double?, prefecture: String?, scope: BoardThread.Audience, allowsExtendedBoardAccess: Bool) async throws -> [BoardThread]
     func loadBoardReplies(threadID: UUID, latitude: Double?, longitude: Double?, prefecture: String?, scope: BoardThread.Audience) async throws -> [BoardReply]
     func loadBoardReplyPreviews(threadIDs: [UUID]) async throws -> [UUID: [String]]
+    /// iter1226.424：未読数計算用。各スレッドのリプライ投稿時刻（新しい順）。
+    func loadBoardReplyActivity(threadIDs: [UUID]) async throws -> [UUID: [Date]]
     func sendBoardReply(_ input: BoardReplyCreateInput) async throws -> BoardReply
     func setBoardThreadReaction(threadID: UUID, reaction: BoardMessageReaction?) async throws
     func setBoardReplyReaction(replyID: UUID, reaction: BoardMessageReaction?) async throws

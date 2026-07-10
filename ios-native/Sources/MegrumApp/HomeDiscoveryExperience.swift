@@ -56,6 +56,8 @@ struct HomeDiscoveryExperience: View {
     var nearbyBoardThreads: [BoardThread] = []
     var boardReplyPreviews: [UUID: [String]] = [:]
     var lockedBoardIDs: Set<UUID> = []
+    /// FB(iter1226.424)：チャットルームごとの未読メッセージ件数。
+    var boardUnreadCounts: [UUID: Int] = [:]
     var onOpenBoardThread: (BoardThread) -> Void = { _ in }
     var onOpenLockedBoardThread: () -> Void = {}
     var onOpenBoardList: () -> Void = {}
@@ -121,6 +123,7 @@ struct HomeDiscoveryExperience: View {
                             threads: nearbyBoardThreads,
                             replyPreviews: boardReplyPreviews,
                             lockedIDs: lockedBoardIDs,
+                            unreadCounts: boardUnreadCounts,
                             onOpenThread: onOpenBoardThread,
                             onOpenLockedThread: onOpenLockedBoardThread,
                             onSeeAll: onOpenBoardList

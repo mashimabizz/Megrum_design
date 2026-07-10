@@ -140,6 +140,10 @@ public extension SupabaseMegrumRepository {
         try await boardClient.loadReplyPreviews(threadIDs: threadIDs)
     }
 
+    func loadBoardReplyActivity(threadIDs: [UUID]) async throws -> [UUID: [Date]] {
+        try await boardClient.loadReplyActivity(threadIDs: threadIDs)
+    }
+
     func loadBoardReplies(
         threadID: UUID,
         latitude: Double?,

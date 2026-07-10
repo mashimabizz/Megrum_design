@@ -167,6 +167,19 @@ public extension PreviewMegrumRepository {
         return previews
     }
 
+    func loadBoardReplyActivity(threadIDs: [UUID]) async throws -> [UUID: [Date]] {
+        var activity: [UUID: [Date]] = [:]
+        for threadID in threadIDs {
+            let dates = (NativePreviewData.boardReplies[threadID] ?? [])
+                .map(\.createdAt)
+                .sorted(by: >)
+            if !dates.isEmpty {
+                activity[threadID] = dates
+            }
+        }
+        return activity
+    }
+
     func loadBoardReplies(threadID: UUID, latitude: Double?, longitude: Double?, prefecture: String?, scope: BoardThread.Audience) async throws -> [BoardReply] {
         NativePreviewData.boardReplies[threadID] ?? []
     }

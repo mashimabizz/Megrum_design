@@ -54,6 +54,33 @@ public final class SupabaseBoardClient: @unchecked Sendable {
         }
     }
 
+    /// 未読数計算用：複数スレッドのリプライ投稿時刻（新しい順）をまとめて取得する（iter1226.424）。
+    public func loadReplyActivity(threadIDs: [UUID], limit: Int = 120) async throws -> [UUID: [Date]] {
+        guard !threadIDs.isEmpty else {
+            return [:]
+        }
+        struct ActivityRow: Decodable {
+            var threadId: UUID
+            var createdAt: Date
+        }
+        let idList = threadIDs.map { $0.uuidString.lowercased() }.sorted().joined(separator: ",")
+        let rows: [ActivityRow] = try await client.fetchRows(
+            from: "meguri_board_replies",
+            select: "thread_id,created_at",
+            queryItems: [
+                URLQueryItem(name: "thread_id", value: "in.(\(idList))"),
+                URLQueryItem(name: "status", value: "eq.visible"),
+                URLQueryItem(name: "order", value: "created_at.desc"),
+                URLQueryItem(name: "limit", value: "\(limit)")
+            ]
+        )
+        var activity: [UUID: [Date]] = [:]
+        for row in rows {
+            activity[row.threadId, default: []].append(row.createdAt)
+        }
+        return activity
+    }
+
     /// 地図の吹き出し用：複数スレッドの最新リプライ本文をまとめて取得する。
     public func loadReplyPreviews(threadIDs: [UUID], perThreadLimit: Int = 3) async throws -> [UUID: [String]] {
         guard !threadIDs.isEmpty else {

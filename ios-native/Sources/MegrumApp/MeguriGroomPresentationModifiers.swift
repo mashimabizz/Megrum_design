@@ -124,33 +124,40 @@ private extension View {
                     backSwipeInteractionScope: .fullScreen,
                     presentationEdge: .leading
                 ) { _ in
-                    GroomStoryComposerScreen(
-                        selectedPhotoItem: selectedPhotoItem,
-                        selectedCreationCoordinate: selectedCreationCoordinate,
-                        draftPhotoData: draftPhotoData,
-                        draftPhotoContentType: draftPhotoContentType,
-                        isPreparingPhoto: isPreparingPhoto,
-                        isCreating: isCreating,
-                        canUseCamera: canUseCamera,
-                        locksCreationCoordinate: locksCreationCoordinate,
-                        currentCoordinate: currentCoordinate,
-                        isRequestingLocation: isRequestingLocation,
-                        groups: groups,
-                        characters: characters,
-                        userOshiSelections: userOshiSelections,
-                        inventory: inventory,
-                        wishes: wishes,
-                        isLoadingGroups: isLoadingGroups,
-                        isLoadingCharacters: isLoadingCharacters,
-                        onRequestLocation: onRequestLocation,
-                        onOpenCamera: onOpenCamera,
-                        onLoadGroups: onLoadGroups,
-                        onLoadCharacters: onLoadCharacters,
-                        onLoadUserOshiSelections: onLoadUserOshiSelections,
-                        onPublish: onPublish,
-                        onPublishInBackground: onPublishInBackground,
-                        onDiscard: onDiscard
-                    )
+                    // iter1226.424：スライドオーバーレイ配下は safe area がゼロ化されるため、
+                    // ウィンドウ実測のインセットで上下を確保する（ステータスバー重なり防止）。
+                    ZStack {
+                        Color.black.ignoresSafeArea()
+                        GroomStoryComposerScreen(
+                            selectedPhotoItem: selectedPhotoItem,
+                            selectedCreationCoordinate: selectedCreationCoordinate,
+                            draftPhotoData: draftPhotoData,
+                            draftPhotoContentType: draftPhotoContentType,
+                            isPreparingPhoto: isPreparingPhoto,
+                            isCreating: isCreating,
+                            canUseCamera: canUseCamera,
+                            locksCreationCoordinate: locksCreationCoordinate,
+                            currentCoordinate: currentCoordinate,
+                            isRequestingLocation: isRequestingLocation,
+                            groups: groups,
+                            characters: characters,
+                            userOshiSelections: userOshiSelections,
+                            inventory: inventory,
+                            wishes: wishes,
+                            isLoadingGroups: isLoadingGroups,
+                            isLoadingCharacters: isLoadingCharacters,
+                            onRequestLocation: onRequestLocation,
+                            onOpenCamera: onOpenCamera,
+                            onLoadGroups: onLoadGroups,
+                            onLoadCharacters: onLoadCharacters,
+                            onLoadUserOshiSelections: onLoadUserOshiSelections,
+                            onPublish: onPublish,
+                            onPublishInBackground: onPublishInBackground,
+                            onDiscard: onDiscard
+                        )
+                        .padding(.top, MegrumWindowInsets.top)
+                        .padding(.bottom, MegrumWindowInsets.bottom)
+                    }
                 }
             }
         } else {

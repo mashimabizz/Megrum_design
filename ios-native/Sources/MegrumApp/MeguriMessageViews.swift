@@ -175,7 +175,8 @@ private struct MeguriMessageThreadRow: View {
             VStack(alignment: .leading, spacing: 5) {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(thread.displayName)
-                        .font(.system(size: 16, weight: .black, design: .rounded))
+                        // FB(iter1226.424)：相手の名前は太字にしない。
+                        .font(.system(size: 16, weight: .medium, design: .rounded))
                         .foregroundStyle(MegrumTheme.ink)
                         .lineLimit(1)
 

@@ -37,6 +37,8 @@ public final class MegrumAppState: ObservableObject {
     @Published public internal(set) var boardReplyPreviewsByThreadID: [UUID: [String]] = [:]
     /// ホーム/一覧用の圏内チャットルーム（圏外も含めて取得し、開閉はクライアントで判定）。iter1226.421。
     @Published public internal(set) var homeNearbyBoardThreads: [BoardThread] = []
+    /// iter1226.424：近くのチャットルームの未読メッセージ件数（訪問記録基準）。
+    @Published public internal(set) var homeNearbyBoardUnreadCounts: [UUID: Int] = [:]
     @Published public internal(set) var groomRepliesByPostID: [UUID: [GroomReply]] = [:]
     @Published public internal(set) var groomReactionsByPostID: [UUID: [GroomReaction]] = [:]
     @Published public internal(set) var meguriMessages: [MeguriMessage] = []

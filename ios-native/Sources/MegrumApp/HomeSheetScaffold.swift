@@ -23,6 +23,9 @@ struct HomeSheetScaffold<Content: View>: View {
                 .padding(.horizontal, 22)
                 .padding(.top, 24)
                 .padding(.bottom, bottomBarBottomPadding)
+                // iter1226.424：最上部からさらに下へは動かさない（バウンスで
+                // シートを閉じるドラッグが奪われないように）。
+                .megrumDisablesEnclosingScrollBounce()
             }
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 bottomBar

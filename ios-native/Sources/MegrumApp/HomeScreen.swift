@@ -337,6 +337,7 @@ struct HomeScreen: View {
             nearbyBoardThreads: appState?.homeNearbyBoardThreads ?? [],
             boardReplyPreviews: appState?.boardReplyPreviewsByThreadID ?? [:],
             lockedBoardIDs: lockedBoardIDs,
+            boardUnreadCounts: appState?.homeNearbyBoardUnreadCounts ?? [:],
             onOpenBoardThread: { thread in
                 onOpenBoardThread(thread, groomLocationState.coordinate)
             },

@@ -10,13 +10,28 @@ import UIKit
 enum MegrumWindowInsets {
     static var top: CGFloat {
         #if os(iOS)
-        UIApplication.shared.connectedScenes
-            .compactMap { $0 as? UIWindowScene }
-            .flatMap { $0.windows }
-            .first { $0.isKeyWindow }?
-            .safeAreaInsets.top ?? 59
+        keyWindowInsets?.top ?? 59
         #else
         0
         #endif
     }
+
+    /// iter1226.424：左スライドのグルーム作成など、safe area がゼロ化された階層用の下端インセット。
+    static var bottom: CGFloat {
+        #if os(iOS)
+        keyWindowInsets?.bottom ?? 34
+        #else
+        0
+        #endif
+    }
+
+    #if os(iOS)
+    private static var keyWindowInsets: UIEdgeInsets? {
+        UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap { $0.windows }
+            .first { $0.isKeyWindow }?
+            .safeAreaInsets
+    }
+    #endif
 }

@@ -402,8 +402,10 @@ struct MegrumAuthenticatedTabContentView: View {
             )
         }
         // iter1226.422：左スワイプで指に追従してめぐりメッセージ一覧をスライドイン。
-        // 縦スクロール・横レールが先にドラッグを消費するので .gesture（低優先）で衝突しない。
-        .gesture(meguriInboxOpenDragGesture)
+        // iter1226.424：.gesture だと配下のScrollViewに食われて onChanged が届かず
+        // 「デジタルに切り替わる」ため simultaneous に変更。左向き×水平優位の時だけ
+        // 追従を開始するので、縦スクロールやタップとは衝突しない。
+        .simultaneousGesture(meguriInboxOpenDragGesture)
         .tag(MegrumTab.home)
         .tabItem {
             Label(MegrumTab.home.title, systemImage: MegrumTab.home.symbolName)
@@ -425,9 +427,10 @@ struct MegrumAuthenticatedTabContentView: View {
                     return
                 }
                 if !isTrackingMeguriInboxOpenDrag {
-                    // 左向き＆水平優位のドラッグだけ追従を開始する。
-                    guard value.translation.width < -12,
-                          abs(value.translation.width) > abs(value.translation.height) * MegrumSlidePresentationMetrics.horizontalDominance
+                    // 左向き＆明確に水平優位のドラッグだけ追従を開始する
+                    //（simultaneous なので縦スクロールと同時に流れてくる分は弾く）。
+                    guard value.translation.width < -16,
+                          abs(value.translation.width) > abs(value.translation.height) * 1.4
                     else {
                         return
                     }

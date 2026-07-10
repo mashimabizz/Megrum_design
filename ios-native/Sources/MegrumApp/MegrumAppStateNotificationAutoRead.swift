@@ -9,6 +9,10 @@ extension MegrumAppState {
             return
         }
         BoardThreadVisitStore.recordVisit(threadID: threadID, viewerID: viewerID)
+        // FB(iter1226.424)：開いた瞬間にホームの未読バッジを消す。
+        if homeNearbyBoardUnreadCounts[threadID, default: 0] > 0 {
+            homeNearbyBoardUnreadCounts[threadID] = 0
+        }
         Task { [weak self] in
             await self?.autoMarkViewedNotificationsRead()
         }

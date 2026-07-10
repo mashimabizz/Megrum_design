@@ -61,6 +61,23 @@ final class NearbyBoardListPolicyTests: XCTestCase {
         XCTAssertEqual(ordered.map(\.title), ["open-new", "open-old", "locked-new", "locked-old"])
     }
 
+    /// FB(iter1226.424)：未読数は訪問記録基準。未訪問=本文+全リプライ、訪問後=それ以降のリプライのみ。
+    func testUnreadCountUsesVisitTimestamp() {
+        let base = Date(timeIntervalSince1970: 1_780_000_000)
+        let dates = [base.addingTimeInterval(300), base.addingTimeInterval(200), base.addingTimeInterval(100)]
+
+        XCTAssertEqual(NearbyBoardUnreadPolicy.unreadCount(replyDates: dates, visitedAt: nil), 4)
+        XCTAssertEqual(
+            NearbyBoardUnreadPolicy.unreadCount(replyDates: dates, visitedAt: base.addingTimeInterval(150)),
+            2
+        )
+        XCTAssertEqual(
+            NearbyBoardUnreadPolicy.unreadCount(replyDates: dates, visitedAt: base.addingTimeInterval(600)),
+            0
+        )
+        XCTAssertEqual(NearbyBoardUnreadPolicy.unreadCount(replyDates: [], visitedAt: nil), 1)
+    }
+
     func testAvailableSeriesNamesAreUniqueAndOrdered() {
         let threads = [
             makeThread(title: "A", seriesName: "2026 LIVE"),
