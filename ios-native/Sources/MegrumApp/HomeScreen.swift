@@ -270,7 +270,7 @@ struct HomeScreen: View {
             }
     }
 
-    private func loadNearbyGroomsIfPossible() async {
+    private func loadNearbyGroomsIfPossible(force: Bool = false) async {
         guard showsGroomRail, let appState, let coordinate = groomLocationState.coordinate else {
             // 位置情報が使えない（拒否・エラー）と確定したらスケルトンを畳む。
             if groomLocationState.locationErrorMessage != nil {
@@ -281,7 +281,7 @@ struct HomeScreen: View {
         defer {
             isLoadingGroomRail = false
         }
-        await appState.loadGroomMapPosts(latitude: coordinate.latitude, longitude: coordinate.longitude)
+        await appState.loadGroomMapPosts(latitude: coordinate.latitude, longitude: coordinate.longitude, force: force)
         // iter1226.421：ホームの「近くのチャットルーム」も同じ座標で取得する。
         await appState.loadHomeNearbyBoardThreads(latitude: coordinate.latitude, longitude: coordinate.longitude)
         // FB(iter1226.392): 出会った(遭遇済み)グルームも取得（近くに無くても列に出す）。
@@ -334,7 +334,10 @@ struct HomeScreen: View {
             onRefresh: {
                 await onRefresh()
                 await loadLocalActivitySettings()
-                await loadNearbyGroomsIfPossible()
+                // iter1226.428：refresh の初期スナップショットが groomMapPosts を
+                // 自分の投稿だけで上書きするため、force なしだとキャッシュキーが
+                // 有効なまま再取得されず、未遭遇の他人グルームが消えたままになる。
+                await loadNearbyGroomsIfPossible(force: true)
             },
             tutorialSampleActive: tutorialSampleActive,
             tutorialFocusAnchor: tutorialFocusAnchor,

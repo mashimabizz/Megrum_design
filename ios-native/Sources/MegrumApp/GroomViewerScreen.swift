@@ -105,8 +105,13 @@ struct GroomViewerScreen: View {
     }
 
     private var currentGroomLikeCount: Int {
+        // iter1226.428：自分のグルームはリアクション一覧の件数が主だが、
+        // 取得途中や欠損時にフィードRPC由来の like_count より少なく見えないようにする。
         if isCurrentGroomMine {
-            return appState.groomReactions(for: currentGroom.id).count
+            return max(
+                appState.groomReactions(for: currentGroom.id).count,
+                appState.groomLikeCount(currentGroom.id, fallback: currentGroom.likeCount)
+            )
         }
         return appState.groomLikeCount(currentGroom.id, fallback: currentGroom.likeCount)
     }

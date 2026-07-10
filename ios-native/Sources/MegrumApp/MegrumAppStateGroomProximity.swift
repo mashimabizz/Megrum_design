@@ -68,6 +68,7 @@ extension MegrumAppState {
         guard let fresh = try? await repository.loadGroomPost(id: postID) else {
             return
         }
+        // 既存位置を保った差し替え（存在しない配列には触れない）。
         grooms = grooms.map { $0.id == postID ? fresh : $0 }
         groomMapPosts = groomMapPosts.map { $0.id == postID ? fresh : $0 }
         encounteredGrooms = encounteredGrooms.map { $0.id == postID ? fresh : $0 }
