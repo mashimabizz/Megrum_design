@@ -353,7 +353,7 @@ struct BoardThreadDetailScreen: View {
                 // 座標未提供＆圏内ルームなら自前で現在地を要求する（iter1226.423）。
                 if coordinate == nil, replyContextScope == .nearby3km,
                    fallbackLocationState.coordinate == nil {
-                    fallbackLocationState.requestCurrentLocation()
+                    fallbackLocationState.startUpdatingCurrentLocation()
                 }
                 determineRoomEntryPhaseIfNeeded(afterRepliesLoaded: false)
                 // 通知一覧の自動既読用に「このルームを見た」記録を残す。

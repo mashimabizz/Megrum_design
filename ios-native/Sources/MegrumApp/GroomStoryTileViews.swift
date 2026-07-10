@@ -62,6 +62,7 @@ struct GroomMyStoryTile: View {
                         viewer: viewer,
                         isLoading: isLoading,
                         hasActiveGroom: hasActiveGroom,
+                        hasAnyOwnGroom: hasAnyOwnGroom,
                         activationSignal: activationSignal
                     )
                 }
@@ -115,6 +116,8 @@ private struct GroomMyStoryAvatar: View {
     var isLoading: Bool
     /// 自分の有効かつ未読のグルームがある時は idle 枠を水色→紫グラデにする（未読ストーリー相当）。
     var hasActiveGroom: Bool
+    /// FB(iter1226.425)：1件も投稿していない時は枠線自体を出さない。
+    var hasAnyOwnGroom: Bool = false
     /// FB(iter1226.395)：この値が変わった時に「枠がぐるっと活性化」アニメを再生する
     /// （投稿完了後、グルーム列が実際に見えたタイミングでホーム側から発火する）。
     var activationSignal: Int
@@ -162,14 +165,18 @@ private struct GroomMyStoryAvatar: View {
     private var ring: some View {
         switch phase {
         case .idle:
-            // 自分のグルームがあれば水色→紫グラデ（未読ストーリー相当）、なければ薄グレー。
+            // 未読の自分グルーム＝グラデ、既読のみ＝薄グレー。
+            // FB(iter1226.425)：1件も投稿していない時は枠線を出さない。
             if hasActiveGroom {
                 Circle()
                     .strokeBorder(GroomStoryMetrics.unseenGradient, lineWidth: GroomStoryMetrics.ringLineWidth)
                     .frame(width: GroomStoryMetrics.ringDiameter, height: GroomStoryMetrics.ringDiameter)
-            } else {
+            } else if hasAnyOwnGroom {
                 Circle()
                     .strokeBorder(GroomStoryMetrics.seenRing, lineWidth: GroomStoryMetrics.ringLineWidth)
+                    .frame(width: GroomStoryMetrics.ringDiameter, height: GroomStoryMetrics.ringDiameter)
+            } else {
+                Color.clear
                     .frame(width: GroomStoryMetrics.ringDiameter, height: GroomStoryMetrics.ringDiameter)
             }
         case .uploading:

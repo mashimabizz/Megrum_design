@@ -229,7 +229,9 @@ struct HomeScreen: View {
             }
             .onAppear {
                 if showsGroomRail, groomLocationState.coordinate == nil {
-                    groomLocationState.requestCurrentLocation()
+                    // iter1226.425：一発取得（requestLocation）は屋内で失敗しやすく、
+                    // めぐりタブを開くまでグルーム列が埋まらなかった。めぐりと同じ連続更新にする。
+                    groomLocationState.startUpdatingCurrentLocation()
                 }
             }
             .onChange(of: groomLocationState.locationErrorMessage) { _, message in

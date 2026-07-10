@@ -74,6 +74,9 @@ extension MegrumAppState {
             if message.contains("meetup_required") {
                 return "手渡し交換は待ち合わせ（日時・場所）の設定が必要です。待ち合わせを設定してから送信してください"
             }
+            if message.contains("cash_offer_consistency") {
+                return "金額指定の条件が合っていません。金額と、ゆずる・うけとるの品物の組み合わせを確認してください"
+            }
             return "打診を更新できませんでした（\(message)）"
         }
         return "打診を更新できませんでした"

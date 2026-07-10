@@ -242,6 +242,8 @@ extension TradeDetailScreen {
                     initialSenderGoodsIDs: offeredGoodsIDs,
                     initialExchangeMethod: currentProposal.exchangeMethod,
                     initialMeetup: currentProposal.meetupCandidates?.first,
+                    initialCashSide: viewerRelativeCashSide,
+                    initialCashAmount: currentProposal.cashOffer ? currentProposal.cashAmount : nil,
                     initialStep: .give,
                     submissionStatusOverride: .negotiating,
                     revisingProposalID: currentProposal.id,

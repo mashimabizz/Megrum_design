@@ -464,7 +464,7 @@ struct NearbyBoardListScreen: View {
         .megrumHiddenNavigationBar()
         .onAppear {
             if locationState.coordinate == nil {
-                locationState.requestCurrentLocation()
+                locationState.startUpdatingCurrentLocation()
             }
             switch qaInitialOverlay {
             case .filter:

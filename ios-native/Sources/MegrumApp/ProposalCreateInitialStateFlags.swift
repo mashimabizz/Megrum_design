@@ -6,6 +6,7 @@ struct ProposalCreateInitialStateFlags: Equatable, Sendable {
     private(set) var hasAppliedVisualQAState = false
     private(set) var hasAppliedInitialMessage = false
     private(set) var hasAppliedInitialMeetup = false
+    private(set) var hasAppliedInitialCash = false
 
     mutating func claimExchangeMethodApplication() -> Bool {
         guard !hasAppliedExchangeMethod else {
@@ -28,6 +29,14 @@ struct ProposalCreateInitialStateFlags: Equatable, Sendable {
             return false
         }
         hasAppliedInitialMeetup = true
+        return true
+    }
+
+    mutating func claimInitialCashApplication() -> Bool {
+        guard !hasAppliedInitialCash else {
+            return false
+        }
+        hasAppliedInitialCash = true
         return true
     }
 

@@ -5,6 +5,7 @@ extension ProposalCreateFlow {
     func prepareInitialProposalState() {
         applyInitialExchangeMethodIfNeeded()
         applyInitialMeetupIfNeeded()
+        applyInitialCashIfNeeded()
         applyInitialMessageIfNeeded()
         applyInitialCashAmountIfNeeded()
         seedDefaultSenderSelection()
@@ -138,6 +139,27 @@ extension ProposalCreateFlow {
             )
         ]
         selectedMeetupCandidateIndex = 0
+    }
+
+    /// iter1226.425：再打診では元の金額条件（定価など）を引き継ぐ。
+    /// 金額が落ちると cash_offer_consistency 制約に触れて保存できないため。
+    /// sender（自分が払う）は既存の applyInitialCashAmountIfNeeded が適用するので、
+    /// ここでは受け取り側（相手が払う）の金額と、対象側の cash モード切替を行う。
+    func applyInitialCashIfNeeded() {
+        guard initialStateFlags.claimInitialCashApplication() else {
+            return
+        }
+        guard let initialCashAmount, initialCashAmount > 0, let initialCashSide else {
+            return
+        }
+        switch initialCashSide {
+        case .sender:
+            valueSelectionState.senderSelectionMode = .cash
+            valueSelectionState.senderCashAmountText = String(initialCashAmount)
+        case .receiver:
+            valueSelectionState.receiverSelectionMode = .cash
+            valueSelectionState.receiverCashAmountText = String(initialCashAmount)
+        }
     }
 
     /// 判定から生成した相談文を、ユーザーが未入力の時だけ下書きとして入れる。

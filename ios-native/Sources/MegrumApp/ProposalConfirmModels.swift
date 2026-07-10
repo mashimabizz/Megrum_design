@@ -100,9 +100,11 @@ struct ProposalCreateSubmissionDraft: Equatable {
             meetupCandidates: meetupCandidates,
             exposeCalendar: exposeCalendar,
             listingID: listingID,
-            cashOffer: cashAmount != nil,
-            cashAmount: cashAmount,
-            cashAmountSide: cashAmountSide
+            // iter1226.425：金額と対象は両方そろった時だけ送る（片方だけの残骸は
+            // proposals_cash_offer_consistency 制約に触れるため落とす）。
+            cashOffer: cashAmount != nil && cashAmountSide != nil,
+            cashAmount: cashAmountSide != nil ? cashAmount : nil,
+            cashAmountSide: cashAmount != nil ? cashAmountSide : nil
         )
     }
 

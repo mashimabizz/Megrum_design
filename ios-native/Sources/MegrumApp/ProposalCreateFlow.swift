@@ -15,6 +15,9 @@ struct ProposalCreateFlow: View {
     var initialExchangeMethod: ExchangeMethod? = nil
     /// iter1226.423：再打診時に元の待ち合わせを引き継ぐ（手渡しは待ち合わせ必須のため）。
     var initialMeetup: ProposalMeetupInput? = nil
+    /// iter1226.425：再打診時に元の金額条件の対象（ビューア視点。sender=自分が払う）。
+    /// nil または .sender の金額適用は既存の applyInitialCashAmountIfNeeded が担う。
+    var initialCashSide: ProposalCashSide? = nil
     var initialMessage: String? = nil
     var initialCashAmount: Int? = nil
     var initialShippingFee: IndividualListingShippingFeeDraft? = nil
