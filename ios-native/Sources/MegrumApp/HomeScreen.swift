@@ -25,9 +25,10 @@ struct HomeScreen: View {
     var onOpenTrades: (() -> Void)? = nil
     var onOpenInventory: () -> Void = {}
     /// FB8-6：ホーム上部の圏内グルーム・ストーリー列からグルームを開く（タブ上位のイマーシブ表示へ）。iter1226.387。
-    var onOpenGroom: (GroomPost) -> Void = { _ in }
+    /// FB(iter1226.403)：タップしたタイルの画面上アンカー（そこから拡大／そこへ縮小）を添える。
+    var onOpenGroom: (GroomPost, UnitPoint) -> Void = { _, _ in }
     /// FB(iter1226.402)：自分のグルームは「自分のグルームだけ」を古い→新しい順で開く（先頭=最古の未読）。
-    var onOpenOwnGrooms: ([GroomPost], GroomPost) -> Void = { _, _ in }
+    var onOpenOwnGrooms: ([GroomPost], GroomPost, UnitPoint) -> Void = { _, _, _ in }
     var tutorialSampleActive: Bool = false
     var tutorialFocusAnchor: TutorialAnchorID? = nil
     var starterMissionEnabled: Bool = false
@@ -130,19 +131,19 @@ struct HomeScreen: View {
         return myActiveGrooms.filter { !viewed.contains($0.id) }
     }
 
-    private func viewOwnGroom() {
+    private func viewOwnGroom(anchor: UnitPoint) {
         // FB(iter1226.402)：自分のグルームだけを古い→新しい順に。最古の未読から開き、右タップで新しい方へ。
         // 未読が無い（＝全部既読）でも、最古から開く。
         let ordered = myActiveGrooms.sorted { $0.createdAt < $1.createdAt }
         guard !ordered.isEmpty else { return }
         let viewed = appState?.viewedGroomIDs ?? []
         let initial = ordered.first(where: { !viewed.contains($0.id) }) ?? ordered.first!
-        onOpenOwnGrooms(ordered, initial)
+        onOpenOwnGrooms(ordered, initial, anchor)
     }
 
-    private func handleGroomRailTap(_ groom: GroomPost) {
+    private func handleGroomRailTap(_ groom: GroomPost, anchor: UnitPoint) {
         guard let appState else {
-            onOpenGroom(groom)
+            onOpenGroom(groom, anchor)
             return
         }
         let canOpen = MeguriAccessPolicy.canOpenGroom(
@@ -153,7 +154,7 @@ struct HomeScreen: View {
             subscriptionState: appState.subscriptionState
         )
         if canOpen {
-            onOpenGroom(groom)
+            onOpenGroom(groom, anchor)
         } else {
             isShowingGroomLockPremium = true
         }

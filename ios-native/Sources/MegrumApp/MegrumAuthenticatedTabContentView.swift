@@ -315,13 +315,13 @@ struct MegrumAuthenticatedTabContentView: View {
                     requestedTradesStage = nil
                     selectedTab = .inventory
                 },
-                onOpenGroom: { groom in
-                    // FB(iter1226.401)：ホームのグルーム一覧（上部）へ縮んでいくよう、開閉の基点を上寄せにする。
-                    openMeguriGroomViewer(groom, sourceAnchor: UnitPoint(x: 0.5, y: 0.12))
+                onOpenGroom: { groom, anchor in
+                    // FB(iter1226.403)：タップしたタイルの位置から拡大／その位置へ縮小する。
+                    openMeguriGroomViewer(groom, sourceAnchor: anchor)
                 },
-                onOpenOwnGrooms: { ownGrooms, initial in
+                onOpenOwnGrooms: { ownGrooms, initial, anchor in
                     // FB(iter1226.402)：自分のグルームは「自分のグルームだけ」を古い→新しい順で辿る。
-                    openMeguriGroomViewer(initial, sourceAnchor: UnitPoint(x: 0.5, y: 0.12), sequence: ownGrooms)
+                    openMeguriGroomViewer(initial, sourceAnchor: anchor, sequence: ownGrooms)
                 },
                 tutorialSampleActive: tutorialSampleActive,
                 tutorialFocusAnchor: tutorialCoordinator.currentBeat?.homeFocusAnchor,

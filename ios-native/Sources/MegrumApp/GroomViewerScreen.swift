@@ -63,6 +63,9 @@ struct GroomViewerScreen: View {
     @State private var isShowingLikes = false
     @State private var isShowingDeleteConfirmation = false
     @State private var storyProgress = 0.0
+    /// FB(iter1226.403)：開くトランジション中はデータ取得・進捗ループ・常時演出を止めてカクつきを防ぐ。
+    /// スケール拡大アニメ（約0.34s）が落ち着いてから重い処理を始める。
+    @State private var isOpeningSettled = false
 
     init(
         grooms: [GroomPost],
@@ -192,7 +195,14 @@ struct GroomViewerScreen: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.black.ignoresSafeArea(.container, edges: .top))
         .ignoresSafeArea()
+        .task {
+            // 開くスケールアニメ（spring 0.34s）が終わるまで待ってから重い処理を解禁する。
+            try? await Task.sleep(nanoseconds: 430_000_000)
+            isOpeningSettled = true
+        }
         .task(id: currentGroom.id) {
+            await waitUntilOpeningSettled()
+            guard !Task.isCancelled else { return }
             prefetchNeighborGroomImages()
             await appState.markGroomViewed(currentGroom.id)
             await appState.loadGroomEngagement(postIDs: [currentGroom.id], reportsFailure: false)
@@ -203,6 +213,8 @@ struct GroomViewerScreen: View {
             }
         }
         .task(id: currentGroom.id) {
+            await waitUntilOpeningSettled()
+            guard !Task.isCancelled else { return }
             await runStoryProgress(for: currentGroom.id)
         }
         .confirmationDialog("このグルームを通報しますか？", isPresented: $interactionState.isShowingReportConfirmation, titleVisibility: .visible) {
@@ -304,15 +316,18 @@ struct GroomViewerScreen: View {
                     .frame(maxHeight: .infinity, alignment: .top)
                     .allowsHitTesting(false)
 
-                // いいね演出：背景から湧くハート＋（自分のグルームなら）いいねした人のアイコン浮遊
-                GroomLikeHeartRainLayer(
-                    groomID: currentGroom.id,
-                    likeCount: currentGroomLikeCount
-                )
-                GroomLikeFloatingLikersLayer(
-                    groomID: currentGroom.id,
-                    likers: floatingLikers
-                )
+                // いいね演出：背景から湧くハート＋（自分のグルームなら）いいねした人のアイコン浮遊。
+                // 開くトランジションが落ち着いてから開始（パーティクル更新が開閉アニメと競合しないように）。
+                if isOpeningSettled {
+                    GroomLikeHeartRainLayer(
+                        groomID: currentGroom.id,
+                        likeCount: currentGroomLikeCount
+                    )
+                    GroomLikeFloatingLikersLayer(
+                        groomID: currentGroom.id,
+                        likers: floatingLikers
+                    )
+                }
 
                 VStack(spacing: 0) {
                     GroomViewerPageIndicator(
@@ -404,7 +419,8 @@ struct GroomViewerScreen: View {
                 }
             }
             try? await Task.sleep(nanoseconds: 100_000_000)
-            if Task.isCancelled || currentGroom.id != groomID {
+            if Task.isCancelled || currentGroom.id != groomID || !isOpeningSettled {
+                // 閉じ始めたら（isOpeningSettled=false）進捗更新を止め、閉じアニメと競合させない。
                 return
             }
             let nextProgress = Double(step) / Double(steps)
@@ -439,10 +455,20 @@ struct GroomViewerScreen: View {
     }
 
     private func dismissViewer() {
+        // 閉じるアニメ中の状態更新（進捗ループ・常時演出）を止めてカクつきを防ぐ。
+        isOpeningSettled = false
         if let onDismiss {
             onDismiss()
         } else {
             dismiss()
+        }
+    }
+
+    /// 開くトランジションが落ち着つくまで待つ（重い処理・毎フレーム更新の開始ゲート）。
+    private func waitUntilOpeningSettled() async {
+        while !isOpeningSettled {
+            if Task.isCancelled { return }
+            try? await Task.sleep(nanoseconds: 40_000_000)
         }
     }
 
@@ -622,11 +648,15 @@ private struct GroomViewerCachedImage: View {
                     return
                 }
                 if let loaded = UIImage(data: data) {
+                    // FB(iter1226.403)：デコードを表示前に済ませる（初回描画時のメインスレッドデコードで
+                    // 開くアニメがカクつくのを防ぐ）。
+                    let prepared = await loaded.byPreparingForDisplay() ?? loaded
+                    guard !Task.isCancelled else { return }
                     // ページ切替はフェードさせず「パッ」と切り替える（デジタルな切替）。
                     var transaction = Transaction()
                     transaction.disablesAnimations = true
                     withTransaction(transaction) {
-                        image = loaded
+                        image = prepared
                     }
                 } else if image == nil {
                     hasFailed = true

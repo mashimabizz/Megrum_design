@@ -4,6 +4,85 @@
 
 ---
 
+## イテレーション1226.403：Swift Native現行画面遷移図の法務レビュー用資料化
+
+### 背景・問題意識
+
+利用規約・プライバシーポリシー作成のため、専門家へ渡せるiOSアプリの画面遷移図が必要になった。既存の `notes/11_screen_inventory.md` は旧JSX/モック時代の参照が多く、現行Swift Nativeの画面遷移資料としてそのまま渡すと誤解が出る。
+
+### 変更内容
+
+#### `notes/81_ios_screen_transition_map_for_legal_review.md`
+- `ios-native/` の現行Swift Native実装を根拠に、認証、初期設定、メイン5タブ、ドロワー、設定、打診作成、通知/ディープリンクの主要遷移をMermaid図と表で整理。
+- 法務・プライバシー上の確認ポイントとして、位置情報、通知、写真、住所、支払方法、評価、異議申し立て、外部ブラウザ/Google Lens、広告/IAP等の接点を併記。
+- 旧 `notes/11_screen_inventory.md` は参考であり、現行Swift Native資料の代替にしないことを明記。
+
+#### `scripts/generate_ios_screen_flow_inventory.sh`
+- SwiftUIの `NavigationStack`、`sheet`、`fullScreenCover`、独自スライド表示、route/step型を抽出する棚卸しスクリプトを追加。
+- 完全自動生成ではなく、Mermaid図更新前の差分確認材料として使う運用を明記。
+
+### 影響範囲
+
+- ドキュメントと補助スクリプトのみ。iOSアプリの挙動、画面遷移、DB/API、通知、法務本文は変更しない。
+
+### 確認方法
+- `bash scripts/generate_ios_screen_flow_inventory.sh > /tmp/megrum-ios-navigation-surfaces.md`
+- `git diff --check`
+
+### セルフレビュー結果
+- ✅ 現行Swift Nativeの主要入口（Root/Auth/AccountSetup/Tab/Drawer/Settings/Home/Inventory/Wish/Trades/Meguri/NotificationRouteIntent）を根拠として記載した。
+- ✅ 専門家向けにユーザー表示名ベースで整理しつつ、根拠ファイルを併記した。
+- ✅ 自動化は静的抽出の限界を明記し、手確認前提の補助スクリプトに留めた。
+- ✅ アプリコード、状態遷移、DB/API、通知payload、法務本文は変更していない。
+
+### 関連ファイル
+- `notes/81_ios_screen_transition_map_for_legal_review.md`
+- `scripts/generate_ios_screen_flow_inventory.sh`
+
+---
+
+## イテレーション1226.403：グルームを開く/閉じる遷移のカクつき解消＋ホーム列はタップしたタイルの位置から拡大/縮小（FB）
+
+### 背景・問題意識
+オーナーFB：(1) めぐりホーム経由でもホーム経由でも、グルームを開いた時の画面遷移が少しカクつく → スムーズに。(2) ホーム経由で開いた時、いまは一覧の中央（固定アンカー）から拡大している → タップしたそのタイルの場所から拡大し、閉じる時も同じ場所へ縮小してほしい。
+
+### 変更内容
+
+#### 1. カクつき解消（`GroomViewerScreen.swift`）— 全経路（ホーム/めぐり地図/アーカイブ）共通
+- **原因3つ**を特定して対処：
+  - (a) 開くスケールアニメ（spring 0.34s）の最中に `.task` の重い処理（markGroomViewed / エンゲージ・プロフィール取得 / 隣接画像プリフェッチ）が走り、MainActor の状態更新がアニメと競合。→ `isOpeningSettled` フラグ（開いて0.43s後に true）を新設し、`waitUntilOpeningSettled()` で**トランジション終了まで重い処理を保留**。
+  - (b) ストーリー進捗ループ（100msごとの `storyProgress` 更新）が開くアニメ中から全画面再描画を起こしていた。→ settle 後に開始。**閉じ始めたら（`dismissViewer` で settle=false）進捗更新を即停止**し、閉じアニメとも競合させない。
+  - (c) 画像の**メインスレッド遅延デコード**：`UIImage(data:)` は初回描画時にデコードするため、開くアニメ中にデコードが走ってヒッチ。→ `byPreparingForDisplay()` で**表示前にバックグラウンドデコード**してから差し替え。
+- 常時演出（ハートレイン/いいねユーザー浮遊）も settle 後に表示開始（パーティクル更新が開閉アニメと競合しない）。
+
+#### 2. タップしたタイルの位置から拡大/縮小（`GroomStoryViews.swift`, `HomeDiscoveryExperience.swift`, `HomeScreen.swift`, `MegrumAuthenticatedTabContentView.swift`）
+- `GroomStrip` に `GroomRailTileFrameStore`（参照型の箱）を追加し、各タイルの画面上フレームを GeometryReader の onChange で記録（**クラスへの書き込みなので View 再評価ゼロ**＝ホーム縦スクロール/列横スクロールのコスト増なし）。
+- タップ時にタイル中心を画面比率の `UnitPoint` に変換し、`onSelect(groom, anchor)` / `onViewOwn(anchor)` として通知。
+- `HomeScreen.onOpenGroom` / `onOpenOwnGrooms` にアンカーを追加 → タブ側 `openMeguriGroomViewer(sourceAnchor: anchor)` へ。既存の `groomViewerImmersiveOverlay` の insertion/removal（scale-to-anchor）と `closeAnchor`（下スワイプ縮小の基点）がそのタイル位置になる → **タップした場所から拡大し、閉じるとそこへ縮む**。
+- めぐり地図は従来からマーカー位置をアンカーに渡しているため変更不要（#1の恩恵のみ受ける）。
+
+### 影響範囲
+- グルームビューアの開閉（全経路）と、ホーム上部グルーム列のタップ挙動。
+
+### 確認方法
+- `swift build`／`swift test` グリーン（XCTest 1536・0 failures、Swift Testing 24）。iOS device build **BUILD SUCCEEDED**。
+- 実機：ホーム列の右端寄り/左端寄りタイルをタップ → その位置から拡大・下スワイプでそこへ縮小。開閉のカクつきが消えていること。めぐり地図からも同様にスムーズなこと。
+
+### セルフレビュー結果
+- ✅ カクつきの根本原因（アニメ中の重い処理・毎フレーム進捗更新・メインスレッド画像デコード）をそれぞれ対処。演出や取得は最大0.43s遅延するだけで欠落なし。
+- ✅ フレーム記録は参照型ストアで View 無効化ゼロ（スクロール性能に影響なし）。
+- ✅ 自分タイル（アバター）タップも同様にタイル位置アンカー。
+- ⚠️ アンカーは keyWindow の bounds 基準（iPhone 単一ウィンドウ前提）。取れない場合は上部中央へフォールバック。
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/GroomViewerScreen.swift`
+- `ios-native/Sources/MegrumApp/GroomStoryViews.swift`
+- `ios-native/Sources/MegrumApp/HomeDiscoveryExperience.swift`
+- `ios-native/Sources/MegrumApp/HomeScreen.swift`
+- `ios-native/Sources/MegrumApp/MegrumAuthenticatedTabContentView.swift`
+
+---
+
 ## イテレーション1226.402：グルーム枠を太く鮮やかに＋自分/地図/アーカイブのビューア順を古い→新しい（右タップで新しい方へ）＋既読でも自分グルーム閲覧可（FB）
 
 ### 背景・問題意識

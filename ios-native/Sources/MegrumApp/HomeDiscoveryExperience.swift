@@ -45,9 +45,9 @@ struct HomeDiscoveryExperience: View {
     var groomRailProfiles: [UUID: PublicUserProfile] = [:]
     var groomRailViewedIDs: Set<UUID> = []
     var isGroomComposerCreating: Bool = false
-    var onOpenGroom: (GroomPost) -> Void = { _ in }
+    var onOpenGroom: (GroomPost, UnitPoint) -> Void = { _, _ in }
     var onAddGroom: () -> Void = {}
-    var onViewOwnGroom: () -> Void = {}
+    var onViewOwnGroom: (UnitPoint) -> Void = { _ in }
 
     @AppStorage(HomeExchangeSettingsStorageKeys.preference) var exchangePreferenceRawValue = HomeDefaultExchangeSettings.standard.preference.rawValue
     @AppStorage(HomeExchangeSettingsStorageKeys.requiresSamePrefecture) var exchangeRequiresSamePrefecture = HomeDefaultExchangeSettings.standard.requiresSamePrefecture
