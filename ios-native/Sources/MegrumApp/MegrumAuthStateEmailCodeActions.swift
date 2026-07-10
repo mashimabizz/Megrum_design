@@ -73,9 +73,33 @@ extension MegrumAuthState {
             activateSession(session)
             return true
         } catch {
-            errorMessage = normalizedMessage(from: error, context: .passwordReset)
+            // パスワード更新の失敗は再設定メール送信とは別物。専用の文言に変換する（iter1226.419）。
+            errorMessage = Self.passwordUpdateErrorMessage(from: error)
             return false
         }
+    }
+
+    /// PUT /auth/v1/user の失敗を利用者が次に何をすべきか分かる文言へ変換する。
+    static func passwordUpdateErrorMessage(from error: Error) -> String {
+        if case let SupabaseAuthError.unexpectedStatus(status, message) = error {
+            let lowered = (message ?? "").lowercased()
+            if lowered.contains("should be different") || lowered.contains("different from the old") {
+                return "現在のパスワードと同じです。別のパスワードを入力してください"
+            }
+            if lowered.contains("at least") || lowered.contains("password length") {
+                return "パスワードは8文字以上で入力してください"
+            }
+            if status == 401 || status == 403 || lowered.contains("session") {
+                return "確認コードの有効期限が切れました。もう一度コードを送信してください"
+            }
+            if let message, !message.isEmpty {
+                return "パスワードを変更できませんでした（\(message)）"
+            }
+        }
+        if case MegrumAuthStateError.timedOut = error {
+            return "通信に時間がかかっています。接続を確認してもう一度お試しください"
+        }
+        return "パスワードを変更できませんでした。もう一度お試しください"
     }
 
     /// 確認コードを再送する。
