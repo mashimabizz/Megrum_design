@@ -38,6 +38,7 @@ struct MegrumAuthenticatedTabContentView: View {
     @State private var isShowingNearbyBoardList = false
     @State private var meguriUserProfileRoute: MeguriUserProfileRoute?
     @State private var didOpenVisualQAMeguriMessages = false
+    @State private var didAutoOpenVisualQAGroomViewer = false
     @State private var meguriGroomViewerPost: GroomPost?
     @State private var meguriGroomViewerSourceAnchor: UnitPoint = .center
     /// FB(iter1226.402)：ビューアで辿るグルーム列の上書き（自分のグルーム閲覧は自分のグルームだけを渡す）。空なら appState.grooms。
@@ -247,6 +248,7 @@ struct MegrumAuthenticatedTabContentView: View {
         }
         .onAppear {
             openVisualQAMeguriMessagesIfNeeded()
+            openVisualQAGroomViewerIfNeeded()
             openVisualQANearbyBoardListIfNeeded()
             openVisualQAHomeGroomComposerIfNeeded()
             handlePendingNotificationRouteIntent(pendingNotificationRouteIntent)
@@ -636,6 +638,32 @@ struct MegrumAuthenticatedTabContentView: View {
         }
         didOpenVisualQAMeguriMessages = true
         openMeguriMessageInbox()
+    }
+
+    /// iter1226.445：開くトランジションの検証用。環境変数で起動後にグルームビューアを自動オープンする
+    /// （録画→フレーム分解で枠と中身のズレを観察するため。タップ操作なしで再現できる）。
+    private func openVisualQAGroomViewerIfNeeded() {
+        guard ProcessInfo.processInfo.environment["MEGRUM_VISUAL_QA_AUTO_OPEN_GROOM"] == "1",
+              !didAutoOpenVisualQAGroomViewer
+        else {
+            return
+        }
+        didAutoOpenVisualQAGroomViewer = true
+        Task { @MainActor in
+            // レール読み込み＋画像先読みが済むのを待ってから、実際のタイル位置相当のアンカーで開く。
+            for _ in 0..<40 {
+                if !appState.grooms.isEmpty {
+                    break
+                }
+                try? await Task.sleep(nanoseconds: 250_000_000)
+            }
+            let viewerID = appState.viewer?.id
+            guard let groom = appState.grooms.first(where: { $0.authorID != viewerID }) ?? appState.grooms.first else {
+                return
+            }
+            try? await Task.sleep(nanoseconds: 1_500_000_000)
+            openMeguriGroomViewer(groom, sourceAnchor: UnitPoint(x: 0.18, y: 0.16))
+        }
     }
 
     private func openVisualQAHomeGroomComposerIfNeeded() {
