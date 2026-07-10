@@ -4,6 +4,8 @@ import MegrumCore
 public enum SupabaseAuthError: Error, Equatable, Sendable {
     case invalidURL
     case emailConfirmationRequired
+    /// 既に登録済みのメールアドレスで signup した（GoTrue の列挙防止応答 identities=[] で検出）。iter1226.420。
+    case emailAlreadyRegistered
     case unexpectedStatus(Int, String?)
 }
 

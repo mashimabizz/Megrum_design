@@ -59,7 +59,6 @@ struct AuthChoiceScreen: View {
         }
         .padding(.horizontal, 36)
         .frame(maxWidth: .infinity)
-        .authVisualBackground()
     }
 }
 

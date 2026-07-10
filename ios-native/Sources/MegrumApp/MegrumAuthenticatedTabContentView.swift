@@ -319,6 +319,10 @@ struct MegrumAuthenticatedTabContentView: View {
                     // FB(iter1226.403)：タップしたタイルの位置から拡大／その位置へ縮小する。
                     openMeguriGroomViewer(groom, sourceAnchor: anchor)
                 },
+                onOpenMeguriMessages: {
+                    // iter1226.420：ホームの紙飛行機/左スワイプからめぐりメッセージ一覧へスライド表示。
+                    isShowingMeguriMessageInbox = true
+                },
                 onOpenOwnGrooms: { ownGrooms, initial, anchor in
                     // FB(iter1226.402)：自分のグルームは「自分のグルームだけ」を古い→新しい順で辿る。
                     openMeguriGroomViewer(initial, sourceAnchor: anchor, sequence: ownGrooms)

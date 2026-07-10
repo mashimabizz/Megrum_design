@@ -13,6 +13,8 @@ struct HomeDiscoverySection: View {
     var title: String
     var candidates: [HomeDiscoveryCandidate]
     var layout: HomeDiscoverySectionLayout
+    /// rail レイアウトを画面端までスクロールさせる（親の20pt余白を打ち消す）。iter1226.420。
+    var fullBleedRail: Bool = false
     var cardTitleStyle: HomeDiscoveryCardTitleStyle = .plain
     var showsGridHeaderTitle = true
     var showsSeeAllButton = false
@@ -63,8 +65,10 @@ struct HomeDiscoverySection: View {
                             .frame(width: 94)
                         }
                     }
+                    .padding(.leading, fullBleedRail ? 20 : 0)
                     .padding(.trailing, 20)
                 }
+                .padding(.horizontal, fullBleedRail ? -20 : 0)
             case .summaryRows:
                 VStack(spacing: 0) {
                     ForEach(Array(displayedCandidates.enumerated()), id: \.element.id) { index, candidate in

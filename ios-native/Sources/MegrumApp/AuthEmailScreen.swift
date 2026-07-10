@@ -101,6 +101,5 @@ struct AuthEmailScreen: View {
             Spacer(minLength: 36)
         }
         .padding(.horizontal, 28)
-        .authVisualBackground()
     }
 }

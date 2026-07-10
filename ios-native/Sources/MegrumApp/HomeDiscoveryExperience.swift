@@ -46,6 +46,10 @@ struct HomeDiscoveryExperience: View {
     var groomRailViewedIDs: Set<UUID> = []
     var isGroomComposerCreating: Bool = false
     var onOpenGroom: (GroomPost, UnitPoint) -> Void = { _, _ in }
+    /// iter1226.420：ユーザー単位に束ねたグルーム群を開く（同一投稿者の連続閲覧）。
+    var onOpenGroomGroup: ([GroomPost], UnitPoint) -> Void = { _, _ in }
+    /// iter1226.420：ヘッダー紙飛行機・左スワイプからめぐりメッセージ一覧を開く。
+    var onOpenMeguriMessages: () -> Void = {}
     var onAddGroom: () -> Void = {}
     var onViewOwnGroom: (UnitPoint) -> Void = { _ in }
 
@@ -97,9 +101,10 @@ struct HomeDiscoveryExperience: View {
                             activationSignal: groomRailActivationSignal,
                             onAdd: onAddGroom,
                             onViewOwn: onViewOwnGroom,
-                            onSelect: onOpenGroom
+                            onSelectGroup: onOpenGroomGroup
                         )
-                        .padding(.leading, 12)
+                        // 画面端までスクロールできるフルブリード（親の20pt余白を打ち消す）。iter1226.420。
+                        .padding(.horizontal, -20)
                     }
 
                     if showsStarterMissionCard {
@@ -151,6 +156,7 @@ struct HomeDiscoveryExperience: View {
                             title: "求められているグッズ",
                             candidates: havesCandidates,
                             layout: .rail,
+                            fullBleedRail: true,
                             badgeText: tutorialSampleActive ? "サンプル" : nil,
                             onSelect: { if !tutorialSampleActive { selectedSheet = $0 } }
                         )

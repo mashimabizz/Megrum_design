@@ -27,6 +27,8 @@ struct HomeScreen: View {
     /// FB8-6：ホーム上部の圏内グルーム・ストーリー列からグルームを開く（タブ上位のイマーシブ表示へ）。iter1226.387。
     /// FB(iter1226.403)：タップしたタイルの画面上アンカー（そこから拡大／そこへ縮小）を添える。
     var onOpenGroom: (GroomPost, UnitPoint) -> Void = { _, _ in }
+    /// iter1226.420：ヘッダー紙飛行機・左スワイプからめぐりメッセージ一覧を開く。
+    var onOpenMeguriMessages: () -> Void = {}
     /// FB(iter1226.402)：自分のグルームは「自分のグルームだけ」を古い→新しい順で開く（先頭=最古の未読）。
     var onOpenOwnGrooms: ([GroomPost], GroomPost, UnitPoint) -> Void = { _, _, _ in }
     var tutorialSampleActive: Bool = false
@@ -141,6 +143,40 @@ struct HomeScreen: View {
         onOpenOwnGrooms(ordered, initial, anchor)
     }
 
+    /// iter1226.420：ユーザー単位に束ねたグルーム群を開く。開けるものだけを古い→新しい順に閲覧。
+    /// 全部ロック（圏外×無料）ならプレミアム案内。
+    private func handleGroomRailGroupTap(_ grooms: [GroomPost], anchor: UnitPoint) {
+        guard let appState else {
+            if let first = grooms.first {
+                onOpenGroom(first, anchor)
+            }
+            return
+        }
+        let coordinate = groomLocationState.coordinate
+        let viewerID = (appState.viewer ?? viewer)?.id
+        let openable = grooms.filter { groom in
+            MeguriAccessPolicy.canOpenGroom(
+                groom,
+                currentCoordinate: coordinate,
+                viewerID: viewerID,
+                hasEncountered: groom.encounteredInRange,
+                subscriptionState: appState.subscriptionState
+            )
+        }
+        guard !openable.isEmpty else {
+            isShowingGroomLockPremium = true
+            return
+        }
+        let ordered = openable.sorted { $0.createdAt < $1.createdAt }
+        let viewed = appState.viewedGroomIDs
+        let initial = ordered.first(where: { !viewed.contains($0.id) }) ?? ordered.first!
+        if ordered.count > 1 {
+            onOpenOwnGrooms(ordered, initial, anchor)
+        } else {
+            onOpenGroom(initial, anchor)
+        }
+    }
+
     private func handleGroomRailTap(_ groom: GroomPost, anchor: UnitPoint) {
         guard let appState else {
             onOpenGroom(groom, anchor)
@@ -169,6 +205,12 @@ struct HomeScreen: View {
                 if showsGroomRail, groomLocationState.coordinate == nil {
                     groomLocationState.requestCurrentLocation()
                 }
+            }
+            // iter1226.420：初回起動はグルーム取得が認証データ同期より先に走って空振りすることがある。
+            // ホーム候補の読み込み確定を追加トリガーにして必ず再取得する。
+            .onChange(of: appState?.hasLoadedHomeCandidates ?? false) { _, loaded in
+                guard loaded else { return }
+                Task { await loadNearbyGroomsIfPossible() }
             }
             .onChange(of: myActiveGrooms.count) { oldCount, newCount in
                 // バックグラウンド投稿が着地して自分グルームが増えたら、列が見える状態で活性化アニメを発火。
@@ -246,6 +288,7 @@ struct HomeScreen: View {
             onRefresh: {
                 await onRefresh()
                 await loadLocalActivitySettings()
+                await loadNearbyGroomsIfPossible()
             },
             tutorialSampleActive: tutorialSampleActive,
             tutorialFocusAnchor: tutorialFocusAnchor,
@@ -262,6 +305,8 @@ struct HomeScreen: View {
             groomRailProfiles: appState?.publicProfilesByUserID ?? [:],
             groomRailViewedIDs: appState?.viewedGroomIDs ?? [],
             onOpenGroom: handleGroomRailTap,
+            onOpenGroomGroup: handleGroomRailGroupTap,
+            onOpenMeguriMessages: onOpenMeguriMessages,
             onAddGroom: {
                 // FB(iter1226.401)：fullScreenCover 既定の「下から」を止め、コンポーザ側の左スライドだけで見せる。
                 var transaction = Transaction()
@@ -271,6 +316,19 @@ struct HomeScreen: View {
             onViewOwnGroom: viewOwnGroom
         )
         .background(MegrumTheme.canvas.ignoresSafeArea())
+        // iter1226.420：ホームを左へスワイプ→めぐりメッセージ一覧へ（Instagram DM風）。
+        // 横レール上のドラッグは各レールのScrollViewが先に消費するため誤発火しない。
+        .gesture(
+            DragGesture(minimumDistance: 40)
+                .onEnded { value in
+                    guard value.translation.width < -70,
+                          abs(value.translation.height) < 60
+                    else {
+                        return
+                    }
+                    onOpenMeguriMessages()
+                }
+        )
         .megrumHiddenNavigationBar()
         .sheet(isPresented: $showsLocalModeSettings) {
             HomeLocalModeSettingsSheet(

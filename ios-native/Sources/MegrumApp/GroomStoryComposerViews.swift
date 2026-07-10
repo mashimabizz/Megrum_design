@@ -393,22 +393,29 @@ private struct GroomComposerLeadingSlideModifier: ViewModifier {
     var active: Bool
     @State private var shown = false
 
+    // iter1226.420：GeometryReader+ignoresSafeArea で包むとヘッダーがステータスバーに食い込み、
+    // 初回レイアウトの寸法揺れで「左下から」に見えていた。画面幅ぶんの単純オフセットに変更し、
+    // safe area は中身（composerContent）に任せる。
     func body(content: Content) -> some View {
         if active {
-            GeometryReader { proxy in
-                content
-                    .frame(width: proxy.size.width, height: proxy.size.height)
-                    .offset(x: shown ? 0 : -proxy.size.width)
-            }
-            .ignoresSafeArea()
-            .onAppear {
-                MegrumHaptics.buttonTap()
-                withAnimation(.spring(response: 0.36, dampingFraction: 0.9)) {
-                    shown = true
+            content
+                .offset(x: shown ? 0 : -Self.slideDistance)
+                .onAppear {
+                    MegrumHaptics.buttonTap()
+                    withAnimation(.spring(response: 0.36, dampingFraction: 0.9)) {
+                        shown = true
+                    }
                 }
-            }
         } else {
             content
         }
+    }
+
+    private static var slideDistance: CGFloat {
+        #if canImport(UIKit)
+        max(UIScreen.main.bounds.width, 320)
+        #else
+        480
+        #endif
     }
 }

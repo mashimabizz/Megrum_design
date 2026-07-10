@@ -43,7 +43,6 @@ struct AuthPasswordResetScreen: View {
             Spacer(minLength: 300)
         }
         .padding(.horizontal, 31)
-        .authVisualBackground()
     }
 }
 

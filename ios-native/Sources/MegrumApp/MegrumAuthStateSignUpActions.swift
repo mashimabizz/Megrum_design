@@ -1,5 +1,6 @@
 import Foundation
 import MegrumCore
+import MegrumData
 
 extension MegrumAuthState {
     public func signUp(email: String, password: String, handle: String?) async {
@@ -46,6 +47,12 @@ extension MegrumAuthState {
             }
             activateSession(nextSession)
         } catch {
+            // 登録済みメールは明示的に弾く（iter1226.420 / オーナー要望）。
+            if case SupabaseAuthError.emailAlreadyRegistered = error {
+                errorMessage = "このメールアドレスは登録済みです。ログインしてください"
+                successMessage = nil
+                return
+            }
             if isLikelyEmailConfirmationRequiredAfterSignUp(error) {
                 // リンクではなく確認コード方式（iter1226.418）：コード入力画面へ誘導する。
                 pendingSignUpCodeEmail = trimmedEmail

@@ -122,14 +122,22 @@ public struct AuthScreen: View {
                     )
                 }
             }
-            .background(MegrumTheme.canvas.ignoresSafeArea())
             .scrollDismissesKeyboard(.interactively)
+            // ステータスバー領域まで同一グラデで塗る（iter1226.420）。個別画面側の背景指定は撤去済み。
             .background(
-                MegrumTheme.canvas
-                    .ignoresSafeArea()
-                    .onTapGesture {
-                        focusedField = nil
-                    }
+                ZStack {
+                    MegrumTheme.canvas
+                    RadialGradient(
+                        colors: [MegrumTheme.lavender.opacity(0.15), .clear],
+                        center: .top,
+                        startRadius: 40,
+                        endRadius: 430
+                    )
+                }
+                .ignoresSafeArea()
+                .onTapGesture {
+                    focusedField = nil
+                }
             )
             #if os(iOS)
             .toolbar {

@@ -90,7 +90,6 @@ struct AuthCodeEntryScreen: View {
             Spacer(minLength: 60)
         }
         .padding(.horizontal, 28)
-        .authVisualBackground()
         .onAppear {
             isCodeFieldFocused = true
         }
@@ -212,6 +211,5 @@ struct AuthNewPasswordScreen: View {
             Spacer(minLength: 60)
         }
         .padding(.horizontal, 28)
-        .authVisualBackground()
     }
 }

@@ -48,7 +48,8 @@ struct GroomStrip: View {
     var onAdd: () -> Void
     /// FB(iter1226.403)：タップしたタイルの画面上アンカー（拡大/縮小の基点）を添えて通知する。
     var onViewOwn: (UnitPoint) -> Void = { _ in }
-    var onSelect: (GroomPost, UnitPoint) -> Void
+    /// iter1226.420：同一ユーザーのグルームは1タイルにまとめ、タップでそのユーザーの全グルームを渡す。
+    var onSelectGroup: ([GroomPost], UnitPoint) -> Void
 
     /// 自分タイルのフレーム記録用ID（グルームIDと衝突しない固定値）。
     private static let ownTileFrameID = UUID(uuidString: "00000000-0000-0000-0000-00000000FEED")!
@@ -58,6 +59,27 @@ struct GroomStrip: View {
 
     private var displayGrooms: [GroomPost] {
         GroomFeedOrdering.sorted(grooms, viewerID: viewer?.id, viewedIDs: viewedGroomIDs)
+    }
+
+    /// iter1226.420：ユーザー単位のまとまり（未読優先の並びを保ったまま、同一投稿者を1つに束ねる）。
+    private var displayGroups: [[GroomPost]] {
+        var order: [UUID] = []
+        var byAuthor: [UUID: [GroomPost]] = [:]
+        for groom in displayGrooms {
+            if byAuthor[groom.authorID] == nil {
+                order.append(groom.authorID)
+            }
+            byAuthor[groom.authorID, default: []].append(groom)
+        }
+        return order.compactMap { byAuthor[$0] }
+    }
+
+    private func isGroupRead(_ group: [GroomPost]) -> Bool {
+        group.allSatisfy { viewedGroomIDs.contains($0.id) }
+    }
+
+    private func isGroupLocked(_ group: [GroomPost]) -> Bool {
+        group.allSatisfy { lockedGroomIDs.contains($0.id) }
     }
 
     var body: some View {
@@ -74,24 +96,42 @@ struct GroomStrip: View {
                 )
                 .background(tileFrameReader(id: Self.ownTileFrameID))
 
-                ForEach(displayGrooms) { groom in
+                ForEach(displayGroups, id: \.first!.id) { group in
+                    let representative = group.first!
                     Button {
-                        onSelect(groom, anchor(for: groom.id))
+                        onSelectGroup(group, anchor(for: representative.id))
                     } label: {
                         GroomStoryTile(
-                            groom: groom,
-                            profile: publicProfilesByUserID[groom.authorID]?.profile,
-                            isRead: viewedGroomIDs.contains(groom.id),
-                            isLocked: lockedGroomIDs.contains(groom.id)
+                            groom: representative,
+                            profile: publicProfilesByUserID[representative.authorID]?.profile,
+                            isRead: isGroupRead(group),
+                            isLocked: isGroupLocked(group)
                         )
+                        .overlay(alignment: .topTrailing) {
+                            // 同一ユーザーの複数グルームは件数バッジで示す（iter1226.420）。
+                            if group.count > 1 {
+                                Text("\(group.count)")
+                                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                                    .foregroundStyle(.white)
+                                    .frame(minWidth: 18)
+                                    .frame(height: 18)
+                                    .background(MegrumTheme.lavender, in: Capsule())
+                                    .overlay {
+                                        Capsule().strokeBorder(.white, lineWidth: 1.5)
+                                    }
+                                    .offset(x: 2, y: -1)
+                            }
+                        }
                     }
                     .buttonStyle(.plain)
-                    .background(tileFrameReader(id: groom.id))
-                    .accessibilityLabel("\(groomStoryName(for: groom))のグルーム")
-                    .id(groom.id)
+                    .background(tileFrameReader(id: representative.id))
+                    .accessibilityLabel("\(groomStoryName(for: representative))のグルーム\(group.count)件")
+                    .id(representative.id)
                 }
             }
             .padding(.vertical, 8)
+            // フルブリード：親の水平パディングを打ち消した分、中身側で先頭/末尾の余白を確保（iter1226.420）。
+            .padding(.horizontal, 20)
         }
     }
 

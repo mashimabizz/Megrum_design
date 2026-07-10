@@ -4,6 +4,49 @@
 
 ---
 
+## イテレーション1226.420：登録済みメール拒否・認証背景統一・グルーム列改善・ホーム導線刷新（FB6件）
+
+### 背景・問題意識
+
+オーナー報告6件：①登録済みメールで新規登録できてしまう（列挙防止の擬似成功）②新規登録画面のステータスバーが真っ白 ③初回起動でグルーム列が空＋同一ユーザーのグルームがバラバラに並ぶ ④ホーム経由のグルーム作成がステータスバーに被る＆左下からスライドして見える ⑤ホーム両端に謎の余白（レールが画面端まで行かない）⑥ヘッダーの「？」を紙飛行機（めぐりメッセージ）へ＋左スワイプ遷移。
+
+### 変更内容
+
+#### ①登録済みメールの拒否（`SupabaseAuthDTOs/ClientSupport/SupabaseAuthClient` / `MegrumAuthStateSignUpActions`）
+- GoTrue は登録済みメールでも列挙防止で200の擬似ユーザーを返すが、**identities が空配列**になる仕様を利用して検出。`SupabaseAuthError.emailAlreadyRegistered` を新設し、「このメールアドレスは登録済みです。ログインしてください」を表示（コード入力へは進ませない）
+
+#### ②認証画面の背景統一（`AuthScreen` ＋各認証画面）
+- グラデ背景（canvas＋radial lavender）を **AuthScreen の ScrollView 全体**へ一本化（ignoresSafeArea でステータスバーまで到達）。各画面個別の `authVisualBackground()` を撤去（二重描画によるトーン差も解消）
+
+#### ③グルーム列（`GroomStoryViews` / `HomeScreen`）
+- **初回空問題**：グルーム取得が認証データ同期より先に走ると空振りし、座標が変わらない限り再試行されなかった。`hasLoadedHomeCandidates` 確定を追加トリガーに再取得＋pull-to-refresh でも再取得
+- **ユーザー単位グルーピング**：同一投稿者のグルームを1タイルに集約（未読優先順は維持・複数件は件数バッジ）。タップでそのユーザーの開けるグルームを**古い→新しい順**に連続閲覧（既存のシーケンスビューアを再利用）。全件ロック（圏外×無料）ならプレミアム案内
+
+#### ④グルーム作成（`GroomStoryComposerViews`）
+- `GroomComposerLeadingSlideModifier` が GeometryReader＋ignoresSafeArea で包んでいたのが原因（ヘッダーがステータスバーへ食い込み・初回レイアウト揺れで左下から見えた）。**画面幅ぶんの単純オフセット**に変更し、safe area は中身に委ねる → 正しく「左から」スライド＆ヘッダーがステータスバー下に収まる
+
+#### ⑤レールのフルブリード（`HomeDiscoveryExperience` / `GroomStrip` / `HomeDiscoverySection`）
+- グルーム列・「求められているグッズ」列を **親の20pt余白を打ち消して画面端までスクロール**（コンテンツ先頭/末尾は20ptインセットで整列）。`HomeDiscoverySection` に `fullBleedRail` を追加（シート内の既存利用は不変）
+
+#### ⑥めぐりメッセージ導線（`HomeDiscoveryExperienceChrome` / `HomeScreen` / `MegrumAuthenticatedTabContentView`）
+- ヘッダー右端の「？」→ **紙飛行機（paperplane）** に置換し、タップで既存の `MeguriMessageInboxScreen` をスライド表示
+- ホームの**左スワイプ**（横-70pt超・縦60pt未満）でも同じ遷移。横レール上のドラッグは各レールの ScrollView が先に消費するため誤発火しない。ヘルプシート本体は残置（導線のみ撤去）
+
+### 影響範囲
+
+- 認証（登録判定・背景）、ホーム（レール・ヘッダー・ジェスチャ）、グルーム作成の表示のみ。データモデル・API不変
+
+### 確認方法
+
+- VisualQA: `auth-email-sign-in`（ステータスバーまでグラデ）/ `home`（紙飛行機・レール位置）目視確認済み。全1540テストパス
+
+### セルフレビュー結果
+- ✅ identities 検出は decode 失敗時も安全側（従来どおりコード入力へ）
+- ✅ グルーピングは表示専用（既読・ロック判定は従来ポリシー流用）
+- ⚠️ 左スワイプとホーム横レールの共存は実機での触感確認をオーナーに依頼
+
+---
+
 ## イテレーション1226.419：パスワード変更エラーの誤文言修正＋設定画面からの再設定フロー
 
 ### 背景・問題意識

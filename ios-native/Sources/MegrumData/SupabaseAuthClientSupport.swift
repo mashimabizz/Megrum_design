@@ -29,6 +29,11 @@ extension SupabaseAuthClient {
         } catch {
             if let pending = try? decoder.decode(SignUpPendingConfirmationResponse.self, from: data),
                pending.requiresEmailConfirmation {
+                // GoTrue は登録済みメールでも列挙防止のため 200 の擬似ユーザーを返すが、
+                // その場合 identities が空配列になる。ここで明示的に弾く（iter1226.420 / オーナー要望）。
+                if pending.isLikelyExistingUser {
+                    throw SupabaseAuthError.emailAlreadyRegistered
+                }
                 throw SupabaseAuthError.emailConfirmationRequired
             }
             throw error
