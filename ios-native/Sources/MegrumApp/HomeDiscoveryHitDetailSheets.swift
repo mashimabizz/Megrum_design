@@ -14,6 +14,8 @@ struct HomeGoodsHitDetailSheet: View {
     var addedExtraSelections: [HomeDiscoveryProposalSelection] = []
     var bottomButtonTitle: String = "交換内容を確認する"
     var preselectPreferredOffer: Bool = true
+    /// 交換内容プレビューを挟むか。追加候補（入れ子）では挟まず即追加する（iter1226.404）。
+    var showsProposalPreview: Bool = true
     /// ガイドツアーのデモ用：選択済み状態を注入して「実際の画面状態」を再現する（通常は nil）。
     var initialSelectionState: HomeListingSheetSelectionState? = nil
     var onOpenOwnerProfile: (UUID) -> Void
@@ -339,6 +341,11 @@ struct HomeGoodsHitDetailSheet: View {
         // 「他にも交換できそうなもの」で追加した候補も含めて確認・打診する（iter1226.384 / FB7-1）。
         // includingExtraSelections はID重複を除くので、後段の primaryProposalSelection で再マージしても二重にならない。
         let merged = proposalSelection.includingExtraSelections(addedExtraSelections)
+        // 追加候補（入れ子）ではプレビューを挟まず即確定。統合プレビューは元シート側で1回だけ出す（iter1226.404）。
+        guard showsProposalPreview else {
+            onStartProposal(merged)
+            return
+        }
         let receiverGoods = HomeMockGoods.orderedUniqueByID(
             confirmationReceiverGoods(for: proposalSelection) + addedExtraSelections.compactMap(\.receiverGoods)
         )

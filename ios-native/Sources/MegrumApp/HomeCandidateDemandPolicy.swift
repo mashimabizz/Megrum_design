@@ -146,6 +146,23 @@ enum HomeCandidateDemandPolicy {
         return (bestRank, demandCount)
     }
 
+    /// 塊内の最大需要ランク。「他にも交換できそうなもの」の足切り判定などに使う。
+    static func bestDemandRank(of candidate: HomeDiscoveryCandidate) -> Int {
+        goodsDemandRanks(of: candidate).max() ?? 0
+    }
+
+    /// 「他にも交換できそうなもの」に出す最低需要ランク＝求めてる？（rank3）以上。
+    /// 定価・探し中・相談だけの候補は出さない（iter1226.404 / FB: 超求・求以外は出さない。不確定判定は含める）。
+    static let otherExchangeMinimumDemandRank = HomeCandidateDemandLine.demandTentative(goodsIDs: []).rank
+
+    /// 需要ランクが minimumRank 以上の候補だけ残す。
+    static func candidatesWithDemand(
+        atLeast minimumRank: Int,
+        in candidates: [HomeDiscoveryCandidate]
+    ) -> [HomeDiscoveryCandidate] {
+        candidates.filter { bestDemandRank(of: $0) >= minimumRank }
+    }
+
     static func sortedCandidates(_ candidates: [HomeDiscoveryCandidate]) -> [HomeDiscoveryCandidate] {
         candidates
             .enumerated()

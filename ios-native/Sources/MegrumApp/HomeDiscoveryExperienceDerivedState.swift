@@ -86,7 +86,13 @@ extension HomeDiscoveryExperience {
             goodsTypes: goodsTypes,
             conditionSignalsByItemID: displayConditionSignalsByItemID
         )
-        return HomeCandidateDemandPolicy.sortedCandidates(candidates)
+        // 「他にも交換できそうなもの」は需要が求めてる？以上の候補だけ。
+        // 定価・探し中・相談だけの候補はノイズになるので出さない（iter1226.404）。
+        let demanded = HomeCandidateDemandPolicy.candidatesWithDemand(
+            atLeast: HomeCandidateDemandPolicy.otherExchangeMinimumDemandRank,
+            in: candidates
+        )
+        return HomeCandidateDemandPolicy.sortedCandidates(demanded)
     }
 
     private func isEligible(item: GoodsItem, source: HomeDiscoveryCandidateSource) -> Bool {

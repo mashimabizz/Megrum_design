@@ -16,6 +16,8 @@ struct HomeWishHitDetailSheet: View {
     var addedExtraSelections: [HomeDiscoveryProposalSelection] = []
     var bottomButtonTitle: String = "交換内容を確認する"
     var preselectFirstOffer: Bool = true
+    /// 交換内容プレビューを挟むか。追加候補（入れ子）では挟まず即追加する（iter1226.404）。
+    var showsProposalPreview: Bool = true
     var onOpenOwnerProfile: (UUID) -> Void
     var onOpenNestedSheet: (HomeDiscoverySheet) -> Void
     var onStartProposal: (HomeDiscoveryProposalSelection) -> Void
@@ -282,6 +284,11 @@ struct HomeWishHitDetailSheet: View {
         proposalSelection.suggestedMessage = suggestedMessage
         // 「他にも交換できそうなもの」で追加した候補も含めて確認・打診する（iter1226.384 / FB7-1）。
         let merged = proposalSelection.includingExtraSelections(addedExtraSelections)
+        // 追加候補（入れ子）ではプレビューを挟まず即確定。統合プレビューは元シート側で1回だけ出す（iter1226.404）。
+        guard showsProposalPreview else {
+            onStartProposal(merged)
+            return
+        }
         let receiverGoods = HomeMockGoods.orderedUniqueByID(
             [selection.goods] + addedExtraSelections.compactMap(\.receiverGoods)
         )

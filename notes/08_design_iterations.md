@@ -4,6 +4,45 @@
 
 ---
 
+## イテレーション1226.404：デザイントークン基盤＋「他にも交換できそうなもの」の需要フィルタ・プレビュー抑制
+
+### 背景・問題意識
+
+オーナーからのデザイン刷新フィードバック10項目（2026-07-10）の実装開始。方針：①単色紫の面塗りを減らしWeb版PrimaryButton（135deg lavender→sky グラデ・radius14）とトーンを揃える、②「他にも交換できそうなもの」に定価/探し中/相談だけの候補が混ざってノイズ、③入れ子（追加候補）でも交換内容プレビューが挟まり冗長——元シートの統合プレビュー1回に集約したい。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumDesign/MegrumButtonStyles.swift`（新規）
+- グラデトークン：`MegrumTheme.primaryGradient`（lavender→sky、Web版と同一）/ `accentGradient`（pink→濃ピンク、需要行「超求！」と同系）/ `heroGradient`（3色、Welcome専用）/ `primaryShadow`
+- 共通ボタンスタイル：`MegrumPrimaryButtonStyle`（グラデ塗り・radius14・高さ52・押下scale0.97・disabled opacity0.5）/ `MegrumSecondaryButtonStyle`（ink5%中立塗り）。`.megrumPrimary` / `.megrumSecondary` で適用
+- 新規ボタンは原則この2種＋iOS標準destructiveの3択。ラベンダー枠線ボタンは廃止方針
+
+#### `HomeCandidateDemandPolicy.swift`
+- `bestDemandRank(of:)` / `candidatesWithDemand(atLeast:in:)` / `otherExchangeMinimumDemandRank`（=rank3・求めてる？）を追加
+
+#### `HomeDiscoveryExperienceDerivedState.swift`
+- `sameOwnerCandidates` で需要rank3未満（cash/lookingFor/discussのみ）の候補を足切り。不確定判定（超求めてる？/求めてる？）は含める（オーナー確認済み）
+
+#### `HomeDiscoverySheets.swift` / `HomeDiscoverySheetContent.swift` / `HomeDiscoveryHitDetailSheets.swift` / `HomeWishHitDetailSheet.swift`
+- `HomeDiscoverySheetPresentationContext.showsProposalPreview`（primaryのみtrue）を追加し、additionalCandidate では「このグッズも追加する」押下時に `HomeProposalStartConfirmationSheet` を挟まず即 `onStartProposal(merged)`。統合プレビューは元シートの「交換内容を確認する」1回だけ
+
+### 影響範囲
+
+- 候補シートの「他にも交換できそうなもの」セクション（表示件数が減る）と追加候補フロー（1タップ減る）。ホーム本体のセクション表示・並び順は不変
+- MegrumDesign は追加のみで既存APIに変更なし
+
+### 確認方法
+
+- `swift test --filter HomeCandidateDemandPolicyTests`（20件パス）
+- xcodebuild Debug ビルド成功（iPhone 17 シミュレータ）
+
+### セルフレビュー結果
+- ✅ ブランドカラー直書きなし（accentGradient の濃ピンクは既存 HomeCandidateDemandLineView と同値を昇格）
+- ✅ 状態名・用語は notes/09/10 に影響なし
+- ⚠️ ButtonStyle の既存画面への適用は後続 iter（1226.405〜）で段階実施
+
+---
+
 ## イテレーション1226.403：Swift Native現行画面遷移図の法務レビュー用資料化
 
 ### 背景・問題意識

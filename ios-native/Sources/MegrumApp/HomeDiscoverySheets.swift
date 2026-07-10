@@ -187,4 +187,11 @@ enum HomeDiscoverySheetPresentationContext: Equatable {
     var preselectPreferredOffer: Bool {
         self == .primary
     }
+
+    /// 交換内容プレビュー（HomeProposalStartConfirmationSheet）を挟むか。
+    /// 「他にも交換できそうなもの」からの追加（additionalCandidate）は軽い操作なので挟まず、
+    /// 元シートの「交換内容を確認する」で統合プレビューを1回だけ出す（iter1226.404 / FB項目4）。
+    var showsProposalPreview: Bool {
+        self == .primary
+    }
 }
