@@ -2,6 +2,12 @@ import Foundation
 import MegrumCore
 import MegrumData
 
+/// メール確認コード（OTP）の用途。iter1226.418。
+public enum AuthEmailCodePurpose: Sendable {
+    case signUp
+    case recovery
+}
+
 public protocol MegrumAuthRepository: Sendable {
     var isConfigured: Bool { get }
     var oauthCallbackScheme: String? { get }
@@ -11,6 +17,12 @@ public protocol MegrumAuthRepository: Sendable {
     func googleOAuthAuthorizeURL() throws -> URL
     func signUp(_ input: AuthSignUpInput) async throws -> AuthSession
     func sendPasswordReset(email: String) async throws
+    /// メールに届いた確認コードを検証してセッションを得る（iter1226.418）。
+    func verifyEmailCode(email: String, code: String, purpose: AuthEmailCodePurpose) async throws -> AuthSession
+    /// 確認コードを再送する（iter1226.418）。
+    func resendEmailCode(email: String, purpose: AuthEmailCodePurpose) async throws
+    /// リカバリ検証後のセッションでパスワードを更新する（iter1226.418）。
+    func updatePassword(session: AuthSession, newPassword: String) async throws
     func signOut(session: AuthSession) async throws
     func refreshSession(_ session: AuthSession) async throws -> AuthSession
     func restoreSession(fromRedirectURL url: URL) async throws -> AuthSession?
@@ -28,6 +40,18 @@ public extension MegrumAuthRepository {
     }
 
     func sendPasswordReset(email: String) async throws {
+        throw MegrumRepositoryError.unsupportedMutation
+    }
+
+    func verifyEmailCode(email: String, code: String, purpose: AuthEmailCodePurpose) async throws -> AuthSession {
+        throw MegrumRepositoryError.unsupportedMutation
+    }
+
+    func resendEmailCode(email: String, purpose: AuthEmailCodePurpose) async throws {
+        throw MegrumRepositoryError.unsupportedMutation
+    }
+
+    func updatePassword(session: AuthSession, newPassword: String) async throws {
         throw MegrumRepositoryError.unsupportedMutation
     }
 
@@ -60,6 +84,14 @@ public struct PreviewMegrumAuthRepository: MegrumAuthRepository {
 
     public func sendPasswordReset(email: String) async throws {}
 
+    public func verifyEmailCode(email: String, code: String, purpose: AuthEmailCodePurpose) async throws -> AuthSession {
+        Self.previewSession(email: email)
+    }
+
+    public func resendEmailCode(email: String, purpose: AuthEmailCodePurpose) async throws {}
+
+    public func updatePassword(session: AuthSession, newPassword: String) async throws {}
+
     public func signOut(session: AuthSession) async throws {}
 
     public func refreshSession(_ session: AuthSession) async throws -> AuthSession {
@@ -76,6 +108,17 @@ public struct PreviewMegrumAuthRepository: MegrumAuthRepository {
                 createdAt: Date(timeIntervalSince1970: 1_780_000_000)
             )
         )
+    }
+}
+
+private extension AuthEmailCodePurpose {
+    var otpType: SupabaseAuthClient.EmailOTPType {
+        switch self {
+        case .signUp:
+            .signup
+        case .recovery:
+            .recovery
+        }
     }
 }
 
@@ -153,6 +196,24 @@ public struct SupabaseMegrumAuthRepository: MegrumAuthRepository {
 
     public func sendPasswordReset(email: String) async throws {
         try await client.sendPasswordReset(email: email, emailRedirectTo: emailRedirectTo)
+    }
+
+    public func verifyEmailCode(email: String, code: String, purpose: AuthEmailCodePurpose) async throws -> AuthSession {
+        try await client.verifyEmailOTP(email: email, token: code, type: purpose.otpType)
+    }
+
+    public func resendEmailCode(email: String, purpose: AuthEmailCodePurpose) async throws {
+        switch purpose {
+        case .signUp:
+            try await client.resendEmailOTP(email: email, type: .signup)
+        case .recovery:
+            // リカバリの再送は recover の再実行（/resend は signup 系のみ対応）。
+            try await client.sendPasswordReset(email: email, emailRedirectTo: emailRedirectTo)
+        }
+    }
+
+    public func updatePassword(session: AuthSession, newPassword: String) async throws {
+        try await client.updateUserPassword(accessToken: session.accessToken, password: newPassword)
     }
 
     public func signOut(session: AuthSession) async throws {

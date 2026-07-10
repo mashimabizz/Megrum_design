@@ -1923,7 +1923,7 @@ final class MegrumAppStateTests: XCTestCase {
 
         XCTAssertTrue(sent)
         XCTAssertNil(state.session)
-        XCTAssertEqual(state.passwordResetMessage, "再設定メールを送信しました。受信メールを確認してください")
+        XCTAssertEqual(state.passwordResetMessage, "確認コードをメールに送信しました。届いた6桁のコードを入力してください")
         XCTAssertFalse(state.isLoading)
         XCTAssertNil(state.errorMessage)
 

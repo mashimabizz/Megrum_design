@@ -14,6 +14,24 @@ struct RefreshTokenPayload: Encodable {
     }
 }
 
+/// メール確認コード（OTP）検証。type は signup / recovery。iter1226.418。
+struct VerifyEmailOTPPayload: Encodable {
+    let email: String
+    let token: String
+    let type: String
+}
+
+/// ログイン済みユーザーのパスワード更新（PUT /auth/v1/user）。iter1226.418。
+struct UpdatePasswordPayload: Encodable {
+    let password: String
+}
+
+/// 確認コードの再送（POST /auth/v1/resend）。iter1226.418。
+struct ResendEmailPayload: Encodable {
+    let email: String
+    let type: String
+}
+
 struct PasswordResetPayload: Encodable {
     var email: String
 }

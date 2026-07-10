@@ -94,6 +94,44 @@ public final class SupabaseAuthClient: @unchecked Sendable {
         }
     }
 
+    /// メール確認コード（OTP）の種別。iter1226.418。
+    public enum EmailOTPType: String, Sendable {
+        case signup
+        case recovery
+    }
+
+    /// メールに届いた確認コードを検証してセッションを得る。iter1226.418。
+    public func verifyEmailOTP(email: String, token: String, type: EmailOTPType) async throws -> AuthSession {
+        let request = try makeVerifyEmailOTPRequest(email: email, token: token, type: type.rawValue)
+        return try await performAuthRequest(request)
+    }
+
+    /// 検証済みセッションでパスワードを更新する。iter1226.418。
+    public func updateUserPassword(accessToken: String, password: String) async throws {
+        let request = try makeUpdatePasswordRequest(accessToken: accessToken, password: password)
+        let (data, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw SupabaseAuthError.unexpectedStatus(-1, nil)
+        }
+        guard (200..<300).contains(httpResponse.statusCode) else {
+            let message = try? decoder.decode(AuthErrorResponse.self, from: data).message
+            throw SupabaseAuthError.unexpectedStatus(httpResponse.statusCode, message)
+        }
+    }
+
+    /// 確認コードの再送。iter1226.418。
+    public func resendEmailOTP(email: String, type: EmailOTPType) async throws {
+        let request = try makeResendEmailRequest(email: email, type: type.rawValue)
+        let (data, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw SupabaseAuthError.unexpectedStatus(-1, nil)
+        }
+        guard (200..<300).contains(httpResponse.statusCode) else {
+            let message = try? decoder.decode(AuthErrorResponse.self, from: data).message
+            throw SupabaseAuthError.unexpectedStatus(httpResponse.statusCode, message)
+        }
+    }
+
     public func signOut(accessToken: String) async throws {
         let request = try makeSignOutRequest(accessToken: accessToken)
         let (_, response) = try await session.data(for: request)

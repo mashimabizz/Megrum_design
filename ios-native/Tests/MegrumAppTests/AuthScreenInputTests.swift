@@ -144,7 +144,7 @@ final class AuthScreenInputTests: XCTestCase {
         XCTAssertNil(state.errorMessage)
         XCTAssertEqual(
             state.successMessage,
-            "確認メールを送信しました。メール内のリンクで認証を完了してからログインしてください"
+            "確認コードをメールに送信しました。届いた6桁のコードを入力してください"
         )
         XCTAssertFalse(state.isLoading)
     }
@@ -158,7 +158,7 @@ final class AuthScreenInputTests: XCTestCase {
         XCTAssertNil(state.errorMessage)
         XCTAssertEqual(
             state.successMessage,
-            "確認メールを送信しました。メール内のリンクで認証を完了してからログインしてください"
+            "確認コードをメールに送信しました。届いた6桁のコードを入力してください"
         )
         XCTAssertFalse(state.isLoading)
     }

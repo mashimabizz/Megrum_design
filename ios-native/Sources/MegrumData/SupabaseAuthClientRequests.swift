@@ -125,6 +125,45 @@ extension SupabaseAuthClient {
         )
     }
 
+    /// メールに届いた確認コード（OTP）を検証する。成功でセッションが返る。iter1226.418。
+    public func makeVerifyEmailOTPRequest(email: String, token: String, type: String) throws -> URLRequest {
+        let payload = VerifyEmailOTPPayload(
+            email: SupabaseTextNormalizer.trimmed(email),
+            token: SupabaseTextNormalizer.trimmed(token),
+            type: type
+        )
+        return try makeAuthRequest(
+            path: "/auth/v1/verify",
+            method: "POST",
+            body: encoder.encode(payload),
+            bearerToken: configuration.publishableKey
+        )
+    }
+
+    /// 検証済みセッションでパスワードを更新する（リカバリの最終ステップ）。iter1226.418。
+    public func makeUpdatePasswordRequest(accessToken: String, password: String) throws -> URLRequest {
+        try makeAuthRequest(
+            path: "/auth/v1/user",
+            method: "PUT",
+            body: encoder.encode(UpdatePasswordPayload(password: password)),
+            bearerToken: accessToken
+        )
+    }
+
+    /// 確認コードの再送（signup用）。iter1226.418。
+    public func makeResendEmailRequest(email: String, type: String) throws -> URLRequest {
+        let payload = ResendEmailPayload(
+            email: SupabaseTextNormalizer.trimmed(email),
+            type: type
+        )
+        return try makeAuthRequest(
+            path: "/auth/v1/resend",
+            method: "POST",
+            body: encoder.encode(payload),
+            bearerToken: configuration.publishableKey
+        )
+    }
+
     public func makeSignOutRequest(accessToken: String) throws -> URLRequest {
         try makeAuthRequest(
             path: "/auth/v1/logout",

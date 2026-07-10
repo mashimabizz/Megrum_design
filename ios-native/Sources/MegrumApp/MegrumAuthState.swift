@@ -17,6 +17,12 @@ public final class MegrumAuthState: ObservableObject {
     @Published public internal(set) var errorMessage: String?
     @Published public internal(set) var successMessage: String?
     @Published public internal(set) var passwordResetMessage: String?
+    /// 新規登録の確認コード入力待ちのメールアドレス（iter1226.418）。
+    @Published public internal(set) var pendingSignUpCodeEmail: String?
+    /// パスワード再設定の確認コード入力待ちのメールアドレス（iter1226.418）。
+    @Published public internal(set) var pendingRecoveryCodeEmail: String?
+    /// リカバリコード検証済みの一時セッション（新パスワード設定に使う）。iter1226.418。
+    @Published internal var recoverySession: AuthSession?
 
     public let isConfigured: Bool
     let repository: any MegrumAuthRepository

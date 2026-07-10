@@ -4,6 +4,48 @@
 
 ---
 
+## イテレーション1226.418：メール認証を確認コード（OTP）方式へ
+
+### 背景・問題意識
+
+オーナー指示：「新規登録・ログイン・パスワード再設定は、リンクを送るのではなく確認番号を送ってアプリで入力したら次に進める設計にしたい」。リンク方式はメールアプリ↔ブラウザ↔アプリの往復が発生し、モバイルでの離脱要因だった。
+
+### 変更内容
+
+#### フロー（GoTrueのOTP検証 `/auth/v1/verify` を使用）
+- **新規登録**：signup → コード入力画面 → `verify(type=signup)` → セッション取得で**即ログイン**（オンボーディングへ）
+- **パスワード再設定**：recover → コード入力画面 → `verify(type=recovery)` → **新パスワード設定画面** → `PUT /auth/v1/user` → そのままログイン
+- **ログイン**：メール未確認のままログインした場合を検出し、確認コードを自動再送してコード入力画面へ誘導（パスワードログイン自体は従来どおり）
+
+#### Supabase側（Management APIで適用済み）
+- `mailer_otp_length` 8→**6**
+- 確認メール/再設定メールのテンプレートを**リンク→6桁コード表示**へ差し替え（{{ .Token }}・大きな等幅表示・有効期限1時間の注記）
+- ※この過程で**SMTPホストが smtppro.zoho.jp に修正済み**（オーナー対応）なのを確認し、`/auth/v1/recover` が **HTTP 200** を返すこと＝メール送信の復旧を確認
+
+#### アプリ（データ層→状態→UI）
+- `SupabaseAuthClient`: `verifyEmailOTP` / `updateUserPassword` / `resendEmailOTP` を追加（DTO・リクエストビルダー含む）
+- `MegrumAuthRepository`: `verifyEmailCode` / `resendEmailCode` / `updatePassword`（既定実装・Preview実装付き）
+- `MegrumAuthState`: `pendingSignUpCodeEmail` / `pendingRecoveryCodeEmail` / `recoverySession` と `MegrumAuthStateEmailCodeActions`（検証・再送・新パスワード確定。コード不一致/期限切れは専用文言）
+- UI: `AuthCodeEntryScreen`（6桁ボックス・`.oneTimeCode` でメールからの自動入力対応・6桁で自動送信・再送リンク）/ `AuthNewPasswordScreen`。`AuthFlowRoute` に signUpCode / recoveryCode / newPassword を追加
+- VisualQA: `auth-signup-code` / `auth-recovery-code` / `auth-new-password`
+
+### 影響範囲
+
+- メール系認証フロー全体。Apple/Googleログインは不変。旧リンクは無効化（テンプレートから撤去）
+- web/（管理画面）でメールリンクに依存する画面があれば要確認（ユーザー向けはiOSのみのため影響は限定的）
+
+### 確認方法
+
+- `/auth/v1/recover` 直叩きで200（テンプレ更新後）。VisualQAで3画面を目視確認
+- 全1540テストパス（成功メッセージ文言の期待値3件を更新）
+
+### セルフレビュー結果
+- ✅ コード検証失敗（401/403/otp/expired）は「再送してやり直し」の分かる文言に変換
+- ✅ 新パスワードは8文字以上バリデーション（登録時と同一基準）
+- ⚠️ 実機での端到端確認（実メール受信→コード入力）はオーナーの次回試行時に
+
+---
+
 ## イテレーション1226.417：「求めてる？」を超求めてる？と同じ3列リッチシートへ＋やりとり一覧の未設定アバター
 
 ### 背景・問題意識

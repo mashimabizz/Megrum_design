@@ -31,6 +31,9 @@ enum VisualQAInitialScreen: String, Equatable {
     case authEmailSignIn = "auth-email-sign-in"
     case authEmailSignUp = "auth-email-sign-up"
     case authPasswordReset = "auth-password-reset"
+    case authSignUpCode = "auth-signup-code"
+    case authRecoveryCode = "auth-recovery-code"
+    case authNewPassword = "auth-new-password"
     case accountSetup = "account-setup"
     case meguri
     case groomArchive = "groom-archive"
@@ -57,7 +60,8 @@ enum VisualQAInitialScreen: String, Equatable {
 
     var isAuthRoute: Bool {
         switch self {
-        case .authSignIn, .authSignUp, .authEmailSignIn, .authEmailSignUp, .authPasswordReset:
+        case .authSignIn, .authSignUp, .authEmailSignIn, .authEmailSignUp, .authPasswordReset,
+             .authSignUpCode, .authRecoveryCode, .authNewPassword:
             true
         default:
             false

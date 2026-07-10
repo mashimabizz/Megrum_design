@@ -20,6 +20,12 @@ enum AuthFlowRoute: Equatable {
     case signInEmail
     case signUpEmail
     case passwordReset
+    /// 新規登録の確認コード入力（iter1226.418）。
+    case signUpCode
+    /// パスワード再設定の確認コード入力（iter1226.418）。
+    case recoveryCode
+    /// リカバリ検証後の新パスワード設定（iter1226.418）。
+    case newPassword
 
     init(visualQAInitialScreen: VisualQAInitialScreen?) {
         switch visualQAInitialScreen {
@@ -31,6 +37,12 @@ enum AuthFlowRoute: Equatable {
             self = .signUpEmail
         case .authPasswordReset:
             self = .passwordReset
+        case .authSignUpCode:
+            self = .signUpCode
+        case .authRecoveryCode:
+            self = .recoveryCode
+        case .authNewPassword:
+            self = .newPassword
         default:
             self = .signInChoice
         }
@@ -38,9 +50,9 @@ enum AuthFlowRoute: Equatable {
 
     var mode: AuthScreenMode {
         switch self {
-        case .signUpChoice, .signUpEmail:
+        case .signUpChoice, .signUpEmail, .signUpCode:
             .signUp
-        case .signInChoice, .signInEmail, .passwordReset:
+        case .signInChoice, .signInEmail, .passwordReset, .recoveryCode, .newPassword:
             .signIn
         }
     }

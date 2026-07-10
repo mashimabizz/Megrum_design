@@ -83,6 +83,43 @@ public struct AuthScreen: View {
                         onBack: { setRoute(.signInEmail) },
                         onLogin: { setRoute(.signInEmail) }
                     )
+                case .signUpCode:
+                    AuthCodeEntryScreen(
+                        purpose: .signUp,
+                        email: authState.pendingSignUpCodeEmail ?? inputState.email,
+                        isLoading: authState.isLoading,
+                        feedback: feedbackMessage,
+                        onSubmit: verifySignUpCodeFromButton,
+                        onResend: { resendEmailCodeFromButton(purpose: .signUp) },
+                        onBack: {
+                            authState.cancelPendingEmailCode(purpose: .signUp)
+                            setRoute(.signUpEmail)
+                        }
+                    )
+                case .recoveryCode:
+                    AuthCodeEntryScreen(
+                        purpose: .recovery,
+                        email: authState.pendingRecoveryCodeEmail ?? inputState.passwordResetEmail,
+                        isLoading: authState.isLoading,
+                        feedback: passwordResetFeedbackMessage,
+                        onSubmit: verifyRecoveryCodeFromButton,
+                        onResend: { resendEmailCodeFromButton(purpose: .recovery) },
+                        onBack: {
+                            authState.cancelPendingEmailCode(purpose: .recovery)
+                            setRoute(.passwordReset)
+                        }
+                    )
+                case .newPassword:
+                    AuthNewPasswordScreen(
+                        password: $inputState.password,
+                        isLoading: authState.isLoading,
+                        feedback: passwordResetFeedbackMessage,
+                        onSubmit: completeNewPasswordFromButton,
+                        onBack: {
+                            authState.cancelPendingEmailCode(purpose: .recovery)
+                            setRoute(.passwordReset)
+                        }
+                    )
                 }
             }
             .background(MegrumTheme.canvas.ignoresSafeArea())
