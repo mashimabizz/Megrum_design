@@ -52,9 +52,6 @@ struct GroomViewerTopBar: View {
     var postTimeText: String
     var authorAvatarID: String?
     var authorAvatarURL: URL?
-    var canModerate: Bool
-    var onReport: () -> Void
-    var onBlock: () -> Void
     var onOpenProfile: () -> Void
     let action: () -> Void
 
@@ -89,26 +86,9 @@ struct GroomViewerTopBar: View {
             .buttonStyle(.plain)
             .accessibilityLabel("\(authorName)のプロフィールを開く")
 
-            if canModerate {
-                Menu {
-                    Button(role: .destructive, action: onReport) {
-                        Label("通報する", systemImage: "exclamationmark.bubble")
-                    }
-                    Button(role: .destructive, action: onBlock) {
-                        Label("ブロックする", systemImage: "person.crop.circle.badge.xmark")
-                    }
-                } label: {
-                    Image(systemName: "ellipsis")
-                        .font(.system(size: 18, weight: .heavy))
-                        .foregroundStyle(.white)
-                        .frame(width: 44, height: 44)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("グルームのメニュー")
-            } else {
-                Color.clear
-                    .frame(width: 44, height: 44)
-            }
+            // iter1226.440：通報/ブロックの三点リーダーは右下（コメント位置の下）へ移動した。
+            Color.clear
+                .frame(width: 44, height: 44)
 
             Spacer()
             Button(action: action) {
@@ -153,28 +133,48 @@ enum GroomViewerEngagementStyle {
 }
 
 struct GroomViewerBottomControls: View {
-    let canReply: Bool
     let canLike: Bool
-    let isSendingReply: Bool
     let isLiked: Bool
     let likeCount: Int
-    let commentCount: Int
     let onToggleLike: () -> Void
-    let onOpenComments: () -> Void
     let onOpenLikes: () -> Void
+    let onReport: () -> Void
+    let onBlock: () -> Void
 
     var body: some View {
         HStack {
             Spacer()
-            GroomViewerEngagementColumn(
-                canLike: canLike,
-                isLiked: isLiked,
-                likeCount: likeCount,
-                commentCount: commentCount,
-                onToggleLike: onToggleLike,
-                onOpenComments: onOpenComments,
-                onOpenLikes: onOpenLikes
-            )
+            // iter1226.440：他人のグルームはコメントアイコンを出さず、
+            // 三点リーダー（通報/ブロック）を自分のグルームと同じ位置（右下の列）に置く。
+            VStack(alignment: .trailing, spacing: 8) {
+                GroomViewerEngagementColumn(
+                    canLike: canLike,
+                    isLiked: isLiked,
+                    likeCount: likeCount,
+                    commentCount: 0,
+                    onToggleLike: onToggleLike,
+                    onOpenComments: {},
+                    onOpenLikes: onOpenLikes,
+                    showsComments: false
+                )
+
+                Menu {
+                    Button(role: .destructive, action: onReport) {
+                        Label("通報する", systemImage: "exclamationmark.bubble")
+                    }
+                    Button(role: .destructive, action: onBlock) {
+                        Label("ブロックする", systemImage: "person.crop.circle.badge.xmark")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 18, weight: .heavy))
+                        .foregroundStyle(.white)
+                        .frame(width: 54, height: 54)
+                        .background(.black.opacity(0.28), in: Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("グルームのメニュー")
+            }
         }
         .padding(.horizontal, 18)
         .padding(.bottom, 24)

@@ -487,7 +487,7 @@ struct GroomViewerScreen: View {
                 // iter1226.438：キューブの各面には画像だけでなく、ユーザー名バー・
                 // いいね/コメント等のUIも張り付けたまま回す（インスタと同じ見え方）。
                 if let cubeSpin {
-                    groomFace(for: cubeSpin.fromGroom, topPadding: topPadding, isInteractive: false)
+                    GroomViewerCubeSnapshotFace(image: cubeSpin.fromSnapshot)
                         .modifier(
                             GroomViewerCubeFaceModifier(
                                 transform: GroomViewerCubeGeometry.outgoing(
@@ -596,9 +596,6 @@ struct GroomViewerScreen: View {
                     postTimeText: GroomPostRelativeTimeFormatter.relativeText(from: groom.createdAt),
                     authorAvatarID: identity.avatarID,
                     authorAvatarURL: identity.avatarURL,
-                    canModerate: canReply(to: groom),
-                    onReport: { interactionState.showReportConfirmation() },
-                    onBlock: { interactionState.showBlockConfirmation() },
                     onOpenProfile: { onOpenMeguriUserProfile(groom.authorID) }
                 ) {
                     dismissViewer()
@@ -624,15 +621,13 @@ struct GroomViewerScreen: View {
                     .padding(.bottom, 24)
                 } else {
                     GroomViewerBottomControls(
-                        canReply: canReply(to: groom),
                         canLike: canReply(to: groom),
-                        isSendingReply: appState.sendingGroomReplyPostID == groom.id,
                         isLiked: appState.isGroomLiked(groom.id),
                         likeCount: likeCount(for: groom),
-                        commentCount: commentCount(for: groom),
                         onToggleLike: { toggleLike(for: groom) },
-                        onOpenComments: { isShowingComments = true },
-                        onOpenLikes: { isShowingLikes = true }
+                        onOpenLikes: { isShowingLikes = true },
+                        onReport: { interactionState.showReportConfirmation() },
+                        onBlock: { interactionState.showBlockConfirmation() }
                     )
                 }
             }
@@ -690,23 +685,44 @@ struct GroomViewerScreen: View {
         }
         // iter1226.435：投稿者が変わる時だけ、Instagramストーリーズ風のキューブ回転で切り替える。
         // 同じ投稿者の連続グルームは従来どおり「パッ」と切り替え（iter1226.422）。
-        let previousGroom = currentGroom
-        let switchesAuthor = grooms[nextIndex].authorID != previousGroom.authorID
+        let switchesAuthor = grooms[nextIndex].authorID != currentGroom.authorID
+        #if canImport(UIKit)
+        // iter1226.440：出ていく面用に、切り替える前の画面をスナップショットしておく
+        //（切替後にビューを作り直すと画像・アバターの再読み込みでチラつくため）。
+        let startsSpin = switchesAuthor && !reduceMotion && isOpeningSettled && cubeDrag == nil
+        let snapshot = startsSpin ? captureViewerSnapshot() : nil
+        #endif
         var transaction = Transaction()
         transaction.disablesAnimations = true
         withTransaction(transaction) {
             currentIndex = nextIndex
         }
         #if canImport(UIKit)
-        if switchesAuthor, !reduceMotion, isOpeningSettled, cubeDrag == nil {
-            startCubeSpin(direction: delta >= 0 ? 1 : -1, from: previousGroom)
+        if startsSpin {
+            startCubeSpin(direction: delta >= 0 ? 1 : -1, snapshot: snapshot)
         }
         #endif
     }
 
     #if canImport(UIKit)
-    private func startCubeSpin(direction: Int, from previousGroom: GroomPost) {
-        let spin = GroomViewerCubeSpin(fromGroom: previousGroom, direction: direction)
+    /// いま表示されている画面（ビューア全面）をそのままスナップショットする。
+    private func captureViewerSnapshot() -> UIImage? {
+        guard let window = UIApplication.shared.connectedScenes
+            .compactMap({ ($0 as? UIWindowScene)?.keyWindow })
+            .first
+        else {
+            return nil
+        }
+        let renderer = UIGraphicsImageRenderer(bounds: window.bounds)
+        return renderer.image { _ in
+            window.drawHierarchy(in: window.bounds, afterScreenUpdates: false)
+        }
+    }
+    #endif
+
+    #if canImport(UIKit)
+    private func startCubeSpin(direction: Int, snapshot: UIImage?) {
+        let spin = GroomViewerCubeSpin(fromSnapshot: snapshot, direction: direction)
         var transaction = Transaction()
         transaction.disablesAnimations = true
         withTransaction(transaction) {
@@ -872,11 +888,28 @@ enum GroomViewerChromeLayout {
 
 #if canImport(UIKit)
 /// iter1226.435：投稿者切替キューブ回転の1回ぶんの状態。
-/// iter1226.438：面にはUIごと張り付けるため、画像スナップではなく直前のグルーム自体を持つ。
+/// iter1226.440：出ていく面は「切替直前の画面そのもの」のスナップショット。
+/// ビューを作り直すと画像・アバターの再読み込みでチラつくため、表示済みピクセルを使う。
 struct GroomViewerCubeSpin {
-    var fromGroom: GroomPost
+    var fromSnapshot: UIImage?
     var direction: Int
     var id = UUID()
+}
+
+/// キューブの「出ていく面」：切替直前の画面スナップショット（UIごと写り込んでいる）。
+private struct GroomViewerCubeSnapshotFace: View {
+    var image: UIImage?
+
+    var body: some View {
+        ZStack {
+            Color.black
+            if let image {
+                Image(uiImage: image)
+                    .resizable()
+            }
+        }
+        .accessibilityHidden(true)
+    }
 }
 
 /// iter1226.437：横スワイプで指に追従して回すキューブの状態。
