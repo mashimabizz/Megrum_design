@@ -6,26 +6,19 @@ struct HomeDiscoveryCandidateButton: View {
     var titleStyle: HomeDiscoveryCardTitleStyle
     var cardHeight: CGFloat
     var onSelect: (HomeDiscoverySheet) -> Void
-    var onSearch: (HomeDiscoveryCandidate, HomeMockGoods?) -> Void
 
     @State private var presentationState = HomeDiscoveryCandidateButtonPresentationState()
 
     var body: some View {
         VStack(spacing: 0) {
-            Button {
-                onSearch(candidate, presentationState.resolvedSelectedGoods(in: candidate.goods))
-            } label: {
-                Text(cardTitle)
-                    .font(.system(size: 14.5, weight: .regular))
-                    .foregroundStyle(MegrumTheme.ink)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.68)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("\(cardTitle)で検索")
-            .padding(.bottom, 10)
+            // 塊ラベルは表示のみ（検索は走らせない）。iter1226.414。
+            Text(cardTitle)
+                .font(.system(size: 14.5, weight: .regular))
+                .foregroundStyle(MegrumTheme.ink)
+                .lineLimit(1)
+                .minimumScaleFactor(0.68)
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.bottom, 10)
 
             HomeDiscoveryRotaryCard(
                 goods: candidate.goods,

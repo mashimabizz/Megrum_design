@@ -20,7 +20,6 @@ struct HomeDiscoveryCandidateSummaryRow: View {
     /// この候補が「他にも交換できそうなもの」から既に交換に追加済みか。追加済みなら行にバッジを出す。iter1226.384 / FB7-1。
     var isAdded: Bool = false
     var onSelect: (HomeDiscoverySheet) -> Void
-    var onSearch: (HomeDiscoveryCandidate, HomeMockGoods?) -> Void
 
     @State private var presentationState = HomeDiscoveryCandidateButtonPresentationState()
 
@@ -45,7 +44,7 @@ struct HomeDiscoveryCandidateSummaryRow: View {
         } label: {
             HStack(alignment: .center, spacing: 14) {
                 VStack(alignment: .leading, spacing: 6) {
-                    labelButton
+                    cardTitleLabel
                     rotaryCard
                 }
                 infoColumn
@@ -85,19 +84,13 @@ struct HomeDiscoveryCandidateSummaryRow: View {
         .accessibilityLabel("交換に追加済み")
     }
 
-    private var labelButton: some View {
-        Button {
-            onSearch(candidate, selectedGoods)
-        } label: {
-            Text(cardTitle)
-                .font(.system(size: 12, weight: .regular))
-                .foregroundStyle(MegrumTheme.ink.opacity(0.82))
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("\(cardTitle)で検索")
+    // 塊ラベルは表示のみ。タップは行全体のシート表示に委ねる（検索は走らせない）。iter1226.414。
+    private var cardTitleLabel: some View {
+        Text(cardTitle)
+            .font(.system(size: 12, weight: .regular))
+            .foregroundStyle(MegrumTheme.ink.opacity(0.82))
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
     }
 
     private var rotaryCard: some View {

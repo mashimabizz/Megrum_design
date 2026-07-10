@@ -146,8 +146,7 @@ private struct HomeHavesDemandSection: View {
                         candidate: ranked.candidate,
                         titleStyle: ranked.titleStyle,
                         viewerGoodsImageURLByID: viewerGoodsImageURLByID,
-                        onSelect: onOpenNestedSheet,
-                        onSearch: { _, _ in }
+                        onSelect: onOpenNestedSheet
                     )
                 }
             }

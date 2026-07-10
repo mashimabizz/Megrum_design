@@ -123,10 +123,6 @@ struct HomeDiscoveryExperience: View {
                             viewerGoodsImageURLByID: viewerGoodsImageURLByID,
                             badgeText: tutorialSampleActive ? "サンプル" : nil,
                             onSelect: { if !tutorialSampleActive { selectedSheet = $0 } },
-                            onSearchCandidate: { candidate, selectedGoods in
-                                guard !tutorialSampleActive else { return }
-                                openSearch(for: candidate, selectedGoods: selectedGoods, source: .userTag)
-                            },
                             onSeeAll: { seeAllRoute = .userTag }
                         )
                         .tutorialAnchor(ifPresent: tutorialSampleActive ? .homeSectionUserTag : nil)
@@ -144,10 +140,6 @@ struct HomeDiscoveryExperience: View {
                             viewerGoodsImageURLByID: viewerGoodsImageURLByID,
                             badgeText: tutorialSampleActive ? "サンプル" : nil,
                             onSelect: { if !tutorialSampleActive { selectedSheet = $0 } },
-                            onSearchCandidate: { candidate, selectedGoods in
-                                guard !tutorialSampleActive else { return }
-                                openSearch(for: candidate, selectedGoods: selectedGoods, source: .user)
-                            },
                             onSeeAll: { seeAllRoute = .user }
                         )
                         .tutorialAnchor(ifPresent: tutorialSampleActive ? .homeSectionUser : nil)
@@ -254,12 +246,6 @@ struct HomeDiscoveryExperience: View {
                     seeAllRoute = nil
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
                         selectedSheet = sheet
-                    }
-                },
-                onSearch: { candidate, selectedGoods in
-                    seeAllRoute = nil
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                        openSearch(for: candidate, selectedGoods: selectedGoods, source: route.searchSource)
                     }
                 }
             )

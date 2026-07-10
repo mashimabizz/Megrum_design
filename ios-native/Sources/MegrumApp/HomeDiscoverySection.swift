@@ -25,7 +25,6 @@ struct HomeDiscoverySection: View {
     /// タイトル横に出す小バッジ（ガイドツアー中の「サンプル」表示に使う）。
     var badgeText: String? = nil
     var onSelect: (HomeDiscoverySheet) -> Void
-    var onSearchCandidate: (HomeDiscoveryCandidate, HomeMockGoods?) -> Void = { _, _ in }
     /// 「すべて見る」タップ時の遷移。未指定時は従来どおり先頭候補のシートを開く。
     var onSeeAll: (() -> Void)? = nil
 
@@ -49,8 +48,7 @@ struct HomeDiscoverySection: View {
                             candidate: candidate,
                             titleStyle: cardTitleStyle,
                             cardHeight: 170,
-                            onSelect: onSelect,
-                            onSearch: onSearchCandidate
+                            onSelect: onSelect
                         )
                     }
                 }
@@ -78,8 +76,7 @@ struct HomeDiscoverySection: View {
                             titleStyle: cardTitleStyle,
                             viewerGoodsImageURLByID: viewerGoodsImageURLByID,
                             isAdded: isCandidateAdded(candidate),
-                            onSelect: onSelect,
-                            onSearch: onSearchCandidate
+                            onSelect: onSelect
                         )
                         .padding(.vertical, 7)
                     }

@@ -30,20 +30,6 @@ extension HomeDiscoveryExperience {
         }
     }
 
-    func openSearch(
-        for candidate: HomeDiscoveryCandidate,
-        selectedGoods: HomeMockGoods?,
-        source: HomeDiscoveryCandidateSource
-    ) {
-        onOpenSearchWithCriteria(
-            HomeDiscoverySearchRoutePolicy.criteria(
-                for: candidate,
-                selectedGoods: selectedGoods,
-                source: source
-            )
-        )
-    }
-
     func requestProposalPresentation(_ selection: HomeDiscoveryProposalSelection) {
         pendingProposalSelection = nil
         selectedSheet = nil

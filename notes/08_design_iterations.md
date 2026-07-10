@@ -4,6 +4,41 @@
 
 ---
 
+## イテレーション1226.414：ホーム塊ラベルの検索起動を廃止＋認証メール不達の原因特定（Zoho SMTP認証失敗）
+
+### 背景・問題意識
+
+オーナー報告3件：①パスワード再設定メールが「送信できませんでした」②新規登録の確認メールが届かない（既存メールでも「送信しました」表示）③ホームのメンバー名（塊ラベル）タップで検索が走るのは不要。
+
+### 調査結果（①②はアプリではなくインフラ起因）
+
+- `/auth/v1/recover` 直叩き → **500 "Error sending recovery email"**、`/auth/v1/signup`（新規メール）→ **500 "Error sending confirmation email"**。GoTrueのメール送信自体が失敗
+- Management API で確認：カスタムSMTP＝**smtppro.zoho.com:587 / info@megrum.jp**。同ホストへのSMTPログインは **535 Authentication Failed**
+- → **Zoho側の認証情報が無効**（アプリパスワード未発行/失効、またはZoho Japan DCなら smtp.zoho.jp 系が正）。**修正はオーナーのZoho/Supabaseダッシュボード作業が必要**（本イテレーションでは変更不可）
+- 「既存メールで新規登録しても『確認メールを送信しました』と出る」のはSupabaseの**アカウント列挙防止仕様**（登録有無を漏らさないため常に同じ応答）。SMTP復旧後もこの表示自体は正常挙動
+
+### 変更内容（③）
+
+#### `HomeDiscoveryCandidateSummaryRow.swift` / `HomeDiscoveryCandidateButton.swift`
+- 塊ラベル（メンバー名/メンバー×シリーズ名）のButtonを**表示のみのText**に変更。タップは行全体のシート表示に委ねる
+
+#### `HomeDiscoverySection.swift` / `HomeDiscoverySeeAllSheet.swift` / `HomeDiscoveryExperience.swift` / `HomeDiscoveryExperienceActions.swift` / `HomeDiscoveryLookupSheets.swift`
+- 不要になった `onSearch` / `onSearchCandidate` パラメータと `openSearch(for:)` / `searchSource` を削除（デッドコード除去）。検索画面への他導線（虫眼鏡ボタン等）は不変
+
+### 影響範囲
+
+- ホーム候補行・グリッドカード・すべて見るシート・求められているグッズ一覧の塊ラベル。検索機能自体は不変
+
+### 確認方法
+
+- 全1540テストパス。実機再インストール済み
+
+### セルフレビュー結果
+- ✅ ラベルの見た目は不変（挙動のみ変更）、accessibilityの「◯◯で検索」ラベルも撤去
+- ⚠️ ①②の恒久対応はオーナー作業（Zohoアプリパスワード再発行→SupabaseダッシュボードのSMTP設定更新）待ち
+
+---
+
 ## イテレーション1226.413：通知の行為者アバター・いいね集約＋シリーズ候補の3層化（iter1226.408/412の将来課題）
 
 ### 背景・問題意識

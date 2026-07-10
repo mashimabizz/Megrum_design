@@ -26,12 +26,6 @@ enum HomeDiscoverySeeAllRoute: String, Identifiable, Sendable {
         }
     }
 
-    var searchSource: HomeDiscoveryCandidateSource {
-        switch self {
-        case .userTag: .userTag
-        case .user: .user
-        }
-    }
 }
 
 /// 「すべて見る」から開く、セクション全候補の一覧シート。
@@ -40,7 +34,6 @@ struct HomeDiscoverySeeAllSheet: View {
     var candidates: [HomeDiscoveryCandidate]
     var viewerGoodsImageURLByID: [UUID: URL] = [:]
     var onSelect: (HomeDiscoverySheet) -> Void
-    var onSearch: (HomeDiscoveryCandidate, HomeMockGoods?) -> Void
 
     @Environment(\.dismiss) private var dismiss
 
@@ -56,8 +49,7 @@ struct HomeDiscoverySeeAllSheet: View {
                             candidate: candidate,
                             titleStyle: route.cardTitleStyle,
                             viewerGoodsImageURLByID: viewerGoodsImageURLByID,
-                            onSelect: onSelect,
-                            onSearch: onSearch
+                            onSelect: onSelect
                         )
                         .padding(.vertical, 8)
                     }
