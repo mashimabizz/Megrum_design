@@ -145,21 +145,6 @@ struct GroomStrip: View {
                             isLocked: isGroupLocked(group),
                             isProfileLoading: isLoadingInitial
                         )
-                        .overlay(alignment: .topTrailing) {
-                            // 同一ユーザーの複数グルームは件数バッジで示す（iter1226.420）。
-                            if group.count > 1 {
-                                Text("\(group.count)")
-                                    .font(.system(size: 10, weight: .bold, design: .rounded))
-                                    .foregroundStyle(.white)
-                                    .frame(minWidth: 18)
-                                    .frame(height: 18)
-                                    .background(MegrumTheme.lavender, in: Capsule())
-                                    .overlay {
-                                        Capsule().strokeBorder(.white, lineWidth: 1.5)
-                                    }
-                                    .offset(x: 2, y: -1)
-                            }
-                        }
                     }
                     .buttonStyle(.plain)
                     .background(tileFrameReader(id: representative.id))

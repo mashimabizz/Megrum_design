@@ -18,6 +18,15 @@ extension MegrumAppState {
         likedGroomIDs.formUnion(GroomInteractionStateReducer.likedIDs(from: posts))
     }
 
+    /// サーバーが返した閲覧済みフラグを viewedGroomIDs へ反映する（iter1226.443）。
+    /// 既読は取り消さない（ローカルで既読にした直後の取得と競合しないよう union のみ）。
+    func syncViewedGroomIDs(with posts: [GroomPost]) {
+        guard !posts.isEmpty else {
+            return
+        }
+        viewedGroomIDs.formUnion(GroomInteractionStateReducer.viewedIDs(from: posts))
+    }
+
     public func loadGroomMapPosts(
         latitude: Double? = nil,
         longitude: Double? = nil,
@@ -62,6 +71,7 @@ extension MegrumAppState {
             }
             groomMapPosts = posts
             syncLikedGroomIDs(with: posts)
+            syncViewedGroomIDs(with: posts)
             groomMapCacheKey = cacheKey
             await loadMeguriProfiles(userIDs: Set(posts.map(\.authorID)), reportsFailure: false)
         } catch {
@@ -108,6 +118,7 @@ extension MegrumAppState {
             // 再読み込み（置き換え）で圏外ピンが消えていた。
             viewportGroomPosts = Self.mergingByID(existing: viewportGroomPosts, incoming: loadedGrooms)
             syncLikedGroomIDs(with: loadedGrooms)
+            syncViewedGroomIDs(with: loadedGrooms)
             await loadMeguriProfiles(userIDs: Set(loadedGrooms.map(\.authorID)), reportsFailure: false)
         }
         if let loadedThreads {

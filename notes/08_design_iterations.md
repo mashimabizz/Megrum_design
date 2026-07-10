@@ -4,6 +4,48 @@
 
 ---
 
+## イテレーション1226.443：グルーム既読の永続化＋レール件数バッジ廃止
+
+### 背景・問題意識
+
+オーナーFB：
+1. 一度既読にしたグルームが、アプリを再起動すると未読扱い（レール枠がグラデ）に戻る
+2. レールのタイル右上の「1ユーザーのグルーム数」バッジは不要
+
+### 調査結果
+
+既読は `groom_views` へ**書き込むだけ**で、起動時に**読み戻していなかった**（`viewedGroomIDs` はメモリのみ）。いいねは `viewer_has_liked` をフィードRPCが返して復元済み（iter1226.428系）だったのに、既読は未対応だった。
+
+### 変更内容
+
+#### Supabase（`20260710230000_groom_feed_viewer_has_viewed.sql`・適用済み）
+- `list_groom_feed_nearby` に **`viewer_has_viewed`**（groom_views の存在）を追加（最新定義 20260709120000 を踏襲）
+
+#### クライアント
+- `GroomPost.viewed` 追加、`GroomFeedRow.viewerHasViewed` をマップ
+- `GroomInteractionStateReducer.viewedIDs(from:)` 追加。初期スナップショット・フィード読み込み・地図読み込み・ビューポート読み込みで `viewedGroomIDs` へ **union 同期**（既読は取り消さない）
+
+#### レール（`GroomStoryViews.swift`）
+- タイル右上の件数バッジを削除（accessibilityLabel の件数は維持）
+
+### 確認方法
+
+- `swift test` 全パス／`supabase db push` 適用済み／実機ビルド→iPhoneへインストール
+- 実機：グルームを見る→アプリを完全終了→再起動→レール枠がグレー（既読）のまま
+
+### 関連ファイル
+
+- `supabase/migrations/20260710230000_groom_feed_viewer_has_viewed.sql`
+- `ios-native/Sources/MegrumCore/GroomModels.swift` / `MegrumData/SupabaseGroomRows.swift`
+- `ios-native/Sources/MegrumApp/GroomInteractionStateReducer.swift` / `MegrumAppInitialSnapshotState.swift` / `MegrumAppStateGroomActions.swift` / `MegrumAppStateMeguriActions.swift` / `GroomStoryViews.swift`
+
+### セルフレビュー結果
+- ✅ いいね復元（viewer_has_liked）と同一パターンで一貫
+- ✅ union同期のため「ローカルで既読→直後の再取得」でも既読が消えない
+- ⚠️ 遭遇済みグルーム取得RPC（list_encountered_grooms）には未追加。圏外の遭遇済みタイルの既読復元が必要になったら同様に対応
+
+---
+
 ## イテレーション1226.442：グルームのスワイプ不能を修正（ジェスチャ競合）
 
 ### 背景・問題意識
