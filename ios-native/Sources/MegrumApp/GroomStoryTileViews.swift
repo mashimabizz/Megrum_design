@@ -237,12 +237,17 @@ struct GroomStoryTile: View {
     /// FB(iter1226.392)：無料会員で圏外の遭遇済みグルーム＝いま開けない。うすい鍵アイコンを右下に付ける。
     var isLocked: Bool = false
 
+    /// iter1226.422：プロフィール未取得の間は「？/めぐり」ではなく読み込み中の見た目（redacted）にする。
+    private var isProfilePending: Bool {
+        profile == nil
+    }
+
     private var displayName: String {
-        profile?.handle.nilIfBlank ?? profile?.displayName.nilIfBlank ?? "めぐり"
+        profile?.handle.nilIfBlank ?? profile?.displayName.nilIfBlank ?? "ロード中"
     }
 
     private var fallbackText: String {
-        profile?.displayName.nilIfBlank ?? profile?.handle.nilIfBlank ?? "?"
+        profile?.displayName.nilIfBlank ?? profile?.handle.nilIfBlank ?? ""
     }
 
     var body: some View {
@@ -270,6 +275,7 @@ struct GroomStoryTile: View {
                 .lineLimit(1)
                 .frame(width: GroomStoryMetrics.labelWidth)
         }
+        .redacted(reason: isProfilePending ? .placeholder : [])
     }
 
     /// うすい鍵アイコン（右下）。プレミアム限定で開けることを示す。

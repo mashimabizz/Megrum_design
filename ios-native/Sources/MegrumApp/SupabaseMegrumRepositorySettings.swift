@@ -175,6 +175,10 @@ public extension SupabaseMegrumRepository {
         try await accountProfilePersistence.completeAccountSetup(input)
     }
 
+    func takenAccountHandles(among handles: [String]) async throws -> Set<String> {
+        try await accountProfilePersistence.takenAccountHandles(among: handles)
+    }
+
     func requestAccountDeletion(_ input: AccountDeletionRequestInput) async throws -> AccountDeletionRequestResult {
         try await accountProfilePersistence.requestAccountDeletion(input)
     }

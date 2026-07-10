@@ -25,6 +25,28 @@ struct SupabaseAccountProfilePersistence: Sendable {
         self.userID = userID
     }
 
+    /// 候補のうち使用済みのユーザーID（小文字）を返す。自分の行は除外（現IDは「使える」扱い）。
+    func takenAccountHandles(among handles: [String]) async throws -> Set<String> {
+        let normalized = handles
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
+            .filter { !$0.isEmpty }
+        guard !normalized.isEmpty else {
+            return []
+        }
+        struct HandleRow: Decodable {
+            var handle: String
+        }
+        let rows: [HandleRow] = try await client.fetchRows(
+            from: "users",
+            select: "handle",
+            queryItems: [
+                URLQueryItem(name: "handle", value: "in.(\(normalized.joined(separator: ",")))"),
+                URLQueryItem(name: "id", value: "neq.\(userID.uuidString)")
+            ]
+        )
+        return Set(rows.map { $0.handle.lowercased() })
+    }
+
     func loadViewer() async throws -> UserProfile {
         let rows = try await fetchViewerRows()
         return rows.first?.profile ?? Self.fallbackViewerProfile(userID: userID)
@@ -47,6 +69,11 @@ struct SupabaseAccountProfilePersistence: Sendable {
                 avatarURL: avatarUpdate.url
             )
         } catch {
+            // 旧スキーマ（birth_date等の列なし）だけレガシーへ。制約違反や重複を
+            // ここで握りつぶすと生年月日などが黙って消えるため（iter1226.422）。
+            guard Self.isSchemaMismatchError(error) else {
+                throw error
+            }
             let rows: [UserRow] = try await client.updateRows(
                 in: "users",
                 values: Self.legacyOwnProfileUpdatePayload(input: input, avatarUpdate: avatarUpdate),
@@ -101,6 +128,11 @@ struct SupabaseAccountProfilePersistence: Sendable {
                 onConflict: "id"
             )
         } catch {
+            // 旧スキーマ（birth_date/age列なし）だけレガシーへ。それ以外（重複・制約違反・通信）を
+            // 黙ってフォールバックすると、生年月日が保存されないままセットアップが「成功」してしまう。
+            guard Self.isSchemaMismatchError(error) else {
+                throw error
+            }
             return try await client.upsertRows(
                 into: "users",
                 values: [
@@ -122,6 +154,15 @@ struct SupabaseAccountProfilePersistence: Sendable {
             payload: Self.accountDeletionPayload(from: input)
         )
         return AccountDeletionRequestResult(deletionScheduledAt: rows.first?.deletionScheduledAt)
+    }
+
+    /// PostgREST の「列が存在しない」系エラーか（PGRST204 / 42703。HTTP 400＋columnを含むメッセージ）。
+    static func isSchemaMismatchError(_ error: Error) -> Bool {
+        guard let restError = error as? SupabaseRESTError, restError.statusCode == 400 else {
+            return false
+        }
+        let message = restError.serverMessage?.lowercased() ?? ""
+        return message.contains("column") || message.contains("schema cache")
     }
 
     private func fetchViewerRows() async throws -> [UserRow] {

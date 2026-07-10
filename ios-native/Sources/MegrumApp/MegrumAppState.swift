@@ -133,6 +133,10 @@ public final class MegrumAppState: ObservableObject {
     @Published public internal(set) var submittingEvaluationProposalID: UUID?
     @Published public internal(set) var filingDisputeProposalID: UUID?
     @Published public internal(set) var isCreatingGroomPost = false
+    /// iter1226.422：ホーム経由のバックグラウンド投稿開始をホーム画面（活性化アニメ予約）へ伝えるシグナル。
+    @Published public internal(set) var homeGroomActivationExpectationSignal = 0
+    /// iter1226.422：ユーザーID重複時の代替候補（アカウントセットアップの保存前チェックで供給）。
+    @Published public internal(set) var accountSetupHandleSuggestions: [String] = []
     @Published public internal(set) var isCreatingBoardThread = false
     @Published public internal(set) var deletingGroomPostID: UUID?
     @Published public internal(set) var reportingGroomPostID: UUID?

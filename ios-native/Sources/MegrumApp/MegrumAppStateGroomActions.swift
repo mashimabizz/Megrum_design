@@ -3,6 +3,11 @@ import MegrumCore
 
 @MainActor
 extension MegrumAppState {
+    /// iter1226.422：ホーム経由コンポーザの「この場所にする」（背景投稿）開始をホームへ通知。
+    public func expectHomeGroomActivation() {
+        homeGroomActivationExpectationSignal += 1
+    }
+
     /// サーバーが返した「自分がいいね済みか」を likedGroomIDs へ反映する。
     /// 再起動後もいいね状態が復元されるように、取得した投稿分は上書きする。
     func syncLikedGroomIDs(with posts: [GroomPost]) {

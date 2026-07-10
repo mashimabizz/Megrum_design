@@ -82,6 +82,7 @@ struct MeguriGroomComposerPresentationModifier: ViewModifier {
 
 private extension View {
     @MainActor
+    @ViewBuilder
     func groomComposerPresentation(
         isPresented: Binding<Bool>,
         selectedPhotoItem: Binding<PhotosPickerItem?>,
@@ -112,35 +113,76 @@ private extension View {
         onDiscard: @escaping () -> Void
     ) -> some View {
         #if os(iOS)
-        fullScreenCover(isPresented: isPresented) {
-            GroomStoryComposerScreen(
-                selectedPhotoItem: selectedPhotoItem,
-                selectedCreationCoordinate: selectedCreationCoordinate,
-                draftPhotoData: draftPhotoData,
-                draftPhotoContentType: draftPhotoContentType,
-                isPreparingPhoto: isPreparingPhoto,
-                isCreating: isCreating,
-                canUseCamera: canUseCamera,
-                locksCreationCoordinate: locksCreationCoordinate,
-                currentCoordinate: currentCoordinate,
-                isRequestingLocation: isRequestingLocation,
-                groups: groups,
-                characters: characters,
-                userOshiSelections: userOshiSelections,
-                inventory: inventory,
-                wishes: wishes,
-                isLoadingGroups: isLoadingGroups,
-                isLoadingCharacters: isLoadingCharacters,
-                onRequestLocation: onRequestLocation,
-                onOpenCamera: onOpenCamera,
-                onLoadGroups: onLoadGroups,
-                onLoadCharacters: onLoadCharacters,
-                onLoadUserOshiSelections: onLoadUserOshiSelections,
-                onPublish: onPublish,
-                onPublishInBackground: onPublishInBackground,
-                presentsFromLeading: presentsFromLeading,
-                onDiscard: onDiscard
-            )
+        // iter1226.422：ホーム経由（左から）は fullScreenCover を使わない。
+        // cover 既定の「下から」アニメが transaction 無効化でも実機で残り、
+        // 内部の左オフセットと合成されて「左下から」に見えていたため、
+        // 他のスライド画面と同じ ZStack オーバーレイ（.leading）で出す。
+        if presentsFromLeading {
+            overlay {
+                MegrumSlideBoolPresentationOverlay(
+                    isPresented: isPresented,
+                    backSwipeInteractionScope: .fullScreen,
+                    presentationEdge: .leading
+                ) { _ in
+                    GroomStoryComposerScreen(
+                        selectedPhotoItem: selectedPhotoItem,
+                        selectedCreationCoordinate: selectedCreationCoordinate,
+                        draftPhotoData: draftPhotoData,
+                        draftPhotoContentType: draftPhotoContentType,
+                        isPreparingPhoto: isPreparingPhoto,
+                        isCreating: isCreating,
+                        canUseCamera: canUseCamera,
+                        locksCreationCoordinate: locksCreationCoordinate,
+                        currentCoordinate: currentCoordinate,
+                        isRequestingLocation: isRequestingLocation,
+                        groups: groups,
+                        characters: characters,
+                        userOshiSelections: userOshiSelections,
+                        inventory: inventory,
+                        wishes: wishes,
+                        isLoadingGroups: isLoadingGroups,
+                        isLoadingCharacters: isLoadingCharacters,
+                        onRequestLocation: onRequestLocation,
+                        onOpenCamera: onOpenCamera,
+                        onLoadGroups: onLoadGroups,
+                        onLoadCharacters: onLoadCharacters,
+                        onLoadUserOshiSelections: onLoadUserOshiSelections,
+                        onPublish: onPublish,
+                        onPublishInBackground: onPublishInBackground,
+                        onDiscard: onDiscard
+                    )
+                }
+            }
+        } else {
+            fullScreenCover(isPresented: isPresented) {
+                    GroomStoryComposerScreen(
+                    selectedPhotoItem: selectedPhotoItem,
+                    selectedCreationCoordinate: selectedCreationCoordinate,
+                    draftPhotoData: draftPhotoData,
+                    draftPhotoContentType: draftPhotoContentType,
+                    isPreparingPhoto: isPreparingPhoto,
+                    isCreating: isCreating,
+                    canUseCamera: canUseCamera,
+                    locksCreationCoordinate: locksCreationCoordinate,
+                    currentCoordinate: currentCoordinate,
+                    isRequestingLocation: isRequestingLocation,
+                    groups: groups,
+                    characters: characters,
+                    userOshiSelections: userOshiSelections,
+                    inventory: inventory,
+                    wishes: wishes,
+                    isLoadingGroups: isLoadingGroups,
+                    isLoadingCharacters: isLoadingCharacters,
+                    onRequestLocation: onRequestLocation,
+                    onOpenCamera: onOpenCamera,
+                    onLoadGroups: onLoadGroups,
+                    onLoadCharacters: onLoadCharacters,
+                    onLoadUserOshiSelections: onLoadUserOshiSelections,
+                    onPublish: onPublish,
+                    onPublishInBackground: onPublishInBackground,
+                    onDiscard: onDiscard
+                )
+            }
         }
         #else
         sheet(isPresented: isPresented) {
@@ -169,7 +211,6 @@ private extension View {
                 onLoadUserOshiSelections: onLoadUserOshiSelections,
                 onPublish: onPublish,
                 onPublishInBackground: onPublishInBackground,
-                presentsFromLeading: presentsFromLeading,
                 onDiscard: onDiscard
             )
         }

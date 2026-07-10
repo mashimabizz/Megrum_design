@@ -261,6 +261,8 @@ public protocol MegrumRepository: Sendable {
     func revokeNativePushDeviceToken(_ token: String, revokedAt: Date) async throws
     func updateOwnProfile(_ input: OwnProfileUpdateInput) async throws -> UserProfile
     func completeAccountSetup(_ input: AccountSetupInput) async throws -> UserProfile
+    /// iter1226.422：候補のうち使用済みのユーザーID（小文字）を返す。自分の現IDは除外して数える。
+    func takenAccountHandles(among handles: [String]) async throws -> Set<String>
     func requestAccountDeletion(_ input: AccountDeletionRequestInput) async throws -> AccountDeletionRequestResult
 }
 

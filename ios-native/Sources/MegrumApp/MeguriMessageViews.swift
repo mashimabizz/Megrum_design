@@ -55,9 +55,14 @@ struct MeguriMessageInboxScreen: View {
                 .megrumInlineNavigationTitle()
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
-                        Button("閉じる") {
+                        // FB(iter1226.422)：スライド遷移に合わせ「閉じる」→戻るアイコンにする。
+                        Button {
                             close()
+                        } label: {
+                            Image(systemName: "chevron.backward")
+                                .font(.system(size: 16, weight: .semibold))
                         }
+                        .accessibilityLabel("戻る")
                     }
                 }
                 .refreshable {

@@ -3,6 +3,11 @@ import SwiftUI
 struct MegrumSlideBoolPresentationOverlay<PresentedContent: View>: View {
     @Binding var isPresented: Bool
     var backSwipeInteractionScope: MegrumSlideBackSwipeInteractionScope
+    /// iter1226.422：出現方向。leading は左からスライド（戻るスワイプは無効）。
+    var presentationEdge: MegrumSlidePresentationEdge = .trailing
+    /// iter1226.422：指追従オープン用。非nilの間はコンテンツをこのオフセットで表示する
+    /// （画面幅=閉、0=全開）。ドラッグ元（ホーム等）が更新し、確定/キャンセル後に nil へ戻す。
+    var openDragOffset: CGFloat?
     var content: (_ dismiss: @escaping @MainActor @Sendable () -> Void) -> PresentedContent
 
     @State private var dragState = MegrumSlidePresentationDragState()
@@ -10,24 +15,33 @@ struct MegrumSlideBoolPresentationOverlay<PresentedContent: View>: View {
     init(
         isPresented: Binding<Bool>,
         backSwipeInteractionScope: MegrumSlideBackSwipeInteractionScope = .leadingEdge,
+        presentationEdge: MegrumSlidePresentationEdge = .trailing,
+        openDragOffset: CGFloat? = nil,
         @ViewBuilder content: @escaping (_ dismiss: @escaping @MainActor @Sendable () -> Void) -> PresentedContent
     ) {
         _isPresented = isPresented
         self.backSwipeInteractionScope = backSwipeInteractionScope
+        self.presentationEdge = presentationEdge
+        self.openDragOffset = openDragOffset
         self.content = content
+    }
+
+    private var isMounted: Bool {
+        isPresented || openDragOffset != nil
     }
 
     var body: some View {
         GeometryReader { proxy in
-            if isPresented {
+            if isMounted {
                 ZStack(alignment: .leading) {
                     presentedContent(screenWidth: proxy.size.width, screenHeight: proxy.size.height)
 
-                    if backSwipeInteractionScope == .leadingEdge {
+                    if backSwipeInteractionScope == .leadingEdge, presentationEdge == .trailing {
                         leadingEdgeSwipeCaptureArea(screenWidth: proxy.size.width, screenHeight: proxy.size.height)
                     }
                 }
-                .transition(MegrumSlidePresentationMetrics.trailingTransition)
+                .offset(x: openDragOffset ?? 0)
+                .transition(MegrumSlidePresentationMetrics.transition(for: presentationEdge))
             }
         }
         .ignoresSafeArea()
@@ -42,13 +56,15 @@ struct MegrumSlideBoolPresentationOverlay<PresentedContent: View>: View {
 
     @ViewBuilder
     private func presentedContent(screenWidth: CGFloat, screenHeight: CGFloat) -> some View {
-        switch backSwipeInteractionScope {
+        // leading 表示は明示的な閉じる操作のみ（戻るスワイプの方向が矛盾するため無効化）。
+        switch presentationEdge == .leading ? .leadingEdge : backSwipeInteractionScope {
         case .leadingEdge:
             content(dismissPresentation)
                 .megrumSlidePresentedContent(
                     width: screenWidth,
                     height: screenHeight,
                     dragOffset: dragState.dragOffset,
+                    presentationEdge: presentationEdge,
                     dismiss: dismissPresentation
                 )
         case .fullScreen:
@@ -57,6 +73,7 @@ struct MegrumSlideBoolPresentationOverlay<PresentedContent: View>: View {
                     width: screenWidth,
                     height: screenHeight,
                     dragOffset: dragState.dragOffset,
+                    presentationEdge: presentationEdge,
                     dismiss: dismissPresentation
                 )
                 .simultaneousGesture(backSwipeGesture(screenWidth: screenWidth), including: .gesture)

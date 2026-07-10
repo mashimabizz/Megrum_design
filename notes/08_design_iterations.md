@@ -4,6 +4,70 @@
 
 ---
 
+## イテレーション1226.422：スワイプ追従・左スライド修正・ID重複NG・生年月日保存ほか（FB9件）
+
+### 背景・問題意識
+
+オーナー報告9件：①ホーム左スワイプは指に追従してスライドしてほしい＋メッセージ一覧の左上を「＜」に ②グルーム作成がまだ左下から出る ③認証画面のキーボード上「閉じる」が反応しない ④オンボ2/8の「グループ全体」不要＋未選択でも次へ ⑤グルームのダブルタップいいね廃止→タップで前後遷移 ⑥グルーム列が起動直後に出ず、後から「？/めぐり」で出る ⑦ユーザーID「megrum」が「megrum_(英数字)」に勝手に変わる ⑧オンボで登録した生年月日が未設定のまま ⑨通知の「いいねされました」がめぐりホーム経由で重い。
+
+### 調査結果（⑦⑧は根本原因を特定）
+
+- **⑦の正体はDB重複対策ではなくクライアントの黙殺リネーム**：`MegrumAppStateInputNormalizer.isGeneratedPlaceholderHandle` が「megrum」「megrum_〜」を自動生成プレースホルダ扱いし、保存時に `megrum_(uuid先頭12桁)` へ差し替えていた（オーナーの実データ `megrum_2bf485a05bfa` と一致）。なお「megrum」自体は5/16の旧アカウントが使用中
+- **⑧はレガシーフォールバックの黙殺**：アカウントセットアップ保存は失敗すると**無条件で** birth_date/age を含まない旧スキーマ用ペイロードへ再試行していた。本番E2Eで正常ペイロードは200で保存できること、`users_age_range_check`（age>=1）違反が400で落ちること（→旧ペイロード成功→**生年月日だけ静かに消える**）を確認
+
+### 変更内容
+
+#### ①指追従スワイプ＋「＜」戻る（`MegrumSlidePresentationOverlay/Components/Gesture` / `MegrumAuthenticatedTabContentView` / `MeguriMessageViews`）
+- `MegrumSlideBoolPresentationOverlay` に `openDragOffset`（指追従オープン用オフセット）を追加。ホームタブの低優先 DragGesture（水平優位×左向きのみ追従開始）が画面幅→0のオフセットを書き、しきい値（78pt/予測132pt）で確定＝一覧を開く／未満はキャンセルで戻す
+- メッセージ一覧の左上「閉じる」→ `chevron.backward` アイコンに変更
+
+#### ②グルーム作成を真左から（`MegrumSlidePresentation*` / `MeguriGroomPresentationModifiers` / `GroomStoryComposerViews` / `HomeScreen` / `MegrumAuthenticatedTabContentView`）
+- 原因：fullScreenCover 既定の「下から」アニメが transaction 無効化でも実機で残り、内部の左オフセットと合成されて斜めに見えていた
+- `presentationEdge: .leading` をスライド基盤に追加し、ホーム経由コンポーザは **cover をやめてタブ上位の ZStack オーバーレイ（zIndex 105）** で左からスライド。`GroomComposerLeadingSlideModifier`（内部オフセット方式）は削除。シミュレータ録画のフレーム分解で**垂直移動ゼロの純左スライド**を確認
+- 活性化アニメ予約は `appState.homeGroomActivationExpectationSignal` 経由でホームへ通知
+
+#### ③キーボードの死んだ「閉じる」（`AuthScreen`）
+- keyboard toolbar ごと削除（focusedField と各入力欄のフォーカスが紐づいておらず反応しなかった）
+
+#### ④オンボ2/8（`AccountSetupOshiMemberStep` / `AccountSetupScreen` / `OnboardingOshiSelection`）
+- 「グループ全体」行を削除。**未選択のまま次へ→そのグループを全体登録として自動補完**（`draftsFillingWholeGroupForUnselected` 新設）。サブタイトルも「選ばなければグループ・作品全体で登録されます」へ
+
+#### ⑤ビューアのタップ遷移（`GroomViewerScreen` / `GroomLikeAmbientEffects`）
+- ダブルタップいいね（0.3秒判定・ハート演出・最後の閉じ猶予）を全廃。左右タップで即前/次、最後の右タップで即閉じ。いいねは既存のボタンで
+
+#### ⑥グルーム列の初期表示（`GroomStoryViews/TileViews` / `HomeScreen` / `HomeDiscoveryExperience`）
+- 初回ロード中（位置情報→グルーム→プロフィール）は**スケルトンタイル4つ**（灰リング＋名前バー・脈動）。位置情報が拒否/エラーと確定したら畳む
+- プロフィール未取得のタイルは「？/めぐり」ではなく **redacted（読み込み中の見た目）** に
+
+#### ⑦ID重複はNG＋候補提示（`AccountHandleAvailabilityLogic` 新設 / `MegrumAppStateInputNormalizer` / repository各層 / `AccountSetupScreen/StepContent/StepViews`）
+- **黙殺リネームを廃止**：有効な入力IDはそのまま使う。ユーザーIDステップの「次へ」と最終保存前に `users` を照会（`takenAccountHandles`）し、重複なら「このユーザーIDは既に使われています」＋**空いている類似候補チップ（タップで採用）**を提示。保存時のサーバー側ユニーク違反も同文言へマッピング（レース対策）
+- プレビューは megrum / hana を使用済みとしてQA可能に
+
+#### ⑧生年月日の保存（`SupabaseAccountProfilePersistence` / `MegrumAppStateProfileSettingsActions`）
+- レガシーフォールバックを**「列が存在しない」エラー（400×column/schema cache）限定**に（セットアップ保存とプロフィール編集の両方）。制約違反・重複・通信断は闇落ちさせず、サーバーメッセージを括弧書きで表示
+- ※オーナーの既存アカウントの生年月日は消失済みのため、プロフィール編集からの再設定が必要（今回の修正で正しく保存される）
+
+#### ⑨通知→グルーム直接表示（`NotificationsScreen`）
+- グルーム系通知（ownGroom/groomDetail）は**通知一覧の上に直接ビューアを表示**（キャッシュ→単発フェッチ）。閉じると通知一覧に戻る。開けない場合（圏外×無料等）だけ従来のタブ遷移へフォールバック
+
+### 影響範囲
+
+- ホーム・めぐりメッセージ・グルーム作成/ビューア・認証・オンボーディング・通知・プロフィール保存。DBスキーマ・API不変（既存 users への SELECT 照会を追加）
+
+### 確認方法
+
+- VisualQA: `home-groom-composer`（新設・自動オープン）を録画→フレーム分解で左スライド確認 / `home`（スケルトン・位置拒否で畳む・データあり）/ 一連の既存ルート回帰
+- `swift test`：1551テスト（+7：`AccountHandleAvailabilityLogicTests`）全パス
+- 本番E2E（テストユーザー作成→確認→REST upsert→削除）で ⑧の再現と修正方針を確認
+
+### セルフレビュー結果
+- ✅ スライド基盤の変更は既存（trailing）の挙動を既定値で完全維持
+- ✅ ID照会は自分の行を除外（現IDのままはOK）・照会失敗時は保存時のサーバー判定に委譲
+- ✅ レガシーフォールバック判定は PGRST204/42703 のメッセージ実物でテスト
+- ⚠️ 指追従スワイプ・左スライドの触感、通知→ビューアの実データ挙動は実機確認をオーナーに依頼
+
+---
+
 ## イテレーション1226.421：ホームに「近くのチャットルーム」＋一覧（フィルター／圏外プレミアムゲート）
 
 ### 背景・問題意識

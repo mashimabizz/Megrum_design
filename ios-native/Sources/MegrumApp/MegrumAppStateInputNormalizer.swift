@@ -68,9 +68,9 @@ enum MegrumAppStateInputNormalizer {
     }
 
     static func accountSetupHandle(_ handle: String, userID: UUID?) -> String? {
-        if let normalized = profileHandle(handle),
-           isValidProfileHandle(normalized),
-           !isGeneratedPlaceholderHandle(normalized) {
+        // iter1226.422：ユーザーが打った有効なIDはそのまま使う（megrum等を勝手に
+        // megrum_xxxx へ差し替えない）。重複はDB照会でNG＋候補提示する。
+        if let normalized = profileHandle(handle), isValidProfileHandle(normalized) {
             return normalized
         }
         guard let userID else {

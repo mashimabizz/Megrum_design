@@ -47,15 +47,7 @@ struct GroomViewerScreen: View {
     var closeAnchor: UnitPoint = .center
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    static let doubleTapSpaceName = "groom-viewer-double-tap"
-    @State private var doubleTapHearts: [GroomDoubleTapHeart] = []
-    @State private var pendingViewerTap: PendingViewerTap?
-    @State private var pendingDismissTask: Task<Void, Never>?
 
-    private struct PendingViewerTap {
-        var time: Date
-        var indexBeforeTap: Int
-    }
     @State private var currentIndex: Int
     @State private var dragState = GroomViewerDragPresentationState()
     @State private var interactionState = GroomViewerInteractionState()
@@ -295,6 +287,7 @@ struct GroomViewerScreen: View {
                 GroomViewerCachedImage(url: currentGroom.imageURL)
                     .padding(.horizontal, 8)
 
+                // FB(iter1226.422)：左右タップで前/次へ即遷移（ダブルタップいいねは廃止）。
                 HStack(spacing: 0) {
                     Color.clear
                         .contentShape(Rectangle())
@@ -303,12 +296,6 @@ struct GroomViewerScreen: View {
                     Color.clear
                         .contentShape(Rectangle())
                         .gesture(pageTapGesture(delta: 1))
-                }
-                .coordinateSpace(name: Self.doubleTapSpaceName)
-
-                // ダブルタップいいねの大きなハート（ドクン→ふわり上昇フェード）
-                ForEach(doubleTapHearts) { heart in
-                    GroomDoubleTapHeartView(position: heart.position)
                 }
 
                 Color.black
@@ -480,66 +467,20 @@ struct GroomViewerScreen: View {
         }
     }
 
-    /// タップした瞬間にページを切り替える（ダブルタップ判定を待たない）。
-    /// ダブルタップいいねは自前のタイミング判定で検出し、
-    /// 1回目のタップで進んでいた場合は元のグルームへ即戻していいねする。
+    /// FB(iter1226.422)：タップした瞬間に前/次へ切り替える（ダブルタップいいねは廃止）。
+    /// 最後のグルームで右タップしたら即閉じる。
     private func pageTapGesture(delta: Int) -> some Gesture {
-        SpatialTapGesture(coordinateSpace: .named(Self.doubleTapSpaceName))
-            .onEnded { value in
-                handleViewerTap(delta: delta, location: value.location)
-            }
-    }
-
-    private static let doubleTapWindow: TimeInterval = 0.30
-
-    private func handleViewerTap(delta: Int, location: CGPoint) {
-        let now = Date()
-        if let pending = pendingViewerTap,
-           now.timeIntervalSince(pending.time) < Self.doubleTapWindow {
-            // 2回目のタップ＝ダブルタップいいね。
-            pendingViewerTap = nil
-            pendingDismissTask?.cancel()
-            pendingDismissTask = nil
-            // 1回目で次へ進んでいたら、いいね対象（元のグルーム）へ即戻す。
-            if currentIndex != pending.indexBeforeTap {
-                move(by: pending.indexBeforeTap - currentIndex)
-            }
-            handleDoubleTapLike(at: location)
-            return
-        }
-
-        pendingViewerTap = PendingViewerTap(time: now, indexBeforeTap: currentIndex)
-        let nextIndex = currentIndex + delta
-        if grooms.indices.contains(nextIndex) {
-            // 押した瞬間に切り替える。
-            move(by: delta)
-        } else if delta > 0 {
-            // 最後のグルームで閉じる操作だけは、ダブルタップいいねの
-            // 猶予（0.3秒）を待ってから閉じる（即閉じるとダブルタップ不能になるため）。
-            pendingDismissTask = Task { @MainActor in
-                try? await Task.sleep(nanoseconds: 320_000_000)
-                guard !Task.isCancelled else {
-                    return
+        TapGesture()
+            .onEnded {
+                let nextIndex = currentIndex + delta
+                if grooms.indices.contains(nextIndex) {
+                    move(by: delta)
+                } else if delta > 0 {
+                    dismissViewer()
                 }
-                dismissViewer()
             }
-        }
     }
 
-    private func handleDoubleTapLike(at location: CGPoint) {
-        MegrumHaptics.buttonTap()
-        if canReplyToCurrentGroom || isCurrentGroomMine, !isCurrentGroomLiked {
-            Task {
-                await appState.setGroomLiked(currentGroom.id, isLiked: true)
-            }
-        }
-        let heart = GroomDoubleTapHeart(position: location)
-        doubleTapHearts.append(heart)
-        Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 1_900_000_000)
-            doubleTapHearts.removeAll { $0.id == heart.id }
-        }
-    }
 
     private func submitGroomReply() {
         guard let body = interactionState.replyBodyForSubmission(isSending: isSendingReply) else {

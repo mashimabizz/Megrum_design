@@ -24,6 +24,12 @@ struct MegrumAuthenticatedTabContentView: View {
     @State private var tradeDetailRoute: TradeDetailRoute?
     @State private var meguriHomeResetToken = UUID()
     @State private var isShowingMeguriMessageInbox = false
+    /// iter1226.422：ホーム左スワイプの指追従オープン用（画面幅=閉、0=全開。非nilの間だけ有効）。
+    @State private var meguriInboxOpenDragOffset: CGFloat?
+    @State private var isTrackingMeguriInboxOpenDrag = false
+    /// iter1226.422：ホーム経由のグルーム作成（左からスライド）をタブ上位で出す。
+    @State private var isShowingHomeGroomComposer = false
+    @StateObject private var homeGroomComposerLocationState = MegrumLocationState()
     @State private var meguriMessageDetailRoute: MeguriMessagePeerRoute?
     @State private var meguriBoardThreadRoute: MeguriBoardThreadRoute?
     /// iter1226.421：圏内チャットルーム一覧（ホームすべて見る・めぐり右下アイコンから）。
@@ -103,6 +109,19 @@ struct MegrumAuthenticatedTabContentView: View {
             )
             .zIndex(100)
 
+            // iter1226.422：ホーム経由のグルーム作成。fullScreenCoverをやめ、左からのスライドで全画面に出す。
+            GroomComposerContainer(
+                appState: appState,
+                locationState: homeGroomComposerLocationState,
+                isPresented: $isShowingHomeGroomComposer,
+                onGroomPublishStarted: { appState.expectHomeGroomActivation() }
+            ) {
+                Color.clear
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .allowsHitTesting(false)
+            }
+            .zIndex(105)
+
             MegrumSlideBoolPresentationOverlay(
                 isPresented: $isShowingNearbyBoardList,
                 backSwipeInteractionScope: .fullScreen
@@ -150,7 +169,8 @@ struct MegrumAuthenticatedTabContentView: View {
 
             MegrumSlideBoolPresentationOverlay(
                 isPresented: $isShowingMeguriMessageInbox,
-                backSwipeInteractionScope: .fullScreen
+                backSwipeInteractionScope: .fullScreen,
+                openDragOffset: meguriInboxOpenDragOffset
             ) { dismiss in
                 MegrumDeferredContent(delayNanoseconds: MegrumDeferredContentDelay.slidePresentation) {
                     MeguriMessageInboxScreen(
@@ -227,6 +247,7 @@ struct MegrumAuthenticatedTabContentView: View {
         .onAppear {
             openVisualQAMeguriMessagesIfNeeded()
             openVisualQANearbyBoardListIfNeeded()
+            openVisualQAHomeGroomComposerIfNeeded()
             handlePendingNotificationRouteIntent(pendingNotificationRouteIntent)
         }
         .onChange(of: pendingNotificationRouteIntent) { _, intent in
@@ -362,6 +383,9 @@ struct MegrumAuthenticatedTabContentView: View {
                 onOpenBoardList: {
                     isShowingNearbyBoardList = true
                 },
+                onOpenGroomComposer: {
+                    isShowingHomeGroomComposer = true
+                },
                 onOpenOwnGrooms: { ownGrooms, initial, anchor in
                     // FB(iter1226.402)：自分のグルームは「自分のグルームだけ」を古い→新しい順で辿る。
                     openMeguriGroomViewer(initial, sourceAnchor: anchor, sequence: ownGrooms)
@@ -376,10 +400,72 @@ struct MegrumAuthenticatedTabContentView: View {
                 visualQAInitialScreen: visualQAInitialScreen
             )
         }
+        // iter1226.422：左スワイプで指に追従してめぐりメッセージ一覧をスライドイン。
+        // 縦スクロール・横レールが先にドラッグを消費するので .gesture（低優先）で衝突しない。
+        .gesture(meguriInboxOpenDragGesture)
         .tag(MegrumTab.home)
         .tabItem {
             Label(MegrumTab.home.title, systemImage: MegrumTab.home.symbolName)
         }
+    }
+
+    private var screenWidthForInboxDrag: CGFloat {
+        #if canImport(UIKit)
+        max(UIScreen.main.bounds.width, 320)
+        #else
+        480
+        #endif
+    }
+
+    private var meguriInboxOpenDragGesture: some Gesture {
+        DragGesture(minimumDistance: 16)
+            .onChanged { value in
+                guard !isShowingMeguriMessageInbox else {
+                    return
+                }
+                if !isTrackingMeguriInboxOpenDrag {
+                    // 左向き＆水平優位のドラッグだけ追従を開始する。
+                    guard value.translation.width < -12,
+                          abs(value.translation.width) > abs(value.translation.height) * MegrumSlidePresentationMetrics.horizontalDominance
+                    else {
+                        return
+                    }
+                    isTrackingMeguriInboxOpenDrag = true
+                }
+                let width = screenWidthForInboxDrag
+                let offset = min(max(width + value.translation.width, 0), width)
+                var transaction = Transaction()
+                transaction.disablesAnimations = true
+                withTransaction(transaction) {
+                    meguriInboxOpenDragOffset = offset
+                }
+            }
+            .onEnded { value in
+                guard isTrackingMeguriInboxOpenDrag else {
+                    return
+                }
+                isTrackingMeguriInboxOpenDrag = false
+                let width = screenWidthForInboxDrag
+                let shouldOpen = -value.translation.width > MegrumSlidePresentationMetrics.minimumTranslation
+                    || -value.predictedEndTranslation.width > MegrumSlidePresentationMetrics.minimumPredictedTranslation
+                if shouldOpen {
+                    isShowingMeguriMessageInbox = true
+                    withAnimation(MegrumSlidePresentationMetrics.animation) {
+                        meguriInboxOpenDragOffset = 0
+                    }
+                } else {
+                    withAnimation(MegrumSlidePresentationMetrics.animation) {
+                        meguriInboxOpenDragOffset = width
+                    }
+                }
+                // アニメ完了後にドラッグ用オフセットを解除（以後は isPresented ベースの表示へ）。
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.42) {
+                    guard !isTrackingMeguriInboxOpenDrag else {
+                        return
+                    }
+                    meguriInboxOpenDragOffset = nil
+                }
+            }
     }
 
     private var inventoryTab: some View {
@@ -588,6 +674,18 @@ struct MegrumAuthenticatedTabContentView: View {
         }
         didOpenVisualQAMeguriMessages = true
         openMeguriMessageInbox()
+    }
+
+    private func openVisualQAHomeGroomComposerIfNeeded() {
+        guard visualQAInitialScreen == .homeGroomComposer, !isShowingHomeGroomComposer else {
+            return
+        }
+        // スライドの向きを録画で確認できるよう、描画が落ち着いてから開く。
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+            withAnimation(MegrumSlidePresentationMetrics.animation) {
+                isShowingHomeGroomComposer = true
+            }
+        }
     }
 
     private func openVisualQANearbyBoardListIfNeeded() {

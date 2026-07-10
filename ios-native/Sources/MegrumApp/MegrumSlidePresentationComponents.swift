@@ -5,6 +5,7 @@ struct MegrumSlidePresentedContentModifier: ViewModifier {
     var width: CGFloat
     var height: CGFloat
     var dragOffset: CGFloat
+    var presentationEdge: MegrumSlidePresentationEdge = .trailing
     var dismiss: @MainActor @Sendable () -> Void
 
     func body(content: Content) -> some View {
@@ -17,8 +18,13 @@ struct MegrumSlidePresentedContentModifier: ViewModifier {
             .frame(width: width, height: height)
             .background(MegrumTheme.canvas.ignoresSafeArea())
             .offset(x: dragOffset)
-            .shadow(color: MegrumTheme.ink.opacity(0.16), radius: 24, x: -8, y: 0)
-            .transition(MegrumSlidePresentationMetrics.trailingTransition)
+            .shadow(
+                color: MegrumTheme.ink.opacity(0.16),
+                radius: 24,
+                x: presentationEdge == .trailing ? -8 : 8,
+                y: 0
+            )
+            .transition(MegrumSlidePresentationMetrics.transition(for: presentationEdge))
             .zIndex(1)
     }
 }
@@ -41,6 +47,7 @@ extension View {
         width: CGFloat,
         height: CGFloat,
         dragOffset: CGFloat,
+        presentationEdge: MegrumSlidePresentationEdge = .trailing,
         dismiss: @escaping @MainActor @Sendable () -> Void
     ) -> some View {
         modifier(
@@ -48,6 +55,7 @@ extension View {
                 width: width,
                 height: height,
                 dragOffset: dragOffset,
+                presentationEdge: presentationEdge,
                 dismiss: dismiss
             )
         )

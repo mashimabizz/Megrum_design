@@ -123,6 +123,10 @@ public extension MegrumRepository {
         throw MegrumRepositoryError.unsupportedMutation
     }
 
+    func takenAccountHandles(among handles: [String]) async throws -> Set<String> {
+        []
+    }
+
     func requestAccountDeletion(_ input: AccountDeletionRequestInput) async throws -> AccountDeletionRequestResult {
         throw MegrumRepositoryError.unsupportedMutation
     }

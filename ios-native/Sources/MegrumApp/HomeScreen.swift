@@ -33,6 +33,8 @@ struct HomeScreen: View {
     var onOpenBoardThread: (BoardThread) -> Void = { _ in }
     /// iter1226.421：「すべて見る」→圏内チャットルーム一覧。
     var onOpenBoardList: () -> Void = {}
+    /// iter1226.422：グルーム作成（左スライドのコンポーザ）をタブ上位のオーバーレイで開く。
+    var onOpenGroomComposer: () -> Void = {}
     /// FB(iter1226.402)：自分のグルームは「自分のグルームだけ」を古い→新しい順で開く（先頭=最古の未読）。
     var onOpenOwnGrooms: ([GroomPost], GroomPost, UnitPoint) -> Void = { _, _, _ in }
     var tutorialSampleActive: Bool = false
@@ -67,7 +69,6 @@ struct HomeScreen: View {
     @State var didOpenVisualQAInitialRoute = false
     // FB8-6：圏内グルーム列＋その場投稿コンポーザ用の状態。iter1226.387。
     @StateObject private var groomLocationState = MegrumLocationState()
-    @State private var isGroomComposerPresented = false
     /// FB(iter1226.392)：ロックされた（圏外×無料）遭遇グルームをタップした時のプレミアム案内。
     @State private var isShowingGroomLockPremium = false
     /// iter1226.421：圏外チャットルーム（無料）タップ時のプレミアム誘導ポップアップ。
@@ -78,6 +79,8 @@ struct HomeScreen: View {
     @State private var groomActivationSignal = 0
     /// バックグラウンド投稿を開始した＝これから自分グルームが1件増えたら活性化アニメを出す、という予約フラグ。
     @State private var expectsGroomActivation = false
+    /// iter1226.422：グルーム列の初回ロード（位置情報→グルーム→著者プロフィール）中はスケルトンを出す。
+    @State private var isLoadingGroomRail = true
 
     /// 実データのホーム（ガイドツアー以外）でグルーム列を出す。
     private var showsGroomRail: Bool {
@@ -220,13 +223,18 @@ struct HomeScreen: View {
     }
 
     var body: some View {
-        groomComposerWrapped
+        homeBody
             .task(id: groomLocationState.coordinate?.latitude) {
                 await loadNearbyGroomsIfPossible()
             }
             .onAppear {
                 if showsGroomRail, groomLocationState.coordinate == nil {
                     groomLocationState.requestCurrentLocation()
+                }
+            }
+            .onChange(of: groomLocationState.locationErrorMessage) { _, message in
+                if message != nil {
+                    isLoadingGroomRail = false
                 }
             }
             // iter1226.420：初回起動はグルーム取得が認証データ同期より先に走って空振りすることがある。
@@ -243,28 +251,21 @@ struct HomeScreen: View {
                     groomActivationSignal += 1
                 }
             }
-    }
-
-    @ViewBuilder
-    private var groomComposerWrapped: some View {
-        if let appState, showsGroomRail {
-            GroomComposerContainer(
-                appState: appState,
-                locationState: groomLocationState,
-                isPresented: $isGroomComposerPresented,
-                onGroomPublishStarted: { expectsGroomActivation = true }
-            ) {
-                homeBody
+            // iter1226.422：コンポーザはタブ上位のオーバーレイへ移動。バックグラウンド投稿開始はシグナルで受ける。
+            .onChange(of: appState?.homeGroomActivationExpectationSignal ?? 0) { _, _ in
+                expectsGroomActivation = true
             }
-        } else {
-            homeBody
-        }
     }
 
     private func loadNearbyGroomsIfPossible() async {
         guard showsGroomRail, let appState, let coordinate = groomLocationState.coordinate else {
+            // 位置情報が使えない（拒否・エラー）と確定したらスケルトンを畳む。
+            if groomLocationState.locationErrorMessage != nil {
+                isLoadingGroomRail = false
+            }
             return
         }
+        defer { isLoadingGroomRail = false }
         await appState.loadGroomMapPosts(latitude: coordinate.latitude, longitude: coordinate.longitude)
         // iter1226.421：ホームの「近くのチャットルーム」も同じ座標で取得する。
         await appState.loadHomeNearbyBoardThreads(latitude: coordinate.latitude, longitude: coordinate.longitude)
@@ -329,6 +330,7 @@ struct HomeScreen: View {
             groomRailViewer: appState?.viewer ?? viewer,
             groomRailProfiles: appState?.publicProfilesByUserID ?? [:],
             groomRailViewedIDs: appState?.viewedGroomIDs ?? [],
+            groomRailIsLoadingInitial: isLoadingGroomRail && showsGroomRail,
             onOpenGroom: handleGroomRailTap,
             onOpenGroomGroup: handleGroomRailGroupTap,
             onOpenMeguriMessages: onOpenMeguriMessages,
@@ -339,27 +341,13 @@ struct HomeScreen: View {
             onOpenLockedBoardThread: { isShowingBoardLockedPopup = true },
             onOpenBoardList: onOpenBoardList,
             onAddGroom: {
-                // FB(iter1226.401)：fullScreenCover 既定の「下から」を止め、コンポーザ側の左スライドだけで見せる。
-                var transaction = Transaction()
-                transaction.disablesAnimations = true
-                withTransaction(transaction) { isGroomComposerPresented = true }
+                MegrumHaptics.buttonTap()
+                onOpenGroomComposer()
             },
             onViewOwnGroom: viewOwnGroom
         )
         .background(MegrumTheme.canvas.ignoresSafeArea())
-        // iter1226.420：ホームを左へスワイプ→めぐりメッセージ一覧へ（Instagram DM風）。
-        // 横レール上のドラッグは各レールのScrollViewが先に消費するため誤発火しない。
-        .gesture(
-            DragGesture(minimumDistance: 40)
-                .onEnded { value in
-                    guard value.translation.width < -70,
-                          abs(value.translation.height) < 60
-                    else {
-                        return
-                    }
-                    onOpenMeguriMessages()
-                }
-        )
+
         .megrumHiddenNavigationBar()
         .sheet(isPresented: $showsLocalModeSettings) {
             HomeLocalModeSettingsSheet(

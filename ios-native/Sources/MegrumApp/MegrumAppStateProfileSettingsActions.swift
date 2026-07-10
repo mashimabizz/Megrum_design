@@ -1,7 +1,35 @@
 import Foundation
 import MegrumCore
+import MegrumData
 
 extension MegrumAppState {
+    /// iter1226.422：ユーザーIDの重複チェック＋空いている類似候補。照会に失敗したら nil
+    /// （その場では通し、保存時のサーバー側ユニーク制約で最終判定する）。
+    public func checkAccountHandleAvailability(_ rawHandle: String) async -> AccountHandleAvailability? {
+        guard let normalized = MegrumAppStateInputNormalizer.profileHandle(rawHandle),
+              MegrumAppStateInputNormalizer.isValidProfileHandle(normalized)
+        else {
+            return nil
+        }
+        if let current = viewer?.handle, current.lowercased() == normalized.lowercased() {
+            return AccountHandleAvailability(isAvailable: true, suggestions: [])
+        }
+        let candidates = [normalized] + AccountHandleSuggestionLogic.candidates(for: normalized)
+        guard let taken = try? await repository.takenAccountHandles(among: candidates) else {
+            return nil
+        }
+        guard taken.contains(normalized.lowercased()) else {
+            return AccountHandleAvailability(isAvailable: true, suggestions: [])
+        }
+        return AccountHandleAvailability(
+            isAvailable: false,
+            suggestions: AccountHandleSuggestionLogic.availableSuggestions(
+                for: normalized,
+                takenLowercased: taken
+            )
+        )
+    }
+
     public func completeAccountSetup(
         handle: String,
         displayName: String,
@@ -54,6 +82,16 @@ extension MegrumAppState {
         isSavingAccountSetup = true
         errorMessage = nil
 
+        // iter1226.422：保存前に重複を明示チェック（黙ってIDが変わる/汎用エラーを防ぐ）。
+        if let availability = await checkAccountHandleAvailability(normalizedHandle),
+           !availability.isAvailable {
+            errorMessage = Self.handleTakenErrorMessage
+            accountSetupHandleSuggestions = availability.suggestions
+            isSavingAccountSetup = false
+            return false
+        }
+        accountSetupHandleSuggestions = []
+
         do {
             let savedViewer = try await repository.completeAccountSetup(
                 AccountSetupInput(
@@ -73,10 +111,24 @@ extension MegrumAppState {
             isSavingAccountSetup = false
             return true
         } catch {
-            errorMessage = "プロフィールを保存できませんでした"
+            errorMessage = Self.accountSetupSaveErrorMessage(from: error)
             isSavingAccountSetup = false
             return false
         }
+    }
+
+    static let handleTakenErrorMessage = "このユーザーIDは既に使われています。別のIDを入力してください"
+
+    /// iter1226.422：保存失敗の原因を闇落ちさせない（重複は専用文言、その他はサーバー詳細を併記）。
+    static func accountSetupSaveErrorMessage(from error: Error) -> String {
+        if let restError = error as? SupabaseRESTError,
+           let message = restError.serverMessage {
+            if message.contains("users_handle") || message.lowercased().contains("duplicate key") {
+                return handleTakenErrorMessage
+            }
+            return "プロフィールを保存できませんでした（\(message)）"
+        }
+        return "プロフィールを保存できませんでした"
     }
 
     public func updateOwnProfile(_ input: OwnProfileUpdateInput) async -> Bool {

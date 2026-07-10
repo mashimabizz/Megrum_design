@@ -12,6 +12,9 @@ public struct AccountSetupScreen: View {
     @State private var oshiState = AccountSetupOshiState()
     @State private var profileState: AccountSetupProfileState
     @State private var toastState = AccountSetupToastState()
+    /// iter1226.422：ユーザーID重複チェック中フラグと代替候補（タップで採用）。
+    @State private var isCheckingHandleAvailability = false
+    @State private var handleSuggestions: [String] = []
     @FocusState private var focusedField: AccountSetupFocusedField?
 
     private var oshiPresentationState: AccountSetupOshiPresentationState {
@@ -139,6 +142,12 @@ public struct AccountSetupScreen: View {
             prefectureSearchText: $profileState.prefectureSearchText,
             displayName: $profileState.displayName,
             handle: $profileState.handle,
+            handleSuggestions: handleSuggestions,
+            onSelectHandleSuggestion: { suggestion in
+                profileState.handle = suggestion
+                handleSuggestions = []
+                clearError()
+            },
             birthDate: $profileState.birthDate,
             gender: $profileState.gender,
             isSaving: appState.isSavingAccountSetup,
@@ -160,7 +169,7 @@ public struct AccountSetupScreen: View {
 
     private var currentSubtitle: String {
         if step == .oshi, oshiState.isSelectingMembers {
-            return "選んだグループ・作品ごとにメンバー・キャラクターを設定します。全体での登録も選べます。"
+            return "推しのメンバー・キャラクターを選びます。選ばなければグループ・作品全体で登録されます。"
         }
         return step.subtitle
     }
@@ -176,7 +185,9 @@ public struct AccountSetupScreen: View {
             } else {
                 Task { await advanceFromOshiMasters() }
             }
-        case .area, .displayName, .handle, .birthDate, .gender:
+        case .handle:
+            Task { await advanceFromHandleStep() }
+        case .area, .displayName, .birthDate, .gender:
             advanceFromValidatedStep(step)
         case .completion:
             Task { await save() }
@@ -200,6 +211,31 @@ public struct AccountSetupScreen: View {
         withAnimation(.snappy(duration: 0.22)) {
             step = nextStep
         }
+    }
+
+    /// iter1226.422：ユーザーIDは進む前に重複チェック。重複ならNG＋空いている候補を提示する。
+    private func advanceFromHandleStep() async {
+        let message = profileState.draft.validationMessage(
+            for: .handle,
+            oshiSelections: selectedOshiInputs
+        )
+        guard message == nil else {
+            profileState.inputErrorMessage = message
+            return
+        }
+        isCheckingHandleAvailability = true
+        let availability = await appState.checkAccountHandleAvailability(profileState.handle)
+        isCheckingHandleAvailability = false
+        if let availability, !availability.isAvailable {
+            profileState.inputErrorMessage = MegrumAppState.handleTakenErrorMessage
+            handleSuggestions = availability.suggestions
+            return
+        }
+        handleSuggestions = []
+        guard let next = AccountSetupStep.handle.next else {
+            return
+        }
+        advance(to: next)
     }
 
     private func advanceFromValidatedStep(_ validatedStep: AccountSetupStep) {
@@ -237,13 +273,11 @@ public struct AccountSetupScreen: View {
     }
 
     private func advanceFromOshiMembers() {
-        let incompleteTargets = selectedMemberTargets.filter { target in
-            !OnboardingOshiSelectionLogic.targetHasSelection(target, in: oshiState.selectedDrafts)
-        }
-        guard incompleteTargets.isEmpty else {
-            profileState.inputErrorMessage = AccountSetupDraftValidator.missingOshiMemberMessage
-            return
-        }
+        // FB(iter1226.422)：メンバー未選択でも次へ進める。未選択のグループは「グループ全体」として登録する。
+        oshiState.selectedDrafts = OnboardingOshiSelectionLogic.draftsFillingWholeGroupForUnselected(
+            selectedGroups: oshiState.selectedGroups,
+            currentDrafts: oshiState.selectedDrafts
+        )
         guard !selectedOshiInputs.isEmpty else {
             profileState.inputErrorMessage = AccountSetupDraftValidator.missingOshiMessage
             return
@@ -265,6 +299,12 @@ public struct AccountSetupScreen: View {
         )
         if !completed {
             profileState.inputErrorMessage = appState.errorMessage
+            // 重複IDで弾かれたらID入力ステップへ戻し、候補を出す（iter1226.422）。
+            if appState.errorMessage == MegrumAppState.handleTakenErrorMessage {
+                handleSuggestions = appState.accountSetupHandleSuggestions
+                advance(to: .handle)
+                profileState.inputErrorMessage = MegrumAppState.handleTakenErrorMessage
+            }
         }
     }
 

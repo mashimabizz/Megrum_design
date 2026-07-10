@@ -44,6 +44,8 @@ struct HomeDiscoveryExperience: View {
     var groomRailViewer: UserProfile? = nil
     var groomRailProfiles: [UUID: PublicUserProfile] = [:]
     var groomRailViewedIDs: Set<UUID> = []
+    /// iter1226.422：グルーム列の初回ロード中フラグ（スケルトン表示用）。
+    var groomRailIsLoadingInitial: Bool = false
     var isGroomComposerCreating: Bool = false
     var onOpenGroom: (GroomPost, UnitPoint) -> Void = { _, _ in }
     /// iter1226.420：ユーザー単位に束ねたグルーム群を開く（同一投稿者の連続閲覧）。
@@ -103,6 +105,7 @@ struct HomeDiscoveryExperience: View {
                             publicProfilesByUserID: groomRailProfiles,
                             viewedGroomIDs: groomRailViewedIDs,
                             isCreating: isGroomComposerCreating,
+                            isLoadingInitial: groomRailIsLoadingInitial,
                             hasOwnActiveGroom: groomRailHasOwnActiveGroom,
                             hasAnyOwnGroom: groomRailHasAnyOwnGroom,
                             activationSignal: groomRailActivationSignal,

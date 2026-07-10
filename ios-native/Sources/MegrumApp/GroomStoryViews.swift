@@ -31,6 +31,34 @@ struct GroomFeedOrdering {
     }
 }
 
+/// iter1226.422：グルーム列の初回ロード中プレースホルダ（淡い円＋名前バーの脈動）。
+struct GroomStorySkeletonTile: View {
+    @State private var pulses = false
+
+    var body: some View {
+        VStack(spacing: GroomStoryMetrics.labelSpacing) {
+            ZStack {
+                Circle()
+                    .strokeBorder(GroomStoryMetrics.seenRing, lineWidth: GroomStoryMetrics.ringLineWidth)
+                    .frame(width: GroomStoryMetrics.ringDiameter, height: GroomStoryMetrics.ringDiameter)
+                Circle()
+                    .fill(MegrumTheme.ink.opacity(0.06))
+                    .frame(width: GroomStoryMetrics.avatarDiameter, height: GroomStoryMetrics.avatarDiameter)
+            }
+            Capsule()
+                .fill(MegrumTheme.ink.opacity(0.08))
+                .frame(width: 40, height: 9)
+        }
+        .opacity(pulses ? 0.55 : 1)
+        .onAppear {
+            withAnimation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true)) {
+                pulses = true
+            }
+        }
+        .accessibilityHidden(true)
+    }
+}
+
 struct GroomStrip: View {
     var grooms: [GroomPost]
     /// FB(iter1226.392)：いま開けない（圏外×無料の遭遇済み）グルームID。ロックアイコン表示に使う。
@@ -39,6 +67,8 @@ struct GroomStrip: View {
     var publicProfilesByUserID: [UUID: PublicUserProfile]
     var viewedGroomIDs: Set<UUID>
     var isCreating: Bool
+    /// iter1226.422：初回ロード中（まだ他ユーザーのタイルが無い間）はスケルトンを出す。
+    var isLoadingInitial: Bool = false
     /// FB(iter1226.394/395)：自分の有効かつ未読のグルームがある時、自分タイルの枠をグラデにする。
     var hasOwnActiveGroom: Bool = false
     /// FB(iter1226.402)：既読でも自分のグルームがあればタップで閲覧できる（枠グラデは未読のみ）。
@@ -95,6 +125,13 @@ struct GroomStrip: View {
                     onViewOwn: { onViewOwn(anchor(for: Self.ownTileFrameID)) }
                 )
                 .background(tileFrameReader(id: Self.ownTileFrameID))
+
+                if isLoadingInitial, displayGroups.isEmpty {
+                    ForEach(0..<4, id: \.self) { index in
+                        GroomStorySkeletonTile()
+                            .opacity(1 - Double(index) * 0.16)
+                    }
+                }
 
                 ForEach(displayGroups, id: \.first!.id) { group in
                     let representative = group.first!

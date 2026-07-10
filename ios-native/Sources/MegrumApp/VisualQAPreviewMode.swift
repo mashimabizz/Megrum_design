@@ -45,6 +45,8 @@ enum VisualQAInitialScreen: String, Equatable {
     case nearbyBoardFilter = "nearby-board-filter"
     /// 一覧＋圏外プレミアム誘導ポップアップを開いた状態（iter1226.421 の確認用）。
     case nearbyBoardLocked = "nearby-board-locked"
+    /// ホーム経由のグルーム作成コンポーザを起動直後に自動で開く（iter1226.422 左スライド確認用）。
+    case homeGroomComposer = "home-groom-composer"
     case meguriMessageThread = "meguri-message-thread"
     case subscriptionSettings = "subscription-settings"
     case individualListings = "individual-listings"

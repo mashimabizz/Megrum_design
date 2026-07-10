@@ -30,7 +30,6 @@ struct GroomStoryComposerScreen: View {
     /// FB(iter1226.399)：ホーム経由の「この場所にする」用。投稿はバックグラウンドで実行し、即ホームへ戻す。
     var onPublishInBackground: (Data, String, String?, MegrumLocationCoordinate, MeguriContentMetadataDraft) -> Void = { _, _, _, _, _ in }
     /// FB(iter1226.401)：ホーム経由の起動は下からではなく左からスライドイン＋触覚。
-    var presentsFromLeading: Bool = false
     var onDiscard: () -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var presentationState = GroomStoryComposerPresentationState()
@@ -55,8 +54,8 @@ struct GroomStoryComposerScreen: View {
     }
 
     var body: some View {
+        // iter1226.422：左からのスライドは呼び出し側（MegrumSlideBoolPresentationOverlay .leading）で行う。
         composerContent
-            .modifier(GroomComposerLeadingSlideModifier(active: presentsFromLeading))
     }
 
     private var composerContent: some View {
@@ -387,35 +386,3 @@ struct GroomStoryComposerScreen: View {
     }
 }
 
-/// FB(iter1226.401)：ホーム経由のグルーム投稿を、下からではなく左からスライドインさせる（＋触覚）。
-/// fullScreenCover 自体のアニメーションは呼び出し側で無効化し、中身のこのオフセットだけで動かす。
-private struct GroomComposerLeadingSlideModifier: ViewModifier {
-    var active: Bool
-    @State private var shown = false
-
-    // iter1226.420：GeometryReader+ignoresSafeArea で包むとヘッダーがステータスバーに食い込み、
-    // 初回レイアウトの寸法揺れで「左下から」に見えていた。画面幅ぶんの単純オフセットに変更し、
-    // safe area は中身（composerContent）に任せる。
-    func body(content: Content) -> some View {
-        if active {
-            content
-                .offset(x: shown ? 0 : -Self.slideDistance)
-                .onAppear {
-                    MegrumHaptics.buttonTap()
-                    withAnimation(.spring(response: 0.36, dampingFraction: 0.9)) {
-                        shown = true
-                    }
-                }
-        } else {
-            content
-        }
-    }
-
-    private static var slideDistance: CGFloat {
-        #if canImport(UIKit)
-        max(UIScreen.main.bounds.width, 320)
-        #else
-        480
-        #endif
-    }
-}

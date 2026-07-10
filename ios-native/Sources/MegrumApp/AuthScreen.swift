@@ -139,16 +139,6 @@ public struct AuthScreen: View {
                     focusedField = nil
                 }
             )
-            #if os(iOS)
-            .toolbar {
-                ToolbarItemGroup(placement: .keyboard) {
-                    Spacer()
-                    Button("閉じる") {
-                        focusedField = nil
-                    }
-                }
-            }
-            #endif
         }
         .onChange(of: inputState.email) { _, _ in
             clearFeedback()
