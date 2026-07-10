@@ -27,6 +27,8 @@ struct MegrumAuthenticatedTabContentView: View {
     /// iter1226.427：ホーム左スワイプの指追従オープン。UIKitパン＋局所観測モデル
     /// （タップ同時発火とTabContentView全体再描画によるカクつきを解消）。
     @StateObject private var meguriInboxOpenDragModel = MeguriInboxOpenDragModel()
+    /// iter1226.429：表示中タブの再タップで最上部へ戻すシグナル（タブごと）。
+    @State private var tabScrollToTopSignals: [MegrumTab: Int] = [:]
     /// iter1226.422：ホーム経由のグルーム作成（左からスライド）をタブ上位で出す。
     @State private var isShowingHomeGroomComposer = false
     @StateObject private var homeGroomComposerLocationState = MegrumLocationState()
@@ -407,6 +409,7 @@ struct MegrumAuthenticatedTabContentView: View {
             isEnabled: { selectedTab == .home && !isShowingMeguriMessageInbox },
             onCommit: { isShowingMeguriMessageInbox = true }
         )
+        .megrumScrollsToTopOnTabReselection(signal: tabScrollToTopSignals[.home] ?? 0)
         .tag(MegrumTab.home)
         .tabItem {
             Label(MegrumTab.home.title, systemImage: MegrumTab.home.symbolName)
@@ -425,6 +428,7 @@ struct MegrumAuthenticatedTabContentView: View {
                 entryKind: .inventory
             )
         }
+        .megrumScrollsToTopOnTabReselection(signal: tabScrollToTopSignals[.inventory] ?? 0)
         .tag(MegrumTab.inventory)
         .tabItem {
             Label(MegrumTab.inventory.title, systemImage: MegrumTab.inventory.symbolName)
@@ -440,6 +444,7 @@ struct MegrumAuthenticatedTabContentView: View {
                 adDisplayContext: adDisplayContext
             )
         }
+        .megrumScrollsToTopOnTabReselection(signal: tabScrollToTopSignals[.wish] ?? 0)
         .tag(MegrumTab.wish)
         .tabItem {
             Label(MegrumTab.wish.title, systemImage: MegrumTab.wish.symbolName)
@@ -455,6 +460,7 @@ struct MegrumAuthenticatedTabContentView: View {
                 adDisplayContext: adDisplayContext
             )
         }
+        .megrumScrollsToTopOnTabReselection(signal: tabScrollToTopSignals[.trades] ?? 0)
         .tag(MegrumTab.trades)
         .tabItem {
             Label(MegrumTab.trades.title, systemImage: MegrumTab.trades.symbolName)
@@ -517,6 +523,10 @@ struct MegrumAuthenticatedTabContentView: View {
     }
 
     private func handleTabReselection(_ tab: MegrumTab) {
+        // iter1226.429：ホーム/やりとり/マイグッズ/ほしいものは再タップで最上部へ。
+        if [.home, .trades, .inventory, .wish].contains(tab) {
+            tabScrollToTopSignals[tab, default: 0] += 1
+        }
         if tab == .meguri {
             meguriGroomViewerPost = nil
             isGroomViewerPresented = false
