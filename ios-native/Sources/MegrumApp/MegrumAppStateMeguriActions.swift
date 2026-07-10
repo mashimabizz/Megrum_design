@@ -383,6 +383,23 @@ extension MegrumAppState {
         }
     }
 
+    /// ホームの「近くのチャットルーム」と一覧用。圏外も一覧に出すため拡張アクセスで取得し、
+    /// 開閉はクライアントの MeguriAccessPolicy.canOpenBoard で判定する（無料×圏外はロック表示）。iter1226.421。
+    public func loadHomeNearbyBoardThreads(latitude: Double, longitude: Double) async {
+        let prefecture = MegrumAppStateInputNormalizer.prefecture(viewer?.prefecture)
+        guard let threads = try? await repository.loadBoardThreads(
+            latitude: latitude,
+            longitude: longitude,
+            prefecture: prefecture,
+            scope: .nearby3km,
+            allowsExtendedBoardAccess: true
+        ) else {
+            return
+        }
+        homeNearbyBoardThreads = threads.sorted { $0.latestActivityAt > $1.latestActivityAt }
+        await loadBoardReplyPreviews(threadIDs: Array(homeNearbyBoardThreads.prefix(30).map(\.id)))
+    }
+
     /// 地図に見えているチャットルームの最新メッセージを吹き出し用に読み込む。
     /// 読み込み済みスレッドはスキップし、失敗しても致命扱いにしない。
     public func loadBoardReplyPreviews(threadIDs: [UUID]) async {

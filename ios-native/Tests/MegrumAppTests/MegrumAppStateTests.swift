@@ -490,7 +490,9 @@ final class MegrumAppStateTests: XCTestCase {
         await state.loadMeguriFeed(scope: .nearby3km)
 
         XCTAssertFalse(state.grooms.isEmpty)
-        XCTAssertEqual(state.threads.map(\.audience), [.nearby3km])
+        // iter1226.421：圏内チャットルーム導線の確認用にプレビューの nearby3km スレッドを3件へ増量。
+        XCTAssertEqual(state.threads.count, 3)
+        XCTAssertTrue(state.threads.allSatisfy { $0.audience == .nearby3km })
         XCTAssertFalse(state.isLoadingMeguri)
 
         await state.loadMeguriFeed(scope: .samePrefecture)

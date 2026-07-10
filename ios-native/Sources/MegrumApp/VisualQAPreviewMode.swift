@@ -39,6 +39,12 @@ enum VisualQAInitialScreen: String, Equatable {
     case groomArchive = "groom-archive"
     case meguriProfileSettings = "meguri-profile-settings"
     case meguriMessages = "meguri-messages"
+    /// 圏内チャットルーム一覧を直接開く（iter1226.421 の確認用）。
+    case nearbyBoardList = "nearby-board-list"
+    /// 一覧＋フィルターシートを開いた状態（iter1226.421 の確認用）。
+    case nearbyBoardFilter = "nearby-board-filter"
+    /// 一覧＋圏外プレミアム誘導ポップアップを開いた状態（iter1226.421 の確認用）。
+    case nearbyBoardLocked = "nearby-board-locked"
     case meguriMessageThread = "meguri-message-thread"
     case subscriptionSettings = "subscription-settings"
     case individualListings = "individual-listings"

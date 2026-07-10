@@ -29,6 +29,10 @@ struct HomeScreen: View {
     var onOpenGroom: (GroomPost, UnitPoint) -> Void = { _, _ in }
     /// iter1226.420：ヘッダー紙飛行機・左スワイプからめぐりメッセージ一覧を開く。
     var onOpenMeguriMessages: () -> Void = {}
+    /// iter1226.421：近くのチャットルーム行→スレッド詳細（スライド表示）。
+    var onOpenBoardThread: (BoardThread) -> Void = { _ in }
+    /// iter1226.421：「すべて見る」→圏内チャットルーム一覧。
+    var onOpenBoardList: () -> Void = {}
     /// FB(iter1226.402)：自分のグルームは「自分のグルームだけ」を古い→新しい順で開く（先頭=最古の未読）。
     var onOpenOwnGrooms: ([GroomPost], GroomPost, UnitPoint) -> Void = { _, _, _ in }
     var tutorialSampleActive: Bool = false
@@ -66,6 +70,9 @@ struct HomeScreen: View {
     @State private var isGroomComposerPresented = false
     /// FB(iter1226.392)：ロックされた（圏外×無料）遭遇グルームをタップした時のプレミアム案内。
     @State private var isShowingGroomLockPremium = false
+    /// iter1226.421：圏外チャットルーム（無料）タップ時のプレミアム誘導ポップアップ。
+    @State private var isShowingBoardLockedPopup = false
+    @State private var isShowingBoardPremium = false
     /// FB(iter1226.395/399)：自分タイルの「枠がぐるっと活性化」アニメの発火トリガ。
     /// 投稿はバックグラウンド実行なので、投稿が着地して自分グルーム件数が増えた時に +1 する。
     @State private var groomActivationSignal = 0
@@ -113,6 +120,22 @@ struct HomeScreen: View {
                     currentCoordinate: coordinate,
                     viewerID: viewerID,
                     hasEncountered: groom.encounteredInRange,
+                    subscriptionState: appState.subscriptionState
+                )
+            }.map(\.id)
+        )
+    }
+
+    /// iter1226.421：無料×圏外で開けないチャットルームID（ロック表示・プレミアム誘導）。
+    private var lockedBoardIDs: Set<UUID> {
+        guard let appState else { return [] }
+        let viewerID = (appState.viewer ?? viewer)?.id
+        return Set(
+            appState.homeNearbyBoardThreads.filter { thread in
+                !MeguriAccessPolicy.canOpenBoard(
+                    thread,
+                    currentCoordinate: groomLocationState.coordinate,
+                    viewerID: viewerID,
                     subscriptionState: appState.subscriptionState
                 )
             }.map(\.id)
@@ -243,6 +266,8 @@ struct HomeScreen: View {
             return
         }
         await appState.loadGroomMapPosts(latitude: coordinate.latitude, longitude: coordinate.longitude)
+        // iter1226.421：ホームの「近くのチャットルーム」も同じ座標で取得する。
+        await appState.loadHomeNearbyBoardThreads(latitude: coordinate.latitude, longitude: coordinate.longitude)
         // FB(iter1226.392): 出会った(遭遇済み)グルームも取得（近くに無くても列に出す）。
         await appState.loadEncounteredGrooms(latitude: coordinate.latitude, longitude: coordinate.longitude)
         await appState.loadMeguriProfiles(
@@ -307,6 +332,12 @@ struct HomeScreen: View {
             onOpenGroom: handleGroomRailTap,
             onOpenGroomGroup: handleGroomRailGroupTap,
             onOpenMeguriMessages: onOpenMeguriMessages,
+            nearbyBoardThreads: appState?.homeNearbyBoardThreads ?? [],
+            boardReplyPreviews: appState?.boardReplyPreviewsByThreadID ?? [:],
+            lockedBoardIDs: lockedBoardIDs,
+            onOpenBoardThread: onOpenBoardThread,
+            onOpenLockedBoardThread: { isShowingBoardLockedPopup = true },
+            onOpenBoardList: onOpenBoardList,
             onAddGroom: {
                 // FB(iter1226.401)：fullScreenCover 既定の「下から」を止め、コンポーザ側の左スライドだけで見せる。
                 var transaction = Transaction()
@@ -339,6 +370,16 @@ struct HomeScreen: View {
             )
         }
         .sheet(isPresented: $isShowingGroomLockPremium) {
+            if let appState {
+                NavigationStack {
+                    SubscriptionSettingsScreen(appState: appState)
+                }
+            }
+        }
+        .sheet(isPresented: $isShowingBoardLockedPopup) {
+            BoardLockedPremiumSheet(onOpenPremium: { isShowingBoardPremium = true })
+        }
+        .sheet(isPresented: $isShowingBoardPremium) {
             if let appState {
                 NavigationStack {
                     SubscriptionSettingsScreen(appState: appState)

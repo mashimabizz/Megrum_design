@@ -26,6 +26,8 @@ struct MegrumAuthenticatedTabContentView: View {
     @State private var isShowingMeguriMessageInbox = false
     @State private var meguriMessageDetailRoute: MeguriMessagePeerRoute?
     @State private var meguriBoardThreadRoute: MeguriBoardThreadRoute?
+    /// iter1226.421：圏内チャットルーム一覧（ホームすべて見る・めぐり右下アイコンから）。
+    @State private var isShowingNearbyBoardList = false
     @State private var meguriUserProfileRoute: MeguriUserProfileRoute?
     @State private var didOpenVisualQAMeguriMessages = false
     @State private var meguriGroomViewerPost: GroomPost?
@@ -100,6 +102,33 @@ struct MegrumAuthenticatedTabContentView: View {
                 proposals: appState.proposals
             )
             .zIndex(100)
+
+            MegrumSlideBoolPresentationOverlay(
+                isPresented: $isShowingNearbyBoardList,
+                backSwipeInteractionScope: .fullScreen
+            ) { dismiss in
+                MegrumDeferredContent(delayNanoseconds: MegrumDeferredContentDelay.slidePresentation) {
+                    NavigationStack {
+                        NearbyBoardListScreen(
+                            appState: appState,
+                            onClose: dismiss,
+                            onOpenThread: { thread in
+                                openMeguriBoardThread(
+                                    MeguriBoardThreadRoute(thread: thread, selectedPrefecture: nil, coordinate: nil)
+                                )
+                            },
+                            qaInitialOverlay: {
+                                switch visualQAInitialScreen {
+                                case .nearbyBoardFilter: .filter
+                                case .nearbyBoardLocked: .lockedPopup
+                                default: nil
+                                }
+                            }()
+                        )
+                    }
+                }
+            }
+            .zIndex(108)
 
             MegrumSlideItemPresentationOverlay(
                 item: $meguriBoardThreadRoute,
@@ -197,6 +226,7 @@ struct MegrumAuthenticatedTabContentView: View {
         }
         .onAppear {
             openVisualQAMeguriMessagesIfNeeded()
+            openVisualQANearbyBoardListIfNeeded()
             handlePendingNotificationRouteIntent(pendingNotificationRouteIntent)
         }
         .onChange(of: pendingNotificationRouteIntent) { _, intent in
@@ -323,6 +353,15 @@ struct MegrumAuthenticatedTabContentView: View {
                     // iter1226.420：ホームの紙飛行機/左スワイプからめぐりメッセージ一覧へスライド表示。
                     isShowingMeguriMessageInbox = true
                 },
+                onOpenBoardThread: { thread in
+                    // iter1226.421：ホームの近くのチャットルーム行→スレッド詳細をスライド表示。
+                    openMeguriBoardThread(
+                        MeguriBoardThreadRoute(thread: thread, selectedPrefecture: nil, coordinate: nil)
+                    )
+                },
+                onOpenBoardList: {
+                    isShowingNearbyBoardList = true
+                },
                 onOpenOwnGrooms: { ownGrooms, initial, anchor in
                     // FB(iter1226.402)：自分のグルームは「自分のグルームだけ」を古い→新しい順で辿る。
                     openMeguriGroomViewer(initial, sourceAnchor: anchor, sequence: ownGrooms)
@@ -399,6 +438,7 @@ struct MegrumAuthenticatedTabContentView: View {
                     homeResetToken: meguriHomeResetToken,
                     visualQAInitialScreen: visualQAInitialScreen,
                     pendingNotificationRouteIntent: $pendingNotificationRouteIntent,
+                    onOpenBoardList: { isShowingNearbyBoardList = true },
                     onOpenMessages: openMeguriMessageInbox,
                     onOpenBoardThread: openMeguriBoardThread,
                     onOpenMeguriUserProfile: openMeguriUserProfile,
@@ -548,6 +588,17 @@ struct MegrumAuthenticatedTabContentView: View {
         }
         didOpenVisualQAMeguriMessages = true
         openMeguriMessageInbox()
+    }
+
+    private func openVisualQANearbyBoardListIfNeeded() {
+        guard visualQAInitialScreen == .nearbyBoardList
+                || visualQAInitialScreen == .nearbyBoardFilter
+                || visualQAInitialScreen == .nearbyBoardLocked,
+              !isShowingNearbyBoardList
+        else {
+            return
+        }
+        isShowingNearbyBoardList = true
     }
 
     private var tradeAttentionCounts: TradeStageAttentionCounts {

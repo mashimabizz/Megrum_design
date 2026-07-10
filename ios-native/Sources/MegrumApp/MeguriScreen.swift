@@ -9,6 +9,8 @@ struct MeguriScreen: View {
     var homeResetToken: UUID?
     var visualQAInitialScreen: VisualQAInitialScreen? = nil
     @Binding var pendingNotificationRouteIntent: NotificationRouteIntent?
+    /// iter1226.421：右下固定フッターからチャットルーム一覧を開く。
+    var onOpenBoardList: () -> Void = {}
     var onOpenMessages: () -> Void = {}
     var onOpenBoardThread: (MeguriBoardThreadRoute) -> Void = { _ in }
     var onOpenMeguriUserProfile: (UUID) -> Void = { _ in }
@@ -149,6 +151,21 @@ struct MeguriScreen: View {
             onViewportChange: handleViewportChange
         )
         .allowsHitTesting(!isShowingGroomArchive)
+        // iter1226.421：右下の固定フッター＝チャットルーム一覧アイコン。
+        .overlay(alignment: .bottomTrailing) {
+            Button(action: onOpenBoardList) {
+                Image(systemName: "text.bubble")
+                    .font(.system(size: 21, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 54, height: 54)
+                    .background(MegrumTheme.primaryGradient, in: Circle())
+                    .shadow(color: MegrumTheme.primaryShadow, radius: 12, y: 5)
+            }
+            .buttonStyle(.plain)
+            .padding(.trailing, 18)
+            .padding(.bottom, 118)
+            .accessibilityLabel("チャットルーム一覧を開く")
+        }
         .ignoresSafeArea(.container, edges: .bottom)
         .background(MegrumTheme.canvas.ignoresSafeArea())
         .megrumHiddenNavigationBar()

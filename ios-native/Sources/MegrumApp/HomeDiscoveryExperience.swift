@@ -50,6 +50,13 @@ struct HomeDiscoveryExperience: View {
     var onOpenGroomGroup: ([GroomPost], UnitPoint) -> Void = { _, _ in }
     /// iter1226.420：ヘッダー紙飛行機・左スワイプからめぐりメッセージ一覧を開く。
     var onOpenMeguriMessages: () -> Void = {}
+    /// iter1226.421：近くのチャットルーム（LINE風行）用。
+    var nearbyBoardThreads: [BoardThread] = []
+    var boardReplyPreviews: [UUID: [String]] = [:]
+    var lockedBoardIDs: Set<UUID> = []
+    var onOpenBoardThread: (BoardThread) -> Void = { _ in }
+    var onOpenLockedBoardThread: () -> Void = {}
+    var onOpenBoardList: () -> Void = {}
     var onAddGroom: () -> Void = {}
     var onViewOwnGroom: (UnitPoint) -> Void = { _ in }
 
@@ -105,6 +112,16 @@ struct HomeDiscoveryExperience: View {
                         )
                         // 画面端までスクロールできるフルブリード（親の20pt余白を打ち消す）。iter1226.420。
                         .padding(.horizontal, -20)
+
+                        // iter1226.421：グルーム列の直下に近くのチャットルーム（LINE風・最大3件＋すべて見る）。
+                        HomeNearbyBoardSection(
+                            threads: nearbyBoardThreads,
+                            replyPreviews: boardReplyPreviews,
+                            lockedIDs: lockedBoardIDs,
+                            onOpenThread: onOpenBoardThread,
+                            onOpenLockedThread: onOpenLockedBoardThread,
+                            onSeeAll: onOpenBoardList
+                        )
                     }
 
                     if showsStarterMissionCard {

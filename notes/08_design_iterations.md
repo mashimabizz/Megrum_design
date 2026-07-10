@@ -4,6 +4,51 @@
 
 ---
 
+## イテレーション1226.421：ホームに「近くのチャットルーム」＋一覧（フィルター／圏外プレミアムゲート）
+
+### 背景・問題意識
+
+オーナー要望：①ホームのグルーム列の下に圏内チャットルームを LINE のメッセージ一覧風（タイトル・最新メッセージ・サムネ・最新投稿日時）で出したい（導線のみ）。複数あれば「すべて見る＞」で一覧へ ②めぐりホームの右下に固定フッターでチャットルーム一覧アイコン ③一覧は固定フッターのフィルターでトピック・シリーズ名絞り込み ④圏外の掲示板は無料会員にも一覧表示するが開けず、プレミアム誘導ポップアップを出す。
+
+### 変更内容
+
+#### `NearbyBoardViews.swift`（新規）
+- `NearbyBoardListPolicy`：純ロジック（キーワード＝タイトル/本文/シリーズ名の部分一致、シリーズ絞り込み、**開ける→ロックの順＋各グループ内は最新アクティビティ降順**、シリーズ名一覧の重複除去）
+- `NearbyBoardThreadRow`：LINE風の行。48ptサムネ（画像なしは吹き出しプレースホルダ）・タイトル・最新メッセージ（リプライプレビュー→無ければ本文）・右端に相対日時。ロック時は錠アイコン＋減光
+- `HomeNearbyBoardSection`：ホーム用「近くのチャットルーム」カード（最大3行、**2件以上で「すべて見る＞」**）
+- `NearbyBoardListScreen`：一覧画面。右下**固定フッターのフィルターボタン**（54ptグラデ円）→ `NearbyBoardFilterSheet`（キーワード＋シリーズチップ）。適用中はヘッダー下に解除チップ
+- `BoardLockedPremiumSheet`：圏外×無料のポップアップ（「圏外のチャットルームです」→「Megrumプレミアムを見る」で `SubscriptionSettingsScreen`）
+
+#### `MegrumAppState` / `MegrumAppStateMeguriActions`
+- `homeNearbyBoardThreads` を新設。`loadHomeNearbyBoardThreads(latitude:longitude:)` は `allowsExtendedBoardAccess: true` で**圏外も含めて取得**（開けるかは既存 `MeguriAccessPolicy.canOpenBoard` でクライアント判定）＋先頭30件のリプライプレビューを先読み
+
+#### `HomeScreen` / `HomeDiscoveryExperience` / `MegrumAuthenticatedTabContentView` / `MeguriScreen`
+- ホーム：グルーム列直下にセクション表示。行タップ→既存のスレッド詳細スライド（zIndex 109）、ロック行→プレミアムポップアップ
+- 一覧は `MegrumSlideBoolPresentationOverlay`（zIndex 108＝詳細の下）でスライド表示
+- めぐりホーム右下に固定フッターアイコン（text.bubble・54ptグラデ円）→ 同じ一覧を開く
+
+#### 付随修正
+- `MeguriHomeChromeViews`：位置情報の許可促し文（「〜チャットルームを表示できます」）が「投稿できませんでした」見出しに誤マッチしていたのを修正（案内文は「現在地をオンにしよう」）
+- `PreviewMegrumRepositoryMeguri`：`loadBoardReplyPreviews` を本番同様（最新リプライ先頭）に実装、nearby3km のプレビュースレッドを3件へ増量（圏内2＋圏外1）
+- VisualQA：`nearby-board-list` / `nearby-board-filter` / `nearby-board-locked` ルート追加
+
+### 影響範囲
+
+- ホーム・めぐりホーム・チャットルーム一覧（新規）。取得は既存 `loadBoardThreads` の別バッファのため、めぐりタブのフィードとは独立。データモデル・API不変
+
+### 確認方法
+
+- VisualQA: `home`（セクション＋ロック行）/ `nearby-board-list`（無料・プレミアム両方）/ `nearby-board-filter` / `nearby-board-locked` / `meguri`（右下アイコン）スクショ確認済み
+- `swift test`：1544テスト（+5：`NearbyBoardListPolicyTests`）全パス
+
+### セルフレビュー結果
+- ✅ ブランドカラー直書きなし（MegrumTheme トークンのみ）
+- ✅ ロック判定は既存 `MeguriAccessPolicy.canOpenBoard` を流用（1km・作者・プレミアムの既存仕様に追従）
+- ✅ 一覧→詳細は既存スレッド詳細ルートを再利用（重複実装なし）
+- ⚠️ ホームのセクションは位置情報許可が前提（未許可時は非表示のまま）。許可導線はグルーム列の既存挙動に委ねる
+
+---
+
 ## イテレーション1226.420：登録済みメール拒否・認証背景統一・グルーム列改善・ホーム導線刷新（FB6件）
 
 ### 背景・問題意識

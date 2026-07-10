@@ -147,6 +147,11 @@ struct MeguriHomeNoticeCard: View {
     }
 
     private var title: String {
+        // iter1226.421：位置情報の許可促し文も「チャットルーム」を含むようになったため、
+        // 案内文（許可すると〜）を投稿エラー扱いしない。
+        if notice.message.contains("許可すると") {
+            return "現在地をオンにしよう"
+        }
         if notice.message.contains("チャットルーム") || notice.message.contains("投稿") {
             return "投稿できませんでした"
         }

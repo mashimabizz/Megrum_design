@@ -152,6 +152,21 @@ public extension PreviewMegrumRepository {
         }
     }
 
+    /// 本番（Supabase）と同じく最新リプライを先頭にする（iter1226.421）。
+    func loadBoardReplyPreviews(threadIDs: [UUID]) async throws -> [UUID: [String]] {
+        var previews: [UUID: [String]] = [:]
+        for threadID in threadIDs {
+            let bodies = (NativePreviewData.boardReplies[threadID] ?? [])
+                .sorted { $0.createdAt > $1.createdAt }
+                .map(\.body)
+                .filter { !$0.isEmpty }
+            if !bodies.isEmpty {
+                previews[threadID] = Array(bodies.prefix(3))
+            }
+        }
+        return previews
+    }
+
     func loadBoardReplies(threadID: UUID, latitude: Double?, longitude: Double?, prefecture: String?, scope: BoardThread.Audience) async throws -> [BoardReply] {
         NativePreviewData.boardReplies[threadID] ?? []
     }
