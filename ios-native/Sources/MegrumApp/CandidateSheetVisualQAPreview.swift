@@ -13,7 +13,18 @@ struct CandidateSheetVisualQAPreview: View {
     }
 
     var body: some View {
-        if variant == .wish {
+        if variant == .lookingFor {
+            HomeLookingForHitDetailSheet(
+                selection: CandidateSheetVisualQASample.lookingForPayload,
+                lookingForText: CandidateSheetVisualQASample.lookingForPayload.lookingForOnlyText ?? "サナのトレカ",
+                viewerOfferGoods: CandidateSheetVisualQASample.viewerOfferGoods(variant: .named),
+                addedExtraCandidateIDs: [],
+                showsOtherExchangeRows: false,
+                onOpenOwnerProfile: { _ in },
+                onOpenNestedSheet: { _ in },
+                onStartProposal: { _ in }
+            )
+        } else if variant == .wish {
             HomeWishHitDetailSheet(
                 selection: CandidateSheetVisualQASample.wishPayload,
                 viewerOfferGoods: CandidateSheetVisualQASample.viewerOfferGoods(variant: .named),
@@ -53,6 +64,7 @@ enum CandidateSheetVisualQASample {
         case cash
         case crowded
         case wish
+        case lookingFor = "looking-for"
     }
 
     // HomeMockGoods.make が使うプレフィックスと一致させ、matchingGoodsIDs と手持ちIDを噛み合わせる。
@@ -292,7 +304,7 @@ enum CandidateSheetVisualQASample {
         // named は3選択肢を持たせて選択肢ピルも検証する。crowded は多数の畳み方を検証する。
         let ordered: [HomeIndividualListingWantedOption]
         switch variant {
-        case .named, .wish:
+        case .named, .wish, .lookingFor:
             ordered = [namedOption, conditionOption, cashOption]
         case .condition:
             ordered = [conditionOption]
@@ -335,6 +347,17 @@ enum CandidateSheetVisualQASample {
         signals.payment.status = .compatible
         signals.payment.viewerMethods = [.paypay]
         signals.payment.partnerMethods = [.paypay]
+    }
+
+    /// 探し中（マッチなし・探し物テキストのみ）→ HomeLookingForHitDetailSheet の検証。iter1226.411。
+    static var lookingForPayload: HomeDiscoverySheetPayload {
+        var signals = HomeCandidateConditionSignalDefaults.noEvidence
+        signals.partnerLookingForText = "サナのトレカ"
+        applySampleExchangeSignals(&signals)
+        return HomeDiscoverySheetPayload(
+            goods: partnerGoods,
+            signals: signals
+        )
     }
 
     /// 求！（相手が自分のグッズを求めるwishマッチ）→ HomeWishHitDetailSheet の統一ヘッダー検証。

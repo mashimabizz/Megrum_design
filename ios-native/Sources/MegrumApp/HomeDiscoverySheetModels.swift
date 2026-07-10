@@ -50,6 +50,18 @@ struct HomeDiscoverySheetPayload: Identifiable, Equatable, Sendable {
         signals.individualListingSelection ?? .defaultSelection
     }
 
+    /// 「探し中」専用シート（iter1226.411）を使う場合の探し物テキスト。
+    /// 個別募集の選択肢もwishマッチも無く、相手の探し物テキストだけがある候補が対象。
+    var lookingForOnlyText: String? {
+        guard let text = signals.partnerLookingForText?.nilIfBlank,
+              (signals.individualListingSelection?.wantedOptions.isEmpty ?? true),
+              signals.wishMatchedOfferGoodsIDs.isEmpty
+        else {
+            return nil
+        }
+        return text
+    }
+
     init(
         goods: HomeMockGoods,
         signals: HomeCandidateConditionSignals = HomeCandidateConditionSignalDefaults.noEvidence,

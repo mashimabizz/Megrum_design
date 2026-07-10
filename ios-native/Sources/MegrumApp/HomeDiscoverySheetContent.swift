@@ -24,6 +24,22 @@ struct HomeDiscoverySheetContent: View {
     var body: some View {
         switch sheet {
         case .goodsHit(let payload):
+            // 「探し中」（マッチなし・探し物テキストのみ）は専用シートへ（iter1226.411 / FB項目3）。
+            if let lookingForText = payload.lookingForOnlyText {
+                HomeLookingForHitDetailSheet(
+                    selection: payload,
+                    lookingForText: lookingForText,
+                    viewerOfferGoods: viewerOfferGoods,
+                    addedExtraCandidateIDs: addedExtraCandidateIDs,
+                    showsOtherExchangeRows: presentationContext.showsOtherExchangeRows,
+                    otherExchangeCandidates: otherExchangeCandidates,
+                    addedExtraSelections: addedExtraSelections,
+                    showsProposalPreview: presentationContext.showsProposalPreview,
+                    onOpenOwnerProfile: onOpenOwnerProfile,
+                    onOpenNestedSheet: onOpenNestedSheet,
+                    onStartProposal: onStartProposal
+                )
+            } else {
             HomeGoodsHitDetailSheet(
                 selection: payload,
                 viewerOfferGoods: viewerOfferGoods,
@@ -41,6 +57,7 @@ struct HomeDiscoverySheetContent: View {
                 onCopyToWish: onCopyToWish,
                 isWishCopyInProgress: copyingWishGoodsID == payload.goods.id
             )
+            }
         case .wishHit(let payload):
             HomeWishHitDetailSheet(
                 showsNonOshiOfferSection: allowsNonOshiOfferSection,
