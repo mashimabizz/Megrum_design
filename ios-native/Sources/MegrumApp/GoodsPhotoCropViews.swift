@@ -73,8 +73,6 @@ struct GoodsPhotoCropSheet: View {
                         .foregroundStyle(MegrumTheme.muted)
                         .fixedSize(horizontal: false, vertical: true)
 
-                    GoodsCropAddFrameButton(action: addFrame)
-
                     GoodsCropPreviewStrip(
                         imageData: session.upload.data,
                         frames: presentationState.frames,
@@ -100,8 +98,6 @@ struct GoodsPhotoCropSheet: View {
                             .background(MegrumTheme.lavender, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                     }
                     .buttonStyle(.plain)
-                    .disabled(!presentationState.canApply)
-                    .opacity(presentationState.canApply ? 1 : 0.45)
                 }
                 .padding(.horizontal, 18)
                 .padding(.top, 16)
@@ -125,13 +121,13 @@ struct GoodsPhotoCropSheet: View {
         if isBulkSession {
             "枠をタップして選択、ドラッグで移動、四隅で大きさを調整できます。"
         } else {
-            "枠をドラッグして商品に合わせます。そのまま追加すると写真全体を使います。"
+            "写真の上をドラッグすると切り取り枠を描けます。そのまま追加すると写真全体を使います。"
         }
     }
 
     private var applyTitle: String {
         presentationState.frames.isEmpty
-            ? "この内容で追加"
+            ? "この内容で追加（写真全体）"
             : "この内容で追加（\(presentationState.frames.count)件）"
     }
 
@@ -141,10 +137,6 @@ struct GoodsPhotoCropSheet: View {
 
     private func resetFrames() {
         presentationState.reset(to: session.initialFrames)
-    }
-
-    private func addFrame() {
-        presentationState.addCenteredFrame()
     }
 
     private func applyCrops() {
@@ -159,9 +151,9 @@ struct GoodsPhotoCropSheet: View {
                     uploads.append(contentsOf: results.map(\.upload))
                 }
             }
-            guard !uploads.isEmpty else {
-                presentationState.showEmptyFrameMessage()
-                return
+            if uploads.isEmpty {
+                // iter1226.436：枠なし＝写真全体をそのまま使う（再エンコードなし）。
+                uploads = [session.upload]
             }
             onApply(uploads)
         } catch {
@@ -193,27 +185,3 @@ private struct GoodsCropAutoDetectPill: View {
     }
 }
 
-private struct GoodsCropAddFrameButton: View {
-    var action: () -> Void
-
-    var body: some View {
-        Button {
-            MegrumHaptics.performButtonTap(action)
-        } label: {
-            Label("枠を追加", systemImage: "plus")
-                .font(.subheadline.weight(.black))
-                .foregroundStyle(MegrumTheme.lavender)
-                .frame(maxWidth: .infinity)
-                .frame(height: 44)
-                .background(MegrumTheme.lavender.opacity(0.06), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .strokeBorder(
-                            MegrumTheme.lavender.opacity(0.5),
-                            style: StrokeStyle(lineWidth: 1.2, dash: [6, 4])
-                        )
-                }
-        }
-        .buttonStyle(.plain)
-    }
-}

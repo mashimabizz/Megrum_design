@@ -705,9 +705,6 @@ final class GoodsEditorDraftTests: XCTestCase {
         XCTAssertEqual(state.frames.map(\.id), [first.id])
         XCTAssertEqual(state.selectedFrameID, first.id)
 
-        state.showEmptyFrameMessage()
-        XCTAssertEqual(state.message, "「枠を追加」で切り取り枠を作ってください。")
-
         state.showFailureMessage("画像を読み込めませんでした。")
         XCTAssertEqual(state.message, "画像を読み込めませんでした。")
 
@@ -719,10 +716,6 @@ final class GoodsEditorDraftTests: XCTestCase {
         XCTAssertEqual(state.frames.map(\.id), [first.id, second.id])
         XCTAssertEqual(state.selectedFrameID, first.id)
         XCTAssertNil(state.message)
-
-        state.addCenteredFrame()
-        XCTAssertEqual(state.frames.count, 3)
-        XCTAssertEqual(state.selectedFrameID, state.frames.last?.id)
     }
 
     func testGoodsPhotoCropCanvasDragStateBuildsFrameAndResetsDraft() {

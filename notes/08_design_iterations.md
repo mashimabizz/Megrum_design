@@ -4,6 +4,48 @@
 
 ---
 
+## イテレーション1226.436：トリミング初期枠の廃止＋メンバー登録シート化
+
+### 背景・問題意識
+
+オーナーFB：
+1. グッズ/ほしいもの追加のトリミングで「デフォルトで枠が大きく切り込まれてる」と、ドラッグが常に既存枠の移動になり**手動で枠を描けない**。最初の枠は不要。「枠を追加」ボタンも不要
+2. 詳細ステップの「メンバー登録」を押すと、**下から2〜3個のメンバーが最初表示されない**バグ
+
+### 変更内容
+
+#### トリミング（`GoodsPhotoCrop*` / `GoodsEditorSheetInventoryPhotoActions`）
+- 手動トリミング（新規追加・再トリミング）の**初期枠を廃止**（`.fullImage` 初期枠と `TradingCardCropFrame.fullImage` を削除）。写真の上をドラッグして枠を描くのが主操作に戻る
+- **「＋枠を追加」ボタンを削除**（`GoodsCropAddFrameButton` / `addCenteredFrame` 削除）
+- **枠なしのまま「この内容で追加」＝写真全体をそのまま使う**（ボタンは「この内容で追加（写真全体）」表示・再エンコードなし）。空枠エラーは廃止
+- ヒント文・プレビュー空メッセージを新仕様に更新。まとめて登録（AI初期枠）は従来どおり
+
+#### メンバー登録（`GoodsCreateMemberAssignSheet` 新規 / `GoodsInventoryCreateMetaFooterView`）
+- confirmationDialog はメンバー数が多いと下2〜3件が初期描画されないOS側バグがあるため、**標準の List シート**（medium/large detents）に置き換え。全メンバー＋「メンバー未設定に戻す」を確実に表示
+
+### 影響範囲
+
+- グッズ/ほしいもの登録のトリミング画面・詳細ステップのメンバー一括登録のみ
+
+### 確認方法
+
+- `swift test` 全パス／実機ビルド・インストール
+- 実機：写真追加→トリミングは枠なしで開く→ドラッグで枠作成 or そのまま「追加（写真全体）」／メンバー登録→全メンバーがシートに表示
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/GoodsPhotoCropViews.swift` / `GoodsPhotoCropSheetPresentationState.swift` / `GoodsPhotoCropPreviewViews.swift`
+- `ios-native/Sources/MegrumApp/GoodsEditorSheetInventoryPhotoActions.swift` / `TradingCardBulkRecognitionModels.swift`
+- `ios-native/Sources/MegrumApp/GoodsCreateMemberAssignSheet.swift`（新規）/ `GoodsInventoryCreateMetaFooterView.swift`
+
+### セルフレビュー結果
+- ✅ 「必ずトリミングを通す」フロー（iter1226.431）は維持。初期状態が「枠なし＝全体」になっただけ
+- ✅ 枠を描いた後の移動・四隅リサイズ・複数枠（ドラッグ追加）は従来どおり
+- ✅ メンバーシートは iOS標準 List/sheet（ブランド専用UIの新造なし）
+- ⚠️ まとめて登録でAI枠を全削除して追加すると「写真全体1枚」になる（従来はエラー）。挙動として自然なので許容
+
+---
+
 ## イテレーション1226.435：グルームビューアの投稿者切替をキューブ回転に
 
 ### 背景・問題意識

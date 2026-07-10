@@ -22,7 +22,7 @@ struct GoodsCropPreviewStrip: View {
             }
 
             if frames.isEmpty {
-                Text("「枠を追加」を押すか、写真の上をドラッグして枠を作れます。")
+                Text("枠なしのまま追加すると、写真全体をそのまま使います。")
                     .font(.caption.weight(.bold))
                     .foregroundStyle(MegrumTheme.muted)
                     .padding(14)

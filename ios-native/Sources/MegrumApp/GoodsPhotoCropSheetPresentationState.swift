@@ -33,18 +33,6 @@ struct GoodsPhotoCropSheetPresentationState: Equatable {
         message = nil
     }
 
-    /// 中央に新しい枠を追加して選択する
-    mutating func addCenteredFrame() {
-        let frame = TradingCardCropFrame(rect: CGRect(x: 0.3, y: 0.3, width: 0.4, height: 0.4))
-        frames.append(frame)
-        selectedFrameID = frame.id
-        message = nil
-    }
-
-    mutating func showEmptyFrameMessage() {
-        message = "「枠を追加」で切り取り枠を作ってください。"
-    }
-
     mutating func showFailureMessage(_ message: String) {
         self.message = message
     }

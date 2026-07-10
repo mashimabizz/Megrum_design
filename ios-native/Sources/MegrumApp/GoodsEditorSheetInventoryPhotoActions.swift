@@ -81,10 +81,11 @@ extension GoodsEditorSheet {
         guard let photo = createPhotos.first(where: { $0.id == photoID }) else {
             return
         }
+        // iter1226.436：初期枠は置かない（全体枠があるとドラッグが常に「枠の移動」になり
+        // 手動で枠を描けない）。枠なしのまま追加＝写真全体を使う。
         cropSession = GoodsPhotoCropSession(
             source: .selectedPhoto(photoID: photoID),
-            upload: photo.upload,
-            initialFrames: [.fullImage]
+            upload: photo.upload
         )
     }
 
@@ -103,8 +104,7 @@ extension GoodsEditorSheet {
         let upload = pendingCropUploads.removeFirst()
         cropSession = GoodsPhotoCropSession(
             source: .newPhoto,
-            upload: upload,
-            initialFrames: [.fullImage]
+            upload: upload
         )
     }
 
