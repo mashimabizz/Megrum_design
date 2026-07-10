@@ -13,13 +13,18 @@ struct GoodsCreatePhotoSelectionGrid: View {
     var photos: [GoodsCreatePhotoDraft]
     var onRemovePhoto: (UUID) -> Void
     var onCropPhoto: (UUID) -> Void
+    var onAddPhoto: (() -> Void)?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            if photos.count > 1 {
+            HStack(spacing: 8) {
+                Text("追加した写真")
+                    .font(.caption.weight(.black))
+                    .foregroundStyle(MegrumTheme.ink)
+                Spacer(minLength: 8)
                 Text("\(photos.count)件")
                     .font(.caption.weight(.black))
-                    .foregroundStyle(MegrumTheme.muted)
+                    .foregroundStyle(MegrumTheme.lavender)
             }
 
             ScrollView(.horizontal) {
@@ -30,6 +35,9 @@ struct GoodsCreatePhotoSelectionGrid: View {
                             onOpen: { onCropPhoto(photo.id) },
                             onRemove: { onRemovePhoto(photo.id) }
                         )
+                    }
+                    if let onAddPhoto {
+                        GoodsCreatePhotoAddTile(action: onAddPhoto)
                     }
                 }
             }
@@ -56,9 +64,19 @@ struct GoodsCreatePhotoTile: View {
                     .frame(width: 118, height: 118)
                     .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                     .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .overlay(alignment: .bottomTrailing) {
+                        // タップ＝再トリミングできることを明示するバッジ
+                        Image(systemName: "crop")
+                            .font(.system(size: 11, weight: .black))
+                            .foregroundStyle(MegrumTheme.lavender)
+                            .frame(width: 24, height: 24)
+                            .background(.white.opacity(0.94), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                            .shadow(color: .black.opacity(0.16), radius: 3, y: 1)
+                            .padding(6)
+                    }
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("写真を切り取る")
+            .accessibilityLabel("トリミングを調整")
 
             Button(action: onRemove) {
                 Image(systemName: "xmark")
@@ -72,6 +90,31 @@ struct GoodsCreatePhotoTile: View {
             .accessibilityLabel("写真を削除")
         }
         .frame(width: 118, height: 118)
+    }
+}
+
+struct GoodsCreatePhotoAddTile: View {
+    var action: () -> Void
+
+    var body: some View {
+        Button {
+            MegrumHaptics.performButtonTap(action)
+        } label: {
+            Image(systemName: "plus")
+                .font(.system(size: 20, weight: .black))
+                .foregroundStyle(MegrumTheme.lavender)
+                .frame(width: 118, height: 118)
+                .background(MegrumTheme.lavender.opacity(0.06), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .strokeBorder(
+                            MegrumTheme.lavender.opacity(0.45),
+                            style: StrokeStyle(lineWidth: 1.4, dash: [6, 4])
+                        )
+                }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("写真を追加")
     }
 }
 

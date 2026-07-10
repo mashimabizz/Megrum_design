@@ -42,8 +42,7 @@ struct GoodsEditorFormContentView: View {
     var onOpenTagSheet: (() -> Void)?
     var onShowCreateOshiPicker: () -> Void
     var onCommonNext: () -> Void
-    var onPickCamera: () -> Void
-    var onPickPhotos: () -> Void
+    var onAddPhoto: () -> Void
     var onStartTradingCardBulk: () -> Void
     var onRemovePhoto: (UUID) -> Void
     var onCropPhoto: (UUID) -> Void
@@ -95,8 +94,7 @@ struct GoodsEditorFormContentView: View {
                 isCreatingGoodsEntry: isCreatingGoodsEntry,
                 onShowOshiPicker: onShowCreateOshiPicker,
                 onCommonNext: onCommonNext,
-                onPickCamera: onPickCamera,
-                onPickPhotos: onPickPhotos,
+                onAddPhoto: onAddPhoto,
                 onStartTradingCardBulk: onStartTradingCardBulk,
                 onRemovePhoto: onRemovePhoto,
                 onCropPhoto: onCropPhoto,

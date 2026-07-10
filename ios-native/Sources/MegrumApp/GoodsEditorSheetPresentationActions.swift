@@ -42,6 +42,11 @@ extension GoodsEditorSheet {
         isShowingCreatePhotoLibraryPicker = true
     }
 
+    /// 写真ステップのヒーロー「写真を追加」から、カメラ / ライブラリ選択のダイアログを開く
+    func showInventoryCreatePhotoSourceDialog() {
+        isShowingCreatePhotoSourceDialog = true
+    }
+
     func returnToCreateCommonStep() {
         createStep = .common
     }

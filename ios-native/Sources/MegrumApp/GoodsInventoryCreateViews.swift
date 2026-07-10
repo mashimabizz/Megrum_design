@@ -85,8 +85,7 @@ struct GoodsInventoryCreateShootStepView: View {
     var tradingCardBulkStatusMessage: String?
     var createError: String?
     var isCreatingGoodsEntry: Bool
-    var onPickCamera: () -> Void
-    var onPickPhotos: () -> Void
+    var onAddPhoto: () -> Void
     var onStartTradingCardBulk: () -> Void
     var onRemovePhoto: (UUID) -> Void
     var onCropPhoto: (UUID) -> Void
@@ -95,9 +94,13 @@ struct GoodsInventoryCreateShootStepView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                GoodsCreatePhotoPickButton(title: "カメラ", systemImage: "camera.fill", action: onPickCamera)
-                GoodsCreatePhotoPickButton(title: "写真を選ぶ（複数可）", systemImage: "photo.on.rectangle.angled", action: onPickPhotos)
+            GoodsCreateAddPhotoHeroTile(action: onAddPhoto)
+
+            if createPhotos.isEmpty {
+                Text("追加した写真はトリミングで整えてから登録されます。")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(MegrumTheme.muted)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             if isTradingCardType {
@@ -117,7 +120,8 @@ struct GoodsInventoryCreateShootStepView: View {
                 GoodsCreatePhotoSelectionGrid(
                     photos: createPhotos,
                     onRemovePhoto: onRemovePhoto,
-                    onCropPhoto: onCropPhoto
+                    onCropPhoto: onCropPhoto,
+                    onAddPhoto: onAddPhoto
                 )
             }
 

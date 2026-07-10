@@ -4,6 +4,70 @@
 
 ---
 
+## イテレーション1226.431：グッズ登録の写真〜トリミングを刷新
+
+### 背景・問題意識
+
+オーナー指摘：グッズ登録の写真ステップが「なんとなくダサい」、写真タップで手動切り抜きに入れることが伝わらない、切り抜き画面（多枠描画）もダサい。仕様から再設計し、モック（Artifact）で合意した上で実装。
+
+合意した方針：
+1. **トリミングを「隠し機能」から「追加の通り道」へ**：写真を追加した直後に必ずトリミング画面を通す
+2. **トリミング画面は1種類**：手動もまとめて登録（旧・トレカAI一括登録）も同じ画面。違いは「AIが枠を自動配置するか」だけ
+3. 手動時の初期枠は写真全体（そのまま追加でもOK）
+
+### 変更内容
+
+#### `GoodsInventoryCreateViews.swift` / `GoodsInventoryCreateActionControls.swift`（写真ステップ刷新）
+- 同大2ボタン（カメラ／写真を選ぶ）を廃止 → 破線ヒーロー「写真を追加」1枚に集約。タップでiOS標準 confirmationDialog（カメラで撮る／ライブラリから選ぶ（複数可））
+- 「トレカ専用 AIで一括登録」→「**まとめて登録**」に改名し、スカイ系グラデで色差別化＋シェブロン
+- 空状態に「追加した写真はトリミングで整えてから登録されます。」
+
+#### `GoodsInventoryCreatePhotoViews.swift`（フィルムストリップ）
+- ヘッダー「追加した写真 N件」、各サムネ右下に **cropバッジ**（タップ=再トリミングを明示）、末尾に破線＋タイル（写真追加）
+
+#### `GoodsEditorSheetPhotoActions.swift` / `GoodsEditorSheetInventoryPhotoActions.swift` / `GoodsEditorScreen.swift`（トリミング必須フロー）
+- `pendingCropUploads` キュー新設。カメラ撮影（連続撮影はカメラを閉じた後）・ライブラリ複数選択 → 1枚ずつ crop sheet を連鎖提示（sheet onDismiss 連鎖）
+- `GoodsPhotoCropSession.Source` に `.newPhoto` 追加。apply=追加＋顔タグ解析、閉じる=その写真は追加しない
+- 再トリミング（`.selectedPhoto`）も全体初期枠で開く
+
+#### `GoodsPhotoCropViews.swift` / `GoodsPhotoCropCanvasViews.swift` / `GoodsPhotoCropCanvasDragState.swift`（トリミング画面統一）
+- タイトル「トリミング」統一（まとめて登録時は「まとめて登録」＋「AIが枠を自動で配置しました」ピル）
+- **枠のドラッグ移動＋四隅ハンドルリサイズ**を実装（DragState を draw/move/resize の3モード化、最小28pt、表示領域クランプ）。空きドラッグの新規描画は補助として残置
+- 「＋ 枠を追加」破線ボタン（中央に0.4×0.4の枠を追加）
+- ツールバー「全削除」→「**リセット**」（初期枠へ戻す）
+- 追加ボタン「この切り取りで追加」→「**この内容で追加（N件）**」
+- ほぼ全体（許容2%）の枠は再エンコードせず元画像をそのまま使うパススルー（`isEffectivelyFullFrame`）
+
+#### 文言追随
+- `TutorialTourStep.swift` / `TutorialGoodsDemoScenes.swift` / `GoodsEditorDialogModifiers.swift`：「トレカ専用 AIで一括登録」→「まとめて登録」
+
+### 影響範囲
+
+- グッズ登録（マイグッズに追加）の写真ステップ・トリミング体験全般。③詳細（メンバー・シリーズ）は今回変更なし（タップ=単品編集シートは次回候補）
+- 状態遷移（notes/09）への影響なし。データモデル影響なし
+
+### 確認方法
+
+- `swift test`：1559テスト全パス（DragState の move/resize/フルフレーム判定テスト追加）
+- シミュレータ（iPhone 17 / iOS 26.5）で実操作確認：ヒーロー→ダイアログ→ライブラリ→**選択直後にトリミング自動表示**→初期枠全体→四隅リサイズ・枠移動・プレビュー連動・「この内容で追加（N件）」まで動作
+- **注意：ios-native（Swift）のためEAS Updateでは配信されない。実機反映はfeatureブランチからのネイティブビルドが必要**
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/GoodsInventoryCreate*.swift`
+- `ios-native/Sources/MegrumApp/GoodsPhotoCrop*.swift`
+- `ios-native/Sources/MegrumApp/GoodsEditorSheet*Actions.swift` / `GoodsEditorScreen.swift` / `GoodsEditorDialogModifiers.swift`
+
+### セルフレビュー結果
+- ✅ ブランドカラー直書きなし（`MegrumTheme.lavender/sky/ink/muted` を使用）
+- ✅ iOS標準コンポーネント優先（confirmationDialog・sheet・PhotosPicker を維持）
+- ✅ 用語：「まとめて登録」へ改名を notes/10 C章に反映（旧称併記）、「トリミング（グッズ登録）」を追加
+- ✅ 廃止用語（交換募集・DM等）不使用
+- ⚠️ 多枠ドラッグ描画はキャンバス上で縦スクロールを取るが、従来からの挙動で今回悪化なし
+- ⚠️ モックにあった「枠ごとの✓チェックでの採否」は、プレビューの✕削除で同等機能のため見送り
+
+---
+
 ## イテレーション1226.430：左スワイプの即時反応化
 
 ### 背景・問題意識

@@ -53,6 +53,9 @@ struct GoodsEditorSheet: View {
     @State var isProcessingTradingCardBulk = false
     @State var tradingCardBulkStatusMessage: String?
     @State var cropSession: GoodsPhotoCropSession?
+    /// 追加直後トリミング必須フローの待ち行列（複数選択・連続撮影分を1枚ずつ処理）
+    @State var pendingCropUploads: [GoodsPhotoUpload] = []
+    @State var isShowingCreatePhotoSourceDialog = false
     @State var faceTaggingReviewQueue = FaceTaggingReviewQueue()
     @State var showsCreateOshiMasterSheet = false
     @State var createOshiRequestSheet: OshiRequestSheetState?
@@ -169,7 +172,7 @@ struct GoodsEditorSheet: View {
             }
 #endif
 #if os(iOS)
-            .sheet(item: $cameraCaptureRoute) { route in
+            .sheet(item: $cameraCaptureRoute, onDismiss: presentNextPendingCropSession) { route in
                 if route.target == .inventoryCreate {
                     // 複数枚登録は連続撮影（撮るたび左下プレビュー→左へシュッと消える）
                     ContinuousCameraCaptureView { imageData in
@@ -197,7 +200,7 @@ struct GoodsEditorSheet: View {
                 }
             }
 #endif
-            .sheet(item: $cropSession) { session in
+            .sheet(item: $cropSession, onDismiss: presentNextPendingCropSession) { session in
                 GoodsPhotoCropSheet(
                     session: session,
                     title: cropSheetTitle(for: session),
@@ -323,6 +326,11 @@ struct GoodsEditorSheet: View {
             } message: {
                 Text("シリーズを登録していないと、検索やマッチ候補で見つかりにくくなる可能性があります。なるべくシリーズを登録してください。")
             }
+            .goodsEditorCreatePhotoSourceDialog(
+                isPresented: $isShowingCreatePhotoSourceDialog,
+                onPickCamera: startInventoryCreateCamera,
+                onPickPhotoLibrary: showInventoryCreatePhotoLibrary
+            )
             .goodsEditorTradingCardBulkSourceDialog(
                 isPresented: $isShowingTradingCardBulkSourceDialog,
                 onPickCamera: startTradingCardBulkCamera,

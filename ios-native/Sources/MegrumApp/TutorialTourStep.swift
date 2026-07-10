@@ -246,8 +246,8 @@ enum TutorialScript {
         ),
         TutorialBeat(
             id: "4-7", chapter: .inventory, presentation: .demo(.goods(.bulkDetect)), targetTab: .inventory,
-            title: "トレカAIで一括登録",
-            body: "「トレカ専用 AIで一括登録」を押すと1枚ずつ自動で切り抜き。今回は7枚OK、右下の2枚は読み取れなかったみたい。"
+            title: "まとめて登録",
+            body: "「まとめて登録」を押すとAIが枠を自動で配置して1枚ずつ切り抜き。今回は7枚OK、右下の2枚は読み取れなかったみたい。"
         ),
         TutorialBeat(
             id: "4-8", chapter: .inventory, presentation: .demo(.goods(.manualCrop)), targetTab: .inventory,

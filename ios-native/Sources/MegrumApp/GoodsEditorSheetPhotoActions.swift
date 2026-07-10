@@ -65,12 +65,10 @@ extension GoodsEditorSheet {
             return
         }
         if photoCaptureTarget == .inventoryCreate {
-            let photo = GoodsCreatePhotoDraft(upload: upload)
-            createPhotos.append(photo)
-            if createStep == .meta {
-                syncCreateMetasWithPhotos()
-            }
-            analyzeFaceTagsIfNeeded(upload: upload, target: .createPhoto(photo.id))
+            // 追加直後に必ずトリミングを通す。カメラ（連続撮影）が閉じた後に
+            // presentNextPendingCropSession が1枚ずつ crop sheet を提示する。
+            // 顔タグ解析は applyCropUploads（トリミング確定後）で行う。
+            enqueueCropForNewUpload(upload)
             createError = nil
             photoError = nil
             return
@@ -123,7 +121,7 @@ extension GoodsEditorSheet {
             return
         }
 
-        var nextPhotos: [GoodsCreatePhotoDraft] = []
+        var nextUploads: [GoodsPhotoUpload] = []
         var lastError: String?
         for item in items {
             do {
@@ -136,22 +134,18 @@ extension GoodsEditorSheet {
                     lastError = uploadError
                     continue
                 }
-                nextPhotos.append(GoodsCreatePhotoDraft(upload: upload))
+                nextUploads.append(upload)
             } catch {
                 lastError = "写真を読み込めませんでした"
             }
         }
 
-        if nextPhotos.isEmpty {
+        if nextUploads.isEmpty {
             createError = lastError ?? "写真を読み込めませんでした"
         } else {
-            createPhotos.append(contentsOf: nextPhotos)
-            if createStep == .meta {
-                syncCreateMetasWithPhotos()
-            }
-            nextPhotos.forEach { photo in
-                analyzeFaceTagsIfNeeded(upload: photo.upload, target: .createPhoto(photo.id))
-            }
+            // 追加直後に必ずトリミングを通す。1枚ずつ crop sheet が連鎖する。
+            nextUploads.forEach { enqueueCropForNewUpload($0) }
+            presentNextPendingCropSession()
             createError = lastError
         }
         selectedCreatePhotoItems = []

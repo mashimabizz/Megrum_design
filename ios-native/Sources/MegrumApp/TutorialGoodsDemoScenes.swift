@@ -98,8 +98,7 @@ struct TutorialGoodsDemoSceneView: View {
                     isCreatingGoodsEntry: false,
                     onShowOshiPicker: {},
                     onCommonNext: {},
-                    onPickCamera: {},
-                    onPickPhotos: {},
+                    onAddPhoto: {},
                     onStartTradingCardBulk: {},
                     onRemovePhoto: { _ in },
                     onCropPhoto: { _ in },
@@ -147,8 +146,7 @@ struct TutorialGoodsDemoSceneView: View {
                     isCreatingGoodsEntry: false,
                     onShowOshiPicker: {},
                     onCommonNext: {},
-                    onPickCamera: {},
-                    onPickPhotos: {},
+                    onAddPhoto: {},
                     onStartTradingCardBulk: {},
                     onRemovePhoto: { _ in },
                     onCropPhoto: { _ in },
@@ -541,7 +539,7 @@ struct TutorialGoodsDemoSceneView: View {
             pointer.appear(at: CGPoint(x: size.width * 0.68, y: size.height * 0.30))
             await pointer.tap()
         case .bulkDetect:
-            // 元写真の下にある「トレカ専用 AIで一括登録」を押す→切り抜き結果へ切替（FB③）。
+            // 元写真の下にある「まとめて登録」を押す→切り抜き結果へ切替（FB③）。
             pointer.appear(at: CGPoint(x: size.width * 0.5, y: size.height * 0.66))
             try? await Task.sleep(nanoseconds: 500_000_000)
             await pointer.tap()

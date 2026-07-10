@@ -51,6 +51,11 @@ struct TradingCardBulkRecognitionResult: Equatable, Identifiable, Sendable {
 }
 
 struct TradingCardCropFrame: Equatable, Identifiable, Sendable {
+    /// 写真全体を覆う初期枠（トリミング必須フローの初期状態）
+    static var fullImage: TradingCardCropFrame {
+        TradingCardCropFrame(rect: CGRect(x: 0, y: 0, width: 1, height: 1), source: .fallbackOriginal)
+    }
+
     var id: UUID
     var rect: CGRect
     var source: TradingCardBulkRecognitionResult.Source

@@ -1,9 +1,7 @@
 import MegrumDesign
 import SwiftUI
 
-struct GoodsCreatePhotoPickButton: View {
-    var title: String
-    var systemImage: String
+struct GoodsCreateAddPhotoHeroTile: View {
     var action: () -> Void
 
     var body: some View {
@@ -11,25 +9,33 @@ struct GoodsCreatePhotoPickButton: View {
             MegrumHaptics.performButtonTap(action)
         } label: {
             VStack(spacing: 10) {
-                Image(systemName: systemImage)
-                    .font(.system(size: 24, weight: .bold))
-                    .foregroundStyle(MegrumTheme.lavender)
-                    .frame(width: 48, height: 48)
-                    .background(.white.opacity(0.82), in: Circle())
-                Text(title)
-                    .font(.subheadline.weight(.black))
+                Image(systemName: "plus")
+                    .font(.system(size: 24, weight: .black))
+                    .foregroundStyle(.white)
+                    .frame(width: 52, height: 52)
+                    .background(MegrumTheme.lavender, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                Text("写真を追加")
+                    .font(.headline.weight(.black))
                     .foregroundStyle(MegrumTheme.ink)
-                    .multilineTextAlignment(.center)
+                Text("タップして カメラ / ライブラリ から選ぶ")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(MegrumTheme.muted)
             }
             .frame(maxWidth: .infinity)
-            .frame(height: 132)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .padding(.vertical, 24)
+            .background(MegrumTheme.lavender.opacity(0.07), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: 22, style: .continuous)
-                    .strokeBorder(MegrumTheme.lavender.opacity(0.18), lineWidth: 1)
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .strokeBorder(
+                        MegrumTheme.lavender.opacity(0.5),
+                        style: StrokeStyle(lineWidth: 1.6, dash: [7, 5])
+                    )
             }
+            .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("写真を追加")
+        .accessibilityHint("カメラかライブラリを選びます")
     }
 }
 
@@ -44,13 +50,24 @@ struct GoodsTradingCardBulkStartButton: View {
             HStack(spacing: 12) {
                 GoodsTradingCardBulkStartIcon(isProcessing: isProcessing)
                 GoodsTradingCardBulkStartCopy()
+                Spacer(minLength: 8)
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.black))
+                    .foregroundStyle(MegrumTheme.lavender)
             }
             .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .background(
+                LinearGradient(
+                    colors: [MegrumTheme.sky.opacity(0.20), MegrumTheme.lavender.opacity(0.10)],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                ),
+                in: RoundedRectangle(cornerRadius: 20, style: .continuous)
+            )
             .overlay {
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .strokeBorder(MegrumTheme.lavender.opacity(0.20), lineWidth: 1)
+                    .strokeBorder(MegrumTheme.sky.opacity(0.55), lineWidth: 1)
             }
         }
         .buttonStyle(.plain)
@@ -64,16 +81,16 @@ private struct GoodsTradingCardBulkStartIcon: View {
     var body: some View {
         ZStack {
             Circle()
-                .fill(MegrumTheme.lavender)
+                .fill(MegrumTheme.sky)
                 .frame(width: 36, height: 36)
             if isProcessing {
                 ProgressView()
-                    .tint(.white)
+                    .tint(MegrumTheme.ink)
                     .controlSize(.small)
             } else {
                 Text("AI")
                     .font(.caption.weight(.black))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(MegrumTheme.ink)
             }
         }
     }
@@ -82,10 +99,10 @@ private struct GoodsTradingCardBulkStartIcon: View {
 private struct GoodsTradingCardBulkStartCopy: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("トレカ専用 AIで一括登録")
+            Text("まとめて登録")
                 .font(.subheadline.weight(.black))
                 .foregroundStyle(MegrumTheme.ink)
-            Text("検出した枠を黄色で確認してから、必要な分だけ追加します。")
+            Text("トレカを並べて1枚で撮ると、AIが枠を自動で配置します。")
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(MegrumTheme.muted)
                 .fixedSize(horizontal: false, vertical: true)

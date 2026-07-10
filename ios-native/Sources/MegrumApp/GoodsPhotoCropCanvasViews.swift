@@ -39,10 +39,15 @@ struct GoodsCropFrameCanvas: View {
                         .stroke(frame.id == selectedFrameID ? Color.yellow : Color.yellow.opacity(0.72), lineWidth: frame.id == selectedFrameID ? 3 : 2)
                         .frame(width: rect.width, height: rect.height)
                         .position(x: rect.midX, y: rect.midY)
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            selectedFrameID = frame.id
-                        }
+                }
+
+                if let selected = frames.first(where: { $0.id == selectedFrameID }) {
+                    let rect = GoodsPhotoCropGeometry.screenRect(for: selected.rect, in: displayRect)
+                    ForEach(GoodsPhotoCropCanvasDragState.Corner.allCases, id: \.self) { corner in
+                        let point = GoodsPhotoCropCanvasDragState.cornerPoint(corner, of: rect)
+                        GoodsCropCornerHandle()
+                            .position(x: point.x, y: point.y)
+                    }
                 }
 
                 if let draftRect = dragState.draftRect {
@@ -66,17 +71,52 @@ struct GoodsCropFrameCanvas: View {
     }
 
     private func dragGesture(in displayRect: CGRect) -> some Gesture {
-        DragGesture(minimumDistance: 8)
+        DragGesture(minimumDistance: 0)
             .onChanged { value in
-                dragState.update(startLocation: value.startLocation, location: value.location, in: displayRect)
+                if dragState.mode == nil {
+                    let selection = dragState.begin(
+                        at: value.startLocation,
+                        frames: frames,
+                        selectedFrameID: selectedFrameID,
+                        in: displayRect
+                    )
+                    if let selection {
+                        selectedFrameID = selection
+                    }
+                }
+                guard let update = dragState.update(location: value.location, in: displayRect),
+                      let index = frames.firstIndex(where: { $0.id == update.frameID })
+                else {
+                    return
+                }
+                frames[index] = TradingCardCropFrame(
+                    id: update.frameID,
+                    rect: GoodsPhotoCropGeometry.normalizedRect(update.rect, in: displayRect),
+                    source: frames[index].source
+                )
             }
             .onEnded { value in
                 guard let frame = dragState.finish(location: value.location, in: displayRect) else {
+                    dragState.reset()
                     return
                 }
                 frames.append(frame)
                 selectedFrameID = frame.id
             }
+    }
+}
+
+private struct GoodsCropCornerHandle: View {
+    var body: some View {
+        Circle()
+            .fill(.white)
+            .frame(width: 15, height: 15)
+            .overlay {
+                Circle()
+                    .strokeBorder(Color.yellow, lineWidth: 2.5)
+            }
+            .shadow(color: .black.opacity(0.28), radius: 3, y: 1)
+            .allowsHitTesting(false)
     }
 }
 
