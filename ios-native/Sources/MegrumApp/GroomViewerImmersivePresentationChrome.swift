@@ -15,23 +15,30 @@ extension View {
             // セーフエリア無視の全画面コンテナを常設し、その中でトランジションさせる。
             // 条件付きビュー自体に ignoresSafeArea を付けると、トランジション終了時に
             // セーフエリア拡張が非アニメーションで適用されて画像位置が「かくっ」とズレる。
-            ZStack {
-                if let presentedItem = item.wrappedValue {
-                    Color.black
-                        .allowsHitTesting(false)
-                        .transition(.opacity)
-                        .zIndex(9_998)
+            // iter1226.444：さらに、ビューア内部のセーフエリア解決がトランジション中に
+            // レイアウトを動かし「枠（スケール変形）と中身（レイアウト）が別々に動く」
+            // ガクつきが出ていたため、中身は常設コンテナの実寸（最終フルスクリーンサイズ）で
+            // **固定レイアウト**し、拡大縮小はスケール変形だけにする。
+            GeometryReader { fullScreenProxy in
+                ZStack {
+                    if let presentedItem = item.wrappedValue {
+                        Color.black
+                            .allowsHitTesting(false)
+                            .transition(.opacity)
+                            .zIndex(9_998)
 
-                    content(presentedItem) {
-                        item.wrappedValue = nil
-                        onDismiss()
+                        content(presentedItem) {
+                            item.wrappedValue = nil
+                            onDismiss()
+                        }
+                        .megrumGroomViewerImmersivePresentationChrome()
+                        .frame(width: fullScreenProxy.size.width, height: fullScreenProxy.size.height)
+                        .transition(.asymmetric(
+                            insertion: .scale(scale: 0.08, anchor: sourceAnchor).combined(with: .opacity),
+                            removal: .scale(scale: 0.08, anchor: sourceAnchor).combined(with: .opacity)
+                        ))
+                        .zIndex(9_999)
                     }
-                    .megrumGroomViewerImmersivePresentationChrome()
-                    .transition(.asymmetric(
-                        insertion: .scale(scale: 0.08, anchor: sourceAnchor).combined(with: .opacity),
-                        removal: .scale(scale: 0.08, anchor: sourceAnchor).combined(with: .opacity)
-                    ))
-                    .zIndex(9_999)
                 }
             }
             .ignoresSafeArea()

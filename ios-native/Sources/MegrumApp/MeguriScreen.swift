@@ -129,6 +129,7 @@ struct MeguriScreen: View {
             currentCoordinate: appState.isTutorialActive
                 ? TutorialSampleMeguriData.centerCoordinate
                 : locationState.coordinate,
+            viewedGroomIDs: appState.viewedGroomIDs,
             subscriptionState: appState.subscriptionState,
             notice: notice,
             isRequestingLocation: locationState.isRequestingLocation,

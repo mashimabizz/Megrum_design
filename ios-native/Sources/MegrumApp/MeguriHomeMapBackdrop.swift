@@ -14,6 +14,8 @@ struct MeguriHomeMapBackdrop: View {
     var replyPreviewsByThreadID: [UUID: [String]] = [:]
     var currentCoordinate: MegrumLocationCoordinate?
     var viewerID: UUID?
+    /// iter1226.444：既読グルームのピン枠をグレーにする判定用。
+    var viewedGroomIDs: Set<UUID> = []
     var subscriptionState: UserSubscriptionState
     var onSelectGroom: (GroomPost, UnitPoint) -> Void
     var onSelectThread: (BoardThread) -> Void
@@ -251,7 +253,8 @@ struct MeguriHomeMapBackdrop: View {
                                                         viewerID: viewerID,
                                                         hasEncountered: groom.encounteredInRange,
                                                         subscriptionState: subscriptionState
-                                                    )
+                                                    ),
+                                                    isRead: viewedGroomIDs.contains(groom.id)
                                                 )
                                             }
                                         }
@@ -298,7 +301,7 @@ struct MeguriHomeMapBackdrop: View {
                                     } label: {
                                         MeguriPinConditionalPopIn(popsIn: displayed.popsIn) {
                                             MeguriFloatingMotion(seed: cluster.id.hashValue) {
-                                                MeguriClusterPin(cluster: cluster)
+                                                MeguriClusterPin(cluster: cluster, viewedGroomIDs: viewedGroomIDs)
                                                     .overlay(alignment: .top) {
                                                         let clusterPreviews = cluster.items.flatMap { item -> [String] in
                                                             if case .thread(let thread) = item {

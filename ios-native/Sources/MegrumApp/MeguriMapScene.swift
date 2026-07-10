@@ -16,6 +16,8 @@ struct MeguriMapScene: View {
     var grooms: [GroomPost]
     var threads: [BoardThread]
     var isVisualQAPreviewEnabled: Bool
+    /// iter1226.444：既読グルームのピン枠をグレーにする判定用。
+    var viewedGroomIDs: Set<UUID> = []
     var isGroomOutOfRange: (GroomPost) -> Bool
     var isBoardOutOfRange: (BoardThread) -> Bool
     var onOpenGroom: (GroomPost) -> Void
@@ -75,7 +77,11 @@ struct MeguriMapScene: View {
                     Button {
                         onOpenGroom(groom)
                     } label: {
-                        GroomMapPin(groom: groom, isOutOfRange: isGroomOutOfRange(groom))
+                        GroomMapPin(
+                            groom: groom,
+                            isOutOfRange: isGroomOutOfRange(groom),
+                            isRead: viewedGroomIDs.contains(groom.id)
+                        )
                     }
                     .buttonStyle(.plain)
                 }

@@ -4,6 +4,45 @@
 
 ---
 
+## イテレーション1226.444：開くトランジションの枠/中身分離を解消＋地図ピンの既読枠色
+
+### 背景・問題意識
+
+オーナーFB（連続スクショ4枚の証拠つき）：
+1. グルームを開く時、**画面（枠）とグルーム画像・上部バーが一致せず**ガクガク見える（進捗バーだけ先に全幅になる等、枠と中身が別々のロジックで展開されている）
+2. 既読と枠色（未読=グラデ/既読=グレー）は**めぐりホーム側でも**実装してほしい
+
+### 調査結果
+
+開くトランジションは scale 変形だが、**ビューア内部のセーフエリア解決（ignoresSafeArea）がトランジション中にレイアウトサイズを別途アニメーション**しており、「枠＝スケール変形」「中身＝レイアウト変化」が同時に走って互いにズレていた（スクショの 00:02.83 で進捗バーだけ全幅になっているのがその瞬間）。
+
+### 変更内容
+
+#### `GroomViewerImmersivePresentationChrome.swift`（1）
+- 常設フルスクリーンコンテナに `GeometryReader` を追加し、ビューア中身へ**実寸（最終フルスクリーンサイズ）を明示 frame で固定**。トランジション中もレイアウトは一切変化せず、拡大縮小は**スケール変形のみ**に。枠と中身（写真・ユーザー名バー・進捗・アイコン）が完全に一体で拡大される
+
+#### 地図ピンの既読枠色（2）
+- `GroomMapPin` に `isRead` を追加：既読はレールと同じ**グレー枠**（`GroomStoryMetrics.seenRing`）、未読は従来のブランドグラデ枠
+- クラスタ代表ピン（`MeguriClusterPin`）は**内包グルームが全て既読ならグレー**
+- 配線：めぐりホーム地図（`MeguriHomeMapBackdrop`）・フルスクリーン地図（`MeguriMapScene`）の両方に `viewedGroomIDs` を伝搬（iter1226.443 の永続化とセットで再起動後も維持）
+
+### 確認方法
+
+- `swift test` 全パス（0失敗）／実機ビルド→iPhoneへインストール
+- 実機：開く時に枠と中身が一体で拡大するか（スクショ再撮影で比較可）。めぐりホームのピンが既読でグレー枠になるか
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/GroomViewerImmersivePresentationChrome.swift`
+- `ios-native/Sources/MegrumApp/MeguriMapAnnotationViews.swift` / `MeguriHomeMapBackdrop.swift` / `MeguriHomeViews.swift` / `MeguriScreen.swift` / `MeguriMapScene.swift` / `MeguriMapViews.swift`
+
+### セルフレビュー結果
+- ✅ 固定フレームは常設コンテナの実寸由来（回転や画面サイズ変化にも追従）
+- ✅ ピンの枠色はレール（GroomStoryRing）と同じ色定数を共有
+- ⚠️ 開く動きの最終確認は実機で（スクショ4枚と同じ手順での比較を依頼）
+
+---
+
 ## イテレーション1226.443：グルーム既読の永続化＋レール件数バッジ廃止
 
 ### 背景・問題意識

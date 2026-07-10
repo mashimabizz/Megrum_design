@@ -14,6 +14,7 @@ struct MeguriHomeContent: View {
     var densityCells: [MeguriMapDensityCell] = []
     var replyPreviewsByThreadID: [UUID: [String]] = [:]
     var currentCoordinate: MegrumLocationCoordinate?
+    var viewedGroomIDs: Set<UUID> = []
     var subscriptionState: UserSubscriptionState
     var notice: MegrumLocationNotice?
     var isRequestingLocation: Bool
@@ -49,6 +50,7 @@ struct MeguriHomeContent: View {
                     replyPreviewsByThreadID: replyPreviewsByThreadID,
                     currentCoordinate: currentCoordinate,
                     viewerID: viewer?.id,
+                    viewedGroomIDs: viewedGroomIDs,
                     subscriptionState: subscriptionState,
                     onSelectGroom: onSelectGroom,
                     onSelectThread: onSelectThread,

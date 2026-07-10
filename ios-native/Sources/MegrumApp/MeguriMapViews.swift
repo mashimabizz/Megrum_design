@@ -82,6 +82,7 @@ struct MeguriMapScreen: View {
                 grooms: mapGrooms,
                 threads: mapThreads,
                 isVisualQAPreviewEnabled: VisualQAPreviewMode.isEnabled(environment: ProcessInfo.processInfo.environment),
+                viewedGroomIDs: appState.viewedGroomIDs,
                 isGroomOutOfRange: isGroomOutOfRange,
                 isBoardOutOfRange: isBoardOutOfRange,
                 onOpenGroom: openGroomIfInRange,
