@@ -48,6 +48,15 @@ enum MegrumHaptics {
         selectionChanged()
         action()
     }
+
+    /// 自動入力の成功など、操作なしで良いことが起きた時の通知触覚（iter1226.407）。
+    static func success() {
+        #if os(iOS)
+        let generator = UINotificationFeedbackGenerator()
+        generator.prepare()
+        generator.notificationOccurred(.success)
+        #endif
+    }
 }
 
 extension View {

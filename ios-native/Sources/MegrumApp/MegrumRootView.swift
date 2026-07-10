@@ -64,6 +64,10 @@ public struct MegrumRootView: View {
         Group {
             if visualQAInitialScreen == .goodsTypeSelect {
                 GoodsTypeSelectPreview()
+            } else if visualQAInitialScreen == .addressSettings {
+                NavigationStack {
+                    AddressSettingsScreen(appState: appState)
+                }
             } else if visualQAInitialScreen == .candidateSheet {
                 CandidateSheetVisualQAPreview()
             } else if AccountSetupSessionPolicy.shouldShowAuthScreen(

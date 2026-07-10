@@ -13,6 +13,10 @@ struct AddressSettingsScreen: View {
 
     @State private var draftState = AddressSettingsDraftState()
     @State private var postalCodeLookupTask: Task<Void, Never>?
+    /// 郵便番号照会が成功して自動入力された回数。フォーム側のフラッシュ表示トリガー。
+    @State private var autoFillPulse = 0
+    /// 照会失敗時の手入力案内。郵便番号を編集し直したら消す。
+    @State private var postalLookupNotice: String?
 
     private var draftAddress: MailingAddress {
         draftState.mailingAddress(userID: appState.viewer?.id ?? NativePreviewData.viewerID)
@@ -32,6 +36,8 @@ struct AddressSettingsScreen: View {
                     phoneNumber: $draftState.phoneNumber,
                     focusedField: $focusedField,
                     isLookingUpPostalCode: appState.isLookingUpPostalCode,
+                    postalLookupNotice: postalLookupNotice,
+                    autoFillPulse: autoFillPulse,
                     inputErrorMessage: draftState.inputErrorMessage,
                     appErrorMessage: appState.errorMessage,
                     onPostalCodeChange: handlePostalCodeChange
@@ -100,6 +106,7 @@ struct AddressSettingsScreen: View {
 
     private func handlePostalCodeChange(_ value: String) {
         let normalized = draftState.normalizePostalCodeInput(value)
+        postalLookupNotice = nil
         schedulePostalCodeLookup(normalized)
     }
 
@@ -115,12 +122,18 @@ struct AddressSettingsScreen: View {
                 return
             }
             guard let address = await appState.lookupPostalCode(value) else {
+                if !Task.isCancelled {
+                    postalLookupNotice = "郵便番号から住所が見つかりませんでした。手入力してください。"
+                }
                 return
             }
             guard !Task.isCancelled else {
                 return
             }
             draftState.apply(postalCodeAddress: address)
+            // 自動入力の成功を触覚＋フィールドのフラッシュで伝える（iter1226.407）。
+            MegrumHaptics.success()
+            autoFillPulse += 1
         }
     }
 }

@@ -5,6 +5,8 @@ enum VisualQAInitialScreen: String, Equatable {
     case drawerOpen = "drawer-open"
     /// ドロワー経由の推し設定を直接開く（iter1226.405 刷新の確認用）。
     case oshiSettings = "oshi-settings"
+    /// 住所設定を直接開く（iter1226.407 刷新の確認用）。
+    case addressSettings = "address-settings"
     case homeHavesLookup = "home-haves-lookup"
     case matchRelation = "match-relation"
     case matchRelationCandidates = "match-relation-candidates"
