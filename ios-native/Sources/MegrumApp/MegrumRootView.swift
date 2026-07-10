@@ -45,6 +45,7 @@ public struct MegrumRootView: View {
         _selectedTab = State(initialValue: VisualQATabRouteResolver.initialTab(for: visualQAInitialScreen))
         _showsDrawer = State(initialValue: visualQAInitialScreen == .drawerOpen)
         _showsSearch = State(initialValue: visualQAInitialScreen == .search)
+        _drawerDestination = State(initialValue: visualQAInitialScreen == .oshiSettings ? .oshiSettings : nil)
         let visualQAProfileUserID = ProcessInfo.processInfo.environment["MEGRUM_VISUAL_QA_PROFILE_USER_ID"]
             .flatMap(UUID.init(uuidString:)) ?? NativePreviewData.partnerID
         _publicProfileRoute = State(

@@ -3,28 +3,6 @@ import MegrumCore
 import XCTest
 
 final class OshiSettingsDraftTests: XCTestCase {
-    func testOshiSettingsGroupSummaryOmitsBoxSelectionCopy() {
-        let group = OshiSettingsGroupDraft(
-            masterGroup: OshiGroup(id: uuid("10000000-0000-0000-0000-000000000201"), name: "BTS"),
-            priority: 1
-        )
-
-        XCTAssertNil(OshiSettingsPresentationText.groupSummary(for: group))
-    }
-
-    func testOshiSettingsGroupSummaryShowsSpecificMemberCount() {
-        let group = OshiGroup(id: uuid("10000000-0000-0000-0000-000000000202"), name: "TWICE")
-        let momo = OshiCharacter(
-            id: uuid("10000000-0000-0000-0000-000000000203"),
-            groupID: group.id,
-            name: "モモ"
-        )
-        var draft = OshiSettingsGroupDraft(masterGroup: group, priority: 1)
-        draft.members.append(OshiSettingsMemberDraft(character: momo))
-
-        XCTAssertEqual(OshiSettingsPresentationText.groupSummary(for: draft), "推しメンバー 1人")
-    }
-
     func testSoloOshiGroupDoesNotSupportMemberSelection() {
         let solo = OshiGroup(
             id: uuid("10000000-0000-0000-0000-000000000209"),
@@ -34,7 +12,6 @@ final class OshiSettingsDraftTests: XCTestCase {
         let draft = OshiSettingsGroupDraft(masterGroup: solo, priority: 1)
 
         XCTAssertFalse(draft.supportsMemberSelection)
-        XCTAssertNil(OshiSettingsPresentationText.groupSummary(for: draft))
         XCTAssertEqual(
             OshiSettingsGroupDraft.accountSetupInputs(from: [draft]).first?.kind,
             .box
@@ -58,23 +35,6 @@ final class OshiSettingsDraftTests: XCTestCase {
     func testOshiSettingsDeleteConfirmationCopy() {
         XCTAssertEqual(OshiSettingsPresentationText.removeGroupConfirmationTitle, "本当に削除しますか？")
         XCTAssertEqual(OshiSettingsPresentationText.removeGroupConfirmationAction, "削除する")
-    }
-
-    func testOshiSettingsGroupCardPresentationStateDelaysRemoveConfirmation() {
-        var state = OshiSettingsGroupCardPresentationState()
-
-        XCTAssertFalse(state.canConfirmRemoval)
-
-        state.enableRemoveConfirmation()
-        XCTAssertTrue(state.canConfirmRemoval)
-
-        state.prepareRemoveConfirmation()
-        XCTAssertFalse(state.canConfirmRemoval)
-
-        state.enableRemoveConfirmation()
-        state.hideRemoveConfirmation()
-
-        XCTAssertFalse(state.canConfirmRemoval)
     }
 
     func testMemberRequestCopyAndPendingMemberTitle() {

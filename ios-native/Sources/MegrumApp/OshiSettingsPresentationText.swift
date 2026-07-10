@@ -1,13 +1,6 @@
 import MegrumCore
 
 enum OshiSettingsPresentationText {
-    static func groupSummary(for group: OshiSettingsGroupDraft) -> String? {
-        guard !group.members.isEmpty else {
-            return nil
-        }
-        return "推しメンバー \(group.members.count)人"
-    }
-
     static func selectedMemberTitle(_ member: OshiSettingsMemberDraft) -> String {
         member.pending ? "\(member.name)（承認待ち）" : member.name
     }

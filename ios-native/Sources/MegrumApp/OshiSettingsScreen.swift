@@ -16,7 +16,6 @@ struct OshiSettingsScreen: View {
             errorMessage: presentationState.errorMessage,
             noticeMessage: presentationState.noticeMessage,
             expandedGroupKey: presentationState.expandedGroupKey,
-            activeRemoveConfirmationGroupKey: $presentationState.activeRemoveConfirmationGroupKey,
             availableCharacters: availableCharacters(for:),
             onBack: closeScreen,
             onShowMasterSheet: showMasterSheet,

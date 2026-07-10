@@ -12,10 +12,11 @@ struct OshiSelectedMemberTag: View {
             HStack(spacing: 6) {
                 Text(OshiSettingsPresentationText.selectedMemberTitle(member))
                     .lineLimit(1)
-                Text("×")
-                    .foregroundStyle(OshiPalette.warn)
+                Image(systemName: "xmark")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(MegrumTheme.muted.opacity(0.7))
             }
-            .font(.system(size: 13, weight: .black, design: .rounded))
+            .font(.system(size: 13, weight: .semibold, design: .rounded))
             .foregroundStyle(MegrumTheme.ink)
             .padding(.horizontal, 10)
             .frame(height: 32)
@@ -45,7 +46,7 @@ struct OshiMemberRequestTag: View {
     var body: some View {
         Button(action: action) {
             Text(OshiSettingsPresentationText.memberRequestTagTitle)
-                .font(.system(size: 12, weight: .black, design: .rounded))
+                .font(.system(size: 12, weight: .bold, design: .rounded))
                 .foregroundStyle(MegrumTheme.lavender)
                 .padding(.horizontal, 11)
                 .frame(height: 30)
@@ -62,8 +63,4 @@ struct OshiMemberRequestTag: View {
         .buttonStyle(.plain)
         .accessibilityLabel("メンバーの追加リクエスト")
     }
-}
-
-enum OshiPalette {
-    static let warn = Color(red: 0.84, green: 0.46, blue: 0.36)
 }

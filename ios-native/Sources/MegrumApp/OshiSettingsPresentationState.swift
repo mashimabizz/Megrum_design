@@ -5,7 +5,6 @@ struct OshiSettingsPresentationState: Equatable {
     var groups: [OshiSettingsGroupDraft] = []
     var charactersByGroupID: [UUID: [OshiCharacter]] = [:]
     var expandedGroupKey: String?
-    var activeRemoveConfirmationGroupKey: String?
     var isSaving = false
     var isLoading = false
     var noticeMessage: String?

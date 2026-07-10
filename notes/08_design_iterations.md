@@ -4,6 +4,50 @@
 
 ---
 
+## イテレーション1226.405：推し設定画面の刷新（タイポ縮小・…メニュー削除・追加導線2本化）
+
+### 背景・問題意識
+
+デザイン刷新FB項目1：「推し設定画面がいけてない。文字でかい、削除ボタンが茶色でおしゃれじゃない、『推しメンバーX人』表記いらない、『推しを追加』ボタンもいけてない」。
+
+### 変更内容
+
+#### `OshiSettingsContentViews.swift`（全面書き換え）
+- ヘッダー：タイトル24pt black lavender→**17pt bold ink**。戻るボタンは56ptガラス円→40pt中立円（ink 4.5%塗り・chevron 17pt semibold）。右上に**グラデ「＋」ボタン**（40pt・primaryGradient・白plus）を新設
+- 巨大フローティング「推しを追加」ピル（高さ64pt・ZStack重ね）を**廃止**。代わりにリスト末尾へ**破線「＋ 推しを追加」カード**（56pt）を常設（空状態でも表示）
+- エラー文言色を茶系 OshiPalette.warn→`MegrumTheme.conditionExact`（赤）。`.black`ウェイト→semibold/boldに全体調整
+
+#### `OshiSettingsGroupCardViews.swift`（全面書き換え）
+- グループ名 22pt black→**17pt semibold**。「推しメンバーX人」サマリー行を**削除**
+- 茶色「削除」カプセル→右上の**「…」メニュー**（32pt中立円）→「この推しを削除」（`role: .destructive`）→**iOS標準 confirmationDialog** で最終確認。カスタム AnchoredDestructiveConfirmationPopover と遅延タップ防止ステートは本画面から撤去
+- カード radius 28→20・padding 18→16
+
+#### `OshiSettingsMemberTagViews.swift`
+- メンバータグの「×」：茶色テキスト→**9pt muted の xmark アイコン**。weight black→semibold。`OshiPalette` enum を削除
+
+#### `OshiSettingsScreen.swift` / `OshiSettingsPresentationState.swift` / `OshiSettingsGroupCardPresentationState.swift`（削除） / `OshiSettingsPresentationText.swift`
+- `activeRemoveConfirmationGroupKey` と `groupSummary` を廃止。関連テスト3件を削除（`OshiSettingsDraftTests` 21件パス）
+
+#### `VisualQAPreviewMode.swift` / `MegrumRootView.swift`
+- VisualQA に `oshi-settings` ケースを追加（drawerDestination 直マウント）。刷新の目視確認用
+
+### 影響範囲
+
+- 推し設定画面のみ。推しマスタ選択シート・リクエストシートは不変。永続化ロジック不変
+
+### 確認方法
+
+- `SIMCTL_CHILD_MEGRUM_VISUAL_QA_PREVIEW_AUTH=1 SIMCTL_CHILD_MEGRUM_VISUAL_QA_INITIAL_SCREEN=oshi-settings xcrun simctl launch <UDID> tokyo.megrum.native.preview`
+- シミュレータで目視確認済み（カード・タグ・ヘッダー・追加カード）
+
+### セルフレビュー結果
+- ✅ ブランドカラー直書きなし（茶色 warn を撤去、赤は既存 conditionExact を使用）
+- ✅ iOS標準コンポーネント優先（Menu + confirmationDialog へ置換）
+- ✅ 項目10の新トークン（primaryGradient/primaryShadow）を初適用
+- ⚠️ 位置情報ダイアログがシミュレータ起動時に毎回出る（既存挙動・本変更と無関係）
+
+---
+
 ## イテレーション1226.404：デザイントークン基盤＋「他にも交換できそうなもの」の需要フィルタ・プレビュー抑制
 
 ### 背景・問題意識

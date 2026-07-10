@@ -3,6 +3,8 @@ import Foundation
 enum VisualQAInitialScreen: String, Equatable {
     case home
     case drawerOpen = "drawer-open"
+    /// ドロワー経由の推し設定を直接開く（iter1226.405 刷新の確認用）。
+    case oshiSettings = "oshi-settings"
     case homeHavesLookup = "home-haves-lookup"
     case matchRelation = "match-relation"
     case matchRelationCandidates = "match-relation-candidates"
