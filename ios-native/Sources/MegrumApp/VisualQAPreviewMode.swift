@@ -9,6 +9,12 @@ enum VisualQAInitialScreen: String, Equatable {
     case addressSettings = "address-settings"
     /// 通知センターを直接開く（iter1226.408 刷新の確認用）。
     case notifications
+    /// 支払い方法設定を直接開く（iter1226.416 刷新の確認用）。
+    case paymentSettings = "payment-settings"
+    /// 交換条件設定を直接開く（iter1226.416 刷新の確認用）。
+    case exchangeSettings = "exchange-settings"
+    /// 推し設定＋推しマスタ選択シートを開いた状態（iter1226.416 刷新の確認用）。
+    case oshiMasterSelect = "oshi-master-select"
     case homeHavesLookup = "home-haves-lookup"
     case matchRelation = "match-relation"
     case matchRelationCandidates = "match-relation-candidates"

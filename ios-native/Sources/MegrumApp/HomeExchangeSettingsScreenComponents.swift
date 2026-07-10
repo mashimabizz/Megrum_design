@@ -9,9 +9,9 @@ struct HomeExchangeMailConditionsCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("郵送交換の条件")
-                .font(.subheadline.weight(.black))
+                .font(.system(size: 16, weight: .bold, design: .rounded))
                 .foregroundStyle(MegrumTheme.ink)
-                .padding(.horizontal, 8)
+                .padding(.horizontal, 2)
 
             VStack(spacing: 14) {
                 HomeExchangeMailConditionSegmentRow(
@@ -26,14 +26,14 @@ struct HomeExchangeMailConditionsCard: View {
                     values: IndividualListingShippingDaysDraft.allCases
                 )
             }
-            .padding(.horizontal, 14)
+            .padding(.horizontal, 16)
             .padding(.vertical, 16)
-            .background(Color.white.opacity(0.90), in: RoundedRectangle(cornerRadius: 22))
+            .background(Color.white.opacity(0.90), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: 22)
-                    .stroke(Color.white.opacity(0.92), lineWidth: 1)
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .strokeBorder(.black.opacity(0.06), lineWidth: 1)
             }
-            .shadow(color: MegrumTheme.lavender.opacity(0.09), radius: 18, y: 10)
+            .shadow(color: .black.opacity(0.03), radius: 14, y: 7)
         }
     }
 }
@@ -46,8 +46,8 @@ private struct HomeExchangeMailConditionSegmentRow<Value: Identifiable & Equatab
     var body: some View {
         VStack(alignment: .leading, spacing: 9) {
             Text(title)
-                .font(.subheadline.weight(.black))
-                .foregroundStyle(MegrumTheme.ink)
+                .font(.system(size: 12.5, weight: .semibold, design: .rounded))
+                .foregroundStyle(MegrumTheme.muted)
 
             HStack(spacing: 7) {
                 ForEach(values) { value in
@@ -55,16 +55,19 @@ private struct HomeExchangeMailConditionSegmentRow<Value: Identifiable & Equatab
                         selection = value
                     } label: {
                         Text(segmentTitle(for: value))
-                            .font(.caption.weight(.black))
+                            .font(.system(size: 13, weight: .semibold, design: .rounded))
                             .foregroundStyle(selection == value ? .white : MegrumTheme.ink.opacity(0.68))
                             .lineLimit(1)
                             .minimumScaleFactor(0.72)
                             .frame(maxWidth: .infinity)
-                            .frame(height: 36)
-                            .background(
-                                selection == value ? MegrumTheme.lavender : MegrumTheme.ink.opacity(0.05),
-                                in: Capsule()
-                            )
+                            .frame(height: 38)
+                            .background {
+                                if selection == value {
+                                    Capsule().fill(MegrumTheme.primaryGradient)
+                                } else {
+                                    Capsule().fill(MegrumTheme.ink.opacity(0.045))
+                                }
+                            }
                     }
                     .buttonStyle(.plain)
                     .accessibilityAddTraits(selection == value ? .isSelected : [])

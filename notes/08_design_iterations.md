@@ -4,6 +4,51 @@
 
 ---
 
+## イテレーション1226.416：支払い方法・交換条件・推しを追加シートを新デザイン言語へ刷新
+
+### 背景・問題意識
+
+オーナー指示：「支払い方法の設定画面や、交換条件の設定画面のデザインも新しいデザインに合わせて刷新して欲しい。推し設定の『推しを追加』のデザインも」。iter1226.404〜407 で確立した規約（semibold基調・40pt小アイコン・チェックマーク選択・淡い塗りフィールド・primaryGradient CTA・radius12/16/20）への追随。
+
+### 変更内容
+
+#### 支払い方法設定（`PaymentSettingsMethodViews/Components/BankAccountViews.swift`）
+- 方法行：左の大型ラジオ（28pt）＋68ptアイコンタイル → **40ptアイコン＋右端チェックマーク円（24pt）**。タイポ 18pt black→15.5pt semibold
+- 「その他」自由入力：左ラベル横並び → **上ラベル＋淡い塗り**（文字数カウンタはラベル行右端へ）
+- 銀行口座行・追加ボタン：48→40ptアイコン・black→semibold。口座エディタの入力行も上ラベル化
+- セクション見出し 20pt black→16pt bold。カード radius24→20。エラー色の茶系直書き→conditionExact
+- 下部バー：キャンセル=`.megrumSecondary`（幅132固定）／保存=`.megrumPrimary`
+
+#### 交換条件設定（`HomeExchangePreferenceCardViews` / `HomeExchangeSettingsChromeViews/Content/ScreenComponents.swift`）
+- 方法カード：左上の空ラジオ廃止 → **選択＝ラベンダー枠＋淡い塗り＋右上チェックバッジ**（グッズサムネと同作法）
+- 送料/発送目安チップ：選択＝単色ラベンダー → **primaryGradient**、black→semibold、高さ38
+- ヘッダー：title2 black→17pt bold、「閉じる」白ピル→中立カプセル。操作ガイドバナーを淡いラベンダー地に軽量化
+- 保存フッター：独自ラベンダーグラデ60pt → `.megrumPrimary`
+
+#### 推しを追加シート（`OshiMasterSelectHeader/Footer` / `OshiMasterCandidateTag` / `OshiGenreSegmentBar.swift`）
+- タイトル22pt black→20pt bold、×=40pt中立円、追加リクエスト=36ptチップ
+- 候補タグ：選択＝単色ラベンダー → **primaryGradient**（登録済みロックは淡ラベンダー維持）、black→semibold
+- ジャンルセグメント：選択＝primaryGradient。検索欄＝白ピル→ink4%塗り radius12。登録ボタン=`.megrumPrimary(height:54)`
+- `OshiMasterSelectLayoutMetrics`（テスト固定値）は不変
+
+#### VisualQA
+- `payment-settings` / `exchange-settings` / `oshi-master-select`（推し設定＋マスタシート自動表示）ルートを追加
+
+### 影響範囲
+
+- 3画面の見た目のみ。保存・選択ロジック、レイアウトメトリクス、口座エディタのForm構造は不変
+
+### 確認方法
+
+- 各ルートでbefore/afterスクショ比較済み。全1540テストパス
+
+### セルフレビュー結果
+- ✅ `.megrumPrimary`/`.megrumSecondary`/primaryGradient で単色ラベンダーの面塗りを一掃
+- ✅ 3画面とも選択表現を「チェックマーク」に統一（空ラジオ廃止）
+- ⚠️ 口座エディタシート（iOS標準Form）は標準準拠のため未改変
+
+---
+
 ## イテレーション1226.415：通知の右端対象サムネ（storageパス保存＋表示時の署名URL解決）
 
 ### 背景・問題意識

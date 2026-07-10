@@ -59,43 +59,48 @@ struct PaymentSettingsMethodRow: View {
     var isSelected: Bool
     var action: () -> Void
 
+    // iter1226.416 刷新：左の大型ラジオを廃止し、右端のチェックマーク円へ。
+    // アイコンは68pt→40ptに縮小し、タイポも15.5/12.5pt semibold 基調に。
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 16) {
+            HStack(spacing: 12) {
                 ZStack {
-                    Circle()
-                        .stroke(isSelected ? MegrumTheme.lavender : MegrumTheme.muted.opacity(0.72), lineWidth: 2.2)
-                        .frame(width: 28, height: 28)
-                    if isSelected {
-                        Circle()
-                            .fill(MegrumTheme.lavender)
-                            .frame(width: 18, height: 18)
-                    }
-                }
-
-                ZStack {
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
                         .fill(iconTint.opacity(0.13))
                     Image(systemName: iconName)
-                        .font(.system(size: 30, weight: .bold))
+                        .font(.system(size: 18, weight: .semibold))
                         .foregroundStyle(iconTint)
                 }
-                .frame(width: 68, height: 68)
+                .frame(width: 40, height: 40)
 
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: 2) {
                     Text(method.displayName)
-                        .font(.system(size: 18, weight: .black, design: .rounded))
+                        .font(.system(size: 15.5, weight: .semibold, design: .rounded))
                         .foregroundStyle(MegrumTheme.ink)
                     Text(description)
-                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                        .font(.system(size: 12.5, weight: .medium, design: .rounded))
                         .foregroundStyle(MegrumTheme.muted)
                         .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
-                Spacer(minLength: 0)
+                Spacer(minLength: 8)
+
+                ZStack {
+                    if isSelected {
+                        Circle()
+                            .fill(MegrumTheme.lavender)
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(.white)
+                    } else {
+                        Circle()
+                            .strokeBorder(MegrumTheme.ink.opacity(0.16), lineWidth: 1.5)
+                    }
+                }
+                .frame(width: 24, height: 24)
             }
-            .padding(.vertical, 18)
+            .padding(.vertical, 13)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -133,36 +138,30 @@ struct PaymentSettingsOtherInlineField: View {
     @Binding var otherNote: String
     var focusedField: FocusState<PaymentSettingsField?>.Binding
 
+    // iter1226.416 刷新：住所/認証と同じ「上ラベル＋淡い塗り」フィールドへ。
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 12) {
-                Text("その他")
-                    .font(.system(size: 17, weight: .bold, design: .rounded))
-                    .foregroundStyle(MegrumTheme.ink)
-                    .frame(width: 88, alignment: .leading)
-
-                TextField("8文字まで", text: $otherNote)
-                    .focused(focusedField, equals: .otherNote)
-                    #if os(iOS)
-                    .textInputAutocapitalization(.never)
-                    #endif
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 11)
-                    .background(MegrumTheme.canvas, in: RoundedRectangle(cornerRadius: 11, style: .continuous))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 11, style: .continuous)
-                            .stroke(MegrumTheme.ink.opacity(0.10), lineWidth: 1)
-                    }
-            }
-
+        VStack(alignment: .leading, spacing: 6) {
             HStack {
+                Text("その他の方法（自由入力）")
+                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .foregroundStyle(MegrumTheme.muted)
                 Spacer()
                 Text("\(otherNote.count)/\(PaymentSettingsDraft.otherNoteMaxLength)")
-                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .font(.system(size: 12, weight: .medium, design: .rounded))
                     .foregroundStyle(MegrumTheme.muted)
             }
+
+            TextField("例：メルペイ", text: $otherNote)
+                .focused(focusedField, equals: .otherNote)
+                #if os(iOS)
+                .textInputAutocapitalization(.never)
+                #endif
+                .font(.system(size: 16, weight: .medium, design: .rounded))
+                .padding(.horizontal, 14)
+                .frame(height: 48)
+                .background(MegrumTheme.ink.opacity(0.04), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
         .padding(.top, 12)
-        .padding(.bottom, 4)
+        .padding(.bottom, 14)
     }
 }

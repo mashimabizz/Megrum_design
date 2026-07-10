@@ -10,7 +10,7 @@ struct OshiMasterSelectHeader: View {
         HStack(alignment: .center, spacing: 12) {
             VStack(alignment: .leading, spacing: 0) {
                 Text("推しを追加")
-                    .font(.system(size: 22, weight: .black, design: .rounded))
+                    .font(.system(size: 20, weight: .bold, design: .rounded))
                     .foregroundStyle(MegrumTheme.ink)
             }
             Spacer()
@@ -20,10 +20,10 @@ struct OshiMasterSelectHeader: View {
 
             Button(action: onClose) {
                 Image(systemName: "xmark")
-                    .font(.system(size: 20, weight: .black, design: .rounded))
+                    .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(MegrumTheme.muted)
-                    .frame(width: 48, height: 48)
-                    .background(.black.opacity(0.04), in: Circle())
+                    .frame(width: 40, height: 40)
+                    .background(MegrumTheme.ink.opacity(0.045), in: Circle())
             }
             .buttonStyle(.plain)
         }
@@ -35,11 +35,11 @@ struct OshiMasterSelectHeader: View {
     private var requestButton: some View {
         Button(action: onRequest) {
                 Text("追加リクエスト")
-                    .font(.system(size: 14, weight: .black, design: .rounded))
+                    .font(.system(size: 13.5, weight: .semibold, design: .rounded))
                     .foregroundStyle(MegrumTheme.lavender)
-                    .padding(.horizontal, 16)
-                    .frame(height: 42)
-                    .background(MegrumTheme.lavender.opacity(0.11), in: Capsule())
+                    .padding(.horizontal, 14)
+                    .frame(height: 36)
+                    .background(MegrumTheme.lavender.opacity(0.10), in: Capsule())
         }
         .buttonStyle(.plain)
     }

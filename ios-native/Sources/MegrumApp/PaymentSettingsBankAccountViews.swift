@@ -64,22 +64,22 @@ struct PaymentSettingsBankAccountRow: View {
             Button(action: onEdit) {
                 HStack(spacing: 14) {
                     ZStack {
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
                             .fill(MegrumTheme.sky.opacity(0.13))
                         Image(systemName: "building.columns")
-                            .font(.system(size: 22, weight: .bold))
+                            .font(.system(size: 18, weight: .semibold))
                             .foregroundStyle(MegrumTheme.sky)
                     }
-                    .frame(width: 48, height: 48)
+                    .frame(width: 40, height: 40)
 
-                    VStack(alignment: .leading, spacing: 3) {
+                    VStack(alignment: .leading, spacing: 2) {
                         Text(titleText)
-                            .font(.system(size: 17, weight: .black, design: .rounded))
+                            .font(.system(size: 15.5, weight: .semibold, design: .rounded))
                             .foregroundStyle(isBlank ? MegrumTheme.muted : MegrumTheme.ink)
                             .lineLimit(1)
                             .minimumScaleFactor(0.8)
                         Text(subtitleText)
-                            .font(.system(size: 13.5, weight: .bold, design: .rounded))
+                            .font(.system(size: 12.5, weight: .medium, design: .rounded))
                             .foregroundStyle(MegrumTheme.muted)
                             .lineLimit(1)
                             .minimumScaleFactor(0.8)
@@ -88,7 +88,7 @@ struct PaymentSettingsBankAccountRow: View {
                     Spacer(minLength: 0)
 
                     Image(systemName: "chevron.right")
-                        .font(.system(size: 14, weight: .black, design: .rounded))
+                        .font(.system(size: 13, weight: .semibold, design: .rounded))
                         .foregroundStyle(MegrumTheme.muted.opacity(0.7))
                 }
                 .contentShape(Rectangle())
@@ -141,10 +141,10 @@ struct PaymentSettingsAddAccountButton: View {
         Button(action: action) {
             HStack(spacing: 12) {
                 Image(systemName: "plus.circle.fill")
-                    .font(.system(size: 22, weight: .bold))
+                    .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(MegrumTheme.lavender)
                 Text("受け取り口座を追加する")
-                    .font(.system(size: 16, weight: .black, design: .rounded))
+                    .font(.system(size: 15, weight: .semibold, design: .rounded))
                     .foregroundStyle(MegrumTheme.lavender)
                 Spacer(minLength: 0)
             }

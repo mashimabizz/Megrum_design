@@ -47,8 +47,10 @@ public struct MegrumRootView: View {
         _showsSearch = State(initialValue: visualQAInitialScreen == .search)
         _drawerDestination = State(initialValue: {
             switch visualQAInitialScreen {
-            case .oshiSettings: .oshiSettings
+            case .oshiSettings, .oshiMasterSelect: .oshiSettings
             case .notifications: .notifications
+            case .paymentSettings: .paymentSettings
+            case .exchangeSettings: .exchangeSettings
             default: nil
             }
         }())

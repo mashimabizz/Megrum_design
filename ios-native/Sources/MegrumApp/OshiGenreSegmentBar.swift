@@ -16,14 +16,18 @@ struct OshiGenreSegmentBar: View {
                         }
                     } label: {
                         Text(option.title)
-                            .font(.system(size: 13.5, weight: .black, design: .rounded))
+                            .font(.system(size: 13.5, weight: .semibold, design: .rounded))
                             .lineLimit(1)
                             .minimumScaleFactor(0.82)
-                            .foregroundStyle(selection == option.id ? .white : MegrumTheme.ink)
+                            .foregroundStyle(selection == option.id ? .white : MegrumTheme.ink.opacity(0.78))
                             .padding(.horizontal, 15)
                             .frame(minWidth: OshiMasterSelectLayoutMetrics.genreSegmentMinWidth)
                             .frame(height: OshiMasterSelectLayoutMetrics.genreSegmentHeight - 6)
-                            .background(selection == option.id ? MegrumTheme.lavender : .clear, in: Capsule())
+                            .background {
+                                if selection == option.id {
+                                    Capsule().fill(MegrumTheme.primaryGradient)
+                                }
+                            }
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel(option.title)

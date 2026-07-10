@@ -25,49 +25,49 @@ private struct HomeExchangePreferenceCard: View {
     var isSelected: Bool
     var action: () -> Void
 
+    // iter1226.416 刷新：左上の空ラジオを廃止し、選択＝ラベンダー枠＋淡い塗り＋右上チェックに。
     var body: some View {
         Button(action: action) {
-            ZStack(alignment: .topLeading) {
-                VStack(spacing: 7) {
-                    Image(systemName: preference.iconName)
-                        .font(.system(size: 18, weight: .bold))
-                        .foregroundStyle(preference.iconTint)
-                        .frame(width: 32, height: 32)
-                        .background(preference.iconTint.opacity(0.13), in: Circle())
-                        .accessibilityHidden(true)
+            VStack(spacing: 7) {
+                Image(systemName: preference.iconName)
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(preference.iconTint)
+                    .frame(width: 34, height: 34)
+                    .background(preference.iconTint.opacity(0.12), in: Circle())
+                    .accessibilityHidden(true)
 
-                    Text(preference.displayName)
-                        .font(.caption.weight(.black))
-                        .foregroundStyle(MegrumTheme.ink)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.62)
-                        .frame(maxWidth: .infinity)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-
-                HStack {
-                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                        .font(.system(size: 18, weight: .bold))
-                        .foregroundStyle(isSelected ? MegrumTheme.lavender : MegrumTheme.muted.opacity(0.62))
-
-                    Spacer(minLength: 0)
-                }
+                Text(preference.displayName)
+                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .foregroundStyle(MegrumTheme.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.62)
+                    .frame(maxWidth: .infinity)
             }
             .padding(.horizontal, 7)
-            .padding(.vertical, 8)
-            .frame(maxWidth: .infinity, minHeight: 70)
+            .padding(.vertical, 10)
+            .frame(maxWidth: .infinity, minHeight: 72)
             .background(
-                isSelected ? Color.white.opacity(0.82) : Color.white.opacity(0.72),
-                in: RoundedRectangle(cornerRadius: 14)
+                isSelected ? MegrumTheme.lavender.opacity(0.08) : Color.white.opacity(0.72),
+                in: RoundedRectangle(cornerRadius: 16, style: .continuous)
             )
             .overlay {
-                RoundedRectangle(cornerRadius: 14)
-                    .stroke(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .strokeBorder(
                         isSelected ? MegrumTheme.lavender : MegrumTheme.ink.opacity(0.08),
-                        lineWidth: isSelected ? 1.7 : 1
+                        lineWidth: isSelected ? 1.6 : 1
                     )
             }
-            .shadow(color: MegrumTheme.ink.opacity(isSelected ? 0.08 : 0.035), radius: isSelected ? 18 : 10, y: 8)
+            .overlay(alignment: .topTrailing) {
+                if isSelected {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(.white)
+                        .frame(width: 18, height: 18)
+                        .background(MegrumTheme.lavender, in: Circle())
+                        .offset(x: 6, y: -6)
+                }
+            }
+            .shadow(color: MegrumTheme.ink.opacity(isSelected ? 0.06 : 0.03), radius: isSelected ? 14 : 8, y: 6)
         }
         .buttonStyle(.plain)
         .accessibilityLabel("\(preference.displayName)、\(isSelected ? "選択中" : "未選択")")
