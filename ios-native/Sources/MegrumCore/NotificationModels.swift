@@ -87,6 +87,12 @@ public struct MegrumNotification: Identifiable, Codable, Hashable, Sendable {
     public var linkPath: String?
     public var readAt: Date?
     public var createdAt: Date
+    /// 通知を発生させたユーザー（いいねした人・打診した人など）。運営通知等は nil。iter1226.413。
+    public var actorUserID: UUID?
+    /// 挿入時点の行為者表示名スナップショット。
+    public var actorDisplayName: String?
+    /// 挿入時点の行為者アバターURLスナップショット。
+    public var actorAvatarURL: URL?
 
     public init(
         id: UUID,
@@ -95,7 +101,10 @@ public struct MegrumNotification: Identifiable, Codable, Hashable, Sendable {
         body: String? = nil,
         linkPath: String? = nil,
         readAt: Date? = nil,
-        createdAt: Date = .now
+        createdAt: Date = .now,
+        actorUserID: UUID? = nil,
+        actorDisplayName: String? = nil,
+        actorAvatarURL: URL? = nil
     ) {
         self.id = id
         self.kind = kind
@@ -104,6 +113,9 @@ public struct MegrumNotification: Identifiable, Codable, Hashable, Sendable {
         self.linkPath = linkPath
         self.readAt = readAt
         self.createdAt = createdAt
+        self.actorUserID = actorUserID
+        self.actorDisplayName = actorDisplayName
+        self.actorAvatarURL = actorAvatarURL
     }
 
     public var isUnread: Bool {

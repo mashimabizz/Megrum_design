@@ -9,6 +9,8 @@ struct NotificationCenterContent: View {
     var isLoading: Bool
     var notifications: [MegrumNotification]
     var onSelectNotification: (MegrumNotification) -> Void
+    /// いいね集約行のタップ（束ねた全通知を渡す。既読化は呼び出し側の責務）。iter1226.413。
+    var onSelectLikeGroup: ([MegrumNotification]) -> Void = { _ in }
 
     var body: some View {
         List {
@@ -33,12 +35,21 @@ struct NotificationCenterContent: View {
             } else {
                 ForEach(sections) { section in
                     Section {
-                        ForEach(section.notifications) { notification in
-                            NotificationCenterRow(notification: notification) {
-                                onSelectNotification(notification)
+                        ForEach(section.displayItems) { item in
+                            Group {
+                                switch item {
+                                case .single(let notification):
+                                    NotificationCenterRow(notification: notification) {
+                                        onSelectNotification(notification)
+                                    }
+                                case .groomLikeGroup(let group):
+                                    NotificationCenterLikeGroupRow(group: group) {
+                                        onSelectLikeGroup(group.notifications)
+                                    }
+                                }
                             }
                             .listRowBackground(
-                                notification.isUnread
+                                item.isUnread
                                     ? MegrumTheme.lavender.opacity(0.07)
                                     : Color.clear
                             )

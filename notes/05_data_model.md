@@ -3,13 +3,14 @@
 > **目的**：Megrum の全エンティティのDBスキーマ設計と、状態・マッチング・取引のデータフロー定義。
 > 実装の正解集。`09_state_machines.md` と完全に整合させ、`10_glossary.md` の用語を使う。
 
-最終更新: 2026-07-03
-ステータス: Draft v2.64（iter1226.273 profile-photos Storage bucket を追加）
+最終更新: 2026-07-10
+ステータス: Draft v2.65（iter1226.413 notifications に行為者スナップショットを追加）
 
 ## 最新化履歴
 
 | Rev | 日付 | 変更 |
 |---|---|---|
+| **v2.65** | **2026-07-10** | **iter1226.413 反映（`notifications.actor_user_id` / `actor_display_name` / `actor_avatar_url` を追加。表示名・アバターは挿入時スナップショットとして非正規化し、`create_trade_notification` / `create_meguri_notification` / `notify_groom_post_published` / `notify_meguri_board_thread_posted` が焼き込む。通知センターのアバターファースト表示と groom_liked 集約に使用。運営通知等は null）** |
 | **v2.64** | **2026-07-03** | **iter1226.273 反映（`profile-photos` Storage bucket を追加し、めぐりプロフィール/グッズ交換プロフィールのカスタムアイコンURL保存で使う公開プロフィール画像アップロード先をDB側に用意）** |
 | **v2.63** | **2026-07-01** | **iter1226.258 反映（`meguri_profiles.last_changed_at` と保存RPCの1ヶ月ロック対象を表示名変更に限定し、アイコン変更・`uses_public_profile` 切り替えは保存できるようにした）** |
 | **v2.62** | **2026-06-30** | **iter1226.231 反映（`groom_posts` / `meguri_board_threads` に任意の `group_id` / `character_id` / `series_name` を追加し、めぐりホームで推し・シリーズによる表示フィルターに使えるようにした）** |

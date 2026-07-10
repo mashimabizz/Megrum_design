@@ -24,7 +24,8 @@ struct NotificationCenterScreen: View {
             presentationState: $presentationState,
             isLoading: appState.isLoadingNotifications,
             notifications: appState.notifications,
-            onSelectNotification: openNotification
+            onSelectNotification: openNotification,
+            onSelectLikeGroup: openLikeGroup
         )
         .navigationTitle("通知")
         .megrumInlineNavigationTitle()
@@ -52,6 +53,24 @@ struct NotificationCenterScreen: View {
         Task {
             await appState.markNotificationRead(notification.id)
             guard let intent = NotificationRouteIntent(notification: notification) else {
+                return
+            }
+            if !onOpenRouteIntent(intent) {
+                onOpenDestination(intent.fallbackTab)
+            }
+        }
+    }
+
+    /// いいね集約行：束ねた全通知を既読化してから、最新の通知の遷移先を開く。iter1226.413。
+    private func openLikeGroup(_ notifications: [MegrumNotification]) {
+        guard let newest = notifications.first else {
+            return
+        }
+        Task {
+            for notification in notifications where notification.isUnread {
+                await appState.markNotificationRead(notification.id)
+            }
+            guard let intent = NotificationRouteIntent(notification: newest) else {
                 return
             }
             if !onOpenRouteIntent(intent) {

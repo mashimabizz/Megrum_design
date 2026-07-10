@@ -185,7 +185,28 @@ enum NativePreviewData {
             title: "新しい打診が届いています",
             body: "ランダムトレカAについて交換の打診があります。",
             linkPath: "/proposals/preview",
-            createdAt: Date(timeIntervalSinceNow: -1_080)
+            createdAt: Date(timeIntervalSinceNow: -1_080),
+            actorUserID: partnerID,
+            actorDisplayName: "ハナ"
+        ),
+        // 同じグルームへのいいね2件＝集約行の検証用（iter1226.413）。
+        MegrumNotification(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000084")!,
+            kind: .groomLiked,
+            title: "ハナさんからいいねされました！",
+            linkPath: "/grooms/00000000-0000-0000-0000-0000000000aa",
+            createdAt: Date(timeIntervalSinceNow: -600),
+            actorUserID: partnerID,
+            actorDisplayName: "ハナ"
+        ),
+        MegrumNotification(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000085")!,
+            kind: .groomLiked,
+            title: "minaさんからいいねされました！",
+            linkPath: "/grooms/00000000-0000-0000-0000-0000000000aa",
+            createdAt: Date(timeIntervalSinceNow: -900),
+            actorUserID: UUID(uuidString: "00000000-0000-0000-0000-000000000092")!,
+            actorDisplayName: "mina"
         ),
         MegrumNotification(
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000082")!,

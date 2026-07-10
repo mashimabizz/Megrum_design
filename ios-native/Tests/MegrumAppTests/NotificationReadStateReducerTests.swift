@@ -131,21 +131,66 @@ final class NotificationReadStateReducerTests: XCTestCase {
         XCTAssertEqual(updated.first(where: { $0.id == otherID })?.title, "そのまま")
     }
 
+    func testDisplayItemsAggregateGroomLikesByTarget() {
+        let groomPath = "/grooms/00000000-0000-0000-0000-00000000aaaa"
+        let like1 = makeNotification(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000131")!,
+            kind: .groomLiked,
+            linkPath: groomPath,
+            actorDisplayName: "ハナ"
+        )
+        let like2 = makeNotification(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000132")!,
+            kind: .groomLiked,
+            linkPath: groomPath,
+            readAt: Date(timeIntervalSince1970: 10)
+        )
+        let otherLike = makeNotification(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000133")!,
+            kind: .groomLiked,
+            linkPath: "/grooms/00000000-0000-0000-0000-00000000bbbb"
+        )
+        let message = makeNotification(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000134")!,
+            kind: .messageReceived
+        )
+
+        let items = NotificationCenterDisplayItem.items(from: [like1, message, like2, otherLike])
+
+        XCTAssertEqual(items.count, 3)
+        guard case .groomLikeGroup(let group) = items[0] else {
+            return XCTFail("先頭は集約行のはず")
+        }
+        XCTAssertEqual(group.notifications.map(\.id), [like1.id, like2.id])
+        XCTAssertEqual(group.summaryText, "ハナさん、他1人がいいねしました")
+        XCTAssertTrue(group.isUnread)
+        guard case .single(let second) = items[1], second.id == message.id else {
+            return XCTFail("2番目はメッセージ単独行のはず")
+        }
+        // 1件だけのいいねは通常行のまま。
+        guard case .single(let third) = items[2], third.id == otherLike.id else {
+            return XCTFail("3番目は単独いいね行のはず")
+        }
+    }
+
     private func makeNotification(
         id: UUID,
         kind: MegrumNotificationKind = .proposalReceived,
         title: String = "通知",
+        linkPath: String? = nil,
         readAt: Date? = nil,
-        createdAt: Date = Date(timeIntervalSince1970: 0)
+        createdAt: Date = Date(timeIntervalSince1970: 0),
+        actorDisplayName: String? = nil
     ) -> MegrumNotification {
         MegrumNotification(
             id: id,
             kind: kind,
             title: title,
             body: "本文",
-            linkPath: "/proposals/\(id.uuidString)",
+            linkPath: linkPath ?? "/proposals/\(id.uuidString)",
             readAt: readAt,
-            createdAt: createdAt
+            createdAt: createdAt,
+            actorDisplayName: actorDisplayName
         )
     }
 }

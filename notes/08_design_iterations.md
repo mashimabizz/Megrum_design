@@ -4,6 +4,45 @@
 
 ---
 
+## イテレーション1226.413：通知の行為者アバター・いいね集約＋シリーズ候補の3層化（iter1226.408/412の将来課題）
+
+### 背景・問題意識
+
+iter1226.408 の将来課題「行為者アバター先頭・『他N人』集約はDB拡張が必要」と、iter1226.412 の「よく使うシリーズはデータ供給拡張が必要」をオーナー指示でクリアする。
+
+### 変更内容
+
+#### `supabase/migrations/20260710150000_add_notification_actor.sql`（新規・**db push 適用済み**）
+- `notifications` に `actor_user_id`（FK users・on delete set null）/ `actor_display_name`（60）/ `actor_avatar_url`（1000）を追加。表示名・アバターは**挿入時スナップショットとして非正規化**（title の名前焼き込みと同方式。JOIN・grants・RLS複雑化を回避）
+- 挿入経路4つのうち中央2ヘルパー（`create_trade_notification` / `create_meguri_notification`）は **p_actor_id を既に受領していた**ため保存を追加するだけ（トリガー側は全て不変）。直接insertの `notify_groom_post_published` / `notify_meguri_board_thread_posted` は投稿者を actor として焼き込むよう最新本体を再作成
+- `megrum_notification_actor_avatar_url()` ヘルパー新設。運営アナウンス等 actor 不在は null
+
+#### Swift（MegrumCore/Data/App）
+- `MegrumNotification` に actorUserID / actorDisplayName / actorAvatarURL。`NotificationRow.select` に3列追加
+- **アバターファースト行**：actor がある通知は38ptアバター＋右下に種別ミニバッジ、無い通知は従来の種別アイコン円へフォールバック
+- **いいね集約**（`NotificationCenterDisplayItem`・純ロジック）：同じ linkPath（同じグルーム）への groom_liked 2件以上を「**ハナさん、他N人がいいねしました**」に集約。重ねアバター（重複行為者除外・最大3）＋ハートバッジ。タップで束ねた全通知を既読化→最新の遷移先へ。1件だけのいいねは通常行
+- プレビューデータに actor 付き通知＋同一グルームへのいいね2件を追加（VisualQA検証用）
+
+#### `GoodsEditorTagSuggestionBuilder.swift`（シリーズ候補の3層化）
+- ①同グループでよく使う（頻度順）→②**他グループ含む自分がよく使うシリーズ**（「会場限定」等の横断タグを拾う）→③定番、の3層に拡張。**グループ未選択時も②③を返す**（従来は空）。シリーズ登録シートの「候補」にそのまま供給される
+
+### 影響範囲
+
+- 通知センター（表示のみ・ルーティング/既読管理は不変）、シリーズ設定シートの候補。DBは追加列のみで既存行は actor null（フォールバック表示）
+
+### 確認方法
+
+- `supabase db push` 適用済み。`swift test` 全1540件パス（select期待値・プレビュー件数のテストを新仕様に更新）
+- VisualQA `notifications` で集約行・アバターバッジ・フォールバックを目視確認済み
+
+### セルフレビュー結果
+- ✅ 通知トリガーは中央ヘルパー差し替えのみで呼び出し側無変更（回帰リスク最小）
+- ✅ notes/05 を v2.65 に更新
+- ⚠️ 右端の対象サムネ（グッズ/グルーム画像）は Storage 署名URLの寿命問題があるため未実装のまま（実装するなら storage パス保存＋表示時解決が必要）
+- ⚠️ 既存通知行は actor null のため、新表示は本マイグレーション以降の通知から効く
+
+---
+
 ## イテレーション1226.412：シリーズ登録シートを検索ファースト化（ペースト・絞り込み・新規追加行）
 
 ### 背景・問題意識

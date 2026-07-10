@@ -1794,12 +1794,13 @@ final class MegrumAppStateTests: XCTestCase {
 
         await state.loadNotifications()
 
-        XCTAssertEqual(state.unreadNotificationCount, 2)
+        // プレビュー通知：未読4件（打診・いいね2件・ボード返信）＋既読1件（iter1226.413で集約検証用のいいねを追加）。
+        XCTAssertEqual(state.unreadNotificationCount, 4)
 
         let notificationID = try! XCTUnwrap(state.notifications.first?.id)
         await state.markNotificationRead(notificationID)
 
-        XCTAssertEqual(state.unreadNotificationCount, 1)
+        XCTAssertEqual(state.unreadNotificationCount, 3)
 
         await state.markAllNotificationsRead()
 

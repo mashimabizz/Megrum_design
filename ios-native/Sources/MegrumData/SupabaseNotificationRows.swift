@@ -2,7 +2,8 @@ import Foundation
 import MegrumCore
 
 struct NotificationRow: Decodable, Sendable {
-    static let select = "id,kind,title,body,link_path,read_at,created_at"
+    static let select = "id,kind,title,body,link_path,read_at,created_at,"
+        + "actor_user_id,actor_display_name,actor_avatar_url"
 
     var id: UUID
     var kind: String
@@ -11,6 +12,10 @@ struct NotificationRow: Decodable, Sendable {
     var linkPath: String?
     var readAt: Date?
     var createdAt: Date
+    // 注意：プロパティ名は convertFromSnakeCase の変換結果に合わせる（actor_user_id→actorUserId）。
+    var actorUserId: UUID?
+    var actorDisplayName: String?
+    var actorAvatarUrl: String?
 
     var notification: MegrumNotification {
         MegrumNotification(
@@ -20,7 +25,10 @@ struct NotificationRow: Decodable, Sendable {
             body: body,
             linkPath: linkPath,
             readAt: readAt,
-            createdAt: createdAt
+            createdAt: createdAt,
+            actorUserID: actorUserId,
+            actorDisplayName: actorDisplayName,
+            actorAvatarURL: actorAvatarUrl.flatMap(URL.init(string:))
         )
     }
 }

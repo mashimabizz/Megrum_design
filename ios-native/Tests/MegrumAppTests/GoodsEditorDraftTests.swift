@@ -70,10 +70,29 @@ final class GoodsEditorDraftTests: XCTestCase {
             limit: 4
         )
 
+        // ①同グループ頻度順 → ②他グループ含む自分の使用タグ → ③定番（iter1226.413で3層化）。
         XCTAssertEqual(Array(suggestions.prefix(2)), ["alpha", "zeta"])
         XCTAssertFalse(suggestions.contains("LIVE"))
-        XCTAssertFalse(suggestions.contains("otherOnly"))
+        XCTAssertEqual(suggestions[2], "otherOnly")
         XCTAssertEqual(suggestions.count, 4)
+    }
+
+    func testGoodsEditorTagSuggestionBuilderReturnsOwnUsageWithoutGroup() {
+        let ownerID = UUID()
+        let inventory = [
+            makeGoodsItem(ownerID: ownerID, groupID: UUID(), tagNames: ["会場ガチャ"])
+        ]
+
+        // グループ未選択でも自分の使用タグ＋定番を返す（従来は空だった）。
+        let suggestions = GoodsEditorTagSuggestionBuilder.suggestions(
+            groupID: nil,
+            selectedTags: [],
+            inventory: inventory,
+            wishes: [],
+            limit: 3
+        )
+
+        XCTAssertEqual(suggestions, ["会場ガチャ", "会場限定", "未開封"])
     }
 
     func testGoodsEditorTagSuggestionBuilderUsesFallbackOrderWhenHistoryIsEmpty() {
