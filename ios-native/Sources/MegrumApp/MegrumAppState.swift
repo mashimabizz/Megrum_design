@@ -46,6 +46,11 @@ public final class MegrumAppState: ObservableObject {
     @Published public internal(set) var meguriProfilesByUserID: [UUID: MeguriProfile] = [:]
     @Published public internal(set) var grooms: [GroomPost] = []
     @Published public internal(set) var groomMapPosts: [GroomPost] = []
+    /// 地図のパン/ズーム（ビューポート読み込み）で取得したグルームの蓄積（iter1226.433）。
+    /// 通常フィード（置き換え型）の読み込みで消されないよう専用ストアに分離する。
+    @Published public internal(set) var viewportGroomPosts: [GroomPost] = []
+    /// 同上：ビューポート読み込みで取得したチャットルームの蓄積。
+    @Published public internal(set) var viewportBoardThreads: [BoardThread] = []
     @Published public internal(set) var ownGroomArchive: [GroomPost] = []
     @Published public internal(set) var viewedGroomIDs: Set<UUID> = []
     @Published public internal(set) var likedGroomIDs: Set<UUID> = []

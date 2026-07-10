@@ -32,7 +32,8 @@ struct BoardThreadDetailScreen: View {
     }
 
     private var currentThread: BoardThread {
-        appState.threads.first { $0.id == thread.id } ?? thread
+        // iter1226.433：ビューポート読み込みでしか取得していないスレッドも最新状態で引けるようにする。
+        appState.meguriMapDisplayThreads.first { $0.id == thread.id } ?? thread
     }
 
     private var replies: [BoardReply] {
@@ -41,6 +42,25 @@ struct BoardThreadDetailScreen: View {
 
     private var replyContextScope: BoardThread.Audience {
         currentThread.audience == .sameSpot ? .nearby3km : currentThread.audience
+    }
+
+    /// FB(iter1226.433)：圏外チャットルームは閲覧のみ（プレミアムで開けても書き込み不可）。
+    /// 該当時は入力欄そのものを出さない。
+    private var isViewOnlyOutOfRange: Bool {
+        guard replyContextScope == .nearby3km else {
+            return false
+        }
+        guard currentThread.authorID != appState.viewer?.id else {
+            return false
+        }
+        guard let distance = MeguriAccessPolicy.distanceMeters(
+            from: effectiveCoordinate,
+            to: currentThread
+        ) else {
+            // 現在地未取得は既存の「現在地が必要です」バナーに任せる。
+            return false
+        }
+        return distance > MeguriAccessPolicy.boardOpenRadiusMeters
     }
 
     private var missingReplyContextMessage: String? {
@@ -229,33 +249,42 @@ struct BoardThreadDetailScreen: View {
             .safeAreaInset(edge: .bottom) {
                 // 入室確定前（紹介画面・注意事項）は入力欄を出さない。
                 if roomEntryPhase == .entered || roomEntryPhase == .undetermined {
-                    VStack(spacing: 0) {
-                        if let replyTarget {
-                            ChatReplyComposerPreview(target: replyTarget) {
-                                self.replyTarget = nil
+                    // FB(iter1226.433)：1km圏外は閲覧のみ。入力欄自体を出さず、理由だけ示す。
+                    if isViewOnlyOutOfRange {
+                        MeguriNoticeBanner(message: "1km圏外のチャットルームは閲覧のみ利用できます")
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 10)
+                            .frame(maxWidth: .infinity)
+                            .background(.ultraThinMaterial)
+                    } else {
+                        VStack(spacing: 0) {
+                            if let replyTarget {
+                                ChatReplyComposerPreview(target: replyTarget) {
+                                    self.replyTarget = nil
+                                }
                             }
-                        }
-                        // iter1226.423：返信できない理由は入力欄に覆い被せて固定表示する
-                        //（以前はタイムライン最上部で、スクロールしないと気付けなかった）。
-                        ZStack {
-                            BoardReplyInput(
-                                text: $replyComposerState.draftReply,
-                                isSending: appState.sendingBoardReplyThreadID == currentThread.id,
-                                isDisabled: missingReplyContextMessage != nil,
-                                canUseCamera: canUseCamera,
-                                onOpenCamera: openCamera,
-                                onOpenPhotoLibrary: openPhotoLibrary
-                            ) {
-                                sendReply(proxy: proxy)
-                            }
-                            .opacity(missingReplyContextMessage == nil ? 1 : 0.35)
+                            // iter1226.423：返信できない理由は入力欄に覆い被せて固定表示する
+                            //（以前はタイムライン最上部で、スクロールしないと気付けなかった）。
+                            ZStack {
+                                BoardReplyInput(
+                                    text: $replyComposerState.draftReply,
+                                    isSending: appState.sendingBoardReplyThreadID == currentThread.id,
+                                    isDisabled: missingReplyContextMessage != nil,
+                                    canUseCamera: canUseCamera,
+                                    onOpenCamera: openCamera,
+                                    onOpenPhotoLibrary: openPhotoLibrary
+                                ) {
+                                    sendReply(proxy: proxy)
+                                }
+                                .opacity(missingReplyContextMessage == nil ? 1 : 0.35)
 
-                            if let missingReplyContextMessage {
-                                MeguriNoticeBanner(message: missingReplyContextMessage)
-                                    .padding(.horizontal, 14)
-                                    .padding(.vertical, 8)
-                                    .frame(maxWidth: .infinity)
-                                    .background(.ultraThinMaterial)
+                                if let missingReplyContextMessage {
+                                    MeguriNoticeBanner(message: missingReplyContextMessage)
+                                        .padding(.horizontal, 14)
+                                        .padding(.vertical, 8)
+                                        .frame(maxWidth: .infinity)
+                                        .background(.ultraThinMaterial)
+                                }
                             }
                         }
                     }

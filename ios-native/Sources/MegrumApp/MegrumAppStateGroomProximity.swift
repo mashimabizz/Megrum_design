@@ -71,6 +71,7 @@ extension MegrumAppState {
         // 既存位置を保った差し替え（存在しない配列には触れない）。
         grooms = grooms.map { $0.id == postID ? fresh : $0 }
         groomMapPosts = groomMapPosts.map { $0.id == postID ? fresh : $0 }
+        viewportGroomPosts = viewportGroomPosts.map { $0.id == postID ? fresh : $0 }
         encounteredGrooms = encounteredGrooms.map { $0.id == postID ? fresh : $0 }
         syncLikedGroomIDs(with: [fresh])
     }
@@ -87,6 +88,12 @@ extension MegrumAppState {
     func markGroomsEncounteredInRange(_ ids: [UUID]) {
         let idSet = Set(ids)
         groomMapPosts = groomMapPosts.map { groom in
+            guard idSet.contains(groom.id) else { return groom }
+            var updated = groom
+            updated.encounteredInRange = true
+            return updated
+        }
+        viewportGroomPosts = viewportGroomPosts.map { groom in
             guard idSet.contains(groom.id) else { return groom }
             var updated = groom
             updated.encounteredInRange = true

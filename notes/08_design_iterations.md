@@ -4,6 +4,66 @@
 
 ---
 
+## イテレーション1226.433：グルーム投稿の現在地更新＋圏外ピン消失修正＋圏外チャット閲覧のみ化
+
+### 背景・問題意識
+
+オーナー報告（FB 7・8）：
+1. ホーム経由のグルーム投稿で位置指定するとき、自分の位置がその時の場所に更新されていない
+2. 圏外のグルーム/チャットルームが表示されないことがある。チャットルームはたまに表示されるが、拡大や統合（クラスタ）タップで消える
+3. プレミアムの圏外チャットルームは閲覧のみなので、入力欄を出さないでほしい
+
+### 調査結果
+
+1. `GroomComposerContainer` は「座標が nil のときだけ」位置取得を開始していたため、前回取得の古い現在地が残っているとそのまま使われていた
+2. **読み込み経路の不整合**：地図パン/ズームのビューポート読み込みは `groomMapPosts`/`threads` へ**マージ**、一方で位置更新（10m毎）等で走る通常フィード読み込みは同じ配列を**置き換え**。ビューポートで取得した圏外ピンが、直後の再読み込みで丸ごと消えていた
+3. 返信ゲートは「現在地未取得」「都道府県未設定」しか見ておらず、圏外（1km外）でも現在地さえあれば入力欄が活きていた
+
+### 変更内容
+
+#### `GroomComposerContainer.swift`（FB7）
+- コンポーザを開くたびに必ず `startUpdatingCurrentLocation()`（閉じたら stop）
+- 新しい現在地が届いたら、**ユーザーが地図タップでピンを選ぶ前に限り**デフォルトピンも追随（手動選択はカスタム Binding で検知）
+
+#### `MegrumAppState`（FB8a：ビューポート蓄積ストアの分離）
+- `viewportGroomPosts` / `viewportBoardThreads` を新設。`loadMeguriMapViewport` はここへマージ（通常フィードの置き換えに消されない）
+- 地図表示は合成プロパティ `meguriMapDisplayGrooms` / `meguriMapDisplayThreads`（通常読み込み分が新鮮・優先、ビューポート蓄積分を補完）
+- いいね/削除/ブロック/遭遇フラグ/リアクション等のローカル変異・ロールバックをビューポートストアにもミラー
+- 読み取り側：ホーム地図（`MeguriScreen.visibleMapGrooms`/`visibleThreads`）とフルスクリーン地図（`MeguriMapScreen`）を合成プロパティへ切替。チャットルーム一覧（`homeNearbyBoardThreads`）は別ストアのため影響なし
+
+#### `MeguriAccessPolicy` / `BoardThreadDetailScreen.swift`（FB8b）
+- `canReplyToBoard`：書き込みは作成者か1km圏内のみ（位置なしスレッドは制約なし、現在地未取得は既存の案内に委譲）
+- 詳細画面：1km圏外（作成者以外）は**入力欄そのものを非表示**にし「1km圏外のチャットルームは閲覧のみ利用できます」バナーを表示
+- `currentThread` の解決をビューポート蓄積分も含む合成へ変更
+
+### 影響範囲
+
+- ホーム経由グルーム作成の位置プレビュー／めぐり地図（ホーム・フルスクリーン）のピン表示／チャットルーム詳細の入力欄
+- 状態遷移・DB・API 影響なし（クライアント内のデータ保持と表示ゲートのみ）
+
+### 確認方法
+
+- `swift test`：全テストパス（`canReplyToBoard` 5ケース＋ビューポートマージ1ケースを追加）
+- シミュレータビルド成功。地図の消失は実データ依存のため、実機での再現確認をオーナーに依頼
+- **ios-native のため実機反映はネイティブビルドが必要**
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/GroomComposerContainer.swift`
+- `ios-native/Sources/MegrumApp/MegrumAppState.swift` / `MegrumAppStateGroomActions.swift` / `MegrumAppStateGroomProximity.swift` / `MegrumAppStateMeguriActions.swift`
+- `ios-native/Sources/MegrumApp/MeguriScreen.swift` / `MeguriMapScreenDerivedState.swift` / `MeguriMapViews.swift` / `MeguriMapScreenActions.swift`
+- `ios-native/Sources/MegrumApp/MeguriAccessPolicy.swift` / `BoardThreadDetailScreen.swift`
+
+### セルフレビュー結果
+- ✅ ビューポート蓄積分は「新しい取得結果優先」で合成（古いデータが新鮮なデータを上書きしない）
+- ✅ ローカル変異（いいね・削除・ブロック・遭遇・リアクション）とその失敗ロールバックをミラー済み
+- ✅ チャットルーム一覧・掲示板一覧は別ストアで表示範囲の意味が変わらない
+- ✅ 入力欄の非表示は作成者を除外（自分のルームは圏外でも管理できる）
+- ⚠️ ビューポート蓄積はセッション中増える一方（削除通知が無い限り残る）。表示劣化があれば距離/件数で間引きを検討
+- ⚠️ 「圏外グルーム/チャットが最初から表示されない」ケースは 3km 取得範囲外の可能性あり。今回の修正は「取得済みが消える」問題の解消が主
+
+---
+
 ## イテレーション1226.432：左スワイプのメッセージ一覧を常駐化（毎回の読み込み表示を解消）
 
 ### 背景・問題意識

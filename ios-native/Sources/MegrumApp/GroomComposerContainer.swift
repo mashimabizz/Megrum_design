@@ -17,16 +17,30 @@ struct GroomComposerContainer<Content: View>: View {
     @State private var draftPhotoData: Data?
     @State private var draftPhotoContentType = "image/jpeg"
     @State private var creationCoordinate: MegrumLocationCoordinate?
+    /// FB(iter1226.433)：ユーザーが地図タップでピンを選んだかどうか。
+    /// 選ぶ前は、後から届く新しい現在地へデフォルトピンを追随させる。
+    @State private var hasManualCreationCoordinate = false
     @State private var isPreparingPhoto = false
     @State private var isCreating = false
     @State private var isShowingCamera = false
+
+    /// 地図タップ（ユーザー操作）による選択だけを手動扱いにするためのバインディング。
+    private var userCreationCoordinateBinding: Binding<MegrumLocationCoordinate?> {
+        Binding(
+            get: { creationCoordinate },
+            set: { newValue in
+                hasManualCreationCoordinate = newValue != nil
+                creationCoordinate = newValue
+            }
+        )
+    }
 
     var body: some View {
         content()
             .modifier(
                 MeguriGroomComposerPresentationModifier(
                     selectedPhotoItem: $selectedPhotoItem,
-                    selectedCreationCoordinate: $creationCoordinate,
+                    selectedCreationCoordinate: userCreationCoordinateBinding,
                     draftPhotoData: $draftPhotoData,
                     draftPhotoContentType: $draftPhotoContentType,
                     isPreparingPhoto: isPreparingPhoto,
@@ -63,12 +77,22 @@ struct GroomComposerContainer<Content: View>: View {
                     if creationCoordinate == nil {
                         creationCoordinate = locationState.coordinate
                     }
-                    if locationState.coordinate == nil {
-                        locationState.startUpdatingCurrentLocation()
-                    }
+                    // FB(iter1226.433)：前回取得の古い現在地が残っていても、開くたびに
+                    // 必ず再取得を始める（「自分の位置がその時の場所に更新されない」対策）。
+                    // 専用の locationState なので、閉じたら停止して無駄な測位を止める。
+                    locationState.startUpdatingCurrentLocation()
                 } else {
+                    locationState.stopUpdatingCurrentLocation()
                     resetDraft()
                 }
+            }
+            .onChange(of: locationState.coordinate) { _, newCoordinate in
+                // 新しい現在地が届いたら、ユーザーがまだピンを選んでいない間は
+                // デフォルトピンも最新の現在地へ追随させる（古い位置のまま公開されるのを防ぐ）。
+                guard isPresented, !hasManualCreationCoordinate, let newCoordinate else {
+                    return
+                }
+                creationCoordinate = newCoordinate
             }
     }
 
@@ -173,6 +197,7 @@ struct GroomComposerContainer<Content: View>: View {
         draftPhotoData = nil
         draftPhotoContentType = "image/jpeg"
         creationCoordinate = nil
+        hasManualCreationCoordinate = false
         isPreparingPhoto = false
     }
 }

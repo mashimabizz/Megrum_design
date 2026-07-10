@@ -3,7 +3,12 @@ import MegrumCore
 
 extension MeguriMapScreen {
     var mapGrooms: [GroomPost] {
-        appState.groomMapPosts.isEmpty ? appState.grooms : appState.groomMapPosts
+        // iter1226.433：ビューポート蓄積分も含める（再読み込みで圏外ピンが消えない）。
+        appState.meguriMapDisplayGrooms
+    }
+
+    var mapThreads: [BoardThread] {
+        appState.meguriMapDisplayThreads
     }
 
     var isLoadingMapContent: Bool {

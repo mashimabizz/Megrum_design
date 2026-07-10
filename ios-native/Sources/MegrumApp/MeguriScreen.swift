@@ -104,15 +104,16 @@ struct MeguriScreen: View {
         if appState.isTutorialActive {
             return TutorialSampleMeguriData.grooms
         }
-        return (appState.groomMapPosts.isEmpty ? appState.grooms : appState.groomMapPosts)
-            .filter(isOwnOrMatchesFilter)
+        // iter1226.433：ビューポート読み込みで蓄積した圏外グルームも（再読み込み後も）消えずに出す。
+        return appState.meguriMapDisplayGrooms.filter(isOwnOrMatchesFilter)
     }
 
     var visibleThreads: [BoardThread] {
         if appState.isTutorialActive {
             return TutorialSampleMeguriData.threads
         }
-        return appState.threads.filter { contentFilter.matches(thread: $0) }
+        // iter1226.433：ビューポート読み込みで蓄積した圏外チャットルームも消えずに出す。
+        return appState.meguriMapDisplayThreads.filter { contentFilter.matches(thread: $0) }
     }
 
     var body: some View {

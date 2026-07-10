@@ -15,7 +15,7 @@ extension MeguriMapScreen {
         let region = kind.visibleRegion(
             userCoordinate: userCoordinate,
             grooms: mapGrooms,
-            threads: appState.threads,
+            threads: mapThreads,
             boardScope: boardScope
         )
         let update = {

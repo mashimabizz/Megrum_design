@@ -105,6 +105,27 @@ enum MeguriAccessPolicy {
         return distance <= boardOpenRadiusMeters
     }
 
+    /// 位置つきチャットルームへの書き込み可否（iter1226.433）。
+    /// プレミアムで圏外を「閲覧」できても、書き込みは作成者か1km圏内のみ。
+    /// 位置なしスレッドは距離制約なし。現在地未取得は判定不能として false
+    ///（呼び出し側が「現在地が必要」の案内を出す）。
+    static func canReplyToBoard(
+        _ thread: BoardThread,
+        currentCoordinate: MegrumLocationCoordinate?,
+        viewerID: UUID?
+    ) -> Bool {
+        if thread.authorID == viewerID {
+            return true
+        }
+        if thread.latitude == nil || thread.longitude == nil {
+            return true
+        }
+        guard let distance = distanceMeters(from: currentCoordinate, to: thread) else {
+            return false
+        }
+        return distance <= boardOpenRadiusMeters
+    }
+
     static func canCreateAt(
         _ selectedCoordinate: MegrumLocationCoordinate?,
         currentCoordinate: MegrumLocationCoordinate?

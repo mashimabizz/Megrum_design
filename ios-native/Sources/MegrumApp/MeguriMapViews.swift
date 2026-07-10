@@ -68,8 +68,8 @@ struct MeguriMapScreen: View {
         self.selectedPrefecture = selectedPrefecture
         self.boardScope = boardScope
         _kind = State(initialValue: kind)
-        let initialGrooms = appState.groomMapPosts.isEmpty ? appState.grooms : appState.groomMapPosts
-        _cameraPosition = State(initialValue: .region(MKCoordinateRegion(center: kind.initialCenter(userCoordinate: locationState.coordinate, grooms: initialGrooms, threads: appState.threads), span: kind.regionSpan)))
+        let initialGrooms = appState.meguriMapDisplayGrooms
+        _cameraPosition = State(initialValue: .region(MKCoordinateRegion(center: kind.initialCenter(userCoordinate: locationState.coordinate, grooms: initialGrooms, threads: appState.meguriMapDisplayThreads), span: kind.regionSpan)))
     }
 
     var body: some View {
@@ -80,7 +80,7 @@ struct MeguriMapScreen: View {
                 rangeCircle: rangeCircle,
                 currentCoordinate: locationState.coordinate,
                 grooms: mapGrooms,
-                threads: appState.threads,
+                threads: mapThreads,
                 isVisualQAPreviewEnabled: VisualQAPreviewMode.isEnabled(environment: ProcessInfo.processInfo.environment),
                 isGroomOutOfRange: isGroomOutOfRange,
                 isBoardOutOfRange: isBoardOutOfRange,

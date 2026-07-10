@@ -103,16 +103,31 @@ extension MegrumAppState {
         let (loadedGrooms, loadedThreads) = await (groomsTask, threadsTask)
 
         if let loadedGrooms {
-            groomMapPosts = Self.mergingByID(existing: groomMapPosts, incoming: loadedGrooms)
+            // iter1226.433：通常フィード（置き換え型）に消されない専用ストアへ蓄積する。
+            // 以前は groomMapPosts / threads へ直接マージしていたため、位置更新等による
+            // 再読み込み（置き換え）で圏外ピンが消えていた。
+            viewportGroomPosts = Self.mergingByID(existing: viewportGroomPosts, incoming: loadedGrooms)
             syncLikedGroomIDs(with: loadedGrooms)
             await loadMeguriProfiles(userIDs: Set(loadedGrooms.map(\.authorID)), reportsFailure: false)
         }
         if let loadedThreads {
-            threads = Self.mergingByID(existing: threads, incoming: loadedThreads)
+            viewportBoardThreads = Self.mergingByID(existing: viewportBoardThreads, incoming: loadedThreads)
         }
     }
 
-    private static func mergingByID<Item: Identifiable>(existing: [Item], incoming: [Item]) -> [Item] {
+    /// 地図に出すグルーム：通常読み込み分（新鮮・優先）＋ビューポート蓄積分（補完）。
+    public var meguriMapDisplayGrooms: [GroomPost] {
+        let base = groomMapPosts.isEmpty ? grooms : groomMapPosts
+        return Self.mergingByID(existing: viewportGroomPosts, incoming: base)
+    }
+
+    /// 地図に出すチャットルーム：通常読み込み分（新鮮・優先）＋ビューポート蓄積分（補完）。
+    public var meguriMapDisplayThreads: [BoardThread] {
+        Self.mergingByID(existing: viewportBoardThreads, incoming: threads)
+    }
+
+    /// ID重複は incoming（新しい取得結果）を優先し、existing にしか無いものを後ろへ残す。
+    static func mergingByID<Item: Identifiable>(existing: [Item], incoming: [Item]) -> [Item] {
         var merged = incoming
         var seen = Set(incoming.map(\.id))
         for item in existing where !seen.contains(item.id) {
@@ -285,6 +300,7 @@ extension MegrumAppState {
         let previousLikedIDs = likedGroomIDs
         let previousGrooms = grooms
         let previousMapPosts = groomMapPosts
+        let previousViewportPosts = viewportGroomPosts
         let previousArchive = ownGroomArchive
         let didChange = likedGroomIDs.contains(postID) != isLiked
         likedGroomIDs = GroomInteractionStateReducer.settingLiked(
@@ -303,6 +319,12 @@ extension MegrumAppState {
             isLiked: isLiked,
             adjustsCount: didChange,
             in: groomMapPosts
+        )
+        viewportGroomPosts = GroomPostLocalMutation.settingLiked(
+            postID: postID,
+            isLiked: isLiked,
+            adjustsCount: didChange,
+            in: viewportGroomPosts
         )
         ownGroomArchive = GroomPostLocalMutation.settingLiked(
             postID: postID,
@@ -338,6 +360,7 @@ extension MegrumAppState {
             likedGroomIDs = previousLikedIDs
             grooms = previousGrooms
             groomMapPosts = previousMapPosts
+            viewportGroomPosts = previousViewportPosts
             ownGroomArchive = previousArchive
             groomReactionsByPostID[postID] = previousReactions
             errorMessage = "グルームのいいねを更新できませんでした"
@@ -359,6 +382,7 @@ extension MegrumAppState {
 
         let previousGrooms = grooms
         let previousMapPosts = groomMapPosts
+        let previousViewportPosts = viewportGroomPosts
         let previousArchive = ownGroomArchive
         let previousReactions = groomReactionsByPostID
         let previousReplies = groomRepliesByPostID
@@ -369,6 +393,7 @@ extension MegrumAppState {
         errorMessage = nil
         grooms = GroomPostLocalMutation.removing(postID: groom.id, from: grooms)
         groomMapPosts = GroomPostLocalMutation.removing(postID: groom.id, from: groomMapPosts)
+        viewportGroomPosts = GroomPostLocalMutation.removing(postID: groom.id, from: viewportGroomPosts)
         ownGroomArchive = GroomPostLocalMutation.removing(postID: groom.id, from: ownGroomArchive)
         groomReactionsByPostID[groom.id] = nil
         groomRepliesByPostID[groom.id] = nil
@@ -382,6 +407,7 @@ extension MegrumAppState {
         } catch {
             grooms = previousGrooms
             groomMapPosts = previousMapPosts
+            viewportGroomPosts = previousViewportPosts
             ownGroomArchive = previousArchive
             groomReactionsByPostID = previousReactions
             groomRepliesByPostID = previousReplies
@@ -449,6 +475,7 @@ extension MegrumAppState {
             try await repository.blockGroomUser(groom.authorID)
             grooms = GroomPostLocalMutation.removing(authorID: groom.authorID, from: grooms)
             groomMapPosts = GroomPostLocalMutation.removing(authorID: groom.authorID, from: groomMapPosts)
+            viewportGroomPosts = GroomPostLocalMutation.removing(authorID: groom.authorID, from: viewportGroomPosts)
             ownGroomArchive = GroomPostLocalMutation.removing(authorID: groom.authorID, from: ownGroomArchive)
             blockingGroomUserID = nil
             return true

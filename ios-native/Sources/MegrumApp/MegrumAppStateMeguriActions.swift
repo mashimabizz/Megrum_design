@@ -224,16 +224,23 @@ extension MegrumAppState {
 
     public func setBoardThreadReaction(threadID: UUID, reaction: BoardMessageReaction?) async {
         let previousThreads = threads
+        let previousViewportThreads = viewportBoardThreads
         threads = ReplyThreadStateReducer.settingBoardThreadReaction(
             reaction,
             threadID: threadID,
             in: threads
+        )
+        viewportBoardThreads = ReplyThreadStateReducer.settingBoardThreadReaction(
+            reaction,
+            threadID: threadID,
+            in: viewportBoardThreads
         )
         errorMessage = nil
         do {
             try await repository.setBoardThreadReaction(threadID: threadID, reaction: reaction)
         } catch {
             threads = previousThreads
+            viewportBoardThreads = previousViewportThreads
             errorMessage = "リアクションを更新できませんでした"
         }
     }
