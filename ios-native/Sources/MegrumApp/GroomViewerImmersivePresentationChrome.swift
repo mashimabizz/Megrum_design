@@ -1,3 +1,4 @@
+import MegrumCore
 import SwiftUI
 
 extension View {
@@ -49,6 +50,20 @@ extension View {
 }
 
 #if os(iOS)
+/// iter1226.447：開くアニメーション開始前に準備を待つ対象（主画像）を伝えるための契約。
+/// 準拠していない Item は従来どおり即開く。
+protocol GroomViewerImmersiveItem {
+    var openReadyImageURL: URL? { get }
+}
+
+extension GroomPost: GroomViewerImmersiveItem {
+    var openReadyImageURL: URL? { imageURL }
+}
+
+extension GroomMapGroomSelection: GroomViewerImmersiveItem {
+    var openReadyImageURL: URL? { initialGroom.imageURL }
+}
+
 /// グルームビューアの没入表示ホスト（iter1226.445 全面書き換え）。
 ///
 /// 以前は `.transition(.scale)` ＋ コンテナの `.animation(_:value:)` で開閉していたが、
@@ -71,6 +86,8 @@ private struct GroomViewerImmersiveHost<Item: Identifiable, Content: View>: View
     @State private var presentedItem: Item?
     /// 0=閉じた状態、1=全開。これだけをアニメーションする。
     @State private var progress: Double = 0
+    /// 開く準備待ちの世代（連打・閉じで古い待ちを破棄する）。
+    @State private var openGeneration: Int = 0
 
     private static var openAnimation: Animation {
         .spring(response: 0.34, dampingFraction: 0.86)
@@ -112,10 +129,28 @@ private struct GroomViewerImmersiveHost<Item: Identifiable, Content: View>: View
                 withTransaction(transaction) {
                     progress = 0
                 }
-                withAnimation(Self.openAnimation) {
-                    progress = 1
+                // iter1226.447：主画像がキャッシュ済みになるまで開くアニメーションを待つ
+                //（最大0.6秒）。「枠が先に開き、写真が後から違う大きさで現れる」事象を
+                // 構造的に防ぐ。progress=0 の間もコンテンツはマウント済みなので、
+                // 内部レイアウトはこの間に確定する。
+                let generation = openGeneration + 1
+                openGeneration = generation
+                Task { @MainActor in
+                    if let url = (newItem as? GroomViewerImmersiveItem)?.openReadyImageURL {
+                        _ = await GroomImageMemoryStore.shared.ensureLoaded(
+                            url: url,
+                            timeoutNanoseconds: 600_000_000
+                        )
+                    }
+                    guard openGeneration == generation, item?.id != nil else {
+                        return
+                    }
+                    withAnimation(Self.openAnimation) {
+                        progress = 1
+                    }
                 }
             } else if newID == nil {
+                openGeneration += 1
                 withAnimation(Self.openAnimation) {
                     progress = 0
                 } completion: {

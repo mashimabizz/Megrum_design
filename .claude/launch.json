@@ -4,7 +4,10 @@
     {
       "name": "mockup-server",
       "runtimeExecutable": "python3",
-      "runtimeArgs": ["-m", "http.server", "8765"],
+      "runtimeArgs": [
+        "-c",
+        "import os; os.chdir('/private/tmp/claude-501/-Users-michitaka-Desktop-Megrum/714a81c8-e2cc-4d33-b4a5-4e13bfb84e25/scratchpad'); from http.server import HTTPServer, SimpleHTTPRequestHandler; HTTPServer(('127.0.0.1', 8765), SimpleHTTPRequestHandler).serve_forever()"
+      ],
       "port": 8765
     }
   ]

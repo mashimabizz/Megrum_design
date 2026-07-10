@@ -995,8 +995,57 @@ final class GroomImageMemoryStore {
         (GroomSignedURLPathExtractor.storagePath(from: url) ?? url.absoluteString) as NSString
     }
 
+    /// 検証用：実機で起きる「未キャッシュで開く」状態をシミュレータで再現する
+    /// （キーごとに最初の1回だけミスさせる。prewarm も無効化する）。
+    static var simulatesColdImages: Bool {
+        ProcessInfo.processInfo.environment["MEGRUM_VISUAL_QA_COLD_IMAGES"] == "1"
+    }
+
+    private var coldMissSimulatedKeys = Set<NSString>()
+
     func image(for url: URL) -> UIImage? {
-        cache.object(forKey: Self.cacheKey(for: url))
+        let key = Self.cacheKey(for: url)
+        if Self.simulatesColdImages, !coldMissSimulatedKeys.contains(key) {
+            coldMissSimulatedKeys.insert(key)
+            return nil
+        }
+        return cache.object(forKey: key)
+    }
+
+    /// 指定URLの画像がキャッシュ済みになるまで読み込む（開くアニメーションの準備待ちに使う）。
+    /// タイムアウトしたら false（呼び出し側はスピナー付きで開く）。
+    func ensureLoaded(url: URL, timeoutNanoseconds: UInt64) async -> Bool {
+        if image(for: url) != nil {
+            return true
+        }
+        let loadTask = Task { () -> Bool in
+            if Self.simulatesColdImages {
+                // 実機のネットワーク遅延を模擬
+                try? await Task.sleep(nanoseconds: 450_000_000)
+            }
+            guard let data = try? await GoodsRemoteImageDataLoader.loadData(from: url),
+                  let loaded = UIImage(data: data)
+            else {
+                return false
+            }
+            let prepared = await loaded.byPreparingForDisplay() ?? loaded
+            self.insert(prepared, for: url)
+            return true
+        }
+        let timeoutTask = Task { () -> Bool in
+            try? await Task.sleep(nanoseconds: timeoutNanoseconds)
+            return false
+        }
+        defer {
+            timeoutTask.cancel()
+        }
+        return await withTaskGroup(of: Bool.self) { group in
+            group.addTask { await loadTask.value }
+            group.addTask { await timeoutTask.value }
+            let first = await group.next() ?? false
+            group.cancelAll()
+            return first
+        }
     }
 
     func insert(_ image: UIImage, for url: URL) {
@@ -1005,7 +1054,10 @@ final class GroomImageMemoryStore {
 
     /// 未キャッシュのURLを並列に読み込み・デコードして格納する（ベストエフォート）。
     func prewarm(urls: [URL]) async {
-        let missing = urls.filter { image(for: $0) == nil }
+        guard !Self.simulatesColdImages else {
+            return
+        }
+        let missing = urls.filter { cache.object(forKey: Self.cacheKey(for: $0)) == nil }
         guard !missing.isEmpty else {
             return
         }
