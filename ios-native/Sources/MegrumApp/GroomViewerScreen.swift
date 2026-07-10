@@ -58,6 +58,13 @@ struct GroomViewerScreen: View {
     /// FB(iter1226.403)：開くトランジション中はデータ取得・進捗ループ・常時演出を止めてカクつきを防ぐ。
     /// スケール拡大アニメ（約0.34s）が落ち着いてから重い処理を始める。
     @State private var isOpeningSettled = false
+    #if canImport(UIKit)
+    /// iter1226.435：投稿者切替時のキューブ回転。fromImage は直前まで表示していた画像のスナップ。
+    @State private var cubeSpin: GroomViewerCubeSpin?
+    @State private var cubeProgress: Double = 0
+    /// 現在画面に出ている画像（キューブの「出ていく面」用に保持）。
+    @State private var displayedImage: UIImage?
+    #endif
 
     init(
         grooms: [GroomPost],
@@ -291,8 +298,45 @@ struct GroomViewerScreen: View {
             ZStack {
                 Color.black.ignoresSafeArea(.container, edges: .top)
 
+                #if canImport(UIKit)
+                // iter1226.435：投稿者切替中はキューブ回転。出ていく面（直前の画像スナップ）＋
+                // 入ってくる面（現在の画像）を、直方体の側面のように回して切り替える。
+                if let cubeSpin {
+                    GroomViewerCubeFace(image: cubeSpin.fromImage)
+                        .modifier(
+                            GroomViewerCubeFaceModifier(
+                                transform: GroomViewerCubeGeometry.outgoing(
+                                    progress: cubeProgress,
+                                    direction: cubeSpin.direction,
+                                    width: proxy.size.width
+                                ),
+                                shade: GroomViewerCubeGeometry.outgoingShade(progress: cubeProgress)
+                            )
+                        )
+                        .allowsHitTesting(false)
+                }
+
+                GroomViewerCachedImage(
+                    url: currentGroom.imageURL,
+                    onImageChange: { displayedImage = $0 }
+                )
+                .padding(.horizontal, 8)
+                .modifier(
+                    GroomViewerCubeFaceModifier(
+                        transform: cubeSpin.map {
+                            GroomViewerCubeGeometry.incoming(
+                                progress: cubeProgress,
+                                direction: $0.direction,
+                                width: proxy.size.width
+                            )
+                        } ?? GroomViewerCubeGeometry.FaceTransform(offsetX: 0, degrees: 0, anchorX: 0.5),
+                        shade: cubeSpin == nil ? 0 : GroomViewerCubeGeometry.incomingShade(progress: cubeProgress)
+                    )
+                )
+                #else
                 GroomViewerCachedImage(url: currentGroom.imageURL)
                     .padding(.horizontal, 8)
+                #endif
 
                 // FB(iter1226.422)：左右タップで前/次へ即遷移（ダブルタップいいねは廃止）。
                 HStack(spacing: 0) {
@@ -390,12 +434,41 @@ struct GroomViewerScreen: View {
             }
             return
         }
+        // iter1226.435：投稿者が変わる時だけ、Instagramストーリーズ風のキューブ回転で切り替える。
+        // 同じ投稿者の連続グルームは従来どおり「パッ」と切り替え（iter1226.422）。
+        let switchesAuthor = grooms[nextIndex].authorID != currentGroom.authorID
         var transaction = Transaction()
         transaction.disablesAnimations = true
         withTransaction(transaction) {
             currentIndex = nextIndex
         }
+        #if canImport(UIKit)
+        if switchesAuthor, !reduceMotion, isOpeningSettled {
+            startCubeSpin(direction: delta >= 0 ? 1 : -1)
+        }
+        #endif
     }
+
+    #if canImport(UIKit)
+    private func startCubeSpin(direction: Int) {
+        let spin = GroomViewerCubeSpin(fromImage: displayedImage, direction: direction)
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            cubeSpin = spin
+            cubeProgress = 0
+        }
+        withAnimation(.easeInOut(duration: GroomViewerCubeGeometry.animationDuration)) {
+            cubeProgress = 1
+        } completion: {
+            // 連打で新しい回転が始まっていたら（idが変わる）古い完了処理は破棄。
+            guard cubeSpin?.id == spin.id else {
+                return
+            }
+            cubeSpin = nil
+        }
+    }
+    #endif
 
     @MainActor
     private func runStoryProgress(for groomID: UUID) async {
@@ -550,12 +623,41 @@ enum GroomViewerChromeLayout {
     }
 }
 
+#if canImport(UIKit)
+/// iter1226.435：投稿者切替キューブ回転の1回ぶんの状態。
+struct GroomViewerCubeSpin {
+    var fromImage: UIImage?
+    var direction: Int
+    var id = UUID()
+}
+
+/// キューブの「出ていく面」。直前まで表示していた画像のスナップを黒面に載せる。
+private struct GroomViewerCubeFace: View {
+    var image: UIImage?
+
+    var body: some View {
+        ZStack {
+            Color.black
+            if let image {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFit()
+                    .padding(.horizontal, 8)
+            }
+        }
+        .accessibilityHidden(true)
+    }
+}
+#endif
+
 /// グルーム表示用のキャッシュ対応画像。読み込み中も直前の画像を出したままにして、
 /// 切り替え時のローディング表示・表示後のガクつきをなくす。
 private struct GroomViewerCachedImage: View {
     var url: URL
 
     #if canImport(UIKit)
+    /// 表示画像が確定/更新された時に親へ知らせる（キューブ回転の「出ていく面」用スナップ）。
+    var onImageChange: ((UIImage) -> Void)? = nil
     @State private var image: UIImage?
     #endif
     @State private var hasFailed = false
@@ -606,6 +708,7 @@ private struct GroomViewerCachedImage: View {
                     withTransaction(transaction) {
                         image = prepared
                     }
+                    onImageChange?(prepared)
                 } else if image == nil {
                     hasFailed = true
                 }
