@@ -82,6 +82,12 @@ struct HomeScreen: View {
     /// iter1226.422：グルーム列の初回ロード（位置情報→グルーム→著者プロフィール）中はスケルトンを出す。
     @State private var isLoadingGroomRail = true
 
+    /// iter1226.448：ホームレールのグルームを iOS18 標準 zoom で開くための提示ルート。
+    /// タイル（matchedTransitionSource）から全画面へ枠と中身が一体で連続変形する。
+    /// iOS17 では従来どおり onOpenGroom/onOpenOwnGrooms（タブ上位のオーバーレイ）へ流す。
+    @State private var homeGroomZoomRoute: HomeGroomZoomRoute?
+    @Namespace private var groomZoomNamespace
+
     /// 実データのホーム（ガイドツアー以外）でグルーム列を出す。
     private var showsGroomRail: Bool {
         appState != nil && !tutorialSampleActive
@@ -191,7 +197,23 @@ struct HomeScreen: View {
         guard !ordered.isEmpty else { return }
         let viewed = appState?.viewedGroomIDs ?? []
         let initial = ordered.first(where: { !viewed.contains($0.id) }) ?? ordered.first!
-        onOpenOwnGrooms(ordered, initial, anchor)
+        if presentsGroomViaZoom {
+            homeGroomZoomRoute = HomeGroomZoomRoute(
+                sourceID: GroomStoryRailSource.ownTile,
+                grooms: ordered,
+                initial: initial
+            )
+        } else {
+            onOpenOwnGrooms(ordered, initial, anchor)
+        }
+    }
+
+    /// iter1226.448：iOS18+ かつ実 appState がある時は標準zoomのローカル提示を使う。
+    /// iOS17 やツアーのモック時は従来のタブ上位オーバーレイ経路へフォールバックする。
+    private var presentsGroomViaZoom: Bool {
+        guard appState != nil else { return false }
+        if #available(iOS 18.0, *) { return true }
+        return false
     }
 
     /// iter1226.420：ユーザー単位に束ねたグルーム群を開く。開けるものだけを古い→新しい順に閲覧。
@@ -239,7 +261,17 @@ struct HomeScreen: View {
                 subscriptionState: appState.subscriptionState
             )
         }
-        onOpenOwnGrooms(railSequence.isEmpty ? ordered : railSequence, initial, anchor)
+        let sequence = railSequence.isEmpty ? ordered : railSequence
+        if presentsGroomViaZoom {
+            // zoom の source は「タップしたタイル＝代表グルーム」。ビューアは initial から開く。
+            homeGroomZoomRoute = HomeGroomZoomRoute(
+                sourceID: grooms.first?.id ?? initial.id,
+                grooms: sequence,
+                initial: initial
+            )
+        } else {
+            onOpenOwnGrooms(sequence, initial, anchor)
+        }
     }
 
     private func handleGroomRailTap(_ groom: GroomPost, anchor: UnitPoint) {
@@ -418,9 +450,16 @@ struct HomeScreen: View {
                 MegrumHaptics.buttonTap()
                 onOpenGroomComposer()
             },
-            onViewOwnGroom: viewOwnGroom
+            onViewOwnGroom: viewOwnGroom,
+            groomZoomNamespace: groomZoomNamespace
         )
         .background(MegrumTheme.canvas.ignoresSafeArea())
+        .modifier(HomeGroomZoomPresentation(
+            route: $homeGroomZoomRoute,
+            appState: appState,
+            namespace: groomZoomNamespace,
+            onOpenAuthorProfile: onOpenOwnerProfile
+        ))
 
         .megrumHiddenNavigationBar()
         .sheet(isPresented: $showsLocalModeSettings) {

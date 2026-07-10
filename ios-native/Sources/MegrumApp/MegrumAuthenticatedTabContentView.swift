@@ -2,6 +2,21 @@ import MegrumCore
 import MegrumDesign
 import SwiftUI
 
+/// iter1226.448：VisualQA 自動オープンをアプリセッション単位で一度だけに制限するガード。
+/// View インスタンス単位の @State だと再マウントで再発火するため、セッション寿命の
+/// シングルトンで claim する。
+@MainActor
+final class VisualQAAutoOpenGuard {
+    static let shared = VisualQAAutoOpenGuard()
+    private var claimed = false
+
+    func tryClaim() -> Bool {
+        guard !claimed else { return false }
+        claimed = true
+        return true
+    }
+}
+
 @MainActor
 struct MegrumAuthenticatedTabContentView: View {
     @ObservedObject var appState: MegrumAppState
@@ -38,7 +53,6 @@ struct MegrumAuthenticatedTabContentView: View {
     @State private var isShowingNearbyBoardList = false
     @State private var meguriUserProfileRoute: MeguriUserProfileRoute?
     @State private var didOpenVisualQAMeguriMessages = false
-    @State private var didAutoOpenVisualQAGroomViewer = false
     @State private var meguriGroomViewerPost: GroomPost?
     @State private var meguriGroomViewerSourceAnchor: UnitPoint = .center
     /// FB(iter1226.402)：ビューアで辿るグルーム列の上書き（自分のグルーム閲覧は自分のグルームだけを渡す）。空なら appState.grooms。
@@ -643,12 +657,17 @@ struct MegrumAuthenticatedTabContentView: View {
     /// iter1226.445：開くトランジションの検証用。環境変数で起動後にグルームビューアを自動オープンする
     /// （録画→フレーム分解で枠と中身のズレを観察するため。タップ操作なしで再現できる）。
     private func openVisualQAGroomViewerIfNeeded() {
-        guard ProcessInfo.processInfo.environment["MEGRUM_VISUAL_QA_AUTO_OPEN_GROOM"] == "1",
-              !didAutoOpenVisualQAGroomViewer
-        else {
+        guard ProcessInfo.processInfo.environment["MEGRUM_VISUAL_QA_AUTO_OPEN_GROOM"] == "1" else {
             return
         }
-        didAutoOpenVisualQAGroomViewer = true
+        // iter1226.448：以前は View インスタンス単位の @State でガードしていたため、
+        // 認証・タブ階層の再マウントで新インスタンスがもう一度 .onAppear → Task を生成し、
+        // 自動オープンが二重発火していた。セッション単位の once トークンへ変更する。
+        guard VisualQAAutoOpenGuard.shared.tryClaim() else {
+            return
+        }
+        let attemptID = UUID()
+        print("[VisualQAAutoOpen] scheduled attempt=\(attemptID.uuidString.prefix(8))")
         Task { @MainActor in
             // レール読み込み＋画像先読みが済むのを待ってから、実際のタイル位置相当のアンカーで開く。
             for _ in 0..<40 {
@@ -659,9 +678,11 @@ struct MegrumAuthenticatedTabContentView: View {
             }
             let viewerID = appState.viewer?.id
             guard let groom = appState.grooms.first(where: { $0.authorID != viewerID }) ?? appState.grooms.first else {
+                print("[VisualQAAutoOpen] cancelled attempt=\(attemptID.uuidString.prefix(8)) (no groom)")
                 return
             }
             try? await Task.sleep(nanoseconds: 1_500_000_000)
+            print("[VisualQAAutoOpen] fired attempt=\(attemptID.uuidString.prefix(8)) groom=\(groom.id)")
             openMeguriGroomViewer(groom, sourceAnchor: UnitPoint(x: 0.18, y: 0.16))
         }
     }

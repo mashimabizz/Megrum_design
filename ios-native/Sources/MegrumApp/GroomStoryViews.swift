@@ -12,6 +12,14 @@ private final class GroomRailTileFrameStore {
     var frames: [UUID: CGRect] = [:]
 }
 
+/// iter1226.448：ホームのグルームレール標準zoom遷移で使う source ID。
+/// タイル側の `matchedTransitionSource(id:)` と、提示側の `navigationTransition(.zoom(sourceID:))`
+/// で同じ値を使う必要があるため、共有の定数として置く。グループタイルの source は
+/// 代表グルームの `id`、自分タイルは `ownTile` 固定値。
+enum GroomStoryRailSource {
+    static let ownTile = UUID(uuidString: "00000000-0000-0000-0000-00000000FEED")!
+}
+
 struct GroomFeedOrdering {
     static func sorted(
         _ grooms: [GroomPost],
@@ -80,9 +88,11 @@ struct GroomStrip: View {
     var onViewOwn: (UnitPoint) -> Void = { _ in }
     /// iter1226.420：同一ユーザーのグルームは1タイルにまとめ、タップでそのユーザーの全グルームを渡す。
     var onSelectGroup: ([GroomPost], UnitPoint) -> Void
+    /// iter1226.448：標準zoom遷移の source namespace（iOS18+・ホームレールのみ）。
+    var groomZoomNamespace: Namespace.ID? = nil
 
     /// 自分タイルのフレーム記録用ID（グルームIDと衝突しない固定値）。
-    private static let ownTileFrameID = UUID(uuidString: "00000000-0000-0000-0000-00000000FEED")!
+    private static let ownTileFrameID = GroomStoryRailSource.ownTile
 
     /// 参照型なので中身の更新で View は再評価されない（スクロール追従のフレーム記録専用）。
     @State private var tileFrameStore = GroomRailTileFrameStore()
@@ -115,15 +125,17 @@ struct GroomStrip: View {
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(alignment: .top, spacing: GroomStoryMetrics.itemSpacing) {
-                GroomMyStoryTile(
-                    viewer: viewer,
-                    isLoading: isCreating,
-                    hasActiveGroom: hasOwnActiveGroom,
-                    hasAnyOwnGroom: hasAnyOwnGroom,
-                    activationSignal: activationSignal,
-                    onAdd: onAdd,
-                    onViewOwn: { onViewOwn(anchor(for: Self.ownTileFrameID)) }
-                )
+                zoomSource(GroomStoryRailSource.ownTile) {
+                    GroomMyStoryTile(
+                        viewer: viewer,
+                        isLoading: isCreating,
+                        hasActiveGroom: hasOwnActiveGroom,
+                        hasAnyOwnGroom: hasAnyOwnGroom,
+                        activationSignal: activationSignal,
+                        onAdd: onAdd,
+                        onViewOwn: { onViewOwn(anchor(for: Self.ownTileFrameID)) }
+                    )
+                }
                 .background(tileFrameReader(id: Self.ownTileFrameID))
 
                 if isLoadingInitial, displayGroups.isEmpty {
@@ -135,18 +147,20 @@ struct GroomStrip: View {
 
                 ForEach(displayGroups, id: \.first!.id) { group in
                     let representative = group.first!
-                    Button {
-                        onSelectGroup(group, anchor(for: representative.id))
-                    } label: {
-                        GroomStoryTile(
-                            groom: representative,
-                            profile: publicProfilesByUserID[representative.authorID]?.profile,
-                            isRead: isGroupRead(group),
-                            isLocked: isGroupLocked(group),
-                            isProfileLoading: isLoadingInitial
-                        )
+                    zoomSource(representative.id) {
+                        Button {
+                            onSelectGroup(group, anchor(for: representative.id))
+                        } label: {
+                            GroomStoryTile(
+                                groom: representative,
+                                profile: publicProfilesByUserID[representative.authorID]?.profile,
+                                isRead: isGroupRead(group),
+                                isLocked: isGroupLocked(group),
+                                isProfileLoading: isLoadingInitial
+                            )
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                     .background(tileFrameReader(id: representative.id))
                     .accessibilityLabel("\(groomStoryName(for: representative))のグルーム\(group.count)件")
                     .id(representative.id)
@@ -156,6 +170,21 @@ struct GroomStrip: View {
             // フルブリード：親の水平パディングを打ち消した分、中身側で先頭/末尾の余白を確保（iter1226.420）。
             .padding(.horizontal, 20)
         }
+    }
+
+    /// iter1226.448：iOS18+ でホームレールに namespace が渡っている時だけ、タイルを
+    /// zoom 遷移の source としてマークする。iOS17 や namespace 未指定時は素通し。
+    @ViewBuilder
+    private func zoomSource(_ id: UUID, @ViewBuilder content: () -> some View) -> some View {
+        #if os(iOS)
+        if #available(iOS 18.0, *), let groomZoomNamespace {
+            content().matchedTransitionSource(id: id, in: groomZoomNamespace)
+        } else {
+            content()
+        }
+        #else
+        content()
+        #endif
     }
 
     private func tileFrameReader(id: UUID) -> some View {

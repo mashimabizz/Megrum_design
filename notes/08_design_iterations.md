@@ -4,6 +4,57 @@
 
 ---
 
+## イテレーション1226.448：ホームのグルームを開くトランジションを iOS18 標準 zoom へ移植（ガクつき根治）
+
+### 背景・問題意識
+
+iter1226.444〜447 まで、手組みの scaleEffect オーバーレイ方式で「開き終わりに写真が下へガクッ」を4〜5回修正したが実機で治らず。ゼロベース調査（マルチエージェント＋実機レイアウト計測プローブ）の結論：
+
+1. **手組み方式は構造的にガクつく**：全画面の黒背景（`Color.black.opacity`）はスケールせず、ビューアだけを点アンカー＋固定0.08スケールで拡大していた＝「枠と中身が別レイヤー」。タイルの実矩形からではなく「タイル付近を支点に縦長全画面が拡大」しているだけ。
+2. **実機計測で判明した直接原因**：`.statusBarHidden(表示中)` が開くスプリングと並走し、ステータスバー非表示＝セーフエリア変化がスケール中の面で毎フレーム再解決→中央配置の写真が約10pt下がって戻る。画像がキャッシュ済みでも毎回発生（sim静的データでは再現しない）。加えて表示ビューと準備待ちの画像二重ダウンロード。
+
+### 変更内容
+
+**A. iOS18 標準 zoom へ移植（ホームレールのみ）**
+- `GroomStrip` のタイルに `matchedTransitionSource(id:in:)`（代表グルームID／自分タイルは固定ID `GroomStoryRailSource.ownTile`）
+- ホーム経路だけを新規 `HomeGroomZoomPresentation`（`fullScreenCover` + `.navigationTransition(.zoom)`）へ分離。`HomeGroomZoomRoute` でグルーム列・初期グルーム・sourceIDを保持
+- タブ上位の共有オーバーレイ（`meguriGroomViewerPost`）は **map / めぐり一覧が使い続けるため一切変更なし**
+- iOS17 は従来の `onOpenOwnGrooms`/`onOpenGroom`（タブ上位オーバーレイ）へフォールバック
+- 結果：タイルの実矩形から、枠と中身が最初のフレームから一体で連続変形（実機フレーム計測＋スパイクA/Bで確認）
+
+**B. 支えとなる修正（保持）**
+- `.statusBarHidden(isGroomViewerPresented)` を廃止（`MegrumAuthenticatedTabsView`）
+- 画像キャッシュキーをストレージパスへ正規化＋in-flightダウンロード共有＋デコードをdetached（`GroomImageMemoryStore`）
+- 開くスプリング完了をビューアへ通知する settle 同期（`megrumGroomViewerOpenSettled` 環境値。ホスト経路用。fullScreenCover経路はタイマーfallback）
+- VisualQA自動オープンの二重発火を停止（Viewインスタンス@State→セッション単位 `VisualQAAutoOpenGuard`）
+
+**C. 検証スパイク**
+- `GroomZoomTransitionSpike`（`MEGRUM_VISUAL_QA_INITIAL_SCREEN=groom-zoom-spike`）：ネットワーク・実データ排除で標準zoom vs 手組みscaleをA/Bトグル比較
+
+### 影響範囲
+
+- ホームのグルームレールからの開き（iOS18+）。map/めぐり/アーカイブ/通知経路は不変。
+
+### 確認方法
+
+- 実機：ホームのグルームタイルをタップ→タイル位置から枠＋写真が一体で連続拡大。下スワイプ閉じ・横スワイプ切替も動作
+- スパイク：`groom-zoom-spike` でトグルA/B
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/HomeGroomZoomPresentation.swift`（新規）
+- `ios-native/Sources/MegrumApp/GroomZoomTransitionSpike.swift`（新規・検証用）
+- `GroomStoryViews.swift` / `HomeDiscoveryExperience.swift` / `HomeScreen.swift`
+- `GroomViewerScreen.swift` / `GroomViewerImmersivePresentationChrome.swift` / `MegrumAuthenticatedTabsView.swift` / `MegrumAuthenticatedTabContentView.swift`
+
+### セルフレビュー結果
+- ✅ オーナー実機確認済み「最高の動き」
+- ✅ ホーム経路のみ分離。map/めぐり/アーカイブ/通知の既存オーバーレイは無変更
+- ✅ iOS17フォールバック・全1583テストパス
+- ⚠️ 下スワイプ閉じと標準zoomの interactive dismiss の共存は実機で要継続観察
+
+---
+
 ## イテレーション1226.447：開くアニメーションに画像レディネスゲートを追加（枠と中身の分離を構造的に排除）
 
 ### 背景・問題意識

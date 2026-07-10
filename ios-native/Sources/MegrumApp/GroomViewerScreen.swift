@@ -58,6 +58,10 @@ struct GroomViewerScreen: View {
     /// FB(iter1226.403)：開くトランジション中はデータ取得・進捗ループ・常時演出を止めてカクつきを防ぐ。
     /// スケール拡大アニメ（約0.34s）が落ち着いてから重い処理を始める。
     @State private var isOpeningSettled = false
+    /// iter1226.448：ホスト（没入オーバーレイ）の開くスプリング完了通知。
+    /// 準備待ちで開始が遅れても「本当に開き終わってから」重い処理を解禁できる。
+    /// nil はホスト以外の提示で、従来のタイマーへフォールバックする。
+    @Environment(\.megrumGroomViewerOpenSettled) private var hostOpenSettled: Bool?
     /// iter1226.441：押下即発火タップの進行状態（isConsumed=発火済み or ドラッグへ移行）。
     @State private var activePageTap: PageTapTouch?
     #if canImport(UIKit)
@@ -251,10 +255,27 @@ struct GroomViewerScreen: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.black.ignoresSafeArea(.container, edges: .top))
         .ignoresSafeArea()
+        .groomOpenMetricsProbe("screen")
+        .onChange(of: hostOpenSettled) { _, settled in
+            // iter1226.448：ホストの開くスプリング完了と正確に同期して重い処理を解禁する。
+            if settled == true, !isOpeningSettled {
+                isOpeningSettled = true
+                GroomOpenMetricsLog.emit("screen", "openingSettled(host)")
+            }
+        }
         .task {
-            // 開くスケールアニメ（spring 0.34s）が終わるまで待ってから重い処理を解禁する。
+            // ホスト以外の提示（fullScreenCover等）向けフォールバック：
+            // 開くアニメ（spring 0.34s）相当を待ってから重い処理を解禁する。
+            guard hostOpenSettled == nil else {
+                if hostOpenSettled == true {
+                    isOpeningSettled = true
+                }
+                return
+            }
             try? await Task.sleep(nanoseconds: 430_000_000)
+            guard hostOpenSettled == nil else { return }
             isOpeningSettled = true
+            GroomOpenMetricsLog.emit("screen", "openingSettled(timer)")
         }
         .task(id: currentGroom.id) {
             await waitUntilOpeningSettled()
@@ -507,6 +528,7 @@ struct GroomViewerScreen: View {
                 }
 
                 groomFace(for: currentGroom, topPadding: topPadding, isInteractive: true)
+                    .groomOpenMetricsProbe("face")
                     .modifier(GroomViewerCubeFaceModifier(transform: liveFaceTransform(width: proxy.size.width), shade: liveFaceShade))
 
                 // iter1226.437：横スワイプ中は切替先（次/前の投稿者）の面を指に追従して回し込む。
@@ -554,6 +576,7 @@ struct GroomViewerScreen: View {
                 surfaceWidth = width
             }
             #endif
+            .groomOpenMetricsProbe("surface")
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.black.ignoresSafeArea(.container, edges: .top))
@@ -568,6 +591,7 @@ struct GroomViewerScreen: View {
             Color.black
 
             GroomViewerCachedImage(url: groom.imageURL)
+                .groomOpenMetricsProbe(isInteractive ? "photo" : "photo-aux")
                 .padding(.horizontal, 8)
 
             if isInteractive {
@@ -997,11 +1021,18 @@ final class GroomImageMemoryStore {
 
     /// 検証用：実機で起きる「未キャッシュで開く」状態をシミュレータで再現する
     /// （キーごとに最初の1回だけミスさせる。prewarm も無効化する）。
-    static var simulatesColdImages: Bool {
+    nonisolated static var simulatesColdImages: Bool {
         ProcessInfo.processInfo.environment["MEGRUM_VISUAL_QA_COLD_IMAGES"] == "1"
     }
 
     private var coldMissSimulatedKeys = Set<NSString>()
+
+    /// iter1226.448：進行中ダウンロードの共有テーブル。
+    /// 以前は「開く準備待ち（ensureLoaded）」と「表示ビュー（GroomViewerCachedImage）」が
+    /// 同じ画像を**別々に**ダウンロードしており、実機では (1) 帯域を食い合って遅延が倍増し
+    /// 準備待ちがタイムアウト、(2) 準備待ち側が先に完了しても表示ビューは自分のDL完了まで
+    /// スピナーのまま、という「枠だけ開いて写真が後からポップイン」の直接原因だった。
+    private var inFlightLoads: [NSString: Task<UIImage?, Never>] = [:]
 
     func image(for url: URL) -> UIImage? {
         let key = Self.cacheKey(for: url)
@@ -1012,13 +1043,20 @@ final class GroomImageMemoryStore {
         return cache.object(forKey: key)
     }
 
-    /// 指定URLの画像がキャッシュ済みになるまで読み込む（開くアニメーションの準備待ちに使う）。
-    /// タイムアウトしたら false（呼び出し側はスピナー付きで開く）。
-    func ensureLoaded(url: URL, timeoutNanoseconds: UInt64) async -> Bool {
-        if image(for: url) != nil {
-            return true
+    /// 画像をキャッシュ経由で取得する。未キャッシュなら1本だけダウンロードを走らせ、
+    /// 同一画像への同時要求（開く準備待ち・表示ビュー・先読み）は全て同じ結果を待つ。
+    func loadedImage(for url: URL) async -> UIImage? {
+        if let hit = image(for: url) {
+            return hit
         }
-        let loadTask = Task { () -> Bool in
+        let key = Self.cacheKey(for: url)
+        if let inFlight = inFlightLoads[key] {
+            return await inFlight.value
+        }
+        // iter1226.448：デコードはメインアクターから切り離す。起動直後の一斉先読みで
+        // メインスレッドがデコード占有され、開くアニメの開始・タイムアウトまで
+        // 巻き添えで遅延していた（実機計測で確認）。
+        let load = Task.detached(priority: .userInitiated) { () -> UIImage? in
             if Self.simulatesColdImages {
                 // 実機のネットワーク遅延を模擬
                 try? await Task.sleep(nanoseconds: 450_000_000)
@@ -1026,11 +1064,27 @@ final class GroomImageMemoryStore {
             guard let data = try? await GoodsRemoteImageDataLoader.loadData(from: url),
                   let loaded = UIImage(data: data)
             else {
-                return false
+                return nil
             }
-            let prepared = await loaded.byPreparingForDisplay() ?? loaded
-            self.insert(prepared, for: url)
+            return await loaded.byPreparingForDisplay() ?? loaded
+        }
+        inFlightLoads[key] = load
+        let prepared = await load.value
+        inFlightLoads[key] = nil
+        if let prepared {
+            cache.setObject(prepared, forKey: key)
+        }
+        return prepared
+    }
+
+    /// 指定URLの画像がキャッシュ済みになるまで読み込む（開くアニメーションの準備待ちに使う）。
+    /// タイムアウトしたら false（呼び出し側はスピナー付きで開く）。
+    func ensureLoaded(url: URL, timeoutNanoseconds: UInt64) async -> Bool {
+        if image(for: url) != nil {
             return true
+        }
+        let loadTask = Task { @MainActor () -> Bool in
+            await self.loadedImage(for: url) != nil
         }
         let timeoutTask = Task { () -> Bool in
             try? await Task.sleep(nanoseconds: timeoutNanoseconds)
@@ -1053,6 +1107,8 @@ final class GroomImageMemoryStore {
     }
 
     /// 未キャッシュのURLを並列に読み込み・デコードして格納する（ベストエフォート）。
+    /// iter1226.448：共有ロード（in-flight合流）経由にし、開く準備待ち・表示ビューと
+    /// 同じ画像を重複ダウンロードしない。
     func prewarm(urls: [URL]) async {
         guard !Self.simulatesColdImages else {
             return
@@ -1061,23 +1117,13 @@ final class GroomImageMemoryStore {
         guard !missing.isEmpty else {
             return
         }
-        await withTaskGroup(of: (URL, UIImage)?.self) { group in
-            for url in missing {
-                group.addTask {
-                    guard let data = try? await GoodsRemoteImageDataLoader.loadData(from: url),
-                          let loaded = UIImage(data: data)
-                    else {
-                        return nil
-                    }
-                    let prepared = await loaded.byPreparingForDisplay() ?? loaded
-                    return (url, prepared)
-                }
-            }
-            for await result in group {
-                if let (url, image) = result {
-                    insert(image, for: url)
-                }
-            }
+        // 各 loadedImage は in-flight 表へ登録した自前の Task で並列に走るため、
+        // ここは起動→合流の順で待つだけでよい。
+        let loads = missing.map { url in
+            Task { _ = await self.loadedImage(for: url) }
+        }
+        for load in loads {
+            _ = await load.value
         }
     }
 }
@@ -1133,6 +1179,7 @@ private struct GroomViewerCachedImage: View {
             // デコード済みキャッシュから即表示し、再ダウンロードしない。
             if let cached = GroomImageMemoryStore.shared.image(for: url) {
                 if image !== cached {
+                    GroomOpenMetricsLog.emit("image", "store-hit size=\(Int(cached.size.width))x\(Int(cached.size.height))")
                     var transaction = Transaction()
                     transaction.disablesAnimations = true
                     withTransaction(transaction) {
@@ -1141,35 +1188,83 @@ private struct GroomViewerCachedImage: View {
                 }
                 return
             }
-            do {
-                let data = try await GoodsRemoteImageDataLoader.loadData(from: url)
-                guard !Task.isCancelled else {
-                    return
+            GroomOpenMetricsLog.emit("image", "store-miss shared-load-start")
+            // iter1226.448：自前ダウンロードをやめ、ストアの共有ロードに合流する。
+            // 開く準備待ち（ensureLoaded）が先に取得した画像を、待ち合わせ無しでそのまま使う。
+            let loaded = await GroomImageMemoryStore.shared.loadedImage(for: url)
+            guard !Task.isCancelled else {
+                return
+            }
+            if let loaded {
+                GroomOpenMetricsLog.emit("image", "shared-load-set size=\(Int(loaded.size.width))x\(Int(loaded.size.height))")
+                // ページ切替はフェードさせず「パッ」と切り替える（デジタルな切替）。
+                var transaction = Transaction()
+                transaction.disablesAnimations = true
+                withTransaction(transaction) {
+                    image = loaded
                 }
-                if let loaded = UIImage(data: data) {
-                    // FB(iter1226.403)：デコードを表示前に済ませる（初回描画時のメインスレッドデコードで
-                    // 開くアニメがカクつくのを防ぐ）。
-                    let prepared = await loaded.byPreparingForDisplay() ?? loaded
-                    guard !Task.isCancelled else { return }
-                    // ページ切替はフェードさせず「パッ」と切り替える（デジタルな切替）。
-                    var transaction = Transaction()
-                    transaction.disablesAnimations = true
-                    withTransaction(transaction) {
-                        image = prepared
-                    }
-                    GroomImageMemoryStore.shared.insert(prepared, for: url)
-                } else if image == nil {
-                    hasFailed = true
-                }
-            } catch {
-                guard !Task.isCancelled else {
-                    return
-                }
-                if image == nil {
-                    hasFailed = true
-                }
+            } else if image == nil {
+                hasFailed = true
             }
         }
         #endif
+    }
+}
+
+// MARK: - 開くトランジションの実機計測（iter1226.448 調査用）
+
+/// `MEGRUM_DEBUG_GROOM_OPEN_METRICS=1` で、開くトランジション前後のレイアウト矩形の
+/// 変化をタイムスタンプ付きで stdout へ出す。実機で「開き終わった瞬間のガクッ」を
+/// 直接観測するための計測フックで、通常実行では完全に無効。
+enum GroomOpenMetricsLog {
+    static let isEnabled: Bool = {
+        #if DEBUG
+        ProcessInfo.processInfo.environment["MEGRUM_DEBUG_GROOM_OPEN_METRICS"] == "1"
+        #else
+        false
+        #endif
+    }()
+
+    static func emit(_ label: String, _ message: String) {
+        guard isEnabled else { return }
+        print(String(format: "[GroomOpenMetrics] t=%.3f %@ %@", ProcessInfo.processInfo.systemUptime, label, message))
+    }
+}
+
+struct GroomOpenMetricsProbe: ViewModifier {
+    var label: String
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if GroomOpenMetricsLog.isEnabled {
+            content.background(
+                GeometryReader { g in
+                    let frame = g.frame(in: .global)
+                    let safeTop = g.safeAreaInsets.top
+                    Color.clear
+                        .onAppear {
+                            GroomOpenMetricsLog.emit(label, Self.describe(frame, safeTop))
+                        }
+                        .onChange(of: frame) { _, f in
+                            GroomOpenMetricsLog.emit(label, Self.describe(f, safeTop))
+                        }
+                        .onChange(of: safeTop) { _, top in
+                            GroomOpenMetricsLog.emit(label, Self.describe(frame, top))
+                        }
+                }
+            )
+        } else {
+            content
+        }
+    }
+
+    static func describe(_ f: CGRect, _ safeTop: CGFloat) -> String {
+        String(format: "frame=(%.1f,%.1f %.1fx%.1f) safeTop=%.1f", f.minX, f.minY, f.width, f.height, safeTop)
+    }
+}
+
+extension View {
+    func groomOpenMetricsProbe(_ label: String) -> some View {
+        modifier(GroomOpenMetricsProbe(label: label))
     }
 }

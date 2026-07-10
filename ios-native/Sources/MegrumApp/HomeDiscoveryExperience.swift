@@ -63,6 +63,8 @@ struct HomeDiscoveryExperience: View {
     var onOpenBoardList: () -> Void = {}
     var onAddGroom: () -> Void = {}
     var onViewOwnGroom: (UnitPoint) -> Void = { _ in }
+    /// iter1226.448：ホームレール標準zoom遷移の source namespace（iOS18+）。
+    var groomZoomNamespace: Namespace.ID? = nil
 
     @AppStorage(HomeExchangeSettingsStorageKeys.preference) var exchangePreferenceRawValue = HomeDefaultExchangeSettings.standard.preference.rawValue
     @AppStorage(HomeExchangeSettingsStorageKeys.requiresSamePrefecture) var exchangeRequiresSamePrefecture = HomeDefaultExchangeSettings.standard.requiresSamePrefecture
@@ -113,7 +115,8 @@ struct HomeDiscoveryExperience: View {
                             activationSignal: groomRailActivationSignal,
                             onAdd: onAddGroom,
                             onViewOwn: onViewOwnGroom,
-                            onSelectGroup: onOpenGroomGroup
+                            onSelectGroup: onOpenGroomGroup,
+                            groomZoomNamespace: groomZoomNamespace
                         )
                         // 画面端までスクロールできるフルブリード（親の20pt余白を打ち消す）。iter1226.420。
                         .padding(.horizontal, -20)

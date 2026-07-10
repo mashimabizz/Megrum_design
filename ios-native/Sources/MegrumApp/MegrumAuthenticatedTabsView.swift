@@ -35,12 +35,16 @@ struct MegrumAuthenticatedTabsView: View {
         ) {
             tabContent
         }
-        #if os(iOS)
         // タブバーはグルーム表示オーバーレイが上から覆うため隠さない。
         // UIKit直叩き（isHidden）やtoolbar切替はiOS 27で復帰に失敗し、
         // タブバーが消えたままになる不具合の原因だった。
-        .statusBarHidden(isGroomViewerPresented)
-        #endif
+        //
+        // iter1226.448：ステータスバーも隠さない。`.statusBarHidden(isGroomViewerPresented)` は
+        // 開くスプリングの最中にステータスバー非表示アニメ（＝セーフエリア変化）を並走させ、
+        // スケール中の面の中でインセットが毎フレーム再解決されて中央配置の写真が
+        // 約10pt「ガクッと下がって戻る」直接原因だった（実機のレイアウト計測 iter1226.448 で確認）。
+        // ビューア上部は黒帯（topObstruction）で覆っており、ステータスバーは
+        // インスタのストーリー同様に表示したままにする。
     }
 
     private var tabContent: some View {

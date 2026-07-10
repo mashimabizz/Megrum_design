@@ -65,6 +65,8 @@ enum VisualQAInitialScreen: String, Equatable {
     case tutorial
     /// ホーム最上部に「最初の3ステップ」ミッションカードを強制表示する（QA/デモ確認用）。
     case starterMission = "starter-mission"
+    /// グルームを開くトランジション（標準zoom vs 手組みscale）のA/Bスパイク。
+    case groomZoomSpike = "groom-zoom-spike"
 
     var isAuthRoute: Bool {
         switch self {

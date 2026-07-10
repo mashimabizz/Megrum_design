@@ -78,6 +78,8 @@ public struct MegrumRootView: View {
                 }
             } else if visualQAInitialScreen == .candidateSheet {
                 CandidateSheetVisualQAPreview()
+            } else if visualQAInitialScreen == .groomZoomSpike {
+                GroomZoomTransitionSpike()
             } else if AccountSetupSessionPolicy.shouldShowAuthScreen(
                 isAuthenticated: authState.isAuthenticated,
                 isReturningStoredIncompleteAccountToLogin: isReturningStoredIncompleteAccountToLogin

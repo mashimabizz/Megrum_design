@@ -49,6 +49,19 @@ extension View {
     }
 }
 
+/// iter1226.448：ホストの開くアニメーションが実際に完了したかをビューアへ伝える。
+/// nil = ホスト以外の提示（fullScreenCover等）で、ビューア側はタイマーでフォールバックする。
+private struct GroomViewerOpenSettledKey: EnvironmentKey {
+    static let defaultValue: Bool? = nil
+}
+
+extension EnvironmentValues {
+    var megrumGroomViewerOpenSettled: Bool? {
+        get { self[GroomViewerOpenSettledKey.self] }
+        set { self[GroomViewerOpenSettledKey.self] = newValue }
+    }
+}
+
 #if os(iOS)
 /// iter1226.447：開くアニメーション開始前に準備を待つ対象（主画像）を伝えるための契約。
 /// 準拠していない Item は従来どおり即開く。
@@ -88,6 +101,8 @@ private struct GroomViewerImmersiveHost<Item: Identifiable, Content: View>: View
     @State private var progress: Double = 0
     /// 開く準備待ちの世代（連打・閉じで古い待ちを破棄する）。
     @State private var openGeneration: Int = 0
+    /// 開くスプリングが実際に完了したか（ビューアの「重い処理の解禁」タイミングを同期させる）。
+    @State private var hasOpenSettled = false
 
     private static var openAnimation: Animation {
         .spring(response: 0.34, dampingFraction: 0.86)
@@ -104,8 +119,10 @@ private struct GroomViewerImmersiveHost<Item: Identifiable, Content: View>: View
                     content(presentedItem) {
                         dismissFromContent()
                     }
+                    .environment(\.megrumGroomViewerOpenSettled, hasOpenSettled)
                     .megrumGroomViewerImmersivePresentationChrome()
                     .frame(width: proxy.size.width, height: proxy.size.height)
+                    .groomOpenMetricsProbe("hostFace")
                     .compositingGroup()
                     .scaleEffect(0.08 + 0.92 * progress, anchor: sourceAnchor)
                     .opacity(progress)
@@ -119,11 +136,14 @@ private struct GroomViewerImmersiveHost<Item: Identifiable, Content: View>: View
             if let item {
                 presentedItem = item
                 progress = 1
+                hasOpenSettled = true
             }
         }
         .onChange(of: item?.id) { _, newID in
             if newID != nil, let newItem = item {
+                GroomOpenMetricsLog.emit("host", "open-request")
                 presentedItem = newItem
+                hasOpenSettled = false
                 var transaction = Transaction()
                 transaction.disablesAnimations = true
                 withTransaction(transaction) {
@@ -139,18 +159,24 @@ private struct GroomViewerImmersiveHost<Item: Identifiable, Content: View>: View
                     if let url = (newItem as? GroomViewerImmersiveItem)?.openReadyImageURL {
                         _ = await GroomImageMemoryStore.shared.ensureLoaded(
                             url: url,
-                            timeoutNanoseconds: 600_000_000
+                            timeoutNanoseconds: 900_000_000
                         )
                     }
                     guard openGeneration == generation, item?.id != nil else {
                         return
                     }
+                    GroomOpenMetricsLog.emit("host", "animate-open")
                     withAnimation(Self.openAnimation) {
                         progress = 1
+                    } completion: {
+                        guard openGeneration == generation else { return }
+                        GroomOpenMetricsLog.emit("host", "open-settled")
+                        hasOpenSettled = true
                     }
                 }
             } else if newID == nil {
                 openGeneration += 1
+                hasOpenSettled = false
                 withAnimation(Self.openAnimation) {
                     progress = 0
                 } completion: {
