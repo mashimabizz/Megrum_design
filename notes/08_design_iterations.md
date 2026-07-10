@@ -4,6 +4,50 @@
 
 ---
 
+## イテレーション1226.408：通知センターのX/Instagram風刷新（時系列セクション・未読=背景色・行内アクション）
+
+### 背景・問題意識
+
+デザイン刷新FB項目9：「通知画面も刷新したい。XとかInstaのデザインを参考にする。まずどういうパターンで通知が飛ぶか確認するところから」。
+**現状の通知パターン（棚卸し結果・24種）**：①取引系＝打診の受信/承認/否認/修正・取引チャットメッセージ・証跡追加・取引完了・評価受領・異議3種・キャンセル要求・期限接近 ②めぐり系＝グルームのいいね/返信/新着・めぐりメッセージ・ボード返信/メンション/新着 ③運営アナウンス。
+**データ制約**：`MegrumNotification` は kind/title/body/linkPath/readAt/createdAt のみで**行為者（アバター・ユーザーID）や対象サムネイルを持たない**。完全なInstagram型（行為者アバター先頭・「◯◯さん他3人が…」集約・右端サムネ）はDB/API拡張が必要。
+
+### 変更内容（UIのみで可能な範囲）
+
+#### `NotificationCenterViews.swift`
+- **未読チップ廃止**。行レイアウトをX風に：種別アイコン38pt（tint12%円）＋タイトル15pt semibold＋時刻インライン右＋本文13pt regular muted
+- **行内アクションピル**：proposal_received=「確認する」/ evidence_added=「証跡を確認」（Xのフォローバック位置。行タップと同遷移）
+- フィルタを「すべて/取引/めぐり」に変更（`isMeguriRelatedForCenter` 新設）。tint整理：警告系=conditionPossible、完了系=ok、いいね/評価=濃ピンク（accentGradient系）
+
+#### `NotificationCenterPresentationState.swift`
+- **時系列セクション**（Instagram型）：「今日/今週/それ以前」へグルーピングする `sections(in:now:calendar:)` を追加（空セクションは非表示・並び順保持・now注入でテスト可能）
+
+#### `NotificationCenterContent.swift`
+- セクション見出し付きListへ。**未読行は `listRowBackground` でラベンダー7%**、既読はクリア。「N件」ヘッダー廃止
+
+#### `VisualQAPreviewMode.swift` / `MegrumRootView.swift`
+- VisualQA `notifications` ケース追加（drawerDestination 直マウント）
+
+### 影響範囲
+
+- 通知センター画面のみ。既読管理・ルーティング（NotificationRouteIntent）・プッシュ設定は不変
+
+### 将来課題（バックエンド拡張が必要なもの）
+
+- 行為者アバター先頭レイアウト／groom_liked の「他N人」集約／右端の対象サムネ → notifications テーブルに actor_user_id・thumbnail_url 等の追加が必要。実装時は notes/05・notes/13 を更新すること
+
+### 確認方法
+
+- `swift test --filter NotificationReadStateReducerTests`（6件パス）
+- VisualQA: `notifications` をシミュレータで目視確認済み（未読淡背景・確認するピル・今日セクション・3分割フィルタ）
+
+### セルフレビュー結果
+- ✅ 未読の可読性：チップよりも背景色の方が視線移動が少ない（X/Instagram準拠）
+- ✅ 用語（打診・取引チャット・グルーム・チャットルーム）は notes/10 準拠
+- ⚠️ 行為者アバター化は上記の将来課題に切り出し
+
+---
+
 ## イテレーション1226.407：住所設定の刷新＋郵便番号自動入力のフィードバック＋打診確認で住所変更
 
 ### 背景・問題意識

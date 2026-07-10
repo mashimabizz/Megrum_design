@@ -2,10 +2,12 @@ import MegrumCore
 import MegrumDesign
 import SwiftUI
 
+/// 通知フィルタ（iter1226.408 刷新）：未読はX/Instagram同様に行背景色で示すため、
+/// フィルタは「すべて/取引/めぐり」のカテゴリ切替に変更。
 enum NotificationCenterFilter: String, CaseIterable, Identifiable {
     case all
-    case unread
     case trades
+    case meguri
 
     var id: String { rawValue }
 
@@ -13,14 +15,17 @@ enum NotificationCenterFilter: String, CaseIterable, Identifiable {
         switch self {
         case .all:
             "すべて"
-        case .unread:
-            "未読"
         case .trades:
             "取引"
+        case .meguri:
+            "めぐり"
         }
     }
 }
 
+/// 通知行（iter1226.408 刷新）：
+/// 種別アイコン＋「タイトル・時刻インライン」＋本文の X/Instagram 風レイアウト。
+/// 未読チップは廃止（行背景の淡いラベンダーで示す）。打診受信には「確認する」ピルを内蔵。
 struct NotificationCenterRow: View {
     var notification: MegrumNotification
     var onTap: () -> Void
@@ -29,44 +34,46 @@ struct NotificationCenterRow: View {
         Button(action: onTap) {
             HStack(alignment: .top, spacing: 12) {
                 Image(systemName: notification.kind.centerSymbolName)
-                    .font(.system(size: 18, weight: .bold))
+                    .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(notification.kind.centerTint)
-                    .frame(width: 42, height: 42)
-                    .background(notification.kind.centerTint.opacity(0.14), in: Circle())
+                    .frame(width: 38, height: 38)
+                    .background(notification.kind.centerTint.opacity(0.12), in: Circle())
 
-                VStack(alignment: .leading, spacing: 5) {
+                VStack(alignment: .leading, spacing: 4) {
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
                         Text(notification.title)
-                            .font(.headline.weight(notification.isUnread ? .black : .bold))
+                            .font(.system(size: 15, weight: .semibold, design: .rounded))
                             .foregroundStyle(MegrumTheme.ink)
                             .lineLimit(2)
+                            .multilineTextAlignment(.leading)
 
                         Spacer(minLength: 8)
 
                         Text(relativeTimeText)
-                            .font(.caption.weight(.bold))
+                            .font(.system(size: 12, weight: .medium, design: .rounded))
                             .foregroundStyle(MegrumTheme.muted)
                     }
 
                     if let body = notification.body, !body.isEmpty {
                         Text(body)
-                            .font(.subheadline.weight(.semibold))
+                            .font(.system(size: 13, weight: .regular, design: .rounded))
                             .foregroundStyle(MegrumTheme.muted)
-                            .lineLimit(3)
+                            .lineLimit(2)
+                            .multilineTextAlignment(.leading)
+                    }
+
+                    if let actionTitle = notification.kind.centerInlineActionTitle {
+                        Text(actionTitle)
+                            .font(.system(size: 12.5, weight: .bold, design: .rounded))
+                            .foregroundStyle(MegrumTheme.lavender)
+                            .padding(.horizontal, 14)
+                            .frame(height: 30)
+                            .background(MegrumTheme.lavender.opacity(0.10), in: Capsule())
+                            .padding(.top, 3)
                     }
                 }
-
-                if notification.isUnread {
-                    Text("未読")
-                        .font(.caption2.weight(.black))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 7)
-                        .padding(.vertical, 3)
-                        .background(MegrumTheme.pink, in: Capsule())
-                        .padding(.top, 2)
-                }
             }
-            .padding(.vertical, 8)
+            .padding(.vertical, 6)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -135,17 +142,27 @@ extension MegrumNotificationKind {
     var centerTint: Color {
         switch self {
         case .proposalAccepted, .tradeCompleted:
-            Color.green
+            MegrumTheme.ok
         case .proposalRejected, .disputeReceived, .disputeResponded, .disputeClosed, .cancelRequested:
-            Color.orange
+            MegrumTheme.conditionPossible
         case .evaluationReceived, .groomLiked, .meguriBoardMention, .expiresSoon:
-            MegrumTheme.pink
+            Color(red: 0.94, green: 0.35, blue: 0.55)
         case .messageReceived:
             MegrumTheme.sky
-        case .adminAnnouncement:
-            MegrumTheme.lavender
         default:
             MegrumTheme.lavender
+        }
+    }
+
+    /// 行内アクションピル（Xのフォローバック位置）。行タップと同じ遷移の視覚的アフォーダンス。
+    var centerInlineActionTitle: String? {
+        switch self {
+        case .proposalReceived:
+            "確認する"
+        case .evidenceAdded:
+            "証跡を確認"
+        default:
+            nil
         }
     }
 
@@ -159,6 +176,17 @@ extension MegrumNotificationKind {
         case .groomLiked, .groomReply, .groomPosted, .meguriMessage,
              .meguriBoardReply, .meguriBoardMention, .meguriBoardPosted,
              .adminAnnouncement, .unknown:
+            false
+        }
+    }
+
+    /// めぐり（グルーム・チャットルーム・めぐりメッセージ）系か。フィルタ「めぐり」用。
+    var isMeguriRelatedForCenter: Bool {
+        switch self {
+        case .groomLiked, .groomReply, .groomPosted, .meguriMessage,
+             .meguriBoardReply, .meguriBoardMention, .meguriBoardPosted:
+            true
+        default:
             false
         }
     }

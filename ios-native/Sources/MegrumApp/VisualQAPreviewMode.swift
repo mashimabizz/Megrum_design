@@ -7,6 +7,8 @@ enum VisualQAInitialScreen: String, Equatable {
     case oshiSettings = "oshi-settings"
     /// 住所設定を直接開く（iter1226.407 刷新の確認用）。
     case addressSettings = "address-settings"
+    /// 通知センターを直接開く（iter1226.408 刷新の確認用）。
+    case notifications
     case homeHavesLookup = "home-haves-lookup"
     case matchRelation = "match-relation"
     case matchRelationCandidates = "match-relation-candidates"
