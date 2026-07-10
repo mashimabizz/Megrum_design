@@ -173,14 +173,14 @@ struct MegrumAuthenticatedTabContentView: View {
                 model: meguriInboxOpenDragModel,
                 isPresented: $isShowingMeguriMessageInbox
             ) { dismiss in
-                MegrumDeferredContent(delayNanoseconds: MegrumDeferredContentDelay.slidePresentation) {
-                    MeguriMessageInboxScreen(
-                        appState: appState,
-                        visualQAInitialScreen: visualQAInitialScreen,
-                        onClose: dismiss,
-                        onOpenThread: openMeguriMessageThread
-                    )
-                }
+                // iter1226.432：keep-alive（アイドル先読み構築）なので DeferredContent は挟まない。
+                // 開く時には構築もデータも済んでいて、あとはスライドするだけ。
+                MeguriMessageInboxScreen(
+                    appState: appState,
+                    visualQAInitialScreen: visualQAInitialScreen,
+                    onClose: dismiss,
+                    onOpenThread: openMeguriMessageThread
+                )
             }
             .zIndex(110)
 
@@ -255,7 +255,13 @@ struct MegrumAuthenticatedTabContentView: View {
             handlePendingNotificationRouteIntent(intent)
         }
         .onChange(of: isShowingMeguriMessageInbox) { _, newValue in
-            if !newValue {
+            if newValue {
+                // iter1226.432：keep-alive 化で画面の .task が開くたびに走らなくなったため、
+                // 開いたタイミングで裏から静かに最新化する（一覧は先読み済みで即表示）。
+                Task {
+                    await appState.loadMeguriMessages(reportsFailure: false)
+                }
+            } else {
                 meguriMessageDetailRoute = nil
             }
         }

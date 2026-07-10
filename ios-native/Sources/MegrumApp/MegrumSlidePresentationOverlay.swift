@@ -300,17 +300,126 @@ extension View {
 /// めぐりメッセージ一覧のスライド表示ホスト（iter1226.427）。
 /// ドラッグ中のオフセットはこのビューだけが観測して再描画するため、
 /// TabContentView 全体の再評価（カクつき）を起こさない。
+///
+/// iter1226.432：コンテンツを閉時も破棄せず画面外へ退避する keep-alive 方式へ。
+/// 従来はパン開始の瞬間にビュー全体を構築（カクつき）→ 340ms スケルトン表示
+///（毎回「読み込み中」に見える）だったが、ホーム表示後のアイドル時間に
+/// 先読み構築しておき、開閉はオフセット移動だけにする。
 struct MeguriInboxSlideHost<PresentedContent: View>: View {
     @ObservedObject var model: MeguriInboxOpenDragModel
     @Binding var isPresented: Bool
     @ViewBuilder var content: (_ dismiss: @escaping @MainActor @Sendable () -> Void) -> PresentedContent
 
+    @State private var dragState = MegrumSlidePresentationDragState()
+    @State private var isPrewarmed = false
+
     var body: some View {
-        MegrumSlideBoolPresentationOverlay(
-            isPresented: $isPresented,
-            backSwipeInteractionScope: .fullScreen,
-            openDragOffset: model.offset,
-            content: content
-        )
+        GeometryReader { proxy in
+            let screenWidth = proxy.size.width
+            // 先読み前にユーザーがスワイプを始めた場合は従来どおりその場で構築する。
+            if isPrewarmed || isPresented || model.offset != nil {
+                content(dismissPresentation)
+                    .megrumSlidePresentedContent(
+                        width: screenWidth,
+                        height: proxy.size.height,
+                        dragOffset: dragState.dragOffset,
+                        dismiss: dismissPresentation
+                    )
+                    .simultaneousGesture(backSwipeGesture(screenWidth: screenWidth), including: .gesture)
+                    .offset(
+                        x: MeguriInboxSlideHostGeometry.restingOffset(
+                            isPresented: isPresented,
+                            openDragOffset: model.offset,
+                            screenWidth: screenWidth
+                        )
+                    )
+                    .accessibilityHidden(!isPresented)
+            }
+        }
+        .ignoresSafeArea()
+        .allowsHitTesting(isPresented)
+        .animation(MegrumSlidePresentationMetrics.animation, value: isPresented)
+        .task {
+            guard !isPrewarmed else {
+                return
+            }
+            // 起動直後の負荷を避けつつ、最初のスワイプより前に構築を済ませる。
+            try? await Task.sleep(nanoseconds: MegrumDeferredContentDelay.idlePrewarm)
+            isPrewarmed = true
+        }
+        .onChange(of: isPresented) { _, newValue in
+            if newValue {
+                resetDismissDrag()
+            }
+        }
+    }
+
+    private func backSwipeGesture(screenWidth: CGFloat) -> some Gesture {
+        DragGesture(minimumDistance: 8)
+            .onChanged { value in
+                guard dragState.beginTrackingIfNeeded(translation: value.translation, screenWidth: screenWidth) else {
+                    return
+                }
+                updateDragOffset(
+                    dragState.clampedDragOffset(translation: value.translation, screenWidth: screenWidth)
+                )
+            }
+            .onEnded { value in
+                guard dragState.isTrackingDismissDrag else {
+                    return
+                }
+                if dragState.shouldDismiss(
+                    translation: value.translation,
+                    predictedEndTranslationWidth: value.predictedEndTranslation.width,
+                    screenWidth: screenWidth
+                ) {
+                    dismissPresentation()
+                } else {
+                    resetDismissDrag(animated: true)
+                }
+            }
+    }
+
+    private func dismissPresentation() {
+        withAnimation(MegrumSlidePresentationMetrics.animation) {
+            isPresented = false
+        }
+    }
+
+    private func updateDragOffset(_ offset: CGFloat) {
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            dragState.dragOffset = offset
+        }
+    }
+
+    private func resetDismissDrag(animated: Bool = false) {
+        dragState.stopTracking()
+        guard dragState.dragOffset != 0 else {
+            return
+        }
+        if animated {
+            withAnimation(MegrumSlidePresentationMetrics.animation) {
+                dragState.resetDragOffset()
+            }
+        } else {
+            updateDragOffset(0)
+        }
+    }
+}
+
+enum MeguriInboxSlideHostGeometry {
+    /// 閉時の退避マージン。presented content の影（radius 24, x:-8）が
+    /// 画面右端へ映り込まないよう、画面幅より余分に逃がす。
+    static let parkedShadowMargin: CGFloat = 48
+
+    /// keep-alive コンテンツの静止位置。
+    /// 指追従中はそのオフセット、開＝0、閉＝画面外（影ぶん余分に退避）。
+    static func restingOffset(isPresented: Bool, openDragOffset: CGFloat?, screenWidth: CGFloat) -> CGFloat {
+        if let openDragOffset {
+            return openDragOffset
+        }
+        return isPresented ? 0 : screenWidth + parkedShadowMargin
     }
 }

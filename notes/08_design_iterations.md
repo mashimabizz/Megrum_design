@@ -4,6 +4,57 @@
 
 ---
 
+## イテレーション1226.432：左スワイプのメッセージ一覧を常駐化（毎回の読み込み表示を解消）
+
+### 背景・問題意識
+
+オーナー報告：ホーム左スワイプが「結構カクカクしてる」「開くたびに読み込みしてるようです」。開く時には読み込みが終わっていて、スムーズに開くだけにしてほしい。
+
+### 調査結果
+
+データ（meguriMessages）は起動時にロード済みだが、見た目が毎回ロードに見えていた原因は2つ：
+
+1. `MegrumSlideBoolPresentationOverlay` は `isPresented || openDragOffset != nil` の時だけコンテンツをマウント → **閉じるたびに破棄・パン開始の瞬間に画面全体を再構築**（＝ドラッグ中のカクつき）
+2. さらに `MegrumDeferredContent(slidePresentation: 340ms)` で包んでいたため、**開くたびにスケルトン5行が表示**（＝毎回「読み込み中」に見える）
+
+### 変更内容
+
+#### `MegrumSlidePresentationOverlay.swift`（`MeguriInboxSlideHost` を keep-alive 化）
+- 汎用オーバーレイは使わず専用実装へ。**コンテンツを閉時も破棄せず、画面外 `screenWidth + 48pt` に退避**（+48 は presented content の影 radius24/x-8 が右端へ映り込まないためのマージン）
+- ホーム表示後 **1.2秒のアイドル時間で先読み構築**（`MegrumDeferredContentDelay.idlePrewarm` 新設）。先読み前にスワイプが始まった場合は従来どおりその場で構築（フォールバック）
+- 開閉は `restingOffset`（指追従 > 開=0 > 閉=画面外）のオフセット移動だけ。戻るスワイプ dismiss・`allowsHitTesting(isPresented)` は従来同等、閉時は `accessibilityHidden` でVoiceOver対象外に
+- `MeguriInboxSlideHostGeometry.restingOffset` として切り出しユニットテスト追加
+
+#### `MegrumAuthenticatedTabContentView.swift`
+- インボックスの `MegrumDeferredContent` ラッパーを撤去（スケルトン廃止）
+- keep-alive 化で画面の `.task` が開くたびに走らなくなったため、`isShowingMeguriMessageInbox == true` になったタイミングで `loadMeguriMessages(reportsFailure: false)` を**裏から静かに**実行（一覧は先読み済みで即表示、更新は差分反映）
+
+### 影響範囲
+
+- ホーム左スワイプ→めぐりメッセージ一覧の開閉のみ。汎用の `MegrumSlideBoolPresentationOverlay` / `MegrumSlideItemPresentationOverlay`（他画面のスライド遷移）は無変更
+- 状態遷移・データモデル影響なし
+
+### 確認方法
+
+- `swift test`：1562テスト全パス（restingOffset の3テスト追加）
+- シミュレータでビュー階層ダンプ（`MEGRUM_DEBUG_DUMP_HIERARCHY=1`）：ホーム表示中に `frame = (450 -62; 402 874)` でインボックス（ナビバー「メッセージ」・List・refresh control 含む）が**画面外に構築済み**であることを確認 = 開く前に準備完了
+- スワイプの触感は実機確認をオーナーに依頼（ios-native のため実機反映はネイティブビルドが必要）
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/MegrumSlidePresentationOverlay.swift`
+- `ios-native/Sources/MegrumApp/MegrumAuthenticatedTabContentView.swift`
+- `ios-native/Sources/MegrumApp/MegrumDeferredContent.swift`
+
+### セルフレビュー結果
+- ✅ 影の映り込み対策（+48pt退避）をテストで担保（margin > 32）
+- ✅ 閉時 `accessibilityHidden` / `allowsHitTesting(isPresented)` で操作・読み上げ対象外
+- ✅ 先読み前スワイプはその場構築フォールバックで従来と同等
+- ✅ 他画面のスライド遷移（汎用オーバーレイ）は無変更
+- ⚠️ 常駐化によりメモリ常用は一覧1画面ぶん増（List数十行想定で軽微）
+
+---
+
 ## イテレーション1226.431：グッズ登録の写真〜トリミングを刷新
 
 ### 背景・問題意識
