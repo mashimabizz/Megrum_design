@@ -115,6 +115,34 @@ extension MegrumAppState {
         }
     }
 
+    /// 地図ズームアウト時の密度（件数）読み込み（iter1226.434）。
+    /// 実データ（画像等）は読まず、セル中心と件数だけを軽量RPCで取得する。
+    public func loadMeguriMapDensity(
+        minLatitude: Double,
+        minLongitude: Double,
+        maxLatitude: Double,
+        maxLongitude: Double,
+        cellDegrees: Double
+    ) async {
+        guard !isLoadingMeguriMapDensity else {
+            return
+        }
+        isLoadingMeguriMapDensity = true
+        defer {
+            isLoadingMeguriMapDensity = false
+        }
+        guard let cells = try? await repository.loadMeguriMapDensity(
+            minLatitude: minLatitude,
+            minLongitude: minLongitude,
+            maxLatitude: maxLatitude,
+            maxLongitude: maxLongitude,
+            cellDegrees: cellDegrees
+        ) else {
+            return
+        }
+        meguriMapDensityCells = cells
+    }
+
     /// 地図に出すグルーム：通常読み込み分（新鮮・優先）＋ビューポート蓄積分（補完）。
     public var meguriMapDisplayGrooms: [GroomPost] {
         let base = groomMapPosts.isEmpty ? grooms : groomMapPosts

@@ -83,6 +83,16 @@ public extension MegrumRepository {
         []
     }
 
+    func loadMeguriMapDensity(
+        minLatitude: Double,
+        minLongitude: Double,
+        maxLatitude: Double,
+        maxLongitude: Double,
+        cellDegrees: Double
+    ) async throws -> [MeguriMapDensityCell] {
+        []
+    }
+
     func loadBoardReplyPreviews(threadIDs: [UUID]) async throws -> [UUID: [String]] {
         [:]
     }

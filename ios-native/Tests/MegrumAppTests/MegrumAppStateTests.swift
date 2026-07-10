@@ -2497,6 +2497,16 @@ private actor CountingMeguriRepository: MegrumRepository {
         ]
     }
 
+    func loadMeguriMapDensity(
+        minLatitude: Double,
+        minLongitude: Double,
+        maxLatitude: Double,
+        maxLongitude: Double,
+        cellDegrees: Double
+    ) async throws -> [MeguriMapDensityCell] {
+        []
+    }
+
     func loadBoardThreads(
         latitude: Double?,
         longitude: Double?,

@@ -51,6 +51,8 @@ public final class MegrumAppState: ObservableObject {
     @Published public internal(set) var viewportGroomPosts: [GroomPost] = []
     /// 同上：ビューポート読み込みで取得したチャットルームの蓄積。
     @Published public internal(set) var viewportBoardThreads: [BoardThread] = []
+    /// 地図ズームアウト時の「おおよその件数」セル（iter1226.434）。
+    @Published public internal(set) var meguriMapDensityCells: [MeguriMapDensityCell] = []
     @Published public internal(set) var ownGroomArchive: [GroomPost] = []
     @Published public internal(set) var viewedGroomIDs: Set<UUID> = []
     @Published public internal(set) var likedGroomIDs: Set<UUID> = []
@@ -117,6 +119,7 @@ public final class MegrumAppState: ObservableObject {
     @Published public internal(set) var isLoadingMeguri = false
     /// めぐり地図のビューポート追加読み込み中（地図中央下の「読み込み中…」表示用）。
     @Published public internal(set) var isLoadingMeguriViewport = false
+    @Published public internal(set) var isLoadingMeguriMapDensity = false
     @Published public internal(set) var isLoadingMeguriProfile = false
     @Published public internal(set) var isSavingMeguriProfile = false
     @Published public internal(set) var isLoadingGroomMap = false

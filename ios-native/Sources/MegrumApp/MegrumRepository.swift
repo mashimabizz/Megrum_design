@@ -219,6 +219,8 @@ public protocol MegrumRepository: Sendable {
     func sendMeguriPhotoMessage(_ input: MeguriPhotoMessageCreateInput) async throws -> MeguriMessage
     func markMeguriMessagesRead(peerID: UUID, sourceGroomPostID: UUID?, includesAllSources: Bool, readAt: Date) async throws -> [MeguriMessage]
     func loadBoardThreads(latitude: Double?, longitude: Double?, prefecture: String?, scope: BoardThread.Audience, allowsExtendedBoardAccess: Bool) async throws -> [BoardThread]
+    /// iter1226.434：地図ズームアウト時の「おおよその件数」セル（実データを読み込む前の密度表示用）。
+    func loadMeguriMapDensity(minLatitude: Double, minLongitude: Double, maxLatitude: Double, maxLongitude: Double, cellDegrees: Double) async throws -> [MeguriMapDensityCell]
     func loadBoardReplies(threadID: UUID, latitude: Double?, longitude: Double?, prefecture: String?, scope: BoardThread.Audience) async throws -> [BoardReply]
     func loadBoardReplyPreviews(threadIDs: [UUID]) async throws -> [UUID: [String]]
     /// iter1226.424：未読数計算用。各スレッドのリプライ投稿時刻（新しい順）。

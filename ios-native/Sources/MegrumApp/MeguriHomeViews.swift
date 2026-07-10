@@ -10,6 +10,8 @@ struct MeguriHomeContent: View {
     var grooms: [GroomPost]
     var mapGrooms: [GroomPost]
     var threads: [BoardThread]
+    /// iter1226.434：ズームアウト時に出す「おおよその件数」セル。
+    var densityCells: [MeguriMapDensityCell] = []
     var replyPreviewsByThreadID: [UUID: [String]] = [:]
     var currentCoordinate: MegrumLocationCoordinate?
     var subscriptionState: UserSubscriptionState
@@ -43,6 +45,7 @@ struct MeguriHomeContent: View {
                     selectedKind: selectedMapKind,
                     grooms: mapGrooms,
                     threads: threads,
+                    densityCells: densityCells,
                     replyPreviewsByThreadID: replyPreviewsByThreadID,
                     currentCoordinate: currentCoordinate,
                     viewerID: viewer?.id,

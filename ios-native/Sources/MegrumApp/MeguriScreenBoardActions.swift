@@ -137,6 +137,23 @@ extension MeguriScreen {
     /// 地図の表示範囲が変わった時のビューポート読み込み。
     /// 直前の取得範囲でおおむねカバーされている場合は再取得しない。
     func handleViewportChange(_ region: MKCoordinateRegion) {
+        // iter1226.434：大きくズームアウトしている間は実データを読み込まず、
+        // セルごとの「おおよその件数」だけを軽量RPCで取得して表示する。
+        if MeguriMapDensityPlanner.isDensityMode(spanLatitudeDelta: region.span.latitudeDelta) {
+            let bounds = MeguriMapDensityPlanner.fetchBounds(region: region)
+            let cellDegrees = MeguriMapDensityPlanner.cellDegrees(spanLatitudeDelta: region.span.latitudeDelta)
+            Task {
+                await appState.loadMeguriMapDensity(
+                    minLatitude: bounds.minLatitude,
+                    minLongitude: bounds.minLongitude,
+                    maxLatitude: bounds.maxLatitude,
+                    maxLongitude: bounds.maxLongitude,
+                    cellDegrees: cellDegrees
+                )
+            }
+            return
+        }
+
         let center = MegrumLocationCoordinate(
             latitude: region.center.latitude,
             longitude: region.center.longitude

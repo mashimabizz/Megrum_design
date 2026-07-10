@@ -19,6 +19,22 @@ public extension SupabaseMegrumRepository {
         )
     }
 
+    func loadMeguriMapDensity(
+        minLatitude: Double,
+        minLongitude: Double,
+        maxLatitude: Double,
+        maxLongitude: Double,
+        cellDegrees: Double
+    ) async throws -> [MeguriMapDensityCell] {
+        try await groomClient.loadMeguriMapDensity(
+            minLatitude: minLatitude,
+            minLongitude: minLongitude,
+            maxLatitude: maxLatitude,
+            maxLongitude: maxLongitude,
+            cellDegrees: cellDegrees
+        )
+    }
+
     func loadGroomPost(id: UUID) async throws -> GroomPost? {
         try await groomClient.loadGroomPost(id: id)
     }

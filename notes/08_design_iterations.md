@@ -4,6 +4,53 @@
 
 ---
 
+## イテレーション1226.434：地図ズームアウト時の「おおよその件数」バブル
+
+### 背景・問題意識
+
+オーナー要望：「3km圏外であっても、地図を縮小していったら大体でいいので、グルームやチャットルームがどれくらいあるか件数だけでもわかればいい。読み込む前に」。
+
+### 変更内容
+
+#### Supabase（`supabase/migrations/20260710220000_add_meguri_map_density.sql`・適用済み）
+- `meguri_map_density(min_lat, min_lng, max_lat, max_lng, cell_deg)` RPC 新設：表示範囲内の published グルームと visible チャットルームを**セル単位で件数だけ**集計して返す（最大300セル・security definer・authenticated のみ）
+- 「大体でいい」件数のため、hidden/ブロックの個人別フィルタは意図的に省略（軽さ優先）
+- `groom_posts` / `meguri_board_threads` の (origin_lat, origin_lng) 部分インデックス追加
+
+#### クライアント
+- `MeguriMapDensityCell`（MegrumCore）＋ RPC クライアント（MegrumData）＋ リポジトリのプロトコル/実装/Preview/デフォルト
+- `MeguriMapDensityPlanner`（純ロジック）：緯度スパン **0.12（約13km表示）超で密度モード**。セルサイズ＝スパン/5（0.02〜2.0度にクランプ）、取得範囲は表示より25%広め、バブルタップ時のズーム先は必ずピン表示モードに入るスパン
+- `MegrumAppState.loadMeguriMapDensity` ＋ `meguriMapDensityCells` ストア
+- `MeguriScreen.handleViewportChange`：密度モード中は**実データのビューポート読み込みをスキップ**して密度だけ取得（軽い）
+- `MeguriHomeMapBackdrop`：密度モード中は個別ピン/クラスタを出さず、**件数バブル**（📷グルーム数＋💬チャット数のカプセル）を表示。タップでそのセルへズーム→ピン表示モードに入り実データが読み込まれる
+
+### 影響範囲
+
+- ホーム地図（めぐりタブ）のズームアウト時のみ。ピン表示モード（±13km以下）の挙動は不変
+- フルスクリーン地図（MeguriMapScreen）はビューポート読み込み自体が無いため今回対象外（要望があれば横展開）
+
+### 確認方法
+
+- `swift test`：planner 5テスト追加・全パス
+- `supabase db push` 適用済み（RPC は本番反映済み）
+- 実機/シミュレータでめぐり地図をピンチアウト→件数バブル表示→タップでズームイン→実ピンに切替、をオーナーに確認依頼
+
+### 関連ファイル
+
+- `supabase/migrations/20260710220000_add_meguri_map_density.sql`
+- `ios-native/Sources/MegrumCore/MeguriMapDensityModels.swift`
+- `ios-native/Sources/MegrumData/SupabaseMeguriMapDensity.swift`
+- `ios-native/Sources/MegrumApp/MeguriMapDensityPlanner.swift` / `MeguriHomeMapBackdrop.swift` / `MeguriScreenBoardActions.swift` / `MeguriMapAnnotationViews.swift` ほか
+
+### セルフレビュー結果
+- ✅ 密度モード⇔ピンモードはスパンしきい値1つで排他（バブルとピンの二重表示なし）
+- ✅ RPC はセルクランプ＋LIMIT 300 でコスト上限あり。件数のみで内容は返さない
+- ✅ バブルタップのズーム先は必ず activation 未満（テストで担保）→ 実データ読み込みへ自然に接続
+- ⚠️ 密度は個人のブロック/非表示を反映しない概算値（仕様として許容）
+- ⚠️ グルームの1km閲覧制限とは独立に「存在の件数」だけを見せる。位置はセル中心に丸められるため個別特定はできない
+
+---
+
 ## イテレーション1226.433：グルーム投稿の現在地更新＋圏外ピン消失修正＋圏外チャット閲覧のみ化
 
 ### 背景・問題意識

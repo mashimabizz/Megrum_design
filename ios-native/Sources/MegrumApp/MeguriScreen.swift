@@ -124,6 +124,7 @@ struct MeguriScreen: View {
             grooms: visibleGrooms,
             mapGrooms: visibleMapGrooms,
             threads: visibleThreads,
+            densityCells: appState.meguriMapDensityCells,
             replyPreviewsByThreadID: appState.boardReplyPreviewsByThreadID,
             currentCoordinate: appState.isTutorialActive
                 ? TutorialSampleMeguriData.centerCoordinate

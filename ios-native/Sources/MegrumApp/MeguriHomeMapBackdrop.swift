@@ -8,6 +8,8 @@ struct MeguriHomeMapBackdrop: View {
     var selectedKind: MeguriMapKind
     var grooms: [GroomPost]
     var threads: [BoardThread]
+    /// iter1226.434：ズームアウト時に出す「おおよその件数」セル。
+    var densityCells: [MeguriMapDensityCell] = []
     /// チャットルームの吹き出し演出用：スレッドID→最新メッセージ本文。
     var replyPreviewsByThreadID: [UUID: [String]] = [:]
     var currentCoordinate: MegrumLocationCoordinate?
@@ -42,6 +44,12 @@ struct MeguriHomeMapBackdrop: View {
     }
 
     private func recomputeDisplayElements() {
+        // iter1226.434：密度表示中は個別ピンを出さない（バブルと二重にならないように）。
+        if isDensityMode {
+            morphToken = UUID()
+            displayedElements = []
+            return
+        }
         let visibleGrooms = (selectedKind == .all || selectedKind == .grooms) ? grooms : []
         let visibleThreads = (selectedKind == .all || selectedKind == .boards)
             ? threads.filter { $0.latitude != nil && $0.longitude != nil }
@@ -159,6 +167,30 @@ struct MeguriHomeMapBackdrop: View {
         }
     }
 
+    /// iter1226.434：ズームアウト中は個別ピンではなく件数バブルを表示する。
+    private var isDensityMode: Bool {
+        MeguriMapDensityPlanner.isDensityMode(spanLatitudeDelta: visibleSpanLatitudeDelta)
+    }
+
+    /// 密度バブルタップ：そのセルへ寄って、ピン表示モード（実データ読み込み）に入る。
+    private func zoomToDensityCell(_ cell: MeguriMapDensityCell, containerSize: CGSize) {
+        let targetSpan = MeguriMapDensityPlanner.zoomSpan(currentSpanLatitudeDelta: visibleSpanLatitudeDelta)
+        let aspect = containerSize.width > 0 && containerSize.height > 0
+            ? max(containerSize.height / containerSize.width, 1)
+            : 2.2
+        withAnimation(.smooth(duration: 0.34)) {
+            cameraPosition = .region(
+                MKCoordinateRegion(
+                    center: CLLocationCoordinate2D(latitude: cell.latitude, longitude: cell.longitude),
+                    span: MKCoordinateSpan(
+                        latitudeDelta: targetSpan,
+                        longitudeDelta: targetSpan / aspect
+                    )
+                )
+            )
+        }
+    }
+
     var body: some View {
         GeometryReader { geometry in
             MapReader { proxy in
@@ -174,6 +206,23 @@ struct MeguriHomeMapBackdrop: View {
 
                             Annotation("現在地", coordinate: currentCoordinate.clLocationCoordinate) {
                                 CurrentLocationDot()
+                            }
+                        }
+
+                        if isDensityMode {
+                            ForEach(densityCells) { cell in
+                                Annotation("", coordinate: CLLocationCoordinate2D(
+                                    latitude: cell.latitude,
+                                    longitude: cell.longitude
+                                )) {
+                                    Button {
+                                        MegrumHaptics.buttonTap()
+                                        zoomToDensityCell(cell, containerSize: geometry.size)
+                                    } label: {
+                                        MeguriDensityBubble(cell: cell)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
                             }
                         }
 
