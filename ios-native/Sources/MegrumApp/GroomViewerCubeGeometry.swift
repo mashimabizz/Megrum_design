@@ -10,7 +10,7 @@ import SwiftUI
 enum GroomViewerCubeGeometry {
     static let rotationDegrees: Double = 90
     static let perspective: CGFloat = 0.7
-    static let animationDuration: Double = 0.30
+    static let animationDuration: Double = 0.22
     /// 回転中に奥へ向かう面へ落とす影の最大濃さ。
     static let maxShadeOpacity: Double = 0.45
     /// スワイプで指を離した時、ここまで回っていれば切替を確定する進捗。
@@ -18,7 +18,7 @@ enum GroomViewerCubeGeometry {
     /// 勢い（predictedEnd）ベースの確定しきい値（進捗換算）。
     static let commitPredictedThreshold: Double = 0.5
     /// 指を離した後の残り回転アニメーションの時間。
-    static let settleDuration: Double = 0.18
+    static let settleDuration: Double = 0.14
 
     struct FaceTransform: Equatable {
         var offsetX: CGFloat

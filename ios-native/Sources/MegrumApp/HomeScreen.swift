@@ -111,6 +111,31 @@ struct HomeScreen: View {
         return result
     }
 
+    #if canImport(UIKit)
+    /// iter1226.441：ビューアを開いた最初のフレームから写真・アバターを出すための先読み対象。
+    /// 各投稿者の「開いた時に最初に表示されるグルーム」（未読先頭）の画像と、投稿者アバター。
+    private var groomRailPrewarmTargets: (imageURLs: [URL], avatarURLs: [URL]) {
+        guard let appState else { return ([], []) }
+        let viewed = appState.viewedGroomIDs
+        var byAuthor: [UUID: [GroomPost]] = [:]
+        for groom in groomRailItems {
+            byAuthor[groom.authorID, default: []].append(groom)
+        }
+        var imageURLs: [URL] = []
+        var avatarURLs: [URL] = []
+        for (authorID, grooms) in byAuthor {
+            let ordered = grooms.sorted { $0.createdAt < $1.createdAt }
+            if let initial = ordered.first(where: { !viewed.contains($0.id) }) ?? ordered.first {
+                imageURLs.append(initial.imageURL)
+            }
+            if let avatarURL = appState.meguriIdentity(for: authorID).avatarURL {
+                avatarURLs.append(avatarURL)
+            }
+        }
+        return (imageURLs, avatarURLs)
+    }
+    #endif
+
     /// 上記のうち、いま開けない（圏外×無料などで）グルームID。ロックアイコン表示に使う。
     private var groomRailLockedIDs: Set<UUID> {
         guard let appState else { return [] }
@@ -264,6 +289,15 @@ struct HomeScreen: View {
                     isLoadingGroomRail = false
                 }
             }
+            #if canImport(UIKit)
+            // iter1226.441：ビューアを開いた最初のフレームから写真・アバターが出るよう、
+            // レールの各投稿者の初期表示グルームを先読みしてデコード済みキャッシュへ入れる。
+            .task(id: groomRailItems.map(\.id)) {
+                let targets = groomRailPrewarmTargets
+                await GroomImageMemoryStore.shared.prewarm(urls: targets.imageURLs)
+                await ProfileAvatarImageStore.shared.prewarm(urls: targets.avatarURLs)
+            }
+            #endif
             // iter1226.420：初回起動はグルーム取得が認証データ同期より先に走って空振りすることがある。
             // ホーム候補の読み込み確定を追加トリガーにして必ず再取得する。
             .onChange(of: appState?.hasLoadedHomeCandidates ?? false) { _, loaded in

@@ -58,6 +58,8 @@ struct GroomViewerScreen: View {
     /// FB(iter1226.403)：開くトランジション中はデータ取得・進捗ループ・常時演出を止めてカクつきを防ぐ。
     /// スケール拡大アニメ（約0.34s）が落ち着いてから重い処理を始める。
     @State private var isOpeningSettled = false
+    /// iter1226.441：押下即発火タップの進行状態（isConsumed=発火済み or ドラッグへ移行）。
+    @State private var activePageTap: PageTapTouch?
     #if canImport(UIKit)
     /// iter1226.435：投稿者切替時のキューブ回転（iter1226.438：面はUIごと描画）。
     @State private var cubeSpin: GroomViewerCubeSpin?
@@ -567,14 +569,15 @@ struct GroomViewerScreen: View {
 
             if isInteractive {
                 // FB(iter1226.422)：左右タップで前/次へ即遷移（ダブルタップいいねは廃止）。
+                // iter1226.441：外側のスワイプ（回転/閉じる）と共存させるため simultaneous にする。
                 HStack(spacing: 0) {
                     Color.clear
                         .contentShape(Rectangle())
-                        .gesture(pageTapGesture(delta: -1))
+                        .simultaneousGesture(pageTapGesture(delta: -1))
 
                     Color.clear
                         .contentShape(Rectangle())
-                        .gesture(pageTapGesture(delta: 1))
+                        .simultaneousGesture(pageTapGesture(delta: 1))
                 }
             }
 
@@ -729,7 +732,8 @@ struct GroomViewerScreen: View {
             cubeSpin = spin
             cubeProgress = 0
         }
-        withAnimation(.easeInOut(duration: GroomViewerCubeGeometry.animationDuration)) {
+        // iter1226.441：出だしを最速に（easeOut）。押した瞬間から回り始める体感にする。
+        withAnimation(.easeOut(duration: GroomViewerCubeGeometry.animationDuration)) {
             cubeProgress = 1
         } completion: {
             // 連打で新しい回転が始まっていたら（idが変わる）古い完了処理は破棄。
@@ -810,18 +814,51 @@ struct GroomViewerScreen: View {
         }
     }
 
-    /// FB(iter1226.422)：タップした瞬間に前/次へ切り替える（ダブルタップいいねは廃止）。
-    /// 最後のグルームで右タップしたら即閉じる。
+    /// FB(iter1226.422)：タップで前/次へ切り替える（ダブルタップいいねは廃止）。
+    /// iter1226.441：指を離すのを待たず「押した瞬間」に発火する。
+    /// タッチ開始から短い猶予（90ms）で発火し、その間に指が動き出したら（スワイプ/閉じる
+    /// ドラッグへ移行したら）取り消す。素早いタップは離した瞬間に即発火。
     private func pageTapGesture(delta: Int) -> some Gesture {
-        TapGesture()
-            .onEnded {
-                let nextIndex = currentIndex + delta
-                if grooms.indices.contains(nextIndex) {
-                    move(by: delta)
-                } else if delta > 0 {
-                    dismissViewer()
+        DragGesture(minimumDistance: 0)
+            .onChanged { value in
+                let distance = hypot(value.translation.width, value.translation.height)
+                if activePageTap == nil {
+                    let id = UUID()
+                    activePageTap = PageTapTouch(id: id)
+                    Task { @MainActor in
+                        try? await Task.sleep(nanoseconds: 90_000_000)
+                        guard let current = activePageTap, current.id == id, !current.isConsumed else {
+                            return
+                        }
+                        activePageTap = PageTapTouch(id: id, isConsumed: true)
+                        performPageTap(delta: delta)
+                    }
+                } else if distance > 12, let current = activePageTap, !current.isConsumed {
+                    // ドラッグへ移行：タップ扱いを取り消す（回転/閉じるスワイプ側が処理する）。
+                    activePageTap = PageTapTouch(id: current.id, isConsumed: true)
                 }
             }
+            .onEnded { value in
+                defer {
+                    activePageTap = nil
+                }
+                guard let current = activePageTap, !current.isConsumed else {
+                    return
+                }
+                guard hypot(value.translation.width, value.translation.height) <= 12 else {
+                    return
+                }
+                performPageTap(delta: delta)
+            }
+    }
+
+    private func performPageTap(delta: Int) {
+        let nextIndex = currentIndex + delta
+        if grooms.indices.contains(nextIndex) {
+            move(by: delta)
+        } else if delta > 0 {
+            dismissViewer()
+        }
     }
 
 
@@ -886,6 +923,12 @@ enum GroomViewerChromeLayout {
     }
 }
 
+/// iter1226.441：押下即発火タップの1タッチぶんの状態。
+struct PageTapTouch {
+    var id: UUID
+    var isConsumed = false
+}
+
 #if canImport(UIKit)
 /// iter1226.435：投稿者切替キューブ回転の1回ぶんの状態。
 /// iter1226.440：出ていく面は「切替直前の画面そのもの」のスナップショット。
@@ -927,6 +970,45 @@ enum GroomViewerDragAxis {
 
 #endif
 
+#if canImport(UIKit)
+/// グルーム写真のデコード済みメモリキャッシュ（iter1226.441）。
+/// ビューアを開く前（ホームのレール表示時）に先読みしておき、開いた最初の
+/// フレームから写真ごと拡大できるようにする（枠と中身が別々に出るのを防ぐ）。
+@MainActor
+final class GroomImageMemoryStore {
+    static let shared = GroomImageMemoryStore()
+    private let cache = NSCache<NSURL, UIImage>()
+
+    init() {
+        cache.countLimit = 80
+    }
+
+    func image(for url: URL) -> UIImage? {
+        cache.object(forKey: url as NSURL)
+    }
+
+    func insert(_ image: UIImage, for url: URL) {
+        cache.setObject(image, forKey: url as NSURL)
+    }
+
+    /// 未キャッシュのURLを順に読み込み・デコードして格納する（ベストエフォート）。
+    func prewarm(urls: [URL]) async {
+        for url in urls where image(for: url) == nil {
+            guard !Task.isCancelled else {
+                return
+            }
+            guard let data = try? await GoodsRemoteImageDataLoader.loadData(from: url),
+                  let loaded = UIImage(data: data)
+            else {
+                continue
+            }
+            let prepared = await loaded.byPreparingForDisplay() ?? loaded
+            insert(prepared, for: url)
+        }
+    }
+}
+#endif
+
 /// グルーム表示用のキャッシュ対応画像。読み込み中も直前の画像を出したままにして、
 /// 切り替え時のローディング表示・表示後のガクつきをなくす。
 private struct GroomViewerCachedImage: View {
@@ -934,6 +1016,12 @@ private struct GroomViewerCachedImage: View {
 
     #if canImport(UIKit)
     @State private var image: UIImage?
+
+    init(url: URL) {
+        self.url = url
+        // iter1226.441：デコード済みキャッシュがあれば最初のフレームから同期表示する。
+        _image = State(initialValue: GroomImageMemoryStore.shared.image(for: url))
+    }
     #endif
     @State private var hasFailed = false
 
@@ -983,6 +1071,7 @@ private struct GroomViewerCachedImage: View {
                     withTransaction(transaction) {
                         image = prepared
                     }
+                    GroomImageMemoryStore.shared.insert(prepared, for: url)
                 } else if image == nil {
                     hasFailed = true
                 }
