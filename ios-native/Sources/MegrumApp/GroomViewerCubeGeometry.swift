@@ -1,5 +1,6 @@
 import CoreGraphics
 import Foundation
+import MegrumCore
 import SwiftUI
 
 /// グルームビューアで投稿者が切り替わる時の「直方体（キューブ）回転」遷移の
@@ -72,6 +73,23 @@ enum GroomViewerCubeGeometry {
 /// Instagramと同じく、横スワイプは「次/前の投稿者」へ飛ぶ：
 /// 進む＝次の投稿者ブロックの先頭、戻る＝前の投稿者ブロックの先頭。
 enum GroomViewerAuthorNavigation {
+    /// iter1226.438：グルーム列を投稿者ごとの「一連」に並べ替える。
+    /// 従来の時刻順だと複数投稿者が交互に混ざり、タップで一連を見終われなかった。
+    /// 投稿者ブロックは各自の最古グルーム時刻の昇順、ブロック内は古い→新しい（iter1226.402踏襲）。
+    static func orderedGroupingAuthors(_ grooms: [GroomPost]) -> [GroomPost] {
+        let sorted = grooms.sorted { $0.createdAt < $1.createdAt }
+        var blocksByAuthor: [UUID: [GroomPost]] = [:]
+        var authorOrder: [UUID] = []
+        for groom in sorted {
+            if blocksByAuthor[groom.authorID] == nil {
+                authorOrder.append(groom.authorID)
+                blocksByAuthor[groom.authorID] = []
+            }
+            blocksByAuthor[groom.authorID]?.append(groom)
+        }
+        return authorOrder.flatMap { blocksByAuthor[$0] ?? [] }
+    }
+
     static func authorSwitchTargetIndex(
         authorIDs: [UUID],
         currentIndex: Int,

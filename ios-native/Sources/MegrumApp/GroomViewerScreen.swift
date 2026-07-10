@@ -59,11 +59,9 @@ struct GroomViewerScreen: View {
     /// スケール拡大アニメ（約0.34s）が落ち着いてから重い処理を始める。
     @State private var isOpeningSettled = false
     #if canImport(UIKit)
-    /// iter1226.435：投稿者切替時のキューブ回転。fromImage は直前まで表示していた画像のスナップ。
+    /// iter1226.435：投稿者切替時のキューブ回転（iter1226.438：面はUIごと描画）。
     @State private var cubeSpin: GroomViewerCubeSpin?
     @State private var cubeProgress: Double = 0
-    /// 現在画面に出ている画像（キューブの「出ていく面」用に保持）。
-    @State private var displayedImage: UIImage?
     /// iter1226.437：横スワイプで指に追従して直方体を回すインタラクティブ切替。
     @State private var cubeDrag: GroomViewerCubeDrag?
     @State private var cubeDragProgress: Double = 0
@@ -84,8 +82,9 @@ struct GroomViewerScreen: View {
         let base = grooms.contains(where: { $0.id == initialGroom.id })
             ? grooms
             : [initialGroom] + grooms
-        // FB(iter1226.402)：古い→新しい順（左が古い、右タップで次に新しいものへ）。地図/アーカイブでも同仕様。
-        let ordered = base.sorted { $0.createdAt < $1.createdAt }
+        // iter1226.438：投稿者ごとの「一連」にグルーピング（ブロック内は古い→新しい、iter1226.402踏襲）。
+        // タップで一連を見終わってから次の投稿者へ移る（境界でキューブ回転）。
+        let ordered = GroomViewerAuthorNavigation.orderedGroupingAuthors(base)
         _grooms = State(initialValue: ordered)
         self.initialGroom = initialGroom
         self.appState = appState
@@ -104,14 +103,11 @@ struct GroomViewerScreen: View {
     }
 
     private var canReplyToCurrentGroom: Bool {
-        guard let viewerID = appState.viewer?.id else {
-            return false
-        }
-        return viewerID != currentGroom.authorID
+        canReply(to: currentGroom)
     }
 
     private var isCurrentGroomMine: Bool {
-        currentGroom.authorID == appState.viewer?.id
+        isMine(currentGroom)
     }
 
     private var isSendingReply: Bool {
@@ -119,27 +115,68 @@ struct GroomViewerScreen: View {
     }
 
     private var currentGroomLikeCount: Int {
-        // iter1226.428：自分のグルームはリアクション一覧の件数が主だが、
-        // 取得途中や欠損時にフィードRPC由来の like_count より少なく見えないようにする。
-        if isCurrentGroomMine {
-            return max(
-                appState.groomReactions(for: currentGroom.id).count,
-                appState.groomLikeCount(currentGroom.id, fallback: currentGroom.likeCount)
-            )
-        }
-        return appState.groomLikeCount(currentGroom.id, fallback: currentGroom.likeCount)
+        likeCount(for: currentGroom)
     }
 
     private var currentGroomCommentCount: Int {
-        let replies = appState.groomReplies(for: currentGroom.id)
+        commentCount(for: currentGroom)
+    }
+
+    // iter1226.438：キューブの面ごとにUIを描くため、current固定だった判定をグルーム引数化。
+    private func isMine(_ groom: GroomPost) -> Bool {
+        groom.authorID == appState.viewer?.id
+    }
+
+    private func canReply(to groom: GroomPost) -> Bool {
+        guard let viewerID = appState.viewer?.id else {
+            return false
+        }
+        return viewerID != groom.authorID
+    }
+
+    private func likeCount(for groom: GroomPost) -> Int {
+        // iter1226.428：自分のグルームはリアクション一覧の件数が主だが、
+        // 取得途中や欠損時にフィードRPC由来の like_count より少なく見えないようにする。
+        if isMine(groom) {
+            return max(
+                appState.groomReactions(for: groom.id).count,
+                appState.groomLikeCount(groom.id, fallback: groom.likeCount)
+            )
+        }
+        return appState.groomLikeCount(groom.id, fallback: groom.likeCount)
+    }
+
+    private func commentCount(for groom: GroomPost) -> Int {
+        let replies = appState.groomReplies(for: groom.id)
         // コメントは投稿者本人以外には自分の送信分しか見えないため、件数も揃える。
-        if isCurrentGroomMine {
+        if isMine(groom) {
             return replies.count
         }
         guard let viewerID = appState.viewer?.id else {
             return replies.count
         }
         return replies.filter { $0.senderID == viewerID }.count
+    }
+
+    private func identity(for groom: GroomPost) -> MeguriProfileIdentity {
+        appState.meguriIdentity(
+            for: groom.authorID,
+            fallbackName: groom.authorID == appState.viewer?.id ? appState.viewer?.displayName : nil,
+            fallbackHandle: groom.authorID == appState.viewer?.id ? appState.viewer?.handle : nil,
+            fallbackAvatarURL: groom.authorID == appState.viewer?.id ? appState.viewer?.avatarURL : nil
+        )
+    }
+
+    private func index(of groom: GroomPost) -> Int {
+        grooms.firstIndex(where: { $0.id == groom.id }) ?? currentIndex
+    }
+
+    private func toggleLike(for groom: GroomPost) {
+        // いいね（ON/OFFどちらも）に触覚フィードバックを添える
+        MegrumHaptics.buttonTap()
+        Task {
+            await appState.setGroomLiked(groom.id, isLiked: !appState.isGroomLiked(groom.id))
+        }
     }
 
     /// 自分のグルームに付いたいいねを、浮遊エフェクト用の表示データへ変換する。
@@ -185,12 +222,7 @@ struct GroomViewerScreen: View {
     }
 
     private var authorIdentity: MeguriProfileIdentity {
-        appState.meguriIdentity(
-            for: currentGroom.authorID,
-            fallbackName: currentGroom.authorID == appState.viewer?.id ? appState.viewer?.displayName : nil,
-            fallbackHandle: currentGroom.authorID == appState.viewer?.id ? appState.viewer?.handle : nil,
-            fallbackAvatarURL: currentGroom.authorID == appState.viewer?.id ? appState.viewer?.avatarURL : nil
-        )
+        identity(for: currentGroom)
     }
 
     var body: some View {
@@ -436,14 +468,15 @@ struct GroomViewerScreen: View {
 
     private var viewerSurface: some View {
         GeometryReader { proxy in
+            let topPadding = GroomViewerChromeLayout.topPadding(safeAreaTop: proxy.safeAreaInsets.top)
             ZStack {
                 Color.black.ignoresSafeArea(.container, edges: .top)
 
                 #if canImport(UIKit)
-                // iter1226.435：投稿者切替中はキューブ回転。出ていく面（直前の画像スナップ）＋
-                // 入ってくる面（現在の画像）を、直方体の側面のように回して切り替える。
+                // iter1226.438：キューブの各面には画像だけでなく、ユーザー名バー・
+                // いいね/コメント等のUIも張り付けたまま回す（インスタと同じ見え方）。
                 if let cubeSpin {
-                    GroomViewerCubeFace(image: cubeSpin.fromImage)
+                    groomFace(for: cubeSpin.fromGroom, topPadding: topPadding, isInteractive: false)
                         .modifier(
                             GroomViewerCubeFaceModifier(
                                 transform: GroomViewerCubeGeometry.outgoing(
@@ -457,16 +490,12 @@ struct GroomViewerScreen: View {
                         .allowsHitTesting(false)
                 }
 
-                GroomViewerCachedImage(
-                    url: currentGroom.imageURL,
-                    onImageChange: { displayedImage = $0 }
-                )
-                .padding(.horizontal, 8)
-                .modifier(GroomViewerCubeFaceModifier(transform: liveFaceTransform(width: proxy.size.width), shade: liveFaceShade))
+                groomFace(for: currentGroom, topPadding: topPadding, isInteractive: true)
+                    .modifier(GroomViewerCubeFaceModifier(transform: liveFaceTransform(width: proxy.size.width), shade: liveFaceShade))
 
                 // iter1226.437：横スワイプ中は切替先（次/前の投稿者）の面を指に追従して回し込む。
                 if let cubeDrag {
-                    GroomViewerCubeTargetFace(url: grooms[cubeDrag.targetIndex].imageURL)
+                    groomFace(for: grooms[cubeDrag.targetIndex], topPadding: topPadding, isInteractive: false)
                         .modifier(
                             GroomViewerCubeFaceModifier(
                                 transform: GroomViewerCubeGeometry.incoming(
@@ -480,20 +509,8 @@ struct GroomViewerScreen: View {
                         .allowsHitTesting(false)
                 }
                 #else
-                GroomViewerCachedImage(url: currentGroom.imageURL)
-                    .padding(.horizontal, 8)
+                groomFace(for: currentGroom, topPadding: topPadding, isInteractive: true)
                 #endif
-
-                // FB(iter1226.422)：左右タップで前/次へ即遷移（ダブルタップいいねは廃止）。
-                HStack(spacing: 0) {
-                    Color.clear
-                        .contentShape(Rectangle())
-                        .gesture(pageTapGesture(delta: -1))
-
-                    Color.clear
-                        .contentShape(Rectangle())
-                        .gesture(pageTapGesture(delta: 1))
-                }
 
                 Color.black
                     .frame(height: GroomViewerChromeLayout.topObstructionHeight(safeAreaTop: proxy.safeAreaInsets.top))
@@ -512,60 +529,6 @@ struct GroomViewerScreen: View {
                         likers: floatingLikers
                     )
                 }
-
-                VStack(spacing: 0) {
-                    GroomViewerPageIndicator(
-                        totalCount: grooms.count,
-                        currentIndex: currentIndex,
-                        currentProgress: storyProgress
-                    )
-
-                    GroomViewerTopBar(
-                        authorName: authorName,
-                        postTimeText: GroomPostRelativeTimeFormatter.relativeText(from: currentGroom.createdAt),
-                        authorAvatarID: authorIdentity.avatarID,
-                        authorAvatarURL: authorIdentity.avatarURL,
-                        canModerate: canReplyToCurrentGroom,
-                        onReport: { interactionState.showReportConfirmation() },
-                        onBlock: { interactionState.showBlockConfirmation() },
-                        onOpenProfile: { onOpenMeguriUserProfile(currentGroom.authorID) }
-                    ) {
-                        dismissViewer()
-                    }
-
-                    Spacer()
-
-                    if isCurrentGroomMine {
-                        HStack {
-                            Spacer()
-                            GroomViewerOwnerBottomControls(
-                                isLiked: isCurrentGroomLiked,
-                                likeCount: currentGroomLikeCount,
-                                commentCount: currentGroomCommentCount,
-                                isDeleting: appState.deletingGroomPostID == currentGroom.id,
-                                onToggleLike: toggleCurrentGroomLike,
-                                onOpenComments: { isShowingComments = true },
-                                onOpenLikes: { isShowingLikes = true },
-                                onDelete: { isShowingDeleteConfirmation = true }
-                            )
-                        }
-                        .padding(.horizontal, 18)
-                        .padding(.bottom, 24)
-                    } else {
-                        GroomViewerBottomControls(
-                            canReply: canReplyToCurrentGroom,
-                            canLike: canReplyToCurrentGroom,
-                            isSendingReply: isSendingReply,
-                            isLiked: isCurrentGroomLiked,
-                            likeCount: currentGroomLikeCount,
-                            commentCount: currentGroomCommentCount,
-                            onToggleLike: toggleCurrentGroomLike,
-                            onOpenComments: { isShowingComments = true },
-                            onOpenLikes: { isShowingLikes = true }
-                        )
-                    }
-                }
-                .padding(.top, GroomViewerChromeLayout.topPadding(safeAreaTop: proxy.safeAreaInsets.top))
             }
             #if canImport(UIKit)
             .onAppear {
@@ -578,6 +541,86 @@ struct GroomViewerScreen: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.black.ignoresSafeArea(.container, edges: .top))
+    }
+
+    /// キューブの1面：グルーム画像＋ページ進捗＋ユーザー名バー＋いいね/コメント等のUI一式。
+    /// isInteractive=false（回転中の面）はUIを見た目だけ表示する（操作は本体面のみ）。
+    @ViewBuilder
+    private func groomFace(for groom: GroomPost, topPadding: CGFloat, isInteractive: Bool) -> some View {
+        let identity = identity(for: groom)
+        ZStack {
+            Color.black
+
+            GroomViewerCachedImage(url: groom.imageURL)
+                .padding(.horizontal, 8)
+
+            if isInteractive {
+                // FB(iter1226.422)：左右タップで前/次へ即遷移（ダブルタップいいねは廃止）。
+                HStack(spacing: 0) {
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .gesture(pageTapGesture(delta: -1))
+
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .gesture(pageTapGesture(delta: 1))
+                }
+            }
+
+            VStack(spacing: 0) {
+                GroomViewerPageIndicator(
+                    totalCount: grooms.count,
+                    currentIndex: index(of: groom),
+                    currentProgress: groom.id == currentGroom.id ? storyProgress : 0
+                )
+
+                GroomViewerTopBar(
+                    authorName: identity.displayName,
+                    postTimeText: GroomPostRelativeTimeFormatter.relativeText(from: groom.createdAt),
+                    authorAvatarID: identity.avatarID,
+                    authorAvatarURL: identity.avatarURL,
+                    canModerate: canReply(to: groom),
+                    onReport: { interactionState.showReportConfirmation() },
+                    onBlock: { interactionState.showBlockConfirmation() },
+                    onOpenProfile: { onOpenMeguriUserProfile(groom.authorID) }
+                ) {
+                    dismissViewer()
+                }
+
+                Spacer()
+
+                if isMine(groom) {
+                    HStack {
+                        Spacer()
+                        GroomViewerOwnerBottomControls(
+                            isLiked: appState.isGroomLiked(groom.id),
+                            likeCount: likeCount(for: groom),
+                            commentCount: commentCount(for: groom),
+                            isDeleting: appState.deletingGroomPostID == groom.id,
+                            onToggleLike: { toggleLike(for: groom) },
+                            onOpenComments: { isShowingComments = true },
+                            onOpenLikes: { isShowingLikes = true },
+                            onDelete: { isShowingDeleteConfirmation = true }
+                        )
+                    }
+                    .padding(.horizontal, 18)
+                    .padding(.bottom, 24)
+                } else {
+                    GroomViewerBottomControls(
+                        canReply: canReply(to: groom),
+                        canLike: canReply(to: groom),
+                        isSendingReply: appState.sendingGroomReplyPostID == groom.id,
+                        isLiked: appState.isGroomLiked(groom.id),
+                        likeCount: likeCount(for: groom),
+                        commentCount: commentCount(for: groom),
+                        onToggleLike: { toggleLike(for: groom) },
+                        onOpenComments: { isShowingComments = true },
+                        onOpenLikes: { isShowingLikes = true }
+                    )
+                }
+            }
+            .padding(.top, topPadding)
+        }
     }
 
     #if canImport(UIKit)
@@ -630,7 +673,8 @@ struct GroomViewerScreen: View {
         }
         // iter1226.435：投稿者が変わる時だけ、Instagramストーリーズ風のキューブ回転で切り替える。
         // 同じ投稿者の連続グルームは従来どおり「パッ」と切り替え（iter1226.422）。
-        let switchesAuthor = grooms[nextIndex].authorID != currentGroom.authorID
+        let previousGroom = currentGroom
+        let switchesAuthor = grooms[nextIndex].authorID != previousGroom.authorID
         var transaction = Transaction()
         transaction.disablesAnimations = true
         withTransaction(transaction) {
@@ -638,14 +682,14 @@ struct GroomViewerScreen: View {
         }
         #if canImport(UIKit)
         if switchesAuthor, !reduceMotion, isOpeningSettled, cubeDrag == nil {
-            startCubeSpin(direction: delta >= 0 ? 1 : -1)
+            startCubeSpin(direction: delta >= 0 ? 1 : -1, from: previousGroom)
         }
         #endif
     }
 
     #if canImport(UIKit)
-    private func startCubeSpin(direction: Int) {
-        let spin = GroomViewerCubeSpin(fromImage: displayedImage, direction: direction)
+    private func startCubeSpin(direction: Int, from previousGroom: GroomPost) {
+        let spin = GroomViewerCubeSpin(fromGroom: previousGroom, direction: direction)
         var transaction = Transaction()
         transaction.disablesAnimations = true
         withTransaction(transaction) {
@@ -733,14 +777,6 @@ struct GroomViewerScreen: View {
         }
     }
 
-    private func toggleCurrentGroomLike() {
-        // いいね（ON/OFFどちらも）に触覚フィードバックを添える
-        MegrumHaptics.buttonTap()
-        Task {
-            await appState.setGroomLiked(currentGroom.id, isLiked: !isCurrentGroomLiked)
-        }
-    }
-
     /// FB(iter1226.422)：タップした瞬間に前/次へ切り替える（ダブルタップいいねは廃止）。
     /// 最後のグルームで右タップしたら即閉じる。
     private func pageTapGesture(delta: Int) -> some Gesture {
@@ -819,8 +855,9 @@ enum GroomViewerChromeLayout {
 
 #if canImport(UIKit)
 /// iter1226.435：投稿者切替キューブ回転の1回ぶんの状態。
+/// iter1226.438：面にはUIごと張り付けるため、画像スナップではなく直前のグルーム自体を持つ。
 struct GroomViewerCubeSpin {
-    var fromImage: UIImage?
+    var fromGroom: GroomPost
     var direction: Int
     var id = UUID()
 }
@@ -838,37 +875,6 @@ enum GroomViewerDragAxis {
     case vertical
 }
 
-/// キューブの「出ていく面」。直前まで表示していた画像のスナップを黒面に載せる。
-private struct GroomViewerCubeFace: View {
-    var image: UIImage?
-
-    var body: some View {
-        ZStack {
-            Color.black
-            if let image {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFit()
-                    .padding(.horizontal, 8)
-            }
-        }
-        .accessibilityHidden(true)
-    }
-}
-
-/// iter1226.437：スワイプ中に回り込んでくる「切替先の面」（次/前の投稿者のグルーム画像）。
-private struct GroomViewerCubeTargetFace: View {
-    var url: URL
-
-    var body: some View {
-        ZStack {
-            Color.black
-            GroomViewerCachedImage(url: url)
-                .padding(.horizontal, 8)
-        }
-        .accessibilityHidden(true)
-    }
-}
 #endif
 
 /// グルーム表示用のキャッシュ対応画像。読み込み中も直前の画像を出したままにして、
@@ -877,8 +883,6 @@ private struct GroomViewerCachedImage: View {
     var url: URL
 
     #if canImport(UIKit)
-    /// 表示画像が確定/更新された時に親へ知らせる（キューブ回転の「出ていく面」用スナップ）。
-    var onImageChange: ((UIImage) -> Void)? = nil
     @State private var image: UIImage?
     #endif
     @State private var hasFailed = false
@@ -929,7 +933,6 @@ private struct GroomViewerCachedImage: View {
                     withTransaction(transaction) {
                         image = prepared
                     }
-                    onImageChange?(prepared)
                 } else if image == nil {
                     hasFailed = true
                 }

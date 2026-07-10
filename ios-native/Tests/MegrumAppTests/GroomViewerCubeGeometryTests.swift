@@ -1,5 +1,7 @@
 @testable import MegrumApp
 import CoreGraphics
+import Foundation
+import MegrumCore
 import XCTest
 
 @MainActor
@@ -107,5 +109,38 @@ final class GroomViewerCubeGeometryTests: XCTestCase {
             GroomViewerCubeGeometry.maxShadeOpacity
         )
         XCTAssertEqual(GroomViewerCubeGeometry.incomingShade(progress: 1), 0)
+    }
+}
+
+@MainActor
+final class GroomViewerAuthorGroupingTests: XCTestCase {
+    private func groom(author: UUID, minutesAgo: Int) -> GroomPost {
+        GroomPost(
+            id: UUID(),
+            authorID: author,
+            imageURL: URL(string: "https://example.com/\(minutesAgo).jpg")!,
+            latitude: 35.0,
+            longitude: 139.0,
+            createdAt: Date(timeIntervalSinceNow: -Double(minutesAgo) * 60)
+        )
+    }
+
+    func testOrderingGroupsInterleavedAuthorsIntoBlocks() {
+        let a = UUID()
+        let b = UUID()
+        // 時刻順だと A, B, A, B と交互になる並び
+        let grooms = [
+            groom(author: a, minutesAgo: 40),
+            groom(author: b, minutesAgo: 30),
+            groom(author: a, minutesAgo: 20),
+            groom(author: b, minutesAgo: 10)
+        ]
+
+        let ordered = GroomViewerAuthorNavigation.orderedGroupingAuthors(grooms.shuffled())
+
+        // 投稿者ブロックにまとまり（A の一連 → B の一連）、ブロック内は古い→新しい
+        XCTAssertEqual(ordered.map(\.authorID), [a, a, b, b])
+        XCTAssertLessThan(ordered[0].createdAt, ordered[1].createdAt)
+        XCTAssertLessThan(ordered[2].createdAt, ordered[3].createdAt)
     }
 }
