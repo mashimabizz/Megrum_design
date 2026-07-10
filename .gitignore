@@ -54,3 +54,6 @@ tmp/
 
 # Xcode user state
 ios-native/**/xcuserdata/
+
+# APNs private keys
+*.p8
