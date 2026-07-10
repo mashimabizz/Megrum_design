@@ -55,6 +55,11 @@ extension MegrumAppState {
                 longitude: longitude,
                 radiusMeters: radiusMeters
             )
+            // iter1226.426：.task(id:) 再起動などでキャンセルされた取得を「成功した空フィード」
+            // としてキャッシュ確定しない（空のまま再取得されなくなるのを防ぐ）。
+            guard !Task.isCancelled else {
+                return
+            }
             groomMapPosts = posts
             syncLikedGroomIDs(with: posts)
             groomMapCacheKey = cacheKey

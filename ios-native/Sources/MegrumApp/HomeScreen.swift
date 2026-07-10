@@ -224,7 +224,9 @@ struct HomeScreen: View {
 
     var body: some View {
         homeBody
-            .task(id: groomLocationState.coordinate?.latitude) {
+            // iter1226.426：座標は約100m格子へ丸めてタスクIDにする。連続更新の微小ジッタで
+            // .task が再起動→ロード連鎖がキャンセルされるのを防ぐ。
+            .task(id: groomLocationState.coordinate.map { String(format: "%.3f,%.3f", $0.latitude, $0.longitude) }) {
                 await loadNearbyGroomsIfPossible()
             }
             .onAppear {
@@ -236,6 +238,15 @@ struct HomeScreen: View {
             }
             .onChange(of: groomLocationState.locationErrorMessage) { _, message in
                 if message != nil {
+                    isLoadingGroomRail = false
+                }
+            }
+            // iter1226.426：屋内などで初回測位が届かない場合、継続測位モードは
+            // locationUnknown を握りつぶすため座標もエラーも来ない。スケルトンを
+            // 無期限に出さないよう、一定時間で畳む（座標が来れば task が読み込む）。
+            .task {
+                try? await Task.sleep(nanoseconds: 12_000_000_000)
+                if groomLocationState.coordinate == nil {
                     isLoadingGroomRail = false
                 }
             }
@@ -267,16 +278,23 @@ struct HomeScreen: View {
             }
             return
         }
-        defer { isLoadingGroomRail = false }
+        defer {
+            isLoadingGroomRail = false
+        }
         await appState.loadGroomMapPosts(latitude: coordinate.latitude, longitude: coordinate.longitude)
         // iter1226.421：ホームの「近くのチャットルーム」も同じ座標で取得する。
         await appState.loadHomeNearbyBoardThreads(latitude: coordinate.latitude, longitude: coordinate.longitude)
         // FB(iter1226.392): 出会った(遭遇済み)グルームも取得（近くに無くても列に出す）。
         await appState.loadEncounteredGrooms(latitude: coordinate.latitude, longitude: coordinate.longitude)
-        await appState.loadMeguriProfiles(
-            userIDs: Set(appState.groomMapPosts.map(\.authorID)).union(appState.encounteredGrooms.map(\.authorID)),
-            reportsFailure: false
-        )
+        // iter1226.426：レールの表示名・アバターは公開プロフィール（publicProfilesByUserID）。
+        // 旧めぐりプロフィール読込では埋まらず、タイルが読み込み中表示のまま残っていた
+        //（めぐりタブの preloadGroomAuthorProfiles と同じ方式に揃える）。
+        let railAuthorIDs = Set(appState.groomMapPosts.map(\.authorID))
+            .union(appState.encounteredGrooms.map(\.authorID))
+        for authorID in railAuthorIDs
+        where authorID != (appState.viewer ?? viewer)?.id && appState.publicProfilesByUserID[authorID] == nil {
+            await appState.loadPublicUserProfile(userID: authorID, reportsFailure: false)
+        }
         // FB(iter1226.390): 現在地1km圏内の推しグルームを検出して遭遇記録＋通知。
         await appState.evaluateGroomProximity(
             latitude: coordinate.latitude,

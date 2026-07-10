@@ -142,7 +142,8 @@ struct GroomStrip: View {
                             groom: representative,
                             profile: publicProfilesByUserID[representative.authorID]?.profile,
                             isRead: isGroupRead(group),
-                            isLocked: isGroupLocked(group)
+                            isLocked: isGroupLocked(group),
+                            isProfileLoading: isLoadingInitial
                         )
                         .overlay(alignment: .topTrailing) {
                             // 同一ユーザーの複数グルームは件数バッジで示す（iter1226.420）。

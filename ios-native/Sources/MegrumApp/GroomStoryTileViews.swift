@@ -244,13 +244,16 @@ struct GroomStoryTile: View {
     /// FB(iter1226.392)：無料会員で圏外の遭遇済みグルーム＝いま開けない。うすい鍵アイコンを右下に付ける。
     var isLocked: Bool = false
 
-    /// iter1226.422：プロフィール未取得の間は「？/めぐり」ではなく読み込み中の見た目（redacted）にする。
+    /// iter1226.426：読み込み中だけ redacted。完了後もプロフィールが無い場合は
+    /// 汎用フォールバック表示（永遠にシマーが続かないように）。
+    var isProfileLoading: Bool = false
+
     private var isProfilePending: Bool {
-        profile == nil
+        profile == nil && isProfileLoading
     }
 
     private var displayName: String {
-        profile?.handle.nilIfBlank ?? profile?.displayName.nilIfBlank ?? "ロード中"
+        profile?.handle.nilIfBlank ?? profile?.displayName.nilIfBlank ?? (isProfileLoading ? "ロード中" : "ユーザー")
     }
 
     private var fallbackText: String {
