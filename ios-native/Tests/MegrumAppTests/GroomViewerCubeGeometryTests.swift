@@ -155,3 +155,22 @@ final class GroomViewerAuthorGroupingTests: XCTestCase {
         XCTAssertEqual(GroomViewerAuthorNavigation.authorBlockRange(authorIDs: authors, currentIndex: 9), 9..<10)
     }
 }
+
+@MainActor
+final class GroomImageCacheKeyNormalizationTests: XCTestCase {
+    /// iter1226.446：署名トークンが回転しても同一画像として扱えること（キャッシュキーの根拠）。
+    func testStoragePathIgnoresRotatingSignedToken() {
+        let first = URL(string: "https://x.supabase.co/storage/v1/object/sign/groom-posts/user1/photo.jpg?token=AAA")!
+        let second = URL(string: "https://x.supabase.co/storage/v1/object/sign/groom-posts/user1/photo.jpg?token=BBB")!
+        XCTAssertEqual(
+            GroomSignedURLPathExtractor.storagePath(from: first),
+            GroomSignedURLPathExtractor.storagePath(from: second)
+        )
+        XCTAssertEqual(GroomSignedURLPathExtractor.storagePath(from: first), "user1/photo.jpg")
+    }
+
+    func testStoragePathIsNilForNonGroomURL() {
+        let url = URL(string: "https://example.com/other/image.jpg")!
+        XCTAssertNil(GroomSignedURLPathExtractor.storagePath(from: url))
+    }
+}

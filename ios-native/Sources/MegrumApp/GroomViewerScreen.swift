@@ -974,39 +974,58 @@ enum GroomViewerDragAxis {
 #endif
 
 #if canImport(UIKit)
-/// グルーム写真のデコード済みメモリキャッシュ（iter1226.441）。
+/// グルーム写真のデコード済みメモリキャッシュ（iter1226.441 / iter1226.446 キー正規化）。
 /// ビューアを開く前（ホームのレール表示時）に先読みしておき、開いた最初の
 /// フレームから写真ごと拡大できるようにする（枠と中身が別々に出るのを防ぐ）。
+///
+/// iter1226.446：キーは署名付きURL全体ではなく**ストレージパスへ正規化**する。
+/// 署名トークンはフィード再取得（位置更新等）のたびに回転するため、URL全体を
+/// キーにすると実機（移動中）ではほぼ毎回キャッシュミスになり、ビューアを
+/// 開き終わった直後に写真がポップインして「ガクッ」と見えていた。
 @MainActor
 final class GroomImageMemoryStore {
     static let shared = GroomImageMemoryStore()
-    private let cache = NSCache<NSURL, UIImage>()
+    private let cache = NSCache<NSString, UIImage>()
 
     init() {
         cache.countLimit = 80
     }
 
+    static func cacheKey(for url: URL) -> NSString {
+        (GroomSignedURLPathExtractor.storagePath(from: url) ?? url.absoluteString) as NSString
+    }
+
     func image(for url: URL) -> UIImage? {
-        cache.object(forKey: url as NSURL)
+        cache.object(forKey: Self.cacheKey(for: url))
     }
 
     func insert(_ image: UIImage, for url: URL) {
-        cache.setObject(image, forKey: url as NSURL)
+        cache.setObject(image, forKey: Self.cacheKey(for: url))
     }
 
-    /// 未キャッシュのURLを順に読み込み・デコードして格納する（ベストエフォート）。
+    /// 未キャッシュのURLを並列に読み込み・デコードして格納する（ベストエフォート）。
     func prewarm(urls: [URL]) async {
-        for url in urls where image(for: url) == nil {
-            guard !Task.isCancelled else {
-                return
+        let missing = urls.filter { image(for: $0) == nil }
+        guard !missing.isEmpty else {
+            return
+        }
+        await withTaskGroup(of: (URL, UIImage)?.self) { group in
+            for url in missing {
+                group.addTask {
+                    guard let data = try? await GoodsRemoteImageDataLoader.loadData(from: url),
+                          let loaded = UIImage(data: data)
+                    else {
+                        return nil
+                    }
+                    let prepared = await loaded.byPreparingForDisplay() ?? loaded
+                    return (url, prepared)
+                }
             }
-            guard let data = try? await GoodsRemoteImageDataLoader.loadData(from: url),
-                  let loaded = UIImage(data: data)
-            else {
-                continue
+            for await result in group {
+                if let (url, image) = result {
+                    insert(image, for: url)
+                }
             }
-            let prepared = await loaded.byPreparingForDisplay() ?? loaded
-            insert(prepared, for: url)
         }
     }
 }
@@ -1058,6 +1077,18 @@ private struct GroomViewerCachedImage: View {
         #if canImport(UIKit)
         .task(id: url) {
             hasFailed = false
+            // iter1226.446：署名URLが回転してもストレージパスが同じなら
+            // デコード済みキャッシュから即表示し、再ダウンロードしない。
+            if let cached = GroomImageMemoryStore.shared.image(for: url) {
+                if image !== cached {
+                    var transaction = Transaction()
+                    transaction.disablesAnimations = true
+                    withTransaction(transaction) {
+                        image = cached
+                    }
+                }
+                return
+            }
             do {
                 let data = try await GoodsRemoteImageDataLoader.loadData(from: url)
                 guard !Task.isCancelled else {
