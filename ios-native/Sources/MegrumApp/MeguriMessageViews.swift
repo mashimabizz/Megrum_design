@@ -558,6 +558,16 @@ struct MeguriMessagesScreen: View {
                     proxy.scrollTo(lastID, anchor: .bottom)
                 }
             }
+            // iter1226.460：開いた瞬間から最新メッセージが見える位置で表示する（アニメなし）。
+            .onAppear {
+                guard let lastID = messages.last?.id else {
+                    return
+                }
+                proxy.scrollTo(lastID, anchor: .bottom)
+                DispatchQueue.main.async {
+                    proxy.scrollTo(lastID, anchor: .bottom)
+                }
+            }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             VStack(spacing: 0) {
