@@ -8,20 +8,6 @@ struct MeguriMapRangeCircle {
     var radius: CLLocationDistance
 }
 
-/// iter1226.454：めぐりマップのグルームを標準zoomで開くための source アンカー。
-/// MapKit Annotation 内の matchedTransitionSource は効かないので、この座標を MapProxy で
-/// 画面点に変換し、そこへ不可視アンカーを重ねる。id は提示側の zoom(sourceID:) と一致させる。
-struct GroomMapZoomAnchor: Equatable {
-    var id: UUID
-    var coordinate: CLLocationCoordinate2D
-
-    static func == (lhs: GroomMapZoomAnchor, rhs: GroomMapZoomAnchor) -> Bool {
-        lhs.id == rhs.id
-            && lhs.coordinate.latitude == rhs.coordinate.latitude
-            && lhs.coordinate.longitude == rhs.coordinate.longitude
-    }
-}
-
 struct MeguriMapScene: View {
     @Binding var cameraPosition: MapCameraPosition
     var kind: MeguriMapKind
@@ -35,14 +21,14 @@ struct MeguriMapScene: View {
     var isGroomOutOfRange: (GroomPost) -> Bool
     var isBoardOutOfRange: (BoardThread) -> Bool
     var onOpenGroom: (GroomPost) -> Void
-    var onOpenGroomCluster: ([GroomPost]) -> Void
+    var onOpenGroomCluster: ([GroomPost], CLLocationCoordinate2D) -> Void
     var onOpenThread: (BoardThread) -> Void
     /// iter1226.453：グルームを開く標準zoomの source namespace（ピンから全画面へ連続変形）。
     var groomZoomNamespace: Namespace.ID? = nil
-    /// iter1226.454：開こうとしているグルームの zoom source アンカー。
-    /// MapKit の Annotation 内 matchedTransitionSource は効かないため、MapProxy で
-    /// 座標→画面点に変換し、その位置に不可視アンカーを重ねて zoom source にする。
-    var zoomAnchor: GroomMapZoomAnchor? = nil
+    /// iter1226.455：開こうとしているグルーム（ミラーを出す対象）。
+    var pendingZoom: PendingGroomMapZoom? = nil
+    /// ミラーの layout 完了フレームを親へ伝える。
+    var onZoomMirrorFrameChange: (CGRect) -> Void = { _ in }
 
     var body: some View {
         MapReader { proxy in
@@ -74,7 +60,7 @@ struct MeguriMapScene: View {
                 MeguriMapBrandToneOverlay()
             }
             .overlay {
-                groomZoomAnchorOverlay(proxy: proxy)
+                groomZoomMirrorOverlay(proxy: proxy)
             }
             .mapControls {
                 if !isVisualQAPreviewEnabled {
@@ -85,21 +71,42 @@ struct MeguriMapScene: View {
             }
         }
         .ignoresSafeArea()
+        .onPreferenceChange(GroomZoomSourceFrameKey.self) { frame in
+            onZoomMirrorFrameChange(frame)
+        }
     }
 
-    /// ピンの画面位置に置く不可視の zoom source アンカー（iOS18+）。
+    /// iter1226.455：ピンの画面位置に、実ピンと同じ見た目の可視ミラーを重ねる。
+    /// これを zoom source（matchedTransitionSource）にし、layout 完了を preference で親へ知らせる。
     @ViewBuilder
-    private func groomZoomAnchorOverlay(proxy: MapProxy) -> some View {
+    private func groomZoomMirrorOverlay(proxy: MapProxy) -> some View {
         #if canImport(UIKit)
         if #available(iOS 18.0, *),
            let groomZoomNamespace,
-           let zoomAnchor,
-           let point = proxy.convert(zoomAnchor.coordinate, to: .local) {
-            Color.clear
-                .frame(width: 48, height: 58)
-                .matchedTransitionSource(id: zoomAnchor.id, in: groomZoomNamespace)
-                .position(point)
-                .allowsHitTesting(false)
+           let pendingZoom,
+           let point = proxy.convert(pendingZoom.coordinate, to: .local) {
+            Group {
+                if pendingZoom.isCluster {
+                    GroomClusterMapPin(count: pendingZoom.clusterCount)
+                } else {
+                    GroomMapPin(
+                        groom: pendingZoom.representative,
+                        isOutOfRange: false,
+                        isRead: pendingZoom.isRead
+                    )
+                }
+            }
+            .matchedTransitionSource(id: pendingZoom.id, in: groomZoomNamespace)
+            .position(point)
+            .allowsHitTesting(false)
+            .background {
+                GeometryReader { geometry in
+                    Color.clear.preference(
+                        key: GroomZoomSourceFrameKey.self,
+                        value: geometry.frame(in: .global)
+                    )
+                }
+            }
         }
         #endif
     }
@@ -110,9 +117,11 @@ struct MeguriMapScene: View {
             Annotation(cluster.title, coordinate: cluster.coordinate) {
                 if cluster.posts.count > 1 {
                     Button {
-                        onOpenGroomCluster(cluster.posts)
+                        onOpenGroomCluster(cluster.posts, cluster.coordinate)
                     } label: {
                         GroomClusterMapPin(count: cluster.posts.count)
+                            // iter1226.455：ミラー表示中の実ピンは隠して二重表示を避ける。
+                            .opacity(isMirrored(cluster.posts.first) ? 0 : 1)
                     }
                     .buttonStyle(.plain)
                 } else if let groom = cluster.posts.first {
@@ -124,11 +133,17 @@ struct MeguriMapScene: View {
                             isOutOfRange: isGroomOutOfRange(groom),
                             isRead: viewedGroomIDs.contains(groom.id)
                         )
+                        .opacity(isMirrored(groom) ? 0 : 1)
                     }
                     .buttonStyle(.plain)
                 }
             }
         }
+    }
+
+    private func isMirrored(_ groom: GroomPost?) -> Bool {
+        guard let groom, let pendingZoom else { return false }
+        return pendingZoom.representative.id == groom.id
     }
 
     @MapContentBuilder

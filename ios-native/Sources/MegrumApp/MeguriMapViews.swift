@@ -47,8 +47,6 @@ struct MeguriMapScreen: View {
     @Environment(\.dismiss) private var dismiss
     @State var kind: MeguriMapKind
     @State var cameraPosition: MapCameraPosition
-    @State var selectedGroom: GroomPost?
-    @State var selectedGroomGroup: GroomMapGroomSelection?
     @State var selectedThread: BoardThread?
     @State var mapNotice: String?
     @State var outOfRangeAlertMessage = ""
@@ -57,9 +55,11 @@ struct MeguriMapScreen: View {
     /// iter1226.453：めぐりホーム（マップ）のグルームもホームレールと同じ標準zoomで開く。
     @Namespace private var groomZoomNamespace
 
-    /// iter1226.454：いま開く/直前に開いたグルームの zoom source アンカー（タップしたピンの座標）。
-    /// 開く時に設定し、閉じアニメ（zoom-back）でも source を参照できるよう保持し続ける。
-    @State var groomZoomAnchor: GroomMapZoomAnchor?
+    /// iter1226.455：二段階提示。タップ時に pendingZoom（ミラー表示）→ layout 完了後に viewerRoute（push）。
+    @State var pendingZoom: PendingGroomMapZoom?
+    @State var viewerRoute: GroomMapViewerRoute?
+    /// 提示済みの pendingZoom.id（閉じた後にミラーフレーム変化で再オープンしないためのガード）。
+    @State var lastPresentedZoomID: UUID?
 
     init(
         kind: MeguriMapKind,
@@ -95,7 +95,8 @@ struct MeguriMapScreen: View {
                 onOpenGroomCluster: openGroomCluster,
                 onOpenThread: openThreadIfInRange,
                 groomZoomNamespace: groomZoomNamespace,
-                zoomAnchor: groomZoomAnchor
+                pendingZoom: pendingZoom,
+                onZoomMirrorFrameChange: handleZoomMirrorFrame
             )
 
             VStack(spacing: 10) {
@@ -170,36 +171,22 @@ struct MeguriMapScreen: View {
             }
         }
         #if os(iOS)
-        // iter1226.453：ホームレールと同じ標準zoomでピンから全画面へ展開する。
-        .fullScreenCover(item: $selectedGroom) { groom in
+        // iter1226.455：二重fullScreenCoverをやめ、Mapを包む NavigationStack へ push する。
+        // ミラー（source）が layout 済みになってから viewerRoute を立てるので zoom がマッチする。
+        .navigationDestination(item: $viewerRoute) { route in
             GroomViewerScreen(
-                grooms: mapGrooms,
-                initialGroom: groom,
+                grooms: route.grooms,
+                initialGroom: route.initialGroom,
                 appState: appState,
-                onDismiss: { selectedGroom = nil }
+                onDismiss: { viewerRoute = nil }
             )
-            .modifier(GroomMapZoomDestination(sourceID: groom.id, namespace: groomZoomNamespace))
-        }
-        .fullScreenCover(item: $selectedGroomGroup) { selection in
-            GroomViewerScreen(
-                grooms: selection.grooms,
-                initialGroom: selection.initialGroom,
-                appState: appState,
-                onDismiss: { selectedGroomGroup = nil }
-            )
-            .modifier(GroomMapZoomDestination(
-                sourceID: selection.initialGroom.id,
-                namespace: groomZoomNamespace
-            ))
+            .toolbar(.hidden, for: .navigationBar)
+            .navigationBarBackButtonHidden()
+            .modifier(GroomMapZoomDestination(sourceID: route.sourceID, namespace: groomZoomNamespace))
         }
         #else
-        .sheet(item: $selectedGroom) { groom in
-            GroomMapDetailSheet(groom: groom)
-                .presentationDetents([.height(280)])
-                .presentationDragIndicator(.visible)
-        }
-        .sheet(item: $selectedGroomGroup) { selection in
-            GroomViewerScreen(grooms: selection.grooms, initialGroom: selection.initialGroom, appState: appState)
+        .sheet(item: $viewerRoute) { route in
+            GroomViewerScreen(grooms: route.grooms, initialGroom: route.initialGroom, appState: appState)
         }
         #endif
         .megrumSlideItemPresentation(

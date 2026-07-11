@@ -4,6 +4,28 @@
 
 ---
 
+## イテレーション1226.455：めぐりマップのグルームzoomを「可視ピンミラー＋layout待ち＋navigation push」方式へ全面再設計
+
+### 背景・問題意識
+iter1226.453/454（Annotation内matchedTransitionSource／不可視アンカー）でも実機でzoomにならず。ワークフロー＋別AI相談の結論：
+1. **透明アンカーはNG**：`Color.clear`はピンの見た目を持たず、Appleの契約（source Viewからzoom）を満たさない。
+2. **source生成と提示が同一トランザクション**：タップと同時にアンカーを出すと layout 未確定で zoom がマッチできない（ホームレールはタイル常設だから成功）。
+3. **二重fullScreenCoverは不要**：MapはすでにNavigationStack内。内側coverをやめ push にすべき。
+
+### 変更内容（別AI推奨構成）
+- **可視ピンミラー**：`MeguriMapScene` に、ピン画面位置へ実ピンと同じ `GroomMapPin`/`GroomClusterMapPin` のミラーを重ね、`matchedTransitionSource(id: pendingZoom.id)`。ミラー表示中は実Annotationピンを opacity 0 で隠す
+- **layout完了を待つ二段階提示**：タップ→`pendingZoom`（ミラーのみ）→ミラーの`GeometryReader`フレームを`GroomZoomSourceFrameKey`でpreference通知→`handleZoomMirrorFrame`が`Task.yield()`後に`viewerRoute`をセット。`lastPresentedZoomID`で閉じ後の再オープンを防止
+- **push化**：二重`fullScreenCover`を撤去し、Mapを包むNavigationStackへ`.navigationDestination(item: $viewerRoute)`。ビューアに`.navigationTransition(.zoom(sourceID:in:))`＋navバー非表示
+- 新型：`PendingGroomMapZoom` / `GroomMapViewerRoute` / `GroomZoomSourceFrameKey`（`MeguriMapGroomZoom.swift`）
+- `onOpenGroomCluster` に pin座標を渡すよう変更（ミラー位置＝クラスタ中心）
+
+### セルフレビュー結果
+- ✅ sim/generic-iOS ビルド成功、全1583テストパス
+- ⚠️ 実機でのピン→全画面zoom動作は要確認（この方式が本命。ダメなら次はMKMapView+preferredTransition.zoom）
+- ⚠️ 実機が一時的に unavailable のためインストール未完（再接続後に投入）
+
+---
+
 ## イテレーション1226.454：プレミアム入力欄の崩れ修正・進捗バーを上端へ・めぐりマップzoomを不可視アンカー方式へ
 
 ### 背景・問題意識
