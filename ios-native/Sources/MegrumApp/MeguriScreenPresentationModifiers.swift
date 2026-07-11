@@ -21,7 +21,6 @@ struct MeguriScreenPresentationModifier: ViewModifier {
     @Binding var isShowingGroomArchive: Bool
     @Binding var selectedGroom: GroomPost?
     @Binding var selectedGroomSourceAnchor: UnitPoint
-    @Binding var activeMap: MeguriMapKind?
     var selectedPrefecture: String?
     var boardScope: BoardThread.Audience
     var canUseCamera: Bool
@@ -97,15 +96,6 @@ struct MeguriScreenPresentationModifier: ViewModifier {
                     grooms: appState.grooms,
                     appState: appState,
                     onOpenMeguriUserProfile: onOpenMeguriUserProfile
-                )
-            )
-            .modifier(
-                MeguriMapPresentationModifier(
-                    activeMap: $activeMap,
-                    appState: appState,
-                    locationState: locationState,
-                    selectedPrefecture: selectedPrefecture,
-                    boardScope: boardScope
                 )
             )
     }

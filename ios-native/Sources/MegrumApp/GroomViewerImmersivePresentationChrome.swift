@@ -73,10 +73,6 @@ extension GroomPost: GroomViewerImmersiveItem {
     var openReadyImageURL: URL? { imageURL }
 }
 
-extension GroomMapGroomSelection: GroomViewerImmersiveItem {
-    var openReadyImageURL: URL? { initialGroom.imageURL }
-}
-
 /// グルームビューアの没入表示ホスト（iter1226.445 全面書き換え）。
 ///
 /// 以前は `.transition(.scale)` ＋ コンテナの `.animation(_:value:)` で開閉していたが、

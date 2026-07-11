@@ -4,6 +4,33 @@
 
 ---
 
+## イテレーション1226.459：グルームアーカイブも標準zoomへ＋到達不能なMeguriMapScreenを削除
+
+### 背景・問題意識
+オーナー承認2件：
+1. 到達不能な `MeguriMapScreen`（フルスクリーンの拡大マップ。`activeMap` を立てる導線がどこにも無いデッドコード。iter1226.453〜457で誤ってここを修正し続けて混乱の元になった）を削除する
+2. グルームアーカイブも、めぐりホームと同じ標準zoom（source常設・タップ即提示）で開けるようにする
+
+### 変更内容
+**A. デッドコード削除**
+- `MeguriMapViews.swift` / `MeguriMapScreenActions.swift` / `MeguriMapScreenDerivedState.swift` / `MeguriMapScene.swift` を削除
+- `activeMap` の配線（`MeguriScreen` / `MeguriScreenPresentationModifiers` / `MeguriScreenResetActions`）と `GroomMapGroomSelection` の `GroomViewerImmersiveItem` 準拠を撤去
+- `MeguriMapChromeViews`（MapGlassHeader等）と `MeguriMapGeometry` / `MeguriMapKind` はホームで使用中のため残置
+
+**B. アーカイブの標準zoom化**（iter1226.457/458と同方式）
+- `GroomArchiveMap`：iOS18+はoverlay側の常設可視ピン（`GroomArchiveMapPin`＋matchedTransitionSource、モーフの位置/不透明度を`morphController.displayedElements`から共有）を唯一の見た目にし、Annotation側は透明タップ領域。`onMapCameraChange(.continuous)`tickで追従
+- `GroomArchiveScreen`：`openArchivedGroom` がiOS18+で `zoomRoute`（fullScreenCover＋`GroomMapZoomDestination`）を即セット。宛先は `GroomArchiveStoryScreen`。iOS17は旧immersiveオーバーレイへフォールバック
+
+### 影響範囲
+- グルームアーカイブのピン表示（iOS18+はoverlayピン）と開き遷移。クラスタピン・モーフ演出は不変。
+
+### セルフレビュー結果
+- ✅ 全1583テストパス、sim/実機ビルド成功・実機インストール済み
+- ✅ これでグルームを開く全経路（ホームレール・めぐりホーム・アーカイブ）が標準zoomに統一
+- ⚠️ 実機確認：アーカイブのピンからタップ即・一体ズームするか／日付ラベル付きピンの見た目が変わっていないか
+
+---
+
 ## イテレーション1226.458：めぐりホーム（タブのインライン地図）のグルームも標準zoomへ＋初回1秒遅延の根治
 
 ### 背景・問題意識

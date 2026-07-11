@@ -10,7 +10,6 @@ extension MeguriScreen {
         isShowingGroomCamera = false
         isShowingGroomArchive = false
         isShowingMeguriProfileSettings = false
-        activeMap = nil
         isShowingThreadComposer = false
         threadCreationCoordinate = nil
         pendingMapCreationCoordinate = nil

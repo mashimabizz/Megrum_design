@@ -40,7 +40,6 @@ struct MeguriScreen: View {
     @State var isShowingMeguriProfileSettings = false
     @State var didOpenVisualQAMeguriProfileSettings = false
     @State var didOpenVisualQAGroomArchive = false
-    @State var activeMap: MeguriMapKind?
     @State var homeMapKind: MeguriMapKind = .all
     @State var isShowingThreadComposer = false
     @State var threadCreationCoordinate: MegrumLocationCoordinate?
@@ -371,7 +370,6 @@ struct MeguriScreen: View {
                 isShowingGroomArchive: $isShowingGroomArchive,
                 selectedGroom: $selectedGroom,
                 selectedGroomSourceAnchor: $selectedGroomSourceAnchor,
-                activeMap: $activeMap,
                 selectedPrefecture: selectedBoardPrefecture,
                 boardScope: selectedBoardScope,
                 canUseCamera: canUseCamera,
