@@ -296,7 +296,8 @@ struct GoodsEditorSheet: View {
                     previewItemsByTag: editorTagPreviewItemsByTag,
                     navigationTitle: "シリーズを一括登録",
                     textFieldPlaceholder: "例：会場限定",
-                    footerText: "\(selectedCreateMetaIDs.count)件の画像に同じシリーズを追加します。",
+                    // iter1226.452：説明文「X件の画像に同じシリーズを追加します」は不要（オーナーFB）。
+                    footerText: nil,
                     confirmationTitle: "登録",
                     googleLensItems: selectedCreateMetaGoogleLensItems,
                     isOpeningGoogleLens: isOpeningGoogleLensSearch,

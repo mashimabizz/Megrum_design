@@ -54,6 +54,8 @@ struct HomeDiscoveryExperience: View {
     var onOpenMeguriMessages: () -> Void = {}
     /// iter1226.421：近くのチャットルーム（LINE風行）用。
     var nearbyBoardThreads: [BoardThread] = []
+    /// iter1226.452：近くのチャットルーム読み込み中フラグ（スケルトン表示用）。
+    var nearbyBoardIsLoading: Bool = false
     var boardReplyPreviews: [UUID: [String]] = [:]
     var lockedBoardIDs: Set<UUID> = []
     /// FB(iter1226.424)：チャットルームごとの未読メッセージ件数。
@@ -129,7 +131,8 @@ struct HomeDiscoveryExperience: View {
                             unreadCounts: boardUnreadCounts,
                             onOpenThread: onOpenBoardThread,
                             onOpenLockedThread: onOpenLockedBoardThread,
-                            onSeeAll: onOpenBoardList
+                            onSeeAll: onOpenBoardList,
+                            isLoading: nearbyBoardIsLoading
                         )
                     }
 

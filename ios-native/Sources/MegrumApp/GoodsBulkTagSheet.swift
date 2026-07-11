@@ -42,7 +42,11 @@ struct GoodsBulkTagSheet: View {
                 } header: {
                     Text("シリーズ名")
                 } footer: {
-                    Text(footerText ?? "\(selectedCount)件のグッズに同じシリーズを追加します。")
+                    // iter1226.452：「X件の画像に同じシリーズを追加します」等の説明文は不要（オーナーFB）。
+                    // 明示的に footerText が渡された場合のみ表示する。
+                    if let footerText, !footerText.isEmpty {
+                        Text(footerText)
+                    }
                 }
 
                 if sheetState.showsNewSeriesRow(in: candidateNames) {
@@ -63,8 +67,6 @@ struct GoodsBulkTagSheet: View {
                         )
                     } header: {
                         Text("候補")
-                    } footer: {
-                        Text("候補は1タップで紐づく画像をプレビュー、もう一度タップで入力欄に入ります。")
                     }
                 }
 

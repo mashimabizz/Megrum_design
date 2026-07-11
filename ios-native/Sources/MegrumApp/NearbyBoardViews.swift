@@ -259,6 +259,8 @@ struct HomeNearbyBoardSection: View {
     var onOpenThread: (BoardThread) -> Void
     var onOpenLockedThread: () -> Void
     var onSeeAll: () -> Void
+    /// iter1226.452：読み込み中はスケルトンを出す（まばらにポップインするのを防ぐ）。
+    var isLoading: Bool = false
 
     /// FB(iter1226.424)：ホームに出すのは最大2件まで。
     private static let displayLimit = 2
@@ -268,7 +270,9 @@ struct HomeNearbyBoardSection: View {
     }
 
     var body: some View {
-        if !threads.isEmpty {
+        if threads.isEmpty, isLoading {
+            skeleton
+        } else if !threads.isEmpty {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(alignment: .firstTextBaseline) {
                     Text("近くのチャットルーム")
@@ -321,6 +325,57 @@ struct HomeNearbyBoardSection: View {
                 }
             }
         }
+    }
+
+    /// iter1226.452：近くのチャットルーム読み込み中のスケルトン。
+    private var skeleton: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("近くのチャットルーム")
+                .font(.system(size: 16, weight: .bold, design: .rounded))
+                .foregroundStyle(MegrumTheme.ink)
+
+            VStack(spacing: 0) {
+                ForEach(0..<2, id: \.self) { index in
+                    if index > 0 {
+                        Divider().opacity(0.5)
+                    }
+                    NearbyBoardSkeletonRow()
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 4)
+            .background(.white.opacity(0.9), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .strokeBorder(.black.opacity(0.05), lineWidth: 1)
+            }
+        }
+    }
+}
+
+/// iter1226.452：チャットルーム行のスケルトン（脈動）。
+private struct NearbyBoardSkeletonRow: View {
+    @State private var pulses = false
+
+    var body: some View {
+        HStack(spacing: 12) {
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(MegrumTheme.ink.opacity(0.07))
+                .frame(width: 46, height: 46)
+            VStack(alignment: .leading, spacing: 7) {
+                Capsule().fill(MegrumTheme.ink.opacity(0.08)).frame(width: 150, height: 11)
+                Capsule().fill(MegrumTheme.ink.opacity(0.06)).frame(width: 92, height: 9)
+            }
+            Spacer()
+        }
+        .padding(.vertical, 12)
+        .opacity(pulses ? 0.55 : 1)
+        .onAppear {
+            withAnimation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true)) {
+                pulses = true
+            }
+        }
+        .accessibilityHidden(true)
     }
 }
 

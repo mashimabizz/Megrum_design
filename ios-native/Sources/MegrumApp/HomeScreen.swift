@@ -438,6 +438,7 @@ struct HomeScreen: View {
             onOpenGroomGroup: handleGroomRailGroupTap,
             onOpenMeguriMessages: onOpenMeguriMessages,
             nearbyBoardThreads: appState?.homeNearbyBoardThreads ?? [],
+            nearbyBoardIsLoading: isLoadingGroomRail && showsGroomRail,
             boardReplyPreviews: appState?.boardReplyPreviewsByThreadID ?? [:],
             lockedBoardIDs: lockedBoardIDs,
             boardUnreadCounts: appState?.homeNearbyBoardUnreadCounts ?? [:],
