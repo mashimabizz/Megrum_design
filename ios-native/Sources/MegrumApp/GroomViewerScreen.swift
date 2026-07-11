@@ -788,7 +788,9 @@ struct GroomViewerScreen: View {
 
                         #if canImport(UIKit)
                         Group {
-                            if isInteractive {
+                            // iter1226.454：開閉zoom遷移の最中は UITextField(UIViewRepresentable) が
+                            // 変形に追従せずズレて描画されるため、遷移が落ち着くまで静的ピルを出す。
+                            if isInteractive, isOpeningSettled {
                                 GroomViewerMessageComposer(
                                     canSend: appState.subscriptionState.hasMeguriMessageAccess,
                                     text: $messageDraft,
@@ -1141,7 +1143,9 @@ enum GroomViewerChromeLayout {
     static let chromeGapBelowObstruction: CGFloat = 10
 
     static func topPadding(safeAreaTop: CGFloat) -> CGFloat {
-        topObstructionHeight(safeAreaTop: safeAreaTop) + chromeGapBelowObstruction
+        // iter1226.454：進捗バー・ユーザー名を画面上部ぎりぎり（ステータスバー直下）へ。
+        // 以前は「セーフエリア＋10pt」で下がり過ぎていた。Dynamic Island の下端付近まで上げる。
+        max(0, topObstructionHeight(safeAreaTop: safeAreaTop) - 6)
     }
 
     /// ステータスバー領域だけを黒帯にして、コンテンツはその直下まで表示する。

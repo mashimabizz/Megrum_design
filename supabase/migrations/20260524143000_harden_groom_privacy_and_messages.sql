@@ -237,7 +237,7 @@ begin
     begin
       perform cron.schedule(
         'expire-groom-posts',
-        '*/15 * * * *',
+        '0 */5 * * *',
         'select public.expire_groom_posts();'
       );
     exception when others then

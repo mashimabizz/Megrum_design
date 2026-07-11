@@ -118,8 +118,18 @@ struct GroomMessageDarkTextField: UIViewRepresentable {
         )
         field.setContentHuggingPriority(.defaultLow, for: .horizontal)
         field.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        // iter1226.454：縦は intrinsic（1行）で固定。これをしないと SwiftUI が縦いっぱいまで
+        // 引き伸ばし、カプセルが画面全体の楕円になってプレースホルダが中央左にズレていた。
+        field.setContentHuggingPriority(.required, for: .vertical)
+        field.setContentCompressionResistancePriority(.required, for: .vertical)
         field.addTarget(context.coordinator, action: #selector(Coordinator.editingChanged(_:)), for: .editingChanged)
         return field
+    }
+
+    func sizeThatFits(_ proposal: ProposedViewSize, uiView: UITextField, context: Context) -> CGSize? {
+        // 幅は提案どおり、高さは1行ぶんに固定（縦への引き伸ばしを防ぐ）。
+        let width = proposal.width ?? uiView.intrinsicContentSize.width
+        return CGSize(width: width, height: uiView.intrinsicContentSize.height)
     }
 
     func updateUIView(_ uiView: UITextField, context: Context) {

@@ -102,6 +102,7 @@ extension MeguriMapScreen {
 
     func openGroomIfInRange(_ groom: GroomPost) {
         guard kind == .grooms || kind == .all else {
+            setGroomZoomAnchor(for: groom)
             selectedGroom = groom
             return
         }
@@ -113,6 +114,7 @@ extension MeguriMapScreen {
                 in: mapGrooms.filter(canOpen(groom:))
             )
             prefetchGroomImages(connected)
+            setGroomZoomAnchor(for: groom)
             selectedGroomGroup = GroomMapGroomSelection(grooms: connected, initialGroom: groom)
             return
         }
@@ -150,9 +152,18 @@ extension MeguriMapScreen {
         )
         let storyGrooms = connected.count > 1 ? connected : visibleGrooms
         prefetchGroomImages(storyGrooms)
+        setGroomZoomAnchor(for: first)
         selectedGroomGroup = GroomMapGroomSelection(
             grooms: storyGrooms,
             initialGroom: first
+        )
+    }
+
+    /// iter1226.454：標準zoomの source アンカーを、いま開くグルームの座標で設定する。
+    func setGroomZoomAnchor(for groom: GroomPost) {
+        groomZoomAnchor = GroomMapZoomAnchor(
+            id: groom.id,
+            coordinate: CLLocationCoordinate2D(latitude: groom.latitude, longitude: groom.longitude)
         )
     }
 

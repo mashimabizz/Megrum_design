@@ -57,6 +57,10 @@ struct MeguriMapScreen: View {
     /// iter1226.453：めぐりホーム（マップ）のグルームもホームレールと同じ標準zoomで開く。
     @Namespace private var groomZoomNamespace
 
+    /// iter1226.454：いま開く/直前に開いたグルームの zoom source アンカー（タップしたピンの座標）。
+    /// 開く時に設定し、閉じアニメ（zoom-back）でも source を参照できるよう保持し続ける。
+    @State var groomZoomAnchor: GroomMapZoomAnchor?
+
     init(
         kind: MeguriMapKind,
         appState: MegrumAppState,
@@ -90,7 +94,8 @@ struct MeguriMapScreen: View {
                 onOpenGroom: openGroomIfInRange,
                 onOpenGroomCluster: openGroomCluster,
                 onOpenThread: openThreadIfInRange,
-                groomZoomNamespace: groomZoomNamespace
+                groomZoomNamespace: groomZoomNamespace,
+                zoomAnchor: groomZoomAnchor
             )
 
             VStack(spacing: 10) {
@@ -183,7 +188,7 @@ struct MeguriMapScreen: View {
                 onDismiss: { selectedGroomGroup = nil }
             )
             .modifier(GroomMapZoomDestination(
-                sourceID: selection.grooms.first?.id ?? selection.initialGroom.id,
+                sourceID: selection.initialGroom.id,
                 namespace: groomZoomNamespace
             ))
         }

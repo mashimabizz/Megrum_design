@@ -648,7 +648,7 @@ stateDiagram-v2
 - iter165 以降、`encountered_people` の閲覧は `audience_user_ids` に含まれるユーザーだけに制限する。空配列を公開フィード扱いにしない。
 - `groom-posts` Storage は private bucket とし、`can_view_groom_post()` を満たす投稿だけ署名URLを発行する。
 - 例外として、`groom_replies.groom_snapshot.image_path` に残した投稿画像は、投稿が期限切れ/アーカイブ済みでも返信スレッド参加者だけ署名URLを発行できる。
-- `published` の通常表示は `expires_at > now()` の投稿だけに限定する。アプリ起動時/復帰時に `expire_groom_posts()` を呼び、pg_cron が利用できる環境では15分間隔でも期限切れ投稿を `expired`、期限切れから7日経過した投稿を `archived` へ進める。
+- `published` の通常表示は `expires_at > now()` の投稿だけに限定する。アプリ起動時/復帰時に `expire_groom_posts()` を呼び、pg_cron が利用できる環境では5時間間隔でも期限切れ投稿を `expired`、期限切れから7日経過した投稿を `archived` へ進める。
 - いいねは `groom_reactions`、閲覧済みは `groom_views`、返信は `groom_replies` に保存する。iter1226.14以降、新規いいねは `notifications.kind='groom_liked'`、返信は `notifications.kind='groom_reply'` をDB triggerで作り、返信通知のbodyには本文プレビューを入れない。めぐりメッセージで開いた時に `groom_replies.read_at` を更新する。
 - iter1225 以降、いいねは `set_groom_like_for_viewer()` RPCで更新する。新規いいねが1件作成された場合だけ `expires_at` を3時間延長し、重複いいねや取り消しでは期限を延長/短縮しない。アプリは `like_count` を表示し、いいね済みはピンクのハートで示す。
 - グルーム返信後の通常会話は `meguri_messages` に保存し、`notifications.kind='meguri_message'` をDB triggerで作る。グルーム返信から複製された起点メッセージは `groom_reply` 通知と重複させず、通常めぐりメッセージ通知のbodyにも本文プレビューを入れない。受信者が会話を開いた時に `meguri_messages.read_at` を更新する。

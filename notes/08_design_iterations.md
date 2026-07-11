@@ -4,6 +4,30 @@
 
 ---
 
+## イテレーション1226.454：プレミアム入力欄の崩れ修正・進捗バーを上端へ・めぐりマップzoomを不可視アンカー方式へ
+
+### 背景・問題意識
+オーナーFB（.453の是正3点）：
+- プレミアム状態でグルームを開くと、メッセージ入力欄が画面全体の巨大な楕円になり「メッセージを送信…」が中央左にズレる
+- ステータスバー（進捗バー）をもっと画面上部ぎりぎりへ
+- めぐりマップのグルームがピンからのzoomにならず普通に開く
+
+### 調査（ワークフロー）
+- **入力欄崩れの主因**：`GroomMessageDarkTextField`(UIViewRepresentable UITextField)に縦の高さ制約が無く、SwiftUIが縦いっぱいに引き伸ばし→カプセルが画面全体の楕円化。加えてUIViewRepresentableはzoom遷移(transform補間)に追従せず遷移中もズレる。
+- **マップzoom不発の主因**：MapKitの`Annotation`ラベルに付けた`matchedTransitionSource`は、中身がMapKit側レイヤ(MKAnnotationView相当)でホストされ遷移コーディネータがsource解決できないため機能しない。回避策はMapProxyで座標→画面点変換し不可視アンカーを重ねる方式。
+
+### 変更内容
+- **入力欄崩れ修正**：`GroomMessageDarkTextField` に縦 content hugging/compression = .required ＋ `sizeThatFits` で高さをintrinsic固定。さらに開閉遷移の間(`isOpeningSettled`前)は純SwiftUI静的ピルを出す
+- **進捗バーを上端へ**：`GroomViewerChromeLayout.topPadding` を `topObstructionHeight + 10`→`- 6`
+- **マップzoomを不可視アンカー方式へ**：`MeguriMapScene` を `MapReader` で包み、`MapProxy.convert` でピン位置に不可視アンカー＋`.matchedTransitionSource`。`MeguriMapScreen` に `@State groomZoomAnchor`、提示 `zoom(sourceID:)` を `initialGroom.id` に一致
+
+### セルフレビュー結果
+- ✅ プレミアム入力欄が正しいバー表示に（sim確認）、進捗バーが上端へ（sim確認）
+- ✅ 全1583テストパス（topPaddingテストを新値へ更新）
+- ⚠️ マップzoomは実機でのピン→全画面変形を要確認（不可視アンカーのsource登録タイミング・ネストfullScreenCover）。効かない場合も通常提示にフォールバック
+
+---
+
 ## イテレーション1226.453：グルーム画像をステータスバー/入力欄手前に収める＋めぐりマップも標準zoom
 
 ### 背景・問題意識
@@ -90845,7 +90869,7 @@ iter165 実装後の再レビューで、グルーム投稿のStorage権限を `
 - `groom_hidden_posts` / `groom_user_blocks` / `groom_reports` を追加し、非表示・ブロック・通報をDB管理にした。
 - `meguri_messages` と `meguri-message-media` private Storage を追加し、グルーム返信後の通常会話と画像送信を永続化した。
 - `notifications.kind='meguri_message'` と `notifications.meguri_message_id` を追加した。
-- pg_cron が利用できる環境では `expire_groom_posts()` を15分ごとに実行するようにした。
+- pg_cron が利用できる環境では `expire_groom_posts()` を5時間ごとに実行するようにした。
 
 #### `mobile/src/lib/groom.ts`
 - グルーム画像を private Storage path として保存し、フィード取得時に署名URLへ差し替えるようにした。
