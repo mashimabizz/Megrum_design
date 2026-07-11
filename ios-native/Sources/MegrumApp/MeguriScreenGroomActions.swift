@@ -187,6 +187,19 @@ extension MeguriScreen {
 
     func presentGroomViewer(_ groom: GroomPost, sourceAnchor: UnitPoint) {
         selectedGroomSourceAnchor = sourceAnchor
+        // iter1226.458：iOS18+はホームレールと同じ標準zoom（source常設・タップ即提示）で開く。
+        // 旧経路（タブ上位の共有オーバーレイ＝スケール開き＋画像待ちゲート）は初回タップが
+        // ゲートタイムアウトまで約0.9秒待つ不具合もあったため、iOS17のみのフォールバックにする。
+        #if os(iOS)
+        if #available(iOS 18.0, *) {
+            groomViewerZoomRoute = GroomMapViewerRoute(
+                sourceID: .groom(groom.id),
+                grooms: appState.grooms,
+                initialGroom: groom
+            )
+            return
+        }
+        #endif
         if let onOpenGroomViewer {
             onOpenGroomViewer(groom, sourceAnchor)
         } else {

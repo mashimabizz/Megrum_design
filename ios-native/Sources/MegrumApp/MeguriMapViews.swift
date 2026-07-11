@@ -134,6 +134,17 @@ struct MeguriMapScreen: View {
             if !VisualQAPreviewMode.isEnabled(environment: ProcessInfo.processInfo.environment) {
                 locationState.startUpdatingCurrentLocation()
             }
+            #if canImport(UIKit)
+            // iter1226.457：フィード再取得を待たず、キャッシュ済み一覧の代表画像から先に温める
+            //（地図を開いてすぐタップした時の初回デコード競争を減らす）。
+            let cachedRepresentatives = GroomMapCluster.clusters(from: appState.meguriMapDisplayGrooms)
+                .compactMap { $0.posts.first?.imageURL }
+            if !cachedRepresentatives.isEmpty {
+                Task {
+                    await GroomImageMemoryStore.shared.prewarm(urls: cachedRepresentatives)
+                }
+            }
+            #endif
             await reloadMapContent(
                 latitude: locationState.coordinate?.latitude,
                 longitude: locationState.coordinate?.longitude
@@ -179,6 +190,7 @@ struct MeguriMapScreen: View {
         // iter1226.457：ホームレールと同一方式（fullScreenCover + navigationTransition(.zoom)）。
         // source は overlay の常設ピンとして既に layout 済みなので、タップ即提示で zoom がマッチする。
         .fullScreenCover(item: $viewerRoute) { route in
+            let _ = GroomOpenMetricsLog.emit("mapCover", "build groom=\(route.initialGroom.id)")
             GroomViewerScreen(
                 grooms: route.grooms,
                 initialGroom: route.initialGroom,
@@ -221,24 +233,6 @@ struct GroomMapGroomSelection: Identifiable {
 
     var id: String {
         grooms.map { $0.id.uuidString }.joined(separator: "-")
-    }
-}
-
-/// iter1226.453：iOS18+ でめぐりマップのグルームを標準zoomで開く宛先モディファイア。
-private struct GroomMapZoomDestination: ViewModifier {
-    var sourceID: GroomMapZoomSourceID
-    var namespace: Namespace.ID
-
-    func body(content: Content) -> some View {
-        #if os(iOS)
-        if #available(iOS 18.0, *) {
-            content.navigationTransition(.zoom(sourceID: sourceID, in: namespace))
-        } else {
-            content
-        }
-        #else
-        content
-        #endif
     }
 }
 

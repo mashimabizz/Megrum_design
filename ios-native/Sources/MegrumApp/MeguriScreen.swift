@@ -21,6 +21,10 @@ struct MeguriScreen: View {
     @State var pendingCreatedThread: BoardThread?
     @State var selectedGroom: GroomPost?
     @State var selectedGroomSourceAnchor: UnitPoint = .center
+    /// iter1226.458：めぐりホームのグルームもホームレールと同じ標準zoomで開く（iOS18+）。
+    /// 旧経路（onOpenGroomViewer→タブ上位オーバーレイ）は iOS17 フォールバックのみ。
+    @State var groomViewerZoomRoute: GroomMapViewerRoute?
+    @Namespace private var groomZoomNamespace
     @State var selectedGroomPhotoItem: PhotosPickerItem?
     @State var groomDraftPhotoData: Data?
     @State var groomDraftPhotoContentType = "image/jpeg"
@@ -151,9 +155,35 @@ struct MeguriScreen: View {
             onOpenMeguriProfile: { isShowingMeguriProfileSettings = true },
             onOpenNotificationSettings: { isShowingNotificationSettings = true },
             isLoadingViewport: appState.isLoadingMeguriViewport,
-            onViewportChange: handleViewportChange
+            onViewportChange: handleViewportChange,
+            groomZoomNamespace: groomZoomNamespace
         )
         .allowsHitTesting(!isShowingGroomArchive)
+        #if os(iOS)
+        // iter1226.458：ホームレールと同一方式（fullScreenCover + 標準zoom）。
+        // source は地図overlayの常設ピン（MeguriHomeMapBackdrop）なのでタップ即・一体でズームする。
+        .fullScreenCover(item: $groomViewerZoomRoute) { route in
+            GroomViewerScreen(
+                grooms: route.grooms,
+                initialGroom: route.initialGroom,
+                appState: appState,
+                onDismiss: { groomViewerZoomRoute = nil },
+                onOpenMeguriUserProfile: { userID in
+                    groomViewerZoomRoute = nil
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+                        onOpenMeguriUserProfile(userID)
+                    }
+                }
+            )
+            .modifier(GroomMapZoomDestination(sourceID: route.sourceID, namespace: groomZoomNamespace))
+        }
+        .task(id: visibleMapGrooms.map(\.id)) {
+            // iter1226.458：ホームレール同様、タップ前に表示中グルームの画像をデコード済みで温める。
+            let urls = Array(visibleMapGrooms.prefix(16).map(\.imageURL))
+            guard !urls.isEmpty else { return }
+            await GroomImageMemoryStore.shared.prewarm(urls: urls)
+        }
+        #endif
         // iter1226.421：右下の固定フッター＝チャットルーム一覧アイコン。
         .overlay(alignment: .bottomTrailing) {
             Button(action: onOpenBoardList) {

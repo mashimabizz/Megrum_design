@@ -37,6 +37,8 @@ struct MeguriHomeContent: View {
     var onOpenNotificationSettings: () -> Void = {}
     var isLoadingViewport = false
     var onViewportChange: (MKCoordinateRegion) -> Void = { _ in }
+    /// iter1226.458：単体グルームピンの標準zoom source namespace（iOS18+）。
+    var groomZoomNamespace: Namespace.ID? = nil
 
     var body: some View {
         GeometryReader { proxy in
@@ -59,7 +61,8 @@ struct MeguriHomeContent: View {
                     onCreateGroomAtPendingCoordinate: onCreateGroomAtPendingCoordinate,
                     onCreateThreadAtPendingCoordinate: onCreateThreadAtPendingCoordinate,
                     onCancelPendingCreationCoordinate: onCancelPendingCreationCoordinate,
-                    onViewportChange: onViewportChange
+                    onViewportChange: onViewportChange,
+                    groomZoomNamespace: groomZoomNamespace
                 )
                 .ignoresSafeArea()
 

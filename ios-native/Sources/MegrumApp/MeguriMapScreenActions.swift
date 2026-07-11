@@ -154,6 +154,7 @@ extension MeguriMapScreen {
     /// iter1226.457：ホームレールと同じ「タップ即提示」。source（常設のoverlayピン）は
     /// 既に layout 済みなので、待たずに route を立てるだけで zoom がマッチする。
     func presentGroomViewer(grooms: [GroomPost], initialGroom: GroomPost, sourceID: GroomMapZoomSourceID) {
+        GroomOpenMetricsLog.emit("mapTap", "present groom=\(initialGroom.id)")
         prefetchGroomImages(grooms)
         viewerRoute = GroomMapViewerRoute(
             sourceID: sourceID,

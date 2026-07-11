@@ -1,5 +1,6 @@
 import Foundation
 import MegrumCore
+import SwiftUI
 
 /// iter1226.457：めぐりマップのグルーム標準zoomの source ID。
 ///
@@ -28,4 +29,23 @@ struct GroomMapViewerRoute: Identifiable {
     let sourceID: GroomMapZoomSourceID
     var grooms: [GroomPost]
     var initialGroom: GroomPost
+}
+
+/// iOS18+ でグルームビューアを標準zoomで開く宛先モディファイア
+/// （めぐりマップ／めぐりホームのインライン地図で共用）。
+struct GroomMapZoomDestination: ViewModifier {
+    var sourceID: GroomMapZoomSourceID
+    var namespace: Namespace.ID
+
+    func body(content: Content) -> some View {
+        #if os(iOS)
+        if #available(iOS 18.0, *) {
+            content.navigationTransition(.zoom(sourceID: sourceID, in: namespace))
+        } else {
+            content
+        }
+        #else
+        content
+        #endif
+    }
 }
