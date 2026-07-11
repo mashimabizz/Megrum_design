@@ -54,6 +54,8 @@ struct MeguriMapScreen: View {
     @State var outOfRangeAlertMessage = ""
     @State var isShowingOutOfRangeAlert = false
     @State var hasCenteredMapOnLocation = false
+    /// iter1226.453：めぐりホーム（マップ）のグルームもホームレールと同じ標準zoomで開く。
+    @Namespace private var groomZoomNamespace
 
     init(
         kind: MeguriMapKind,
@@ -87,7 +89,8 @@ struct MeguriMapScreen: View {
                 isBoardOutOfRange: isBoardOutOfRange,
                 onOpenGroom: openGroomIfInRange,
                 onOpenGroomCluster: openGroomCluster,
-                onOpenThread: openThreadIfInRange
+                onOpenThread: openThreadIfInRange,
+                groomZoomNamespace: groomZoomNamespace
             )
 
             VStack(spacing: 10) {
@@ -162,21 +165,27 @@ struct MeguriMapScreen: View {
             }
         }
         #if os(iOS)
-        .groomViewerImmersiveOverlay(item: $selectedGroom) { groom, dismiss in
+        // iter1226.453：ホームレールと同じ標準zoomでピンから全画面へ展開する。
+        .fullScreenCover(item: $selectedGroom) { groom in
             GroomViewerScreen(
                 grooms: mapGrooms,
                 initialGroom: groom,
                 appState: appState,
-                onDismiss: dismiss
+                onDismiss: { selectedGroom = nil }
             )
+            .modifier(GroomMapZoomDestination(sourceID: groom.id, namespace: groomZoomNamespace))
         }
-        .groomViewerImmersiveOverlay(item: $selectedGroomGroup) { selection, dismiss in
+        .fullScreenCover(item: $selectedGroomGroup) { selection in
             GroomViewerScreen(
                 grooms: selection.grooms,
                 initialGroom: selection.initialGroom,
                 appState: appState,
-                onDismiss: dismiss
+                onDismiss: { selectedGroomGroup = nil }
             )
+            .modifier(GroomMapZoomDestination(
+                sourceID: selection.grooms.first?.id ?? selection.initialGroom.id,
+                namespace: groomZoomNamespace
+            ))
         }
         #else
         .sheet(item: $selectedGroom) { groom in
@@ -217,6 +226,24 @@ struct GroomMapGroomSelection: Identifiable {
 
     var id: String {
         grooms.map { $0.id.uuidString }.joined(separator: "-")
+    }
+}
+
+/// iter1226.453：iOS18+ でめぐりマップのグルームを標準zoomで開く宛先モディファイア。
+private struct GroomMapZoomDestination: ViewModifier {
+    var sourceID: UUID
+    var namespace: Namespace.ID
+
+    func body(content: Content) -> some View {
+        #if os(iOS)
+        if #available(iOS 18.0, *) {
+            content.navigationTransition(.zoom(sourceID: sourceID, in: namespace))
+        } else {
+            content
+        }
+        #else
+        content
+        #endif
     }
 }
 

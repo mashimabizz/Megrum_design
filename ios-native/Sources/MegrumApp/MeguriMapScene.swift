@@ -23,6 +23,8 @@ struct MeguriMapScene: View {
     var onOpenGroom: (GroomPost) -> Void
     var onOpenGroomCluster: ([GroomPost]) -> Void
     var onOpenThread: (BoardThread) -> Void
+    /// iter1226.453：グルームを開く標準zoomの source namespace（ピンから全画面へ連続変形）。
+    var groomZoomNamespace: Namespace.ID? = nil
 
     var body: some View {
         Map(position: $cameraPosition, interactionModes: [.pan, .zoom, .rotate]) {
@@ -70,23 +72,41 @@ struct MeguriMapScene: View {
                     Button {
                         onOpenGroomCluster(cluster.posts)
                     } label: {
-                        GroomClusterMapPin(count: cluster.posts.count)
+                        groomZoomSource(cluster.posts.first?.id) {
+                            GroomClusterMapPin(count: cluster.posts.count)
+                        }
                     }
                     .buttonStyle(.plain)
                 } else if let groom = cluster.posts.first {
                     Button {
                         onOpenGroom(groom)
                     } label: {
-                        GroomMapPin(
-                            groom: groom,
-                            isOutOfRange: isGroomOutOfRange(groom),
-                            isRead: viewedGroomIDs.contains(groom.id)
-                        )
+                        groomZoomSource(groom.id) {
+                            GroomMapPin(
+                                groom: groom,
+                                isOutOfRange: isGroomOutOfRange(groom),
+                                isRead: viewedGroomIDs.contains(groom.id)
+                            )
+                        }
                     }
                     .buttonStyle(.plain)
                 }
             }
         }
+    }
+
+    /// iter1226.453：iOS18+ かつ namespace 指定時のみ、ピンを zoom 遷移の source にする。
+    @ViewBuilder
+    private func groomZoomSource(_ id: UUID?, @ViewBuilder content: () -> some View) -> some View {
+        #if canImport(UIKit)
+        if #available(iOS 18.0, *), let groomZoomNamespace, let id {
+            content().matchedTransitionSource(id: id, in: groomZoomNamespace)
+        } else {
+            content()
+        }
+        #else
+        content()
+        #endif
     }
 
     @MapContentBuilder

@@ -647,6 +647,17 @@ struct GroomViewerScreen: View {
         .background(Color.black.ignoresSafeArea(.container, edges: .top))
     }
 
+    /// iter1226.453：画像を入力欄/コントロール手前で止めるための下インセット。
+    /// 他人グルーム＝メッセージ入力欄の高さ、自分グルーム＝下端の小さめ余白。
+    private func imageBottomInset(for groom: GroomPost) -> CGFloat {
+        #if canImport(UIKit)
+        let safeBottom = MegrumWindowInsets.bottom
+        return isMine(groom) ? safeBottom + 20 : safeBottom + 62
+        #else
+        return 0
+        #endif
+    }
+
     /// キューブの1面：グルーム画像＋ページ進捗＋ユーザー名バー＋いいね/コメント等のUI一式。
     /// isInteractive=false（回転中の面）はUIを見た目だけ表示する（操作は本体面のみ）。
     @ViewBuilder
@@ -655,11 +666,14 @@ struct GroomViewerScreen: View {
         ZStack {
             Color.black
 
-            // iter1226.450：画像は画面いっぱい（ステータスバー手前まで）。左右のはみ出しはクリップ。
+            // iter1226.453：画像はステータスバー「手前まで」＋メッセージ入力欄「手前まで」に収める
+            //（ステータスバー領域・入力欄領域には画像を出さない＝インスタのストーリーと同じ）。
+            // 合成キャンバスは9:16なので、この上下インセットを引いた領域にちょうど収まる。
             GroomViewerCachedImage(url: groom.imageURL)
                 .groomOpenMetricsProbe(isInteractive ? "photo" : "photo-aux")
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .clipped()
+                .padding(.top, MegrumWindowInsets.top)
+                .padding(.bottom, imageBottomInset(for: groom))
 
             // iter1226.450：上部（ステータスバー〜ユーザー名）に薄いダークグラデ。
             // 明るい画像でも名前・時刻が読めるように、名前より奥（chromeより下）に敷く。
@@ -1337,11 +1351,9 @@ private struct GroomViewerCachedImage: View {
         ZStack {
             #if canImport(UIKit)
             if let image {
-                // iter1226.450：合成済み9:16キャンバスを画面いっぱいに（ステータスバー手前まで）
-                // 広げる。縦を満たし、左右のはみ出し（主にぼかし背景）はクリップする。
                 Image(uiImage: image)
                     .resizable()
-                    .scaledToFill()
+                    .scaledToFit()
             } else if hasFailed {
                 GroomImageFailureView(message: "画像を読み込めませんでした", foregroundColor: .white)
             } else {
@@ -1353,7 +1365,7 @@ private struct GroomViewerCachedImage: View {
             AsyncImage(url: url) { phase in
                 switch phase {
                 case .success(let image):
-                    image.resizable().scaledToFill()
+                    image.resizable().scaledToFit()
                 case .failure:
                     GroomImageFailureView(message: "画像を読み込めませんでした", foregroundColor: .white)
                 default:
