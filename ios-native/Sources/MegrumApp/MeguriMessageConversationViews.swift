@@ -234,7 +234,14 @@ struct MeguriMessageBubble: View {
     @ViewBuilder
     private var visibleMessageContent: some View {
         if message.messageType == .image {
-            MeguriPhotoMessageBubble(photoURL: message.imageURL, onOpenImage: onOpenImage)
+            // iter1226.462：画像は送信から14日で有効期限切れ（サーバー側で削除）。
+            // 期限切れは写真アイコンのプレースホルダに差し替える。
+            let isExpired = MeguriMessageMediaPolicy.isImageExpired(sentAt: message.createdAt)
+            MeguriPhotoMessageBubble(
+                photoURL: isExpired ? nil : message.imageURL,
+                isExpired: isExpired,
+                onOpenImage: onOpenImage
+            )
             if let body = message.body?.nilIfBlank {
                 textBubble(body)
             }
@@ -429,6 +436,8 @@ struct MeguriMessageMeta: View {
 
 struct MeguriPhotoMessageBubble: View {
     var photoURL: URL?
+    /// iter1226.462：送信から14日を過ぎて有効期限切れになった画像。
+    var isExpired: Bool = false
     var onOpenImage: (URL) -> Void
 
     private let thumbnailSize = CGSize(width: 150, height: 150)
@@ -459,7 +468,11 @@ struct MeguriPhotoMessageBubble: View {
                 .background(.black.opacity(0.46), in: Capsule())
                 .padding(7)
         }
-        .accessibilityLabel(photoURL == nil ? "写真を表示できません" : "写真を拡大表示")
+        .accessibilityLabel(
+            isExpired
+                ? "写真の有効期限が切れました"
+                : (photoURL == nil ? "写真を表示できません" : "写真を拡大表示")
+        )
     }
 
     private func thumbnailContent(photoURL: URL) -> some View {
@@ -496,7 +509,7 @@ struct MeguriPhotoMessageBubble: View {
                 VStack(spacing: 6) {
                     Image(systemName: "photo")
                         .font(.system(size: 22, weight: .bold))
-                    Text("写真")
+                    Text(isExpired ? "有効期限切れ" : "写真")
                         .font(.system(size: 11, weight: .heavy, design: .rounded))
                 }
                 .foregroundStyle(MegrumTheme.muted)

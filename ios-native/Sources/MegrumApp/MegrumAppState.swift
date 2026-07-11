@@ -41,7 +41,14 @@ public final class MegrumAppState: ObservableObject {
     @Published public internal(set) var homeNearbyBoardUnreadCounts: [UUID: Int] = [:]
     @Published public internal(set) var groomRepliesByPostID: [UUID: [GroomReply]] = [:]
     @Published public internal(set) var groomReactionsByPostID: [UUID: [GroomReaction]] = [:]
-    @Published public internal(set) var meguriMessages: [MeguriMessage] = []
+    // iter1226.462：テキストのやりとりは端末側にも保持する（開き直しても即表示）。
+    @Published public internal(set) var meguriMessages: [MeguriMessage] = [] {
+        didSet {
+            persistMeguriMessagesToLocalStore()
+        }
+    }
+    /// 端末キャッシュ書き込みのデバウンス用。
+    var meguriMessagePersistTask: Task<Void, Never>?
     @Published public internal(set) var meguriProfile: MeguriProfile?
     @Published public internal(set) var meguriProfilesByUserID: [UUID: MeguriProfile] = [:]
     @Published public internal(set) var grooms: [GroomPost] = []

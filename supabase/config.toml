@@ -401,6 +401,9 @@ deno_version = 2
 [functions.send-apns-notification]
 verify_jwt = false
 
+[functions.expire-meguri-message-media]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327

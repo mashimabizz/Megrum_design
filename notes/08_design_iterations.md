@@ -4,6 +4,27 @@
 
 ---
 
+## イテレーション1226.462：メッセージのページ20件化＋テキスト端末保持＋画像14日期限（削除→写真アイコン）
+
+### 背景・問題意識
+オーナーFB 3件：ページサイズは20件に／テキストのやりとりはアプリ側で保持／画像は送信から2週間で有効期限切れ→削除し、写真アイコンに差し替え。
+
+### 変更内容
+- **ページ20件**：`MeguriMessagesScreen.messagePageSize` 30→20
+- **テキストの端末保持**（`MeguriMessageLocalStore` 新規）：やりとりをユーザーごとにJSONで端末保存（iOSはファイル保護付き）。`meguriMessages` の didSet でデバウンス保存し、`loadMeguriMessages` は空ならキャッシュから即復元→裏でネットワーク更新。アプリを開き直しても即表示
+- **画像の14日期限（クライアント）**：`MeguriMessageMediaPolicy`（MegrumCore・テスト付き）。`MeguriPhotoMessageBubble` は期限切れなら写真アイコンのプレースホルダ（「有効期限切れ」表記）に差し替え
+- **画像の14日期限（サーバー）**：`storage.objects` への直接SQL削除は禁止のため、Edge Function `expire-meguri-message-media`（service roleでStorage API削除＋`image_url`無効化、認証はAPNsと同じディスパッチシークレット共用）を新設・デプロイ。migration `20260712090000` で pg_cron（毎日03:20 UTC）→ `net.http_post` 起動（URLは `app.settings.apns_dispatch_url` から関数名置換で導出＝追加の手動設定なし）。`supabase db push` 適用済み・401検証済み
+
+### 影響範囲
+- めぐりメッセージ（表示・保持・画像寿命）。`image_path` はCHECK制約のためDB上は残す（実体とURLは消える）。
+
+### セルフレビュー結果
+- ✅ 全1587テストパス（ポリシー境界テスト4件追加）、simビルド成功、migration適用済み、Edge Functionデプロイ＋401（未認証拒否）確認
+- ⚠️ cron経由の実削除は次回実行（03:20 UTC）以降にダッシュボードで確認可能
+- ⚠️ 実機未接続のためインストール未完
+
+---
+
 ## イテレーション1226.461：めぐりメッセージ画面を「最新位置で開く＋上へ遡るとページング」へ
 
 ### 背景・問題意識

@@ -4,6 +4,14 @@ import MegrumCore
 @MainActor
 extension MegrumAppState {
     public func loadMeguriMessages(reportsFailure: Bool = true) async {
+        // iter1226.462：まだ何も無ければ端末キャッシュから即復元する（テキストのやりとりは
+        // アプリ側で保持）。ネットワーク取得は裏で続き、届き次第置き換わる。
+        if meguriMessages.isEmpty, let viewerID = viewer?.id {
+            let cached = MeguriMessageLocalStore.load(viewerID: viewerID)
+            if !cached.isEmpty {
+                meguriMessages = cached
+            }
+        }
         guard !isLoadingMeguriMessages else {
             return
         }
@@ -222,6 +230,22 @@ extension MegrumAppState {
         } catch {
             meguriMessages = previous
             errorMessage = "めぐりメッセージを既読にできませんでした"
+        }
+    }
+
+    /// iter1226.462：テキストのやりとりを端末側にも保持する（デバウンス書き込み）。
+    func persistMeguriMessagesToLocalStore() {
+        guard let viewerID = viewer?.id else {
+            return
+        }
+        let snapshot = meguriMessages
+        meguriMessagePersistTask?.cancel()
+        meguriMessagePersistTask = Task.detached(priority: .utility) {
+            try? await Task.sleep(nanoseconds: 400_000_000)
+            guard !Task.isCancelled else {
+                return
+            }
+            MeguriMessageLocalStore.save(snapshot, viewerID: viewerID)
         }
     }
 }

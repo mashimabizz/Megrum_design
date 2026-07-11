@@ -348,7 +348,7 @@ struct MeguriMessagesScreen: View {
     /// iter1226.461：描画するのは最新N件だけ。上へ遡るたびに1ページ分ずつ広げる
     /// （全件を一度に組み立てると開いた瞬間が重く、最新位置の表示も不安定になるため）。
     @State private var visibleMessageCount = MeguriMessagesScreen.messagePageSize
-    static let messagePageSize = 30
+    static let messagePageSize = 20
 
     private var messages: [MeguriMessage] {
         switch route.scope {
