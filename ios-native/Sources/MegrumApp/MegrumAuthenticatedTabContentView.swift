@@ -589,9 +589,10 @@ struct MegrumAuthenticatedTabContentView: View {
     private func openMeguriMessageThread(_ thread: MeguriMessageThread) {
         withAnimation(MegrumSlidePresentationMetrics.animation) {
             isShowingMeguriMessageInbox = true
+            // iter1226.451：ルームは相手単位。グルーム返信も直接メッセージも同じルームで開く。
             meguriMessageDetailRoute = MeguriMessagePeerRoute(
                 peerID: thread.peerID,
-                scope: .conversation(sourceGroomPostID: thread.sourceGroomPostID)
+                scope: .all
             )
         }
     }

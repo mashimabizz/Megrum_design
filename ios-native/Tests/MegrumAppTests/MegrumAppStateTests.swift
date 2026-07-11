@@ -885,7 +885,8 @@ final class MegrumAppStateTests: XCTestCase {
         await state.loadInitialData()
 
         XCTAssertEqual(state.meguriMessages.first?.body, "グルーム見ました。会場付近ですか？")
-        XCTAssertEqual(state.meguriPendingReplyCount, 2)
+        // iter1226.451：メッセージルームは1ユーザー1つ。同一相手の複数グルーム返信は1ルームへ統合。
+        XCTAssertEqual(state.meguriPendingReplyCount, 1)
 
         let sent = await state.sendMeguriMessage(
             recipientID: recipientID,
@@ -969,44 +970,27 @@ final class MegrumAppStateTests: XCTestCase {
     }
 
     func testAppStateMarksPreviewMeguriMessagesRead() async {
+        // iter1226.451：ルームは1ユーザー1つ。同一相手の複数グルーム返信は1ルームへ統合され、
+        // 既読化は相手からの全メッセージに及ぶ。
         let state = MegrumAppState(repository: PreviewMegrumRepository())
         let peerID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
-        let firstSourceID = UUID(uuidString: "00000000-0000-0000-0000-000000000502")!
-        let secondSourceID = UUID(uuidString: "00000000-0000-0000-0000-000000000503")!
 
         await state.loadInitialData()
 
-        XCTAssertEqual(
-            state.meguriMessageThreads.map(\.sourceGroomPostID),
-            [firstSourceID, secondSourceID]
-        )
-        XCTAssertNil(
-            state.meguriMessages(
-                in: MeguriMessageConversationKey(
-                    peerID: peerID,
-                    sourceGroomPostID: firstSourceID
-                )
-            ).first?.readAt
-        )
+        // 相手（peerID）は1ルームに統合される。
+        let peerThreads = state.meguriMessageThreads.filter { $0.peerID == peerID }
+        XCTAssertEqual(peerThreads.count, 1)
 
-        await state.markMeguriMessagesRead(peerID: peerID, sourceGroomPostID: firstSourceID)
+        let incomingBefore = state.meguriMessages(with: peerID)
+            .filter { $0.recipientID != peerID }
+        XCTAssertTrue(incomingBefore.contains { $0.readAt == nil })
 
-        XCTAssertNotNil(
-            state.meguriMessages(
-                in: MeguriMessageConversationKey(
-                    peerID: peerID,
-                    sourceGroomPostID: firstSourceID
-                )
-            ).first?.readAt
-        )
-        XCTAssertNil(
-            state.meguriMessages(
-                in: MeguriMessageConversationKey(
-                    peerID: peerID,
-                    sourceGroomPostID: secondSourceID
-                )
-            ).first?.readAt
-        )
+        await state.markMeguriMessagesRead(peerID: peerID, showsAllPeerMessages: true)
+
+        // 相手からの受信メッセージは（グルームソースを問わず）すべて既読になる。
+        let incomingAfter = state.meguriMessages(with: peerID)
+            .filter { $0.recipientID != peerID }
+        XCTAssertTrue(incomingAfter.allSatisfy { $0.readAt != nil })
         XCTAssertNil(state.errorMessage)
     }
 

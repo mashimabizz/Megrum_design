@@ -105,7 +105,8 @@ private struct GroomViewerImmersiveHost<Item: Identifiable, Content: View>: View
     @State private var hasOpenSettled = false
 
     private static var openAnimation: Animation {
-        .spring(response: 0.34, dampingFraction: 0.86)
+        // iter1226.450：開閉を速く（response 0.34→0.26）。めぐり/マップ経路の開き心地を機敏に。
+        .spring(response: 0.26, dampingFraction: 0.85)
     }
 
     var body: some View {
