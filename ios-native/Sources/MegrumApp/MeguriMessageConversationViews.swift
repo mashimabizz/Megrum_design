@@ -17,11 +17,26 @@ struct MeguriMessageList: View {
     var onReply: (MeguriMessage) -> Void = { _ in }
     var onReport: (MeguriMessage) -> Void = { _ in }
     var onJumpToMessage: (UUID) -> Void = { _ in }
+    /// iter1226.461：表示ウィンドウより古いメッセージが残っているか（上端でページング読み込み）。
+    var hasOlderMessages: Bool = false
+    /// 上端に到達した時に呼ばれる（親が表示ウィンドウを1ページ分広げる）。
+    var onLoadOlder: () -> Void = {}
 
     var body: some View {
         GeometryReader { proxy in
             ScrollView {
                 LazyVStack(spacing: 12) {
+                    // iter1226.461：上へ遡った時だけ古いページを足す（チャットの定石）。
+                    // この行が見えたら親がウィンドウを広げる。
+                    if hasOlderMessages {
+                        ProgressView()
+                            .controlSize(.small)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 6)
+                            .id(MeguriMessageList.olderTriggerID)
+                            .onAppear(perform: onLoadOlder)
+                    }
+
                     // iter1226.460：キャッシュ済みのやりとりがあれば裏の再取得中もそのまま出し続ける
                     //（開くたびに「表示→ローディング→再表示」と差し替わるのを防ぐ）。
                     if messages.isEmpty {
@@ -73,9 +88,14 @@ struct MeguriMessageList: View {
                     alignment: .top
                 )
             }
+            // iter1226.461：開いた瞬間から最新メッセージ（最下部）が見える位置で表示する。
+            // スクロールで飛ばすのではなく、初期アンカー自体を下端にする。
+            .defaultScrollAnchor(.bottom)
         }
         .scrollDismissesKeyboard(.interactively)
     }
+
+    static let olderTriggerID = "meguri-message-older-trigger"
 }
 
 private struct MeguriMessageLoadingRow: View {
