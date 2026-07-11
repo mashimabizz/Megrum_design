@@ -21,14 +21,27 @@ struct MeguriMapScene: View {
     var isGroomOutOfRange: (GroomPost) -> Bool
     var isBoardOutOfRange: (BoardThread) -> Bool
     var onOpenGroom: (GroomPost) -> Void
-    var onOpenGroomCluster: ([GroomPost], CLLocationCoordinate2D) -> Void
+    var onOpenGroomCluster: ([GroomPost], GroomMapZoomSourceID) -> Void
     var onOpenThread: (BoardThread) -> Void
     /// iter1226.453：グルームを開く標準zoomの source namespace（ピンから全画面へ連続変形）。
     var groomZoomNamespace: Namespace.ID? = nil
-    /// iter1226.455：開こうとしているグルーム（ミラーを出す対象）。
-    var pendingZoom: PendingGroomMapZoom? = nil
-    /// ミラーの layout 完了フレームを親へ伝える。
-    var onZoomMirrorFrameChange: (CGRect) -> Void = { _ in }
+
+    /// iter1226.457：カメラ移動のたびに body を再評価させ、overlay の常設ピンを追従させる。
+    /// （@State の読み取りが無いと SwiftUI が変化を追跡しないため、overlay 内で読む。）
+    @State private var cameraUpdateTick = 0
+
+    /// iter1226.457：ホームレールと同じ「source常設・タップ即提示」構成。
+    /// MapKit Annotation 内の View は zoom source として解決されないため、
+    /// iOS18+ では **overlay 側の常設ピンを唯一の可視ピン**にして matchedTransitionSource を付け、
+    /// Annotation 側は透明のタップ領域だけにする（タップ判定は MapKit 側が確実）。
+    private var usesOverlayPins: Bool {
+        #if canImport(UIKit)
+        if #available(iOS 18.0, *), groomZoomNamespace != nil {
+            return true
+        }
+        #endif
+        return false
+    }
 
     var body: some View {
         MapReader { proxy in
@@ -57,10 +70,10 @@ struct MeguriMapScene: View {
             }
             .mapStyle(MeguriMapVisualStyle.quietStandard)
             .overlay {
-                MeguriMapBrandToneOverlay()
+                groomZoomSourcePinsOverlay(proxy: proxy)
             }
             .overlay {
-                groomZoomMirrorOverlay(proxy: proxy)
+                MeguriMapBrandToneOverlay()
             }
             .mapControls {
                 if !isVisualQAPreviewEnabled {
@@ -69,42 +82,38 @@ struct MeguriMapScene: View {
                 MapCompass()
                 MapScaleView()
             }
+            .onMapCameraChange(frequency: .continuous) { _ in
+                cameraUpdateTick &+= 1
+            }
         }
         .ignoresSafeArea()
-        .onPreferenceChange(GroomZoomSourceFrameKey.self) { frame in
-            onZoomMirrorFrameChange(frame)
-        }
     }
 
-    /// iter1226.455：ピンの画面位置に、実ピンと同じ見た目の可視ミラーを重ねる。
-    /// これを zoom source（matchedTransitionSource）にし、layout 完了を preference で親へ知らせる。
+    /// iter1226.457：表示中の単体ピン／クラスタの画面位置に、実際に見えるピンを常設で重ねる。
+    /// 各ピンが常時 matchedTransitionSource を持つため、タップ時には source が既に layout 済み
+    /// ＝ホームレールと同じ「タップ即・一体でズーム」になる。
     @ViewBuilder
-    private func groomZoomMirrorOverlay(proxy: MapProxy) -> some View {
+    private func groomZoomSourcePinsOverlay(proxy: MapProxy) -> some View {
         #if canImport(UIKit)
-        if #available(iOS 18.0, *),
-           let groomZoomNamespace,
-           let pendingZoom,
-           let point = proxy.convert(pendingZoom.coordinate, to: .local) {
-            Group {
-                if pendingZoom.isCluster {
-                    GroomClusterMapPin(count: pendingZoom.clusterCount)
-                } else {
-                    GroomMapPin(
-                        groom: pendingZoom.representative,
-                        isOutOfRange: false,
-                        isRead: pendingZoom.isRead
-                    )
-                }
-            }
-            .matchedTransitionSource(id: pendingZoom.id, in: groomZoomNamespace)
-            .position(point)
-            .allowsHitTesting(false)
-            .background {
-                GeometryReader { geometry in
-                    Color.clear.preference(
-                        key: GroomZoomSourceFrameKey.self,
-                        value: geometry.frame(in: .global)
-                    )
+        if #available(iOS 18.0, *), let groomZoomNamespace, kind != .boards {
+            // カメラ変化の tick を読むことで、パン/ズーム中も位置が追従する。
+            let _ = cameraUpdateTick
+            ForEach(GroomMapCluster.clusters(from: grooms)) { cluster in
+                if let point = proxy.convert(cluster.coordinate, to: .local) {
+                    Group {
+                        if cluster.posts.count > 1 {
+                            GroomClusterMapPin(count: cluster.posts.count)
+                        } else if let groom = cluster.posts.first {
+                            GroomMapPin(
+                                groom: groom,
+                                isOutOfRange: isGroomOutOfRange(groom),
+                                isRead: viewedGroomIDs.contains(groom.id)
+                            )
+                        }
+                    }
+                    .matchedTransitionSource(id: GroomMapZoomSourceID(cluster: cluster), in: groomZoomNamespace)
+                    .position(point)
+                    .allowsHitTesting(false)
                 }
             }
         }
@@ -117,33 +126,40 @@ struct MeguriMapScene: View {
             Annotation(cluster.title, coordinate: cluster.coordinate) {
                 if cluster.posts.count > 1 {
                     Button {
-                        onOpenGroomCluster(cluster.posts, cluster.coordinate)
+                        onOpenGroomCluster(cluster.posts, GroomMapZoomSourceID(cluster: cluster))
                     } label: {
-                        GroomClusterMapPin(count: cluster.posts.count)
-                            // iter1226.455：ミラー表示中の実ピンは隠して二重表示を避ける。
-                            .opacity(isMirrored(cluster.posts.first) ? 0 : 1)
+                        if usesOverlayPins {
+                            // 見た目は overlay 側の常設ピン。ここはタップ領域だけ。
+                            Color.clear
+                                .frame(width: 66, height: 66)
+                                .contentShape(Rectangle())
+                        } else {
+                            GroomClusterMapPin(count: cluster.posts.count)
+                        }
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel(cluster.title)
                 } else if let groom = cluster.posts.first {
                     Button {
                         onOpenGroom(groom)
                     } label: {
-                        GroomMapPin(
-                            groom: groom,
-                            isOutOfRange: isGroomOutOfRange(groom),
-                            isRead: viewedGroomIDs.contains(groom.id)
-                        )
-                        .opacity(isMirrored(groom) ? 0 : 1)
+                        if usesOverlayPins {
+                            Color.clear
+                                .frame(width: 66, height: 66)
+                                .contentShape(Rectangle())
+                        } else {
+                            GroomMapPin(
+                                groom: groom,
+                                isOutOfRange: isGroomOutOfRange(groom),
+                                isRead: viewedGroomIDs.contains(groom.id)
+                            )
+                        }
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel("グルーム")
                 }
             }
         }
-    }
-
-    private func isMirrored(_ groom: GroomPost?) -> Bool {
-        guard let groom, let pendingZoom else { return false }
-        return pendingZoom.representative.id == groom.id
     }
 
     @MapContentBuilder

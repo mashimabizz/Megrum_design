@@ -55,11 +55,8 @@ struct MeguriMapScreen: View {
     /// iter1226.453：めぐりホーム（マップ）のグルームもホームレールと同じ標準zoomで開く。
     @Namespace private var groomZoomNamespace
 
-    /// iter1226.455：二段階提示。タップ時に pendingZoom（ミラー表示）→ layout 完了後に viewerRoute（push）。
-    @State var pendingZoom: PendingGroomMapZoom?
+    /// iter1226.457：ホームレールと同じ「source常設・タップ即提示」。タップで即セットして開く。
     @State var viewerRoute: GroomMapViewerRoute?
-    /// 提示済みの pendingZoom.id（閉じた後にミラーフレーム変化で再オープンしないためのガード）。
-    @State var lastPresentedZoomID: UUID?
 
     init(
         kind: MeguriMapKind,
@@ -94,9 +91,7 @@ struct MeguriMapScreen: View {
                 onOpenGroom: openGroomIfInRange,
                 onOpenGroomCluster: openGroomCluster,
                 onOpenThread: openThreadIfInRange,
-                groomZoomNamespace: groomZoomNamespace,
-                pendingZoom: pendingZoom,
-                onZoomMirrorFrameChange: handleZoomMirrorFrame
+                groomZoomNamespace: groomZoomNamespace
             )
 
             VStack(spacing: 10) {
@@ -147,6 +142,16 @@ struct MeguriMapScreen: View {
                 alignCameraToVisibleContent(userCoordinate: locationState.coordinate, animated: false)
             }
         }
+        #if canImport(UIKit)
+        // iter1226.457：ホームレール同様、タップ前に表示中ピンの代表画像をデコード済みで温めておく。
+        // タップ後の preload では開き心地に間に合わない（開いた瞬間の写真ポップイン防止）。
+        .task(id: mapGrooms.map(\.id)) {
+            let representatives = GroomMapCluster.clusters(from: mapGrooms)
+                .compactMap { $0.posts.first?.imageURL }
+            guard !representatives.isEmpty else { return }
+            await GroomImageMemoryStore.shared.prewarm(urls: representatives)
+        }
+        #endif
         .onReceive(locationState.$coordinate.compactMap { $0 }) { coordinate in
             Task {
                 await reloadMapContent(
@@ -171,17 +176,15 @@ struct MeguriMapScreen: View {
             }
         }
         #if os(iOS)
-        // iter1226.455：二重fullScreenCoverをやめ、Mapを包む NavigationStack へ push する。
-        // ミラー（source）が layout 済みになってから viewerRoute を立てるので zoom がマッチする。
-        .navigationDestination(item: $viewerRoute) { route in
+        // iter1226.457：ホームレールと同一方式（fullScreenCover + navigationTransition(.zoom)）。
+        // source は overlay の常設ピンとして既に layout 済みなので、タップ即提示で zoom がマッチする。
+        .fullScreenCover(item: $viewerRoute) { route in
             GroomViewerScreen(
                 grooms: route.grooms,
                 initialGroom: route.initialGroom,
                 appState: appState,
                 onDismiss: { viewerRoute = nil }
             )
-            .toolbar(.hidden, for: .navigationBar)
-            .navigationBarBackButtonHidden()
             .modifier(GroomMapZoomDestination(sourceID: route.sourceID, namespace: groomZoomNamespace))
         }
         #else
@@ -223,7 +226,7 @@ struct GroomMapGroomSelection: Identifiable {
 
 /// iter1226.453：iOS18+ でめぐりマップのグルームを標準zoomで開く宛先モディファイア。
 private struct GroomMapZoomDestination: ViewModifier {
-    var sourceID: UUID
+    var sourceID: GroomMapZoomSourceID
     var namespace: Namespace.ID
 
     func body(content: Content) -> some View {

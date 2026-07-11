@@ -4,6 +4,74 @@
 
 ---
 
+## イテレーション1226.457：めぐりマップzoomを「source常設・タップ即提示」へ（ホームレール同等の開き心地）
+
+### 背景・問題意識
+iter1226.455（可視ミラー＋layout待ち＋push→fullScreenCover）でピンからのzoom自体は動いたが、オーナーFB：
+- ホームのグルームレールと開き心地が違う
+- 最初のタップでは開かない
+
+別AI相談の結論：
+1. **初回不発の原因**：PreferenceKey値がCGRectのみで「値が変わった時しか通知されない」＋dismiss後もpendingZoomが残る＋`Task.yield()`はlayout完了の保証にならない。二段階ゲート自体が壊れやすい
+2. **開き心地が違う原因**：ホームは「source常設・タップ即提示」、地図は「タップ後にミラー生成→待ち→提示」で、sourceが"タップした描画済みピン"ではなく"タップ後に生まれた複製"
+3. **本命**：表示中の単体ピン/クラスタ全部を常設sourceにし、タップでrouteを即セット（Apple Wishlistサンプルと同じ構造）
+
+### 変更内容
+- **source常設**（`MeguriMapScene`）：iOS18+では overlay 側の常設ピン（`GroomMapPin`/`GroomClusterMapPin`＋`matchedTransitionSource`）を唯一の可視ピンにし、MapKit `Annotation` 側は透明タップ領域（66pt）だけに。`onMapCameraChange(frequency: .continuous)` の tick でパン/ズーム中も追従。iOS17は従来どおりAnnotation内の可視ピン（zoomなし）
+- **安定source ID**：`GroomMapZoomSourceID`（`.groom(UUID)` / `.cluster(String)`）。route の presentation ID（`GroomMapViewerRoute.id`）とは分離
+- **タップ即提示**：`presentGroomViewer` が `viewerRoute` を即セット。`PendingGroomMapZoom`/`GroomZoomSourceFrameKey`/`handleZoomMirrorFrame`/`lastPresentedZoomID`/`Task.yield` を全削除
+- **画像prewarm**：表示中ピンの代表画像を `GroomImageMemoryStore.prewarm` でタップ前にデコード済み化（ホームと同じ）
+- 提示は fullScreenCover + `.navigationTransition(.zoom)`（ホームと同一方式）を維持
+
+### 影響範囲
+- めぐりマップのグルームピン表示（iOS18+はoverlayピン）・開き遷移。チャットルームピン・iOS17は不変。
+
+### 確認方法
+- 実機：めぐりマップのピンをタップ→初回から即・ピンから全画面へズーム。パン/ズーム中にピンが追従すること
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/MeguriMapGroomZoom.swift` / `MeguriMapScene.swift` / `MeguriMapViews.swift` / `MeguriMapScreenActions.swift`
+
+### セルフレビュー結果
+- ✅ 全1583テストパス、sim/実機ビルド成功・実機インストール済み
+- ⚠️ 実機確認ポイント：初回タップで即開くか／ホームレール同等の開き心地か／パン・ズーム中のoverlayピン追従（追従しない場合はUIKit MKMapView案へ）
+- ⚠️ sourceの見た目差（ホーム=84pt円タイル、地図=58pt円ピン）による拡大率の違いは標準zoomの仕様上残る
+
+---
+
+## イテレーション1226.456：左ドロワーの閉じスワイプが項目タップ扱いになる不具合を修正
+
+### 背景・問題意識
+オーナー報告：「左ドロワーを開いている時、その項目をタップしたような状態でドロワーを閉じるスワイプ動作をすると、その項目をタップした判定になってしまう」。項目はタップ時だけ反応し、閉じスワイプ中のタップには反応しないようにしたい。
+
+### 原因
+- ドロワーを閉じる pan は親 `AppDrawerInteractiveHost` の `drawerPanGesture`（`minimumDistance: 6`、慣性 `predictedEndTranslation` で閉じ判定）が担当。
+- 一方、子ボタン側のタップ抑制は `AppDrawerOverlay` 内の別ジェスチャ（`minimumDistance: 8`、実移動量ベース）だった。
+- **勢いのある小さなフリックで閉じる**と、親は慣性で閉じるのに子の抑制は実移動 8pt を満たさず発火せず、ボタンの `select()` が通ってタップ扱いになっていた。
+
+### 変更内容
+#### `ios-native/Sources/MegrumApp/MegrumAuthenticatedTabsView.swift`
+- `AppDrawerInteractiveHost` に `@State suppressesDrawerItemTap` を追加。閉じ判定の権威である親 pan が実ドラッグを開始した瞬間（`onChanged` で `activeTranslation` が非nil かつ `showsDrawer`）に true。フリックでもここは必ず通る。
+- `onEnded` の全経路で `scheduleDrawerItemTapSuppressionRelease()` を呼び、`drawerItemTapSuppressionDuration`(0.28s) 遅延で解除。指を離した後に発火するボタン action（onEnded とボタン action の順序は不定）を取りこぼさないため。
+- `suppressesDrawerItemTap` を `AppDrawerOverlay` へ受け渡し。
+
+#### `ios-native/Sources/MegrumApp/AppDrawerOverlay.swift`
+- `var suppressesItemTap: Bool` を追加し、`select()` の先頭で `guard !suppressesItemTap` を追加。既存の子ジェスチャ抑制（`presentationState`）はベルト＆サスペンダーとして併存。
+
+### 影響範囲
+- 左ドロワー（`AppDrawerOverlay` の項目タップ／閉じスワイプ）のみ。開くスワイプ・オーバーレイタップ閉じ・ログアウト等は不変。
+
+### セルフレビュー結果
+- ✅ `swift build --target MegrumApp` 成功（全1029ファイルコンパイル完了。末尾の build.db disk I/O は書込のみで無害）
+- ⚠️ Swift ネイティブ変更のため EAS Update では反映されない。実機確認は Xcode/EAS build 後（feature ブランチ）。
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/MegrumAuthenticatedTabsView.swift`
+- `ios-native/Sources/MegrumApp/AppDrawerOverlay.swift`
+- `ios-native/Sources/MegrumApp/AppDrawerModels.swift`（`drawerItemTapSuppressionDuration`）
+
+---
+
 ## イテレーション1226.455：めぐりマップのグルームzoomを「可視ピンミラー＋layout待ち＋navigation push」方式へ全面再設計
 
 ### 背景・問題意識

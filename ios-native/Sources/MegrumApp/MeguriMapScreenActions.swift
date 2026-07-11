@@ -102,13 +102,7 @@ extension MeguriMapScreen {
 
     func openGroomIfInRange(_ groom: GroomPost) {
         guard kind == .grooms || kind == .all else {
-            beginGroomZoom(
-                grooms: [groom],
-                initialGroom: groom,
-                mirrorCoordinate: CLLocationCoordinate2D(latitude: groom.latitude, longitude: groom.longitude),
-                isCluster: false,
-                clusterCount: 1
-            )
+            presentGroomViewer(grooms: [groom], initialGroom: groom, sourceID: .groom(groom.id))
             return
         }
         if canOpen(groom: groom) {
@@ -118,14 +112,7 @@ extension MeguriMapScreen {
                 around: groom,
                 in: mapGrooms.filter(canOpen(groom:))
             )
-            prefetchGroomImages(connected)
-            beginGroomZoom(
-                grooms: connected,
-                initialGroom: groom,
-                mirrorCoordinate: CLLocationCoordinate2D(latitude: groom.latitude, longitude: groom.longitude),
-                isCluster: false,
-                clusterCount: 1
-            )
+            presentGroomViewer(grooms: connected, initialGroom: groom, sourceID: .groom(groom.id))
             return
         }
         guard locationState.coordinate != nil else {
@@ -144,7 +131,7 @@ extension MeguriMapScreen {
         showOutOfRangeAlert(groomRangeNotice(groom))
     }
 
-    func openGroomCluster(_ grooms: [GroomPost], _ pinCoordinate: CLLocationCoordinate2D) {
+    func openGroomCluster(_ grooms: [GroomPost], _ sourceID: GroomMapZoomSourceID) {
         let openable = grooms.filter(canOpen(groom:))
         let visibleGrooms = openable.isEmpty ? grooms : openable
         guard let first = visibleGrooms.first else {
@@ -161,64 +148,18 @@ extension MeguriMapScreen {
             in: mapGrooms.filter(canOpen(groom:))
         )
         let storyGrooms = connected.count > 1 ? connected : visibleGrooms
-        prefetchGroomImages(storyGrooms)
-        beginGroomZoom(
-            grooms: storyGrooms,
-            initialGroom: first,
-            mirrorCoordinate: pinCoordinate,
-            isCluster: grooms.count > 1,
-            clusterCount: grooms.count
-        )
+        presentGroomViewer(grooms: storyGrooms, initialGroom: first, sourceID: sourceID)
     }
 
-    /// iter1226.455：二段階提示の1段階目。ミラー用の pendingZoom を立てる（まだ開かない）。
-    /// ミラーが layout 済みになったら handleZoomMirrorFrame が viewerRoute を立てて push する。
-    func beginGroomZoom(
-        grooms: [GroomPost],
-        initialGroom: GroomPost,
-        mirrorCoordinate: CLLocationCoordinate2D,
-        isCluster: Bool,
-        clusterCount: Int
-    ) {
-        pendingZoom = PendingGroomMapZoom(
-            id: UUID(),
-            latitude: mirrorCoordinate.latitude,
-            longitude: mirrorCoordinate.longitude,
-            representative: initialGroom,
+    /// iter1226.457：ホームレールと同じ「タップ即提示」。source（常設のoverlayピン）は
+    /// 既に layout 済みなので、待たずに route を立てるだけで zoom がマッチする。
+    func presentGroomViewer(grooms: [GroomPost], initialGroom: GroomPost, sourceID: GroomMapZoomSourceID) {
+        prefetchGroomImages(grooms)
+        viewerRoute = GroomMapViewerRoute(
+            sourceID: sourceID,
             grooms: grooms,
-            initialGroom: initialGroom,
-            isCluster: isCluster,
-            clusterCount: clusterCount,
-            isRead: appState.viewedGroomIDs.contains(initialGroom.id)
+            initialGroom: initialGroom
         )
-    }
-
-    /// iter1226.455：ミラー（source）の layout 完了フレームを受けて push を開始する。
-    /// 同一フレームで source と提示が生まれる問題を避け、source が確実に存在してから zoom する。
-    func handleZoomMirrorFrame(_ frame: CGRect) {
-        guard let pending = pendingZoom,
-              viewerRoute == nil,
-              lastPresentedZoomID != pending.id,   // 閉じた後の再オープンを防ぐ
-              frame.width > 0,
-              frame.height > 0
-        else {
-            return
-        }
-        Task { @MainActor in
-            await Task.yield()
-            guard pendingZoom?.id == pending.id,
-                  viewerRoute == nil,
-                  lastPresentedZoomID != pending.id
-            else {
-                return
-            }
-            lastPresentedZoomID = pending.id
-            viewerRoute = GroomMapViewerRoute(
-                sourceID: pending.id,
-                grooms: pending.grooms,
-                initialGroom: pending.initialGroom
-            )
-        }
     }
 
     /// ビューアを開く前に先頭数枚の画像を温めて、開いた瞬間のローディングを防ぐ。
