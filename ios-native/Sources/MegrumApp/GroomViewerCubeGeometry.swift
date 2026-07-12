@@ -28,6 +28,11 @@ enum GroomViewerCubeGeometry {
         var anchorX: CGFloat
     }
 
+    /// 回転していない正面（恒等変換）。通常表示の面と、incoming(progress:1) の
+    /// 到達点をこれに完全一致させることで、回転完了時に target 面を作り直さず
+    /// そのまま current へ昇格できる（iter1226.469）。
+    static let resting = FaceTransform(offsetX: 0, degrees: 0, anchorX: 0.5)
+
     /// 出ていく面：進む（direction=+1）なら trailing 辺（共有辺）を軸に
     /// 外側視点の回転（-90度）で左へ抜ける。
     static func outgoing(progress: Double, direction: Int, width: CGFloat) -> FaceTransform {
@@ -40,7 +45,12 @@ enum GroomViewerCubeGeometry {
     }
 
     /// 入ってくる面：進むなら右側面（leading 辺が軸・+90度）から正面へ回り込む。
+    /// progress=1（正面到達）では恒等変換 `resting` と**完全一致**させる。これにより
+    /// 回転完了時に incoming 面をそのまま通常面へ昇格でき、View を作り直さない（iter1226.469）。
     static func incoming(progress: Double, direction: Int, width: CGFloat) -> FaceTransform {
+        guard progress < 1 else {
+            return resting
+        }
         let d = direction >= 0 ? 1.0 : -1.0
         let remaining = 1 - progress
         return FaceTransform(

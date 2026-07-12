@@ -76,8 +76,6 @@ struct GroomViewerScreen: View {
     /// 準備待ちで開始が遅れても「本当に開き終わってから」重い処理を解禁できる。
     /// nil はホスト以外の提示で、従来のタイマーへフォールバックする。
     @Environment(\.megrumGroomViewerOpenSettled) private var hostOpenSettled: Bool?
-    /// iter1226.441：押下即発火タップの進行状態（isConsumed=発火済み or ドラッグへ移行）。
-    @State private var activePageTap: PageTapTouch?
     #if canImport(UIKit)
     /// iter1226.467：投稿者切替のキューブ回転を、タップ・スワイプ・自動送りで
     /// 共通化した統一遷移状態。source/target の実ビューを回し、完了時にだけ
@@ -194,10 +192,6 @@ struct GroomViewerScreen: View {
             fallbackHandle: groom.authorID == appState.viewer?.id ? appState.viewer?.handle : nil,
             fallbackAvatarURL: groom.authorID == appState.viewer?.id ? appState.viewer?.avatarURL : nil
         )
-    }
-
-    private func index(of groom: GroomPost) -> Int {
-        grooms.firstIndex(where: { $0.id == groom.id }) ?? currentIndex
     }
 
     private func toggleLike(for groom: GroomPost) {
@@ -526,6 +520,7 @@ struct GroomViewerScreen: View {
             withTransaction(transaction) {
                 if commits {
                     currentIndex = transition.targetIndex
+                    storyProgress = 0
                 }
                 cubeTransition = nil
             }
@@ -571,30 +566,35 @@ struct GroomViewerScreen: View {
                 Color.black.ignoresSafeArea(.container, edges: .top)
 
                 #if canImport(UIKit)
-                // iter1226.467：出ていく面（source＝現在のグルーム）を実ビューのまま回す
-                //（スナップショット廃止）。回転中でなければ恒等変換で通常表示。
-                // 面には画像だけでなくユーザー名バー・いいね/コメント等のUIも張り付く。
-                groomFace(for: currentGroom, topPadding: topPadding, isInteractive: true)
-                    .groomOpenMetricsProbe("face")
-                    .modifier(GroomViewerCubeFaceModifier(transform: liveFaceTransform(width: proxy.size.width), shade: liveFaceShade))
-
-                // 入ってくる面（target）：タップ・スワイプ・自動送りいずれも同じ実ビューを回し込む。
-                if let transition = cubeTransition, grooms.indices.contains(transition.targetIndex) {
-                    groomFace(for: grooms[transition.targetIndex], topPadding: topPadding, isInteractive: false)
+                // iter1226.469：current 面と target 面を別枝で描かず、単一の ForEach で描く。
+                // ID を groom.id に固定することで、回転中の incoming（target）面と回転完了後の
+                // current 面が同じ View identity になり、画像 State・UITextField を保持した
+                // まま昇格できる（最終フレームで作り直さない＝「一瞬止まる」現象の根治）。
+                ForEach(faceLayers) { layer in
+                    groomFaceView(for: layer, topPadding: topPadding)
+                        .groomOpenMetricsProbe(layer.role == .incoming ? "face-incoming" : "face")
                         .modifier(
                             GroomViewerCubeFaceModifier(
-                                transform: GroomViewerCubeGeometry.incoming(
-                                    progress: transition.progress,
-                                    direction: transition.direction,
-                                    width: proxy.size.width
-                                ),
-                                shade: GroomViewerCubeGeometry.incomingShade(progress: transition.progress)
+                                transform: faceTransform(for: layer, width: proxy.size.width),
+                                shade: faceShade(for: layer)
                             )
                         )
-                        .allowsHitTesting(false)
+                        .allowsHitTesting(layer.isInteractionEnabled)
+                        .zIndex(layer.zIndex)
                 }
                 #else
-                groomFace(for: currentGroom, topPadding: topPadding, isInteractive: true)
+                if grooms.indices.contains(currentIndex) {
+                    groomFaceView(
+                        for: GroomViewerFaceLayer(
+                            id: currentGroom.id,
+                            groomIndex: currentIndex,
+                            role: .current,
+                            zIndex: 0,
+                            isInteractionEnabled: true
+                        ),
+                        topPadding: topPadding
+                    )
+                }
                 #endif
 
                 // いいね演出：背景から湧くハート＋（自分のグルームなら）いいねした人のアイコン浮遊。
@@ -624,193 +624,100 @@ struct GroomViewerScreen: View {
         .background(Color.black.ignoresSafeArea(.container, edges: .top))
     }
 
-    /// iter1226.453：画像を入力欄/コントロール手前で止めるための下インセット。
-    /// 他人グルーム＝メッセージ入力欄の高さ、自分グルーム＝下端の小さめ余白。
-    private func imageBottomInset(for groom: GroomPost) -> CGFloat {
-        #if canImport(UIKit)
-        let safeBottom = MegrumWindowInsets.bottom
-        return isMine(groom) ? safeBottom + 20 : safeBottom + 62
-        #else
-        return 0
-        #endif
-    }
-
-    /// キューブの1面：グルーム画像＋ページ進捗＋ユーザー名バー＋いいね/コメント等のUI一式。
-    /// isInteractive=false（回転中の面）はUIを見た目だけ表示する（操作は本体面のみ）。
-    @ViewBuilder
-    private func groomFace(for groom: GroomPost, topPadding: CGFloat, isInteractive: Bool) -> some View {
-        let identity = identity(for: groom)
-        ZStack {
-            Color.black
-
-            // iter1226.453：画像はステータスバー「手前まで」＋メッセージ入力欄「手前まで」に収める
-            //（ステータスバー領域・入力欄領域には画像を出さない＝インスタのストーリーと同じ）。
-            // 合成キャンバスは9:16なので、この上下インセットを引いた領域にちょうど収まる。
-            GroomViewerCachedImage(url: groom.imageURL)
-                .groomOpenMetricsProbe(isInteractive ? "photo" : "photo-aux")
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .padding(.top, MegrumWindowInsets.top)
-                .padding(.bottom, imageBottomInset(for: groom))
-
-            // iter1226.450：上部（ステータスバー〜ユーザー名）に薄いダークグラデ。
-            // 明るい画像でも名前・時刻が読めるように、名前より奥（chromeより下）に敷く。
-            LinearGradient(
-                colors: [.black.opacity(0.55), .black.opacity(0.16), .clear],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .frame(height: topPadding + 64)
-            .frame(maxHeight: .infinity, alignment: .top)
-            .allowsHitTesting(false)
-            .ignoresSafeArea(.container, edges: .top)
-
-            // iter1226.450：下部（いいね/メニュー〜メッセージ入力）にも薄いダークグラデ。
-            // フルブリードで明るい画像でも、白いアイコン・入力欄が沈まないように奥へ敷く。
-            LinearGradient(
-                colors: [.clear, .black.opacity(0.22), .black.opacity(0.5)],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .frame(height: 220)
-            .frame(maxHeight: .infinity, alignment: .bottom)
-            .allowsHitTesting(false)
-            .ignoresSafeArea(.container, edges: .bottom)
-
-            #if canImport(UIKit)
-            // iter1226.451：メッセージ入力フォーカス中は画像を薄暗くする（タップで解除）。
-            // 暗転は「徐々にフェードイン（0.38s）」、解除は「素早くフェードアウト（0.12s）」の非対称。
-            if isInteractive {
-                Color.black
-                    .opacity(isMessageFieldFocused ? 0.55 : 0)
-                    .ignoresSafeArea()
-                    .allowsHitTesting(isMessageFieldFocused)
-                    .contentShape(Rectangle())
-                    .onTapGesture { isMessageFieldFocused = false }
-                    .animation(
-                        isMessageFieldFocused ? .easeIn(duration: 0.38) : .easeOut(duration: 0.12),
-                        value: isMessageFieldFocused
-                    )
-            }
-            #endif
-
-            if isInteractive, !isMessageFieldFocused {
-                // FB(iter1226.422)：左右タップで前/次へ即遷移（ダブルタップいいねは廃止）。
-                // iter1226.441：外側のスワイプ（回転/閉じる）と共存させるため simultaneous にする。
-                HStack(spacing: 0) {
-                    Color.clear
-                        .contentShape(Rectangle())
-                        .simultaneousGesture(pageTapGesture(delta: -1))
-
-                    Color.clear
-                        .contentShape(Rectangle())
-                        .simultaneousGesture(pageTapGesture(delta: 1))
-                }
-            }
-
-            VStack(spacing: 0) {
-                // iter1226.439：進捗バーは「その投稿者の一連（この一覧で見られる数）」だけで分割する。
-                let groomIndex = index(of: groom)
-                let blockRange = GroomViewerAuthorNavigation.authorBlockRange(
-                    authorIDs: grooms.map(\.authorID),
-                    currentIndex: groomIndex
-                )
-                GroomViewerPageIndicator(
-                    totalCount: blockRange.count,
-                    currentIndex: groomIndex - blockRange.lowerBound,
-                    currentProgress: groom.id == currentGroom.id ? storyProgress : 0
-                )
-
-                GroomViewerTopBar(
-                    authorName: identity.displayName,
-                    postTimeText: GroomPostRelativeTimeFormatter.relativeText(from: groom.createdAt),
-                    authorAvatarID: identity.avatarID,
-                    authorAvatarURL: identity.avatarURL,
-                    onOpenProfile: { profileSheetRoute = MeguriUserProfileRoute(userID: groom.authorID) }
-                ) {
-                    dismissViewer()
-                }
-
-                Spacer()
-
-                if isMine(groom) {
-                    HStack {
-                        Spacer()
-                        GroomViewerOwnerBottomControls(
-                            isLiked: appState.isGroomLiked(groom.id),
-                            likeCount: likeCount(for: groom),
-                            commentCount: commentCount(for: groom),
-                            isDeleting: appState.deletingGroomPostID == groom.id,
-                            onToggleLike: { toggleLike(for: groom) },
-                            onOpenComments: { isShowingComments = true },
-                            onOpenLikes: { isShowingLikes = true },
-                            onDelete: { isShowingDeleteConfirmation = true }
-                        )
-                    }
-                    .padding(.horizontal, 18)
-                    .padding(.bottom, 24)
-                } else {
-                    // iter1226.450：他人のグルームは「いいね/メニュー列」の下に、
-                    // インスタのストーリー返信風メッセージ入力を積む（同じ VStack 内なので
-                    // 立方体回転にも追従する）。操作できるのは本体面のみ。
-                    VStack(spacing: 6) {
-                        GroomViewerBottomControls(
-                            canLike: canReply(to: groom),
-                            isLiked: appState.isGroomLiked(groom.id),
-                            likeCount: likeCount(for: groom),
-                            onToggleLike: { toggleLike(for: groom) },
-                            onOpenLikes: { isShowingLikes = true },
-                            onReport: { interactionState.showReportConfirmation() },
-                            onBlock: { interactionState.showBlockConfirmation() }
-                        )
-
-                        #if canImport(UIKit)
-                        Group {
-                            // iter1226.454：開閉zoom遷移の最中は UITextField(UIViewRepresentable) が
-                            // 変形に追従せずズレて描画されるため、遷移が落ち着くまで静的ピルを出す。
-                            if isInteractive, isOpeningSettled {
-                                GroomViewerMessageComposer(
-                                    canSend: appState.subscriptionState.hasMeguriMessageAccess,
-                                    text: $messageDraft,
-                                    isFocused: $isMessageFieldFocused,
-                                    isSending: appState.sendingGroomReplyPostID == groom.id,
-                                    onSend: { sendGroomMessage(to: groom) },
-                                    onBlockedTap: { isShowingMessagePremiumSheet = true }
-                                )
-                            } else {
-                                GroomViewerMessageComposerStatic()
-                            }
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.bottom, isInteractive && keyboardHeight > 0 ? keyboardHeight : MegrumWindowInsets.bottom)
-                        #endif
-                    }
-                }
-            }
-            .padding(.top, topPadding)
-        }
-    }
 
     #if canImport(UIKit)
-    /// 本体（source＝現在のグルーム）に当てるキューブ変換。
-    /// 回転中は「出ていく面」、通常時は恒等（iter1226.467：タップ/スワイプ/自動送り共通）。
-    private func liveFaceTransform(width: CGFloat) -> GroomViewerCubeGeometry.FaceTransform {
-        if let transition = cubeTransition {
-            return GroomViewerCubeGeometry.outgoing(
-                progress: transition.progress,
-                direction: transition.direction,
-                width: width
-            )
-        }
-        return GroomViewerCubeGeometry.FaceTransform(offsetX: 0, degrees: 0, anchorX: 0.5)
+    /// 表示する面レイヤー（通常=[current]／回転中=[outgoing,incoming]／完了後=[current]）。iter1226.469。
+    private var faceLayers: [GroomViewerFaceLayer] {
+        GroomViewerFacePlanner.layers(grooms: grooms, currentIndex: currentIndex, transition: cubeTransition)
     }
 
-    private var liveFaceShade: Double {
-        if let transition = cubeTransition {
-            return GroomViewerCubeGeometry.outgoingShade(progress: transition.progress)
+    /// レイヤーの役割に応じたキューブ変換。current／回転無しは恒等（resting）。
+    private func faceTransform(for layer: GroomViewerFaceLayer, width: CGFloat) -> GroomViewerCubeGeometry.FaceTransform {
+        guard let transition = cubeTransition else {
+            return GroomViewerCubeGeometry.resting
         }
-        return 0
+        switch layer.role {
+        case .outgoing:
+            return GroomViewerCubeGeometry.outgoing(progress: transition.progress, direction: transition.direction, width: width)
+        case .incoming:
+            return GroomViewerCubeGeometry.incoming(progress: transition.progress, direction: transition.direction, width: width)
+        case .current:
+            return GroomViewerCubeGeometry.resting
+        }
+    }
+
+    private func faceShade(for layer: GroomViewerFaceLayer) -> Double {
+        guard let transition = cubeTransition else {
+            return 0
+        }
+        switch layer.role {
+        case .outgoing:
+            return GroomViewerCubeGeometry.outgoingShade(progress: transition.progress)
+        case .incoming:
+            return GroomViewerCubeGeometry.incomingShade(progress: transition.progress)
+        case .current:
+            return 0
+        }
     }
     #endif
+
+    /// 1面ぶんの実ビュー（`GroomViewerFace`）を組み立てる。isInteractive で構造を変えず、
+    /// 操作可否は layer.isInteractionEnabled（外側の allowsHitTesting／内部の disabled）で
+    /// 制御する。回転中の incoming と完了後の current が同じ groom.id なので、面を作り直さず
+    /// 画像 State・UITextField を保持したまま昇格できる（iter1226.469）。
+    @ViewBuilder
+    private func groomFaceView(for layer: GroomViewerFaceLayer, topPadding: CGFloat) -> some View {
+        if grooms.indices.contains(layer.groomIndex) {
+            let groom = grooms[layer.groomIndex]
+            let blockRange = GroomViewerAuthorNavigation.authorBlockRange(
+                authorIDs: grooms.map(\.authorID),
+                currentIndex: layer.groomIndex
+            )
+            GroomViewerFace(
+                groom: groom,
+                identity: identity(for: groom),
+                topPadding: topPadding,
+                isMine: isMine(groom),
+                canReply: canReply(to: groom),
+                isLiked: appState.isGroomLiked(groom.id),
+                likeCount: likeCount(for: groom),
+                commentCount: commentCount(for: groom),
+                isDeleting: appState.deletingGroomPostID == groom.id,
+                isSendingReply: appState.sendingGroomReplyPostID == groom.id,
+                hasMeguriMessageAccess: appState.subscriptionState.hasMeguriMessageAccess,
+                isOpeningSettled: isOpeningSettled,
+                isInteractionEnabled: layer.isInteractionEnabled,
+                pageTotal: blockRange.count,
+                pageIndex: layer.groomIndex - blockRange.lowerBound,
+                storyProgress: storyProgressForRole(layer.role),
+                keyboardHeight: keyboardHeight,
+                messageDraft: $messageDraft,
+                isMessageFieldFocused: $isMessageFieldFocused,
+                onPageTap: { delta in move(by: delta) },
+                onOpenProfile: { profileSheetRoute = MeguriUserProfileRoute(userID: groom.authorID) },
+                onDismiss: { dismissViewer() },
+                onToggleLike: { toggleLike(for: groom) },
+                onOpenComments: { isShowingComments = true },
+                onOpenLikes: { isShowingLikes = true },
+                onDelete: { isShowingDeleteConfirmation = true },
+                onReport: { interactionState.showReportConfirmation() },
+                onBlock: { interactionState.showBlockConfirmation() },
+                onSendMessage: { sendGroomMessage(to: groom) },
+                onBlockedMessageTap: { isShowingMessagePremiumSheet = true }
+            )
+        }
+    }
+
+    /// 面レイヤーの役割ごとの進捗値。incoming（新ユーザー）は 0 から始め、旧ユーザーの
+    /// 進捗を新面へ持ち込まない（commit 時の storyProgress=0 リセットと整合）。iter1226.469。
+    private func storyProgressForRole(_ role: GroomViewerFaceRole) -> Double {
+        switch role {
+        case .incoming:
+            return 0
+        case .current, .outgoing:
+            return storyProgress
+        }
+    }
 
     /// 進捗一時停止の判定に使う「キューブ回転中」フラグ（iter1226.467：全遷移に拡大）。
     private var isCubeTransitionActive: Bool {
@@ -907,6 +814,10 @@ struct GroomViewerScreen: View {
         withTransaction(transaction) {
             currentIndex = transition.targetIndex
             cubeTransition = nil
+            // iter1226.469：commit と同じ非アニメーション Transaction で進捗を 0 に戻し、
+            // 昇格した新面の進捗バーに旧ユーザーの進捗が 1 フレーム出ないようにする。
+            // 直後に currentGroom.id 変化で runStoryProgress が動き直し 0→ と進む。
+            storyProgress = 0
         }
     }
     #endif
@@ -986,50 +897,6 @@ struct GroomViewerScreen: View {
             try? await Task.sleep(nanoseconds: 40_000_000)
         }
     }
-
-    /// FB(iter1226.422)：タップで前/次へ切り替える（ダブルタップいいねは廃止）。
-    /// iter1226.441：指を離すのを待たず「押した瞬間」に発火する。
-    /// タッチ開始から短い猶予（90ms）で発火し、その間に指が動き出したら（スワイプ/閉じる
-    /// ドラッグへ移行したら）取り消す。素早いタップは離した瞬間に即発火。
-    private func pageTapGesture(delta: Int) -> some Gesture {
-        DragGesture(minimumDistance: 0)
-            .onChanged { value in
-                let distance = hypot(value.translation.width, value.translation.height)
-                if activePageTap == nil {
-                    let id = UUID()
-                    activePageTap = PageTapTouch(id: id)
-                    Task { @MainActor in
-                        try? await Task.sleep(nanoseconds: 90_000_000)
-                        guard let current = activePageTap, current.id == id, !current.isConsumed else {
-                            return
-                        }
-                        activePageTap = PageTapTouch(id: id, isConsumed: true)
-                        performPageTap(delta: delta)
-                    }
-                } else if distance > 12, let current = activePageTap, !current.isConsumed {
-                    // ドラッグへ移行：タップ扱いを取り消す（回転/閉じるスワイプ側が処理する）。
-                    activePageTap = PageTapTouch(id: current.id, isConsumed: true)
-                }
-            }
-            .onEnded { value in
-                defer {
-                    activePageTap = nil
-                }
-                guard let current = activePageTap, !current.isConsumed else {
-                    return
-                }
-                guard hypot(value.translation.width, value.translation.height) <= 12 else {
-                    return
-                }
-                performPageTap(delta: delta)
-            }
-    }
-
-    private func performPageTap(delta: Int) {
-        // 範囲判定・末尾での閉じる・回転中の直列化は move(by:) 内の planner に委譲する（iter1226.467）。
-        move(by: delta)
-    }
-
 
     private func submitGroomReply() {
         guard let body = interactionState.replyBodyForSubmission(isSending: isSendingReply) else {
@@ -1147,6 +1014,232 @@ enum GroomViewerChromeLayout {
 struct PageTapTouch {
     var id: UUID
     var isConsumed = false
+}
+
+/// グルームビューアの1面（画像＋進捗＋名前バー＋いいね/コメント＋メッセージ入力）。iter1226.469。
+///
+/// `isInteractive` で見た目・構造を分岐せず、常に同じ View 構造を返す。操作可否は
+/// `isInteractionEnabled`（外側の `allowsHitTesting` と、入力欄の `disabled`）だけで
+/// 切り替える。これにより、回転中の incoming 面と回転完了後の current 面が
+/// **同一 View identity・同一構造**になり、`GroomViewerCachedImage` の画像 State や
+/// `UITextField` を保持したまま昇格できる（最終フレームで作り直さない）。
+private struct GroomViewerFace: View {
+    let groom: GroomPost
+    let identity: MeguriProfileIdentity
+    let topPadding: CGFloat
+    let isMine: Bool
+    let canReply: Bool
+    let isLiked: Bool
+    let likeCount: Int
+    let commentCount: Int
+    let isDeleting: Bool
+    let isSendingReply: Bool
+    let hasMeguriMessageAccess: Bool
+    let isOpeningSettled: Bool
+    /// 操作可能か（回転中は source/target とも false）。構造は変えず可否だけ切り替える。
+    let isInteractionEnabled: Bool
+    let pageTotal: Int
+    let pageIndex: Int
+    let storyProgress: Double
+    let keyboardHeight: CGFloat
+    @Binding var messageDraft: String
+    @Binding var isMessageFieldFocused: Bool
+    let onPageTap: (Int) -> Void
+    let onOpenProfile: () -> Void
+    let onDismiss: () -> Void
+    let onToggleLike: () -> Void
+    let onOpenComments: () -> Void
+    let onOpenLikes: () -> Void
+    let onDelete: () -> Void
+    let onReport: () -> Void
+    let onBlock: () -> Void
+    let onSendMessage: () -> Void
+    let onBlockedMessageTap: () -> Void
+
+    /// 押下即発火タップの進行状態（面ごとに保持。回転中は allowsHitTesting=false で発火しない）。
+    @State private var activePageTap: PageTapTouch?
+
+    /// フォーカス暗転は操作可能な current 面だけで有効にする。
+    private var focusDimmingActive: Bool {
+        isInteractionEnabled && isMessageFieldFocused
+    }
+
+    private var imageBottomInset: CGFloat {
+        #if canImport(UIKit)
+        let safeBottom = MegrumWindowInsets.bottom
+        return isMine ? safeBottom + 20 : safeBottom + 62
+        #else
+        return 0
+        #endif
+    }
+
+    var body: some View {
+        ZStack {
+            Color.black
+
+            // iter1226.453：画像はステータスバー手前＋入力欄手前に収める（インスタと同じ）。
+            GroomViewerCachedImage(url: groom.imageURL)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding(.top, MegrumWindowInsets.top)
+                .padding(.bottom, imageBottomInset)
+
+            LinearGradient(
+                colors: [.black.opacity(0.55), .black.opacity(0.16), .clear],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(height: topPadding + 64)
+            .frame(maxHeight: .infinity, alignment: .top)
+            .allowsHitTesting(false)
+            .ignoresSafeArea(.container, edges: .top)
+
+            LinearGradient(
+                colors: [.clear, .black.opacity(0.22), .black.opacity(0.5)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(height: 220)
+            .frame(maxHeight: .infinity, alignment: .bottom)
+            .allowsHitTesting(false)
+            .ignoresSafeArea(.container, edges: .bottom)
+
+            // iter1226.451：メッセージ入力フォーカス中の暗転。構造は常設し、opacity/hitTest だけ切替。
+            Color.black
+                .opacity(focusDimmingActive ? 0.55 : 0)
+                .ignoresSafeArea()
+                .allowsHitTesting(focusDimmingActive)
+                .contentShape(Rectangle())
+                .onTapGesture { isMessageFieldFocused = false }
+                .animation(
+                    focusDimmingActive ? .easeIn(duration: 0.38) : .easeOut(duration: 0.12),
+                    value: focusDimmingActive
+                )
+
+            // 左右タップゾーン。フォーカス中のみ隠す。回転中は外側の allowsHitTesting=false で無効。
+            if !isMessageFieldFocused {
+                HStack(spacing: 0) {
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .simultaneousGesture(pageTapGesture(delta: -1))
+
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .simultaneousGesture(pageTapGesture(delta: 1))
+                }
+            }
+
+            VStack(spacing: 0) {
+                GroomViewerPageIndicator(
+                    totalCount: pageTotal,
+                    currentIndex: pageIndex,
+                    currentProgress: storyProgress
+                )
+
+                GroomViewerTopBar(
+                    authorName: identity.displayName,
+                    postTimeText: GroomPostRelativeTimeFormatter.relativeText(from: groom.createdAt),
+                    authorAvatarID: identity.avatarID,
+                    authorAvatarURL: identity.avatarURL,
+                    onOpenProfile: onOpenProfile
+                ) {
+                    onDismiss()
+                }
+
+                Spacer()
+
+                if isMine {
+                    HStack {
+                        Spacer()
+                        GroomViewerOwnerBottomControls(
+                            isLiked: isLiked,
+                            likeCount: likeCount,
+                            commentCount: commentCount,
+                            isDeleting: isDeleting,
+                            onToggleLike: onToggleLike,
+                            onOpenComments: onOpenComments,
+                            onOpenLikes: onOpenLikes,
+                            onDelete: onDelete
+                        )
+                    }
+                    .padding(.horizontal, 18)
+                    .padding(.bottom, 24)
+                } else {
+                    VStack(spacing: 6) {
+                        GroomViewerBottomControls(
+                            canLike: canReply,
+                            isLiked: isLiked,
+                            likeCount: likeCount,
+                            onToggleLike: onToggleLike,
+                            onOpenLikes: onOpenLikes,
+                            onReport: onReport,
+                            onBlock: onBlock
+                        )
+
+                        #if canImport(UIKit)
+                        Group {
+                            // iter1226.454：開閉zoom遷移中（未settled）は UITextField がズレるため静的ピル。
+                            // iter1226.469：settled 後は current でも incoming（回転中）でも実入力欄を
+                            // 事前マウントし、回転中は disabled で操作だけ無効化する。commit で
+                            // target→current になっても UITextField（makeUIView）を作り直さない。
+                            if isOpeningSettled {
+                                GroomViewerMessageComposer(
+                                    canSend: hasMeguriMessageAccess,
+                                    text: $messageDraft,
+                                    isFocused: $isMessageFieldFocused,
+                                    isSending: isSendingReply,
+                                    onSend: onSendMessage,
+                                    onBlockedTap: onBlockedMessageTap
+                                )
+                                .disabled(!isInteractionEnabled)
+                            } else {
+                                GroomViewerMessageComposerStatic()
+                            }
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.bottom, isInteractionEnabled && keyboardHeight > 0 ? keyboardHeight : MegrumWindowInsets.bottom)
+                        #endif
+                    }
+                }
+            }
+            .padding(.top, topPadding)
+        }
+    }
+
+    /// 押した瞬間に発火するタップ（90ms 猶予・12pt 以上動いたら取消）。iter1226.441 を面内へ移設。
+    /// 回転中は外側 `allowsHitTesting(false)` で発火しないため直列化される。
+    private func pageTapGesture(delta: Int) -> some Gesture {
+        DragGesture(minimumDistance: 0)
+            .onChanged { value in
+                let distance = hypot(value.translation.width, value.translation.height)
+                if activePageTap == nil {
+                    let id = UUID()
+                    activePageTap = PageTapTouch(id: id)
+                    Task { @MainActor in
+                        try? await Task.sleep(nanoseconds: 90_000_000)
+                        guard let current = activePageTap, current.id == id, !current.isConsumed else {
+                            return
+                        }
+                        activePageTap = PageTapTouch(id: id, isConsumed: true)
+                        onPageTap(delta)
+                    }
+                } else if distance > 12, let current = activePageTap, !current.isConsumed {
+                    // ドラッグへ移行：タップ扱いを取り消す（回転/閉じるスワイプ側が処理する）。
+                    activePageTap = PageTapTouch(id: current.id, isConsumed: true)
+                }
+            }
+            .onEnded { value in
+                defer {
+                    activePageTap = nil
+                }
+                guard let current = activePageTap, !current.isConsumed else {
+                    return
+                }
+                guard hypot(value.translation.width, value.translation.height) <= 12 else {
+                    return
+                }
+                onPageTap(delta)
+            }
+    }
 }
 
 #if canImport(UIKit)

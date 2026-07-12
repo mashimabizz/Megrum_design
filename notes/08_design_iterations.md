@@ -4,6 +4,42 @@
 
 ---
 
+## イテレーション1226.469：キューブ回転「完了時の一瞬停止」を面のhandoff統一で根治
+
+### 背景・問題意識
+オーナー＋別AIの精査：iter1226.467でタップ回転の「開始側」の経路差は解消したが、**回転完了時**にまだ一瞬止まって見える。原因は incoming→通常面の handoff：
+- viewerSurfaceで current 面（通常枝）と target 面（`cubeTransition`中だけの条件付き枝）が**別View**だった。
+- progress=1到達後、`commitCubeTransition` が同一Transactionで `currentIndex=targetIndex` と `cubeTransition=nil` を実行。
+- その結果、正面まで回った target 面が**削除**され、通常枝に同じグルームの**別View**が作り直される。この最終フレームで画像State・ページ進捗・静的ピル→実UITextField・`currentGroom.id`紐づきtask・いいね演出がまとめて差し替わる。
+- 特に `GroomViewerCachedImage` の `@State` 初期値はView生成時のみ有効で、作り直されると旧画像Stateを一時保持し、`.task(id:url)` で後追い更新になり得る。
+
+### 変更内容（面を「作り直す」のではなく「昇格させる」）
+
+#### `GroomViewerFaceLayer.swift`（新規・UIKit非依存）
+- `GroomViewerFaceLayer`（id=`groom.id` / groomIndex / role(current/outgoing/incoming) / zIndex / isInteractionEnabled）と純粋 planner `GroomViewerFacePlanner.layers`。通常=[current]／回転中=[outgoing,incoming]／完了後=[current]。**回転中のtarget(incoming)と完了後のcurrentが同じ`groom.id`** になる
+
+#### `GroomViewerScreen.swift`
+- viewerSurfaceを**単一の`ForEach(faceLayers)`**へ集約（current/target を別枝で描かない）。ID固定で target 面をcommit時に破棄・再生成しない
+- `groomFace`（巨大@ViewBuilder）を専用 **`GroomViewerFace` View** へ抽出。`isInteractive`で構造を変えず、操作可否は `isInteractionEnabled`（外側`allowsHitTesting`＋入力欄`disabled`）だけで切替
+- 実メッセージ入力欄（UITextField）は current／incoming（回転中）とも `isOpeningSettled` 後に**事前マウント**し、回転中は`disabled`。commitで target→current になっても `makeUIView` を呼ばせない（静的ピル→実入力欄の最終フレーム交換を排除）
+- `commitCubeTransition` で `storyProgress=0` を**同一非アニメーションTransaction**で設定し、旧ユーザーの進捗を1フレーム出さない（ReduceMotionのスワイプ確定も同様）
+- 左右タップ（90ms猶予）を `GroomViewerFace` 内へ移設し `onPageTap` で親の `move(by:)` へ委譲。回転中は面の`allowsHitTesting=false`で無効＝直列化
+- `GroomViewerCubeGeometry.resting`（恒等）を追加し、`incoming(progress:1)` を resting と**完全一致**（昇格時に変形差ゼロ）
+
+### 影響範囲
+- グルームビューアの面描画のみ。Reduce Motion・同一投稿者即切替・左右方向・スワイプ確定/キャンセル・末尾で閉じる・mark viewed/engagement取得のタイミングは不変。
+
+### やらなかったこと（明示）
+- 140ms固定待機の復活／`Task.yield`での次フレーム推測／viewer全体への`.id`付与／アニメーション時間だけの延長／スクリーンショット方式の復活 — いずれも禁止事項として不採用。
+
+### セルフレビュー結果
+- ✅ 全1602 XCTestパス（面レイヤーのplannerテスト追加：遷移中target=commit後currentのID一致／[source,target]→[target]／incoming(1)==resting／範囲外フォールバック 等）
+- ✅ `swift test --enable-xctest --disable-swift-testing -j 1` 成功、`xcodebuild ... iOS Simulator` 成功、実機（iPhone 15）Debugビルド・インストール済み
+- ⚠️ 実機A/B（投稿者境界タップ10回／target GroomViewerFaceのonAppearが遷移開始の1回だけ・commit時に再onAppearしない／`GroomMessageDarkTextField.makeUIView`がcommit瞬間に呼ばれない／`MEGRUM_VISUAL_QA_COLD_IMAGES=1`で旧画像に戻らない／Instrumentsでcommit周辺のhitch比較）はオーナー確認。構造修正後も減速感だけ残る場合に限り 0.16s easeOut と 0.18〜0.20s Animation.smooth を実機A/B比較
+- ✅ notes/09・10は状態/用語変更なしのため据え置き
+
+---
+
 ## イテレーション1226.468：個別募集メモを「条件のグッズを確認！」の直上へ昇格表示
 
 ### 背景・問題意識

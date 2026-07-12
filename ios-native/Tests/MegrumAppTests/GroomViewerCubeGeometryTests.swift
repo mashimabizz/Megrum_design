@@ -260,6 +260,117 @@ final class GroomViewerCubeTransitionPlannerTests: XCTestCase {
 }
 
 @MainActor
+final class GroomViewerFacePlannerTests: XCTestCase {
+    private func groom(id: UUID, author: UUID) -> GroomPost {
+        GroomPost(
+            id: id,
+            authorID: author,
+            imageURL: URL(string: "https://example.com/\(id.uuidString).jpg")!,
+            latitude: 35.0,
+            longitude: 139.0,
+            createdAt: Date(timeIntervalSince1970: 0)
+        )
+    }
+
+    /// 投稿者違いの2件（境界）。source=0（authorA）→ target=1（authorB）。
+    private func makeGrooms() -> (grooms: [GroomPost], g0: UUID, g1: UUID) {
+        let g0 = UUID()
+        let g1 = UUID()
+        let a = UUID()
+        let b = UUID()
+        return ([groom(id: g0, author: a), groom(id: g1, author: b)], g0, g1)
+    }
+
+    private func transition(source: Int, target: Int, progress: Double) -> GroomViewerCubeTransition {
+        GroomViewerCubeTransition(
+            sourceIndex: source,
+            targetIndex: target,
+            direction: 1,
+            progress: progress,
+            origin: .tap
+        )
+    }
+
+    func testNormalStateShowsOnlyCurrentLayer() {
+        let (grooms, g0, _) = makeGrooms()
+        let layers = GroomViewerFacePlanner.layers(grooms: grooms, currentIndex: 0, transition: nil)
+        XCTAssertEqual(layers.map(\.role), [.current])
+        XCTAssertEqual(layers.first?.id, g0)
+        XCTAssertEqual(layers.first?.isInteractionEnabled, true)
+    }
+
+    func testTransitionShowsOutgoingThenIncomingBothNonInteractive() {
+        let (grooms, g0, g1) = makeGrooms()
+        let layers = GroomViewerFacePlanner.layers(
+            grooms: grooms, currentIndex: 0, transition: transition(source: 0, target: 1, progress: 0.5)
+        )
+        XCTAssertEqual(layers.map(\.role), [.outgoing, .incoming])
+        XCTAssertEqual(layers.map(\.groomIndex), [0, 1])
+        XCTAssertEqual(layers[0].id, g0)
+        XCTAssertEqual(layers[1].id, g1)
+        // 回転中は source/target とも操作無効（直列化）。
+        XCTAssertEqual(layers.allSatisfy { !$0.isInteractionEnabled }, true)
+        // incoming が前面。
+        XCTAssertGreaterThan(layers[1].zIndex, layers[0].zIndex)
+    }
+
+    /// 核心：回転中の target(incoming) 面と、commit 後の current 面が **同じ id**。
+    /// これにより SwiftUI が同一 View として扱い、面を作り直さず昇格できる。
+    func testIncomingLayerIdEqualsCurrentLayerIdAfterCommit() {
+        let (grooms, _, g1) = makeGrooms()
+        let during = GroomViewerFacePlanner.layers(
+            grooms: grooms, currentIndex: 0, transition: transition(source: 0, target: 1, progress: 1)
+        )
+        let incoming = during.first { $0.role == .incoming }
+        // commit 後：currentIndex=targetIndex, transition=nil
+        let after = GroomViewerFacePlanner.layers(grooms: grooms, currentIndex: 1, transition: nil)
+        let current = after.first { $0.role == .current }
+        XCTAssertEqual(incoming?.id, current?.id)
+        XCTAssertEqual(current?.id, g1)
+    }
+
+    func testTransitionToCommitReducesToSingleTargetLayer() {
+        let (grooms, _, g1) = makeGrooms()
+        let during = GroomViewerFacePlanner.layers(
+            grooms: grooms, currentIndex: 0, transition: transition(source: 0, target: 1, progress: 0.8)
+        )
+        XCTAssertEqual(during.count, 2)
+        let after = GroomViewerFacePlanner.layers(grooms: grooms, currentIndex: 1, transition: nil)
+        XCTAssertEqual(after.count, 1)
+        XCTAssertEqual(after.map(\.role), [.current])
+        XCTAssertEqual(after.first?.groomIndex, 1)
+        XCTAssertEqual(after.first?.id, g1)
+    }
+
+    func testIncomingTransformAtProgressOneEqualsRestingIdentity() {
+        // progress=1 の incoming が恒等（resting）と完全一致するので、昇格時に変形差が出ない。
+        XCTAssertEqual(
+            GroomViewerCubeGeometry.incoming(progress: 1, direction: 1, width: 390),
+            GroomViewerCubeGeometry.resting
+        )
+        XCTAssertEqual(
+            GroomViewerCubeGeometry.incoming(progress: 1, direction: -1, width: 390),
+            GroomViewerCubeGeometry.resting
+        )
+        // 途中はまだ回転している（恒等ではない）。
+        XCTAssertNotEqual(
+            GroomViewerCubeGeometry.incoming(progress: 0.5, direction: 1, width: 390),
+            GroomViewerCubeGeometry.resting
+        )
+    }
+
+    func testOutOfRangeTransitionFallsBackToCurrent() {
+        let (grooms, g0, _) = makeGrooms()
+        // targetIndex 範囲外 → current にフォールバック（クラッシュしない）。
+        let layers = GroomViewerFacePlanner.layers(
+            grooms: grooms, currentIndex: 0, transition: transition(source: 0, target: 9, progress: 0.5)
+        )
+        XCTAssertEqual(layers.map(\.role), [.current])
+        XCTAssertEqual(layers.first?.id, g0)
+    }
+}
+
+@MainActor
 final class GroomViewerAuthorGroupingTests: XCTestCase {
     private func groom(author: UUID, minutesAgo: Int) -> GroomPost {
         GroomPost(
