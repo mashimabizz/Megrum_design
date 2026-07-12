@@ -58,7 +58,8 @@ struct MegrumSlideBoolPresentationOverlay<PresentedContent: View>: View {
     private func presentedContent(screenWidth: CGFloat, screenHeight: CGFloat) -> some View {
         // leading 表示は明示的な閉じる操作のみ（戻るスワイプの方向が矛盾するため無効化）。
         switch presentationEdge == .leading ? .leadingEdge : backSwipeInteractionScope {
-        case .leadingEdge:
+        case .leadingEdge, .none:
+            // iter1226.476：.none は戻るスワイプ無効（明示的な閉じる操作のみ）。
             content(dismissPresentation)
                 .megrumSlidePresentedContent(
                     width: screenWidth,
@@ -185,7 +186,8 @@ struct MegrumSlideItemPresentationOverlay<Item: Identifiable, PresentedContent: 
     @ViewBuilder
     private func presentedContent(_ item: Item, screenWidth: CGFloat, screenHeight: CGFloat) -> some View {
         switch backSwipeInteractionScope {
-        case .leadingEdge:
+        case .leadingEdge, .none:
+            // iter1226.476：.none は戻るスワイプ無効（gesture も leadingEdge 捕捉帯も付けない）。
             content(item, dismissPresentation)
                 .megrumSlidePresentedContent(
                     width: screenWidth,

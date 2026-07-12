@@ -388,7 +388,9 @@ extension HomeGoodsHitDetailSelectionContext {
             receive: receiveColumnModel(),
             partner: partnerColumnModel(option: option),
             offer: offerColumnModel(option: option),
-            achievement: achievementModel(option: option)
+            // iter1226.476：「すべて：X/X選択済み・あとXつで成立」「条件に合う手持ちが X/X 点」の
+            // 達成カウンタ文はオーナーFBで不要になったため出さない。
+            achievement: nil
         )
     }
 
@@ -564,15 +566,26 @@ extension HomeGoodsHitDetailSelectionContext {
             .components(separatedBy: " / ")
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
+        // iter1226.476：「〇〇以外」「A・B」（複数）「一部メンバー除く」は単一の検索語にできないため、
+        // メンバー名を検索キーワードから外す（グループ・種別・シリーズだけで検索する）。
+        let hasMemberExclusionOrMultiple = summaryParts.contains { part in
+            part.contains("以外") || part.contains("除く") || part.contains("・")
+        }
         // シリーズは検索ワードに # を含めない（#DICON D'FESTA → DICON D'FESTA）。iter1226.378。
         let seriesTokens = summaryParts
             .filter { $0.hasPrefix("#") }
             .map { String($0.dropFirst()).trimmingCharacters(in: .whitespaces) }
-        let baseTokens = summaryParts.filter { !$0.hasPrefix("#") } // グループ・種別（・記載メンバー）
+        let baseTokens = summaryParts.filter { part in
+            guard !part.hasPrefix("#") else { return false }
+            // 除外/複数メンバーのトークン（「以外: …」「A・B」「一部メンバー除く」）は検索語に入れない。
+            if part.contains("以外") || part.contains("除く") || part.contains("・") { return false }
+            return true
+        }
         let firstOffer = selectedOfferGoods.first ?? offerGoods.first
         // 種別が条件文に無いケースの保険として選択中グッズの種別も足す。
         let offerType = firstOffer?.goodsTypeName?.nilIfBlank
-        let member = firstOffer?.memberName?.nilIfBlank
+        // 除外/複数メンバー指定の時は、選択中グッズの単一メンバー名も検索へ足さない。
+        let member = hasMemberExclusionOrMultiple ? nil : firstOffer?.memberName?.nilIfBlank
 
         var tokens: [String] = []
         var seen = Set<String>()
@@ -585,37 +598,5 @@ extension HomeGoodsHitDetailSelectionContext {
         add(offerType)
         seriesTokens.forEach(add)
         return tokens.joined(separator: " ")
-    }
-
-    private func achievementModel(option: HomeIndividualListingWantedOption) -> HomeDealAchievement? {
-        let required = offerRequiredCount
-        guard required > 1 else {
-            return nil
-        }
-        let goods = offerGoods
-        guard goods.count >= required else {
-            return HomeDealAchievement(text: "条件に合う手持ちが \(goods.count)/\(required) 点", satisfied: false)
-        }
-        let selectedCount = selectionState.selectedOfferIndices.count
-        let satisfied = selectedCount >= required
-        let prefix: String
-        if option.kind == .condition {
-            // 条件は「数量以上」を要求する。iter1226.377。
-            prefix = "\(required)個以上"
-        } else {
-            switch offerLogic {
-            case .all:
-                prefix = "すべて"
-            case .atLeast:
-                prefix = "\(required)個以上"
-            case .one:
-                prefix = ""
-            }
-        }
-        let base = prefix.isEmpty
-            ? "\(min(selectedCount, required))/\(required) 選択済み"
-            : "\(prefix)：\(min(selectedCount, required))/\(required) 選択済み"
-        let suffix = satisfied ? "・成立OK" : "・あと\(max(0, required - selectedCount))つで成立"
-        return HomeDealAchievement(text: base + suffix, satisfied: satisfied)
     }
 }

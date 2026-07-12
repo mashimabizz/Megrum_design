@@ -200,7 +200,9 @@ public struct MegrumRootView: View {
                 )
             }
         }
-        .megrumSlideItemPresentation(item: $publicProfileRoute) { route, _ in
+        // iter1226.476：プロフィールは横スワイプで誤って閉じないよう戻るスワイプ無効。
+        // 閉じるは画面左上の「閉じる」ボタン（standalone は表示される）で行う。
+        .megrumSlideItemPresentation(item: $publicProfileRoute, backSwipeInteractionScope: .none) { route, _ in
             NavigationStack {
                 PublicUserProfileScreen(
                     appState: appState,

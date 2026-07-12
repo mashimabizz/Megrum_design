@@ -45,6 +45,9 @@ enum MegrumSlidePresentationEdge: Equatable {
 enum MegrumSlideBackSwipeInteractionScope: Equatable {
     case leadingEdge
     case fullScreen
+    /// iter1226.476：戻るスワイプ無効（明示的な「閉じる」ボタンのみで閉じる）。
+    /// プロフィールなど、横スワイプで誤って閉じたくない画面に使う。
+    case none
 }
 
 enum MegrumSlideBackSwipeResolver {
