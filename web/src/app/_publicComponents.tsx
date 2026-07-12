@@ -8,6 +8,7 @@ import {
   FOOTER_NAV,
   HEADER_NAV,
   OFFICE_ADDRESS_LINES,
+  routeEnabled,
   SITE_URL,
 } from "./_siteConfig";
 
@@ -361,6 +362,46 @@ export function TextLink({
       className="font-black text-violet-700 underline decoration-megrum-lavender/35 underline-offset-4 transition hover:text-violet-900"
     >
       {children}
+    </Link>
+  );
+}
+
+/**
+ * 「詳しく見る →」リンク。遷移先ページが実装済みのときだけ描画する
+ * （未実装ページ＝NAV enabled:false へのリンク切れを回避。notes/82 §9）。
+ * 同一ページ内アンカー（#始まり）は常に描画する。
+ */
+export function DetailLink({
+  href,
+  label = "詳しく見る",
+  className = "",
+}: {
+  href: string;
+  label?: string;
+  className?: string;
+}) {
+  const isAnchor = href.startsWith("#");
+  if (!isAnchor && !routeEnabled(href)) return null;
+  const classes = [
+    "inline-flex items-center gap-1 text-[13px] font-black text-violet-700 transition hover:text-violet-900",
+    className,
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const content = (
+    <>
+      {label}
+      <span aria-hidden="true">→</span>
+    </>
+  );
+  // 同一ページ内アンカーは <a>、内部ページ遷移は next/link を使う。
+  return isAnchor ? (
+    <a href={href} className={classes}>
+      {content}
+    </a>
+  ) : (
+    <Link href={href} className={classes}>
+      {content}
     </Link>
   );
 }

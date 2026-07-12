@@ -81,14 +81,14 @@ export interface NavItem {
 }
 
 export const HEADER_NAV: NavItem[] = [
-  { href: "/features", label: "機能", enabled: false },
+  { href: "/features", label: "機能", enabled: true },
   { href: "/safety", label: "安全", enabled: false },
   { href: "/articles", label: "記事", enabled: false },
   { href: "/faq", label: "FAQ", enabled: false },
 ];
 
 export const FOOTER_NAV: NavItem[] = [
-  { href: "/features", label: "機能紹介", enabled: false },
+  { href: "/features", label: "機能紹介", enabled: true },
   { href: "/articles", label: "記事", enabled: false },
   { href: "/safety", label: "安全への取り組み", enabled: false },
   { href: "/terms", label: "利用規約", enabled: true },
@@ -164,5 +164,21 @@ export function softwareApplicationJsonLd(): Record<string, unknown> {
       price: "0",
       priceCurrency: "JPY",
     },
+  };
+}
+
+/** パンくず（BreadcrumbList）。items は先頭がホーム。 */
+export function breadcrumbJsonLd(
+  items: { name: string; path: string }[],
+): Record<string, unknown> {
+  return {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: items.map((item, index) => ({
+      "@type": "ListItem",
+      position: index + 1,
+      name: item.name,
+      item: `${SITE_URL}${item.path}`,
+    })),
   };
 }

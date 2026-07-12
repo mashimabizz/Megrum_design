@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 
 import { PrimaryCtaBlock } from "./_cta";
 import {
+  DetailLink,
   FaqList,
   JsonLd,
   PublicPage,
@@ -12,7 +13,6 @@ import {
 } from "./_publicComponents";
 import {
   buildMetadata,
-  routeEnabled,
   softwareApplicationJsonLd,
   X_URL,
 } from "./_siteConfig";
@@ -186,7 +186,7 @@ function SolutionSection() {
                 </span>
               </p>
             </div>
-            <DetailLink href="/features#trade" />
+            <DetailLink href="/features#trade" className="mt-5" />
           </div>
         </div>
       </div>
@@ -230,7 +230,7 @@ function FeatureRow({
         <p className="mt-3 max-w-xl text-[14px] font-medium leading-7 text-slate-600 md:text-[15px]">
           {body}
         </p>
-        <DetailLink href={detailHref} />
+        <DetailLink href={detailHref} className="mt-5" />
       </div>
       <div className="mx-auto w-full max-w-[300px]">
         <Screenshot
@@ -309,7 +309,7 @@ function MeguriSection() {
             <p className="mt-5 rounded-xl border border-megrum-sky/40 bg-megrum-sky/[0.08] px-4 py-3 text-[12px] font-semibold leading-6 text-slate-600">
               正確な現在地は表示されません。グルームは現在地から約1km以内、チャットルームは約1km以内または同じ都道府県で見られます。
             </p>
-            <DetailLink href="/features#meguri" label="めぐりを詳しく" />
+            <DetailLink href="/features#meguri" label="めぐりを詳しく" className="mt-5" />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <Screenshot
@@ -365,7 +365,7 @@ function SafetyDigest() {
           </div>
         ))}
       </div>
-      <DetailLink href="/safety" label="安全への取り組みを詳しく" />
+      <DetailLink href="/safety" label="安全への取り組みを詳しく" className="mt-6" />
     </Section>
   );
 }
@@ -429,25 +429,5 @@ function ClosingSection() {
         </div>
       </div>
     </section>
-  );
-}
-
-/** 遷移先が実装済みのときだけ「詳しく見る →」を出す（未実装ページのリンク切れ回避）。 */
-function DetailLink({
-  href,
-  label = "詳しく見る",
-}: {
-  href: string;
-  label?: string;
-}) {
-  if (!routeEnabled(href)) return null;
-  return (
-    <a
-      href={href}
-      className="mt-5 inline-flex items-center gap-1 text-[13px] font-black text-violet-700 transition hover:text-violet-900"
-    >
-      {label}
-      <span aria-hidden="true">→</span>
-    </a>
   );
 }

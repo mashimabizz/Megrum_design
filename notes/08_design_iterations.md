@@ -4,6 +4,46 @@
 
 ---
 
+## イテレーション1226.481：公式サイトT3 — /features 機能紹介ページ実装
+
+### 背景・問題意識
+`notes/82` WBS の T3（/features・§4B）。トップの各機能から誘導する「DL判断を後押しする深掘り」ページ。5アンカー構成。
+
+### 変更内容
+
+#### `web/src/app/features/page.tsx`（新規）
+- 5アンカー：`#share-image`（マイグッズ・ほしいもの・譲求シェア画像／SS-2,6）／`#matching`（候補と打診・受諾前ネゴ／SS-3）／`#trade`（現地・郵送を分けた取引チャット／SS-4,5・現地に位置情報の必須併記）／`#meguri`（マップ/グルーム/チャットルーム/めぐりあった人／SS-7,8,9・必須併記・プレミアムは補足で価格/購入導線なし・メッセージ強調しない）／`#safety`（証跡/評価/通報/待ち合わせ確定→/safetyへ）
+- パンくず（ホーム/機能紹介）＋アンカーチップ＋ページ末尾CTA＋トップ戻り
+- `buildMetadata`（title=機能紹介）＋ `breadcrumbJsonLd`
+
+#### `web/src/app/_siteConfig.ts`
+- HEADER_NAV / FOOTER_NAV の `/features` を enabled:true 化（→ヘッダ「機能」表示・トップのDetailLink表示）
+- `breadcrumbJsonLd()` 追加
+
+#### `web/src/app/_publicComponents.tsx`
+- `DetailLink` を共通化（page.tsx から移設）。内部ページ遷移は next/link、#アンカーは `<a>`。未実装ページ（enabled:false）はリンク非描画
+
+#### `web/src/app/page.tsx`
+- ローカルの DetailLink を共通コンポーネント参照へ。呼び出しに margin className を付与
+
+#### `web/src/app/sitemap.ts`
+- `/features` を追加（§8）
+
+### 影響範囲
+- 新規 /features と、トップからの導線活性化。ヘッダ/フッタに「機能」導線が出る。web/ のみ＝EAS不要
+
+### 確認方法
+- `tsc`／`eslint`（no-html-link-for-pages を Link化で解消）→ 0
+- dev：/features HTTP 200・console エラーなし・title「機能紹介 | Megrum」
+- curl＋スクショ：5アンカー・確定コピー・BreadcrumbList・禁止語なし（お品書き/30秒/匿名配送/完全無料）。トップに /features#… DetailLink 出現。sitemap に /features
+
+### セルフレビュー結果
+- ✅ 用語 `notes/10` 準拠。語彙 `notes/80` §1：必須併記（現地・めぐり）、郵送は成立後・送る相手だけ、料金は事実説明のみで価格/購入導線なし（Go条件前・§0A-3）、めぐりのメッセージ強調を回避
+- ✅ アクセシビリティ：見出し階層、パンくず nav[aria-label]、内部遷移は next/link
+- ⏭️ 未：スクショ SS-2〜9 はプレースホルダ（T9納品待ち）。/safety の DetailLink は T4 実装で自動表示
+
+---
+
 ## イテレーション1226.480：公式サイトT2 — トップLP全面実装
 
 ### 背景・問題意識
