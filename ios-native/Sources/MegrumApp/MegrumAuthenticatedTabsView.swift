@@ -110,6 +110,11 @@ struct AppDrawerInteractiveHost<Content: View>: View {
 
     private let content: Content
     @State private var dragTranslation: CGFloat = 0
+    // 閉じスワイプ（フリック含む）が発生している間はドロワー項目のタップを無効化する。
+    // 子ボタン側の抑制ジェスチャ（minimumDistance: 8）は、慣性で閉じる小さなフリックを
+    // 取りこぼしてタップ扱いになる不具合があったため、閉じ判定の権威である親の
+    // pan（minimumDistance: 6）が動いた瞬間にこのフラグで抑制する。iter1226.456。
+    @State private var suppressesDrawerItemTap = false
 
     init(
         appState: MegrumAppState,
@@ -142,6 +147,7 @@ struct AppDrawerInteractiveHost<Content: View>: View {
                     isPresented: $showsDrawer,
                     presentationProgress: drawerPresentation.progress,
                     drawerWidth: drawerPresentation.drawerWidth,
+                    suppressesItemTap: suppressesDrawerItemTap,
                     appState: appState,
                     onSelectDestination: onSelectDestination,
                     onSignOut: onSignOut
@@ -215,6 +221,11 @@ struct AppDrawerInteractiveHost<Content: View>: View {
                     isPresented: showsDrawer,
                     translation: value.translation
                 ) {
+                    if showsDrawer, !suppressesDrawerItemTap {
+                        // 開いているドロワー上で実ドラッグ（閉じスワイプ）が始まった。
+                        // この瞬間に項目タップを抑制する（フリックでもここは必ず通る）。
+                        suppressesDrawerItemTap = true
+                    }
                     updateDragTranslation(translation)
                 } else {
                     resetDismissDrag()
@@ -223,6 +234,7 @@ struct AppDrawerInteractiveHost<Content: View>: View {
             .onEnded { value in
                 guard allowsStart(value.startLocation) else {
                     resetDismissDrag()
+                    scheduleDrawerItemTapSuppressionRelease()
                     return
                 }
                 guard let targetVisibility = AppDrawerGestureResolver.targetVisibility(
@@ -232,6 +244,7 @@ struct AppDrawerInteractiveHost<Content: View>: View {
                     drawerWidth: drawerTravel
                 ) else {
                     resetDismissDrag(animated: true)
+                    scheduleDrawerItemTapSuppressionRelease()
                     return
                 }
 
@@ -248,7 +261,21 @@ struct AppDrawerInteractiveHost<Content: View>: View {
                     showsDrawer = targetVisibility
                     dragTranslation = 0
                 }
+                scheduleDrawerItemTapSuppressionRelease()
             }
+    }
+
+    /// 指を離した後も、閉じアニメ中に発火するボタンタップ（onEnded とボタン action の
+    /// 発火順は不定）を取りこぼさないよう、少し遅延してから抑制を解除する。
+    private func scheduleDrawerItemTapSuppressionRelease() {
+        guard suppressesDrawerItemTap else {
+            return
+        }
+        DispatchQueue.main.asyncAfter(
+            deadline: .now() + AppDrawerGestureResolver.drawerItemTapSuppressionDuration
+        ) {
+            suppressesDrawerItemTap = false
+        }
     }
 
     private func updateDragTranslation(_ translation: CGFloat) {

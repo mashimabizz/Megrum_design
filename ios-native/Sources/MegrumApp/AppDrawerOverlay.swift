@@ -7,6 +7,9 @@ struct AppDrawerOverlay: View {
     @Binding var isPresented: Bool
     var presentationProgress: CGFloat
     var drawerWidth: CGFloat
+    /// 親（AppDrawerInteractiveHost）が閉じスワイプを検知している間 true。
+    /// これが立っている間は項目タップを無効化し、スワイプがタップ扱いになるのを防ぐ。
+    var suppressesItemTap: Bool = false
     @ObservedObject var appState: MegrumAppState
     var onSelectDestination: (AppDrawerDestination) -> Void
     var onSignOut: () async -> Void
@@ -249,7 +252,7 @@ struct AppDrawerOverlay: View {
     }
 
     private func select(_ destination: AppDrawerDestination) {
-        guard presentationState.canSelectDestination else {
+        guard !suppressesItemTap, presentationState.canSelectDestination else {
             return
         }
         close {
