@@ -6,6 +6,10 @@ import SwiftUI
 struct TradeDetailMessagesSection: View {
     var proposal: TradeProposal
     var messages: [TradeMessage]
+    /// iter1226.463：表示ウィンドウより古いメッセージが残っているか（上端でページング）。
+    var hasOlderMessages: Bool = false
+    /// 上端に到達した時に呼ばれる（親が表示ウィンドウを1ページ分広げる）。
+    var onLoadOlder: () -> Void = {}
     var viewerID: UUID?
     var evaluationState: TradeEvaluationPromptState
     var partnerLastReadAt: Date?
@@ -53,6 +57,15 @@ struct TradeDetailMessagesSection: View {
             if messages.isEmpty, !isLoading {
                 TradeEmptyMessageCard()
             } else {
+                // iter1226.463：上へ遡った時だけ古いページを足す（チャットの定石）。
+                if hasOlderMessages {
+                    ProgressView()
+                        .controlSize(.small)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 6)
+                        .onAppear(perform: onLoadOlder)
+                }
+
                 ForEach(timelineRows) { row in
                     if let dayDividerText = row.dayDividerText {
                         TradeChatTimestampDivider(text: dayDividerText)

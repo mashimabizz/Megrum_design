@@ -22,7 +22,14 @@ public final class MegrumAppState: ObservableObject {
     @Published public internal(set) var homeMutualMatchCandidates: [HomeMutualMatchCandidateData] = []
     @Published public internal(set) var listings: [IndividualListing] = []
     @Published public internal(set) var proposals: [TradeProposal] = []
-    @Published public internal(set) var messagesByProposalID: [UUID: [TradeMessage]] = [:]
+    // iter1226.463：取引チャットも端末側に保持する（アプリを閉じても・オフラインでも表示）。
+    @Published public internal(set) var messagesByProposalID: [UUID: [TradeMessage]] = [:] {
+        didSet {
+            persistTradeMessagesToLocalStore()
+        }
+    }
+    /// 端末キャッシュ書き込みのデバウンス用。
+    var tradeMessagePersistTask: Task<Void, Never>?
     /// 自分が評価済みの proposal ID（サーバー基準）。チャット未読込でも
     /// 「評価待ち」タグ・バッジをサーバーの評価状態で判定するために持つ。
     @Published public internal(set) var viewerEvaluatedProposalIDs: Set<UUID> = []

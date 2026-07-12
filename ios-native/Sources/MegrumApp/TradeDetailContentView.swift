@@ -48,6 +48,15 @@ struct TradeDetailContent: View {
     var onRate: () -> Void
     var onApproveCancel: () -> Void
     @State private var agreementDisclosureRoute: TradeAgreementDisclosureRoute?
+    /// iter1226.463：描画するのは最新N件だけ。上へ遡るたびに1ページ分ずつ広げる
+    /// （めぐりメッセージと同じページング）。
+    @State private var visibleMessageCount = TradeDetailContent.messagePageSize
+    static let messagePageSize = 20
+
+    /// 表示ウィンドウ（最新 visibleMessageCount 件）。
+    private var windowedMessages: [TradeMessage] {
+        Array(messages.suffix(visibleMessageCount))
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -95,7 +104,22 @@ struct TradeDetailContent: View {
                     VStack(spacing: 12) {
                         TradeDetailMessagesSection(
                             proposal: proposal,
-                            messages: messages,
+                            messages: windowedMessages,
+                            hasOlderMessages: messages.count > windowedMessages.count,
+                            onLoadOlder: {
+                                // iter1226.463：上端到達→1ページ分広げ、直前の先頭位置へ無アニメ復元。
+                                guard let anchorID = windowedMessages.first?.id else {
+                                    return
+                                }
+                                visibleMessageCount += TradeDetailContent.messagePageSize
+                                DispatchQueue.main.async {
+                                    var transaction = Transaction()
+                                    transaction.disablesAnimations = true
+                                    withTransaction(transaction) {
+                                        proxy.scrollTo(anchorID, anchor: .top)
+                                    }
+                                }
+                            },
                             viewerID: viewerID,
                             evaluationState: evaluationState,
                             partnerLastReadAt: partnerLastReadAt,
@@ -110,6 +134,17 @@ struct TradeDetailContent: View {
                             onReportMessage: onReportMessage,
                             partnerAvatarURL: heroPresentation.partnerAvatarURL,
                             onJumpToMessage: { messageID in
+                                // 引用元がウィンドウ外（古いページ）ならウィンドウを広げてからジャンプ。
+                                if !windowedMessages.contains(where: { $0.id == messageID }),
+                                   let index = messages.firstIndex(where: { $0.id == messageID }) {
+                                    visibleMessageCount = messages.count - index + TradeDetailContent.messagePageSize / 2
+                                    DispatchQueue.main.async {
+                                        withAnimation(.snappy(duration: 0.3)) {
+                                            proxy.scrollTo(messageID, anchor: .center)
+                                        }
+                                    }
+                                    return
+                                }
                                 withAnimation(.snappy(duration: 0.3)) {
                                     proxy.scrollTo(messageID, anchor: .center)
                                 }
@@ -157,6 +192,10 @@ struct TradeDetailContent: View {
                     if !isLoading {
                         scrollToLatestMessage(proxy, animated: false)
                     }
+                }
+                .onChange(of: proposal.id) { _, _ in
+                    // iter1226.463：別のやりとりへ切り替わったらウィンドウを最新20件へ戻す。
+                    visibleMessageCount = TradeDetailContent.messagePageSize
                 }
             }
         }
