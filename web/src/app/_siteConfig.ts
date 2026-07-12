@@ -97,6 +97,18 @@ export const FOOTER_NAV: NavItem[] = [
   { href: "/operator", label: "運営者情報", enabled: true },
 ];
 
+/**
+ * 指定パス（#アンカー可）の遷移先ページが実装済みかを返す。
+ * 未実装ページ（T2〜で順次）への「詳しく見る」リンクを描画しないために使う。
+ * T3〜で該当ページを実装したら NAV の enabled を true にすればリンクが出る。
+ */
+export function routeEnabled(path: string): boolean {
+  const base = path.split("#")[0];
+  return [...HEADER_NAV, ...FOOTER_NAV].some(
+    (item) => item.href === base && item.enabled,
+  );
+}
+
 // ── メタデータ生成（notes/82 §8） ─────────────────────────────
 export interface PageMetaInput {
   title?: string; // 未指定なら layout の default/template を使う
