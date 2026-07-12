@@ -479,17 +479,14 @@ struct GroomViewerEngagementColumn: View {
 
     var body: some View {
         VStack(spacing: 14) {
-            VStack(spacing: 3) {
-                GroomViewerLikeButton(
-                    isLiked: isLiked,
-                    isEnabled: canLike,
-                    action: onToggleLike,
-                    onLongPress: onOpenLikes
-                )
-                Text("\(likeCount)")
-                    .font(.system(size: 12.5, weight: .black, design: .rounded))
-                    .shadow(color: .black.opacity(0.4), radius: 4, y: 1)
-            }
+            // iter1226.472：いいねアイコン＋数を1つのタップ判定に統合（数字を押しても反応）。
+            GroomViewerLikeButton(
+                isLiked: isLiked,
+                isEnabled: canLike,
+                likeCount: likeCount,
+                action: onToggleLike,
+                onLongPress: onOpenLikes
+            )
 
             if showsComments {
                 VStack(spacing: 3) {
@@ -562,6 +559,7 @@ private struct GroomViewerReplyComposer: View {
 private struct GroomViewerLikeButton: View {
     let isLiked: Bool
     let isEnabled: Bool
+    let likeCount: Int
     let action: () -> Void
     let onLongPress: () -> Void
     @State private var presentationState = GroomViewerLikeButtonPresentationState()
@@ -573,17 +571,28 @@ private struct GroomViewerLikeButton: View {
             }
             action()
         } label: {
-            // 未押下時も枠線と同じ色で中まで塗る（塗り付きハート）。
-            Image(systemName: "heart.fill")
-                .font(.system(size: 30, weight: .heavy))
-                .foregroundStyle(isLiked ? Color.red : GroomViewerEngagementStyle.idleIconColor)
-                .shadow(color: .black.opacity(0.35), radius: 6, y: 1)
-                .scaleEffect(presentationState.likeIconScale)
-                .frame(width: 48, height: 44)
+            // iter1226.472：アイコン＋いいね数をひとまとまりのタップ判定にする。
+            // アイコン・数字のサイズは据え置き。間の余白まで contentShape で拾えるようにして、
+            // いいね数の部分を押しても「いいね」判定になるようにする。
+            VStack(spacing: 3) {
+                // 未押下時も枠線と同じ色で中まで塗る（塗り付きハート）。
+                Image(systemName: "heart.fill")
+                    .font(.system(size: 30, weight: .heavy))
+                    .foregroundStyle(isLiked ? Color.red : GroomViewerEngagementStyle.idleIconColor)
+                    .shadow(color: .black.opacity(0.35), radius: 6, y: 1)
+                    .scaleEffect(presentationState.likeIconScale)
+                    .frame(width: 48, height: 44)
+
+                Text("\(likeCount)")
+                    .font(.system(size: 12.5, weight: .black, design: .rounded))
+                    .shadow(color: .black.opacity(0.4), radius: 4, y: 1)
+            }
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .opacity(isEnabled ? 1 : 0.82)
         .accessibilityLabel(isLiked ? "いいねを取り消す" : "いいね")
+        .accessibilityValue("\(likeCount)")
         .simultaneousGesture(
             LongPressGesture(minimumDuration: 0.45)
                 .onEnded { _ in
