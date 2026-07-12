@@ -69,6 +69,9 @@ struct GroomViewerScreen: View {
     /// 効かないため、キーボード高さを自前で観測して入力欄を持ち上げる。
     @State private var keyboardHeight: CGFloat = 0
     @State private var storyProgress = 0.0
+    /// iter1226.470：先頭セグメント再生中の左タップで進捗タイマーを最初から回し直す
+    /// ためのトークン（インクリメントで runStoryProgress の .task を再起動する）。
+    @State private var storyRestartToken = 0
     /// FB(iter1226.403)：開くトランジション中はデータ取得・進捗ループ・常時演出を止めてカクつきを防ぐ。
     /// スケール拡大アニメ（約0.34s）が落ち着いてから重い処理を始める。
     @State private var isOpeningSettled = false
@@ -319,7 +322,9 @@ struct GroomViewerScreen: View {
                 await appState.loadPublicUserProfile(userID: currentGroom.authorID, reportsFailure: false)
             }
         }
-        .task(id: currentGroom.id) {
+        // iter1226.470：storyRestartToken を id に含め、先頭セグメントの左タップで
+        // 現在のグルームを最初から再生し直せるようにする（groom 変更でも従来どおり再起動）。
+        .task(id: StoryProgressTaskID(groomID: currentGroom.id, restartToken: storyRestartToken)) {
             await waitUntilOpeningSettled()
             guard !Task.isCancelled else { return }
             await runStoryProgress(for: currentGroom.id)
@@ -728,10 +733,37 @@ struct GroomViewerScreen: View {
         #endif
     }
 
+    /// 現在のグルームがその投稿者の一連の先頭（進捗バーの最初のセグメント）か。iter1226.470。
+    private var isAtFirstGroomOfBlock: Bool {
+        let blockRange = GroomViewerAuthorNavigation.authorBlockRange(
+            authorIDs: grooms.map(\.authorID),
+            currentIndex: currentIndex
+        )
+        return currentIndex == blockRange.lowerBound
+    }
+
+    /// 現在のグルームの進捗を最初から再生し直す（storyProgress=0＋タイマー再起動）。iter1226.470。
+    private func restartCurrentStory() {
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            storyProgress = 0
+        }
+        // .task(id:) の restartToken を変え、runStoryProgress を最初から回し直す。
+        storyRestartToken &+= 1
+    }
+
     /// タップ／自動送りで前後のグルームへ移る（iter1226.467：統一遷移＋直列化）。
     /// 投稿者境界では「currentIndex を変えずに回転→完了時に commit」する。
     private func move(by delta: Int, origin: GroomViewerCubeTransition.Origin = .tap) {
         #if canImport(UIKit)
+        // iter1226.470：左タップで、その投稿者の一連の先頭（進捗バーの最初のセグメント）を
+        // 再生中なら、前の投稿者へ戻らず現在のグルームを最初から再生し直す（インスタ準拠）。
+        // 先頭以外の左タップは従来どおり同一投稿者の前のグルームへ戻る。
+        if delta < 0, cubeTransition == nil, isAtFirstGroomOfBlock {
+            restartCurrentStory()
+            return
+        }
         let decision = GroomViewerCubeTransitionPlanner.decideMove(
             authorIDs: grooms.map(\.authorID),
             currentIndex: currentIndex,
@@ -1014,6 +1046,13 @@ enum GroomViewerChromeLayout {
 struct PageTapTouch {
     var id: UUID
     var isConsumed = false
+}
+
+/// iter1226.470：ストーリー進捗タイマーの `.task(id:)` キー。groom 変更でも、
+/// 先頭セグメント左タップによる再生し直し（restartToken 変更）でも再起動する。
+struct StoryProgressTaskID: Hashable {
+    var groomID: UUID
+    var restartToken: Int
 }
 
 /// グルームビューアの1面（画像＋進捗＋名前バー＋いいね/コメント＋メッセージ入力）。iter1226.469。

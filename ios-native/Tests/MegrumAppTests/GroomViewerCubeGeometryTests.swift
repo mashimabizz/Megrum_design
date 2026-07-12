@@ -412,6 +412,22 @@ final class GroomViewerAuthorGroupingTests: XCTestCase {
         // 範囲外は現在位置のみの安全な範囲
         XCTAssertEqual(GroomViewerAuthorNavigation.authorBlockRange(authorIDs: authors, currentIndex: 9), 9..<10)
     }
+
+    /// iter1226.470：先頭セグメント判定＝currentIndex がブロックの lowerBound と一致するか。
+    /// 左タップの「現在グルームを最初から再生し直す」条件（それ以外は前グルームへ）。
+    func testFirstSegmentOfBlockPredicate() {
+        let a = UUID()
+        let b = UUID()
+        let authors = [a, a, b, b, b]
+        func isFirstOfBlock(_ index: Int) -> Bool {
+            index == GroomViewerAuthorNavigation.authorBlockRange(authorIDs: authors, currentIndex: index).lowerBound
+        }
+        XCTAssertTrue(isFirstOfBlock(0))   // 投稿者a の先頭 → 再生し直し
+        XCTAssertFalse(isFirstOfBlock(1))  // a の2件目 → 前グルームへ
+        XCTAssertTrue(isFirstOfBlock(2))   // 投稿者b の先頭 → 再生し直し
+        XCTAssertFalse(isFirstOfBlock(3))  // b の2件目 → 前グルームへ
+        XCTAssertFalse(isFirstOfBlock(4))  // b の3件目 → 前グルームへ
+    }
 }
 
 @MainActor
