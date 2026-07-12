@@ -128,6 +128,18 @@ enum HomeCandidateListingWantedOptionFactory {
         Dictionary(rows.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
     }
 
+    /// iter1226.477：グッズ行から キャラID→表示名 の対応を作る（除外メンバー名の解決に使う）。
+    private static func characterNames(rows: [SupabaseHomeGoodsRow]) -> [UUID: String] {
+        var names: [UUID: String] = [:]
+        for row in rows {
+            guard let id = row.characterId, let name = row.characterName?.nilIfBlank, names[id] == nil else {
+                continue
+            }
+            names[id] = name
+        }
+        return names
+    }
+
     private static func cashWantedOption(
         option: SupabaseHomeListingWishOptionRow,
         logic: ListingLogic
@@ -179,7 +191,13 @@ enum HomeCandidateListingWantedOptionFactory {
             groupID: option.wishGroupId,
             goodsTypeID: option.wishGoodsTypeId,
             conditionSummary: kind == .condition
-                ? Self.conditionSummary(option: option, matchingItems: matchingItems)
+                ? Self.conditionSummary(
+                    option: option,
+                    matchingItems: matchingItems,
+                    // iter1226.477：除外メンバーの具体名を出すため、名前解決元を
+                    // マッチ済み自分グッズだけでなく相手在庫（previewInventory）まで広げる。
+                    characterNamesByID: Self.characterNames(rows: matchingItems + Array(wantedRowsByID.values))
+                )
                 : nil,
             namedPairings: kind == .goods
                 ? Self.namedPairings(
@@ -228,7 +246,8 @@ enum HomeCandidateListingWantedOptionFactory {
     /// グループ・種別名はマッチしたグッズ（同属性）から取り、シリーズは選択肢に保存された文字列を使う。iter1226.371。
     private static func conditionSummary(
         option: SupabaseHomeListingWishOptionRow,
-        matchingItems: [SupabaseHomeGoodsRow]
+        matchingItems: [SupabaseHomeGoodsRow],
+        characterNamesByID: [UUID: String] = [:]
     ) -> String? {
         var parts: [String] = []
         if let groupID = option.wishGroupId,
@@ -242,13 +261,21 @@ enum HomeCandidateListingWantedOptionFactory {
             parts.append(name)
         }
         if !option.wishMemberIds.isEmpty {
-            let names = option.wishMemberIds.compactMap { memberID in
-                matchingItems.first { $0.characterId == memberID }?.characterName?.nilIfBlank
+            // iter1226.477：メンバー名は widened な名前解決元（自分グッズ＋相手在庫）から引く。
+            let resolvedNames = option.wishMemberIds.compactMap { memberID -> String? in
+                characterNamesByID[memberID]
+                    ?? matchingItems.first { $0.characterId == memberID }?.characterName?.nilIfBlank
             }
-            if !names.isEmpty {
-                parts.append((option.excludesWishMembers ? "以外: " : "") + names.joined(separator: "・"))
-            } else if option.excludesWishMembers {
-                parts.append("一部メンバー除く")
+            if option.excludesWishMembers {
+                // 除外は「誰を除くか」を正確に示す必要があるため、全員解決できた時だけ具体名にする。
+                // 一部でも名前不明なら誤解を招くので従来どおり「一部メンバー除く」。
+                if resolvedNames.count == option.wishMemberIds.count, !resolvedNames.isEmpty {
+                    parts.append("以外: " + resolvedNames.joined(separator: "・"))
+                } else {
+                    parts.append("一部メンバー除く")
+                }
+            } else if !resolvedNames.isEmpty {
+                parts.append(resolvedNames.joined(separator: "・"))
             }
         }
         if !option.wishSeriesNames.isEmpty {
