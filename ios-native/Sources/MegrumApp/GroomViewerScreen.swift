@@ -733,13 +733,15 @@ struct GroomViewerScreen: View {
         #endif
     }
 
-    /// 現在のグルームがその投稿者の一連の先頭（進捗バーの最初のセグメント）か。iter1226.470。
-    private var isAtFirstGroomOfBlock: Bool {
+    /// 一連の「最初の投稿者」かつ「最初のセグメント」を再生中か（iter1226.471）。
+    /// = 前の投稿者がいない（ブロック先頭が index 0）かつ そのブロックの先頭。
+    /// この時だけ左タップで頭出しし、それ以外は前のグルーム／前の投稿者へ戻る。
+    private var isAtFirstAuthorFirstSegment: Bool {
         let blockRange = GroomViewerAuthorNavigation.authorBlockRange(
             authorIDs: grooms.map(\.authorID),
             currentIndex: currentIndex
         )
-        return currentIndex == blockRange.lowerBound
+        return blockRange.lowerBound == 0 && currentIndex == blockRange.lowerBound
     }
 
     /// 現在のグルームの進捗を最初から再生し直す（storyProgress=0＋タイマー再起動）。iter1226.470。
@@ -757,10 +759,9 @@ struct GroomViewerScreen: View {
     /// 投稿者境界では「currentIndex を変えずに回転→完了時に commit」する。
     private func move(by delta: Int, origin: GroomViewerCubeTransition.Origin = .tap) {
         #if canImport(UIKit)
-        // iter1226.470：左タップで、その投稿者の一連の先頭（進捗バーの最初のセグメント）を
-        // 再生中なら、前の投稿者へ戻らず現在のグルームを最初から再生し直す（インスタ準拠）。
-        // 先頭以外の左タップは従来どおり同一投稿者の前のグルームへ戻る。
-        if delta < 0, cubeTransition == nil, isAtFirstGroomOfBlock {
+        // iter1226.471：左タップで頭出しするのは「一連の最初の投稿者・最初のセグメント」の
+        // 時だけ（前へ戻る先が無い所）。それ以外は前のグルーム／前の投稿者へ戻る（下の planner）。
+        if delta < 0, cubeTransition == nil, isAtFirstAuthorFirstSegment {
             restartCurrentStory()
             return
         }

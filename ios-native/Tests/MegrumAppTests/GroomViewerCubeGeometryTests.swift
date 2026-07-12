@@ -413,20 +413,21 @@ final class GroomViewerAuthorGroupingTests: XCTestCase {
         XCTAssertEqual(GroomViewerAuthorNavigation.authorBlockRange(authorIDs: authors, currentIndex: 9), 9..<10)
     }
 
-    /// iter1226.470：先頭セグメント判定＝currentIndex がブロックの lowerBound と一致するか。
-    /// 左タップの「現在グルームを最初から再生し直す」条件（それ以外は前グルームへ）。
-    func testFirstSegmentOfBlockPredicate() {
+    /// iter1226.471：左タップで頭出しするのは「最初の投稿者・最初のセグメント」の時だけ。
+    /// ＝前の投稿者がいない（lowerBound==0）かつ そのブロックの先頭。それ以外は前へ戻る。
+    func testFirstAuthorFirstSegmentPredicate() {
         let a = UUID()
         let b = UUID()
         let authors = [a, a, b, b, b]
-        func isFirstOfBlock(_ index: Int) -> Bool {
-            index == GroomViewerAuthorNavigation.authorBlockRange(authorIDs: authors, currentIndex: index).lowerBound
+        func isFirstAuthorFirstSegment(_ index: Int) -> Bool {
+            let range = GroomViewerAuthorNavigation.authorBlockRange(authorIDs: authors, currentIndex: index)
+            return range.lowerBound == 0 && index == range.lowerBound
         }
-        XCTAssertTrue(isFirstOfBlock(0))   // 投稿者a の先頭 → 再生し直し
-        XCTAssertFalse(isFirstOfBlock(1))  // a の2件目 → 前グルームへ
-        XCTAssertTrue(isFirstOfBlock(2))   // 投稿者b の先頭 → 再生し直し
-        XCTAssertFalse(isFirstOfBlock(3))  // b の2件目 → 前グルームへ
-        XCTAssertFalse(isFirstOfBlock(4))  // b の3件目 → 前グルームへ
+        XCTAssertTrue(isFirstAuthorFirstSegment(0))   // 最初の投稿者a の先頭 → 頭出し
+        XCTAssertFalse(isFirstAuthorFirstSegment(1))  // a の2件目 → 前グルームへ
+        XCTAssertFalse(isFirstAuthorFirstSegment(2))  // 投稿者b の先頭 → 前の投稿者へ戻る（頭出ししない）
+        XCTAssertFalse(isFirstAuthorFirstSegment(3))  // b の2件目 → 前グルームへ
+        XCTAssertFalse(isFirstAuthorFirstSegment(4))  // b の3件目 → 前グルームへ
     }
 }
 
