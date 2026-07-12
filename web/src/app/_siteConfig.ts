@@ -17,10 +17,15 @@ export const OFFICE_ADDRESS_LINES = [
   "大阪駅前第2ビル12-12",
 ];
 
-// ── 外部リンク（要オーナー確定：notes/82 §12） ─────────────────
-// TODO(owner): 実際の公式Xハンドルへ差し替え。v1 の主CTA先。
-export const X_URL = "https://x.com/megrum_jp"; // ⚠️ 仮ハンドル。確定まで本番デプロイしない
-// TODO(owner): App Store 公開後に ID を設定（Smart App Banner / DLバッジで使用）。
+// ── 外部リンク ────────────────────────────────────────────────
+// 公式Xハンドル（オーナー確定 2026-07-13）。v1 の主CTA先。
+export const X_URL = "https://x.com/megrum_jp";
+// App Store の数値ID（= App Store Connect の「Apple ID」）。
+// 確認場所: App Store Connect → マイApp → 対象アプリ → App情報 →
+//   「一般情報」内の「Apple ID」（10桁前後の数値）。App/URLの id の後の番号。
+//   アプリレコードを作成した時点で採番され、公開前でも確認できる。
+// 設定すると v1_1 で自動的に App Store DLバッジCTAへ切り替わる
+//   （Smart App Banner の apple-itunes-app にも使用）。
 export const APP_STORE_ID = ""; // 例: "1234567890"
 export const APP_STORE_URL = APP_STORE_ID
   ? `https://apps.apple.com/jp/app/megrum/id${APP_STORE_ID}`
