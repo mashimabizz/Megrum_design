@@ -11,6 +11,8 @@ public final class MegrumAppState: ObservableObject {
     public internal(set) var authenticatedUserID: UUID?
     /// オフラインスナップショット書き込みのデバウンス用。
     var offlineSnapshotPersistTask: Task<Void, Never>?
+    /// 相手プロフィール辞書の端末保存デバウンス用（iter1226.466）。
+    var profileDirectoryPersistTask: Task<Void, Never>?
     /// iter1226.465：直近のデータ取得が通信状態の問題（オフライン・電波弱）で失敗し、
     /// 端末キャッシュ（または空）を表示している状態。ホーム画面でその旨を表示する。
     /// 取得に成功したら false へ戻す。
@@ -67,7 +69,12 @@ public final class MegrumAppState: ObservableObject {
     /// 端末キャッシュ書き込みのデバウンス用。
     var meguriMessagePersistTask: Task<Void, Never>?
     @Published public internal(set) var meguriProfile: MeguriProfile?
-    @Published public internal(set) var meguriProfilesByUserID: [UUID: MeguriProfile] = [:]
+    // iter1226.466：相手のめぐりプロフィールも端末保持（オフラインでも一覧の名前・アバターを表示）。
+    @Published public internal(set) var meguriProfilesByUserID: [UUID: MeguriProfile] = [:] {
+        didSet {
+            persistProfileDirectoryToLocalStore()
+        }
+    }
     @Published public internal(set) var grooms: [GroomPost] = []
     @Published public internal(set) var groomMapPosts: [GroomPost] = []
     /// 地図のパン/ズーム（ビューポート読み込み）で取得したグルームの蓄積（iter1226.433）。
@@ -87,7 +94,12 @@ public final class MegrumAppState: ObservableObject {
     @Published public internal(set) var userOshiSelections: [UserOshiSelection] = []
     @Published public internal(set) var goodsTypes: [GoodsType] = []
     @Published public internal(set) var searchResults: [SearchResultItem] = []
-    @Published public internal(set) var publicProfilesByUserID: [UUID: PublicUserProfile] = [:]
+    // iter1226.466：相手の公開プロフィールも端末保持（取引一覧・めぐりメッセージ一覧の名前/アバター）。
+    @Published public internal(set) var publicProfilesByUserID: [UUID: PublicUserProfile] = [:] {
+        didSet {
+            persistProfileDirectoryToLocalStore()
+        }
+    }
     @Published public internal(set) var publicTradeGoodsByUserID: [UUID: [GoodsItem]] = [:]
     @Published public internal(set) var publicListingsByUserID: [UUID: [IndividualListing]] = [:]
     /// 他人プロフィールのほしいもの（userIDごと）。
@@ -429,6 +441,9 @@ public final class MegrumAppState: ObservableObject {
         // 取引チャット・めぐりメッセージの「一覧ごと」オフライン閲覧ができる。
         // オンライン時はこの後の取得で最新に置き換わる。
         restoreOfflineSnapshotIfAvailable()
+        // iter1226.466：一覧の相手情報（名前・アバター）もオフラインで出せるよう、
+        // セッションを跨いで蓄積した相手プロフィール辞書を復元する。
+        restoreProfileDirectoryIfAvailable()
 
         do {
             // 評価済みIDはスナップショットと並行で取得し、proposals を公開する前に
@@ -612,6 +627,43 @@ public final class MegrumAppState: ObservableObject {
                 return
             }
             MegrumOfflineSnapshotStore.save(payload, userID: userID)
+        }
+    }
+
+    /// iter1226.466：セッション中に読み込んだ相手プロフィール辞書を端末へ保存する。
+    /// 取引一覧・めぐりメッセージ一覧を開いた時に遅延ロードされる相手情報も、
+    /// これで次回オフライン起動時に表示できる。didSet からデバウンス呼び出し。
+    func persistProfileDirectoryToLocalStore() {
+        guard let userID = authenticatedUserID else {
+            return
+        }
+        let payload = ProfileDirectoryLocalStore.Payload(
+            publicProfiles: publicProfilesByUserID,
+            meguriProfiles: meguriProfilesByUserID
+        )
+        profileDirectoryPersistTask?.cancel()
+        profileDirectoryPersistTask = Task.detached(priority: .utility) {
+            try? await Task.sleep(nanoseconds: 500_000_000)
+            guard !Task.isCancelled else {
+                return
+            }
+            ProfileDirectoryLocalStore.save(payload, userID: userID)
+        }
+    }
+
+    /// iter1226.466：端末に保存済みの相手プロフィール辞書を復元する（起動時）。
+    /// 既存（今セッションで取得済み）の値は上書きせず、欠けている相手だけ補完する。
+    func restoreProfileDirectoryIfAvailable() {
+        guard let userID = authenticatedUserID,
+              let payload = ProfileDirectoryLocalStore.load(userID: userID)
+        else {
+            return
+        }
+        if !payload.publicProfiles.isEmpty {
+            publicProfilesByUserID.merge(payload.publicProfiles) { existing, _ in existing }
+        }
+        if !payload.meguriProfiles.isEmpty {
+            meguriProfilesByUserID.merge(payload.meguriProfiles) { existing, _ in existing }
         }
     }
 
