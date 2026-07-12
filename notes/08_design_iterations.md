@@ -4,6 +4,37 @@
 
 ---
 
+## イテレーション1226.468：個別募集メモを「条件のグッズを確認！」の直上へ昇格表示
+
+### 背景・問題意識
+オーナーFB：「個別募集のメモ内容は『条件のグッズを確認！』のブロックの直上に記載してほしい。ホーム画面のマッチ候補の画像を押した後の画面。メモには重要なことが書かれている場合があるため、交換内容を選ぶ時に情報として出しておきたい」。
+
+これまでメモは `HomeCandidateDealAboutSection`（「交換の方法について」折りたたみ）の中に控えめに入っており、既定は畳まれていて読まれにくかった。
+
+### 変更内容
+
+#### `HomeDiscoveryHitDetailSheets.swift`（`HomeGoodsHitDetailSheet`）
+- 条件パターンで「条件のグッズを確認！」ブロック（`HomeConditionSeriesCheckSection`）を出す時、その**直上に**個別募集メモを昇格表示（`HomeListingMemoHighlight` 新規）。ラベン ダー枠＋左アクセントの強調カードで「出品者のメモ」を目立たせる
+- `listingNoteText` / `showsMemoAboveConditionBlock`（メモあり かつ 条件確認ブロックあり）を算出
+
+#### `HomeCandidateDealAboutSection.swift`
+- `showsListingNoteRow: Bool = true` を追加。メモを直上へ昇格した画面では折りたたみ内のメモ行を出さず**重複を防ぐ**（既定 true なので他シート＝Wish/LookingFor は不変）
+
+### 影響範囲
+- ホームのマッチ候補（グッズヒット）詳細シートのうち、条件のグッズ確認が出る候補のみメモを昇格。条件確認ブロックが無い候補（指名/定価）は従来どおり折りたたみ内にメモ表示（選択肢ピル切替で動的に切り替わる）。Wish/探し中シートは不変。
+
+### 確認方法
+- VisualQA：`MEGRUM_VISUAL_QA_INITIAL_SCREEN=candidate-sheet MEGRUM_VISUAL_QA_CANDIDATE_VARIANT=condition` → メモが「条件：…／条件のグッズを確認！」の直上に出て、下の折りたたみには重複しないことをスクショ確認
+- `variant=named` → 昇格メモ無し・折りたたみ内にメモ保持（消えない）ことを確認
+
+### セルフレビュー結果
+- ✅ ブランドカラー直書きなし（`MegrumTheme.lavender`/`.ink` 使用）。iOS標準の角丸カード・SF Symbol
+- ✅ 全テストパス、SwiftPMビルド・シミュレータVisualQA・実機（iPhone 15）インストール済み
+- ✅ 重複表示なし（`showsListingNoteRow` で抑止）。他シートは default 引数で不変
+- ✅ notes/09・10は状態/用語変更なしのため据え置き
+
+---
+
 ## イテレーション1226.467：グルームビューアのタップ切替キューブ回転を滑らかに（経路差の解消）
 
 ### 背景・問題意識

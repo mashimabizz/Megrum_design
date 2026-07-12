@@ -11,6 +11,9 @@ struct HomeCandidateDealAboutSection: View {
     var paymentSummaryText: String
     var exchangeCalendarContext: HomePartnerExchangeCalendarContext?
     var listingNote: String?
+    /// iter1226.468：メモを「条件のグッズを確認！」の直上へ昇格表示する画面では、
+    /// この折りたたみ内の重複表示を抑止する（false でメモ行を出さない）。
+    var showsListingNoteRow: Bool = true
     var listingUpdatedAt: Date?
     var goodsUpdatedAt: Date?
     /// 「交換内容を確認する」が有効になったか。true になった瞬間に自動展開する（iter1226.384 / FB7-3）。
@@ -35,7 +38,7 @@ struct HomeCandidateDealAboutSection: View {
                     HomePaymentBox(summaryText: paymentSummaryText)
                 }
 
-                if let note = listingNote?.nilIfBlank {
+                if showsListingNoteRow, let note = listingNote?.nilIfBlank {
                     HomeCandidateAboutNoteRow(note: note)
                 }
 

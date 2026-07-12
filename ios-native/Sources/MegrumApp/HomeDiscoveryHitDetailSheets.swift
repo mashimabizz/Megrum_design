@@ -72,6 +72,11 @@ struct HomeGoodsHitDetailSheet: View {
 
                 // 条件パターンは「条件のグッズを確認！」（参考画像 or 画像検索）を続けて出す。
                 if let seriesCheck = selectionContext.conditionSeriesCheckModel() {
+                    // FB(iter1226.468)：メモには重要なことが書かれている場合があるため、交換内容を
+                    // 選ぶこの画面では「条件のグッズを確認！」ブロックの直上にメモを昇格表示する。
+                    if let listingNoteText {
+                        HomeListingMemoHighlight(note: listingNoteText)
+                    }
                     HomeConditionSeriesCheckSection(model: seriesCheck)
                 }
             } else {
@@ -90,6 +95,7 @@ struct HomeGoodsHitDetailSheet: View {
                     ownerName: selection.goods.ownerSummary?.displayName
                 ),
                 listingNote: selection.individualListingSelection.listingNote,
+                showsListingNoteRow: !showsMemoAboveConditionBlock,
                 listingUpdatedAt: selection.individualListingSelection.listingUpdatedAt,
                 goodsUpdatedAt: selection.goods.updatedAt,
                 isReadyToConfirm: selectionContext.canStartProposal
@@ -133,6 +139,17 @@ struct HomeGoodsHitDetailSheet: View {
             selectionState: selectionState,
             focusedWantedOptionID: focusedWantedOptionID
         )
+    }
+
+    /// 個別募集メモ（空白は無視）。iter1226.468。
+    private var listingNoteText: String? {
+        selection.individualListingSelection.listingNote?.nilIfBlank
+    }
+
+    /// メモを「条件のグッズを確認！」ブロックの直上へ昇格表示するか。
+    /// 条件のグッズ確認ブロックが出る画面でのみ昇格し、下の折りたたみ内では重複させない（iter1226.468）。
+    private var showsMemoAboveConditionBlock: Bool {
+        listingNoteText != nil && selectionContext.conditionSeriesCheckModel() != nil
     }
 
     /// 個別募集の選択肢が無い候補（旧フォールバック）用の選択UI。取引ブロックが使えない時だけ表示。
@@ -368,5 +385,45 @@ struct HomeGoodsHitDetailSheet: View {
             return receiverGoods
         }
         return proposalSelection.receiverGoods.map { [$0] } ?? [selection.goods]
+    }
+}
+
+/// iter1226.468：個別募集メモを「条件のグッズを確認！」の直上へ昇格表示する強調カード。
+/// メモには当日の可否や注意など重要事項が書かれる場合があるため、交換内容を選ぶ段階で
+/// はっきり読めるようにする（折りたたみ内の控えめ表示から独立させた）。
+private struct HomeListingMemoHighlight: View {
+    var note: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            RoundedRectangle(cornerRadius: 2, style: .continuous)
+                .fill(MegrumTheme.lavender.opacity(0.55))
+                .frame(width: 3)
+
+            VStack(alignment: .leading, spacing: 5) {
+                HStack(spacing: 6) {
+                    Image(systemName: "text.alignleft")
+                    Text("出品者のメモ")
+                }
+                .font(.system(size: 12.5, weight: .black, design: .rounded))
+                .foregroundStyle(MegrumTheme.lavender)
+
+                Text(note)
+                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    .foregroundStyle(MegrumTheme.ink.opacity(0.82))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 11)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(MegrumTheme.lavender.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(MegrumTheme.lavender.opacity(0.18), lineWidth: 1)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("出品者のメモ。\(note)")
     }
 }
