@@ -2,23 +2,21 @@ import Image from "next/image";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-export const SITE_URL = "https://megrum.jp";
-export const CONTACT_EMAIL = "support@megrum.jp";
-export const OFFICE_ADDRESS_LINES = [
-  "〒530-0001",
-  "大阪府大阪市北区梅田1丁目2番2号",
-  "大阪駅前第2ビル12-12",
-];
+import { PrimaryCta } from "./_cta";
+import {
+  CONTACT_EMAIL,
+  FOOTER_NAV,
+  HEADER_NAV,
+  OFFICE_ADDRESS_LINES,
+  SITE_URL,
+} from "./_siteConfig";
 
-const navItems = [
-  { href: "/", label: "Megrum" },
-  { href: "/operator", label: "運営者情報" },
-  { href: "/privacy", label: "プライバシー" },
-  { href: "/support", label: "サポート" },
-  { href: "/terms", label: "利用規約" },
-];
+// 既存ページ（robots/sitemap/operator/terms/privacy/support）の import 互換を維持。
+// 実体は _siteConfig に集約し、ここからは再エクスポートする。
+export { SITE_URL, CONTACT_EMAIL, OFFICE_ADDRESS_LINES };
 
 export function SiteHeader() {
+  const navItems = HEADER_NAV.filter((item) => item.enabled);
   return (
     <header className="absolute left-0 right-0 top-0 z-30">
       <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-5 py-5">
@@ -35,23 +33,30 @@ export function SiteHeader() {
             Megrum
           </span>
         </Link>
-        <nav className="hidden items-center gap-1 rounded-full border border-white/70 bg-white/80 px-2 py-2 shadow-[0_12px_36px_rgba(58,50,74,0.08)] backdrop-blur sm:flex">
-          {navItems.slice(1).map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="rounded-full px-3 py-2 text-[12px] font-bold text-slate-700 transition hover:bg-megrum-lavender/10 hover:text-violet-700"
-            >
-              {item.label}
-            </Link>
-          ))}
-        </nav>
+        <div className="flex items-center gap-3">
+          {navItems.length > 0 && (
+            <nav className="hidden items-center gap-1 rounded-full border border-white/70 bg-white/80 px-2 py-2 shadow-[0_12px_36px_rgba(58,50,74,0.08)] backdrop-blur sm:flex">
+              {navItems.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className="rounded-full px-3 py-2 text-[12px] font-bold text-slate-700 transition hover:bg-megrum-lavender/10 hover:text-violet-700"
+                >
+                  {item.label}
+                </Link>
+              ))}
+            </nav>
+          )}
+          {/* 主CTAはモバイルでも常に到達可能にする（notes/82 §5） */}
+          <PrimaryCta placement="header" size="sm" />
+        </div>
       </div>
     </header>
   );
 }
 
 export function SiteFooter() {
+  const links = FOOTER_NAV.filter((item) => item.enabled);
   return (
     <footer className="border-t border-slate-200 bg-white">
       <div className="mx-auto grid w-full max-w-6xl gap-8 px-5 py-10 md:grid-cols-[1.2fr_1fr]">
@@ -69,17 +74,17 @@ export function SiteFooter() {
                 Megrum
               </p>
               <p className="mt-1 text-[12px] font-semibold text-slate-500">
-                推し活グッズの現地交換アプリ
+                推し活グッズの交換アプリ（現地・郵送）
               </p>
             </div>
           </div>
           <p className="mt-5 max-w-xl text-[13px] font-medium leading-7 text-slate-600">
-            Megrumは、グッズ登録、wish、打診、取引チャット、現地交換の合流支援を扱うiOSアプリです。
-            サービスに関する問い合わせ、プライバシーに関する請求、通報相談はサポート窓口で受け付けます。
+            Megrumは、マイグッズとほしいものの登録、譲・求のシェア画像づくり、打診、取引チャット、現地交換・郵送交換の合流支援を扱うiOSアプリです。
+            問い合わせ、プライバシーに関する請求、通報相談はサポート窓口で受け付けます。
           </p>
         </div>
-        <div className="grid grid-cols-2 gap-4 text-[13px] font-bold text-slate-700 sm:grid-cols-4 md:grid-cols-2">
-          {navItems.map((item) => (
+        <div className="grid grid-cols-2 gap-4 text-[13px] font-bold text-slate-700 sm:grid-cols-3 md:grid-cols-2">
+          {links.map((item) => (
             <Link
               key={item.href}
               href={item.href}
@@ -113,6 +118,39 @@ export function PublicPage({ children }: { children: ReactNode }) {
   );
 }
 
+/** eyebrow + 見出し + 説明の共通ヘッダーブロック（Section と単体の両方で使う）。 */
+export function SectionHeading({
+  eyebrow,
+  title,
+  description,
+  as: Heading = "h2",
+}: {
+  eyebrow?: string;
+  title: string;
+  description?: string;
+  as?: "h2" | "h3";
+}) {
+  const titleClass =
+    Heading === "h2"
+      ? "mt-3 text-[30px] font-black leading-tight tracking-normal text-slate-950 md:text-[42px]"
+      : "mt-3 text-[22px] font-black leading-tight tracking-normal text-slate-950 md:text-[28px]";
+  return (
+    <div className="max-w-3xl">
+      {eyebrow && (
+        <p className="text-[12px] font-black uppercase tracking-normal text-violet-700">
+          {eyebrow}
+        </p>
+      )}
+      <Heading className={titleClass}>{title}</Heading>
+      {description && (
+        <p className="mt-4 text-[15px] font-medium leading-8 text-slate-600 md:text-[16px]">
+          {description}
+        </p>
+      )}
+    </div>
+  );
+}
+
 export function Section({
   id,
   eyebrow,
@@ -127,26 +165,117 @@ export function Section({
   children: ReactNode;
 }) {
   return (
-    <section id={id} className="px-5 py-16 md:py-20">
+    <section id={id} className="scroll-mt-24 px-5 py-16 md:py-20">
       <div className="mx-auto w-full max-w-6xl">
-        <div className="max-w-3xl">
-          {eyebrow && (
-            <p className="text-[12px] font-black uppercase tracking-normal text-violet-700">
-              {eyebrow}
-            </p>
-          )}
-          <h2 className="mt-3 text-[30px] font-black leading-tight tracking-normal text-slate-950 md:text-[42px]">
-            {title}
-          </h2>
-          {description && (
-            <p className="mt-4 text-[15px] font-medium leading-8 text-slate-600 md:text-[16px]">
-              {description}
-            </p>
-          )}
-        </div>
+        <SectionHeading eyebrow={eyebrow} title={title} description={description} />
         {children}
       </div>
     </section>
+  );
+}
+
+/**
+ * アプリのスクショ枠（notes/82 §5・§7）。端末モック枠は自作せず角丸＋影のみ。
+ * src 未指定なら納品前プレースホルダ（アスペクト比を保った箱）を出す。
+ */
+export function Screenshot({
+  src,
+  alt,
+  width = 390,
+  height = 844,
+  priority = false,
+  placeholderLabel,
+  ratio = "390 / 844",
+  className = "",
+}: {
+  src?: string;
+  alt: string;
+  width?: number;
+  height?: number;
+  priority?: boolean;
+  placeholderLabel?: string;
+  ratio?: string;
+  className?: string;
+}) {
+  const frame =
+    "overflow-hidden rounded-[28px] border border-white/70 bg-white shadow-[0_28px_80px_rgba(58,50,74,0.18)]";
+  if (src) {
+    return (
+      <div className={[frame, className].filter(Boolean).join(" ")}>
+        <Image
+          src={src}
+          alt={alt}
+          width={width}
+          height={height}
+          priority={priority}
+          className="h-auto w-full"
+        />
+      </div>
+    );
+  }
+  return (
+    <div
+      role="img"
+      aria-label={alt}
+      style={{ aspectRatio: ratio }}
+      className={[
+        frame,
+        "grid place-items-center bg-gradient-to-b from-megrum-lavender/10 to-megrum-sky/10",
+        className,
+      ]
+        .filter(Boolean)
+        .join(" ")}
+    >
+      <span className="px-6 text-center text-[12px] font-bold text-slate-400">
+        {placeholderLabel ?? "スクリーンショット（納品待ち）"}
+      </span>
+    </div>
+  );
+}
+
+/** よくある質問（native details＝ゼロJS・アクセシブル・SSG向き）。 */
+export function FaqList({
+  items,
+}: {
+  items: { q: string; a: ReactNode }[];
+}) {
+  return (
+    <div className="mt-8 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+      {items.map((item, index) => (
+        <details
+          key={index}
+          className="group border-t border-slate-100 first:border-t-0 open:bg-megrum-lavender/[0.04]"
+        >
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 text-[15px] font-bold text-slate-900 [&::-webkit-details-marker]:hidden">
+            <span>{item.q}</span>
+            <span
+              aria-hidden="true"
+              className="grid size-6 shrink-0 place-items-center rounded-full border border-slate-300 text-slate-500 transition group-open:rotate-45 group-open:border-megrum-lavender group-open:text-violet-700"
+            >
+              +
+            </span>
+          </summary>
+          <div className="px-5 pb-5 text-[14px] font-medium leading-7 text-slate-600">
+            {item.a}
+          </div>
+        </details>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * JSON-LD 構造化データ（Next 16 公式パターン）。
+ * XSS 対策で "<" を < へ置換してから埋め込む。
+ */
+export function JsonLd({ data }: { data: Record<string, unknown> }) {
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{
+        __html: JSON.stringify(data).replace(/</g, "\\u003c"),
+      }}
+    />
   );
 }
 

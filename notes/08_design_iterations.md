@@ -4,6 +4,52 @@
 
 ---
 
+## イテレーション1226.479：公式サイトT1 — 公開ページ共通基盤の整備
+
+### 背景・問題意識
+`notes/82` WBS の T1（公開ページ共通基盤）を実装。後続 T2〜（各ページ実装）が参照する、CTA・ナビ・フェーズ設定・計測境界・スクショ枠・FAQ・OGP/JSON-LD ヘルパを整備する。web/ のみ（管理者/公開サイト用途）。
+
+### 変更内容
+
+#### `web/src/app/_analytics.ts`（新規）
+- 計測境界（`notes/82` §6-1）。固定イベント名 union（cta_app_store_click / cta_x_follow_click / feature_detail_click / article_open / article_related_click / article_cta_click）と `track()`／`withCampaign()`
+- ⚠️ Vercel Analytics 本体は未配線（本番 no-op）。Privacy追記＋外部サービス台帳記載後に有効化（§8・§12-3・`notes/63` 未説明外部解析No-Go）
+
+#### `web/src/app/_siteConfig.ts`（新規）
+- 単一設定ソース：`SITE_URL`/`CONTACT_EMAIL`/`OFFICE_ADDRESS_LINES`、`LAUNCH_PHASE`（v1）、`primaryCta()`（フェーズ連動：v1=公式Xフォロー／v1_1=App Store）、`HEADER_NAV`/`FOOTER_NAV`（enabled ゲートで未実装ページのリンク切れ回避）、`buildMetadata()`、`softwareApplicationJsonLd()`
+- ⚠️ `X_URL` は仮ハンドル・`APP_STORE_ID` 未設定（要オーナー確定・本番前に差し替え）
+
+#### `web/src/app/_cta.tsx`（新規・client）
+- フェーズ連動の主CTA（`PrimaryCta`/`PrimaryCtaBlock`）。click時に `track()`。href未確定なら非描画。X/Appleアイコン内蔵。ブランドグラデ（lavender→sky）・rounded-[14px]
+
+#### `web/src/app/_publicComponents.tsx`（拡張）
+- config再エクスポートで既存import（robots/sitemap/operator/terms/privacy/support）の互換維持
+- `SiteHeader` を enabled ナビ＋主CTA（モバイルでも到達可）へ更新。`SiteFooter` を §4-9 構成へ（用語を `notes/10` 準拠に：マイグッズ/ほしいもの/譲・求のシェア画像/現地・郵送）
+- 追加：`Screenshot`（端末モック自作せず角丸+影・納品前プレースホルダ対応）／`FaqList`（native details＝ゼロJS）／`SectionHeading`／`JsonLd`（Next16公式パターン・XSS対策）
+
+#### `.claude/launch.json`
+- web dev サーバ設定（`npm --prefix web run dev` / port 3000）を追加
+
+### 影響範囲
+- 公開サイトの全ページ（ヘッダ/フッタ共通）。既存法務ページ・home プレースホルダは表示互換維持
+- web/ のみ＝EAS Update / iOS Preview 反映は不要
+
+### 確認方法
+- `npx tsc --noEmit` → exit 0
+- `npx eslint`（対象4ファイル）→ 0 errors 0 warnings
+- dev（`npm --prefix web run dev`）：home/terms/operator = HTTP 200、console エラーなし
+- 描画確認：ヘッダに主CTA「公式Xをフォロー」（v1）表示、フッタは enabled 法務リンク＋mailto、未実装ページ（/features等）へのリンクは非表示、terms でもヘッダCTA共通表示（スクショ取得）
+
+### セルフレビュー結果
+- ✅ ブランドカラー：`megrum-*` トークン使用（HEX直書きは既存スクショ影のrgbaのみ＝新規箇所も既存に踏襲）
+- ✅ CTA/URL/フェーズを1設定（_siteConfig）へ集約（`notes/82` §10）。ページ別直書きなし
+- ✅ 計測は境界のみ実装し外部解析タグ未読込（notes/63 準拠）。フォントは next/font self-host 継続
+- ✅ 用語 `notes/10` 準拠。CTAは v1=公式Xフォローのみ（`notes/82` §6・§12-9のGo条件前の価格/購入導線は未実装）
+- ⚠️ 要オーナー確定：公式Xハンドル（`X_URL` 仮）・App Store ID。本番デプロイ前に差し替え必須
+- ⏭️ 未着手：T2以降（各ページ実装）。enabled フラグは各ページ実装時に true 化
+
+---
+
 ## イテレーション1226.478：HP仕様T0照合＋オーナー決定反映＋収益/マーケ整合
 
 ### 背景・問題意識
