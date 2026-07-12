@@ -22,10 +22,15 @@ struct MeguriMessageList: View {
         GeometryReader { proxy in
             ScrollView {
                 LazyVStack(spacing: 12) {
-                    if isLoading {
-                        MeguriMessageLoadingRow()
-                    } else if messages.isEmpty {
-                        MeguriMessageEmptyState()
+                    // 既にキャッシュ済みのやりとりがある時は、裏側の再取得中でも
+                    // ローディング行へ差し替えず会話をそのまま表示し続ける
+                    // （開いた瞬間に「表示→ローディング→再表示」の点滅を防ぐ）。
+                    if messages.isEmpty {
+                        if isLoading {
+                            MeguriMessageLoadingRow()
+                        } else {
+                            MeguriMessageEmptyState()
+                        }
                     } else {
                         ForEach(Array(messages.enumerated()), id: \.element.id) { index, message in
                             if ChatTimestampFormatter.startsNewDay(
