@@ -2,7 +2,7 @@ import Foundation
 import MegrumCore
 import MegrumData
 
-public struct MegrumAppSnapshot: Sendable {
+public struct MegrumAppSnapshot: Codable, Sendable {
     public var viewer: UserProfile
     public var inventory: [GoodsItem]
     public var wishes: [WishItem]

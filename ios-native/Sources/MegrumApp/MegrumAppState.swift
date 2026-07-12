@@ -5,6 +5,12 @@ import MegrumCore
 @MainActor
 public final class MegrumAppState: ObservableObject {
     @Published public internal(set) var viewer: UserProfile?
+    /// 認証済みユーザーID（`replaceRepository` 経由で受け取る）。オフライン起動時に
+    /// `viewer` がまだ無い状態でも端末キャッシュ（`MegrumOfflineSnapshotStore`）を
+    /// 特定・復元するために保持する（iter1226.464）。
+    public internal(set) var authenticatedUserID: UUID?
+    /// オフラインスナップショット書き込みのデバウンス用。
+    var offlineSnapshotPersistTask: Task<Void, Never>?
     /// 初回ガイドツアー実行中フラグ。広告・共有プロンプト・位置情報・通知遷移などの
     /// 割り込みを抑制するために深い階層からも参照する（`setTutorialActive` で更新）。
     @Published public internal(set) var isTutorialActive = false
@@ -414,6 +420,12 @@ public final class MegrumAppState: ObservableObject {
         isLoading = true
         errorMessage = nil
 
+        // iter1226.464：ネットワーク取得の前に端末キャッシュから一覧を即復元する。
+        // オフライン起動でもここで viewer / proposals / めぐりメッセージ一覧が揃うため、
+        // 取引チャット・めぐりメッセージの「一覧ごと」オフライン閲覧ができる。
+        // オンライン時はこの後の取得で最新に置き換わる。
+        restoreOfflineSnapshotIfAvailable()
+
         do {
             // 評価済みIDはスナップショットと並行で取得し、proposals を公開する前に
             // 反映する。後から反映するとやりとりバッジが「開いた直後だけ多い→減る」
@@ -433,11 +445,19 @@ public final class MegrumAppState: ObservableObject {
             await loadMeguriMessages(reportsFailure: false)
             await preloadTradeMessages()
             await preloadTradeEvidencePhotos()
+            // iter1226.464：取得できた最新スナップショットを端末へ保存し、次回オフライン
+            // 起動時に一覧を復元できるようにする（相手プロフィール辞書も含めて保存）。
+            persistOfflineSnapshot(snapshot)
         } catch {
             #if DEBUG
             print("MEGRUM_DEBUG_SNAPSHOT error: \(error)")
             #endif
-            errorMessage = "データを読み込めませんでした"
+            // オフライン等で最新取得に失敗しても、端末キャッシュを復元済み（viewer あり）なら
+            // 一覧はそのまま見られる（めぐりメッセージ一覧は restoreOfflineSnapshotIfAvailable
+            // で復元済み）。致命的エラー表示は「見せられる中身が何も無い」時だけ。
+            if viewer == nil {
+                errorMessage = "データを読み込めませんでした"
+            }
         }
 
         isLoading = false
@@ -499,9 +519,13 @@ public final class MegrumAppState: ObservableObject {
 
     public func replaceRepository(
         _ repository: any MegrumRepository,
+        authenticatedUserID: UUID? = nil,
         reloadsInitialData: Bool = true
     ) async {
         self.repository = repository
+        if let authenticatedUserID {
+            self.authenticatedUserID = authenticatedUserID
+        }
         guard reloadsInitialData else {
             return
         }
@@ -530,6 +554,51 @@ public final class MegrumAppState: ObservableObject {
         likedGroomIDs = state.likedGroomIDs
         threads = state.threads
         subscriptionState = state.subscriptionState
+    }
+
+    /// iter1226.464：オフライン起動時などで `viewer` がまだ無い時に、端末に保存した
+    /// アプリ全体スナップショットを復元して一覧を即表示する。オンライン時は直後の
+    /// ネットワーク取得で最新に置き換わるため、ここでの復元は「初期表示」の役割。
+    func restoreOfflineSnapshotIfAvailable() {
+        // すでに中身がある（再同期など）なら、キャッシュで上書きしない。
+        guard viewer == nil else {
+            return
+        }
+        guard let userID = authenticatedUserID,
+              let payload = MegrumOfflineSnapshotStore.load(userID: userID)
+        else {
+            return
+        }
+        apply(payload.snapshot)
+        // 一覧の表示名・アバターに使う相手プロフィール辞書も復元する。
+        publicProfilesByUserID.merge(payload.publicProfiles) { _, cached in cached }
+        meguriProfilesByUserID.merge(payload.meguriProfiles) { _, cached in cached }
+        // めぐりメッセージ一覧（テキストのやりとり）は別ストアから復元する。
+        if meguriMessages.isEmpty {
+            let cached = MeguriMessageLocalStore.load(viewerID: userID)
+            if !cached.isEmpty {
+                meguriMessages = cached
+            }
+        }
+    }
+
+    /// iter1226.464：取得できた最新スナップショットを端末へ保存する（次回オフライン起動用）。
+    func persistOfflineSnapshot(_ snapshot: MegrumAppSnapshot) {
+        let userID = snapshot.viewer.id
+        authenticatedUserID = userID
+        let payload = MegrumOfflineSnapshotStore.Payload(
+            snapshot: snapshot,
+            publicProfiles: publicProfilesByUserID,
+            meguriProfiles: meguriProfilesByUserID
+        )
+        offlineSnapshotPersistTask?.cancel()
+        offlineSnapshotPersistTask = Task.detached(priority: .utility) {
+            try? await Task.sleep(nanoseconds: 400_000_000)
+            guard !Task.isCancelled else {
+                return
+            }
+            MegrumOfflineSnapshotStore.save(payload, userID: userID)
+        }
     }
 
     private func applyHomeCandidateSections(_ sections: HomeCandidateSections, fallbackInventory: [GoodsItem]) {

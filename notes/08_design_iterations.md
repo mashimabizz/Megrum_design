@@ -4,6 +4,36 @@
 
 ---
 
+## イテレーション1226.464：オフライン起動でも一覧（取引・めぐりメッセージ）を開けるようにする
+
+### 背景・問題意識
+オーナーFB：「オフライン状態だとログインができません。なので取引チャットやめぐりメッセージを見ることができません。オフライン状態でも開けるようにしてください。また一覧ごとオフラインで開きたい」。
+
+調査結果：ログインセッションは Keychain（`KeychainAuthSessionStore`）から起動時に復元されるため `isAuthenticated` はオフラインでも true になり、認証自体は通っていた。真因は別で、
+1. 起動時の `loadInitialData()` が最初の `loadInitialSnapshot()`（ネットワーク）でthrow→catchに飛び、**その後のキャッシュ復元処理（`loadMeguriMessages` 等）に一切到達しない**
+2. その結果 `viewer` が nil のままになり、`viewer` を前提とする一覧（`meguriMessageThreads` は `guard let viewer else { return [] }`）や取引一覧（`proposals`）がすべて空になる
+3. セッション期限切れ時の `refreshSessionIfNeeded` がオフラインで「ログイン情報を更新できません…」バナーを出し、「ログインできない」ように見えていた
+
+### 変更内容
+- **アプリ全体スナップショットの端末キャッシュ**（`MegrumOfflineSnapshotStore` 新規）：`MegrumAppSnapshot`（viewer/inventory/wishes/listings/proposals/grooms/threads/subscriptionState）＋相手プロフィール辞書（public/meguri）を認証ユーザーID単位でJSON保存（iOSはファイル保護付き）。`MegrumAppSnapshot` を `Codable` 化
+- **オフライン即時復元**：`loadInitialData` 冒頭で `viewer == nil` の時だけ `restoreOfflineSnapshotIfAvailable()` を呼び、`apply()`＋プロフィール辞書マージ＋めぐりメッセージ端末キャッシュ復元。オフラインでも取引一覧・めぐりメッセージ一覧が即表示される（オンライン時は直後の取得で最新へ置換）
+- **最新スナップショットの保存**：取得成功後に `persistOfflineSnapshot(snapshot)`（デバウンスの detached 書き込み）
+- **catchの非致命化**：最新取得に失敗しても、キャッシュ復元済み（`viewer != nil`）なら「データを読み込めませんでした」を出さない
+- **認証ユーザーIDの受け渡し**：`replaceRepository(_:authenticatedUserID:reloadsInitialData:)` に引数追加。`MegrumRootView` から `authState.session?.user.id` を渡す（viewer 未確定でもキャッシュを特定できる）
+- **オフライン時のセッション保持**：`refreshSessionIfNeeded` の接続エラー分岐でバナーを出さず、セッションを維持して静かに続行（400-403の失効時のみ従来通りサインインへ）
+
+### 影響範囲
+- 起動フロー（`loadInitialData` / `replaceRepository` / `MegrumRootView.syncRepositoryWithAuthSession`）、認証（`refreshSessionIfNeeded`）。取引チャット一覧・めぐりメッセージ一覧のオフライン表示。テキストのやりとり本体は既存の `TradeMessageLocalStore` / `MeguriMessageLocalStore` が保持（.462/.463）。
+
+### セルフレビュー結果
+- ✅ 全25 suite/テストパス（`MegrumOfflineSnapshotStore` 往復テスト追加）、SwiftPMビルド成功、xcodebuild（device/Debug）成功・**実機インストール済み**
+- ✅ iOS標準：セッションは Keychain 復元のまま（独自認証を足さない）。一覧はネットワーク→端末キャッシュのフォールバック方式で、UI構造は不変
+- ✅ 用語「取引チャット」「めぐりメッセージ」は notes/10 の正式用語
+- ⚠️ 実機確認：機内モードでアプリを再起動→ログイン画面に落ちず、取引チャット一覧・めぐりメッセージ一覧＋各やりとりが見えるか。相手名/アバターはキャッシュ済みプロフィールで表示（未キャッシュ分はフォールバック表示）
+- ⚠️ 画像など署名URLの実体はオフラインでは取得不可（テキストと一覧構造のみ保証）
+
+---
+
 ## イテレーション1226.463：取引チャットにもページング・初回20件・端末保持（オフライン表示）を反映
 
 ### 背景・問題意識

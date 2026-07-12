@@ -373,6 +373,7 @@ public struct MegrumRootView: View {
         await authState.refreshSessionIfNeeded()
         await appState.replaceRepository(
             MegrumAppStateFactory.repository(authSession: authState.session),
+            authenticatedUserID: authState.session?.user.id,
             reloadsInitialData: reloadsInitialData
         )
         // アプリアイコンのバッジ（未読通知数）を起動直後から反映できるよう、
