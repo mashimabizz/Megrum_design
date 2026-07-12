@@ -4,6 +4,38 @@
 
 ---
 
+## イテレーション1226.467：グルームビューアのタップ切替キューブ回転を滑らかに（経路差の解消）
+
+### 背景・問題意識
+オーナーFB：「グルームビューアの『タップで投稿者が切り替わる時』のキューブ回転を滑らかにして」。スワイプは滑らかなのにタップだけカクついていた。
+
+原因（経路差）：
+- スワイプは現在面と切替先面をSwiftUIで同時描画し `cubeDragProgress` を更新する滑らかな経路。
+- タップは `captureViewerSnapshot()`（`UIGraphicsImageRenderer` + `window.drawHierarchy` の全画面ラスタライズ）を**同期実行**し、かつ**回転開始前に `currentIndex` を変更**していた。この全画面ラスタライズと、index先行変更による `.task`再発火・story進捗リセット・画面全体の再評価がカクつきの主因。
+- 3Dジオメトリではなく経路差の問題なので、タップをスワイプと同じ描画経路へ寄せる。
+
+### 変更内容
+- **統一遷移状態**（`GroomViewerCubeTransition` 新規ファイル・UIKit非依存）：`sourceIndex / targetIndex / direction / progress / origin(gesture|tap|automatic) / id`。タップ・スワイプ・自動送りを1つの状態で扱う。純粋ロジック `GroomViewerCubeTransitionPlanner`（`decideMove` / `swipeCommits`）をViewから切り出しテスト可能にした
+- **削除**：`captureViewerSnapshot()` / `GroomViewerCubeSnapshotFace` / `GroomViewerCubeSpin` / `GroomViewerCubeDrag` / `startCubeSpin` と `cubeSpin/cubeProgress/cubeDrag/cubeDragProgress` state。全画面ラスタライズを回転経路から完全に外した
+- **タップ（投稿者境界）**：`currentIndex` を先に変えず、source=currentIndex / target=nextIndex の遷移をprogress=0で作り、source面(outgoing)・target面(incoming)を**実ビュー**で同時描画。progressを0→1へアニメーション。完了後、アニメ無しの同一Transactionで `currentIndex=target` に確定し遷移解除
+- **スワイプ**：同じ遷移状態で指追従・確定/キャンセルを維持（挙動不変）
+- **直列化**：回転中の追加タップは planner が `.ignore`、横ドラッグは origin判定で無視。二重遷移しない
+- **story進捗のpause**：`isCubeDragActive` → `isCubeTransitionActive`（全遷移中に拡大）
+- **先読み**：遷移開始時に切替先画像をprefetch（ネットワーク完了は待たずタップ応答を遅らせない）
+- **維持**：animationDuration 0.16s / pageTapGestureの90ms待ち / mark viewed・engagement/profile取得・story再開は遷移完了後に自然発火 / 同一投稿者は即切替 / Reduce Motionは即切替 / 閉じる・左右方向・下スワイプ・メッセージ入力・いいね・進捗バーの意味は不変
+
+### 影響範囲
+- グルームビューア（`GroomViewerScreen`）の投稿者切替のみ。画像・アバターは既存メモリキャッシュ（`GroomImageMemoryStore`）から同期表示するため、両面とも実ビューでも旧画像のチラつきは出ない。
+
+### セルフレビュー結果
+- ✅ 全1596 XCTestパス（planner判定テスト追加：境界タップで即commitしない/完了時targetへ1回commit/同一投稿者即/ReduceMotion即/未settled即/連打で二重遷移しない/左右方向/スワイプ確定・キャンセル）
+- ✅ `swift test --enable-xctest --disable-swift-testing -j 1` 成功、`xcodebuild ... iOS Simulator` 成功、実機（iPhone 15）Debugビルド・インストール済み
+- ✅ タップ経路から `drawHierarchy` / `UIGraphicsImageRenderer` を完全排除（grep確認）
+- ⚠️ 実機A/B（同一投稿者境界をタップ10回・スワイプ10回、Instruments Time Profiler、`MEGRUM_VISUAL_QA_COLD_IMAGES=1`でのチラつき有無）はオーナー確認。改善後も動きが急なら `Animation.smooth` の0.18〜0.20sを実機比較のうえ検討（時間延長だけを主修正にしない）
+- ✅ notes/09・10は状態/用語変更なしのため据え置き
+
+---
+
 ## イテレーション1226.466：相手ユーザー情報（プロフィール辞書）も端末保持しオフライン表示
 
 ### 背景・問題意識

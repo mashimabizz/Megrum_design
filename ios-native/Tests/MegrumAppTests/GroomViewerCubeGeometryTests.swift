@@ -113,6 +113,153 @@ final class GroomViewerCubeGeometryTests: XCTestCase {
 }
 
 @MainActor
+final class GroomViewerCubeTransitionPlannerTests: XCTestCase {
+    private let a = UUID()
+    private let b = UUID()
+    private let c = UUID()
+
+    /// [a, a, b, c] を返す（0,1=投稿者a、2=b、3=c）。
+    private var authors: [UUID] { [a, a, b, c] }
+
+    func testTapAcrossAuthorBoundaryStartsTransitionWithoutChangingIndex() {
+        // index 1（投稿者a末尾）→ index 2（投稿者b）は境界なので回転（＝index即変更しない）。
+        let decision = GroomViewerCubeTransitionPlanner.decideMove(
+            authorIDs: authors,
+            currentIndex: 1,
+            delta: 1,
+            reduceMotion: false,
+            isOpeningSettled: true,
+            hasActiveTransition: false
+        )
+        XCTAssertEqual(decision, .transition(source: 1, target: 2, direction: 1))
+    }
+
+    func testTransitionCommitsToTargetIndexExactlyOnce() {
+        // 完了時に渡された targetIndex へ 1 回だけ commit されること（id 一致時のみ）。
+        let transition = GroomViewerCubeTransition(
+            sourceIndex: 1, targetIndex: 2, direction: 1, progress: 1, origin: .tap
+        )
+        // 現在の遷移が同一 id → commit すべき。
+        XCTAssertTrue(shouldCommit(active: transition, completed: transition))
+        // 連打で別遷移に置き換わっている → 古い完了は破棄（commit しない）。
+        let newer = GroomViewerCubeTransition(
+            sourceIndex: 2, targetIndex: 3, direction: 1, progress: 0.3, origin: .tap
+        )
+        XCTAssertFalse(shouldCommit(active: newer, completed: transition))
+        XCTAssertFalse(shouldCommit(active: nil, completed: transition))
+    }
+
+    private func shouldCommit(
+        active: GroomViewerCubeTransition?,
+        completed: GroomViewerCubeTransition
+    ) -> Bool {
+        active?.id == completed.id
+    }
+
+    func testTapWithinSameAuthorSwitchesImmediately() {
+        // index 0 → 1 は同一投稿者a。回転せず即切替。
+        let decision = GroomViewerCubeTransitionPlanner.decideMove(
+            authorIDs: authors,
+            currentIndex: 0,
+            delta: 1,
+            reduceMotion: false,
+            isOpeningSettled: true,
+            hasActiveTransition: false
+        )
+        XCTAssertEqual(decision, .immediate(index: 1))
+    }
+
+    func testReduceMotionSwitchesImmediatelyEvenAcrossAuthors() {
+        let decision = GroomViewerCubeTransitionPlanner.decideMove(
+            authorIDs: authors,
+            currentIndex: 1,
+            delta: 1,
+            reduceMotion: true,
+            isOpeningSettled: true,
+            hasActiveTransition: false
+        )
+        XCTAssertEqual(decision, .immediate(index: 2))
+    }
+
+    func testNotSettledSwitchesImmediatelyEvenAcrossAuthors() {
+        let decision = GroomViewerCubeTransitionPlanner.decideMove(
+            authorIDs: authors,
+            currentIndex: 1,
+            delta: 1,
+            reduceMotion: false,
+            isOpeningSettled: false,
+            hasActiveTransition: false
+        )
+        XCTAssertEqual(decision, .immediate(index: 2))
+    }
+
+    func testTapDuringActiveTransitionIsIgnoredNoDoubleTransition() {
+        let decision = GroomViewerCubeTransitionPlanner.decideMove(
+            authorIDs: authors,
+            currentIndex: 1,
+            delta: 1,
+            reduceMotion: false,
+            isOpeningSettled: true,
+            hasActiveTransition: true
+        )
+        XCTAssertEqual(decision, .ignore)
+    }
+
+    func testBackwardDirectionAcrossAuthorBoundaryIsNegative() {
+        // index 2（投稿者b）→ index 1（投稿者a）は境界。戻る＝direction -1。
+        let decision = GroomViewerCubeTransitionPlanner.decideMove(
+            authorIDs: authors,
+            currentIndex: 2,
+            delta: -1,
+            reduceMotion: false,
+            isOpeningSettled: true,
+            hasActiveTransition: false
+        )
+        XCTAssertEqual(decision, .transition(source: 2, target: 1, direction: -1))
+    }
+
+    func testForwardPastEndDismissesBackwardPastStartIgnored() {
+        // 末尾（index 3）から先へ → 閉じる。
+        XCTAssertEqual(
+            GroomViewerCubeTransitionPlanner.decideMove(
+                authorIDs: authors, currentIndex: 3, delta: 1,
+                reduceMotion: false, isOpeningSettled: true, hasActiveTransition: false
+            ),
+            .dismiss
+        )
+        // 先頭（index 0）から前へ → 何もしない。
+        XCTAssertEqual(
+            GroomViewerCubeTransitionPlanner.decideMove(
+                authorIDs: authors, currentIndex: 0, delta: -1,
+                reduceMotion: false, isOpeningSettled: true, hasActiveTransition: false
+            ),
+            .ignore
+        )
+    }
+
+    func testSwipeCommitByProgressOrPredictedThreshold() {
+        // 進捗がしきい値超え → 確定。
+        XCTAssertTrue(
+            GroomViewerCubeTransitionPlanner.swipeCommits(
+                progress: GroomViewerCubeGeometry.commitProgressThreshold + 0.01,
+                predicted: 0
+            )
+        )
+        // 進捗は足りないが勢い（predicted）がしきい値超え → 確定。
+        XCTAssertTrue(
+            GroomViewerCubeTransitionPlanner.swipeCommits(
+                progress: 0.1,
+                predicted: GroomViewerCubeGeometry.commitPredictedThreshold + 0.01
+            )
+        )
+        // どちらも足りない → キャンセル（戻す）。
+        XCTAssertFalse(
+            GroomViewerCubeTransitionPlanner.swipeCommits(progress: 0.1, predicted: 0.1)
+        )
+    }
+}
+
+@MainActor
 final class GroomViewerAuthorGroupingTests: XCTestCase {
     private func groom(author: UUID, minutesAgo: Int) -> GroomPost {
         GroomPost(
