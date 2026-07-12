@@ -53,25 +53,26 @@ struct HomeSelectedGoodsHeader: View {
                     }
 
                     HomePaymentBox(summaryText: goods.ownerPaymentSummaryText)
-
-                    if let listingDetail {
-                        HomeListingDetailButton {
-                            presentationState.presentListingDetail(listingDetail)
-                        }
-                    }
                 }
                 .padding(.top, 4)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
 
+            // メモは「個別募集の詳細を見る（条件のグッズを確認）」ブロックの直上に置く。
             if let listingNote = listingNote?.nilIfBlank {
                 HomeListingNoteBox(note: listingNote)
+            }
 
-                if let timestampText {
-                    Text(timestampText)
-                        .font(.system(size: 9.5, weight: .semibold, design: .rounded))
-                        .foregroundStyle(MegrumTheme.muted.opacity(0.85))
+            if let listingDetail {
+                HomeListingDetailButton {
+                    presentationState.presentListingDetail(listingDetail)
                 }
+            }
+
+            if listingNote?.nilIfBlank != nil, let timestampText {
+                Text(timestampText)
+                    .font(.system(size: 9.5, weight: .semibold, design: .rounded))
+                    .foregroundStyle(MegrumTheme.muted.opacity(0.85))
             }
         }
         .sheet(item: $presentationState.presentedListingDetail) { detail in
