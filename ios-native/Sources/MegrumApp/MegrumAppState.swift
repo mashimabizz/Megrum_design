@@ -11,6 +11,10 @@ public final class MegrumAppState: ObservableObject {
     public internal(set) var authenticatedUserID: UUID?
     /// オフラインスナップショット書き込みのデバウンス用。
     var offlineSnapshotPersistTask: Task<Void, Never>?
+    /// iter1226.465：直近のデータ取得が通信状態の問題（オフライン・電波弱）で失敗し、
+    /// 端末キャッシュ（または空）を表示している状態。ホーム画面でその旨を表示する。
+    /// 取得に成功したら false へ戻す。
+    @Published public internal(set) var isShowingOfflineData = false
     /// 初回ガイドツアー実行中フラグ。広告・共有プロンプト・位置情報・通知遷移などの
     /// 割り込みを抑制するために深い階層からも参照する（`setTutorialActive` で更新）。
     @Published public internal(set) var isTutorialActive = false
@@ -448,10 +452,14 @@ public final class MegrumAppState: ObservableObject {
             // iter1226.464：取得できた最新スナップショットを端末へ保存し、次回オフライン
             // 起動時に一覧を復元できるようにする（相手プロフィール辞書も含めて保存）。
             persistOfflineSnapshot(snapshot)
+            // iter1226.465：最新取得に成功したのでオフライン表示は解除。
+            isShowingOfflineData = false
         } catch {
             #if DEBUG
             print("MEGRUM_DEBUG_SNAPSHOT error: \(error)")
             #endif
+            // iter1226.465：通信状態の問題ならホームで「オフライン表示中」を出す。
+            isShowingOfflineData = NetworkErrorClassifier.isConnectivityError(error)
             // オフライン等で最新取得に失敗しても、端末キャッシュを復元済み（viewer あり）なら
             // 一覧はそのまま見られる（めぐりメッセージ一覧は restoreOfflineSnapshotIfAvailable
             // で復元済み）。致命的エラー表示は「見せられる中身が何も無い」時だけ。
@@ -485,8 +493,14 @@ public final class MegrumAppState: ObservableObject {
             await loadMeguriMessages(reportsFailure: false)
             await preloadTradeMessages()
             await preloadTradeEvidencePhotos()
+            isShowingOfflineData = false
         } catch {
-            errorMessage = "ホームを更新できませんでした"
+            // iter1226.465：更新失敗が通信状態の問題ならオフライン表示、それ以外は従来のエラー。
+            if NetworkErrorClassifier.isConnectivityError(error) {
+                isShowingOfflineData = true
+            } else {
+                errorMessage = "ホームを更新できませんでした"
+            }
         }
     }
 

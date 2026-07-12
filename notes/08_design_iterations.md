@@ -4,6 +4,28 @@
 
 ---
 
+## イテレーション1226.465：通信状態が悪くデータ取得できない時、ホームに「オフライン表示中」を出す
+
+### 背景・問題意識
+オーナーFB：「オフラインなど通信状態が悪くてデータ取得できない場合は、ホーム画面（グルームレーンがある画面）にその旨を表示するようにしてください」。.464でオフラインでも一覧は見られるようにしたが、「今オフラインで最新が取れていない」ことがユーザーに伝わらなかった。
+
+### 変更内容
+- **通信エラー判定**（`NetworkErrorClassifier` 新規・MegrumCore・テスト付き）：`NSURLErrorDomain` の到達性コード（notConnectedToInternet / networkConnectionLost / timedOut / cannotConnectToHost 等）だけを「通信状態の問題」と判定。サーバー4xx/5xx（`SupabaseRESTError`）やデコード失敗は除外
+- **状態フラグ**：`MegrumAppState.isShowingOfflineData`。`loadInitialData` / `refreshHomeDiscovery` の catch で通信エラーなら true、取得成功で false
+- **ホーム通知バナー**（`HomeOfflineNoticeBanner` 新規）：`HomeDiscoveryExperience` の先頭（グルームレーンの上）に表示。`wifi.slash` アイコン＋「オフライン表示中／通信状態が悪く最新のデータを取得できません。保存済みの内容を表示しています。」＋「再読み込み」ボタン（押すと `onRefresh` を再実行、実行中はスピナー）
+- **配線**：`HomeScreen` から `appState.isShowingOfflineData` を `showsOfflineNotice` として渡す
+
+### 影響範囲
+- ホーム画面（グルームレーンのある画面）。データ取得の成否表示のみで、既存レイアウト・グルームレーンの挙動は不変。プルリフレッシュ／再読み込みで最新取得に成功すればバナーは自動的に消える。
+
+### セルフレビュー結果
+- ✅ 全27テストパス（`NetworkErrorClassifier` 判定テスト2件追加）、SwiftPMビルド成功、xcodebuild（device/Debug）成功・**実機インストール済み**
+- ✅ ブランドカラー直書きなし（`MegrumTheme.conditionPossible`／`.ink`／`.muted` を使用）。共通トークン準拠。iOS標準の SF Symbol・`ProgressView` を使用
+- ✅ 到達性エラーのみを対象にしたため、サーバー起因の失敗で誤って「オフライン」と出さない
+- ⚠️ 実機確認：機内モードでアプリ起動／ホームでプルリフレッシュ→バナーが出るか、通信回復後に「再読み込み」またはプルで消えるか
+
+---
+
 ## イテレーション1226.464：オフライン起動でも一覧（取引・めぐりメッセージ）を開けるようにする
 
 ### 背景・問題意識

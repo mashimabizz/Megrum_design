@@ -424,6 +424,7 @@ struct HomeScreen: View {
             starterMissionEnabled: starterMissionEnabled,
             starterMissionForcedState: starterMissionForcedState,
             onOpenInventory: onOpenInventory,
+            showsOfflineNotice: appState?.isShowingOfflineData ?? false,
             showsGroomRail: showsGroomRail,
             groomRailGrooms: groomRailItems,
             groomRailLockedIDs: groomRailLockedIDs,

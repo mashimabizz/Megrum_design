@@ -34,6 +34,8 @@ struct HomeDiscoveryExperience: View {
     /// QA/デモ確認用：非nilの時は実データに関わらずこの達成状況でミッションカードを強制表示する。
     var starterMissionForcedState: HomeStarterMissionState? = nil
     var onOpenInventory: () -> Void = {}
+    /// iter1226.465：通信状態が悪くデータ取得できない時にホーム先頭へオフライン通知を出す。
+    var showsOfflineNotice: Bool = false
     // FB8-6：ホーム上部の圏内グルーム・ストーリー列。iter1226.387。
     var showsGroomRail: Bool = false
     var groomRailGrooms: [GroomPost] = []
@@ -77,6 +79,8 @@ struct HomeDiscoveryExperience: View {
     @AppStorage(HomeExchangeSettingsStorageKeys.mailShippingDays) var exchangeMailShippingDaysRawValue = HomeDefaultExchangeSettings.standard.mailShippingDays.rawValue
     @State private var showsEmptyStateOshiSettings = false
     @State private var starterMissionCompleted = false
+    /// iter1226.465：オフライン通知の「再読み込み」実行中フラグ。
+    @State private var isRefreshingOfflineNotice = false
     @State var selectedSheet: HomeDiscoverySheet?
     @State var selectedMutualMatchCandidate: HomeMutualMatchCandidate?
     @State var showsMatchHelp = false
@@ -102,6 +106,22 @@ struct HomeDiscoveryExperience: View {
                 onRefresh: onRefresh
             ) {
                 VStack(alignment: .leading, spacing: 14) {
+                    if showsOfflineNotice {
+                        // iter1226.465：通信状態が悪い時、グルームレーンの上に「オフライン表示中」を出す。
+                        HomeOfflineNoticeBanner(
+                            isRetrying: isRefreshingOfflineNotice,
+                            onRetry: {
+                                guard !isRefreshingOfflineNotice else { return }
+                                isRefreshingOfflineNotice = true
+                                Task {
+                                    await onRefresh()
+                                    isRefreshingOfflineNotice = false
+                                }
+                            }
+                        )
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                    }
+
                     if showsGroomRail {
                         // FB8-6：圏内グルームのストーリー横並び（自分アイコン＋＋、未読先頭、水色→紫/グレー枠）。
                         GroomStrip(
