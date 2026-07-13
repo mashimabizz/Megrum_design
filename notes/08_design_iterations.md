@@ -4,6 +4,27 @@
 
 ---
 
+## イテレーション1226.487：公式サイト本番デプロイ＋web-only PR（恒久化）
+
+### 背景・問題意識
+オーナー指示「今の状態でデプロイして megrum.jp で見れるように」。デプロイ構成を調査し、本番公開＋恒久化の導線を整えた。
+
+### 実施内容
+- **デプロイ構成の把握**：Vercel プロジェクト `ihub`（root=`web/`）が GitHub 連携で自動デプロイ。default/本番ブランチ=`main`。本番ドメイン=`megrum.jp`/`www.megrum.jp`/`ihub.tokyo`。Vercel CLI は `~/Library/Application Support/com.vercel.cli/auth.json` で認証済み（whoami=mashimabizz）
+- **本番デプロイ**：`npx vercel --prod`（本番環境変数で新規ビルド）→ `dpl_FiGRvEv5...` READY/production。**megrum.jp が新サイトで公開**（全8公開ページ200・新title・CTA・sitemap 反映を curl 検証）
+- **⚠️恒久化の課題**：上記は feat ブランチからの CLI デプロイで、本番ブランチ `main` には web 変更が未反映（feat は iOS含め376ファイル先行）。**このまま `main` が本番ビルドされると旧状態へ戻り得る**
+- **web-only PR**：`git worktree` で `origin/main` 起点の `feat/web-public-site` を作成し、feat から **web の18ファイルのみ**を取り込み（iOS/未コミットの web/AGENTS.md は除外）→ push → **PR #3**（base=main）。マージで main からの自動デプロイでも新サイトを維持
+
+### 関連
+- PR: https://github.com/mashimabizz/Megrum_design/pull/3
+- 本番: https://megrum.jp （現在この作業内容で公開中）
+
+### 申し送り（次セッション必読）
+- megrum.jp は **CLIデプロイ由来で main 未反映**。PR #3 未マージのうちに `main` を本番ビルドすると旧サイトに戻る。恒久化には **PR #3 のマージ**が必要
+- 公開中の留意：スクショはプレースホルダ（T9）／`/faq`・記事1本は法務隣接・`/privacy``/terms`短縮版（`notes/legal`最終化と整合）
+
+---
+
 ## イテレーション1226.486：公式サイトT10 — 仕上げQA＋是正
 
 ### 背景・問題意識
