@@ -5,6 +5,8 @@ const routes = [
   "",
   "/features",
   "/safety",
+  "/guide/local",
+  "/guide/mail",
   "/operator",
   "/privacy",
   "/support",

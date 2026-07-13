@@ -175,6 +175,23 @@ export function Section({
   );
 }
 
+/** 正直な注意書き（安全・匿名性を過大に見せないための警告トーン）。 */
+export function Callout({
+  children,
+  className = "mt-4",
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <p
+      className={`max-w-4xl rounded-2xl border border-megrum-warn/30 bg-megrum-warn/[0.07] px-5 py-4 text-[13px] font-semibold leading-7 text-slate-700 ${className}`}
+    >
+      {children}
+    </p>
+  );
+}
+
 /** アンカー付きの汎用セクション枠（見出しは中で自由に組む）。tone="white" で白背景。 */
 export function AnchorSection({
   id,

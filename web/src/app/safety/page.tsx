@@ -5,6 +5,8 @@ import type { ReactNode } from "react";
 import { PrimaryCtaBlock } from "../_cta";
 import {
   AnchorSection,
+  Callout,
+  DetailLink,
   JsonLd,
   PublicPage,
   SectionHeading,
@@ -132,6 +134,7 @@ function AddressSection() {
       <Callout>
         郵送はお互いに送り合うため、双方の住所がそれぞれの相手に伝わります（「匿名配送」ではありません）。相手や取引に不安がある場合は、フリマサービスなどの匿名配送の利用も検討してください。高額な取引では、追跡ありの配送をおすすめします。
       </Callout>
+      <DetailLink href="/guide/mail" label="郵送交換ガイドを見る" className="mt-6" />
     </AnchorSection>
   );
 }
@@ -237,14 +240,5 @@ function Card({ children }: { children: ReactNode }) {
     <div className="rounded-2xl border border-slate-200 bg-white p-6 text-[14px] font-medium leading-7 text-slate-600 shadow-[0_10px_30px_rgba(58,50,74,0.05)]">
       {children}
     </div>
-  );
-}
-
-/** 正直な注意書き（安全・匿名性を過大に見せないための警告トーン）。 */
-function Callout({ children }: { children: ReactNode }) {
-  return (
-    <p className="mt-4 max-w-4xl rounded-2xl border border-megrum-warn/30 bg-megrum-warn/[0.07] px-5 py-4 text-[13px] font-semibold leading-7 text-slate-700">
-      {children}
-    </p>
   );
 }

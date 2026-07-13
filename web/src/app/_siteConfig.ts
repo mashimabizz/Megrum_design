@@ -98,12 +98,18 @@ export const FOOTER_NAV: NavItem[] = [
 ];
 
 /**
+ * ナビには出さないが実装済みのページ（ガイド等）。routeEnabled で参照する。
+ */
+export const EXTRA_ENABLED_ROUTES: string[] = ["/guide/local", "/guide/mail"];
+
+/**
  * 指定パス（#アンカー可）の遷移先ページが実装済みかを返す。
  * 未実装ページ（T2〜で順次）への「詳しく見る」リンクを描画しないために使う。
- * T3〜で該当ページを実装したら NAV の enabled を true にすればリンクが出る。
+ * NAV の enabled、または EXTRA_ENABLED_ROUTES に含まれれば実装済みとみなす。
  */
 export function routeEnabled(path: string): boolean {
   const base = path.split("#")[0];
+  if (EXTRA_ENABLED_ROUTES.includes(base)) return true;
   return [...HEADER_NAV, ...FOOTER_NAV].some(
     (item) => item.href === base && item.enabled,
   );

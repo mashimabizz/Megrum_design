@@ -4,6 +4,48 @@
 
 ---
 
+## イテレーション1226.483：公式サイトT5 — /guide/local・/guide/mail ガイド実装
+
+### 背景・問題意識
+`notes/82` WBS の T5（現地マナー・郵送ガイド・§3 IA）。X安全Tips・アプリ内ヘルプ・/safety・/features からのリンク先。実用的で正直な how-to。
+
+### 変更内容
+
+#### `web/src/app/guide/local/page.tsx`（新規）
+- 4アンカー：`#meet`（待ち合わせは合意前に・公共の場）／`#day`（合流→実物確認してから交換・現在地非表示の注意）／`#manner`（店内交換は店のルール・ショップ前や休憩スペース・掲示に頼らない）／`#safe`（評価確認・無理しない・通報・未成年は保護者相談）
+
+#### `web/src/app/guide/mail/page.tsx`（新規）
+- 4アンカー：`#address`（成立後・送る相手だけ・相互発送で双方に住所＝匿名配送ではない）／`#ship`（追跡あり推奨・**普通郵便は追跡/補償なしのリスクを明示**）／`#trouble`（発送前の写真・追跡番号記録・梱包）／`#highvalue`（高額は匿名配送/補償も検討・見送る判断）
+
+#### `web/src/app/_publicComponents.tsx`
+- `Callout`（正直な注意書き）を共通化・export
+
+#### `web/src/app/_siteConfig.ts`
+- `EXTRA_ENABLED_ROUTES`（nav非表示だが実装済みのページ）を追加し `routeEnabled` を拡張 → ガイドへの DetailLink が出せる
+
+#### `web/src/app/safety/page.tsx` / `features/page.tsx`
+- safety#address → /guide/mail、features#trade の現地/郵送カード → /guide/local・/guide/mail の DetailLink を追加。safety のローカル Callout を共通版へ
+
+#### `web/src/app/sitemap.ts`
+- `/guide/local` `/guide/mail` を追加
+
+### 影響範囲
+- 新規ガイド2ページ＋ /safety・/features からの導線。ガイドはヘッダnavには出さず、文脈リンクで到達。web/ のみ＝EAS不要
+
+### 確認方法
+- `tsc`／`eslint` → 0（未使用import除去）
+- dev：/guide/local・/guide/mail = HTTP 200・console エラーなし・title 反映
+- curl＋スクショ：各4アンカー・確定コピー・正直な注意（普通郵便のリスク／「匿名配送」ではありません）。features#trade・safety#address からガイドへのリンク活性。sitemap に両ガイド
+
+### セルフレビュー結果
+- ✅ 語彙 `notes/80` §1／§3-3：郵送は成立後・送る相手だけ、「匿名配送」は否定文脈のみ、普通郵便のリスク明示、高額は見送りも案内（notes/82 §3 IAの指示どおり）
+- ✅ 現地マナーは notes/78 §2-3（店内交換NG・掲示撤去リスク）と整合
+- ✅ アクセシビリティ：見出し階層・パンくず・内部遷移は next/link
+- ⚠️ 申し送り：ガイドの安全/法務表現も `notes/legal` 最終化と突き合わせ対象
+- ⏭️ 次は T6（/faq・FAQPage JSON-LD）／T7（/articles 記事基盤）
+
+---
+
 ## イテレーション1226.482：公式サイトT4 — /safety 安全への取り組みページ実装
 
 ### 背景・問題意識

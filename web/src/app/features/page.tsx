@@ -154,6 +154,7 @@ function TradeSection() {
           <p className="mt-4 rounded-xl bg-slate-50 px-3 py-2 text-[12px] font-semibold leading-6 text-slate-500">
             正確な現在地は表示されません。
           </p>
+          <DetailLink href="/guide/local" label="現地交換のマナーを見る" className="mt-4" />
         </TradeCard>
         <TradeCard title="郵送交換">
           <p>
@@ -162,6 +163,7 @@ function TradeSection() {
           <p className="mt-3">
             追跡番号を記録すれば、発送状況を確認しやすくなります。高額な取引では、追跡ありの配送がおすすめです。
           </p>
+          <DetailLink href="/guide/mail" label="郵送交換ガイドを見る" className="mt-4" />
         </TradeCard>
       </div>
       <div className="mt-4 grid grid-cols-2 gap-4 md:max-w-md">
