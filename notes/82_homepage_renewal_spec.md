@@ -44,7 +44,7 @@
 | 住所の開示 | `agreed`（合意）まで相手に見せず、合意後に当事者だけへアプリ内表示。郵送は相互発送のため**双方の住所が相手に渡る** | `notes/09` L111-112, `notes/78` §3-3 | 「住所は取引成立後に、送る相手だけへアプリ内表示」。※「相手にこちらの住所は分からない」等の一方向・匿名の含意は禁止 |
 | 料金（プレミアム） | コードにプレミアム機能（めぐりメッセージ本文/返信/画像・圏外チャットルーム・広告非表示）実装済み。プレミアム＝月¥500／年¥4,800（`notes/16`）。**オーナー決定（2026-07-12）：初回リリースから課金オン** | `notes/16` L154/L180, `notes/09` L584/L859, `notes/17` L16 | 「完全無料」は禁止（景表法）。有料機能の事実説明は可。ただし**価格・購入導線の実表示はGo条件充足後**（特商法・ASC商品/価格・FAQ・Review Notes・サーバー検証：`notes/63` CM-008／`notes/17` L16）。⚠️`notes/16`/`notes/78`（初期無料想定）と不一致→両notes更新が別途必要 |
 | プレミアムの呼称 | UI表示は「Megrumプレミアム」（内部 feature_key=`megrum_plus`。旧 `premium`/`meguri_plus` は互換） | `notes/09` L859, `NearbyBoardViews.swift` L398/L404 | 有料階層に触れる場合の表記は「Megrumプレミアム」 |
-| 公開ページURL | 実在：`/terms` `/privacy` `/support` `/operator`。**`/legal` は存在しない**。正式な特商法本文ページは未公開（IAP公開時に `/legal/commerce` 予定） | `web/src/app/` 実測, `notes/17` L157 | `/legal` へリンクしない。特商法リンクは正式ページ公開後だけ |
+| 公開ページURL | 実在：`/terms` `/privacy` `/support` `/operator`。`/legal/privacy`・`/legal/terms` は /privacy・/terms の**エイリアス**（`export {default,metadata} from ...`／canonicalは正規側を指すのでSEO重複なし）。`/legal` 直下indexと正式特商法本文は未実装（IAP公開時に `/legal/commerce` 予定）。※T0初報「/legalは存在しない」をT10で是正 | `web/src/app/` 実測（`next build`ルート一覧）, `notes/17` L157 | 正規の `/privacy` `/terms` へリンク（実装済み）。特商法リンクは正式 `/legal/commerce` 公開後だけ |
 | 代表者情報 | 非公表。ただし個人情報保護法・特商法等で必要な場合や正当な請求時は本人確認のうえ遅滞なく回答 | `notes/17` L544-550 | 「一切回答しない」と読ませない／実住所・個人電話・代表者個人情報を公開ページに載せない |
 | 外部アセット・解析 | 公開ページは未説明の外部フォント・外部地図・外部ジオコーディング・外部解析・広告タグを読み込んではならない（`next/font/google` はself-host前提） | `notes/63` L100/L108 | フォントは自己ホスト。分析(Vercel等)は Privacy＋外部サービス台帳へ記載してから有効化（§6-1・§12-3） |
 

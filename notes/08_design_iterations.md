@@ -4,6 +4,43 @@
 
 ---
 
+## イテレーション1226.486：公式サイトT10 — 仕上げQA＋是正
+
+### 背景・問題意識
+`notes/82` WBS の T10（仕上げQA・§10チェックリスト）。ここまで実装した公開サイト全体を機械検査し、本番ビルドで検証。
+
+### QA結果（すべてpass）
+- **禁止語スキャン**（src/app＋content grep）：お品書き/完全無料/日本初/No.1 不在。出会い＝FAQの否定文脈のみ／匿名＝「匿名配送ではない」等の否定・正直案内のみ／転売＝既存terms のみ／30秒 不在
+- **ブランドHEX直書き**：無し（`#a695d8` 等は globals.css のトークン定義のみ）
+- **内部リンク疎通**：全12ページから抽出した11リンクすべて **HTTP 200**（404なし）
+- **/legal リンク**：無し
+- **メタデータ**：全ページ固有 title＋正しい canonical。OGP/Twitter 出力
+- **構造化データ**：/ =SoftwareApplication、下層=BreadcrumbList、/faq=FAQPage、/articles/[slug]=Article。表示と一致
+- **記事frontmatter**：必須項目すべて有り。draft除外・不正slug=404・generateStaticParams動作
+- **レスポンシブ**：375pxで横スクロールなし（doc.scrollWidth==innerWidth）。モバイルはnav畳んでCTA到達可（§5）
+- **a11y**：各ページ h1=1・alt無しimg=0・CTA/パンくずに aria-label・FAQ/一覧は native details と semantic
+- **計測/外部資産**：未説明の外部解析・外部フォントの読込なし（notes/63・Vercel未配線）
+- **本番ビルド**：`next build` 成功。公開ページは Static(○)、/articles/[slug] は SSG(●) で megrum-flow 生成。sitemap/robots 静的
+
+### 変更内容（是正）
+#### `web/src/app/layout.tsx`
+- 既定 title/description/OG を現地限定→**現地・郵送を包含**へ（「推し活グッズの交換アプリ」／wish表記→ほしいもの）
+
+#### `notes/82_homepage_renewal_spec.md`
+- §0A-1 是正：`/legal/privacy`・`/legal/terms` は /privacy・/terms の**エイリアス**（canonicalは正規側でSEO重複なし）。T0初報「/legalは存在しない」を訂正
+
+### 影響範囲
+- 既定メタデータの文言のみ実変更。他はドキュメント是正。web/ のみ＝EAS不要
+
+### セルフレビュー結果（スキルチェーン相当を自動検査で代替）
+- ✅ baseline-ui相当：megrum-*トークン・size-*・native details・no h-screen・text-pretty（記事本文）
+- ✅ fixing-accessibility相当：h1単一・alt・aria-label・見出し階層・キーボード到達（details/next/link）
+- ✅ web-design-guidelines相当：内部リンクnext/link・OGP・canonical・外部資産なし
+- ⏭️ 手動で残す推奨：本番URLでの Lighthouse mobile 計測 と X カードプレビュー、公開前の formal スキルchain（design-review）
+- ⏭️ 残WBS：T8（初期記事・法務隣接→notes/legal整合）・T9（スクショ差替＝オーナー納品）・T11（v1.1切替）・T12（特商法）
+
+---
+
 ## イテレーション1226.485：公式サイトT7 — /articles 記事基盤（依存追加なし）
 
 ### 背景・問題意識
