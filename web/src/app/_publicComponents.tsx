@@ -175,6 +175,28 @@ export function Section({
   );
 }
 
+/** アンカー付きの汎用セクション枠（見出しは中で自由に組む）。tone="white" で白背景。 */
+export function AnchorSection({
+  id,
+  tone = "default",
+  children,
+}: {
+  id: string;
+  tone?: "default" | "white";
+  children: ReactNode;
+}) {
+  return (
+    <section
+      id={id}
+      className={`scroll-mt-24 px-5 py-16 md:py-20 ${
+        tone === "white" ? "bg-white" : ""
+      }`}
+    >
+      <div className="mx-auto w-full max-w-6xl">{children}</div>
+    </section>
+  );
+}
+
 /**
  * アプリのスクショ枠（notes/82 §5・§7）。端末モック枠は自作せず角丸＋影のみ。
  * src 未指定なら納品前プレースホルダ（アスペクト比を保った箱）を出す。

@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 
 import { PrimaryCtaBlock } from "../_cta";
 import {
+  AnchorSection,
   DetailLink,
   JsonLd,
   PublicPage,
@@ -304,27 +305,6 @@ function PageEnd() {
 }
 
 /* ── 共通レイアウト ──────────────────────────────────────── */
-function AnchorSection({
-  id,
-  tone = "default",
-  children,
-}: {
-  id: string;
-  tone?: "default" | "white";
-  children: ReactNode;
-}) {
-  return (
-    <section
-      id={id}
-      className={`scroll-mt-24 px-5 py-16 md:py-20 ${
-        tone === "white" ? "bg-white" : ""
-      }`}
-    >
-      <div className="mx-auto w-full max-w-6xl">{children}</div>
-    </section>
-  );
-}
-
 function FeatureBlock({
   index,
   eyebrow,

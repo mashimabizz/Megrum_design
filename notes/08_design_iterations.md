@@ -4,6 +4,48 @@
 
 ---
 
+## イテレーション1226.482：公式サイトT4 — /safety 安全への取り組みページ実装
+
+### 背景・問題意識
+`notes/82` WBS の T4（/safety・§3 IA）。信頼形成の柱ページ。4テーマを1ページに見出し分割。「Megrum 怪しい」検索の受け皿として、正直な注意書きも入れて信頼を作る。
+
+### 変更内容
+
+#### `web/src/app/safety/page.tsx`（新規）
+- 4アンカー：`#location`（位置情報＝正確な現在地は非表示・丸め表示・グルーム1km/チャットルーム1km・都道府県）／`#address`（現地は住所不要・郵送は成立後に送る相手だけ）／`#trust`（証跡・相互評価・待ち合わせ確定・通報/ブロック）／`#minors`（未成年・保護者向け）
+- **正直な注意書き（Callout）**：距離やおおまかな範囲の表示は安全・匿名性を保証しない（notes/10・notes/63）／郵送は相互発送で双方に住所が渡る＝「匿名配送」ではない・不安なら匿名配送サービス検討（notes/80 §3-3）
+- パンくず＋アンカーチップ、末尾は /privacy・/terms・/support への導線＋CTA
+- `buildMetadata`（title=安全への取り組み）＋ breadcrumbJsonLd
+
+#### `web/src/app/_publicComponents.tsx`
+- `AnchorSection` を共通化（features から移設・export）
+
+#### `web/src/app/features/page.tsx`
+- ローカル AnchorSection を共通コンポーネント参照へ
+
+#### `web/src/app/_siteConfig.ts`
+- HEADER_NAV / FOOTER_NAV の `/safety` を enabled:true 化（ヘッダ「安全」表示・トップ4-5とfeatures #safety の DetailLink 活性）
+
+#### `web/src/app/sitemap.ts`
+- `/safety` を追加
+
+### 影響範囲
+- 新規 /safety と、トップ4-5・/features #safety からの導線活性化。ヘッダに「安全」。web/ のみ＝EAS不要
+
+### 確認方法
+- `tsc`／`eslint` → 0
+- dev：/safety HTTP 200・console エラーなし・title「安全への取り組み | Megrum」
+- curl＋スクショ：4アンカー・確定コピー・正直な注意書き（匿名性を保証しない／「匿名配送」ではありません）・BreadcrumbList。ヘッダ「安全」表示、トップに /safety DetailLink。sitemap に /safety
+
+### セルフレビュー結果
+- ✅ 語彙 `notes/80` §1：位置情報の非表示、郵送は成立後・送る相手だけ、「匿名配送」は否定文脈のみ。過大表示を避けた正直トーン
+- ✅ 事実整合（notes/09/10/17/78）：グルーム1km・チャットルーム1km/都道府県、相互発送で双方に住所、距離は匿名性非保証
+- ✅ 未成年：具体的な年齢ゲート等を捏造せず、公共の場推奨・保護者相談・通報窓口に留めた
+- ⚠️ 申し送り：本ページはプライバシー/法務に隣接。`notes/legal` の規約・プライバシー最終化（別作業中）と表現を突き合わせ、齟齬があれば公開前に調整すること
+- ⏭️ /safety の DetailLink（トップ・features）は本実装で自動表示。次は T5（/guide/local・/guide/mail）
+
+---
+
 ## イテレーション1226.481：公式サイトT3 — /features 機能紹介ページ実装
 
 ### 背景・問題意識
