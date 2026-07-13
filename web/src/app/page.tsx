@@ -401,6 +401,7 @@ function FaqSection() {
   return (
     <Section eyebrow="よくある質問" title="はじめる前に。">
       <FaqList items={items} />
+      <DetailLink href="/faq" label="よくある質問をすべて見る" className="mt-6" />
     </Section>
   );
 }

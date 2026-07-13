@@ -84,7 +84,7 @@ export const HEADER_NAV: NavItem[] = [
   { href: "/features", label: "機能", enabled: true },
   { href: "/safety", label: "安全", enabled: true },
   { href: "/articles", label: "記事", enabled: false },
-  { href: "/faq", label: "FAQ", enabled: false },
+  { href: "/faq", label: "FAQ", enabled: true },
 ];
 
 export const FOOTER_NAV: NavItem[] = [
@@ -170,6 +170,21 @@ export function softwareApplicationJsonLd(): Record<string, unknown> {
       price: "0",
       priceCurrency: "JPY",
     },
+  };
+}
+
+/** FAQPage 構造化データ。answer は装飾なしのプレーンテキスト。 */
+export function faqPageJsonLd(
+  items: { q: string; a: string }[],
+): Record<string, unknown> {
+  return {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: items.map((item) => ({
+      "@type": "Question",
+      name: item.q,
+      acceptedAnswer: { "@type": "Answer", text: item.a },
+    })),
   };
 }
 
