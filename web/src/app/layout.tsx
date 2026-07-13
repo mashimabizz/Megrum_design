@@ -18,18 +18,18 @@ const interTight = Inter_Tight({
 export const metadata: Metadata = {
   metadataBase: new URL("https://megrum.jp"),
   title: {
-    default: "Megrum | 推し活グッズの現地交換アプリ",
+    default: "Megrum | 推し活グッズの交換アプリ",
     template: "%s | Megrum",
   },
   description:
-    "Megrumは、推し活グッズの登録、wish、打診、取引チャット、現地交換の合流支援をまとめて扱うiOSアプリです。",
+    "Megrumは、推し活グッズの登録、ほしいもの、打診、取引チャット、現地交換・郵送交換をまとめて扱うiOSアプリです。",
   alternates: {
     canonical: "/",
   },
   openGraph: {
     title: "Megrum",
     description:
-      "推し活グッズの交換を、現地で安心して進めるためのiOSアプリ。",
+      "推し活グッズの交換を、現地でも郵送でも安心して進めるためのiOSアプリ。",
     url: "https://megrum.jp",
     siteName: "Megrum",
     locale: "ja_JP",
