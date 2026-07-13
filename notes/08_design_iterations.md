@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション1226.485：公式サイトT7 — /articles 記事基盤（依存追加なし）
+
+### 背景・問題意識
+`notes/82` WBS の T7（記事基盤・§4C）。**依存追加なし**の方針（プロジェクトは最小5deps、オーナーはレビュー容易性重視、§4C「依存少・raw HTML無効」）。T8の法務センシティブ4本は保留し、基盤＋非センシティブな使い方記事1本で検証。
+
+### 変更内容
+
+#### `web/content/articles/megrum-flow.md`（新規・記事1本）
+- 「Megrumでグッズ交換する流れ」（category=Megrumの使い方）。登録→シェア画像→候補→打診→現地/郵送。確定ファクトのみ・法務主張なし。guide/features/safety へ内部リンク
+
+#### `web/src/app/articles/_articles.ts`（新規・server）
+- fs で `content/articles/*.md` を読み、frontmatter を自前パース（依存なし）。getPublishedArticles（draft除外・新着順）／getArticleBySlug／getRelatedArticles
+
+#### `web/src/app/articles/_markdown.tsx`（新規）
+- Markdown サブセット→React要素（h2/h3/段落/箇条書き/番号/引用/hr/**強調**/[リンク]/`code`）。**dangerouslySetInnerHTML 不使用＝XSS安全・raw HTML無効**
+
+#### `web/src/app/articles/_ArticleCard.tsx`／`page.tsx`／`[slug]/page.tsx`（新規）
+- 一覧（新着・0件は準備中表示）／詳細（generateStaticParams・generateMetadataでper-article title/desc/canonical/OGP・Article+BreadcrumbList JSON-LD・関連記事・関連機能リンク・notFoundで404）
+
+#### `web/src/app/_siteConfig.ts`／`sitemap.ts`／`page.tsx`
+- /articles を nav有効化。sitemap に静的ルート＋公開記事（lastModified=updatedAt）。トップに §4-7 新着記事（0件は非表示）＋「すべての記事を見る」
+
+### 影響範囲
+- 新規 /articles・/articles/[slug]、ヘッダ/フッタに「記事」、トップ新着記事。web/ のみ＝EAS不要
+
+### 確認方法
+- `tsc`／`eslint` → 0
+- dev：一覧/詳細=200、存在しないslug=**404**、title反映、console エラーなし
+- curl＋スクショ：記事カード・MD描画（h2/リスト/内部リンク/強調）・Article/Breadcrumb JSON-LD・関連機能・トップ新着記事・nav記事・sitemapに記事
+
+### セルフレビュー結果
+- ✅ raw HTML 無効（React要素描画）・依存追加ゼロ。draft除外・404・generateStaticParams 動作
+- ✅ 記事1本は非センシティブ（使い方）。確定ファクトのみで語彙・法務OK
+- ⚠️ 申し送り：T8の初期記事（安全・トラブル・郵送・X比較）は法務隣接＝`notes/legal`最終化と歩調を合わせる。frontmatter の reviewedAt を必須運用
+- ⏭️ 次は T10（仕上げQA）
+
+---
+
 ## イテレーション1226.484：公式サイトT6 — /faq よくある質問ページ実装
 
 ### 背景・問題意識

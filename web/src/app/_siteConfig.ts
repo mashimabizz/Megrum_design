@@ -83,13 +83,13 @@ export interface NavItem {
 export const HEADER_NAV: NavItem[] = [
   { href: "/features", label: "機能", enabled: true },
   { href: "/safety", label: "安全", enabled: true },
-  { href: "/articles", label: "記事", enabled: false },
+  { href: "/articles", label: "記事", enabled: true },
   { href: "/faq", label: "FAQ", enabled: true },
 ];
 
 export const FOOTER_NAV: NavItem[] = [
   { href: "/features", label: "機能紹介", enabled: true },
-  { href: "/articles", label: "記事", enabled: false },
+  { href: "/articles", label: "記事", enabled: true },
   { href: "/safety", label: "安全への取り組み", enabled: true },
   { href: "/terms", label: "利用規約", enabled: true },
   { href: "/privacy", label: "プライバシーポリシー", enabled: true },

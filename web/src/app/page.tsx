@@ -16,6 +16,8 @@ import {
   softwareApplicationJsonLd,
   X_URL,
 } from "./_siteConfig";
+import { ArticleCard } from "./articles/_ArticleCard";
+import { getPublishedArticles } from "./articles/_articles";
 
 export const metadata: Metadata = buildMetadata({
   description:
@@ -34,8 +36,31 @@ export default function HomePage() {
       <MeguriSection />
       <SafetyDigest />
       <FaqSection />
+      <NewArticlesSection />
       <ClosingSection />
     </PublicPage>
+  );
+}
+
+/* ── 4-7 新着記事（記事0件のときは非表示） ────────────────── */
+function NewArticlesSection() {
+  const articles = getPublishedArticles().slice(0, 3);
+  if (articles.length === 0) return null;
+  return (
+    <section className="bg-white px-5 py-16 md:py-20">
+      <div className="mx-auto w-full max-w-6xl">
+        <SectionHeading
+          eyebrow="記事"
+          title="交換を、もっと安心でスムーズに。"
+        />
+        <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          {articles.map((article) => (
+            <ArticleCard key={article.slug} article={article} />
+          ))}
+        </div>
+        <DetailLink href="/articles" label="すべての記事を見る" className="mt-8" />
+      </div>
+    </section>
   );
 }
 
