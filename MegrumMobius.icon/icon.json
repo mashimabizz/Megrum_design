@@ -1,0 +1,105 @@
+{
+  "groups": [
+    {
+      "layers": [
+        {
+          "image-name": "03-front-ribbon.svg",
+          "name": "03-front-ribbon",
+          "opacity": 1,
+          "blend-mode": "normal",
+          "glass": true,
+          "position": {
+            "scale": 1,
+            "translation-in-points": [
+              0,
+              0
+            ]
+          },
+          "fill-specializations": [
+            {
+              "appearance": "tinted",
+              "value": {
+                "solid": "srgb:1.00000,1.00000,1.00000,1.00000"
+              }
+            }
+          ]
+        },
+        {
+          "image-name": "02-right-return.svg",
+          "name": "02-right-return",
+          "opacity": 1,
+          "blend-mode": "normal",
+          "glass": true,
+          "position": {
+            "scale": 1,
+            "translation-in-points": [
+              0,
+              0
+            ]
+          },
+          "fill-specializations": [
+            {
+              "appearance": "tinted",
+              "value": {
+                "solid": "srgb:0.78431,0.78431,0.78431,1.00000"
+              }
+            }
+          ]
+        },
+        {
+          "image-name": "01-rear-ribbon.svg",
+          "name": "01-rear-ribbon",
+          "glass": true,
+          "position": {
+            "scale": 1,
+            "translation-in-points": [
+              0,
+              0
+            ]
+          },
+          "fill-specializations": [
+            {
+              "appearance": "tinted",
+              "value": {
+                "solid": "srgb:0.65098,0.65098,0.65098,1.00000"
+              }
+            }
+          ]
+        }
+      ],
+      "name": "Continuous asymmetrical Mobius ribbon",
+      "specular": false,
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.05
+      },
+      "blur-material": null,
+      "translucency": {
+        "enabled": false,
+        "value": 0
+      }
+    }
+  ],
+  "supported-platforms": {
+    "squares": "shared"
+  },
+  "fill-specializations": [
+    {
+      "value": {
+        "solid": "srgb:0.97255,0.98039,1.00000,1.00000"
+      }
+    },
+    {
+      "appearance": "dark",
+      "value": {
+        "solid": "srgb:0.06667,0.08235,0.14510,1.00000"
+      }
+    },
+    {
+      "appearance": "tinted",
+      "value": {
+        "solid": "srgb:0.14510,0.14510,0.14510,1.00000"
+      }
+    }
+  ]
+}

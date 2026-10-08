@@ -4,6 +4,50 @@
 
 ---
 
+## イテレーション1226.488：採用メビウスを正式App Iconへ接続
+
+### 背景・問題意識
+
+オーナーからNotion Megrumのアイコン作成タスクを実行する依頼。M173「採用メビウス案をLiquid Glass対応の正式App Iconへ仕上げる」と2026-10-07本人採用画像を取得し、左小・右大の交差メビウス＋多色方向を基準に正式資産を作成した。固定調査SHA `a2bcba0a74914dbd9d2cdda82139a79e77a86b9d` は保持し、`codex/megrum-m173-mobius-icon`で作業。
+
+### 変更内容
+
+#### `MegrumMobius.icon/` / `ios-native/App/IconComposerAssets/Mobius/`
+- 採用PNG／JPEGから、背面・右内側・前面のSVG3面を再構成。非対称ループ、中央交差、多色グラデーションを保持し、追加記号は入れない。
+- 編集可能なIcon Composer文書と、Default／Dark／Tinted Light・Dark／Clear Light・Darkのappearanceを作成。強いspecularとtranslucencyを抑え、単色でも前後関係が残る濃淡を設定。
+- Apple公式ictoolでiOS 27世代6モード×7サイズ、26世代6モード×1024pxの計48枚を生成し、寸法と小サイズの判読性を確認。
+
+#### `ios-native/MegrumNative.xcodeproj/project.pbxproj` / `ios-native/App/Assets.xcassets/`
+- Debug／ReleaseのApp Icon参照を `MegrumMobius`へ変更。
+- 予備AppIcon、認証・共有画像等のMegrumBrandIcon、起動・読み込みのLaunchIcon、めぐりタブのTabMeguriIconを同じ新メビウスへ更新。画像名、Swift View、配置、template指定は維持。
+
+#### `scripts/create-m173-mobius-sources.py` / `scripts/export-m173-mobius-previews.py` / `notes/83_m173_mobius_app_icon.md`
+- 再生成手順、48プレビュー、旧資産の役割、検証と未確認事項を記録。旧star／heart／起動案は削除せず履歴保持。
+- 本人共有の `icon-composer-mcp@1.1.1` のCLIを一時環境で使用。MCP設定やアプリの依存には追加しない。
+
+### 影響範囲
+
+iOSアイコン資産とApp Icon設定のみ。アプリ全体カラー、永続化、DB/API、状態遷移、分析、通知、認証処理、画面レイアウト、ナビゲーション、ユーザー表示文言は維持。状態・用語・データモデル変更がないため09／10／05は更新不要。Webアイコンは範囲外として維持。
+
+### 確認方法
+
+- SVG XML／icon・imageset JSON／project plist、参照画像ファイル・寸法、SVG正本との一致、`git diff --check`：passed。
+- `python3 scripts/export-m173-mobius-previews.py`：48枚＋確認sheet2枚、1024／180／120／87／60／40／29px、passed。
+- `xcodebuild -list -project /tmp/megrum-m173-validation/ios-native/MegrumNative.xcodeproj`：passed。
+- `xcodebuild -project /tmp/megrum-m173-validation/ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-m173-xcodebuild CODE_SIGNING_ALLOWED=NO build`：BUILD SUCCEEDED。
+  - Google DriveのNSFileCoordinator待ちを回避するため、固定HEADのgit archive＋本差分だけの同一ソースをローカルで確認。
+  - actoolのApp Icon入力、ビルド済みInfo.plist、生成された旧OS向けPNGとAssets.carを読戻し、新メビウスと旧アイコン参照解除を確認。
+
+### セルフレビュー結果
+
+- ✅ 本人採用の形・色方向を保持。元SVG未取得のため、採用画像からの再構成であり原作者SVGやピクセル完全一致とは区別した。
+- ✅ 新App Iconの編集可能な資産、OS実レンダリング、参照接続、Simulatorビルドを確認。アプリ全体色Token化はM170へ引き渡す。
+- ✅ 既存の無関係な `web/AGENTS.md`、`div,main`、`notes/legal/00_ai_handoff_plan.md` は変更・commit対象へ含めない。
+- ⚠️ 実機ホーム／Spotlight／Settings／通知、壁紙透過・動的反射、署名付きRelease／TestFlight／App Store提出は未実施。配布前確認として残す。
+- ⚠️ 既存Swiftコードのactor isolation warningあり。今回の資産エラーはなく、Swiftコードへは触れない。ロジック変更がないためunit testは追加・再実行しない。
+
+---
+
 ## イテレーション1226.487：公式サイト本番デプロイ＋web-only PR（恒久化）
 
 ### 背景・問題意識

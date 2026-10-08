@@ -1,0 +1,33 @@
+{
+  "source": "MegrumMobius.icon",
+  "tool": "/Applications/Xcode.app/Contents/Applications/Icon Composer.app/Contents/Executables/ictool",
+  "version": "27.0 (129)",
+  "platform": "iOS",
+  "design_generations": [
+    26,
+    27
+  ],
+  "renditions": [
+    "Default",
+    "Dark",
+    "TintedLight",
+    "TintedDark",
+    "ClearLight",
+    "ClearDark"
+  ],
+  "sizes_iOS27": [
+    1024,
+    180,
+    120,
+    87,
+    60,
+    40,
+    29
+  ],
+  "sizes_iOS26": [
+    1024
+  ],
+  "tint_color": 0.58,
+  "tint_strength": 0.8,
+  "clear_limitation": "OS shader export; live wallpaper and motion not tested by still exports"
+}

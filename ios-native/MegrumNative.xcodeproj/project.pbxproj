@@ -12,7 +12,7 @@
 		7C35B443C9C34E51AF45D3F2 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = C8F50324503B4596A4E03357 /* PrivacyInfo.xcprivacy */; };
 		8B8C7A1F2A03407C8E14D5B6 /* GoogleMobileAds in Frameworks */ = {isa = PBXBuildFile; productRef = 6E7A4F123BC74F69A2D9150C /* GoogleMobileAds */; };
 		A2F716C91609477A83F4F4C1 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 5FE3FB4473824B50B23B9D87 /* Assets.xcassets */; };
-		B1E54F89762842C7A1B05E31 /* MegrumIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = F4C8A9E13D6B4D1B93A67210 /* MegrumIcon.icon */; };
+		B1E54F89762842C7A1B05E31 /* MegrumMobius.icon in Resources */ = {isa = PBXBuildFile; fileRef = F4C8A9E13D6B4D1B93A67210 /* MegrumMobius.icon */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -24,7 +24,7 @@
 		C8F50324503B4596A4E03357 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		D3FBF9C8C95D427FAF75EE97 /* MegrumNative.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MegrumNative.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		EB317683D09049DF88A9DF5A /* MegrumNativeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MegrumNativeApp.swift; sourceTree = "<group>"; };
-		F4C8A9E13D6B4D1B93A67210 /* MegrumIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = ../MegrumIcon.icon; sourceTree = SOURCE_ROOT; };
+		F4C8A9E13D6B4D1B93A67210 /* MegrumMobius.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = ../MegrumMobius.icon; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -73,7 +73,7 @@
 			isa = PBXGroup;
 			children = (
 				62E971A7479443AEBA8CB754 /* App */,
-				F4C8A9E13D6B4D1B93A67210 /* MegrumIcon.icon */,
+				F4C8A9E13D6B4D1B93A67210 /* MegrumMobius.icon */,
 				6A31C4F4C6C2415E96E45DA8 /* Config */,
 				00AC5373E5B84AB5B97B34E1 /* Products */,
 			);
@@ -148,7 +148,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A2F716C91609477A83F4F4C1 /* Assets.xcassets in Resources */,
-				B1E54F89762842C7A1B05E31 /* MegrumIcon.icon in Resources */,
+				B1E54F89762842C7A1B05E31 /* MegrumMobius.icon in Resources */,
 				7C35B443C9C34E51AF45D3F2 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -172,7 +172,7 @@
 			baseConfigurationReference = 9722E6114D194F97A9D926F9 /* MegrumNative.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
-				ASSETCATALOG_COMPILER_APPICON_NAME = MegrumIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = MegrumMobius;
 				APS_ENVIRONMENT = development;
 				CODE_SIGN_ENTITLEMENTS = App/MegrumNative.entitlements;
 				CODE_SIGN_STYLE = Automatic;
@@ -201,7 +201,7 @@
 			baseConfigurationReference = 9722E6114D194F97A9D926F9 /* MegrumNative.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
-				ASSETCATALOG_COMPILER_APPICON_NAME = MegrumIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = MegrumMobius;
 				APS_ENVIRONMENT = production;
 				CODE_SIGN_ENTITLEMENTS = App/MegrumNative.entitlements;
 				CODE_SIGN_STYLE = Automatic;

@@ -1,0 +1,49 @@
+{
+  "xcode": "27.0 (27A266a)",
+  "icon_composer": "27.0 (129)",
+  "scheme": "MegrumNative",
+  "destination": "generic/platform=iOS Simulator",
+  "build": "BUILD SUCCEEDED",
+  "minimum_deployment_target": "17.0",
+  "icon_info": {
+    "CFBundleIcons": {
+      "CFBundlePrimaryIcon": {
+        "CFBundleIconFiles": [
+          "MegrumMobius60x60"
+        ],
+        "CFBundleIconName": "MegrumMobius"
+      }
+    },
+    "CFBundleIcons~ipad": {
+      "CFBundlePrimaryIcon": {
+        "CFBundleIconFiles": [
+          "MegrumMobius60x60",
+          "MegrumMobius76x76"
+        ]
+      }
+    }
+  },
+  "compiled_icon_names": [
+    "LaunchIcon",
+    "MegrumBrandIcon",
+    "MegrumMobius",
+    "MegrumMobius/Continuous asymmetrical Mobius ribbon",
+    "MegrumMobius_Assets/01-rear-ribbon",
+    "MegrumMobius_Assets/02-right-return",
+    "MegrumMobius_Assets/03-front-ribbon",
+    "MegrumMobius_Assets/Color-1",
+    "MegrumMobius_Assets/Color-2",
+    "MegrumMobius_Assets/Color-3",
+    "MegrumMobius_Assets/Color-4",
+    "MegrumMobius_Assets/Color-5",
+    "MegrumMobius_Assets/Color-6",
+    "TabMeguriIcon"
+  ],
+  "fixed_source_sha": "a2bcba0a74914dbd9d2cdda82139a79e77a86b9d",
+  "validation_source": "git archive of fixed HEAD plus icon-task changes; local copy for NSFileCoordinator workaround",
+  "unverified": [
+    "physical device appearances",
+    "live wallpaper refraction",
+    "signed Release/TestFlight/App Store submission"
+  ]
+}

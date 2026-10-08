@@ -1,5 +1,20 @@
 # Megrum Icon Composer assets
 
+## 現行採用アイコン（M173 / 2026-10-08）
+
+正式App Iconはリポジトリ直下の `MegrumMobius.icon/`。本人採用の非対称な交差メビウスと多色グラデーションを基準に、`Mobius/` のSVGを使用する。Xcode Debug / ReleaseともApp Icon名は `MegrumMobius`。
+
+- `Mobius/01-rear-ribbon.svg`：小さい左ループから大きい右ループへ上昇する背面。
+- `Mobius/02-right-return.svg`：右ループ内側で戻る帯。
+- `Mobius/03-front-ribbon.svg`：中央交差の前面を通る下降する帯。
+- `Mobius/megrum-mobius.svg`：同じ3面を統合したフラット前景。
+- `Mobius/megrum-mobius-mono.svg`：同じ外形の白いtemplate前景。
+- `Mobius/Previews/`：Apple `ictool` の6表示モード、1024 / 180 / 120 / 87 / 60 / 40 / 29px、iOS 26世代と27世代の比較。
+
+再生成・検証の手順、旧資産の扱い、未確認事項は `notes/83_m173_mobius_app_icon.md` を参照。以下は旧ハート案の記録であり、現行の推奨素材ではない。
+
+## 旧ハート案（履歴保持）
+
 Apple Icon Composer向けの前景SVG素材です。背景グラデーション、単色背景、外側の角丸マスクは含めていません。
 
 ## Recommended files
