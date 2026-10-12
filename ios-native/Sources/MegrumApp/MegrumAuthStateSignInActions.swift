@@ -22,6 +22,22 @@ extension MegrumAuthState {
         await runAuthAction {
             try await repository.signIn(email: trimmedEmail, password: password)
         }
+
+        // メール未確認のままログインした場合は確認コード入力へ誘導（コードも再送）。iter1226.418。
+        if session == nil, Self.isEmailNotConfirmedError(message: errorMessage) {
+            pendingSignUpCodeEmail = trimmedEmail
+            try? await repository.resendEmailCode(email: trimmedEmail, purpose: .signUp)
+            errorMessage = nil
+            successMessage = "メール認証が未完了です。確認コードを再送したので入力してください"
+        }
+    }
+
+    /// GoTrue の「Email not confirmed」を検出する（normalizedMessage 通過後の文字列でも拾う）。
+    private static func isEmailNotConfirmedError(message: String?) -> Bool {
+        let lowered = (message ?? "").lowercased()
+        return lowered.contains("not confirmed")
+            || lowered.contains("email_not_confirmed")
+            || lowered.contains("メール認証が完了していません")
     }
 
     public func signInWithApple(idToken: String, nonce: String, fullName: String?) async {

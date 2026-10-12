@@ -55,9 +55,14 @@ struct MeguriMessageInboxScreen: View {
                 .megrumInlineNavigationTitle()
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
-                        Button("閉じる") {
+                        // FB(iter1226.422)：スライド遷移に合わせ「閉じる」→戻るアイコンにする。
+                        Button {
                             close()
+                        } label: {
+                            Image(systemName: "chevron.backward")
+                                .font(.system(size: 16, weight: .semibold))
                         }
+                        .accessibilityLabel("戻る")
                     }
                 }
                 .refreshable {
@@ -170,7 +175,8 @@ private struct MeguriMessageThreadRow: View {
             VStack(alignment: .leading, spacing: 5) {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(thread.displayName)
-                        .font(.system(size: 16, weight: .black, design: .rounded))
+                        // FB(iter1226.424)：相手の名前は太字にしない。
+                        .font(.system(size: 16, weight: .medium, design: .rounded))
                         .foregroundStyle(MegrumTheme.ink)
                         .lineLimit(1)
 
@@ -339,6 +345,10 @@ struct MeguriMessagesScreen: View {
     @State private var photoPresentationState = MeguriMessagePhotoPresentationState()
     @State private var replyTarget: ChatReplyTarget?
     @State private var reportTargetMessage: MeguriMessage?
+    /// iter1226.461：描画するのは最新N件だけ。上へ遡るたびに1ページ分ずつ広げる
+    /// （全件を一度に組み立てると開いた瞬間が重く、最新位置の表示も不安定になるため）。
+    @State private var visibleMessageCount = MeguriMessagesScreen.messagePageSize
+    static let messagePageSize = 20
 
     private var messages: [MeguriMessage] {
         switch route.scope {
@@ -352,6 +362,11 @@ struct MeguriMessagesScreen: View {
                 )
             )
         }
+    }
+
+    /// 表示ウィンドウ（最新 visibleMessageCount 件）。
+    private var visibleMessages: [MeguriMessage] {
+        Array(messages.suffix(visibleMessageCount))
     }
 
     private var canUseMeguriMessages: Bool {
@@ -503,7 +518,7 @@ struct MeguriMessagesScreen: View {
     private var content: some View {
         ScrollViewReader { proxy in
             MeguriMessageList(
-                messages: messages,
+                messages: visibleMessages,
                 viewerID: appState.viewer?.id,
                 isLoading: appState.isLoadingMeguriMessages,
                 canReadIncomingMessages: canUseMeguriMessages,
@@ -539,13 +554,43 @@ struct MeguriMessagesScreen: View {
                     reportTargetMessage = message
                 },
                 onJumpToMessage: { messageID in
+                    // 引用元がウィンドウ外（古いページ）ならウィンドウを広げてからジャンプする。
+                    if !visibleMessages.contains(where: { $0.id == messageID }),
+                       let index = messages.firstIndex(where: { $0.id == messageID }) {
+                        visibleMessageCount = messages.count - index + MeguriMessagesScreen.messagePageSize / 2
+                        DispatchQueue.main.async {
+                            withAnimation(.snappy(duration: 0.3)) {
+                                proxy.scrollTo(messageID, anchor: .center)
+                            }
+                        }
+                        return
+                    }
                     withAnimation(.snappy(duration: 0.3)) {
                         proxy.scrollTo(messageID, anchor: .center)
                     }
+                },
+                hasOlderMessages: messages.count > visibleMessages.count,
+                onLoadOlder: {
+                    // iter1226.461：上端に到達→1ページ分広げる。広げた後も
+                    // 直前の先頭メッセージが同じ位置に見えるよう位置を復元する。
+                    guard let anchorID = visibleMessages.first?.id else {
+                        return
+                    }
+                    visibleMessageCount += MeguriMessagesScreen.messagePageSize
+                    DispatchQueue.main.async {
+                        var transaction = Transaction()
+                        transaction.disablesAnimations = true
+                        withTransaction(transaction) {
+                            proxy.scrollTo(anchorID, anchor: .top)
+                        }
+                    }
                 }
             )
-            .onChange(of: messages.count) { _, _ in
-                guard let lastID = messages.last?.id else {
+            // iter1226.461：新着（末尾が変わった時）だけ最下部へ。ページングで件数が
+            // 変わった時に飛ばないよう、count ではなく末尾IDで判定する。
+            // 初期表示は defaultScrollAnchor(.bottom) が最新位置に置くのでスクロール不要。
+            .onChange(of: messages.last?.id) { _, lastID in
+                guard let lastID else {
                     return
                 }
                 withAnimation(.snappy(duration: 0.24)) {

@@ -47,6 +47,12 @@ public struct PreviewMegrumRepository: MegrumRepository {
         )
     }
 
+    /// プレビュー/QA用：megrum・hana は使用済みとして扱う（重複NG＋候補提示の確認用）。
+    public func takenAccountHandles(among handles: [String]) async throws -> Set<String> {
+        let taken: Set<String> = ["megrum", "hana"]
+        return Set(handles.map { $0.lowercased() }.filter { taken.contains($0) })
+    }
+
     public func completeAccountSetup(_ input: AccountSetupInput) async throws -> UserProfile {
         UserProfile(
             id: NativePreviewData.viewer.id,

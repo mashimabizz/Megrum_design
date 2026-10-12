@@ -647,3 +647,88 @@ final class MeguriAccessPolicyTests: XCTestCase {
         XCTAssertEqual(MegrumLocationState.meguriNotice(phase: .notDetermined, errorMessage: nil)?.message, "現在地を許可すると、近くのグルームと1km圏内のチャットルームを表示できます")
     }
 }
+
+@MainActor
+final class MeguriBoardReplyGateTests: XCTestCase {
+    private let viewerID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+    private let otherID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+    private let current = MegrumLocationCoordinate(latitude: 35.681236, longitude: 139.767125)
+
+    private func thread(
+        authorID: UUID,
+        latitude: Double? = nil,
+        longitude: Double? = nil
+    ) -> BoardThread {
+        BoardThread(
+            id: UUID(),
+            authorID: authorID,
+            title: "チャットルーム",
+            body: "本文",
+            audience: .nearby3km,
+            latitude: latitude,
+            longitude: longitude
+        )
+    }
+
+    func testReplyAllowedWithinOneKilometer() {
+        let nearby = thread(authorID: otherID, latitude: 35.684236, longitude: 139.767125)
+        XCTAssertTrue(
+            MeguriAccessPolicy.canReplyToBoard(nearby, currentCoordinate: current, viewerID: viewerID)
+        )
+    }
+
+    func testReplyBlockedOutsideOneKilometerEvenIfViewable() {
+        let far = thread(authorID: otherID, latitude: 35.701236, longitude: 139.767125)
+        XCTAssertFalse(
+            MeguriAccessPolicy.canReplyToBoard(far, currentCoordinate: current, viewerID: viewerID)
+        )
+    }
+
+    func testAuthorCanReplyEvenOutsideRange() {
+        let far = thread(authorID: viewerID, latitude: 35.701236, longitude: 139.767125)
+        XCTAssertTrue(
+            MeguriAccessPolicy.canReplyToBoard(far, currentCoordinate: current, viewerID: viewerID)
+        )
+    }
+
+    func testThreadWithoutLocationHasNoDistanceRestriction() {
+        let located = thread(authorID: otherID)
+        XCTAssertTrue(
+            MeguriAccessPolicy.canReplyToBoard(located, currentCoordinate: nil, viewerID: viewerID)
+        )
+    }
+
+    func testUnknownCurrentLocationBlocksReplyForLocatedThread() {
+        let far = thread(authorID: otherID, latitude: 35.701236, longitude: 139.767125)
+        XCTAssertFalse(
+            MeguriAccessPolicy.canReplyToBoard(far, currentCoordinate: nil, viewerID: viewerID)
+        )
+    }
+}
+
+@MainActor
+final class MeguriMapViewportMergeTests: XCTestCase {
+    private struct Item: Identifiable, Equatable {
+        var id: Int
+        var label: String
+    }
+
+    func testMergingPrefersIncomingAndKeepsViewportOnlyItems() {
+        let viewportAccumulated = [
+            Item(id: 1, label: "viewport-stale"),
+            Item(id: 3, label: "viewport-only")
+        ]
+        let freshBase = [
+            Item(id: 1, label: "base-fresh"),
+            Item(id: 2, label: "base-only")
+        ]
+
+        let merged = MegrumAppState.mergingByID(existing: viewportAccumulated, incoming: freshBase)
+
+        XCTAssertEqual(merged.map(\.id), [1, 2, 3])
+        // 同一IDは新しい取得結果（base）を優先する
+        XCTAssertEqual(merged.first?.label, "base-fresh")
+        // ビューポートでしか取れていない圏外分は消えない
+        XCTAssertTrue(merged.contains(Item(id: 3, label: "viewport-only")))
+    }
+}

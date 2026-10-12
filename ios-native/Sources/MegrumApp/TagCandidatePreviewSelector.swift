@@ -32,10 +32,29 @@ struct TagCandidatePreviewSelector: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.vertical, 2)
             } else {
+                // iter1226.452：タグの高さを固定（プレビュー画像はタグ列の下に別枠で出す）。
+                // 以前はプレビュー吹き出しがタグのセル内に入り、選択のたびに折り返しが変わって
+                // タグの位置がズレ、押しづらくなっていた。
                 WrappingTagFlow(spacing: 8, rowSpacing: 8) {
                     ForEach(candidateNames, id: \.self) { name in
                         tagButton(name)
                     }
+                }
+
+                if let previewedName = previewState.previewedName,
+                   !isSelected(previewedName),
+                   candidateNames.contains(previewedName) {
+                    TagCandidatePreviewGroup(
+                        name: previewedName,
+                        items: previewItemsByTag[previewedName] ?? [],
+                        onRegister: {
+                            MegrumHaptics.performSelectionChanged {
+                                toggle(previewedName)
+                            }
+                        }
+                    )
+                    .padding(.top, 2)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
                 }
             }
         }
@@ -69,8 +88,7 @@ struct TagCandidatePreviewSelector: View {
         let selected = isSelected(name)
         let previewing = previewState.isPreviewing(name)
         let disabled = previewState.isDisabled(name, selectedNames: selectedNames, maxSelection: maxSelection)
-        return VStack(alignment: .leading, spacing: 0) {
-            Button {
+        return Button {
                 if selected || previewing {
                     MegrumHaptics.performSelectionChanged {
                         toggle(name)
@@ -103,23 +121,12 @@ struct TagCandidatePreviewSelector: View {
                         .strokeBorder(MegrumTheme.lavender.opacity(previewing ? 0.45 : 0.22), lineWidth: 1)
                 }
                 .fixedSize(horizontal: true, vertical: false)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("シリーズ候補 #\(name)")
-            .accessibilityHint(previewing ? "もう一度タップするとこのシリーズを選択します" : "タップすると紐づく画像の吹き出しを表示します")
-            .disabled(disabled)
-            .opacity(disabled ? 0.45 : 1)
-
-            if previewing && !selected {
-                TagCandidatePreviewPopover(
-                    name: name,
-                    items: previewItemsByTag[name] ?? []
-                )
-                .padding(.top, 7)
-                .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .topLeading)))
-            }
         }
-        .zIndex(previewing ? 2 : 0)
+        .buttonStyle(.plain)
+        .accessibilityLabel("シリーズ候補 #\(name)")
+        .accessibilityHint(previewing ? "もう一度タップするとこのシリーズを選択します" : "タップすると紐づく画像を下に表示します")
+        .disabled(disabled)
+        .opacity(disabled ? 0.45 : 1)
     }
 
     private func toggle(_ name: String) {
@@ -134,62 +141,53 @@ struct TagCandidatePreviewSelector: View {
     }
 }
 
-private struct TagCandidatePreviewPopover: View {
+/// iter1226.452：候補タグ列の「下」に別枠で出す紐づき画像プレビュー。
+/// タグのセル内に入れないので、タップしてもタグの折り返し順は変わらない。
+private struct TagCandidatePreviewGroup: View {
     var name: String
     var items: [TagPreviewItem]
+    var onRegister: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 6) {
                 Text("#\(name)")
-                    .font(.system(size: 12, weight: .black, design: .rounded))
+                    .font(.system(size: 12.5, weight: .black, design: .rounded))
                     .foregroundStyle(MegrumTheme.ink)
-                Text("もう一度タップで登録")
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
-                    .foregroundStyle(MegrumTheme.muted)
+                Spacer(minLength: 8)
+                Button(action: onRegister) {
+                    Text("このシリーズを登録")
+                        .font(.system(size: 12, weight: .black, design: .rounded))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 12)
+                        .frame(height: 28)
+                        .background(MegrumTheme.lavender, in: Capsule())
+                }
+                .buttonStyle(.plain)
             }
 
-            HStack(spacing: 8) {
-                ForEach(items.prefix(3)) { item in
-                    ListingGoodsImage(url: item.imageURL, title: item.title, cornerRadius: 8)
-                        .frame(width: 44, height: 44)
-                }
-                if items.isEmpty {
-                    Text("紐づく画像はまだありません")
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
-                        .foregroundStyle(MegrumTheme.muted)
-                        .frame(height: 44)
+            if items.isEmpty {
+                Text("紐づく画像はまだありません")
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .foregroundStyle(MegrumTheme.muted)
+                    .frame(height: 44)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(items) { item in
+                            ListingGoodsImage(url: item.imageURL, title: item.title, cornerRadius: 8)
+                                .frame(width: 52, height: 52)
+                        }
+                    }
                 }
             }
         }
-        .padding(10)
-        .frame(width: TagCandidatePreviewMetrics.width, alignment: .leading)
-        .background(.white.opacity(0.96), in: RoundedRectangle(cornerRadius: 15, style: .continuous))
-        .overlay(alignment: .topLeading) {
-            Triangle()
-                .fill(.white.opacity(0.96))
-                .frame(width: 16, height: 8)
-                .offset(x: 24, y: -7)
-        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(MegrumTheme.lavender.opacity(0.07), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 15, style: .continuous)
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .strokeBorder(MegrumTheme.lavender.opacity(0.18), lineWidth: 1)
         }
-        .shadow(color: MegrumTheme.ink.opacity(0.08), radius: 12, y: 5)
-    }
-}
-
-enum TagCandidatePreviewMetrics {
-    static let width: CGFloat = 232
-}
-
-private struct Triangle: Shape {
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        path.move(to: CGPoint(x: rect.midX, y: rect.minY))
-        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
-        path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
-        path.closeSubpath()
-        return path
     }
 }

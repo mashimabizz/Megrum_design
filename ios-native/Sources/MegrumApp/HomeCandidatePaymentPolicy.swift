@@ -4,17 +4,23 @@ import MegrumCore
 enum HomeCandidatePaymentPolicy {
     static func signals(
         viewerMethods: [String]?,
-        partnerMethods: [String]?
+        partnerMethods: [String]?,
+        viewerBankNames: [String] = [],
+        partnerBankNames: [String] = []
     ) -> HomePaymentConditionSignals {
         signals(
             viewerMethods: viewerMethods,
-            partnerMethodsList: [partnerMethods]
+            partnerMethodsList: [partnerMethods],
+            viewerBankNames: viewerBankNames,
+            partnerBankNames: partnerBankNames
         )
     }
 
     static func signals(
         viewerMethods: [String]?,
-        partnerMethodsList: [[String]?]
+        partnerMethodsList: [[String]?],
+        viewerBankNames: [String] = [],
+        partnerBankNames: [String] = []
     ) -> HomePaymentConditionSignals {
         let viewer = paymentProfile(from: viewerMethods)
         let partners = partnerMethodsList.map(paymentProfile(from:))
@@ -39,7 +45,9 @@ enum HomeCandidatePaymentPolicy {
             hasCompatiblePaymentMethod: status == .compatible,
             status: status,
             viewerMethods: methods(viewer.rawMethods),
-            partnerMethods: methods(Set(partners.flatMap(\.rawMethods)))
+            partnerMethods: methods(Set(partners.flatMap(\.rawMethods))),
+            partnerBankNames: partnerBankNames,
+            viewerBankNames: viewerBankNames
         )
     }
 

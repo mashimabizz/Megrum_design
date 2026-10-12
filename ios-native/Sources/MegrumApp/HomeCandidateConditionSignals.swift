@@ -25,6 +25,8 @@ public struct HomeExchangeConditionSignals: Equatable, Sendable {
     public var partnerLocalConditionText: String?
     public var viewerShippingFeeTitle: String?
     public var partnerShippingFeeTitle: String?
+    /// 相手の発送目安（例: 2〜4日以内）。郵送行のサブに併記する。
+    public var partnerShippingDaysTitle: String?
     public var localRouteAvailable: Bool
     public var localRoutePrefectureMatches: Bool
     public var localRouteDateMatches: Bool
@@ -51,6 +53,7 @@ public struct HomeExchangeConditionSignals: Equatable, Sendable {
         partnerLocalConditionText: String? = nil,
         viewerShippingFeeTitle: String? = nil,
         partnerShippingFeeTitle: String? = nil,
+        partnerShippingDaysTitle: String? = nil,
         localRouteAvailable: Bool? = nil,
         localRoutePrefectureMatches: Bool? = nil,
         localRouteDateMatches: Bool? = nil,
@@ -74,6 +77,7 @@ public struct HomeExchangeConditionSignals: Equatable, Sendable {
         self.partnerLocalConditionText = partnerLocalConditionText
         self.viewerShippingFeeTitle = viewerShippingFeeTitle
         self.partnerShippingFeeTitle = partnerShippingFeeTitle
+        self.partnerShippingDaysTitle = partnerShippingDaysTitle
         self.localRouteAvailable = localRouteAvailable ?? localExchangeSelected
         self.localRoutePrefectureMatches = localRoutePrefectureMatches ?? prefectureMatches
         self.localRouteDateMatches = localRouteDateMatches ?? dateMatches
@@ -110,19 +114,48 @@ public struct HomePaymentConditionSignals: Equatable, Sendable {
     public var status: HomePaymentConditionStatus
     public var viewerMethods: [UserPaymentMethod]
     public var partnerMethods: [UserPaymentMethod]
+    /// 相手可視の受け取り銀行名（銀行振込の表示・同一銀行太字に使う）。
+    public var partnerBankNames: [String]
+    /// 自分の受け取り銀行名（同一銀行判定に使う）。
+    public var viewerBankNames: [String]
 
     public init(
         hasCompatiblePaymentMethod: Bool,
         requiresPayment: Bool = false,
         status: HomePaymentConditionStatus? = nil,
         viewerMethods: [UserPaymentMethod] = [],
-        partnerMethods: [UserPaymentMethod] = []
+        partnerMethods: [UserPaymentMethod] = [],
+        partnerBankNames: [String] = [],
+        viewerBankNames: [String] = []
     ) {
         self.hasCompatiblePaymentMethod = hasCompatiblePaymentMethod
         self.requiresPayment = requiresPayment
         self.status = status ?? (hasCompatiblePaymentMethod ? .compatible : .methodMismatch)
         self.viewerMethods = UserPaymentMethod.normalized(viewerMethods)
         self.partnerMethods = UserPaymentMethod.normalized(partnerMethods)
+        self.partnerBankNames = Self.cleanedBankNames(partnerBankNames)
+        self.viewerBankNames = Self.cleanedBankNames(viewerBankNames)
+    }
+
+    /// 相手の銀行名のうち、自分の登録銀行と同じ銀行（太字対象）のキー集合。
+    public var sharedBankMatchKeys: Set<String> {
+        let viewerKeys = Set(viewerBankNames.compactMap { BankMaster.matchKey(displayName: $0) })
+        return Set(partnerBankNames.compactMap { name in
+            BankMaster.matchKey(displayName: name)
+        }).intersection(viewerKeys)
+    }
+
+    private static func cleanedBankNames(_ names: [String]) -> [String] {
+        var seen = Set<String>()
+        var result: [String] = []
+        for name in names {
+            let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty, seen.insert(trimmed).inserted else {
+                continue
+            }
+            result.append(trimmed)
+        }
+        return result
     }
 
     public static var none: HomePaymentConditionSignals {
@@ -154,7 +187,12 @@ public struct HomeCandidateConditionSignals: Equatable, Sendable {
     public var payment: HomePaymentConditionSignals
     public var linkCounts: HomeCandidateLinkCounts
     public var individualListingSelection: HomeIndividualListingSelectionContext?
+    /// 「求めてる？」用：相手のほしいものを条件型選択肢へ合成したもの（iter1226.417）。
+    /// 個別募集の選択肢とは別枠で、需要判定（超求）には使わない。
+    public var wishWantedOptions: [HomeIndividualListingWantedOption] = []
     public var wishMatchedOfferGoodsIDs: [UUID]
+    /// wishMatchedOfferGoodsIDs のうち、シリーズ等が無記載で「確定」できない（＝不確定「？」）分。iter1226.363。
+    public var wishTentativeOfferGoodsIDs: [UUID]
     public var wishMatchedPartnerUserIDs: [UUID]
     public var matchesViewerWish: Bool
     public var matchesViewerWishCharacter: Bool
@@ -169,7 +207,9 @@ public struct HomeCandidateConditionSignals: Equatable, Sendable {
         payment: HomePaymentConditionSignals = .none,
         linkCounts: HomeCandidateLinkCounts = .zero,
         individualListingSelection: HomeIndividualListingSelectionContext? = nil,
+        wishWantedOptions: [HomeIndividualListingWantedOption] = [],
         wishMatchedOfferGoodsIDs: [UUID] = [],
+        wishTentativeOfferGoodsIDs: [UUID] = [],
         wishMatchedPartnerUserIDs: [UUID] = [],
         matchesViewerWish: Bool = false,
         matchesViewerWishCharacter: Bool = false,
@@ -182,7 +222,9 @@ public struct HomeCandidateConditionSignals: Equatable, Sendable {
         self.payment = payment
         self.linkCounts = linkCounts
         self.individualListingSelection = individualListingSelection
+        self.wishWantedOptions = wishWantedOptions
         self.wishMatchedOfferGoodsIDs = Self.orderedUnique(wishMatchedOfferGoodsIDs)
+        self.wishTentativeOfferGoodsIDs = Self.orderedUnique(wishTentativeOfferGoodsIDs)
         self.wishMatchedPartnerUserIDs = Self.orderedUnique(wishMatchedPartnerUserIDs)
         self.matchesViewerWish = matchesViewerWish
         self.matchesViewerWishCharacter = matchesViewerWishCharacter

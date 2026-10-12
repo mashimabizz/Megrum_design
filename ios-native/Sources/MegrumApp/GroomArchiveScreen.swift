@@ -9,6 +9,10 @@ struct GroomArchiveScreen: View {
     @Environment(\.dismiss) private var dismiss
     @State private var cameraPosition: MapCameraPosition = .automatic
     @State private var presentationState = GroomArchivePresentationState()
+    /// iter1226.459：アーカイブのピンもめぐりホームと同じ標準zoomで開く（iOS18+）。
+    /// 旧経路（immersiveオーバーレイ）はiOS17フォールバックのみ。
+    @State private var zoomRoute: GroomMapViewerRoute?
+    @Namespace private var groomZoomNamespace
 
     private var archivedGrooms: [GroomPost] {
         GroomArchiveOrdering.sorted(appState.ownGroomArchive)
@@ -25,7 +29,8 @@ struct GroomArchiveScreen: View {
                 cameraPosition: $cameraPosition,
                 grooms: archivedGrooms,
                 currentCoordinate: currentCoordinate,
-                onSelect: { presentationState.select($0) }
+                onSelect: openArchivedGroom,
+                groomZoomNamespace: groomZoomNamespace
             )
             .ignoresSafeArea()
 
@@ -79,6 +84,18 @@ struct GroomArchiveScreen: View {
             updateCameraPositionForFocusedGroom()
         }
         #if os(iOS)
+        // iter1226.459：めぐりホームと同一方式（fullScreenCover + 標準zoom）。
+        // source は地図overlayの常設ピン（GroomArchiveMap）なのでタップ即・一体でズームする。
+        .fullScreenCover(item: $zoomRoute) { route in
+            GroomArchiveStoryScreen(
+                grooms: route.grooms,
+                initialGroom: route.initialGroom,
+                appState: appState,
+                onDismiss: { zoomRoute = nil }
+            )
+            .modifier(GroomMapZoomDestination(sourceID: route.sourceID, namespace: groomZoomNamespace))
+        }
+        // iOS17フォールバック（openArchivedGroom が selectedGroom を立てた時のみ）。
         .groomViewerImmersiveOverlay(item: $presentationState.selectedGroom) { groom, dismiss in
             GroomArchiveStoryScreen(
                 grooms: archivedGrooms,
@@ -101,6 +118,21 @@ struct GroomArchiveScreen: View {
                 SubscriptionSettingsScreen(appState: appState)
             }
         }
+    }
+
+    /// iter1226.459：iOS18+は標準zoom（source常設・タップ即提示）、iOS17は旧オーバーレイ。
+    private func openArchivedGroom(_ groom: GroomPost) {
+        #if os(iOS)
+        if #available(iOS 18.0, *) {
+            zoomRoute = GroomMapViewerRoute(
+                sourceID: .groom(groom.id),
+                grooms: archivedGrooms,
+                initialGroom: groom
+            )
+            return
+        }
+        #endif
+        presentationState.select(groom)
     }
 
     private func updateCameraPosition() {

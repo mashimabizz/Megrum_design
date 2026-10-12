@@ -14,18 +14,63 @@ final class HomeCandidateDemandPolicyTests: XCTestCase {
             HomeCandidateDemandPolicy.demandLine(for: signals),
             .hotDemand(goodsIDs: [goodsID])
         )
-        XCTAssertEqual(HomeCandidateDemandPolicy.demandRank(for: signals), 4)
+        XCTAssertEqual(HomeCandidateDemandPolicy.demandRank(for: signals), 6)
     }
 
-    func testConditionOptionMatchIsDemand() {
+    func testConditionOptionMatchIsHotDemand() {
+        // iter1226.362：個別募集の条件選択肢を満たせる場合も超求（指名と同じ扱い）。
         let goodsID = UUID()
         let signals = makeSignals(
             wantedOptions: [makeOption(kind: .condition, matchingGoodsIDs: [goodsID])]
         )
         XCTAssertEqual(
             HomeCandidateDemandPolicy.demandLine(for: signals),
-            .demand(goodsIDs: [goodsID])
+            .hotDemand(goodsIDs: [goodsID])
         )
+        XCTAssertEqual(HomeCandidateDemandPolicy.demandRank(for: signals), 6)
+    }
+
+    func testListingTentativeOnlyIsHotDemandTentative() {
+        // iter1226.363：無記載で確定できない一致だけなら「超求めてる？」。
+        let goodsID = UUID()
+        let signals = makeSignals(
+            wantedOptions: [makeOption(kind: .condition, matchingGoodsIDs: [goodsID], tentativeGoodsIDs: [goodsID])]
+        )
+        XCTAssertEqual(
+            HomeCandidateDemandPolicy.demandLine(for: signals),
+            .hotDemandTentative(goodsIDs: [goodsID])
+        )
+        XCTAssertEqual(HomeCandidateDemandPolicy.demandRank(for: signals), 5)
+    }
+
+    func testConfirmedListingBeatsTentative() {
+        // 同じ選択肢群に確定と不確定が混在するなら確定（超求！）を優先。
+        let confirmedID = UUID()
+        let tentativeID = UUID()
+        let signals = makeSignals(
+            wantedOptions: [
+                makeOption(kind: .condition, matchingGoodsIDs: [tentativeID], tentativeGoodsIDs: [tentativeID]),
+                makeOption(kind: .goods, matchingGoodsIDs: [confirmedID])
+            ]
+        )
+        XCTAssertEqual(
+            HomeCandidateDemandPolicy.demandLine(for: signals),
+            .hotDemand(goodsIDs: [confirmedID])
+        )
+    }
+
+    func testWishTentativeIsDemandTentative() {
+        // ほしいもの一致が無記載で確定できないなら「求めてる？」。
+        let goodsID = UUID()
+        let signals = makeSignals(
+            wishMatchedOfferGoodsIDs: [goodsID],
+            wishTentativeOfferGoodsIDs: [goodsID]
+        )
+        XCTAssertEqual(
+            HomeCandidateDemandPolicy.demandLine(for: signals),
+            .demandTentative(goodsIDs: [goodsID])
+        )
+        XCTAssertEqual(HomeCandidateDemandPolicy.demandRank(for: signals), 3)
     }
 
     func testWishMatchWithoutListingIsDemand() {
@@ -37,7 +82,8 @@ final class HomeCandidateDemandPolicyTests: XCTestCase {
         )
     }
 
-    func testHotDemandBeatsConditionAndCash() {
+    func testListingOptionsAreHotDemandAndBeatCash() {
+        // 個別募集の選択肢（指名・条件どちらも）は激求で、定価より優先。
         let designatedID = UUID()
         let conditionID = UUID()
         let signals = makeSignals(
@@ -49,7 +95,7 @@ final class HomeCandidateDemandPolicyTests: XCTestCase {
         )
         XCTAssertEqual(
             HomeCandidateDemandPolicy.demandLine(for: signals),
-            .hotDemand(goodsIDs: [designatedID])
+            .hotDemand(goodsIDs: [conditionID, designatedID])
         )
     }
 
@@ -78,16 +124,33 @@ final class HomeCandidateDemandPolicyTests: XCTestCase {
         XCTAssertEqual(HomeCandidateDemandPolicy.demandRank(for: signals), 0)
     }
 
-    func testDemandGoodsIDsAreUniquedAcrossOptionsAndWish() {
+    func testHotDemandGoodsIDsAreUniquedAcrossListingOptions() {
+        // 激求のグッズIDは複数の個別募集選択肢を横断して重複排除される。
         let sharedID = UUID()
         let otherID = UUID()
         let signals = makeSignals(
-            wantedOptions: [makeOption(kind: .condition, matchingGoodsIDs: [sharedID, otherID])],
-            wishMatchedOfferGoodsIDs: [sharedID]
+            wantedOptions: [
+                makeOption(kind: .condition, matchingGoodsIDs: [sharedID]),
+                makeOption(kind: .goods, matchingGoodsIDs: [sharedID, otherID])
+            ]
         )
         XCTAssertEqual(
             HomeCandidateDemandPolicy.demandLine(for: signals),
-            .demand(goodsIDs: [sharedID, otherID])
+            .hotDemand(goodsIDs: [sharedID, otherID])
+        )
+    }
+
+    func testListingHotDemandBeatsWishDemand() {
+        // 個別募集ヒット（激求）は、ほしいものヒット（求）より優先される。
+        let listingID = UUID()
+        let wishID = UUID()
+        let signals = makeSignals(
+            wantedOptions: [makeOption(kind: .condition, matchingGoodsIDs: [listingID])],
+            wishMatchedOfferGoodsIDs: [wishID]
+        )
+        XCTAssertEqual(
+            HomeCandidateDemandPolicy.demandLine(for: signals),
+            .hotDemand(goodsIDs: [listingID])
         )
     }
 
@@ -222,6 +285,7 @@ final class HomeCandidateDemandPolicyTests: XCTestCase {
     private func makeOption(
         kind: HomeIndividualListingWantedOption.Kind,
         matchingGoodsIDs: [UUID] = [],
+        tentativeGoodsIDs: [UUID] = [],
         cashAmount: Int? = nil
     ) -> HomeIndividualListingWantedOption {
         HomeIndividualListingWantedOption(
@@ -232,6 +296,7 @@ final class HomeCandidateDemandPolicyTests: XCTestCase {
             kind: kind,
             goodsIDs: kind == .goods ? matchingGoodsIDs : [],
             matchingGoodsIDs: matchingGoodsIDs,
+            tentativeGoodsIDs: tentativeGoodsIDs,
             cashAmount: cashAmount
         )
     }
@@ -248,6 +313,7 @@ final class HomeCandidateDemandPolicyTests: XCTestCase {
         matchedDateKeys: Set<String> = [],
         wantedOptions: [HomeIndividualListingWantedOption] = [],
         wishMatchedOfferGoodsIDs: [UUID] = [],
+        wishTentativeOfferGoodsIDs: [UUID] = [],
         partnerLookingForText: String? = nil
     ) -> HomeCandidateConditionSignals {
         HomeCandidateConditionSignals(
@@ -270,6 +336,7 @@ final class HomeCandidateDemandPolicyTests: XCTestCase {
                 ? nil
                 : HomeIndividualListingSelectionContext(wantedOptions: wantedOptions),
             wishMatchedOfferGoodsIDs: wishMatchedOfferGoodsIDs,
+            wishTentativeOfferGoodsIDs: wishTentativeOfferGoodsIDs,
             partnerLookingForText: partnerLookingForText
         )
     }

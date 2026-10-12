@@ -5,6 +5,7 @@ import SwiftUI
 
 struct GoodsPhotoCropSession: Identifiable, Equatable {
     enum Source: Equatable {
+        case newPhoto
         case selectedPhoto(photoID: UUID)
         case tradingCardBulk
     }
@@ -48,14 +49,17 @@ struct GoodsPhotoCropSheet: View {
         _presentationState = State(initialValue: GoodsPhotoCropSheetPresentationState(initialFrames: session.initialFrames))
     }
 
+    private var isBulkSession: Bool {
+        session.source == .tradingCardBulk
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    Text("写真上をドラッグして切り取り枠を追加できます。不要な枠は下のプレビューから削除できます。")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(MegrumTheme.muted)
-                        .fixedSize(horizontal: false, vertical: true)
+                    if isBulkSession, !session.initialFrames.isEmpty {
+                        GoodsCropAutoDetectPill()
+                    }
 
                     GoodsCropFrameCanvas(
                         imageData: session.upload.data,
@@ -63,6 +67,11 @@ struct GoodsPhotoCropSheet: View {
                         selectedFrameID: $presentationState.selectedFrameID
                     )
                     .frame(height: 430)
+
+                    Text(hintText)
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(MegrumTheme.muted)
+                        .fixedSize(horizontal: false, vertical: true)
 
                     GoodsCropPreviewStrip(
                         imageData: session.upload.data,
@@ -81,7 +90,7 @@ struct GoodsPhotoCropSheet: View {
                     }
 
                     Button(action: applyCrops) {
-                        Text("この切り取りで追加")
+                        Text(applyTitle)
                             .font(.headline.weight(.black))
                             .foregroundStyle(.white)
                             .frame(maxWidth: .infinity)
@@ -89,8 +98,6 @@ struct GoodsPhotoCropSheet: View {
                             .background(MegrumTheme.lavender, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                     }
                     .buttonStyle(.plain)
-                    .disabled(!presentationState.canApply)
-                    .opacity(presentationState.canApply ? 1 : 0.45)
                 }
                 .padding(.horizontal, 18)
                 .padding(.top, 16)
@@ -104,32 +111,77 @@ struct GoodsPhotoCropSheet: View {
                     Button("閉じる", action: onCancel)
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("全削除", action: clearFrames)
-                        .disabled(!presentationState.canApply)
+                    Button("リセット", action: resetFrames)
                 }
             }
         }
+    }
+
+    private var hintText: String {
+        if isBulkSession {
+            "枠をタップして選択、ドラッグで移動、四隅で大きさを調整できます。"
+        } else {
+            "写真の上をドラッグすると切り取り枠を描けます。そのまま追加すると写真全体を使います。"
+        }
+    }
+
+    private var applyTitle: String {
+        presentationState.frames.isEmpty
+            ? "この内容で追加（写真全体）"
+            : "この内容で追加（\(presentationState.frames.count)件）"
     }
 
     private func deleteFrame(_ frameID: UUID) {
         presentationState.deleteFrame(frameID)
     }
 
-    private func clearFrames() {
-        presentationState.clearFrames()
+    private func resetFrames() {
+        presentationState.reset(to: session.initialFrames)
     }
 
     private func applyCrops() {
         do {
-            let results = try TradingCardBulkRecognizer.cropFramesSynchronously(presentationState.frames, in: session.upload.data)
-            let uploads = results.map(\.upload)
-            guard !uploads.isEmpty else {
-                presentationState.showEmptyFrameMessage()
-                return
+            var uploads: [GoodsPhotoUpload] = []
+            for frame in presentationState.frames {
+                if GoodsPhotoCropSheet.isEffectivelyFullFrame(frame.rect) {
+                    // ほぼ全体の枠は再エンコードせず元画像をそのまま使う
+                    uploads.append(session.upload)
+                } else {
+                    let results = try TradingCardBulkRecognizer.cropFramesSynchronously([frame], in: session.upload.data)
+                    uploads.append(contentsOf: results.map(\.upload))
+                }
+            }
+            if uploads.isEmpty {
+                // iter1226.436：枠なし＝写真全体をそのまま使う（再エンコードなし）。
+                uploads = [session.upload]
             }
             onApply(uploads)
         } catch {
             presentationState.showFailureMessage(error.localizedDescription)
         }
     }
+
+    static func isEffectivelyFullFrame(_ rect: CGRect, tolerance: CGFloat = 0.02) -> Bool {
+        rect.minX <= tolerance
+            && rect.minY <= tolerance
+            && rect.maxX >= 1 - tolerance
+            && rect.maxY >= 1 - tolerance
+    }
 }
+
+private struct GoodsCropAutoDetectPill: View {
+    var body: some View {
+        HStack(spacing: 8) {
+            Circle()
+                .fill(MegrumTheme.sky)
+                .frame(width: 8, height: 8)
+            Text("AIが枠を自動で配置しました")
+                .font(.caption.weight(.black))
+                .foregroundStyle(MegrumTheme.ink)
+        }
+        .padding(.horizontal, 13)
+        .padding(.vertical, 8)
+        .background(MegrumTheme.sky.opacity(0.24), in: Capsule())
+    }
+}
+

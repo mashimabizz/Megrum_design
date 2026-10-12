@@ -194,6 +194,12 @@ public struct UserSubscriptionState: Codable, Hashable, Sendable {
         isMegrumPlusActive || hasMeguriPlus || isPremiumActive
     }
 
+    /// FB8-7: 圏外グルームは「通知が飛んだもの」だけプレミアムで閲覧できる。
+    /// これはその「プレミアム」条件のみを表す（通知済み判定は別途 `wasNotified` で行う）。iter1226.388。
+    public var hasMeguriGroomExtendedAccess: Bool {
+        isMegrumPlusActive || hasMeguriPlus || isPremiumActive
+    }
+
     public var hasUnlimitedIndividualListings: Bool {
         isMegrumPlusActive
     }

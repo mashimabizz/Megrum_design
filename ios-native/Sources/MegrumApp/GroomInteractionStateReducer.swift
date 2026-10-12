@@ -35,4 +35,9 @@ public enum GroomInteractionStateReducer {
     public static func likedIDs(from posts: [GroomPost]) -> Set<UUID> {
         Set(posts.filter(\.liked).map(\.id))
     }
+
+    /// サーバーが返した閲覧済みフラグからIDセットを作る（iter1226.443）。
+    public static func viewedIDs(from posts: [GroomPost]) -> Set<UUID> {
+        Set(posts.filter(\.viewed).map(\.id))
+    }
 }

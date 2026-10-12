@@ -19,6 +19,30 @@ public extension SupabaseMegrumRepository {
         )
     }
 
+    func loadMeguriMapDensity(
+        minLatitude: Double,
+        minLongitude: Double,
+        maxLatitude: Double,
+        maxLongitude: Double,
+        cellDegrees: Double
+    ) async throws -> [MeguriMapDensityCell] {
+        try await groomClient.loadMeguriMapDensity(
+            minLatitude: minLatitude,
+            minLongitude: minLongitude,
+            maxLatitude: maxLatitude,
+            maxLongitude: maxLongitude,
+            cellDegrees: cellDegrees
+        )
+    }
+
+    func loadGroomPost(id: UUID) async throws -> GroomPost? {
+        try await groomClient.loadGroomPost(id: id)
+    }
+
+    func loadEncounteredGrooms(latitude: Double?, longitude: Double?) async throws -> [GroomPost] {
+        try await groomClient.loadEncounteredGrooms(latitude: latitude, longitude: longitude)
+    }
+
     func loadOwnGroomArchive(limit: Int) async throws -> [GroomPost] {
         try await groomClient.loadOwnGroomArchive(userID: viewerID, limit: limit)
     }
@@ -130,6 +154,10 @@ public extension SupabaseMegrumRepository {
 
     func loadBoardReplyPreviews(threadIDs: [UUID]) async throws -> [UUID: [String]] {
         try await boardClient.loadReplyPreviews(threadIDs: threadIDs)
+    }
+
+    func loadBoardReplyActivity(threadIDs: [UUID]) async throws -> [UUID: [Date]] {
+        try await boardClient.loadReplyActivity(threadIDs: threadIDs)
     }
 
     func loadBoardReplies(

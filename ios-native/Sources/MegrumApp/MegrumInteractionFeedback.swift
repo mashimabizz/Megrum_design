@@ -14,6 +14,15 @@ enum MegrumHaptics {
         #endif
     }
 
+    /// ドロワーを閉じるスワイプ確定時の触覚。開く時（buttonTap=0.58）よりほんの少しだけ弱く。
+    static func drawerClose() {
+        #if os(iOS)
+        let generator = UIImpactFeedbackGenerator(style: .light)
+        generator.prepare()
+        generator.impactOccurred(intensity: 0.42)
+        #endif
+    }
+
     static func longPress() {
         #if os(iOS)
         let generator = UIImpactFeedbackGenerator(style: .medium)
@@ -38,6 +47,15 @@ enum MegrumHaptics {
     static func performSelectionChanged(_ action: () -> Void) {
         selectionChanged()
         action()
+    }
+
+    /// 自動入力の成功など、操作なしで良いことが起きた時の通知触覚（iter1226.407）。
+    static func success() {
+        #if os(iOS)
+        let generator = UINotificationFeedbackGenerator()
+        generator.prepare()
+        generator.notificationOccurred(.success)
+        #endif
     }
 }
 

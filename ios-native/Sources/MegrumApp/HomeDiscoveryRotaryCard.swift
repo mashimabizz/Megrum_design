@@ -81,18 +81,22 @@ struct HomeDiscoveryRotaryCard: View {
     }
 
     private var visibleEntries: [HomeRotaryEntry] {
+        // 表示する3枚を中心に近い順で選ぶが、宣言順は index 固定にする。
+        // 位置順で並べ替えると回転アニメ中に ZStack の宣言順が入れ替わり、奥のカードが
+        // 一瞬手前に描画される（貫通して見える）。宣言順を安定させ zIndex だけで前後を決める。iter1226.379。
         goods.indices
             .map { index in
-                HomeRotaryEntry(goods: goods[index], position: relativePosition(for: index))
+                (index: index, entry: HomeRotaryEntry(goods: goods[index], position: relativePosition(for: index)))
             }
             .sorted { lhs, rhs in
-                if abs(lhs.position) == abs(rhs.position) {
-                    return lhs.position < rhs.position
+                if abs(lhs.entry.position) == abs(rhs.entry.position) {
+                    return lhs.entry.position < rhs.entry.position
                 }
-                return abs(lhs.position) < abs(rhs.position)
+                return abs(lhs.entry.position) < abs(rhs.entry.position)
             }
             .prefix(3)
-            .sorted { $0.position < $1.position }
+            .sorted { $0.index < $1.index }
+            .map(\.entry)
     }
 
     private func relativePosition(for index: Int) -> Double {

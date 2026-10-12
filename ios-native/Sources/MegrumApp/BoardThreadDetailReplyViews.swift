@@ -5,7 +5,6 @@ import SwiftUI
 struct BoardThreadChatTimeline: View {
     var messages: [BoardThreadChatMessageDisplay]
     var isLoadingReplies: Bool
-    var missingReplyContextMessage: String?
     var onReact: (BoardThreadChatMessageTarget, BoardMessageReaction?) -> Void
     var onOpenImage: (URL) -> Void = { _ in }
     var onReply: (BoardThreadChatMessageDisplay) -> Void = { _ in }
@@ -14,11 +13,6 @@ struct BoardThreadChatTimeline: View {
 
     var body: some View {
         LazyVStack(spacing: 8) {
-            if let missingReplyContextMessage {
-                MeguriNoticeBanner(message: missingReplyContextMessage)
-                    .padding(.horizontal, 16)
-            }
-
             ForEach(messages) { message in
                 if let daySeparatorText = message.daySeparatorText {
                     BoardChatDaySeparatorLabel(text: daySeparatorText)

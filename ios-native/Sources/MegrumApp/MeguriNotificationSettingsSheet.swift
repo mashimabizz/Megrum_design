@@ -14,12 +14,18 @@ struct MeguriNotificationSettingsSheet: View {
         List {
             Section {
                 Toggle("いいね・コメントの通知", isOn: groomActivityBinding)
-                Toggle("推しの新着グルーム", isOn: subscriptionBinding(\.groomOshiPushEnabled))
-                Toggle("圏内の新着グルーム", isOn: subscriptionBinding(\.groomNearbyPushEnabled))
+                Toggle("圏内の推しグルーム通知", isOn: groomOshiNearbyMasterBinding)
+                if appState.groomOshiPushNotificationsEnabled {
+                    NavigationLink {
+                        MeguriGroomOshiNotifySettingsScreen(appState: appState)
+                    } label: {
+                        Text("推しごとの通知設定")
+                    }
+                }
             } header: {
                 Text("グルーム")
             } footer: {
-                Text("推しは推し設定（グループ・メンバー）との一致で判定します。")
+                Text("最後にめぐりを開いた場所から約3km以内で、自分の推し（グループ・メンバー）に一致する新着グルームを通知します。")
             }
 
             Section {
@@ -72,6 +78,26 @@ struct MeguriNotificationSettingsSheet: View {
             set: { enabled in
                 Task {
                     await appState.setChatroomActivityPushNotificationsEnabled(enabled)
+                }
+            }
+        )
+    }
+
+    /// FB8-7: グルーム通知の親スイッチ（圏内 かつ 同一推し）。有効化時は今の位置を基準位置として保存する。iter1226.388。
+    private var groomOshiNearbyMasterBinding: Binding<Bool> {
+        Binding(
+            get: { appState.groomOshiPushNotificationsEnabled },
+            set: { enabled in
+                var next = currentSubscriptionSettings
+                next.groomOshiPushEnabled = enabled
+                Task {
+                    let saved = await appState.setMeguriSubscriptionPushSettings(next)
+                    if saved, enabled, let coordinate = currentCoordinate {
+                        await appState.updatePushNotificationLocationIfNeeded(
+                            latitude: coordinate.latitude,
+                            longitude: coordinate.longitude
+                        )
+                    }
                 }
             }
         )

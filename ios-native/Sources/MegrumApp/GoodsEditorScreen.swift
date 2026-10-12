@@ -53,6 +53,9 @@ struct GoodsEditorSheet: View {
     @State var isProcessingTradingCardBulk = false
     @State var tradingCardBulkStatusMessage: String?
     @State var cropSession: GoodsPhotoCropSession?
+    /// 追加直後トリミング必須フローの待ち行列（複数選択・連続撮影分を1枚ずつ処理）
+    @State var pendingCropUploads: [GoodsPhotoUpload] = []
+    @State var isShowingCreatePhotoSourceDialog = false
     @State var faceTaggingReviewQueue = FaceTaggingReviewQueue()
     @State var showsCreateOshiMasterSheet = false
     @State var createOshiRequestSheet: OshiRequestSheetState?
@@ -169,7 +172,7 @@ struct GoodsEditorSheet: View {
             }
 #endif
 #if os(iOS)
-            .sheet(item: $cameraCaptureRoute) { route in
+            .sheet(item: $cameraCaptureRoute, onDismiss: presentNextPendingCropSession) { route in
                 if route.target == .inventoryCreate {
                     // 複数枚登録は連続撮影（撮るたび左下プレビュー→左へシュッと消える）
                     ContinuousCameraCaptureView { imageData in
@@ -197,7 +200,7 @@ struct GoodsEditorSheet: View {
                 }
             }
 #endif
-            .sheet(item: $cropSession) { session in
+            .sheet(item: $cropSession, onDismiss: presentNextPendingCropSession) { session in
                 GoodsPhotoCropSheet(
                     session: session,
                     title: cropSheetTitle(for: session),
@@ -293,7 +296,8 @@ struct GoodsEditorSheet: View {
                     previewItemsByTag: editorTagPreviewItemsByTag,
                     navigationTitle: "シリーズを一括登録",
                     textFieldPlaceholder: "例：会場限定",
-                    footerText: "\(selectedCreateMetaIDs.count)件の画像に同じシリーズを追加します。",
+                    // iter1226.452：説明文「X件の画像に同じシリーズを追加します」は不要（オーナーFB）。
+                    footerText: nil,
                     confirmationTitle: "登録",
                     googleLensItems: selectedCreateMetaGoogleLensItems,
                     isOpeningGoogleLens: isOpeningGoogleLensSearch,
@@ -323,6 +327,11 @@ struct GoodsEditorSheet: View {
             } message: {
                 Text("シリーズを登録していないと、検索やマッチ候補で見つかりにくくなる可能性があります。なるべくシリーズを登録してください。")
             }
+            .goodsEditorCreatePhotoSourceDialog(
+                isPresented: $isShowingCreatePhotoSourceDialog,
+                onPickCamera: startInventoryCreateCamera,
+                onPickPhotoLibrary: showInventoryCreatePhotoLibrary
+            )
             .goodsEditorTradingCardBulkSourceDialog(
                 isPresented: $isShowingTradingCardBulkSourceDialog,
                 onPickCamera: startTradingCardBulkCamera,

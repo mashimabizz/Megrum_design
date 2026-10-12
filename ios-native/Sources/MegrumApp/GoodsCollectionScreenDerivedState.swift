@@ -176,6 +176,11 @@ extension GoodsCollectionScreen {
         entryKind == .inventory ? "マイグッズに追加" : "ほしいものを追加"
     }
 
+    /// フッター追加ボタンに表示する文字（iter1226.385 / FB8-9）。
+    var addButtonTitle: String {
+        entryKind == .inventory ? "グッズを追加" : "ほしいものを追加"
+    }
+
     var addButtonHint: String {
         entryKind == .inventory ? "新しいマイグッズの登録シートを開きます" : "新しいほしいものの登録シートを開きます"
     }

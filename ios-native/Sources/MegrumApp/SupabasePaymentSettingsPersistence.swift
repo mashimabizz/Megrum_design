@@ -25,7 +25,8 @@ final class SupabasePaymentSettingsPersistence: @unchecked Sendable {
             in: "users",
             values: UserPaymentSummaryUpdatePayload(
                 paymentMethods: normalized.methods,
-                paymentNote: normalized.otherNote
+                paymentNote: normalized.otherNote,
+                paymentBankNames: normalized.methods.contains(.bankTransfer) ? normalized.bankAccountDisplayNames : []
             ),
             // birth_date / bio を含むフル項目で返す。縮小selectのプロフィールを
             // そのまま viewer に代入すると、生年月日などがセッション内で消える。
@@ -49,11 +50,7 @@ final class SupabasePaymentSettingsPersistence: @unchecked Sendable {
         return UserPaymentSettings(
             userID: storedSettings.userID,
             methods: normalizedSettings.methods,
-            bankName: storedSettings.bankName,
-            bankBranchName: storedSettings.bankBranchName,
-            bankAccountType: storedSettings.bankAccountType,
-            bankAccountNumber: storedSettings.bankAccountNumber,
-            bankAccountHolder: storedSettings.bankAccountHolder,
+            bankAccounts: storedSettings.bankAccounts,
             otherNote: storedSettings.otherNote,
             createdAt: storedSettings.createdAt,
             updatedAt: storedSettings.updatedAt
@@ -70,6 +67,7 @@ final class SupabasePaymentSettingsPersistence: @unchecked Sendable {
             displayName: "Megrum",
             paymentMethods: normalizedSettings.methods,
             paymentNote: normalizedSettings.otherNote,
+            paymentBankNames: normalizedSettings.methods.contains(.bankTransfer) ? normalizedSettings.bankAccountDisplayNames : [],
             accountStatus: .active
         )
     }

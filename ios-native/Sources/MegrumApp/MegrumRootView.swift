@@ -5,6 +5,7 @@ import SwiftUI
 public struct MegrumRootView: View {
     @StateObject private var appState: MegrumAppState
     @StateObject private var authState: MegrumAuthState
+    @StateObject private var tutorialCoordinator = TutorialTourCoordinator()
     @State private var selectedTab: MegrumTab = .home
     @State private var showsSearch = false
     @State private var showsDrawer = false
@@ -44,6 +45,15 @@ public struct MegrumRootView: View {
         _selectedTab = State(initialValue: VisualQATabRouteResolver.initialTab(for: visualQAInitialScreen))
         _showsDrawer = State(initialValue: visualQAInitialScreen == .drawerOpen)
         _showsSearch = State(initialValue: visualQAInitialScreen == .search)
+        _drawerDestination = State(initialValue: {
+            switch visualQAInitialScreen {
+            case .oshiSettings, .oshiMasterSelect: .oshiSettings
+            case .notifications: .notifications
+            case .paymentSettings: .paymentSettings
+            case .exchangeSettings: .exchangeSettings
+            default: nil
+            }
+        }())
         let visualQAProfileUserID = ProcessInfo.processInfo.environment["MEGRUM_VISUAL_QA_PROFILE_USER_ID"]
             .flatMap(UUID.init(uuidString:)) ?? NativePreviewData.partnerID
         _publicProfileRoute = State(
@@ -62,6 +72,14 @@ public struct MegrumRootView: View {
         Group {
             if visualQAInitialScreen == .goodsTypeSelect {
                 GoodsTypeSelectPreview()
+            } else if visualQAInitialScreen == .addressSettings {
+                NavigationStack {
+                    AddressSettingsScreen(appState: appState)
+                }
+            } else if visualQAInitialScreen == .candidateSheet {
+                CandidateSheetVisualQAPreview()
+            } else if visualQAInitialScreen == .groomZoomSpike {
+                GroomZoomTransitionSpike()
             } else if AccountSetupSessionPolicy.shouldShowAuthScreen(
                 isAuthenticated: authState.isAuthenticated,
                 isReturningStoredIncompleteAccountToLogin: isReturningStoredIncompleteAccountToLogin
@@ -82,14 +100,19 @@ public struct MegrumRootView: View {
             guard let destination else {
                 return
             }
-            selectedTab = destination
+            // ツアー中は通知タブ遷移でスポットライトと実画面がズレるため破棄する。
+            if !tutorialCoordinator.isActive {
+                selectedTab = destination
+            }
             notificationDestinationTab = nil
         }
         .onChange(of: notificationRouteLinkPath) { _, linkPath in
             guard let linkPath else {
                 return
             }
-            handleNotificationRoute(linkPath: linkPath, kindRawValue: notificationRouteKindRawValue)
+            if !tutorialCoordinator.isActive {
+                handleNotificationRoute(linkPath: linkPath, kindRawValue: notificationRouteKindRawValue)
+            }
             notificationRouteLinkPath = nil
             notificationRouteKindRawValue = nil
         }
@@ -166,11 +189,20 @@ public struct MegrumRootView: View {
                     onOpenRouteIntent: { intent in
                         applyNotificationRouteIntent(intent)
                     },
+                    onStartTutorialChapter: { chapter in
+                        // ヘルプの「使い方ガイド」：シートを閉じてから章別再生を開始する。
+                        drawerDestination = nil
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                            tutorialCoordinator.startChapter(chapter)
+                        }
+                    },
                     onClose: dismiss
                 )
             }
         }
-        .megrumSlideItemPresentation(item: $publicProfileRoute) { route, _ in
+        // iter1226.476：プロフィールは横スワイプで誤って閉じないよう戻るスワイプ無効。
+        // 閉じるは画面左上の「閉じる」ボタン（standalone は表示される）で行う。
+        .megrumSlideItemPresentation(item: $publicProfileRoute, backSwipeInteractionScope: .none) { route, _ in
             NavigationStack {
                 PublicUserProfileScreen(
                     appState: appState,
@@ -213,6 +245,56 @@ public struct MegrumRootView: View {
             displayContext: adDisplayContext,
             configuration: adConfiguration
         )
+        .onChange(of: appState.viewer?.accountStatus) { oldValue, newValue in
+            startTutorialTourIfNeeded(oldStatus: oldValue, newStatus: newValue)
+        }
+        .onChange(of: tutorialCoordinator.currentBeat) { _, beat in
+            handleTutorialBeatChange(beat)
+        }
+        .onAppear {
+            startVisualQATutorialIfNeeded()
+        }
+    }
+
+    /// セットアップ完了直後（requiresSetup→active）に初回のみツアーを起動する。
+    private func startTutorialTourIfNeeded(oldStatus: AccountStatus?, newStatus: AccountStatus?) {
+        guard oldStatus?.requiresSetup == true, newStatus == .active else { return }
+        guard let userID = appState.viewer?.id else { return }
+        guard !OnboardingTutorialProgressStore.isTourCompleted(userID: userID) else { return }
+        tutorialCoordinator.start()
+    }
+
+    /// VisualQA（MEGRUM_VISUAL_QA_INITIAL_SCREEN=tutorial）では既読フラグを無視して強制起動する。
+    /// MEGRUM_VISUAL_QA_TUTORIAL_STEP でビートID（例: 4-7）指定、
+    /// MEGRUM_VISUAL_QA_TUTORIAL_CHAPTER で章別再生（ヘルプ導線相当）の直接起動もできる（スクショ検証用）。
+    private func startVisualQATutorialIfNeeded() {
+        guard visualQAInitialScreen == .tutorial, !tutorialCoordinator.isActive else { return }
+        let environment = ProcessInfo.processInfo.environment
+        if let chapter = VisualQAPreviewMode.tutorialStartChapter(environment: environment) {
+            tutorialCoordinator.startChapter(chapter)
+            return
+        }
+        let startBeat = VisualQAPreviewMode.tutorialStartBeat(environment: environment)
+        tutorialCoordinator.start(at: startBeat)
+    }
+
+    /// ビート変化に応じてタブを自動遷移し、割り込み抑制フラグと完了フラグを更新する。
+    private func handleTutorialBeatChange(_ beat: TutorialBeat?) {
+        appState.setTutorialActive(beat != nil)
+
+        guard let beat else {
+            // ツアー終了：全編再生の時だけ既読フラグを保存（ヘルプからの章別再生では触らない）。
+            if tutorialCoordinator.scope == .full, let userID = appState.viewer?.id {
+                OnboardingTutorialProgressStore.markTourCompleted(userID: userID)
+            }
+            return
+        }
+
+        requestedTradesStage = nil
+        if let section = beat.requestedWishSection {
+            requestedWishSection = section
+        }
+        selectedTab = beat.targetTab
     }
 
     private var directVisualQAProposalRoute: HomeRelationRoute? {
@@ -267,6 +349,7 @@ public struct MegrumRootView: View {
             homeSettingsRoute: $homeSettingsRoute,
             requestedWishSection: $requestedWishSection,
             pendingNotificationRouteIntent: $pendingNotificationRouteIntent,
+            tutorialCoordinator: tutorialCoordinator,
             adDisplayContext: adDisplayContext,
             visualQAInitialScreen: visualQAInitialScreen,
             onSignOut: {
@@ -292,6 +375,7 @@ public struct MegrumRootView: View {
         await authState.refreshSessionIfNeeded()
         await appState.replaceRepository(
             MegrumAppStateFactory.repository(authSession: authState.session),
+            authenticatedUserID: authState.session?.user.id,
             reloadsInitialData: reloadsInitialData
         )
         // アプリアイコンのバッジ（未読通知数）を起動直後から反映できるよう、
@@ -318,7 +402,7 @@ public struct MegrumRootView: View {
     private func applyNotificationRouteIntent(_ intent: NotificationRouteIntent) {
         selectedTab = intent.fallbackTab
         switch intent {
-        case .meguriMessages, .ownGroom:
+        case .meguriMessages, .ownGroom, .groomDetail:
             pendingNotificationRouteIntent = intent
         case .userProfile(let id), .userEvaluations(let id):
             guard let userID = UUID(uuidString: id) else {
@@ -356,6 +440,8 @@ public struct MegrumRootView: View {
     }
 
     private func requestInterstitial(_ placement: AdPlacement) {
+        // ツアー中はタブ自動遷移で広告が挟まらないよう抑制する。
+        guard !tutorialCoordinator.isActive else { return }
         interstitialAdRequest = AdInterstitialRequest(placement: placement)
     }
 }

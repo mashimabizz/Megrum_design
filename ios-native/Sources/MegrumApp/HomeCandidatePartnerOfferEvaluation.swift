@@ -53,7 +53,9 @@ struct HomeCandidatePartnerOfferEvaluation {
             tagMatchCount: tagMatchCount,
             linkCounts: partnerDemand.linkCounts,
             individualListingSelection: partnerDemand.individualListingSelection,
+            wishWantedOptions: partnerDemand.wishWantedOptions,
             wishMatchedOfferGoodsIDs: partnerDemand.wishMatchedOfferGoodsIDs,
+            wishTentativeOfferGoodsIDs: partnerDemand.wishTentativeOfferGoodsIDs,
             wishMatchedPartnerUserIDs: partnerDemand.wishMatchedPartnerUserIDs,
             ownerHasMegrumPlus: context.composition.megrumPlusUserIDs.contains(candidate.userId),
             partnerLookingForText: partnerDemand.partnerLookingForText

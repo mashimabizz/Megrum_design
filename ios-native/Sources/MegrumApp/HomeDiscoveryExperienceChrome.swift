@@ -53,16 +53,15 @@ extension HomeDiscoveryExperience {
                 .buttonStyle(.plain)
                 .accessibilityLabel("検索")
 
-                Button {
-                    showsMatchHelp = true
-                } label: {
-                    Image(systemName: "questionmark.circle.fill")
-                        .font(.system(size: 24, weight: .bold))
+                // iter1226.420：ヘルプ「？」を紙飛行機に置き換え、めぐりメッセージ一覧へ。
+                Button(action: onOpenMeguriMessages) {
+                    Image(systemName: "paperplane")
+                        .font(.system(size: 21, weight: .semibold))
                         .foregroundStyle(MegrumTheme.lavender)
                         .frame(width: 44, height: 44)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("マッチ表示のヘルプを開く")
+                .accessibilityLabel("めぐりメッセージを開く")
             }
             .frame(width: 94)
         }

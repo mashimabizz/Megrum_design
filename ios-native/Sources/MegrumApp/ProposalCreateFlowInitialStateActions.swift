@@ -4,6 +4,9 @@ import MegrumCore
 extension ProposalCreateFlow {
     func prepareInitialProposalState() {
         applyInitialExchangeMethodIfNeeded()
+        applyInitialMeetupIfNeeded()
+        applyInitialCashIfNeeded()
+        applyInitialMessageIfNeeded()
         applyInitialCashAmountIfNeeded()
         seedDefaultSenderSelection()
         seedDefaultReceiverSelection()
@@ -17,9 +20,22 @@ extension ProposalCreateFlow {
 
     func loadTargetOwnerExchangeContent() async {
         await appState.loadPublicExchangeContent(userID: targetItem.ownerID)
-        // 相手の交換カレンダー（現地交換可能な場所と日程）表示用。
+        // 相手の交換カレンダー（現地交換可能な場所と日程）と表示名のため、
+        // 相手のプロフィール・交換設定・アクティビティウィンドウを読み込む。
+        await appState.loadPublicUserProfile(userID: targetItem.ownerID, reportsFailure: false)
         await appState.loadPublicExchangeSettings(userID: targetItem.ownerID)
+        await appState.loadPartnerActivityWindows(userID: targetItem.ownerID)
+        // 自分の希望条件も相手と同じロジック・カレンダーで表示するため、
+        // 自分（打診者）の交換設定・アクティビティウィンドウも読み込む。
+        if let viewerID = appState.viewer?.id {
+            await appState.loadPublicExchangeSettings(userID: viewerID)
+            await appState.loadPartnerActivityWindows(userID: viewerID)
+        }
         syncPaymentSelectionIfNeeded()
+        // VisualQA：自分の交換条件カレンダーをタップ操作なしで検証する。
+        if ProcessInfo.processInfo.environment["MEGRUM_VISUAL_QA_OPEN_VIEWER_CALENDAR"] != nil {
+            showsViewerScheduleCalendar = true
+        }
     }
 
     func loadMailingAddressIfNeeded() async {
@@ -98,8 +114,81 @@ extension ProposalCreateFlow {
         exchangeMethod = initialExchangeMethod
     }
 
+    /// iter1226.423：再打診では元の待ち合わせを初期値として引き継ぐ。
+    /// 手渡し/両方はDB制約で待ち合わせ必須のため、空のまま送ると保存が確実に失敗する。
+    func applyInitialMeetupIfNeeded() {
+        guard initialStateFlags.claimInitialMeetupApplication() else {
+            return
+        }
+        guard let initialMeetup else {
+            return
+        }
+        meetupStartAt = initialMeetup.startAt
+        meetupEndAt = initialMeetup.endAt
+        meetupPlaceName = initialMeetup.placeName
+        meetupLatitudeText = String(initialMeetup.latitude)
+        meetupLongitudeText = String(initialMeetup.longitude)
+        meetupCandidateDrafts = [
+            ProposalMeetupCandidateDraft(
+                id: UUID(),
+                startAt: initialMeetup.startAt,
+                endAt: initialMeetup.endAt,
+                placeName: initialMeetup.placeName,
+                latitudeText: String(initialMeetup.latitude),
+                longitudeText: String(initialMeetup.longitude)
+            )
+        ]
+        selectedMeetupCandidateIndex = 0
+    }
+
+    /// iter1226.425：再打診では元の金額条件（定価など）を引き継ぐ。
+    /// 金額が落ちると cash_offer_consistency 制約に触れて保存できないため。
+    /// sender（自分が払う）は既存の applyInitialCashAmountIfNeeded が適用するので、
+    /// ここでは受け取り側（相手が払う）の金額と、対象側の cash モード切替を行う。
+    func applyInitialCashIfNeeded() {
+        guard initialStateFlags.claimInitialCashApplication() else {
+            return
+        }
+        guard let initialCashAmount, initialCashAmount > 0, let initialCashSide else {
+            return
+        }
+        switch initialCashSide {
+        case .sender:
+            valueSelectionState.senderSelectionMode = .cash
+            valueSelectionState.senderCashAmountText = String(initialCashAmount)
+        case .receiver:
+            valueSelectionState.receiverSelectionMode = .cash
+            valueSelectionState.receiverCashAmountText = String(initialCashAmount)
+        }
+    }
+
+    /// 判定から生成した相談文を、ユーザーが未入力の時だけ下書きとして入れる。
+    func applyInitialMessageIfNeeded() {
+        guard initialStateFlags.claimInitialMessageApplication() else {
+            return
+        }
+        guard let initialMessage = initialMessage?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !initialMessage.isEmpty,
+              message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        else {
+            return
+        }
+        message = String(initialMessage.prefix(Self.messageLimit))
+    }
+
     func applyVisualQAStateIfNeeded() {
         guard initialStateFlags.claimVisualQAStateApplication() else {
+            return
+        }
+        // 3/3「交換条件」を検証するQAルートは、提示物・受け取りを1件ずつシードして
+        // 交換条件ステップへ到達できるようにする（未選択だと give で待機してしまう）。
+        if visualQAInitialScreen == .proposalMeetup || visualQAInitialScreen == .proposalMeetupMonth {
+            if selectedSenderGoodsIDs.isEmpty, let first = selectableSenderGoods.first?.id {
+                toggleSenderGoods(first)
+            }
+            if selectedReceiverGoodsIDs.isEmpty, let first = receiverChoiceGoods.first?.id {
+                toggleReceiverGoods(first)
+            }
             return
         }
         guard visualQAInitialScreen == .proposalConfirm || visualQAInitialScreen == .proposalComplete else {

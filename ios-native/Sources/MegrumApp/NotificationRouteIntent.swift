@@ -17,6 +17,8 @@ enum NotificationRouteIntent: Equatable, Sendable {
     case meguriBoardThread(id: String, viewMode: String?)
     case meguriMessages(peerID: String?, open: String?)
     case ownGroom(postID: String?)
+    /// FB(iter1226.390): プッシュから特定グルームを直接開く（圏外は遭遇済み×プレミアム判定つき）。
+    case groomDetail(id: String)
     case userProfile(id: String)
     case userEvaluations(userID: String)
     case unknown(rawPath: String, fallbackTab: MegrumTab)
@@ -39,7 +41,7 @@ enum NotificationRouteIntent: Equatable, Sendable {
         case .tradeDetail, .tradeEvidenceCapture, .tradeEvidenceApproval,
              .tradeEvaluation, .tradeAssistance, .disputeDetail:
             .trades
-        case .meguriBoardThread, .meguriMessages, .ownGroom:
+        case .meguriBoardThread, .meguriMessages, .ownGroom, .groomDetail:
             .meguri
         case .userProfile, .userEvaluations:
             .home
@@ -52,6 +54,11 @@ enum NotificationRouteIntent: Equatable, Sendable {
     ) -> NotificationRouteIntent {
         if kind == .groomLiked {
             return ownGroomIntent(from: link)
+        }
+
+        // FB(iter1226.390): 圏内推しグルームの新着プッシュは特定グルームへ直接ディープリンク。
+        if kind == .groomPosted, let id = groomDetailID(from: link) {
+            return .groomDetail(id: id)
         }
 
         if (kind == .groomReply || kind == .meguriMessage),
@@ -144,6 +151,7 @@ enum NotificationRouteIntent: Equatable, Sendable {
             if let intent = meguriMessageIntent(from: link) {
                 return intent
             }
+            // groom_posted のみ特定グルームのディープリンク（圏外はゲート付き）。kind 判定は先頭で実施済み。
             return ownGroomIntent(from: link)
         case "meguri":
             return .tab(.meguri)
@@ -188,5 +196,10 @@ enum NotificationRouteIntent: Equatable, Sendable {
         let postID = link.queryValue("groompostid", "groom_post_id", "postid", "post_id", "id").nilIfBlank
             ?? link.firstUUIDLikeSegment
         return .ownGroom(postID: postID)
+    }
+
+    private static func groomDetailID(from link: NotificationLinkComponents) -> String? {
+        link.queryValue("groompostid", "groom_post_id", "postid", "post_id", "id").nilIfBlank
+            ?? link.firstUUIDLikeSegment
     }
 }

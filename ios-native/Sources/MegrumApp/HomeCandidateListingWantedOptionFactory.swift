@@ -18,10 +18,11 @@ enum HomeCandidateListingWantedOptionFactory {
             return cashWantedOption(option: option, logic: logic)
         }
 
+        let rowsByID = Self.rowsByID(previewInventory)
         let matchingItems = HomeCandidateListingWantedOptionMatchPolicy.matchingItems(
             for: option,
             in: viewerInventory,
-            wantedRowsByID: Self.rowsByID(previewInventory),
+            wantedRowsByID: rowsByID,
             tagsByInventoryID: tagsByInventoryID
         )
         guard HomeCandidateListingWantedOptionMatchPolicy.isSelectable(
@@ -36,13 +37,21 @@ enum HomeCandidateListingWantedOptionFactory {
             option: option,
             logic: logic,
             matchingItems: matchingItems,
+            tentativeGoodsIDs: Self.tentativeGoodsIDs(
+                option: option,
+                matchingItems: matchingItems,
+                rowsByID: rowsByID,
+                tagsByInventoryID: tagsByInventoryID
+            ),
             titlePreviewItems: [],
             previewItems: HomeCandidateListingWantedOptionPreviewBuilder.previewItems(
                 for: option,
                 matchingItems: matchingItems,
                 previewInventory: previewInventory,
                 tagsByInventoryID: tagsByInventoryID
-            )
+            ),
+            wantedRowsByID: rowsByID,
+            tagsByInventoryID: tagsByInventoryID
         )
     }
 
@@ -61,10 +70,11 @@ enum HomeCandidateListingWantedOptionFactory {
             return cashWantedOption(option: option, logic: logic)
         }
 
+        let rowsByID = Self.rowsByID(previewInventory)
         let matchingItems = HomeCandidateListingWantedOptionMatchPolicy.matchingItems(
             for: option,
             in: viewerInventory,
-            wantedRowsByID: Self.rowsByID(previewInventory),
+            wantedRowsByID: rowsByID,
             tagsByInventoryID: tagsByInventoryID
         )
         let previews = HomeCandidateListingWantedOptionPreviewBuilder.previewItems(
@@ -81,14 +91,53 @@ enum HomeCandidateListingWantedOptionFactory {
             option: option,
             logic: logic,
             matchingItems: matchingItems,
+            tentativeGoodsIDs: Self.tentativeGoodsIDs(
+                option: option,
+                matchingItems: matchingItems,
+                rowsByID: rowsByID,
+                tagsByInventoryID: tagsByInventoryID
+            ),
             titlePreviewItems: previews,
             previewItems: previews,
-            subtitleMatchingCount: max(matchingItems.count, previews.count)
+            subtitleMatchingCount: max(matchingItems.count, previews.count),
+            wantedRowsByID: rowsByID,
+            tagsByInventoryID: tagsByInventoryID
         )
+    }
+
+    /// matchingItems のうち、確度が不確定（メンバー・種別・シリーズが無記載）な分のID。iter1226.363。
+    private static func tentativeGoodsIDs(
+        option: SupabaseHomeListingWishOptionRow,
+        matchingItems: [SupabaseHomeGoodsRow],
+        rowsByID: [UUID: SupabaseHomeGoodsRow],
+        tagsByInventoryID: [UUID: [SupabaseHomeInventoryTagRow]]
+    ) -> [UUID] {
+        matchingItems
+            .filter { item in
+                HomeMutualMatchListingEvaluator.mutualOptionMatchConfidence(
+                    option,
+                    counterpartItem: item,
+                    rowsByID: rowsByID,
+                    tagsByInventoryID: tagsByInventoryID
+                ) == .tentative
+            }
+            .map(\.id)
     }
 
     private static func rowsByID(_ rows: [SupabaseHomeGoodsRow]) -> [UUID: SupabaseHomeGoodsRow] {
         Dictionary(rows.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+    }
+
+    /// iter1226.477：グッズ行から キャラID→表示名 の対応を作る（除外メンバー名の解決に使う）。
+    private static func characterNames(rows: [SupabaseHomeGoodsRow]) -> [UUID: String] {
+        var names: [UUID: String] = [:]
+        for row in rows {
+            guard let id = row.characterId, let name = row.characterName?.nilIfBlank, names[id] == nil else {
+                continue
+            }
+            names[id] = name
+        }
+        return names
     }
 
     private static func cashWantedOption(
@@ -111,9 +160,12 @@ enum HomeCandidateListingWantedOptionFactory {
         option: SupabaseHomeListingWishOptionRow,
         logic: ListingLogic,
         matchingItems: [SupabaseHomeGoodsRow],
+        tentativeGoodsIDs: [UUID] = [],
         titlePreviewItems: [HomeIndividualListingWantedPreviewItem],
         previewItems: [HomeIndividualListingWantedPreviewItem],
-        subtitleMatchingCount: Int? = nil
+        subtitleMatchingCount: Int? = nil,
+        wantedRowsByID: [UUID: SupabaseHomeGoodsRow] = [:],
+        tagsByInventoryID: [UUID: [SupabaseHomeInventoryTagRow]] = [:]
     ) -> HomeIndividualListingWantedOption {
         let kind: HomeIndividualListingWantedOption.Kind = option.wishIds.isEmpty ? .condition : .goods
         return HomeIndividualListingWantedOption(
@@ -134,10 +186,106 @@ enum HomeCandidateListingWantedOptionFactory {
             kind: kind,
             goodsIDs: option.wishIds,
             matchingGoodsIDs: matchingItems.map(\.id),
+            tentativeGoodsIDs: tentativeGoodsIDs,
             previewItems: previewItems,
             groupID: option.wishGroupId,
-            goodsTypeID: option.wishGoodsTypeId
+            goodsTypeID: option.wishGoodsTypeId,
+            conditionSummary: kind == .condition
+                ? Self.conditionSummary(
+                    option: option,
+                    matchingItems: matchingItems,
+                    // iter1226.477：除外メンバーの具体名を出すため、名前解決元を
+                    // マッチ済み自分グッズだけでなく相手在庫（previewInventory）まで広げる。
+                    characterNamesByID: Self.characterNames(rows: matchingItems + Array(wantedRowsByID.values))
+                )
+                : nil,
+            namedPairings: kind == .goods
+                ? Self.namedPairings(
+                    option: option,
+                    matchingItems: matchingItems,
+                    wantedRowsByID: wantedRowsByID,
+                    tagsByInventoryID: tagsByInventoryID
+                )
+                : [],
+            quantity: option.wishQuantity
         )
+    }
+
+    /// 指名オプションの「相手のほしいもの1件 → 充てられる自分の候補」対応。iter1226.373。
+    /// 相手のほしいもの画像（相手自身のほしいもの行）と、それを満たせる自分のマッチ済みグッズをメンバー等で紐づける。
+    private static func namedPairings(
+        option: SupabaseHomeListingWishOptionRow,
+        matchingItems: [SupabaseHomeGoodsRow],
+        wantedRowsByID: [UUID: SupabaseHomeGoodsRow],
+        tagsByInventoryID: [UUID: [SupabaseHomeInventoryTagRow]]
+    ) -> [HomeWantedNamedPairing] {
+        option.wishIds.compactMap { wishID -> HomeWantedNamedPairing? in
+            guard let wanted = wantedRowsByID[wishID] else {
+                return nil
+            }
+            let candidateIDs = matchingItems
+                .filter { item in
+                    HomeMutualMatchListingEvaluator.wishGoodsConfidence(
+                        wish: wanted,
+                        item: item,
+                        tagsByInventoryID: tagsByInventoryID
+                    ) != nil
+                }
+                .map(\.id)
+            return HomeWantedNamedPairing(
+                id: wanted.id,
+                title: wanted.title,
+                imageURL: GoodsPhotoURLResolver.displayURL(from: wanted.photoUrls),
+                characterID: wanted.characterId,
+                candidateGoodsIDs: candidateIDs
+            )
+        }
+    }
+
+    /// 条件指定型の選択肢を「TWICE / トレカ / メンバー / #シリーズ」の1文字列にする。
+    /// グループ・種別名はマッチしたグッズ（同属性）から取り、シリーズは選択肢に保存された文字列を使う。iter1226.371。
+    private static func conditionSummary(
+        option: SupabaseHomeListingWishOptionRow,
+        matchingItems: [SupabaseHomeGoodsRow],
+        characterNamesByID: [UUID: String] = [:]
+    ) -> String? {
+        var parts: [String] = []
+        if let groupID = option.wishGroupId,
+           let name = (matchingItems.first { $0.groupId == groupID }?.groupName
+            ?? matchingItems.first?.groupName)?.nilIfBlank {
+            parts.append(name)
+        }
+        if let goodsTypeID = option.wishGoodsTypeId,
+           let name = (matchingItems.first { $0.goodsTypeId == goodsTypeID }?.goodsTypeName
+            ?? matchingItems.first?.goodsTypeName)?.nilIfBlank {
+            parts.append(name)
+        }
+        if !option.wishMemberIds.isEmpty {
+            // iter1226.477：メンバー名は widened な名前解決元（自分グッズ＋相手在庫）から引く。
+            let resolvedNames = option.wishMemberIds.compactMap { memberID -> String? in
+                characterNamesByID[memberID]
+                    ?? matchingItems.first { $0.characterId == memberID }?.characterName?.nilIfBlank
+            }
+            if option.excludesWishMembers {
+                // 除外は「誰を除くか」を正確に示す必要があるため、全員解決できた時だけ具体名にする。
+                // 一部でも名前不明なら誤解を招くので従来どおり「一部メンバー除く」。
+                if resolvedNames.count == option.wishMemberIds.count, !resolvedNames.isEmpty {
+                    parts.append("以外: " + resolvedNames.joined(separator: "・"))
+                } else {
+                    parts.append("一部メンバー除く")
+                }
+            } else if !resolvedNames.isEmpty {
+                parts.append(resolvedNames.joined(separator: "・"))
+            }
+        }
+        if !option.wishSeriesNames.isEmpty {
+            let series = option.wishSeriesNames
+                .map { $0.hasPrefix("#") ? String($0.dropFirst()) : $0 }
+                .filter { !$0.isEmpty }
+                .map { "#\($0)" }
+            parts.append(contentsOf: series)
+        }
+        return parts.isEmpty ? nil : parts.joined(separator: " / ")
     }
 
 }

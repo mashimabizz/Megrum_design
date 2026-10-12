@@ -15,6 +15,7 @@ struct MegrumAuthenticatedTabsView: View {
     @Binding var homeSettingsRoute: HomeSettingsRoute?
     @Binding var requestedWishSection: WishCollectionSection?
     @Binding var pendingNotificationRouteIntent: NotificationRouteIntent?
+    @ObservedObject var tutorialCoordinator: TutorialTourCoordinator
     var adDisplayContext: AdDisplayContext
     var visualQAInitialScreen: VisualQAInitialScreen?
     var onSignOut: () async -> Void
@@ -34,12 +35,16 @@ struct MegrumAuthenticatedTabsView: View {
         ) {
             tabContent
         }
-        #if os(iOS)
         // タブバーはグルーム表示オーバーレイが上から覆うため隠さない。
         // UIKit直叩き（isHidden）やtoolbar切替はiOS 27で復帰に失敗し、
         // タブバーが消えたままになる不具合の原因だった。
-        .statusBarHidden(isGroomViewerPresented)
-        #endif
+        //
+        // iter1226.448：ステータスバーも隠さない。`.statusBarHidden(isGroomViewerPresented)` は
+        // 開くスプリングの最中にステータスバー非表示アニメ（＝セーフエリア変化）を並走させ、
+        // スケール中の面の中でインセットが毎フレーム再解決されて中央配置の写真が
+        // 約10pt「ガクッと下がって戻る」直接原因だった（実機のレイアウト計測 iter1226.448 で確認）。
+        // ビューア上部は黒帯（topObstruction）で覆っており、ステータスバーは
+        // インスタのストーリー同様に表示したままにする。
     }
 
     private var tabContent: some View {
@@ -53,6 +58,7 @@ struct MegrumAuthenticatedTabsView: View {
             requestedWishSection: $requestedWishSection,
             pendingNotificationRouteIntent: $pendingNotificationRouteIntent,
             isGroomViewerPresented: $isGroomViewerPresented,
+            tutorialCoordinator: tutorialCoordinator,
             adDisplayContext: adDisplayContext,
             visualQAInitialScreen: visualQAInitialScreen,
             onOpenDrawer: openDrawer,
@@ -104,6 +110,11 @@ struct AppDrawerInteractiveHost<Content: View>: View {
 
     private let content: Content
     @State private var dragTranslation: CGFloat = 0
+    // 閉じスワイプ（フリック含む）が発生している間はドロワー項目のタップを無効化する。
+    // 子ボタン側の抑制ジェスチャ（minimumDistance: 8）は、慣性で閉じる小さなフリックを
+    // 取りこぼしてタップ扱いになる不具合があったため、閉じ判定の権威である親の
+    // pan（minimumDistance: 6）が動いた瞬間にこのフラグで抑制する。iter1226.456。
+    @State private var suppressesDrawerItemTap = false
 
     init(
         appState: MegrumAppState,
@@ -136,6 +147,7 @@ struct AppDrawerInteractiveHost<Content: View>: View {
                     isPresented: $showsDrawer,
                     presentationProgress: drawerPresentation.progress,
                     drawerWidth: drawerPresentation.drawerWidth,
+                    suppressesItemTap: suppressesDrawerItemTap,
                     appState: appState,
                     onSelectDestination: onSelectDestination,
                     onSignOut: onSignOut
@@ -209,6 +221,11 @@ struct AppDrawerInteractiveHost<Content: View>: View {
                     isPresented: showsDrawer,
                     translation: value.translation
                 ) {
+                    if showsDrawer, !suppressesDrawerItemTap {
+                        // 開いているドロワー上で実ドラッグ（閉じスワイプ）が始まった。
+                        // この瞬間に項目タップを抑制する（フリックでもここは必ず通る）。
+                        suppressesDrawerItemTap = true
+                    }
                     updateDragTranslation(translation)
                 } else {
                     resetDismissDrag()
@@ -217,6 +234,7 @@ struct AppDrawerInteractiveHost<Content: View>: View {
             .onEnded { value in
                 guard allowsStart(value.startLocation) else {
                     resetDismissDrag()
+                    scheduleDrawerItemTapSuppressionRelease()
                     return
                 }
                 guard let targetVisibility = AppDrawerGestureResolver.targetVisibility(
@@ -226,14 +244,38 @@ struct AppDrawerInteractiveHost<Content: View>: View {
                     drawerWidth: drawerTravel
                 ) else {
                     resetDismissDrag(animated: true)
+                    scheduleDrawerItemTapSuppressionRelease()
                     return
                 }
 
+                // スワイプの指が離れ「開閉が確定した瞬間」に触覚フィードバック（開くアニメの完了待ちはしない）。
+                // 開く時は buttonTap、閉じる時はほんの少しだけ弱い drawerClose。iter1226.397。
+                let willOpenViaSwipe = targetVisibility && !showsDrawer
+                let willCloseViaSwipe = !targetVisibility && showsDrawer
+                if willOpenViaSwipe {
+                    MegrumHaptics.buttonTap()
+                } else if willCloseViaSwipe {
+                    MegrumHaptics.drawerClose()
+                }
                 withAnimation(AppDrawerInteractiveMetrics.animation) {
                     showsDrawer = targetVisibility
                     dragTranslation = 0
                 }
+                scheduleDrawerItemTapSuppressionRelease()
             }
+    }
+
+    /// 指を離した後も、閉じアニメ中に発火するボタンタップ（onEnded とボタン action の
+    /// 発火順は不定）を取りこぼさないよう、少し遅延してから抑制を解除する。
+    private func scheduleDrawerItemTapSuppressionRelease() {
+        guard suppressesDrawerItemTap else {
+            return
+        }
+        DispatchQueue.main.asyncAfter(
+            deadline: .now() + AppDrawerGestureResolver.drawerItemTapSuppressionDuration
+        ) {
+            suppressesDrawerItemTap = false
+        }
     }
 
     private func updateDragTranslation(_ translation: CGFloat) {

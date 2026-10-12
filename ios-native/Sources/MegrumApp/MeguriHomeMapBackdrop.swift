@@ -8,10 +8,14 @@ struct MeguriHomeMapBackdrop: View {
     var selectedKind: MeguriMapKind
     var grooms: [GroomPost]
     var threads: [BoardThread]
+    /// iter1226.434：ズームアウト時に出す「おおよその件数」セル。
+    var densityCells: [MeguriMapDensityCell] = []
     /// チャットルームの吹き出し演出用：スレッドID→最新メッセージ本文。
     var replyPreviewsByThreadID: [UUID: [String]] = [:]
     var currentCoordinate: MegrumLocationCoordinate?
     var viewerID: UUID?
+    /// iter1226.444：既読グルームのピン枠をグレーにする判定用。
+    var viewedGroomIDs: Set<UUID> = []
     var subscriptionState: UserSubscriptionState
     var onSelectGroom: (GroomPost, UnitPoint) -> Void
     var onSelectThread: (BoardThread) -> Void
@@ -21,6 +25,22 @@ struct MeguriHomeMapBackdrop: View {
     var onCreateThreadAtPendingCoordinate: () -> Void
     var onCancelPendingCreationCoordinate: () -> Void
     var onViewportChange: (MKCoordinateRegion) -> Void = { _ in }
+    /// iter1226.458：単体グルームピンをホームレールと同じ標準zoomのsourceにする（iOS18+）。
+    var groomZoomNamespace: Namespace.ID? = nil
+
+    /// iter1226.458：カメラ移動ごとにoverlayピンの位置を追従させるためのtick。
+    @State private var cameraUpdateTick = 0
+
+    /// iter1226.458：iOS18+かつnamespaceありなら、単体グルームピンの見た目はoverlay側
+    /// （常設matchedTransitionSource）に出し、Annotation側は透明タップ領域にする。
+    private var usesOverlayGroomPins: Bool {
+        #if canImport(UIKit)
+        if #available(iOS 18.0, *), groomZoomNamespace != nil {
+            return true
+        }
+        #endif
+        return false
+    }
 
     /// 表示中スパン（クラスタリング粒度に使用）。カメラ操作の終了時に更新。
     @State private var visibleSpanLatitudeDelta = MeguriHomeMapCamera.focusedSpan.latitudeDelta
@@ -42,6 +62,12 @@ struct MeguriHomeMapBackdrop: View {
     }
 
     private func recomputeDisplayElements() {
+        // iter1226.434：密度表示中は個別ピンを出さない（バブルと二重にならないように）。
+        if isDensityMode {
+            morphToken = UUID()
+            displayedElements = []
+            return
+        }
         let visibleGrooms = (selectedKind == .all || selectedKind == .grooms) ? grooms : []
         let visibleThreads = (selectedKind == .all || selectedKind == .boards)
             ? threads.filter { $0.latitude != nil && $0.longitude != nil }
@@ -159,6 +185,30 @@ struct MeguriHomeMapBackdrop: View {
         }
     }
 
+    /// iter1226.434：ズームアウト中は個別ピンではなく件数バブルを表示する。
+    private var isDensityMode: Bool {
+        MeguriMapDensityPlanner.isDensityMode(spanLatitudeDelta: visibleSpanLatitudeDelta)
+    }
+
+    /// 密度バブルタップ：そのセルへ寄って、ピン表示モード（実データ読み込み）に入る。
+    private func zoomToDensityCell(_ cell: MeguriMapDensityCell, containerSize: CGSize) {
+        let targetSpan = MeguriMapDensityPlanner.zoomSpan(currentSpanLatitudeDelta: visibleSpanLatitudeDelta)
+        let aspect = containerSize.width > 0 && containerSize.height > 0
+            ? max(containerSize.height / containerSize.width, 1)
+            : 2.2
+        withAnimation(.smooth(duration: 0.34)) {
+            cameraPosition = .region(
+                MKCoordinateRegion(
+                    center: CLLocationCoordinate2D(latitude: cell.latitude, longitude: cell.longitude),
+                    span: MKCoordinateSpan(
+                        latitudeDelta: targetSpan,
+                        longitudeDelta: targetSpan / aspect
+                    )
+                )
+            )
+        }
+    }
+
     var body: some View {
         GeometryReader { geometry in
             MapReader { proxy in
@@ -177,6 +227,23 @@ struct MeguriHomeMapBackdrop: View {
                             }
                         }
 
+                        if isDensityMode {
+                            ForEach(densityCells) { cell in
+                                Annotation("", coordinate: CLLocationCoordinate2D(
+                                    latitude: cell.latitude,
+                                    longitude: cell.longitude
+                                )) {
+                                    Button {
+                                        MegrumHaptics.buttonTap()
+                                        zoomToDensityCell(cell, containerSize: geometry.size)
+                                    } label: {
+                                        MeguriDensityBubble(cell: cell)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                        }
+
                         ForEach(displayedElements) { displayed in
                             let coordinate = CLLocationCoordinate2D(
                                 latitude: displayed.latitude,
@@ -192,21 +259,22 @@ struct MeguriHomeMapBackdrop: View {
                                             sourceAnchor(for: groom, in: proxy, containerSize: geometry.size)
                                         )
                                     } label: {
-                                        MeguriPinConditionalPopIn(popsIn: displayed.popsIn) {
-                                            MeguriFloatingMotion(seed: groom.id.hashValue) {
-                                                GroomMapPin(
-                                                    groom: groom,
-                                                    isOutOfRange: !MeguriAccessPolicy.canOpenGroom(
-                                                        groom,
-                                                        currentCoordinate: currentCoordinate,
-                                                        viewerID: viewerID
-                                                    )
-                                                )
+                                        if usesOverlayGroomPins {
+                                            // iter1226.458：見た目はoverlay側の常設ピン。ここはタップ領域だけ。
+                                            Color.clear
+                                                .frame(width: 62, height: 66)
+                                                .contentShape(Rectangle())
+                                        } else {
+                                            MeguriPinConditionalPopIn(popsIn: displayed.popsIn) {
+                                                MeguriFloatingMotion(seed: groom.id.hashValue) {
+                                                    groomPinView(groom)
+                                                }
                                             }
                                         }
                                     }
                                     .buttonStyle(.plain)
                                     .opacity(displayed.opacity)
+                                    .accessibilityLabel("グルーム")
                                 }
 
                             case .single(.thread(let thread)):
@@ -247,7 +315,7 @@ struct MeguriHomeMapBackdrop: View {
                                     } label: {
                                         MeguriPinConditionalPopIn(popsIn: displayed.popsIn) {
                                             MeguriFloatingMotion(seed: cluster.id.hashValue) {
-                                                MeguriClusterPin(cluster: cluster)
+                                                MeguriClusterPin(cluster: cluster, viewedGroomIDs: viewedGroomIDs)
                                                     .overlay(alignment: .top) {
                                                         let clusterPreviews = cluster.items.flatMap { item -> [String] in
                                                             if case .thread(let thread) = item {
@@ -272,6 +340,12 @@ struct MeguriHomeMapBackdrop: View {
 
                     }
                     .mapStyle(MeguriMapVisualStyle.quietStandard)
+                    .onMapCameraChange(frequency: .continuous) { _ in
+                        // iter1226.458：overlayの常設グルームピンをパン/ズームに追従させる。
+                        if usesOverlayGroomPins {
+                            cameraUpdateTick &+= 1
+                        }
+                    }
                     .onMapCameraChange(frequency: .onEnd) { context in
                         visibleSpanLatitudeDelta = context.region.span.latitudeDelta
                         onViewportChange(context.region)
@@ -305,6 +379,9 @@ struct MeguriHomeMapBackdrop: View {
                                 )
                             }
                     )
+                    .overlay {
+                        groomZoomSourcePinsOverlay(proxy: proxy)
+                    }
                     .overlay {
                         MeguriMapBrandToneOverlay(
                             topWhiteOpacity: 0.80,
@@ -359,6 +436,51 @@ private func isMergeCluster(_ element: MeguriMapClusterBuilder.Element, mergedHe
 }
 
 private extension MeguriHomeMapBackdrop {
+    /// 単体グルームピンの見た目（Annotation側とoverlay側で共通）。
+    func groomPinView(_ groom: GroomPost) -> some View {
+        GroomMapPin(
+            groom: groom,
+            isOutOfRange: !MeguriAccessPolicy.canOpenGroom(
+                groom,
+                currentCoordinate: currentCoordinate,
+                viewerID: viewerID,
+                hasEncountered: groom.encounteredInRange,
+                subscriptionState: subscriptionState
+            ),
+            isRead: viewedGroomIDs.contains(groom.id)
+        )
+    }
+
+    /// iter1226.458：表示中の単体グルームピンの画面位置に、常設の可視ピン
+    /// （matchedTransitionSource付き）を重ねる。ホームレールと同じ「source常設・
+    /// タップ即提示」を成立させる（MapKit Annotation内のsourceはzoomに解決されないため）。
+    /// popIn/浮遊/モーフの位置・不透明度は displayedElements の値を共有して再現する。
+    @ViewBuilder
+    func groomZoomSourcePinsOverlay(proxy: MapProxy) -> some View {
+        #if canImport(UIKit)
+        if #available(iOS 18.0, *), let groomZoomNamespace {
+            let _ = cameraUpdateTick
+            ForEach(displayedElements) { displayed in
+                if case .single(.groom(let groom)) = displayed.element,
+                   let point = proxy.convert(
+                       CLLocationCoordinate2D(latitude: displayed.latitude, longitude: displayed.longitude),
+                       to: .local
+                   ) {
+                    MeguriPinConditionalPopIn(popsIn: displayed.popsIn) {
+                        MeguriFloatingMotion(seed: groom.id.hashValue) {
+                            groomPinView(groom)
+                        }
+                    }
+                    .opacity(displayed.opacity)
+                    .matchedTransitionSource(id: GroomMapZoomSourceID.groom(groom.id), in: groomZoomNamespace)
+                    .position(point)
+                    .allowsHitTesting(false)
+                }
+            }
+        }
+        #endif
+    }
+
     func sourceAnchor(for groom: GroomPost, in proxy: MapProxy, containerSize: CGSize) -> UnitPoint {
         guard containerSize.width > 0,
               containerSize.height > 0,

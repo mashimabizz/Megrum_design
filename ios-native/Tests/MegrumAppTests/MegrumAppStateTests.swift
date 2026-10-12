@@ -490,7 +490,9 @@ final class MegrumAppStateTests: XCTestCase {
         await state.loadMeguriFeed(scope: .nearby3km)
 
         XCTAssertFalse(state.grooms.isEmpty)
-        XCTAssertEqual(state.threads.map(\.audience), [.nearby3km])
+        // iter1226.421：圏内チャットルーム導線の確認用にプレビューの nearby3km スレッドを3件へ増量。
+        XCTAssertEqual(state.threads.count, 3)
+        XCTAssertTrue(state.threads.allSatisfy { $0.audience == .nearby3km })
         XCTAssertFalse(state.isLoadingMeguri)
 
         await state.loadMeguriFeed(scope: .samePrefecture)
@@ -883,7 +885,8 @@ final class MegrumAppStateTests: XCTestCase {
         await state.loadInitialData()
 
         XCTAssertEqual(state.meguriMessages.first?.body, "グルーム見ました。会場付近ですか？")
-        XCTAssertEqual(state.meguriPendingReplyCount, 2)
+        // iter1226.451：メッセージルームは1ユーザー1つ。同一相手の複数グルーム返信は1ルームへ統合。
+        XCTAssertEqual(state.meguriPendingReplyCount, 1)
 
         let sent = await state.sendMeguriMessage(
             recipientID: recipientID,
@@ -967,44 +970,27 @@ final class MegrumAppStateTests: XCTestCase {
     }
 
     func testAppStateMarksPreviewMeguriMessagesRead() async {
+        // iter1226.451：ルームは1ユーザー1つ。同一相手の複数グルーム返信は1ルームへ統合され、
+        // 既読化は相手からの全メッセージに及ぶ。
         let state = MegrumAppState(repository: PreviewMegrumRepository())
         let peerID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
-        let firstSourceID = UUID(uuidString: "00000000-0000-0000-0000-000000000502")!
-        let secondSourceID = UUID(uuidString: "00000000-0000-0000-0000-000000000503")!
 
         await state.loadInitialData()
 
-        XCTAssertEqual(
-            state.meguriMessageThreads.map(\.sourceGroomPostID),
-            [firstSourceID, secondSourceID]
-        )
-        XCTAssertNil(
-            state.meguriMessages(
-                in: MeguriMessageConversationKey(
-                    peerID: peerID,
-                    sourceGroomPostID: firstSourceID
-                )
-            ).first?.readAt
-        )
+        // 相手（peerID）は1ルームに統合される。
+        let peerThreads = state.meguriMessageThreads.filter { $0.peerID == peerID }
+        XCTAssertEqual(peerThreads.count, 1)
 
-        await state.markMeguriMessagesRead(peerID: peerID, sourceGroomPostID: firstSourceID)
+        let incomingBefore = state.meguriMessages(with: peerID)
+            .filter { $0.recipientID != peerID }
+        XCTAssertTrue(incomingBefore.contains { $0.readAt == nil })
 
-        XCTAssertNotNil(
-            state.meguriMessages(
-                in: MeguriMessageConversationKey(
-                    peerID: peerID,
-                    sourceGroomPostID: firstSourceID
-                )
-            ).first?.readAt
-        )
-        XCTAssertNil(
-            state.meguriMessages(
-                in: MeguriMessageConversationKey(
-                    peerID: peerID,
-                    sourceGroomPostID: secondSourceID
-                )
-            ).first?.readAt
-        )
+        await state.markMeguriMessagesRead(peerID: peerID, showsAllPeerMessages: true)
+
+        // 相手からの受信メッセージは（グルームソースを問わず）すべて既読になる。
+        let incomingAfter = state.meguriMessages(with: peerID)
+            .filter { $0.recipientID != peerID }
+        XCTAssertTrue(incomingAfter.allSatisfy { $0.readAt != nil })
         XCTAssertNil(state.errorMessage)
     }
 
@@ -1794,12 +1780,13 @@ final class MegrumAppStateTests: XCTestCase {
 
         await state.loadNotifications()
 
-        XCTAssertEqual(state.unreadNotificationCount, 2)
+        // プレビュー通知：未読4件（打診・いいね2件・ボード返信）＋既読1件（iter1226.413で集約検証用のいいねを追加）。
+        XCTAssertEqual(state.unreadNotificationCount, 4)
 
         let notificationID = try! XCTUnwrap(state.notifications.first?.id)
         await state.markNotificationRead(notificationID)
 
-        XCTAssertEqual(state.unreadNotificationCount, 1)
+        XCTAssertEqual(state.unreadNotificationCount, 3)
 
         await state.markAllNotificationsRead()
 
@@ -1922,7 +1909,7 @@ final class MegrumAppStateTests: XCTestCase {
 
         XCTAssertTrue(sent)
         XCTAssertNil(state.session)
-        XCTAssertEqual(state.passwordResetMessage, "再設定メールを送信しました。受信メールを確認してください")
+        XCTAssertEqual(state.passwordResetMessage, "確認コードをメールに送信しました。届いた6桁のコードを入力してください")
         XCTAssertFalse(state.isLoading)
         XCTAssertNil(state.errorMessage)
 
@@ -2492,6 +2479,16 @@ private actor CountingMeguriRepository: MegrumRepository {
                 longitude: longitude ?? 139.767125
             )
         ]
+    }
+
+    func loadMeguriMapDensity(
+        minLatitude: Double,
+        minLongitude: Double,
+        maxLatitude: Double,
+        maxLongitude: Double,
+        cellDegrees: Double
+    ) async throws -> [MeguriMapDensityCell] {
+        []
     }
 
     func loadBoardThreads(

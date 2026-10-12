@@ -391,11 +391,15 @@ final class SettingsScreenTests: XCTestCase {
     func testPaymentSettingsDraftFormatsPreviewAndValidation() {
         var draft = PaymentSettingsDraft(
             methods: [.bankTransfer, .paypay, .cashExchange, .other],
-            bankName: " みずほ銀行 ",
-            bankBranchName: " 渋谷支店 ",
-            bankAccountType: " 普通 ",
-            bankAccountNumber: "1234567",
-            bankAccountHolder: " ヤマダ ハナコ ",
+            accounts: [
+                BankReceivingAccount(
+                    bankName: " みずほ銀行 ",
+                    branchName: " 渋谷支店 ",
+                    accountType: " 普通 ",
+                    accountNumber: "1234567",
+                    holder: " ヤマダ ハナコ "
+                )
+            ],
             otherNote: " 楽天ペイ相談可能です "
         )
 
@@ -404,7 +408,13 @@ final class SettingsScreenTests: XCTestCase {
         XCTAssertEqual(PaymentSettingsDraft.limitedOtherNote("123456789"), "12345678")
         XCTAssertEqual(draft.normalized.otherNote, "楽天ペイ相談可能")
         XCTAssertEqual(draft.normalized.summaryText, "銀行振込 / PayPay / 現金交換 / 楽天ペイ相談可能")
-        XCTAssertEqual(draft.normalized.bankPreviewText, "口座: みずほ銀行 渋谷支店 普通 ****4567")
+
+        let normalizedAccount = draft.normalized.accounts.first
+        XCTAssertEqual(normalizedAccount?.bankName, "みずほ銀行")
+        XCTAssertEqual(normalizedAccount?.branchName, "渋谷支店")
+        XCTAssertEqual(normalizedAccount?.accountType, "普通")
+        XCTAssertEqual(normalizedAccount?.accountNumber, "1234567")
+        XCTAssertEqual(normalizedAccount?.holder, "ヤマダ ハナコ")
 
         draft.otherNote = " "
         XCTAssertEqual(draft.validationMessage, "その他を選ぶ場合は自由入力を入力してください")
@@ -473,7 +483,7 @@ final class SettingsScreenTests: XCTestCase {
         )
         XCTAssertEqual(state.draft.methods, [.paypay])
 
-        state.updateText(\.bankName, value: "ユーザー入力銀行")
+        state.appendAccount(BankReceivingAccount(bankName: "ユーザー入力銀行"))
         state.applyCurrentValues(
             settings: UserPaymentSettings(
                 userID: userID,
@@ -482,7 +492,7 @@ final class SettingsScreenTests: XCTestCase {
             ),
             viewer: viewer
         )
-        XCTAssertEqual(state.draft.bankName, "ユーザー入力銀行")
+        XCTAssertEqual(state.draft.accounts.first?.bankName, "ユーザー入力銀行")
 
         state.applyCurrentValues(
             settings: UserPaymentSettings(
@@ -494,7 +504,7 @@ final class SettingsScreenTests: XCTestCase {
             force: true
         )
         XCTAssertEqual(state.draft.methods, [.bankTransfer])
-        XCTAssertEqual(state.draft.bankName, "外部更新銀行")
+        XCTAssertEqual(state.draft.accounts.first?.bankName, "外部更新銀行")
     }
 
     func testPaymentSettingsEditingStateValidatesBeforeSave() {

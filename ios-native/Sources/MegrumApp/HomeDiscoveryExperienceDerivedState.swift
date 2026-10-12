@@ -3,6 +3,10 @@ import MegrumCore
 
 extension HomeDiscoveryExperience {
     var userTagCandidates: [HomeDiscoveryCandidate] {
+        // ガイドツアー中は推し一致フィルタを外し、サンプルを本物のレイアウトで見せる。
+        if tutorialSampleActive {
+            return tutorialSampleCandidates(from: matchedItems, source: .userTag)
+        }
         let items = partnerItems(from: matchedItems + possibleItems)
             .filter { item in
                 HomeDiscoveryMatchPolicy.isMemberTagMatchEligible(
@@ -23,6 +27,9 @@ extension HomeDiscoveryExperience {
     }
 
     var userCandidates: [HomeDiscoveryCandidate] {
+        if tutorialSampleActive {
+            return tutorialSampleCandidates(from: possibleItems, source: .user)
+        }
         let items = partnerItems(from: matchedItems + possibleItems)
             .filter { item in
                 HomeDiscoveryMatchPolicy.isMemberMatchEligible(
@@ -34,6 +41,82 @@ extension HomeDiscoveryExperience {
         let candidates = HomeDiscoveryCandidateFactory.candidates(
             from: items,
             source: .user,
+            goodsTypes: goodsTypes,
+            conditionSignalsByItemID: displayConditionSignalsByItemID
+        )
+        return HomeCandidateDemandPolicy.sortedCandidates(candidates)
+    }
+
+    /// 開こうとしている候補シートに対して、同じ相手の他候補（ホーム構造）を組む。相手が特定できない時は空。iter1226.383 / FB6-1。
+    func otherExchangeGroups(for sheet: HomeDiscoverySheet) -> HomeOtherExchangeCandidateGroups {
+        guard let goods = sheet.primaryGoods, let ownerID = goods.ownerID else {
+            return .empty
+        }
+        return sameOwnerExchangeCandidateGroups(ownerID: ownerID, excludingGoodsID: goods.id)
+    }
+
+    /// 候補シートの「他にも交換できそうなもの」用：同じ相手の他の候補を、ホームと同じ tier で束ねる。iter1226.383 / FB6-1。
+    /// 現在開いているグッズ（excludingGoodsID）は除外し、ホームと同じ eligibility / factory / 並び順を使う。
+    func sameOwnerExchangeCandidateGroups(
+        ownerID: UUID,
+        excludingGoodsID: UUID?
+    ) -> HomeOtherExchangeCandidateGroups {
+        HomeOtherExchangeCandidateGroups(
+            tagCandidates: sameOwnerCandidates(source: .userTag, ownerID: ownerID, excludingGoodsID: excludingGoodsID),
+            memberCandidates: sameOwnerCandidates(source: .user, ownerID: ownerID, excludingGoodsID: excludingGoodsID),
+            viewerGoodsImageURLByID: viewerGoodsImageURLByID
+        )
+    }
+
+    private func sameOwnerCandidates(
+        source: HomeDiscoveryCandidateSource,
+        ownerID: UUID,
+        excludingGoodsID: UUID?
+    ) -> [HomeDiscoveryCandidate] {
+        let items = partnerItems(from: matchedItems + possibleItems)
+            .filter { item in
+                item.ownerID == ownerID
+                    && item.id != excludingGoodsID
+                    && isEligible(item: item, source: source)
+            }
+            .sorted(by: candidateSorter.areInCandidateOrder)
+        let candidates = HomeDiscoveryCandidateFactory.candidates(
+            from: items,
+            source: source,
+            goodsTypes: goodsTypes,
+            conditionSignalsByItemID: displayConditionSignalsByItemID
+        )
+        // 「他にも交換できそうなもの」は需要が求めてる？以上の候補だけ。
+        // 定価・探し中・相談だけの候補はノイズになるので出さない（iter1226.404）。
+        let demanded = HomeCandidateDemandPolicy.candidatesWithDemand(
+            atLeast: HomeCandidateDemandPolicy.otherExchangeMinimumDemandRank,
+            in: candidates
+        )
+        return HomeCandidateDemandPolicy.sortedCandidates(demanded)
+    }
+
+    private func isEligible(item: GoodsItem, source: HomeDiscoveryCandidateSource) -> Bool {
+        let signals = displayConditionSignalsByItemID[item.id]
+        switch source {
+        case .userTag:
+            return HomeDiscoveryMatchPolicy.isMemberTagMatchEligible(item: item, signals: signals)
+        case .user:
+            return HomeDiscoveryMatchPolicy.isMemberMatchEligible(item: item, signals: signals)
+        default:
+            return false
+        }
+    }
+
+    /// ツアーのサンプル候補：推し一致フィルタを通さず、他ユーザー所有分をそのまま候補化する。
+    private func tutorialSampleCandidates(
+        from items: [GoodsItem],
+        source: HomeDiscoveryCandidateSource
+    ) -> [HomeDiscoveryCandidate] {
+        let partner = partnerItems(from: items)
+            .sorted(by: candidateSorter.areInCandidateOrder)
+        let candidates = HomeDiscoveryCandidateFactory.candidates(
+            from: partner,
+            source: source,
             goodsTypes: goodsTypes,
             conditionSignalsByItemID: displayConditionSignalsByItemID
         )

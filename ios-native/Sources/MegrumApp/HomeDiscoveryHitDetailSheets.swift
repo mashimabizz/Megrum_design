@@ -8,8 +8,16 @@ struct HomeGoodsHitDetailSheet: View {
     var viewerOfferGoods: [HomeMockGoods]
     var addedExtraCandidateIDs: Set<UUID>
     var showsOtherExchangeRows: Bool = true
+    /// 「他にも交換できそうなもの」に出す同じ相手の他候補（ホーム構造）。iter1226.383 / FB6-1。
+    var otherExchangeCandidates: HomeOtherExchangeCandidateGroups = .empty
+    /// 「他にも交換できそうなもの」で追加済みの選択。確認画面・最終打診に含める。iter1226.384 / FB7-1。
+    var addedExtraSelections: [HomeDiscoveryProposalSelection] = []
     var bottomButtonTitle: String = "交換内容を確認する"
     var preselectPreferredOffer: Bool = true
+    /// 交換内容プレビューを挟むか。追加候補（入れ子）では挟まず即追加する（iter1226.404）。
+    var showsProposalPreview: Bool = true
+    /// ガイドツアーのデモ用：選択済み状態を注入して「実際の画面状態」を再現する（通常は nil）。
+    var initialSelectionState: HomeListingSheetSelectionState? = nil
     var onOpenOwnerProfile: (UUID) -> Void
     var onOpenNestedSheet: (HomeDiscoverySheet) -> Void
     var onStartProposal: (HomeDiscoveryProposalSelection) -> Void
@@ -30,87 +38,73 @@ struct HomeGoodsHitDetailSheet: View {
             bottomButtonDisabled: !selectionContext.canStartProposal,
             bottomButtonAction: startProposal
         ) {
-            HomeSelectedGoodsHeader(
-                goods: selection.goods,
-                conditionTags: selection.conditionTags,
-                exchangeSummary: HomeDiscoveryOwnerExchangeSummary.fromCandidateSignals(selection.signals),
-                exchangeCalendarContext: HomePartnerExchangeCalendarContext.from(
-                    signals: selection.signals,
-                    ownerName: selection.goods.ownerSummary?.displayName
-                ),
-                listingNote: selection.individualListingSelection.listingNote,
-                listingDetail: selection.individualListingSelection.detail,
-                listingUpdatedAt: selection.individualListingSelection.listingUpdatedAt,
+            HomeCandidateSheetHeader(
+                owner: selection.goods.ownerSummary,
+                fallbackName: selection.goods.ownerDisplayName?.nilIfBlank ?? "ユーザー",
                 onOpenOwnerProfile: onOpenOwnerProfile
             )
 
             Divider().opacity(0.55)
 
-            if selectionContext.showsReceiveSelection {
-                HomeSheetSectionTitle(
-                    systemName: "sparkles",
-                    title: "受け取るものを選ぶ",
-                    trailing: selectionContext.receiveRequirementLabel
-                )
-                HomeGoodsImagePanelRail(
-                    goods: selectionContext.receiveGoods,
-                    selectedIndices: selectionState.selectedReceiveIndices,
-                    selectedBannerText: "受け取る",
-                    cardSize: selectionCardSize,
-                    onSelect: toggleReceiveGoods
+            // 選択肢ピル（相手希望を切替）を常時表示。旧「他の選択肢」ボタンはこれに集約。iter1226.374。
+            if selectionContext.showsWantedOptionPicker {
+                HomeWantedOptionPills(
+                    options: selectionContext.pillWantedOptions,
+                    selectedID: selectionContext.selectedWantedOptionID,
+                    onSelect: selectWantedOption
                 )
             }
 
-            HomeWantedSelectionSectionHeader(
-                systemName: "person",
-                title: "相手の希望から譲るを選ぶ",
-                trailing: selectionContext.wantedRequirementLabel,
-                showsOtherOptionsButton: selectionContext.showsWantedOptionPicker
-                    && selection.individualListingSelection.detail != nil,
-                onOpenOtherOptions: openWantedOptionPicker
-            )
-            HomeGoodsHitWantedSelectionRail(
-                usesListingWantedOptions: selectionContext.usesListingWantedOptions,
-                wantedOptionPreviewGoods: selectionContext.wantedOptionPreviewGoods,
-                selectedWantedOptionPreviewIndices: selectionContext.selectedWantedOptionPreviewIndices,
-                topTrailingBadgeTextByGoodsID: selectionContext.wantedOptionPreviewBadgeTextByGoodsID,
-                wantedGoods: selectionContext.wantedGoods,
-                selectedWantedIndices: selectionState.selectedWantedIndices,
-                cardSize: selectionCardSize,
-                onSelectWantedOptionPreviewGoods: toggleWantedOptionPreviewGoods,
-                onSelectWantedGoods: toggleWantedGoods
-            )
+            if selectionContext.selectedCashOption != nil, let cashModel = selectionContext.cashBlockModel() {
+                // 定価も他選択肢と同じ左右構造（うけとる ⇄ ゆずる＝金額入力）。iter1226.379。
+                HomeDealCashBlockView(
+                    model: cashModel,
+                    amountText: $selectionState.cashAmountText,
+                    onToggleReceive: toggleReceiveGoods
+                )
+            } else if let dealModel = selectionContext.dealBlockModel() {
+                // 取引ブロック（3列：受け取る｜相手希望｜譲る）。notes/19 候補シート再設計。
+                HomeDealBlockView(
+                    model: dealModel,
+                    onToggleReceive: toggleReceiveGoods,
+                    onToggleOffer: toggleOfferGoods
+                )
 
-            if !selectionState.selectedWantedIndices.isEmpty {
-                if let selectedCashOption = selectionContext.selectedCashOption {
-                    HomeCashAmountEntryCard(
-                        amountText: $selectionState.cashAmountText,
-                        suggestedAmount: selectedCashOption.cashAmount
-                    )
-                } else {
-                    HomeSheetSectionTitle(
-                        systemName: "gift",
-                        title: "譲るグッズを選ぶ",
-                        trailing: selectionContext.offerRequirementLabel
-                    )
-                    if selectionContext.offerGoods.isEmpty {
-                        HomeNoMatchingOfferGoodsPanel()
-                    } else {
-                        HomeGoodsImagePanelRail(
-                            goods: selectionContext.offerGoods,
-                            selectedIndices: selectionState.selectedOfferIndices,
-                            selectedBannerText: "これを譲る",
-                            cardSize: selectionCardSize,
-                            onSelect: toggleOfferGoods
-                        )
+                // 条件パターンは「条件のグッズを確認！」（参考画像 or 画像検索）を続けて出す。
+                if let seriesCheck = selectionContext.conditionSeriesCheckModel() {
+                    // FB(iter1226.468)：メモには重要なことが書かれている場合があるため、交換内容を
+                    // 選ぶこの画面では「条件のグッズを確認！」ブロックの直上にメモを昇格表示する。
+                    if let listingNoteText {
+                        HomeListingMemoHighlight(note: listingNoteText)
                     }
+                    HomeConditionSeriesCheckSection(model: seriesCheck)
                 }
+            } else {
+                legacyDealSelection
             }
+
+            HomeCandidateDealAboutSection(
+                verdict: HomeConditionVerdictPolicy.make(
+                    from: selection.signals,
+                    partnerPaymentNote: selection.goods.ownerPaymentNote
+                ),
+                exchangeSummary: HomeDiscoveryOwnerExchangeSummary.fromCandidateSignals(selection.signals),
+                paymentSummaryText: selection.goods.ownerPaymentSummaryText,
+                exchangeCalendarContext: HomePartnerExchangeCalendarContext.from(
+                    signals: selection.signals,
+                    ownerName: selection.goods.ownerSummary?.displayName
+                ),
+                listingNote: selection.individualListingSelection.listingNote,
+                showsListingNoteRow: !showsMemoAboveConditionBlock,
+                listingUpdatedAt: selection.individualListingSelection.listingUpdatedAt,
+                goodsUpdatedAt: selection.goods.updatedAt,
+                isReadyToConfirm: selectionContext.canStartProposal
+            )
 
             if showsOtherExchangeRows {
-                HomeOtherExchangeRows(
+                HomeSamePartnerExchangeSection(
+                    groups: otherExchangeCandidates,
                     addedCandidateIDs: addedExtraCandidateIDs,
-                    excludedGoodsIDs: [selection.goods.id],
                     onOpenNestedSheet: onOpenNestedSheet
                 )
             }
@@ -145,6 +139,88 @@ struct HomeGoodsHitDetailSheet: View {
             selectionState: selectionState,
             focusedWantedOptionID: focusedWantedOptionID
         )
+    }
+
+    /// 個別募集メモ（空白は無視）。iter1226.468。
+    private var listingNoteText: String? {
+        selection.individualListingSelection.listingNote?.nilIfBlank
+    }
+
+    /// メモを「条件のグッズを確認！」ブロックの直上へ昇格表示するか。
+    /// 条件のグッズ確認ブロックが出る画面でのみ昇格し、下の折りたたみ内では重複させない（iter1226.468）。
+    private var showsMemoAboveConditionBlock: Bool {
+        listingNoteText != nil && selectionContext.conditionSeriesCheckModel() != nil
+    }
+
+    /// 個別募集の選択肢が無い候補（旧フォールバック）用の選択UI。取引ブロックが使えない時だけ表示。
+    @ViewBuilder
+    private var legacyDealSelection: some View {
+        if selectionContext.showsReceiveSelection {
+            HomeSheetSectionTitle(
+                systemName: "sparkles",
+                title: "受け取るものを選ぶ",
+                trailing: selectionContext.receiveRequirementLabel
+            )
+            HomeGoodsImagePanelRail(
+                goods: selectionContext.receiveGoods,
+                selectedIndices: selectionState.selectedReceiveIndices,
+                selectedBannerText: "受け取る",
+                cardSize: selectionCardSize,
+                onSelect: toggleReceiveGoods
+            )
+        }
+
+        if let singleWantedSummary = selectionContext.singleWantedOptionSummary {
+            HomeWantedSingleOptionContextRow(summary: singleWantedSummary)
+        } else {
+            HomeWantedSelectionSectionHeader(
+                systemName: "person",
+                title: "相手の希望から譲るを選ぶ",
+                trailing: selectionContext.wantedRequirementLabel,
+                showsOtherOptionsButton: false,
+                onOpenOtherOptions: {}
+            )
+            HomeGoodsHitWantedSelectionRail(
+                usesListingWantedOptions: selectionContext.usesListingWantedOptions,
+                wantedOptionPreviewGoods: selectionContext.wantedOptionPreviewGoods,
+                selectedWantedOptionPreviewIndices: selectionContext.selectedWantedOptionPreviewIndices,
+                topTrailingBadgeTextByGoodsID: selectionContext.wantedOptionPreviewBadgeTextByGoodsID,
+                wantedGoods: selectionContext.wantedGoods,
+                selectedWantedIndices: selectionState.selectedWantedIndices,
+                cardSize: selectionCardSize,
+                conditionCard: selectionContext.displayedWantedConditionCard,
+                onSelectWantedOptionPreviewGoods: toggleWantedOptionPreviewGoods,
+                onSelectWantedGoods: toggleWantedGoods,
+                onToggleConditionCard: { toggleWantedOptionPreviewGoods(at: 0) }
+            )
+        }
+
+        if !selectionState.selectedWantedIndices.isEmpty, selectionContext.selectedCashOption == nil {
+            HomeSheetSectionTitle(
+                systemName: "gift",
+                title: "譲るグッズを選ぶ",
+                trailing: selectionContext.offerRequirementLabel
+            )
+            if selectionContext.offerGoods.isEmpty {
+                HomeNoMatchingOfferGoodsPanel()
+            } else {
+                HomeGoodsImagePanelRail(
+                    goods: selectionContext.offerGoods,
+                    selectedIndices: selectionState.selectedOfferIndices,
+                    selectedBannerText: "これを譲る",
+                    cardSize: selectionCardSize,
+                    onSelect: toggleOfferGoods
+                )
+            }
+        }
+    }
+
+    /// 選択肢ピルで相手希望を切替。旧「他の選択肢」ポップアップの選択と同じ挙動。iter1226.374。
+    private func selectWantedOption(_ id: UUID) {
+        guard let option = selectionContext.wantedOption(withID: id) else {
+            return
+        }
+        selectWantedOptionFromDetail(option)
     }
 
     private func toggleWantedOptionPreviewGoods(at _: Int) {
@@ -188,13 +264,26 @@ struct HomeGoodsHitDetailSheet: View {
     }
 
     private func prepareInitialSelections() {
+        if let initialSelectionState {
+            selectionState = initialSelectionState
+            if !selectionState.selectedWantedIndices.isEmpty {
+                fillSuggestedCashAmountIfNeeded()
+                if preselectPreferredOffer {
+                    selectPreferredOfferIfNeeded()
+                }
+            }
+            return
+        }
         let context = selectionContext
         selectionState = HomeListingSheetSelectionStateReducer.preparingInitialSelection(
             itemCount: context.wantedItemCount,
             logic: context.wantedLogic
         )
         selectionState.selectedReceiveIndices = context.initialReceiveIndices
-        if !selectionState.selectedWantedIndices.isEmpty {
+        if context.usesListingWantedOptions {
+            // 候補シートの相手希望は必ず「選択肢1つ」を表示する。複数選択肢で全部選択され定価が混ざる不具合を防ぐ。iter1226.379。
+            selectFirstWantedOption()
+        } else if !selectionState.selectedWantedIndices.isEmpty {
             fillSuggestedCashAmountIfNeeded()
             if preselectPreferredOffer {
                 selectPreferredOfferIfNeeded()
@@ -202,13 +291,22 @@ struct HomeGoodsHitDetailSheet: View {
         }
     }
 
+    private func selectFirstWantedOption() {
+        guard let first = selectionContext.pillWantedOptions.first else {
+            selectionState.selectedWantedIndices = []
+            return
+        }
+        focusedWantedOptionID = first.id
+        selectionState.selectedWantedIndices = [0]
+        fillSuggestedCashAmountIfNeeded()
+        if preselectPreferredOffer {
+            selectPreferredOfferIfNeeded()
+        }
+    }
+
     private func resetSelections() {
         focusedWantedOptionID = nil
         prepareInitialSelections()
-    }
-
-    private func openWantedOptionPicker() {
-        presentedWantedOptionDetail = selection.individualListingSelection.detail
     }
 
     private func selectWantedOptionFromDetail(_ option: HomeIndividualListingWantedOption) {
@@ -249,14 +347,30 @@ struct HomeGoodsHitDetailSheet: View {
     }
 
     private func startProposal() {
-        guard let proposalSelection = selectionContext.proposalSelection() else {
+        guard var proposalSelection = selectionContext.proposalSelection() else {
             return
         }
+        let verdict = HomeConditionVerdictPolicy.make(
+            from: selection.signals,
+            partnerPaymentNote: selection.goods.ownerPaymentNote
+        )
+        proposalSelection.suggestedMessage = ProposalSuggestedMessageBuilder.make(from: verdict)
+        // 「他にも交換できそうなもの」で追加した候補も含めて確認・打診する（iter1226.384 / FB7-1）。
+        // includingExtraSelections はID重複を除くので、後段の primaryProposalSelection で再マージしても二重にならない。
+        let merged = proposalSelection.includingExtraSelections(addedExtraSelections)
+        // 追加候補（入れ子）ではプレビューを挟まず即確定。統合プレビューは元シート側で1回だけ出す（iter1226.404）。
+        guard showsProposalPreview else {
+            onStartProposal(merged)
+            return
+        }
+        let receiverGoods = HomeMockGoods.orderedUniqueByID(
+            confirmationReceiverGoods(for: proposalSelection) + addedExtraSelections.compactMap(\.receiverGoods)
+        )
         proposalConfirmation = HomeProposalStartConfirmationPayload(
-            proposalSelection: proposalSelection,
-            receiverGoods: confirmationReceiverGoods(for: proposalSelection),
-            senderGoods: selectionContext.selectedCashOption == nil ? proposalSelection.senderGoods : [],
-            senderCashAmount: proposalSelection.cashAmount
+            proposalSelection: merged,
+            receiverGoods: receiverGoods,
+            senderGoods: selectionContext.selectedCashOption == nil ? merged.senderGoods : [],
+            senderCashAmount: merged.cashAmount
         )
     }
 
@@ -271,5 +385,45 @@ struct HomeGoodsHitDetailSheet: View {
             return receiverGoods
         }
         return proposalSelection.receiverGoods.map { [$0] } ?? [selection.goods]
+    }
+}
+
+/// iter1226.468：個別募集メモを「条件のグッズを確認！」の直上へ昇格表示する強調カード。
+/// メモには当日の可否や注意など重要事項が書かれる場合があるため、交換内容を選ぶ段階で
+/// はっきり読めるようにする（折りたたみ内の控えめ表示から独立させた）。
+private struct HomeListingMemoHighlight: View {
+    var note: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            RoundedRectangle(cornerRadius: 2, style: .continuous)
+                .fill(MegrumTheme.lavender.opacity(0.55))
+                .frame(width: 3)
+
+            VStack(alignment: .leading, spacing: 5) {
+                HStack(spacing: 6) {
+                    Image(systemName: "text.alignleft")
+                    Text("出品者のメモ")
+                }
+                .font(.system(size: 12.5, weight: .black, design: .rounded))
+                .foregroundStyle(MegrumTheme.lavender)
+
+                Text(note)
+                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    .foregroundStyle(MegrumTheme.ink.opacity(0.82))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 11)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(MegrumTheme.lavender.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(MegrumTheme.lavender.opacity(0.18), lineWidth: 1)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("出品者のメモ。\(note)")
     }
 }

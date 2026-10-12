@@ -16,7 +16,6 @@ struct OshiSettingsScreen: View {
             errorMessage: presentationState.errorMessage,
             noticeMessage: presentationState.noticeMessage,
             expandedGroupKey: presentationState.expandedGroupKey,
-            activeRemoveConfirmationGroupKey: $presentationState.activeRemoveConfirmationGroupKey,
             availableCharacters: availableCharacters(for:),
             onBack: closeScreen,
             onShowMasterSheet: showMasterSheet,
@@ -70,6 +69,10 @@ struct OshiSettingsScreen: View {
         }
         .task {
             await prepare()
+            // VisualQA: 推しマスタ選択シートを開いた状態で起動（iter1226.416 刷新の確認用）。
+            if VisualQAPreviewMode.initialScreen(environment: ProcessInfo.processInfo.environment) == .oshiMasterSelect {
+                presentationState.showsMasterSheet = true
+            }
         }
     }
 }

@@ -1,7 +1,8 @@
 import Foundation
 import MegrumCore
+import MegrumData
 
-public struct MegrumAppSnapshot: Sendable {
+public struct MegrumAppSnapshot: Codable, Sendable {
     public var viewer: UserProfile
     public var inventory: [GoodsItem]
     public var wishes: [WishItem]
@@ -161,6 +162,7 @@ public protocol MegrumRepository: Sendable {
     func loadPublicWishes(userID: UUID) async throws -> [WishItem]
     func freshGroomImageURL(storagePath: String) async -> URL?
     func loadPublicUserProfile(userID: UUID) async throws -> PublicUserProfile?
+    func loadUserActivityWindows(userID: UUID) async throws -> [SupabaseActivityWindow]
     func loadUserEvaluations(userID: UUID, limit: Int) async throws -> [UserEvaluation]
     func loadGroomLikeCount(userID: UUID) async throws -> Int
     func createProposal(_ input: ProposalCreateInput) async throws -> TradeProposal
@@ -217,8 +219,12 @@ public protocol MegrumRepository: Sendable {
     func sendMeguriPhotoMessage(_ input: MeguriPhotoMessageCreateInput) async throws -> MeguriMessage
     func markMeguriMessagesRead(peerID: UUID, sourceGroomPostID: UUID?, includesAllSources: Bool, readAt: Date) async throws -> [MeguriMessage]
     func loadBoardThreads(latitude: Double?, longitude: Double?, prefecture: String?, scope: BoardThread.Audience, allowsExtendedBoardAccess: Bool) async throws -> [BoardThread]
+    /// iter1226.434：地図ズームアウト時の「おおよその件数」セル（実データを読み込む前の密度表示用）。
+    func loadMeguriMapDensity(minLatitude: Double, minLongitude: Double, maxLatitude: Double, maxLongitude: Double, cellDegrees: Double) async throws -> [MeguriMapDensityCell]
     func loadBoardReplies(threadID: UUID, latitude: Double?, longitude: Double?, prefecture: String?, scope: BoardThread.Audience) async throws -> [BoardReply]
     func loadBoardReplyPreviews(threadIDs: [UUID]) async throws -> [UUID: [String]]
+    /// iter1226.424：未読数計算用。各スレッドのリプライ投稿時刻（新しい順）。
+    func loadBoardReplyActivity(threadIDs: [UUID]) async throws -> [UUID: [Date]]
     func sendBoardReply(_ input: BoardReplyCreateInput) async throws -> BoardReply
     func setBoardThreadReaction(threadID: UUID, reaction: BoardMessageReaction?) async throws
     func setBoardReplyReaction(replyID: UUID, reaction: BoardMessageReaction?) async throws
@@ -234,6 +240,8 @@ public protocol MegrumRepository: Sendable {
     func blockUser(_ userID: UUID) async throws -> BlockedUser
     func unblockUser(_ userID: UUID) async throws
     func loadNotifications(limit: Int) async throws -> [MegrumNotification]
+    /// 非公開バケットの通知サムネを表示用の署名URLへ解決する（iter1226.415）。
+    func resolveNotificationThumbnailURL(bucket: String, path: String) async -> URL?
     func markNotificationRead(_ notificationID: UUID) async throws -> MegrumNotification?
     func markAllNotificationsRead() async throws -> [MegrumNotification]
     func loadNotificationSettings() async throws -> UserNotificationSettings
@@ -242,11 +250,23 @@ public protocol MegrumRepository: Sendable {
     func setGroomActivityPushNotificationsEnabled(_ enabled: Bool) async throws -> UserNotificationSettings
     func setChatroomActivityPushNotificationsEnabled(_ enabled: Bool) async throws -> UserNotificationSettings
     func setMeguriSubscriptionPushSettings(_ input: MeguriSubscriptionPushSettingsInput) async throws -> UserNotificationSettings
+    func loadGroomNotifyPrefs() async throws -> [GroomNotifyPref]
+    func setGroomNotifyPref(
+        groupID: UUID,
+        enabled: Bool,
+        notifyAllMembers: Bool,
+        memberCharacterIDs: [UUID]
+    ) async throws -> GroomNotifyPref
+    func recordGroomEncounters(groomPostIDs: [UUID]) async throws
+    func loadGroomPost(id: UUID) async throws -> GroomPost?
+    func loadEncounteredGrooms(latitude: Double?, longitude: Double?) async throws -> [GroomPost]
     func updatePushNotificationLocation(latitude: Double, longitude: Double) async throws
     func registerNativePushDeviceToken(_ token: String, appVersion: String?) async throws
     func revokeNativePushDeviceToken(_ token: String, revokedAt: Date) async throws
     func updateOwnProfile(_ input: OwnProfileUpdateInput) async throws -> UserProfile
     func completeAccountSetup(_ input: AccountSetupInput) async throws -> UserProfile
+    /// iter1226.422：候補のうち使用済みのユーザーID（小文字）を返す。自分の現IDは除外して数える。
+    func takenAccountHandles(among handles: [String]) async throws -> Set<String>
     func requestAccountDeletion(_ input: AccountDeletionRequestInput) async throws -> AccountDeletionRequestResult
 }
 

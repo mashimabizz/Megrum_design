@@ -108,6 +108,32 @@ public struct HomeIndividualListingSelectionContext: Equatable, Sendable {
     }
 }
 
+/// 指名オプションの「相手のほしいもの1件」と、それに充てられる自分の候補グッズの対応。iter1226.373（候補シート再設計）。
+/// 相手希望（相手のほしいもの画像）→ 譲る（自分の候補）を1対1で見せるための供給データ。
+public struct HomeWantedNamedPairing: Identifiable, Equatable, Sendable {
+    /// 相手のほしいもの（指名）のID。
+    public var id: UUID
+    public var title: String
+    public var imageURL: URL?
+    public var characterID: UUID?
+    /// この指名を満たせる自分の候補グッズID（メンバー・種別・シリーズ一致で判定）。
+    public var candidateGoodsIDs: [UUID]
+
+    public init(
+        id: UUID,
+        title: String,
+        imageURL: URL? = nil,
+        characterID: UUID? = nil,
+        candidateGoodsIDs: [UUID] = []
+    ) {
+        self.id = id
+        self.title = title
+        self.imageURL = imageURL
+        self.characterID = characterID
+        self.candidateGoodsIDs = candidateGoodsIDs
+    }
+}
+
 public struct HomeIndividualListingWantedOption: Identifiable, Equatable, Sendable {
     public enum Kind: Equatable, Sendable {
         case goods
@@ -125,10 +151,18 @@ public struct HomeIndividualListingWantedOption: Identifiable, Equatable, Sendab
     public var kind: Kind
     public var goodsIDs: [UUID]
     public var matchingGoodsIDs: [UUID]
+    /// matchingGoodsIDs のうち、シリーズ等が無記載で「確定」できない（＝不確定「？」）分。iter1226.363。
+    public var tentativeGoodsIDs: [UUID]
     public var previewItems: [HomeIndividualListingWantedPreviewItem]
     public var groupID: UUID?
     public var goodsTypeID: UUID?
     public var cashAmount: Int?
+    /// 条件指定型の選択肢の内容（例「TWICE / トレカ / #DICON…」）。マッチしたグッズ名ではなく募集の条件そのもの。iter1226.371。
+    public var conditionSummary: String?
+    /// 指名オプションの「相手のほしいもの1件 → 自分の候補」対応。条件/現金では空。iter1226.373。
+    public var namedPairings: [HomeWantedNamedPairing]
+    /// 条件指定型の希望数量（wish_quantity）。条件は「この数以上」を要求する。iter1226.377。
+    public var quantity: Int
 
     public init(
         id: UUID,
@@ -141,10 +175,14 @@ public struct HomeIndividualListingWantedOption: Identifiable, Equatable, Sendab
         kind: Kind,
         goodsIDs: [UUID] = [],
         matchingGoodsIDs: [UUID] = [],
+        tentativeGoodsIDs: [UUID] = [],
         previewItems: [HomeIndividualListingWantedPreviewItem] = [],
         groupID: UUID? = nil,
         goodsTypeID: UUID? = nil,
-        cashAmount: Int? = nil
+        cashAmount: Int? = nil,
+        conditionSummary: String? = nil,
+        namedPairings: [HomeWantedNamedPairing] = [],
+        quantity: Int = 1
     ) {
         self.id = id
         self.listingID = listingID
@@ -156,10 +194,14 @@ public struct HomeIndividualListingWantedOption: Identifiable, Equatable, Sendab
         self.kind = kind
         self.goodsIDs = goodsIDs
         self.matchingGoodsIDs = matchingGoodsIDs
+        self.tentativeGoodsIDs = tentativeGoodsIDs
         self.previewItems = previewItems
         self.groupID = groupID
         self.goodsTypeID = goodsTypeID
         self.cashAmount = cashAmount.map { max(0, $0) }
+        self.conditionSummary = conditionSummary
+        self.namedPairings = namedPairings
+        self.quantity = max(1, quantity)
     }
 
     public var isCashOffer: Bool {

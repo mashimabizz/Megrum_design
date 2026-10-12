@@ -5,60 +5,38 @@ struct PaymentSettingsDraft: Equatable, Sendable {
     static let otherNoteMaxLength = 8
 
     var methods: [UserPaymentMethod]
-    var bankName: String
-    var bankBranchName: String
-    var bankAccountType: String
-    var bankAccountNumber: String
-    var bankAccountHolder: String
+    var accounts: [BankReceivingAccount]
     var otherNote: String
 
     static let empty = PaymentSettingsDraft(
         methods: [],
-        bankName: "",
-        bankBranchName: "",
-        bankAccountType: "",
-        bankAccountNumber: "",
-        bankAccountHolder: "",
+        accounts: [],
         otherNote: ""
     )
 
     init(settings: UserPaymentSettings?, viewer: UserProfile?) {
         self.methods = PaymentSettingsResolver.methods(settings: settings, viewer: viewer)
-        self.bankName = settings?.bankName ?? ""
-        self.bankBranchName = settings?.bankBranchName ?? ""
-        self.bankAccountType = settings?.bankAccountType ?? ""
-        self.bankAccountNumber = settings?.bankAccountNumber ?? ""
-        self.bankAccountHolder = settings?.bankAccountHolder ?? ""
-        self.otherNote = Self.limitedOtherNote(Self.trimmed(PaymentSettingsResolver.otherNote(settings: settings, viewer: viewer) ?? ""))
+        self.accounts = settings?.bankAccounts ?? []
+        self.otherNote = Self.limitedOtherNote(
+            Self.trimmed(PaymentSettingsResolver.otherNote(settings: settings, viewer: viewer) ?? "")
+        )
     }
 
     init(
         methods: [UserPaymentMethod],
-        bankName: String,
-        bankBranchName: String,
-        bankAccountType: String,
-        bankAccountNumber: String,
-        bankAccountHolder: String,
+        accounts: [BankReceivingAccount],
         otherNote: String
     ) {
         self.methods = UserPaymentMethod.normalized(methods)
-        self.bankName = bankName
-        self.bankBranchName = bankBranchName
-        self.bankAccountType = bankAccountType
-        self.bankAccountNumber = bankAccountNumber
-        self.bankAccountHolder = bankAccountHolder
+        self.accounts = Array(accounts.prefix(BankReceivingAccount.maxCount))
         self.otherNote = otherNote
     }
 
     var normalized: PaymentSettingsDraft {
         PaymentSettingsDraft(
             methods: methods,
-            bankName: trimmed(bankName),
-            bankBranchName: trimmed(bankBranchName),
-            bankAccountType: trimmed(bankAccountType),
-            bankAccountNumber: normalizedAccountNumber,
-            bankAccountHolder: trimmed(bankAccountHolder),
-            otherNote: Self.limitedOtherNote(trimmed(otherNote))
+            accounts: accounts.map { $0.normalized() }.filter { !$0.isBlank },
+            otherNote: Self.limitedOtherNote(Self.trimmed(otherNote))
         )
     }
 
@@ -70,35 +48,22 @@ struct PaymentSettingsDraft: Equatable, Sendable {
         )
     }
 
-    var bankPreviewText: String? {
-        let normalized = normalized
-        guard normalized.methods.contains(.bankTransfer),
-              !normalized.bankName.isEmpty,
-              !normalized.bankBranchName.isEmpty,
-              !normalized.bankAccountType.isEmpty,
-              !normalized.bankAccountNumber.isEmpty
-        else {
-            return nil
-        }
-        return "口座: \(normalized.bankName) \(normalized.bankBranchName) \(normalized.bankAccountType) \(maskedAccountNumber(normalized.bankAccountNumber))"
-    }
-
     var requiresBankAccountDetails: Bool {
         contains(.bankTransfer)
+    }
+
+    var canAddAccount: Bool {
+        accounts.count < BankReceivingAccount.maxCount
     }
 
     var validationMessage: String? {
         let normalized = normalized
         if normalized.methods.contains(.bankTransfer) {
-            let bankValues = [
-                normalized.bankName,
-                normalized.bankBranchName,
-                normalized.bankAccountType,
-                normalized.bankAccountNumber,
-                normalized.bankAccountHolder
-            ]
-            if bankValues.contains(where: \.isEmpty) {
-                return "銀行振込を選ぶ場合は口座情報を入力してください"
+            if normalized.accounts.isEmpty {
+                return "銀行振込を選ぶ場合は受け取り口座を1件以上入力してください"
+            }
+            if normalized.accounts.contains(where: { !$0.isComplete }) {
+                return "受け取り口座は銀行名・支店・種別・口座番号・名義をすべて入力してください"
             }
         }
         if normalized.methods.contains(.other), normalized.otherNote.isEmpty {
@@ -120,16 +85,33 @@ struct PaymentSettingsDraft: Equatable, Sendable {
         methods.contains(method)
     }
 
+    @discardableResult
+    mutating func appendAccount(_ account: BankReceivingAccount) -> Bool {
+        guard canAddAccount else {
+            return false
+        }
+        accounts.append(account)
+        return true
+    }
+
+    mutating func removeAccount(id: UUID) {
+        accounts.removeAll { $0.id == id }
+    }
+
+    mutating func updateAccount(_ account: BankReceivingAccount) {
+        guard let index = accounts.firstIndex(where: { $0.id == account.id }) else {
+            return
+        }
+        accounts[index] = account
+    }
+
     func settings(userID: UUID) -> UserPaymentSettings {
         let normalized = normalized
+        let offersBankTransfer = normalized.methods.contains(.bankTransfer)
         return UserPaymentSettings(
             userID: userID,
             methods: normalized.methods,
-            bankName: normalized.bankName,
-            bankBranchName: normalized.bankBranchName,
-            bankAccountType: normalized.bankAccountType,
-            bankAccountNumber: normalized.bankAccountNumber,
-            bankAccountHolder: normalized.bankAccountHolder,
+            bankAccounts: offersBankTransfer ? normalized.accounts : [],
             otherNote: normalized.methods.contains(.other) ? normalized.otherNote.nilIfBlank : nil
         )
     }
@@ -138,20 +120,7 @@ struct PaymentSettingsDraft: Equatable, Sendable {
         String(value.prefix(otherNoteMaxLength))
     }
 
-    private var normalizedAccountNumber: String {
-        String(bankAccountNumber.filter(\.isNumber).prefix(32))
-    }
-
-    private func trimmed(_ value: String) -> String {
-        Self.trimmed(value)
-    }
-
     private static func trimmed(_ value: String) -> String {
         value.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    private func maskedAccountNumber(_ value: String) -> String {
-        let suffix = String(value.suffix(4))
-        return "****\(suffix)"
     }
 }

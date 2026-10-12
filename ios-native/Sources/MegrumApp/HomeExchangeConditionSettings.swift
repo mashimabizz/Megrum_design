@@ -85,17 +85,16 @@ public struct HomeDefaultExchangeSettings: Equatable, Sendable {
         localDateKeys.filter { HomeExchangeDateKey.isOnOrAfterToday($0) }
     }
 
-    func needsConfiguration(isExplicitlyConfigured: Bool, now: Date = Date()) -> Bool {
+    func needsConfiguration(isExplicitlyConfigured: Bool, now _: Date = Date()) -> Bool {
         guard isExplicitlyConfigured else {
             return true
         }
         guard preference.acceptsLocal else {
             return false
         }
-        let hasUsableDate = localDateKeys.contains {
-            HomeExchangeDateKey.isOnOrAfterToday($0, now: now)
-        }
-        return localPrefecture.isBlank || !hasUsableDate
+        // デフォルト都道府県を設定していれば「要設定」を出さない。
+        // 直近の現地交換日程は必須にしない（iter1226.367）。
+        return localPrefecture.isBlank
     }
 
     func applying(to signals: HomeCandidateConditionSignals) -> HomeCandidateConditionSignals {

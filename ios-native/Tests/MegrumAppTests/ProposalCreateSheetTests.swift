@@ -173,4 +173,79 @@ final class ProposalCreateSheetTests: XCTestCase {
         XCTAssertEqual(configuration.targetSubtitle, "個別募集から選択")
         XCTAssertEqual(configuration.targetSupplement, "ほか2件も受け取る条件です")
     }
+
+    // MARK: - 支払方法を 3/3 の後の独立ステップへ（iter1226.381 / FB5-1）
+
+    private func handConfiguration(requiresPaymentSelection: Bool, hasSelectedPaymentMethod: Bool) -> ProposalCreateConfiguration {
+        ProposalCreateConfiguration(
+            exchangeMethod: .hand,
+            hasSelectedSenderGoods: true,
+            isCreatingProposal: false,
+            hasReadyMailingAddress: false,
+            isLoadingMailingAddress: false,
+            hasValidMeetup: true,
+            requiresPaymentSelection: requiresPaymentSelection,
+            hasSelectedPaymentMethod: hasSelectedPaymentMethod,
+            receiverGoodsCount: 1,
+            isListingSource: false
+        )
+    }
+
+    func testConditionsCanAdvanceWithoutPaymentSelection() {
+        // 支払方法が未選択でも 3/3（交換条件）自体は完了扱いにできる。
+        let configuration = handConfiguration(requiresPaymentSelection: true, hasSelectedPaymentMethod: false)
+        XCTAssertTrue(configuration.canAdvance(from: .conditions))
+    }
+
+    func testConditionsRoutesToPaymentStepWhenCashInvolved() {
+        let configuration = handConfiguration(requiresPaymentSelection: true, hasSelectedPaymentMethod: false)
+        let destination = ProposalCreatePrimaryStepDestination.destination(
+            from: .conditions,
+            configuration: configuration,
+            visibleSteps: [.give, .receive, .conditions, .payment, .confirm]
+        )
+        XCTAssertEqual(destination, .payment)
+    }
+
+    func testConditionsRoutesToConfirmWhenNoCash() {
+        let configuration = handConfiguration(requiresPaymentSelection: false, hasSelectedPaymentMethod: false)
+        let destination = ProposalCreatePrimaryStepDestination.destination(
+            from: .conditions,
+            configuration: configuration,
+            visibleSteps: [.give, .receive, .conditions, .confirm]
+        )
+        XCTAssertEqual(destination, .confirm)
+    }
+
+    func testPaymentStepRoutesToConfirm() {
+        let configuration = handConfiguration(requiresPaymentSelection: true, hasSelectedPaymentMethod: true)
+        let destination = ProposalCreatePrimaryStepDestination.destination(
+            from: .payment,
+            configuration: configuration,
+            visibleSteps: [.give, .receive, .conditions, .payment, .confirm]
+        )
+        XCTAssertEqual(destination, .confirm)
+    }
+
+    func testConditionsBottomBarCopyReflectsPaymentStep() {
+        let cashConfiguration = handConfiguration(requiresPaymentSelection: true, hasSelectedPaymentMethod: false)
+        XCTAssertEqual(
+            ProposalCreateBottomBarCopy.primaryTitle(
+                selectedStep: .conditions,
+                configuration: cashConfiguration,
+                meetupHasTimeDraft: true
+            ),
+            "支払方法へ進む"
+        )
+
+        let noCashConfiguration = handConfiguration(requiresPaymentSelection: false, hasSelectedPaymentMethod: false)
+        XCTAssertEqual(
+            ProposalCreateBottomBarCopy.primaryTitle(
+                selectedStep: .conditions,
+                configuration: noCashConfiguration,
+                meetupHasTimeDraft: true
+            ),
+            "次へ：送信確認"
+        )
+    }
 }

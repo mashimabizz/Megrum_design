@@ -15,12 +15,43 @@ extension MegrumAppState {
             notifications = try await repository.loadNotifications(limit: 100)
             // すでに見ためぐりメッセージ/チャットルームの通知は自動で既読にする。
             await autoMarkViewedNotificationsRead()
+            await resolveNotificationThumbnails()
         } catch {
             if reportsFailure {
                 errorMessage = "通知を読み込めませんでした"
             }
         }
         isLoadingNotifications = false
+    }
+
+    /// 右端サムネの表示URLを解決する：公開URLはそのまま、非公開バケットは署名URLへ（重複パスは1回だけ解決）。iter1226.415。
+    func resolveNotificationThumbnails() async {
+        var resolved: [UUID: URL] = [:]
+        var signedURLByStorageKey: [String: URL?] = [:]
+        for notification in notifications {
+            if let url = notification.thumbnailURL {
+                resolved[notification.id] = url
+                continue
+            }
+            guard let bucket = notification.thumbnailBucket?.nilIfBlank,
+                  let path = notification.thumbnailPath?.nilIfBlank
+            else {
+                continue
+            }
+            let storageKey = "\(bucket)/\(path)"
+            if let cached = signedURLByStorageKey[storageKey] {
+                if let cached {
+                    resolved[notification.id] = cached
+                }
+                continue
+            }
+            let url = await repository.resolveNotificationThumbnailURL(bucket: bucket, path: path)
+            signedURLByStorageKey[storageKey] = url
+            if let url {
+                resolved[notification.id] = url
+            }
+        }
+        notificationThumbnailURLByID = resolved
     }
 
     public func markNotificationRead(_ notificationID: UUID) async {
@@ -242,12 +273,70 @@ extension MegrumAppState {
         }
     }
 
-    /// 圏内通知の基準位置を更新する。圏内通知が無効なら何もしない。
+    /// 圏内通知の基準位置を更新する。圏内通知（グルーム圏内含む）が無効なら何もしない。
     public func updatePushNotificationLocationIfNeeded(latitude: Double, longitude: Double) async {
-        guard groomNearbyPushNotificationsEnabled || chatroomNearbyPushNotificationsEnabled else {
+        guard groomOshiPushNotificationsEnabled
+            || groomNearbyPushNotificationsEnabled
+            || chatroomNearbyPushNotificationsEnabled
+        else {
             return
         }
         try? await repository.updatePushNotificationLocation(latitude: latitude, longitude: longitude)
+    }
+
+    /// FB8-7: 推し(L1)ごとの圏内グルーム通知設定を読み込む。iter1226.388。
+    public func loadGroomNotifyPrefs() async {
+        do {
+            let prefs = try await repository.loadGroomNotifyPrefs()
+            groomNotifyPrefsByGroupID = Dictionary(
+                prefs.map { ($0.groupID, $0) },
+                uniquingKeysWith: { _, latest in latest }
+            )
+            hasLoadedGroomNotifyPrefs = true
+        } catch {
+            // 読み込み失敗時は既定（ON・全メンバー）にフォールバックするため、状態は触らない。
+        }
+    }
+
+    /// FB(iter1226.390): 推し(L1)ごとの圏内グルーム通知設定を保存する（楽観更新・メンバー個別選択対応）。
+    @discardableResult
+    public func setGroomNotifyPref(
+        groupID: UUID,
+        enabled: Bool,
+        notifyAllMembers: Bool,
+        memberCharacterIDs: [UUID]
+    ) async -> Bool {
+        let previous = groomNotifyPrefsByGroupID[groupID]
+        let optimistic = GroomNotifyPref(
+            groupID: groupID,
+            enabled: enabled,
+            notifyAllMembers: notifyAllMembers,
+            memberCharacterIDs: memberCharacterIDs
+        )
+        groomNotifyPrefsByGroupID[groupID] = optimistic
+        do {
+            let saved = try await repository.setGroomNotifyPref(
+                groupID: groupID,
+                enabled: enabled,
+                notifyAllMembers: notifyAllMembers,
+                memberCharacterIDs: memberCharacterIDs
+            )
+            groomNotifyPrefsByGroupID[groupID] = saved
+            return true
+        } catch {
+            if let previous {
+                groomNotifyPrefsByGroupID[groupID] = previous
+            } else {
+                groomNotifyPrefsByGroupID.removeValue(forKey: groupID)
+            }
+            errorMessage = "通知設定を保存できませんでした"
+            return false
+        }
+    }
+
+    /// 指定グループの現在の設定（未収載は既定：ON・全メンバー）。
+    public func groomNotifyPref(for groupID: UUID) -> GroomNotifyPref {
+        groomNotifyPrefsByGroupID[groupID] ?? GroomNotifyPref(groupID: groupID)
     }
 
     private func applyMeguriSubscriptionSettings(_ input: MeguriSubscriptionPushSettingsInput) {

@@ -1,4 +1,5 @@
 import Foundation
+import MegrumData
 import MegrumCore
 
 public extension MegrumRepository {
@@ -127,6 +128,10 @@ public extension MegrumRepository {
     }
 
     func loadPublicWishes(userID: UUID) async throws -> [WishItem] {
+        []
+    }
+
+    func loadUserActivityWindows(userID: UUID) async throws -> [SupabaseActivityWindow] {
         []
     }
 

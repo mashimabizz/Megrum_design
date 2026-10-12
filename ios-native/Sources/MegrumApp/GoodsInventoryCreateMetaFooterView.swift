@@ -51,22 +51,16 @@ struct GoodsInventoryCreateMetaFooterView: View {
                 )
             }
         }
-        .confirmationDialog(
-            "メンバーを登録",
-            isPresented: $presentationState.isShowingMemberDialog,
-            titleVisibility: .visible
-        ) {
-            ForEach(memberOptions) { member in
-                Button(member.name) {
-                    onAssignMember(member.id)
-                }
-            }
-            Button("メンバー未設定に戻す", role: .destructive) {
-                onAssignMember(nil)
-            }
-            Button("キャンセル", role: .cancel) {}
-        } message: {
-            Text("\(selectedCount)件の画像に同じメンバーを割り当てます。")
+        // iter1226.436：confirmationDialog はメンバーが多いと下の2〜3件が初期表示されない
+        // OS側の描画バグがあるため、標準のシート（List）で全件確実に表示する。
+        .sheet(isPresented: $presentationState.isShowingMemberDialog) {
+            GoodsCreateMemberAssignSheet(
+                memberOptions: memberOptions,
+                selectedCount: selectedCount,
+                onAssignMember: onAssignMember
+            )
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
         }
     }
 

@@ -29,6 +29,10 @@ extension MeguriScreen {
     }
 
     var notice: MegrumLocationNotice? {
+        // ガイドツアー中は位置ノーティスやエラー表示を出さない（デモの見た目を汚さない）。
+        if appState.isTutorialActive {
+            return nil
+        }
         let shouldSuppressAppError = appState.isLoading || appState.isLoadingMeguri || appState.isLoadingGroomMap
         return MeguriNoticeResolver.notice(
             localMessage: localNoticeMessage,

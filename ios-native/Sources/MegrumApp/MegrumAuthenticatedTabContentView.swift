@@ -2,6 +2,21 @@ import MegrumCore
 import MegrumDesign
 import SwiftUI
 
+/// iter1226.448：VisualQA 自動オープンをアプリセッション単位で一度だけに制限するガード。
+/// View インスタンス単位の @State だと再マウントで再発火するため、セッション寿命の
+/// シングルトンで claim する。
+@MainActor
+final class VisualQAAutoOpenGuard {
+    static let shared = VisualQAAutoOpenGuard()
+    private var claimed = false
+
+    func tryClaim() -> Bool {
+        guard !claimed else { return false }
+        claimed = true
+        return true
+    }
+}
+
 @MainActor
 struct MegrumAuthenticatedTabContentView: View {
     @ObservedObject var appState: MegrumAppState
@@ -13,6 +28,7 @@ struct MegrumAuthenticatedTabContentView: View {
     @Binding var requestedWishSection: WishCollectionSection?
     @Binding var pendingNotificationRouteIntent: NotificationRouteIntent?
     @Binding var isGroomViewerPresented: Bool
+    @ObservedObject var tutorialCoordinator: TutorialTourCoordinator
     var adDisplayContext: AdDisplayContext
     var visualQAInitialScreen: VisualQAInitialScreen?
     var onOpenDrawer: () -> Void
@@ -23,12 +39,24 @@ struct MegrumAuthenticatedTabContentView: View {
     @State private var tradeDetailRoute: TradeDetailRoute?
     @State private var meguriHomeResetToken = UUID()
     @State private var isShowingMeguriMessageInbox = false
+    /// iter1226.427：ホーム左スワイプの指追従オープン。UIKitパン＋局所観測モデル
+    /// （タップ同時発火とTabContentView全体再描画によるカクつきを解消）。
+    @StateObject private var meguriInboxOpenDragModel = MeguriInboxOpenDragModel()
+    /// iter1226.429：表示中タブの再タップで最上部へ戻すシグナル（タブごと）。
+    @State private var tabScrollToTopSignals: [MegrumTab: Int] = [:]
+    /// iter1226.422：ホーム経由のグルーム作成（左からスライド）をタブ上位で出す。
+    @State private var isShowingHomeGroomComposer = false
+    @StateObject private var homeGroomComposerLocationState = MegrumLocationState()
     @State private var meguriMessageDetailRoute: MeguriMessagePeerRoute?
     @State private var meguriBoardThreadRoute: MeguriBoardThreadRoute?
+    /// iter1226.421：圏内チャットルーム一覧（ホームすべて見る・めぐり右下アイコンから）。
+    @State private var isShowingNearbyBoardList = false
     @State private var meguriUserProfileRoute: MeguriUserProfileRoute?
     @State private var didOpenVisualQAMeguriMessages = false
     @State private var meguriGroomViewerPost: GroomPost?
     @State private var meguriGroomViewerSourceAnchor: UnitPoint = .center
+    /// FB(iter1226.402)：ビューアで辿るグルーム列の上書き（自分のグルーム閲覧は自分のグルームだけを渡す）。空なら appState.grooms。
+    @State private var meguriGroomViewerSequence: [GroomPost] = []
 
     var body: some View {
         ZStack {
@@ -61,6 +89,7 @@ struct MegrumAuthenticatedTabContentView: View {
                         initialSenderGoodsIDs: route.senderGoodsIDs,
                         matchType: route.matchType,
                         initialExchangeMethod: route.initialExchangeMethod,
+                        initialMessage: route.initialMessage,
                         initialCashAmount: route.initialCashAmount,
                         initialShippingFee: route.initialShippingFee,
                         initialShippingDays: route.initialShippingDays,
@@ -97,6 +126,46 @@ struct MegrumAuthenticatedTabContentView: View {
             )
             .zIndex(100)
 
+            // iter1226.422：ホーム経由のグルーム作成。fullScreenCoverをやめ、左からのスライドで全画面に出す。
+            GroomComposerContainer(
+                appState: appState,
+                locationState: homeGroomComposerLocationState,
+                isPresented: $isShowingHomeGroomComposer,
+                onGroomPublishStarted: { appState.expectHomeGroomActivation() }
+            ) {
+                Color.clear
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .allowsHitTesting(false)
+            }
+            .zIndex(105)
+
+            MegrumSlideBoolPresentationOverlay(
+                isPresented: $isShowingNearbyBoardList,
+                backSwipeInteractionScope: .fullScreen
+            ) { dismiss in
+                MegrumDeferredContent(delayNanoseconds: MegrumDeferredContentDelay.slidePresentation) {
+                    NavigationStack {
+                        NearbyBoardListScreen(
+                            appState: appState,
+                            onClose: dismiss,
+                            onOpenThread: { thread, coordinate in
+                                openMeguriBoardThread(
+                                    MeguriBoardThreadRoute(thread: thread, selectedPrefecture: nil, coordinate: coordinate)
+                                )
+                            },
+                            qaInitialOverlay: {
+                                switch visualQAInitialScreen {
+                                case .nearbyBoardFilter: .filter
+                                case .nearbyBoardLocked: .lockedPopup
+                                default: nil
+                                }
+                            }()
+                        )
+                    }
+                }
+            }
+            .zIndex(108)
+
             MegrumSlideItemPresentationOverlay(
                 item: $meguriBoardThreadRoute,
                 backSwipeInteractionScope: .fullScreen
@@ -115,18 +184,18 @@ struct MegrumAuthenticatedTabContentView: View {
             }
             .zIndex(109)
 
-            MegrumSlideBoolPresentationOverlay(
-                isPresented: $isShowingMeguriMessageInbox,
-                backSwipeInteractionScope: .fullScreen
+            MeguriInboxSlideHost(
+                model: meguriInboxOpenDragModel,
+                isPresented: $isShowingMeguriMessageInbox
             ) { dismiss in
-                MegrumDeferredContent(delayNanoseconds: MegrumDeferredContentDelay.slidePresentation) {
-                    MeguriMessageInboxScreen(
-                        appState: appState,
-                        visualQAInitialScreen: visualQAInitialScreen,
-                        onClose: dismiss,
-                        onOpenThread: openMeguriMessageThread
-                    )
-                }
+                // iter1226.432：keep-alive（アイドル先読み構築）なので DeferredContent は挟まない。
+                // 開く時には構築もデータも済んでいて、あとはスライドするだけ。
+                MeguriMessageInboxScreen(
+                    appState: appState,
+                    visualQAInitialScreen: visualQAInitialScreen,
+                    onClose: dismiss,
+                    onOpenThread: openMeguriMessageThread
+                )
             }
             .zIndex(110)
 
@@ -168,15 +237,47 @@ struct MegrumAuthenticatedTabContentView: View {
             }
             .zIndex(112)
         }
+        .overlayPreferenceValue(TutorialAnchorPreferenceKey.self) { anchors in
+            // GeometryReader ごと ignoresSafeArea して、アンカー解決・dim・吹き出しを
+            // 同一のフルスクリーン座標系に揃える（内側だけ広げると切り抜きがズレる）。
+            if let beat = tutorialCoordinator.currentBeat {
+                GeometryReader { proxy in
+                    TutorialTourOverlay(
+                        beat: beat,
+                        overallProgress: tutorialCoordinator.overallProgress,
+                        canRetreat: tutorialCoordinator.canRetreat,
+                        advanceTitle: tutorialCoordinator.isAtScopeEnd
+                            ? (tutorialCoordinator.scope == .full ? "はじめる！" : "閉じる")
+                            : "次へ",
+                        anchorFrames: anchors.mapValues { proxy[$0] },
+                        containerSize: proxy.size,
+                        onAdvance: { tutorialCoordinator.advance() },
+                        onRetreat: { tutorialCoordinator.retreat() },
+                        onEndTour: { tutorialCoordinator.skip() },
+                        onMeguriDemoTap: { appState.requestTutorialMeguriCallout() }
+                    )
+                }
+                .ignoresSafeArea()
+            }
+        }
         .onAppear {
             openVisualQAMeguriMessagesIfNeeded()
+            openVisualQAGroomViewerIfNeeded()
+            openVisualQANearbyBoardListIfNeeded()
+            openVisualQAHomeGroomComposerIfNeeded()
             handlePendingNotificationRouteIntent(pendingNotificationRouteIntent)
         }
         .onChange(of: pendingNotificationRouteIntent) { _, intent in
             handlePendingNotificationRouteIntent(intent)
         }
         .onChange(of: isShowingMeguriMessageInbox) { _, newValue in
-            if !newValue {
+            if newValue {
+                // iter1226.432：keep-alive 化で画面の .task が開くたびに走らなくなったため、
+                // 開いたタイミングで裏から静かに最新化する（一覧は先読み済みで即表示）。
+                Task {
+                    await appState.loadMeguriMessages(reportsFailure: false)
+                }
+            } else {
                 meguriMessageDetailRoute = nil
             }
         }
@@ -192,11 +293,12 @@ struct MegrumAuthenticatedTabContentView: View {
             onDismiss: dismissMeguriGroomViewer
         ) { groom, dismiss in
             GroomViewerScreen(
-                grooms: appState.grooms,
+                grooms: meguriGroomViewerSequence.isEmpty ? appState.grooms : meguriGroomViewerSequence,
                 initialGroom: groom,
                 appState: appState,
                 onDismiss: dismiss,
-                onOpenMeguriUserProfile: openMeguriUserProfileFromGroomViewer
+                onOpenMeguriUserProfile: openMeguriUserProfileFromGroomViewer,
+                closeAnchor: meguriGroomViewerSourceAnchor
             )
         }
     }
@@ -231,12 +333,16 @@ struct MegrumAuthenticatedTabContentView: View {
     }
     #endif
 
+    private var tutorialSampleActive: Bool {
+        tutorialCoordinator.isActive
+    }
+
     private var homeTab: some View {
         NavigationStack {
             HomeScreen(
                 viewer: appState.viewer,
-                matchedItems: appState.homeMatchedItems,
-                possibleItems: appState.homePossibleItems,
+                matchedItems: tutorialSampleActive ? TutorialSampleHomeData.matchedItems : appState.homeMatchedItems,
+                possibleItems: tutorialSampleActive ? TutorialSampleHomeData.possibleItems : appState.homePossibleItems,
                 adDisplayContext: adDisplayContext,
                 showsSearch: $showsSearch,
                 onRefresh: appState.refresh,
@@ -279,14 +385,59 @@ struct MegrumAuthenticatedTabContentView: View {
                     requestedTradesStage = nil
                     selectedTab = .trades
                 },
+                onOpenInventory: {
+                    requestedTradesStage = nil
+                    selectedTab = .inventory
+                },
+                onOpenGroom: { groom, anchor in
+                    // FB(iter1226.403)：タップしたタイルの位置から拡大／その位置へ縮小する。
+                    openMeguriGroomViewer(groom, sourceAnchor: anchor)
+                },
+                onOpenMeguriMessages: {
+                    // iter1226.420：ホームの紙飛行機/左スワイプからめぐりメッセージ一覧へスライド表示。
+                    isShowingMeguriMessageInbox = true
+                },
+                onOpenBoardThread: { thread, coordinate in
+                    // iter1226.421：ホームの近くのチャットルーム行→スレッド詳細をスライド表示。
+                    // iter1226.423：現在地を添えて「返信には現在地が必要」の誤表示を防ぐ。
+                    openMeguriBoardThread(
+                        MeguriBoardThreadRoute(thread: thread, selectedPrefecture: nil, coordinate: coordinate)
+                    )
+                },
+                onOpenBoardList: {
+                    isShowingNearbyBoardList = true
+                },
+                onOpenGroomComposer: {
+                    isShowingHomeGroomComposer = true
+                },
+                onOpenOwnGrooms: { ownGrooms, initial, anchor in
+                    // FB(iter1226.402)：自分のグルームは「自分のグルームだけ」を古い→新しい順で辿る。
+                    openMeguriGroomViewer(initial, sourceAnchor: anchor, sequence: ownGrooms)
+                },
+                tutorialSampleActive: tutorialSampleActive,
+                tutorialFocusAnchor: tutorialCoordinator.currentBeat?.homeFocusAnchor,
+                starterMissionEnabled: !tutorialSampleActive,
+                conditionSignalsByItemIDOverride: tutorialSampleActive ? TutorialSampleHomeData.conditionSignals : nil,
+                inventoryItemsOverride: tutorialSampleActive
+                    ? TutorialSampleHomeData.viewerInventory(ownerID: appState.viewer?.id ?? TutorialSampleHomeData.placeholderViewerID)
+                    : nil,
                 visualQAInitialScreen: visualQAInitialScreen
             )
         }
+        // iter1226.427：左スワイプはUIKitパンで認識（認識開始でタッチがキャンセル
+        // されるため、行・タイル・画像のタップと同時発火しない）。
+        .meguriInboxOpenPanGesture(
+            model: meguriInboxOpenDragModel,
+            isEnabled: { selectedTab == .home && !isShowingMeguriMessageInbox },
+            onCommit: { isShowingMeguriMessageInbox = true }
+        )
+        .megrumScrollsToTopOnTabReselection(signal: tabScrollToTopSignals[.home] ?? 0)
         .tag(MegrumTab.home)
         .tabItem {
             Label(MegrumTab.home.title, systemImage: MegrumTab.home.symbolName)
         }
     }
+
 
     private var inventoryTab: some View {
         NavigationStack {
@@ -299,6 +450,7 @@ struct MegrumAuthenticatedTabContentView: View {
                 entryKind: .inventory
             )
         }
+        .megrumScrollsToTopOnTabReselection(signal: tabScrollToTopSignals[.inventory] ?? 0)
         .tag(MegrumTab.inventory)
         .tabItem {
             Label(MegrumTab.inventory.title, systemImage: MegrumTab.inventory.symbolName)
@@ -314,6 +466,7 @@ struct MegrumAuthenticatedTabContentView: View {
                 adDisplayContext: adDisplayContext
             )
         }
+        .megrumScrollsToTopOnTabReselection(signal: tabScrollToTopSignals[.wish] ?? 0)
         .tag(MegrumTab.wish)
         .tabItem {
             Label(MegrumTab.wish.title, systemImage: MegrumTab.wish.symbolName)
@@ -329,6 +482,7 @@ struct MegrumAuthenticatedTabContentView: View {
                 adDisplayContext: adDisplayContext
             )
         }
+        .megrumScrollsToTopOnTabReselection(signal: tabScrollToTopSignals[.trades] ?? 0)
         .tag(MegrumTab.trades)
         .tabItem {
             Label(MegrumTab.trades.title, systemImage: MegrumTab.trades.symbolName)
@@ -344,10 +498,11 @@ struct MegrumAuthenticatedTabContentView: View {
                     homeResetToken: meguriHomeResetToken,
                     visualQAInitialScreen: visualQAInitialScreen,
                     pendingNotificationRouteIntent: $pendingNotificationRouteIntent,
+                    onOpenBoardList: { isShowingNearbyBoardList = true },
                     onOpenMessages: openMeguriMessageInbox,
                     onOpenBoardThread: openMeguriBoardThread,
                     onOpenMeguriUserProfile: openMeguriUserProfile,
-                    onOpenGroomViewer: openMeguriGroomViewer
+                    onOpenGroomViewer: { groom, anchor in openMeguriGroomViewer(groom, sourceAnchor: anchor) }
                 )
             }
         }
@@ -390,6 +545,10 @@ struct MegrumAuthenticatedTabContentView: View {
     }
 
     private func handleTabReselection(_ tab: MegrumTab) {
+        // iter1226.429：ホーム/やりとり/マイグッズ/ほしいものは再タップで最上部へ。
+        if [.home, .trades, .inventory, .wish].contains(tab) {
+            tabScrollToTopSignals[tab, default: 0] += 1
+        }
         if tab == .meguri {
             meguriGroomViewerPost = nil
             isGroomViewerPresented = false
@@ -400,14 +559,16 @@ struct MegrumAuthenticatedTabContentView: View {
         }
     }
 
-    private func openMeguriGroomViewer(_ groom: GroomPost, sourceAnchor: UnitPoint) {
+    private func openMeguriGroomViewer(_ groom: GroomPost, sourceAnchor: UnitPoint, sequence: [GroomPost] = []) {
         meguriGroomViewerSourceAnchor = sourceAnchor
+        meguriGroomViewerSequence = sequence
         isGroomViewerPresented = true
         meguriGroomViewerPost = groom
     }
 
     private func dismissMeguriGroomViewer() {
         meguriGroomViewerPost = nil
+        meguriGroomViewerSequence = []
         isGroomViewerPresented = false
     }
 
@@ -428,9 +589,10 @@ struct MegrumAuthenticatedTabContentView: View {
     private func openMeguriMessageThread(_ thread: MeguriMessageThread) {
         withAnimation(MegrumSlidePresentationMetrics.animation) {
             isShowingMeguriMessageInbox = true
+            // iter1226.451：ルームは相手単位。グルーム返信も直接メッセージも同じルームで開く。
             meguriMessageDetailRoute = MeguriMessagePeerRoute(
                 peerID: thread.peerID,
-                scope: .conversation(sourceGroomPostID: thread.sourceGroomPostID)
+                scope: .all
             )
         }
     }
@@ -472,7 +634,8 @@ struct MegrumAuthenticatedTabContentView: View {
                 }
             }
             pendingNotificationRouteIntent = nil
-        case .ownGroom:
+        case .ownGroom, .groomDetail:
+            // めぐりタブへ切替。詳細（取得＋ゲート＋表示）は MeguriScreen 側で処理するため pending は残す。
             requestedTradesStage = nil
             selectedTab = .meguri
         case .tab, .tradeDetail, .tradeEvidenceCapture, .tradeEvidenceApproval,
@@ -490,6 +653,62 @@ struct MegrumAuthenticatedTabContentView: View {
         }
         didOpenVisualQAMeguriMessages = true
         openMeguriMessageInbox()
+    }
+
+    /// iter1226.445：開くトランジションの検証用。環境変数で起動後にグルームビューアを自動オープンする
+    /// （録画→フレーム分解で枠と中身のズレを観察するため。タップ操作なしで再現できる）。
+    private func openVisualQAGroomViewerIfNeeded() {
+        guard ProcessInfo.processInfo.environment["MEGRUM_VISUAL_QA_AUTO_OPEN_GROOM"] == "1" else {
+            return
+        }
+        // iter1226.448：以前は View インスタンス単位の @State でガードしていたため、
+        // 認証・タブ階層の再マウントで新インスタンスがもう一度 .onAppear → Task を生成し、
+        // 自動オープンが二重発火していた。セッション単位の once トークンへ変更する。
+        guard VisualQAAutoOpenGuard.shared.tryClaim() else {
+            return
+        }
+        let attemptID = UUID()
+        print("[VisualQAAutoOpen] scheduled attempt=\(attemptID.uuidString.prefix(8))")
+        Task { @MainActor in
+            // レール読み込み＋画像先読みが済むのを待ってから、実際のタイル位置相当のアンカーで開く。
+            for _ in 0..<40 {
+                if !appState.grooms.isEmpty {
+                    break
+                }
+                try? await Task.sleep(nanoseconds: 250_000_000)
+            }
+            let viewerID = appState.viewer?.id
+            guard let groom = appState.grooms.first(where: { $0.authorID != viewerID }) ?? appState.grooms.first else {
+                print("[VisualQAAutoOpen] cancelled attempt=\(attemptID.uuidString.prefix(8)) (no groom)")
+                return
+            }
+            try? await Task.sleep(nanoseconds: 1_500_000_000)
+            print("[VisualQAAutoOpen] fired attempt=\(attemptID.uuidString.prefix(8)) groom=\(groom.id)")
+            openMeguriGroomViewer(groom, sourceAnchor: UnitPoint(x: 0.18, y: 0.16))
+        }
+    }
+
+    private func openVisualQAHomeGroomComposerIfNeeded() {
+        guard visualQAInitialScreen == .homeGroomComposer, !isShowingHomeGroomComposer else {
+            return
+        }
+        // スライドの向きを録画で確認できるよう、描画が落ち着いてから開く。
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+            withAnimation(MegrumSlidePresentationMetrics.animation) {
+                isShowingHomeGroomComposer = true
+            }
+        }
+    }
+
+    private func openVisualQANearbyBoardListIfNeeded() {
+        guard visualQAInitialScreen == .nearbyBoardList
+                || visualQAInitialScreen == .nearbyBoardFilter
+                || visualQAInitialScreen == .nearbyBoardLocked,
+              !isShowingNearbyBoardList
+        else {
+            return
+        }
+        isShowingNearbyBoardList = true
     }
 
     private var tradeAttentionCounts: TradeStageAttentionCounts {

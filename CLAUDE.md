@@ -15,6 +15,7 @@
 4. **`notes/08_design_iterations.md` の最新 iter を 1〜2件読む**（直近のコンテキスト）
 5. **オーナーがタスク的な指示をした場合は `notes/USER_PLAYBOOK.md` を確認**（Phase 2 タスク・指示テンプレ・チェックポイントが集約されている）
 6. **法的文書（規約・プライバシー・特商法）に関わる作業は `notes/17_legal_alignment.md` を確認**（弁護士納品の規約原典との整合性管理）
+7. **マーケティング関連の作業は `notes/78_marketing_plan.md`（戦略）→ `notes/79_marketing_action_tracker.md`（実行管理・毎週更新）→ `notes/80_marketing_copy_kit.md`（語彙・法務チェック・コピペ文面）の順で確認**（オーナーは大阪在住・関西拠点、交換会の自主開催はしない。詳細前提は 78 の §1）
 
 これらを読まずに作業を始めない。
 
@@ -97,7 +98,7 @@ bg-megrum-lavender / text-megrum-sky / border-megrum-pink / megrum-warn / megrum
 
 #### B. 仕様整合性チェック
 - [ ] 状態名は `notes/09` の通りか（snake_case 統一）
-- [ ] 用語は `notes/10` の通りか（廃止用語 = 「交換募集」「DM」「MyLog」「郵送」を使っていない）
+- [ ] 用語は `notes/10` の通りか（廃止用語 = 「交換募集」「DM」「MyLog」を使っていない。※「郵送交換」は iter168.71 で正式用語として復活済み）
 - [ ] DB スキーマは `notes/05` と整合（必要なら migration 追記）
 - [ ] 機能要件は `notes/02` の MVP 範囲内
 - [ ] API 仕様は `notes/13` と整合（あれば）
@@ -124,9 +125,10 @@ bg-megrum-lavender / text-megrum-sky / border-megrum-pink / megrum-warn / megrum
 | 交換依頼 | **打診（proposal）** | iter46 統一 |
 | ~~交換募集 / 募集情報 / 募集登録~~ | （概念消滅） | 在庫登録（kind=for_trade）に吸収 |
 | ~~MyLog / MyLog投稿 / 投稿コンテンツ~~ | （削除） | iter46 で MVP 対象外 |
-| ~~郵送 / 本人確認（身分証）~~ | （削除） | iter46 で現地のみ |
+| 郵送 | **郵送交換**（iter168.71で復活） | 合意成立後に当事者だけへ住所開示。本人確認（身分証）は初回リリースでは無し |
 
-**「交換募集」「交換依頼」「ダイレクトメッセージ」「MyLog」「郵送」を新規ドキュメントに書かない。**
+**「交換募集」「交換依頼」「ダイレクトメッセージ」「MyLog」を新規ドキュメントに書かない。**
+（「郵送交換」は iter168.71 以降の正式用語。iter46 時点の「郵送＝削除」は古い）
 詳細は `notes/10_glossary.md` §J 廃止用語、§M 規約原典マッピングを参照。
 
 ## 🔒 法的文書の方針
@@ -140,9 +142,9 @@ bg-megrum-lavender / text-megrum-sky / border-megrum-pink / megrum-warn / megrum
 
 ## 30秒で理解する Megrum
 
-- **何**: K-POP / アニメ等の推し活グッズを **現地で交換**するモバイルアプリ
+- **何**: K-POP / アニメ等の推し活グッズを **現地または郵送で交換**するモバイルアプリ
 - **誰のため**: メインペルソナはハナ（27歳・IT勤務・月3〜5万円グッズ予算）。詳細は `notes/00_persona.md`
-- **MVP の範囲**: 現地交換（郵送は Yahoo フリマ等と棲み分け）、ランダム封入の小型グッズが主な交換対象
+- **MVP の範囲**: 現地交換＋郵送交換（iter168.71。住所は合意成立後に当事者だけへ開示）、ランダム封入の小型グッズが主な交換対象
 - **特徴**: AW（Activity Window = 「この時間ここにいる」予定）と wish のマッチング、受諾前ネゴ、合意前に待ち合わせfix
 
 ## 🎯 実装対象の優先方針（iter168.51）

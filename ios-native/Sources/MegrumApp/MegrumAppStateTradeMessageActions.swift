@@ -2,7 +2,17 @@ import Foundation
 import MegrumCore
 
 extension MegrumAppState {
-    public func loadMessages(proposalID: UUID, limit: Int = 80) async {
+    public func loadMessages(proposalID: UUID, limit: Int = 20) async {
+        // iter1226.463：まだローカルに無ければ端末キャッシュから即復元する
+        //（オフラインでも保持したやりとりを表示）。取得は裏で続き、届き次第置き換わる。
+        if messagesByProposalID[proposalID] == nil, let viewerID = viewer?.id {
+            let cached = TradeMessageLocalStore.load(viewerID: viewerID)
+            if !cached.isEmpty {
+                for (id, messages) in cached where messagesByProposalID[id] == nil {
+                    messagesByProposalID[id] = messages
+                }
+            }
+        }
         guard loadingMessagesProposalID != proposalID else {
             return
         }
@@ -308,6 +318,22 @@ extension MegrumAppState {
             errorMessage = failureMessage
             sendingMessageProposalID = nil
             return false
+        }
+    }
+
+    /// iter1226.463：取引チャットを端末側にも保持する（デバウンス書き込み）。
+    func persistTradeMessagesToLocalStore() {
+        guard let viewerID = viewer?.id else {
+            return
+        }
+        let snapshot = messagesByProposalID
+        tradeMessagePersistTask?.cancel()
+        tradeMessagePersistTask = Task.detached(priority: .utility) {
+            try? await Task.sleep(nanoseconds: 400_000_000)
+            guard !Task.isCancelled else {
+                return
+            }
+            TradeMessageLocalStore.save(snapshot, viewerID: viewerID)
         }
     }
 }

@@ -10,6 +10,7 @@ struct MegrumRootDrawerDestinationSheet: View {
     @Binding var drawerDestination: AppDrawerDestination?
     @Binding var publicProfileRoute: PublicProfileRoute?
     var onOpenRouteIntent: (NotificationRouteIntent) -> Void = { _ in }
+    var onStartTutorialChapter: (TutorialChapter) -> Void = { _ in }
     var onClose: () -> Void = {}
 
     var body: some View {
@@ -18,7 +19,7 @@ struct MegrumRootDrawerDestinationSheet: View {
             settingsScreen
         case .help:
             NavigationStack {
-                SettingsHelpScreen()
+                SettingsHelpScreen(onStartTutorialChapter: onStartTutorialChapter)
                     .toolbar {
                         ToolbarItem(placement: .cancellationAction) {
                             Button("閉じる", action: onClose)
@@ -97,7 +98,7 @@ struct MegrumRootDrawerDestinationSheet: View {
             }
         case .tab, .tradeDetail, .tradeEvidenceCapture, .tradeEvidenceApproval,
              .tradeEvaluation, .tradeAssistance, .disputeDetail,
-             .meguriBoardThread, .meguriMessages, .ownGroom, .unknown:
+             .meguriBoardThread, .meguriMessages, .ownGroom, .groomDetail, .unknown:
             break
         }
         return true

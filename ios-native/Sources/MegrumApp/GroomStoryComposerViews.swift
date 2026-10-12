@@ -27,11 +27,16 @@ struct GroomStoryComposerScreen: View {
     var onLoadCharacters: (OshiGroup?) async -> Void
     var onLoadUserOshiSelections: () async -> Void
     var onPublish: (Data, String, String?, MegrumLocationCoordinate, MeguriContentMetadataDraft) async -> Bool
+    /// FB(iter1226.399)：ホーム経由の「この場所にする」用。投稿はバックグラウンドで実行し、即ホームへ戻す。
+    var onPublishInBackground: (Data, String, String?, MegrumLocationCoordinate, MeguriContentMetadataDraft) -> Void = { _, _, _, _, _ in }
+    /// FB(iter1226.401)：ホーム経由の起動は下からではなく左からスライドイン＋触覚。
     var onDiscard: () -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var presentationState = GroomStoryComposerPresentationState()
     @State private var metadataDraft = MeguriContentMetadataDraft()
     @State private var isShowingMetadataPrompt = false
+    /// FB(iter1226.391)：ホーム等（場所未確定）からの投稿で最後に地図で場所を選ぶステップ。
+    @State private var isShowingLocationStep = false
 
     private var hasPhotoDraft: Bool {
         draftPhotoData != nil
@@ -49,6 +54,11 @@ struct GroomStoryComposerScreen: View {
     }
 
     var body: some View {
+        // iter1226.422：左からのスライドは呼び出し側（MegrumSlideBoolPresentationOverlay .leading）で行う。
+        composerContent
+    }
+
+    private var composerContent: some View {
         ZStack {
             Color.black.ignoresSafeArea()
 
@@ -58,7 +68,7 @@ struct GroomStoryComposerScreen: View {
                     textOverlays: $presentationState.textOverlays,
                     isCreating: isCreating,
                     onClose: returnToPhotoSelection,
-                    onPublish: presentMetadataPrompt
+                    onPublish: beginPublishFlow
                 )
             } else {
                 VStack(spacing: 0) {
@@ -84,6 +94,27 @@ struct GroomStoryComposerScreen: View {
 
                     GroomStoryComposerPrivacyFooter()
                 }
+            }
+
+            if isShowingLocationStep {
+                GroomStoryLocationStepView(
+                    photoData: draftPhotoData,
+                    caption: presentationState.captionForPublish,
+                    selectedCoordinate: $selectedCreationCoordinate,
+                    currentCoordinate: currentCoordinate,
+                    isRequestingLocation: isRequestingLocation,
+                    canConfirm: canCreateAtSelectedLocation,
+                    onRequestLocation: onRequestLocation,
+                    onOutOfRange: { showToast($0) },
+                    onCancel: {
+                        withAnimation(.smooth(duration: 0.2)) {
+                            isShowingLocationStep = false
+                        }
+                    },
+                    onConfirm: publishDraftPhotoInBackground
+                )
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .zIndex(2)
             }
 
             GroomStoryComposerToastOverlay(message: presentationState.toastMessage)
@@ -117,7 +148,7 @@ struct GroomStoryComposerScreen: View {
                             isShowingMetadataPrompt = false
                         }
                     },
-                    onSubmit: publishDraftPhoto
+                    onSubmit: proceedAfterMetadata
                 )
                 .transition(.scale(scale: 0.96).combined(with: .opacity))
             }
@@ -149,28 +180,14 @@ struct GroomStoryComposerScreen: View {
         onOpenCamera()
     }
 
+    /// 写真編集の「投稿」から呼ばれる。まずトピック/シリーズのポップアップを出す（場所は次のステップ）。
+    private func beginPublishFlow() {
+        presentMetadataPrompt()
+    }
+
     private func presentMetadataPrompt() {
         guard draftPhotoData != nil else {
             showToast("投稿する写真を選択してください")
-            return
-        }
-        guard let selectedCreationCoordinate else {
-            if currentCoordinate == nil {
-                onRequestLocation()
-            }
-            showToast("最後に地図上でピンを立ててください")
-            return
-        }
-        if currentCoordinate == nil {
-            onRequestLocation()
-        }
-        guard canCreateAtSelectedLocation else {
-            showToast(
-                MeguriAccessPolicy.creationLocationMessage(
-                    selectedCoordinate: selectedCreationCoordinate,
-                    currentCoordinate: effectiveCurrentCoordinate
-                )
-            )
             return
         }
         withAnimation(.smooth(duration: 0.18)) {
@@ -183,6 +200,26 @@ struct GroomStoryComposerScreen: View {
             if let group = groups.first(where: { $0.id == metadataDraft.groupID }) {
                 await onLoadCharacters(group)
             }
+        }
+    }
+
+    /// トピック/シリーズ確定後：めぐり地図経由（場所確定済み）はそのまま投稿、ホーム等は地図で場所を選ぶ。
+    private func proceedAfterMetadata() {
+        withAnimation(.smooth(duration: 0.18)) {
+            isShowingMetadataPrompt = false
+        }
+        if locksCreationCoordinate {
+            publishDraftPhoto()
+            return
+        }
+        if currentCoordinate == nil {
+            onRequestLocation()
+        }
+        if selectedCreationCoordinate == nil {
+            selectedCreationCoordinate = currentCoordinate
+        }
+        withAnimation(.smooth(duration: 0.2)) {
+            isShowingLocationStep = true
         }
     }
 
@@ -234,6 +271,49 @@ struct GroomStoryComposerScreen: View {
             onDiscard()
             dismiss()
         }
+    }
+
+    /// FB(iter1226.399)：ホーム経由の「この場所にする」。写真を書き出したら即コンポーザを閉じてホームへ戻り、
+    /// 実際の投稿はコンテナ側のバックグラウンドタスクに委ねる（自分アイコンの枠活性化アニメが見えるようにする）。
+    private func publishDraftPhotoInBackground() {
+        guard let draftPhotoData else {
+            showToast("投稿する写真を選択してください")
+            return
+        }
+        guard let selectedCreationCoordinate else {
+            if currentCoordinate == nil {
+                onRequestLocation()
+            }
+            showToast("最後に地図上でピンを立ててください")
+            return
+        }
+        if currentCoordinate == nil {
+            onRequestLocation()
+        }
+        guard canCreateAtSelectedLocation else {
+            showToast(
+                MeguriAccessPolicy.creationLocationMessage(
+                    selectedCoordinate: selectedCreationCoordinate,
+                    currentCoordinate: effectiveCurrentCoordinate
+                )
+            )
+            return
+        }
+        guard let photoUpload = renderedGroomPhotoUpload(from: draftPhotoData) else {
+            showToast("編集した写真を作成できませんでした")
+            return
+        }
+        onPublishInBackground(
+            photoUpload.data,
+            photoUpload.contentType,
+            presentationState.captionForPublish,
+            selectedCreationCoordinate,
+            metadataDraft
+        )
+        isShowingLocationStep = false
+        isShowingMetadataPrompt = false
+        onDiscard()
+        dismiss()
     }
 
     @MainActor
@@ -305,3 +385,4 @@ struct GroomStoryComposerScreen: View {
         }
     }
 }
+

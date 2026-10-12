@@ -2,6 +2,9 @@ import MegrumCore
 import MegrumDesign
 import SwiftUI
 
+/// 推し設定のメインコンテンツ（iter1226.405 刷新）：
+/// 巨大フローティングピルを廃止し、ヘッダー右上の「＋」とリスト末尾の破線カードの2導線に。
+/// タイポは17pt基準へ縮小し、`.black` ウェイト多用をやめる。
 struct OshiSettingsMainContent: View {
     var groups: [OshiSettingsGroupDraft]
     var isLoading: Bool
@@ -9,7 +12,6 @@ struct OshiSettingsMainContent: View {
     var errorMessage: String?
     var noticeMessage: String?
     var expandedGroupKey: String?
-    @Binding var activeRemoveConfirmationGroupKey: String?
     var availableCharacters: (OshiSettingsGroupDraft) -> [OshiCharacter]
     var onBack: () -> Void
     var onShowMasterSheet: () -> Void
@@ -20,132 +22,140 @@ struct OshiSettingsMainContent: View {
     var onRequestMember: (OshiSettingsGroupDraft) -> Void
 
     var body: some View {
-        ZStack(alignment: .bottomLeading) {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 14) {
-                    OshiSettingsHeader(onBack: onBack)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                OshiSettingsHeader(
+                    onBack: onBack,
+                    onAdd: onShowMasterSheet,
+                    isAddDisabled: isSaving
+                )
 
-                    if isLoading {
-                        OshiInlineLoading(text: "推し設定を読み込み中…")
-                            .padding(.horizontal, 20)
-                    }
+                if isLoading {
+                    OshiInlineLoading(text: "推し設定を読み込み中…")
+                        .padding(.horizontal, 20)
+                }
 
-                    if let errorMessage {
-                        Text(errorMessage)
-                            .font(.system(size: 12, weight: .bold, design: .rounded))
-                            .foregroundStyle(OshiPalette.warn)
-                            .padding(.horizontal, 20)
-                    }
+                if let errorMessage {
+                    Text(errorMessage)
+                        .font(.system(size: 12, weight: .semibold, design: .rounded))
+                        .foregroundStyle(MegrumTheme.conditionExact)
+                        .padding(.horizontal, 20)
+                }
 
+                VStack(spacing: 14) {
                     if groups.isEmpty, !isLoading {
                         OshiEmptyState()
-                            .padding(.horizontal, 20)
-                            .padding(.top, 12)
                     } else {
-                        VStack(spacing: 14) {
-                            ForEach(groups) { group in
-                                OshiSettingsGroupCard(
-                                    group: group,
-                                    availableCharacters: availableCharacters(group),
-                                    isExpanded: expandedGroupKey == group.key,
-                                    isRemoveConfirmationActive: activeRemoveConfirmationGroupKey == group.key,
-                                    isSaving: isSaving,
-                                    onToggleExpanded: { onToggleExpanded(group) },
-                                    onShowRemoveConfirmation: { activeRemoveConfirmationGroupKey = group.key },
-                                    onHideRemoveConfirmation: {
-                                        if activeRemoveConfirmationGroupKey == group.key {
-                                            activeRemoveConfirmationGroupKey = nil
-                                        }
-                                    },
-                                    onRemoveGroup: { onRemoveGroup(group) },
-                                    onRemoveMember: { onRemoveMember($0, group) },
-                                    onAddMember: { onAddMember($0, group) },
-                                    onRequestMember: { onRequestMember(group) }
-                                )
-                                .zIndex(activeRemoveConfirmationGroupKey == group.key ? 100 : 0)
-                            }
+                        ForEach(groups) { group in
+                            OshiSettingsGroupCard(
+                                group: group,
+                                availableCharacters: availableCharacters(group),
+                                isExpanded: expandedGroupKey == group.key,
+                                isSaving: isSaving,
+                                onToggleExpanded: { onToggleExpanded(group) },
+                                onRemoveGroup: { onRemoveGroup(group) },
+                                onRemoveMember: { onRemoveMember($0, group) },
+                                onAddMember: { onAddMember($0, group) },
+                                onRequestMember: { onRequestMember(group) }
+                            )
                         }
+                    }
+
+                    if !isLoading {
+                        OshiAddGroupCard(action: onShowMasterSheet)
+                            .disabled(isSaving)
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 8)
+
+                if let noticeMessage {
+                    Text(noticeMessage)
+                        .font(.system(size: 12, weight: .semibold, design: .rounded))
+                        .foregroundStyle(MegrumTheme.muted)
                         .padding(.horizontal, 20)
-                        .padding(.top, 8)
-                    }
-
-                    if let noticeMessage {
-                        Text(noticeMessage)
-                            .font(.system(size: 12, weight: .heavy, design: .rounded))
-                            .foregroundStyle(MegrumTheme.muted)
-                            .padding(.horizontal, 20)
-                            .padding(.top, 2)
-                    }
+                        .padding(.top, 2)
                 }
-                .padding(.bottom, 116)
             }
-            .scrollDismissesKeyboard(.interactively)
-
-            Button(action: onShowMasterSheet) {
-                HStack(spacing: 14) {
-                    ZStack {
-                        Circle()
-                            .fill(MegrumTheme.lavender)
-                            .frame(width: 48, height: 48)
-                        Image(systemName: "plus")
-                            .font(.system(size: 20, weight: .black, design: .rounded))
-                            .foregroundStyle(.white)
-                    }
-                    Text("推しを追加")
-                        .font(.system(size: 18, weight: .black, design: .rounded))
-                        .foregroundStyle(MegrumTheme.ink)
-                }
-                .padding(.leading, 16)
-                .padding(.trailing, 22)
-                .frame(height: 64)
-                .background(.ultraThinMaterial, in: Capsule())
-                .overlay {
-                    Capsule()
-                        .strokeBorder(.white.opacity(0.64), lineWidth: 1)
-                }
-                .shadow(color: .black.opacity(0.07), radius: 22, x: 0, y: 12)
-            }
-            .buttonStyle(.plain)
-            .padding(.leading, 20)
-            .padding(.bottom, 24)
-            .disabled(isSaving)
+            .padding(.bottom, 48)
         }
+        .scrollDismissesKeyboard(.interactively)
     }
 }
 
 private struct OshiSettingsHeader: View {
     var onBack: () -> Void
+    var onAdd: () -> Void
+    var isAddDisabled: Bool
 
     var body: some View {
         ZStack {
             HStack {
                 Button(action: onBack) {
                     Image(systemName: "chevron.left")
-                        .font(.system(size: 26, weight: .black, design: .rounded))
+                        .font(.system(size: 17, weight: .semibold))
                         .foregroundStyle(MegrumTheme.ink)
-                        .frame(width: 56, height: 56)
-                        .background(.ultraThinMaterial, in: Circle())
-                        .overlay {
-                            Circle()
-                                .strokeBorder(.white.opacity(0.55), lineWidth: 1)
-                        }
-                        .shadow(color: .black.opacity(0.06), radius: 18, x: 0, y: 10)
+                        .frame(width: 40, height: 40)
+                        .background(MegrumTheme.ink.opacity(0.045), in: Circle())
+                        .contentShape(Circle())
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("戻る")
+
                 Spacer()
+
+                Button(action: onAdd) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundStyle(.white)
+                        .frame(width: 40, height: 40)
+                        .background(MegrumTheme.primaryGradient, in: Circle())
+                        .shadow(color: MegrumTheme.primaryShadow, radius: 8, x: 0, y: 3)
+                        .contentShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .disabled(isAddDisabled)
+                .accessibilityLabel("推しを追加")
             }
             Text("推し設定")
-                .font(.system(size: 24, weight: .black, design: .rounded))
-                .foregroundStyle(MegrumTheme.lavender)
+                .font(.system(size: 17, weight: .bold, design: .rounded))
+                .foregroundStyle(MegrumTheme.ink)
         }
         .padding(.horizontal, 20)
-        .padding(.top, 18)
-        .padding(.bottom, 18)
+        .padding(.top, 14)
+        .padding(.bottom, 12)
         .overlay(alignment: .bottom) {
             Rectangle()
-                .fill(.black.opacity(0.08))
+                .fill(.black.opacity(0.06))
                 .frame(height: 0.5)
         }
+    }
+}
+
+/// リスト末尾の「推しを追加」カード。空状態でも常設し、追加導線を画面内に残す。
+private struct OshiAddGroupCard: View {
+    var action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: "plus")
+                    .font(.system(size: 14, weight: .bold))
+                Text("推しを追加")
+                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+            }
+            .foregroundStyle(MegrumTheme.muted)
+            .frame(maxWidth: .infinity)
+            .frame(height: 56)
+            .overlay {
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .strokeBorder(style: StrokeStyle(lineWidth: 1.4, dash: [6, 6]))
+                    .foregroundStyle(MegrumTheme.muted.opacity(0.4))
+            }
+            .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("推しを追加")
     }
 }
 
@@ -153,20 +163,19 @@ private struct OshiEmptyState: View {
     var body: some View {
         VStack(spacing: 8) {
             Text("推しが未設定です")
-                .font(.system(size: 16, weight: .black, design: .rounded))
+                .font(.system(size: 16, weight: .bold, design: .rounded))
                 .foregroundStyle(MegrumTheme.ink)
-            Text("左下の「推しを追加」からグループ・作品を追加できます。")
-                .font(.system(size: 13, weight: .bold, design: .rounded))
+            Text("「推しを追加」からグループ・作品を追加できます。")
+                .font(.system(size: 13, weight: .semibold, design: .rounded))
                 .foregroundStyle(MegrumTheme.muted)
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
         .padding(24)
-        .background(.white.opacity(0.78), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .background(.white.opacity(0.78), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .strokeBorder(style: StrokeStyle(lineWidth: 1.2, dash: [6, 6]))
-                .foregroundStyle(.black.opacity(0.12))
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(.black.opacity(0.06), lineWidth: 1)
         }
     }
 }
@@ -180,7 +189,7 @@ private struct OshiInlineLoading: View {
                 .controlSize(.small)
                 .tint(MegrumTheme.lavender)
             Text(text)
-                .font(.system(size: 13, weight: .black, design: .rounded))
+                .font(.system(size: 13, weight: .semibold, design: .rounded))
                 .foregroundStyle(MegrumTheme.muted)
         }
     }

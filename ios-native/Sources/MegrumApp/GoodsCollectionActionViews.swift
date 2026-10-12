@@ -3,8 +3,10 @@ import SwiftUI
 
 struct GoodsCollectionFloatingControls: View {
     var showsAddButton: Bool
+    var addButtonTitle: String
     var addButtonLabel: String
     var addButtonHint: String
+    var tutorialAnchorID: TutorialAnchorID? = nil
     var isSelectionMode: Bool
     var quickActionItem: GoodsItem?
     var quickActionHeader: GoodsQuickActionHeaderPresentation?
@@ -20,9 +22,17 @@ struct GoodsCollectionFloatingControls: View {
 
     var body: some View {
         if showsAddButton && !isSelectionMode && quickActionItem == nil {
-            AddGoodsButton(accessibilityLabel: addButtonLabel, accessibilityHint: addButtonHint, action: onAdd)
-                .padding(.leading, FloatingActionLayoutMetrics.leadingPadding)
-                .padding(.bottom, FloatingActionLayoutMetrics.addButtonBottomPadding)
+            // FB8-9：追加ボタンは右下・文字付き、フィルタは左下（位置を入れ替え）。iter1226.385。
+            AddGoodsButton(
+                title: addButtonTitle,
+                accessibilityLabel: addButtonLabel,
+                accessibilityHint: addButtonHint,
+                action: onAdd
+            )
+            .tutorialAnchor(ifPresent: tutorialAnchorID)
+            .frame(maxWidth: .infinity, alignment: .trailing)
+            .padding(.trailing, FloatingActionLayoutMetrics.leadingPadding)
+            .padding(.bottom, FloatingActionLayoutMetrics.addButtonBottomPadding)
         }
 
         if let quickActionItem {

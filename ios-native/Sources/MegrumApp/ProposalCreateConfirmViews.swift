@@ -111,6 +111,18 @@ struct ProposalConfirmAddressCard: View {
                 if isLoading {
                     ProgressView()
                         .controlSize(.small)
+                } else if mailingAddress != nil {
+                    // 送信内容の最終確認から住所をその場で直せる（iter1226.407 / FB項目7）。
+                    Button(action: onOpenAddressSettings) {
+                        Text("変更")
+                            .font(.system(size: 12.5, weight: .bold, design: .rounded))
+                            .foregroundStyle(MegrumTheme.lavender)
+                            .padding(.horizontal, 12)
+                            .frame(height: 30)
+                            .background(MegrumTheme.lavender.opacity(0.10), in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("郵送先の住所を変更")
                 }
             }
 
@@ -134,15 +146,8 @@ struct ProposalConfirmAddressCard: View {
                     .font(.system(size: 13, weight: .bold, design: .rounded))
                     .foregroundStyle(MegrumTheme.conditionExact)
 
-                Button(action: onOpenAddressSettings) {
-                    Text("住所を登録する")
-                        .font(.system(size: 14, weight: .heavy, design: .rounded))
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 44)
-                        .background(MegrumTheme.lavender, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                }
-                .buttonStyle(.plain)
+                Button("住所を登録する", action: onOpenAddressSettings)
+                    .buttonStyle(.megrumPrimary(height: 44))
             }
         }
         .padding(16)

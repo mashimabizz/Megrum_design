@@ -11,6 +11,18 @@ enum HomeMockGoodsShape: Sendable {
     case plush
 }
 
+extension HomeMockGoods {
+    /// ID重複を除いて順序を保つ（確認画面の受け取り一覧などで使う）。iter1226.384 / FB7-1。
+    static func orderedUniqueByID(_ goods: [HomeMockGoods]) -> [HomeMockGoods] {
+        var seen: Set<UUID> = []
+        var result: [HomeMockGoods] = []
+        for item in goods where seen.insert(item.id).inserted {
+            result.append(item)
+        }
+        return result
+    }
+}
+
 struct HomeMockGoods: Identifiable, Equatable, Sendable {
     var id: UUID
     var ownerID: UUID?

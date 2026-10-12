@@ -91,10 +91,18 @@ struct MeguriPinPopIn<Content: View>: View {
 struct GroomMapPin: View {
     var groom: GroomPost
     var isOutOfRange: Bool
+    /// iter1226.444：既読グルームはレール（ホーム）と同じくグレー枠にする。
+    var isRead: Bool = false
 
     var body: some View {
         GroomThumbnailCircle(url: groom.imageURL, size: 58)
-            .overlay(Circle().stroke(megrumPinBorderGradient, lineWidth: 3))
+            .overlay {
+                if isRead {
+                    Circle().stroke(GroomStoryMetrics.seenRing, lineWidth: 3)
+                } else {
+                    Circle().stroke(megrumPinBorderGradient, lineWidth: 3)
+                }
+            }
             .overlay(alignment: .bottomTrailing) {
                 if isOutOfRange {
                     Image(systemName: "lock.fill")
@@ -308,6 +316,21 @@ private struct BoardMapPinThumbnail: View {
 /// アイコンに採用し、右上に青バッジで合計数を出す。
 struct MeguriClusterPin: View {
     var cluster: MeguriMapClusterBuilder.Cluster
+    /// iter1226.444：既読判定（クラスタ内の全グルームが既読なら代表ピンをグレー枠に）。
+    var viewedGroomIDs: Set<UUID> = []
+
+    private var allGroomsRead: Bool {
+        let groomIDs = cluster.items.compactMap { item -> UUID? in
+            if case .groom(let groom) = item {
+                return groom.id
+            }
+            return nil
+        }
+        guard !groomIDs.isEmpty else {
+            return false
+        }
+        return groomIDs.allSatisfy { viewedGroomIDs.contains($0) }
+    }
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
@@ -328,7 +351,7 @@ struct MeguriClusterPin: View {
     private var representativeIcon: some View {
         switch cluster.representative {
         case .groom(let groom):
-            GroomMapPin(groom: groom, isOutOfRange: false)
+            GroomMapPin(groom: groom, isOutOfRange: false, isRead: allGroomsRead)
         case .thread(let thread):
             BoardMapPin(thread: thread)
         case nil:
@@ -418,6 +441,59 @@ struct GroomMapCluster: Identifiable {
                 return lhs.id < rhs.id
             }
             return lhs.posts.count > rhs.posts.count
+        }
+    }
+}
+
+/// ズームアウト時の「おおよその件数」バブル（iter1226.434）。
+/// 実データを読み込む前に、この付近にどれくらいあるかだけを伝える。
+struct MeguriDensityBubble: View {
+    var cell: MeguriMapDensityCell
+
+    var body: some View {
+        HStack(spacing: 8) {
+            if cell.groomCount > 0 {
+                MeguriDensityCountLabel(
+                    systemImage: "camera.fill",
+                    count: cell.groomCount,
+                    tint: MegrumTheme.lavender
+                )
+            }
+            if cell.threadCount > 0 {
+                MeguriDensityCountLabel(
+                    systemImage: "text.bubble.fill",
+                    count: cell.threadCount,
+                    tint: MegrumTheme.sky
+                )
+            }
+        }
+        .padding(.horizontal, 11)
+        .padding(.vertical, 8)
+        .background(.regularMaterial, in: Capsule())
+        .overlay {
+            Capsule()
+                .strokeBorder(MegrumTheme.lavender.opacity(0.45), lineWidth: 1.2)
+        }
+        .shadow(color: MegrumTheme.ink.opacity(0.18), radius: 9, y: 5)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("この付近にグルーム\(cell.groomCount)件、チャットルーム\(cell.threadCount)件。タップで拡大")
+    }
+}
+
+private struct MeguriDensityCountLabel: View {
+    var systemImage: String
+    var count: Int
+    var tint: Color
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Image(systemName: systemImage)
+                .font(.system(size: 11, weight: .heavy))
+                .foregroundStyle(tint)
+            Text("\(count)")
+                .font(.system(size: 13, weight: .black, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(MegrumTheme.ink)
         }
     }
 }

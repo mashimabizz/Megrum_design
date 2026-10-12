@@ -95,6 +95,31 @@ private struct GoodsEditorDialogsModifier: ViewModifier {
     }
 }
 
+private struct GoodsEditorCreatePhotoSourceDialogModifier: ViewModifier {
+    @Binding var isPresented: Bool
+    var onPickCamera: () -> Void
+    var onPickPhotoLibrary: () -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .confirmationDialog(
+                "写真を追加",
+                isPresented: $isPresented,
+                titleVisibility: .visible
+            ) {
+                #if os(iOS)
+                Button("カメラで撮る", action: onPickCamera)
+                #endif
+                #if canImport(PhotosUI)
+                Button("ライブラリから選ぶ（複数可）", action: onPickPhotoLibrary)
+                #endif
+                Button("閉じる", role: .cancel) {}
+            } message: {
+                Text("追加した写真は、続けてトリミングで整えられます。")
+            }
+    }
+}
+
 private struct GoodsEditorTradingCardBulkSourceDialogModifier: ViewModifier {
     @Binding var isPresented: Bool
     var onPickCamera: () -> Void
@@ -103,7 +128,7 @@ private struct GoodsEditorTradingCardBulkSourceDialogModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .confirmationDialog(
-                "トレカ専用 AIで一括登録",
+                "まとめて登録",
                 isPresented: $isPresented,
                 titleVisibility: .visible
             ) {
@@ -157,6 +182,20 @@ extension View {
                 photoSourceDialogTitle: photoSourceDialogTitle,
                 onClearPhoto: onClearPhoto,
                 onDeleteInventory: onDeleteInventory
+            )
+        )
+    }
+
+    func goodsEditorCreatePhotoSourceDialog(
+        isPresented: Binding<Bool>,
+        onPickCamera: @escaping () -> Void,
+        onPickPhotoLibrary: @escaping () -> Void
+    ) -> some View {
+        modifier(
+            GoodsEditorCreatePhotoSourceDialogModifier(
+                isPresented: isPresented,
+                onPickCamera: onPickCamera,
+                onPickPhotoLibrary: onPickPhotoLibrary
             )
         )
     }

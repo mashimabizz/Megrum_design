@@ -8,32 +8,55 @@ struct ProposalMeetupConditionStep: View {
     @Binding var scheduleDate: Date
     var viewerConditionText: String
     var partnerConditionText: String
+    var onOpenViewerCalendar: (() -> Void)?
     var onOpenPartnerCalendar: (() -> Void)?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             ProposalCardSection(title: "待ち合わせ") {
                 VStack(spacing: 0) {
-                    Picker("都道府県", selection: $prefecture) {
-                        Text("未設定").tag("")
-                        ForEach(OwnProfileEditValidation.japanPrefectures, id: \.self) { prefecture in
-                            Text(prefecture).tag(prefecture)
+                    // 都道府県：ラベルは黒（青リンク色にしない）＋右に選択値。
+                    HStack(spacing: 12) {
+                        Text("都道府県")
+                            .font(.system(size: 15, weight: .bold, design: .rounded))
+                            .foregroundStyle(MegrumTheme.ink)
+                        Spacer(minLength: 8)
+                        Menu {
+                            Picker("都道府県", selection: $prefecture) {
+                                Text("未設定").tag("")
+                                ForEach(OwnProfileEditValidation.japanPrefectures, id: \.self) { prefecture in
+                                    Text(prefecture).tag(prefecture)
+                                }
+                            }
+                        } label: {
+                            HStack(spacing: 4) {
+                                Text(prefecture.isBlank ? "未設定" : prefecture)
+                                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                                    .foregroundStyle(prefecture.isBlank ? MegrumTheme.muted : MegrumTheme.ink)
+                                Image(systemName: "chevron.up.chevron.down")
+                                    .font(.system(size: 12, weight: .bold))
+                                    .foregroundStyle(MegrumTheme.muted)
+                            }
                         }
                     }
-                    .font(.system(size: 15, weight: .bold, design: .rounded))
                     .padding(.vertical, ProposalMeetupConditionMetrics.rowVerticalPadding)
                     .frame(minHeight: ProposalMeetupConditionMetrics.rowMinHeight)
-                    #if os(iOS)
-                    .pickerStyle(.navigationLink)
-                    #endif
 
                     Divider()
 
-                    TextField("メモ（例：駅周辺、会場入口付近）", text: $placeMemo, axis: .vertical)
-                        .font(.system(size: 15, weight: .semibold, design: .rounded))
-                        .lineLimit(1...3)
-                        .padding(.vertical, 12)
-                        .frame(minHeight: ProposalMeetupConditionMetrics.rowMinHeight)
+                    // メモ：ラベル「メモ」＋その右横に自由入力。
+                    HStack(alignment: .center, spacing: 12) {
+                        Text("メモ")
+                            .font(.system(size: 15, weight: .bold, design: .rounded))
+                            .foregroundStyle(MegrumTheme.ink)
+                        TextField("例：駅周辺、会場入口付近", text: $placeMemo, axis: .vertical)
+                            .font(.system(size: 15, weight: .semibold, design: .rounded))
+                            .multilineTextAlignment(.trailing)
+                            .lineLimit(1...3)
+                            .frame(maxWidth: .infinity, alignment: .trailing)
+                    }
+                    .padding(.vertical, 12)
+                    .frame(minHeight: ProposalMeetupConditionMetrics.rowMinHeight)
 
                     Divider()
 
@@ -43,6 +66,7 @@ struct ProposalMeetupConditionStep: View {
                         displayedComponents: [.date]
                     )
                     .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .tint(MegrumTheme.lavender)
                     .padding(.vertical, 10)
                     .frame(minHeight: ProposalMeetupConditionMetrics.rowMinHeight)
                 }
@@ -60,6 +84,7 @@ struct ProposalMeetupConditionStep: View {
                     ProposalMutualConditionRowData(label: "自分", value: viewerConditionText),
                     ProposalMutualConditionRowData(label: "相手", value: partnerConditionText)
                 ],
+                onViewerDetail: onOpenViewerCalendar,
                 onPartnerDetail: onOpenPartnerCalendar
             )
         }
@@ -118,7 +143,9 @@ struct ProposalMutualConditionRowData: Equatable {
 struct ProposalMutualConditionCard: View {
     var title: String
     var rows: [ProposalMutualConditionRowData]
-    /// 「相手」行の右端の「＞」から開く詳細（相手の交換カレンダー等）。
+    /// 「自分」行の右端の「＞」から開く詳細（自分の交換カレンダー）。
+    var onViewerDetail: (() -> Void)?
+    /// 「相手」行の右端の「＞」から開く詳細（相手の交換カレンダー）。
     var onPartnerDetail: (() -> Void)?
 
     var body: some View {
@@ -131,8 +158,18 @@ struct ProposalMutualConditionCard: View {
         }
     }
 
+    /// 各行の「＞」で開く詳細アクション（自分＝onViewerDetail / 相手＝onPartnerDetail）。
+    private func detailAction(for row: ProposalMutualConditionRowData) -> (() -> Void)? {
+        switch row.label {
+        case "自分": return onViewerDetail
+        case "相手": return onPartnerDetail
+        default: return nil
+        }
+    }
+
     @ViewBuilder
     private func rowView(_ row: ProposalMutualConditionRowData) -> some View {
+        let action = detailAction(for: row)
         let content = HStack(alignment: .top, spacing: 12) {
             Text(row.label)
                 .font(.system(size: 12, weight: .black, design: .rounded))
@@ -143,7 +180,7 @@ struct ProposalMutualConditionCard: View {
                 .foregroundStyle(MegrumTheme.ink)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .fixedSize(horizontal: false, vertical: true)
-            if row.label == "相手", onPartnerDetail != nil {
+            if action != nil {
                 Image(systemName: "chevron.right")
                     .font(.system(size: 13, weight: .black))
                     .foregroundStyle(MegrumTheme.muted)
@@ -153,14 +190,14 @@ struct ProposalMutualConditionCard: View {
         .padding(11)
         .background(Color.white.opacity(0.72), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
 
-        if row.label == "相手", let onPartnerDetail {
+        if let action {
             Button {
-                MegrumHaptics.performButtonTap(onPartnerDetail)
+                MegrumHaptics.performButtonTap(action)
             } label: {
                 content
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("相手の現地交換カレンダーを開く")
+            .accessibilityLabel("\(row.label)の現地交換カレンダーを開く")
         } else {
             content
         }
@@ -235,14 +272,13 @@ struct ProposalStepProgressPill: View {
     }
 }
 
-/// 3/3 交換条件：交換手段・現地・郵送・支払をひとつのステップにまとめる。
+/// 3/3 交換条件：交換手段・現地・郵送をひとつのステップにまとめる。
+/// 支払方法は 3/3 の完了後、独立した「支払方法」ステップで選ぶ（金額発生時のみ）。iter1226.381。
 /// 各セクションの下に「お互いの希望条件」（現地/郵送の各サブビューが内包）を表示する。
-struct ProposalExchangeConditionsStep<MeetupContent: View, ShippingContent: View, PaymentContent: View>: View {
+struct ProposalExchangeConditionsStep<MeetupContent: View, ShippingContent: View>: View {
     @Binding var exchangeMethod: ExchangeMethod
-    var requiresPaymentSelection: Bool
     @ViewBuilder var meetupContent: () -> MeetupContent
     @ViewBuilder var shippingContent: () -> ShippingContent
-    @ViewBuilder var paymentContent: () -> PaymentContent
 
     var body: some View {
         VStack(alignment: .leading, spacing: 28) {
@@ -264,13 +300,6 @@ struct ProposalExchangeConditionsStep<MeetupContent: View, ShippingContent: View
                     shippingContent()
                 }
             }
-
-            if requiresPaymentSelection {
-                VStack(alignment: .leading, spacing: 14) {
-                    sectionTitle("\(paymentSectionNumber). 支払方法")
-                    paymentContent()
-                }
-            }
         }
     }
 
@@ -284,17 +313,6 @@ struct ProposalExchangeConditionsStep<MeetupContent: View, ShippingContent: View
 
     private var mailSectionNumber: Int {
         exchangeMethod == .both ? 3 : 2
-    }
-
-    private var paymentSectionNumber: Int {
-        var number = 2
-        if exchangeMethod == .hand || exchangeMethod == .both {
-            number += 1
-        }
-        if exchangeMethod == .mail || exchangeMethod == .both {
-            number += 1
-        }
-        return number
     }
 }
 

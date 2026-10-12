@@ -69,6 +69,11 @@ enum HomeCandidateExchangePolicy {
         })
     }
 
+    /// 任意の (開始, 終了) ペアから、期間内の日付キーを列挙する（打診フローの相手カレンダー用）。
+    static func localDateKeys(fromStartEndPairs pairs: [(start: Date, end: Date)]) -> [String] {
+        pairs.flatMap { dateKeys(from: $0.start, through: $0.end) }
+    }
+
     /// 自分と相手のAWが重なっている組のうち、最初に見つかった会場名。
     /// 相手側の会場名を優先し、無ければ自分側を使う。
     static func matchedVenue(

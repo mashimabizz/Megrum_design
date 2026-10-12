@@ -40,6 +40,10 @@ public extension MegrumRepository {
         []
     }
 
+    func resolveNotificationThumbnailURL(bucket: String, path: String) async -> URL? {
+        nil
+    }
+
     func markNotificationRead(_ notificationID: UUID) async throws -> MegrumNotification? {
         nil
     }
@@ -77,6 +81,34 @@ public extension MegrumRepository {
         )
     }
 
+    func loadGroomNotifyPrefs() async throws -> [GroomNotifyPref] {
+        []
+    }
+
+    func setGroomNotifyPref(
+        groupID: UUID,
+        enabled: Bool,
+        notifyAllMembers: Bool,
+        memberCharacterIDs: [UUID]
+    ) async throws -> GroomNotifyPref {
+        GroomNotifyPref(
+            groupID: groupID,
+            enabled: enabled,
+            notifyAllMembers: notifyAllMembers,
+            memberCharacterIDs: memberCharacterIDs
+        )
+    }
+
+    func recordGroomEncounters(groomPostIDs _: [UUID]) async throws {}
+
+    func loadGroomPost(id _: UUID) async throws -> GroomPost? {
+        nil
+    }
+
+    func loadEncounteredGrooms(latitude _: Double?, longitude _: Double?) async throws -> [GroomPost] {
+        []
+    }
+
     func updatePushNotificationLocation(latitude: Double, longitude: Double) async throws {}
 
     func registerNativePushDeviceToken(_ token: String, appVersion: String?) async throws {}
@@ -89,6 +121,10 @@ public extension MegrumRepository {
 
     func completeAccountSetup(_ input: AccountSetupInput) async throws -> UserProfile {
         throw MegrumRepositoryError.unsupportedMutation
+    }
+
+    func takenAccountHandles(among handles: [String]) async throws -> Set<String> {
+        []
     }
 
     func requestAccountDeletion(_ input: AccountDeletionRequestInput) async throws -> AccountDeletionRequestResult {

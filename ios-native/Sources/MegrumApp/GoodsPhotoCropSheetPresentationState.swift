@@ -26,8 +26,11 @@ struct GoodsPhotoCropSheetPresentationState: Equatable {
         selectedFrameID = nil
     }
 
-    mutating func showEmptyFrameMessage() {
-        message = "切り取り枠を追加してください。"
+    /// 初期枠へ戻す（リセット）
+    mutating func reset(to initialFrames: [TradingCardCropFrame]) {
+        frames = initialFrames
+        selectedFrameID = initialFrames.first?.id
+        message = nil
     }
 
     mutating func showFailureMessage(_ message: String) {

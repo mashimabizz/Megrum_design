@@ -10,6 +10,8 @@ struct LoginSecuritySettingsScreen: View {
 
     @FocusState private var focusedField: Field?
     @State private var passwordResetState = LoginSecurityPasswordResetState()
+    /// 確認コード入力→新パスワード設定のシート（iter1226.419）。
+    @State private var showsResetCodeFlow = false
 
     private var summary: LoginSecuritySummary {
         LoginSecuritySummary(
@@ -49,7 +51,7 @@ struct LoginSecuritySettingsScreen: View {
             } header: {
                 Text("パスワード再設定")
             } footer: {
-                Text("メール/パスワードでログインしている場合は、登録メールへ再設定リンクを送れます。")
+                Text("メール/パスワードでログインしている場合は、登録メールへ6桁の確認コードを送り、この場で新しいパスワードに変更できます。")
             }
 
             LoginSecuritySignOutSection(
@@ -79,6 +81,11 @@ struct LoginSecuritySettingsScreen: View {
         .onChange(of: passwordResetState.email) { _, _ in
             passwordResetState.clearInputFeedback()
             authState.clearFeedback()
+        }
+        .sheet(isPresented: $showsResetCodeFlow) {
+            PasswordResetCodeFlowSheet(authState: authState)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
         }
     }
 
@@ -113,7 +120,11 @@ struct LoginSecuritySettingsScreen: View {
             return
         }
 
-        _ = await authState.sendPasswordReset(email: passwordResetState.normalizedEmail)
+        let sent = await authState.sendPasswordReset(email: passwordResetState.normalizedEmail)
+        // 確認コード方式（iter1226.419）：送信できたらコード入力→新パスワードのシートを開く。
+        if sent, authState.pendingRecoveryCodeEmail != nil {
+            showsResetCodeFlow = true
+        }
     }
 
     private func startSignOut() {

@@ -90,8 +90,14 @@ struct TradeCardHeader: View {
                 TradePartnerMetaText(demographicText)
             }
 
-            if let ratingText = presentation.partnerRatingText {
-                TradePartnerMetaText(ratingText)
+            if let evaluationCount = presentation.partnerEvaluationCount {
+                // 評価は黄色い星アイコン＋「X.X（X件）」で統一（iter1226.382 / FB6-4）。
+                MegrumRatingLabel(
+                    averageStars: presentation.partnerAverageStars,
+                    evaluationCount: evaluationCount,
+                    starSize: 11,
+                    fontSize: 12
+                )
             }
 
             Spacer(minLength: 6)
@@ -172,13 +178,14 @@ struct TradePartnerAvatar: View {
         .accessibilityHidden(true)
     }
 
+    // アイコン未設定＝グレーの人型プレースホルダ（頭文字表示をやめ、未設定であることが分かるように）。iter1226.417。
     private var placeholder: some View {
         RoundedRectangle(cornerRadius: 9, style: .continuous)
-            .fill(MegrumTheme.lavender.opacity(readState == .unopened ? 0.14 : 0.09))
+            .fill(Color(red: 0.90, green: 0.90, blue: 0.92))
             .overlay {
-                Text(initial)
-                    .font(.system(size: 10.5, weight: .black, design: .rounded))
-                    .foregroundStyle(MegrumTheme.lavender.opacity(readState == .waitingForReply ? 0.62 : 0.92))
+                Image(systemName: "person.fill")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Color(red: 0.62, green: 0.62, blue: 0.66).opacity(readState == .waitingForReply ? 0.7 : 1))
             }
     }
 }

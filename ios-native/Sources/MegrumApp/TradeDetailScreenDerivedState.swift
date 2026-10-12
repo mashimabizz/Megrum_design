@@ -92,6 +92,17 @@ extension TradeDetailScreen {
         }
     }
 
+    /// iter1226.425：再打診用。金額指定の側をビューア視点（sender=自分が払う）へ変換する。
+    var viewerRelativeCashSide: ProposalCashSide? {
+        guard currentProposal.cashOffer, let side = currentProposal.cashAmountSide else {
+            return nil
+        }
+        guard let viewerID, currentProposal.senderID != viewerID else {
+            return side
+        }
+        return side == .sender ? .receiver : .sender
+    }
+
     var offeredGoodsIDs: [UUID] {
         viewerID.flatMap { currentProposal.goodsOffered(by: $0) } ?? currentProposal.senderGoodsIDs
     }

@@ -22,18 +22,17 @@ struct HomeExchangeSettingsHeader: View {
     var body: some View {
         ZStack {
             Text("交換条件")
-                .font(.title2.weight(.black))
+                .font(.system(size: 17, weight: .bold, design: .rounded))
                 .foregroundStyle(MegrumTheme.ink)
                 .frame(maxWidth: .infinity)
 
             HStack {
                 Button("閉じる", action: onClose)
-                    .font(.headline.weight(.bold))
+                    .font(.system(size: 15, weight: .semibold, design: .rounded))
                     .foregroundStyle(MegrumTheme.ink)
-                    .padding(.horizontal, 17)
-                    .frame(minHeight: 44)
-                    .background(Color.white.opacity(0.92), in: RoundedRectangle(cornerRadius: 20))
-                    .shadow(color: MegrumTheme.lavender.opacity(0.10), radius: 16, y: 8)
+                    .padding(.horizontal, 14)
+                    .frame(height: 36)
+                    .background(MegrumTheme.ink.opacity(0.045), in: Capsule())
 
                 Spacer(minLength: 0)
             }
@@ -45,21 +44,17 @@ struct HomeExchangeSettingsInstructionBanner: View {
     var body: some View {
         Label {
             Text("日付タップで場所とメモ、横ドラッグで複数日程を追加できます")
-                .font(.subheadline.weight(.bold))
-                .foregroundStyle(MegrumTheme.ink)
+                .font(.system(size: 13, weight: .medium, design: .rounded))
+                .foregroundStyle(MegrumTheme.ink.opacity(0.78))
                 .fixedSize(horizontal: false, vertical: true)
         } icon: {
             Image(systemName: "hand.tap.fill")
-                .font(.title3.weight(.bold))
+                .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(MegrumTheme.lavender)
         }
-        .padding(.horizontal, 16)
-        .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
-        .background(Color.white.opacity(0.74), in: RoundedRectangle(cornerRadius: 18))
-        .overlay {
-            RoundedRectangle(cornerRadius: 18)
-                .stroke(MegrumTheme.lavender.opacity(0.14), lineWidth: 1)
-        }
+        .padding(.horizontal, 14)
+        .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
+        .background(MegrumTheme.lavender.opacity(0.06), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 }
 
@@ -76,21 +71,9 @@ struct HomeExchangeSettingsSaveFooter: View {
                         .tint(.white)
                 }
                 Text("保存")
-                    .font(.title3.weight(.black))
             }
-            .foregroundStyle(Color.white)
-            .frame(maxWidth: .infinity, minHeight: 60)
-            .background(
-                LinearGradient(
-                    colors: [MegrumTheme.lavender, MegrumTheme.lavender.opacity(0.82)],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                ),
-                in: RoundedRectangle(cornerRadius: 18)
-            )
-            .shadow(color: MegrumTheme.lavender.opacity(0.28), radius: 18, y: 10)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.megrumPrimary)
         .disabled(isSaving)
         .padding(.horizontal, 20)
         .padding(.top, 10)

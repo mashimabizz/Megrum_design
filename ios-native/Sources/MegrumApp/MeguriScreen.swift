@@ -9,6 +9,8 @@ struct MeguriScreen: View {
     var homeResetToken: UUID?
     var visualQAInitialScreen: VisualQAInitialScreen? = nil
     @Binding var pendingNotificationRouteIntent: NotificationRouteIntent?
+    /// iter1226.421：右下固定フッターからチャットルーム一覧を開く。
+    var onOpenBoardList: () -> Void = {}
     var onOpenMessages: () -> Void = {}
     var onOpenBoardThread: (MeguriBoardThreadRoute) -> Void = { _ in }
     var onOpenMeguriUserProfile: (UUID) -> Void = { _ in }
@@ -19,6 +21,10 @@ struct MeguriScreen: View {
     @State var pendingCreatedThread: BoardThread?
     @State var selectedGroom: GroomPost?
     @State var selectedGroomSourceAnchor: UnitPoint = .center
+    /// iter1226.458：めぐりホームのグルームもホームレールと同じ標準zoomで開く（iOS18+）。
+    /// 旧経路（onOpenGroomViewer→タブ上位オーバーレイ）は iOS17 フォールバックのみ。
+    @State var groomViewerZoomRoute: GroomMapViewerRoute?
+    @Namespace private var groomZoomNamespace
     @State var selectedGroomPhotoItem: PhotosPickerItem?
     @State var groomDraftPhotoData: Data?
     @State var groomDraftPhotoContentType = "image/jpeg"
@@ -34,7 +40,6 @@ struct MeguriScreen: View {
     @State var isShowingMeguriProfileSettings = false
     @State var didOpenVisualQAMeguriProfileSettings = false
     @State var didOpenVisualQAGroomArchive = false
-    @State var activeMap: MeguriMapKind?
     @State var homeMapKind: MeguriMapKind = .all
     @State var isShowingThreadComposer = false
     @State var threadCreationCoordinate: MegrumLocationCoordinate?
@@ -88,17 +93,30 @@ struct MeguriScreen: View {
         }
     }
 
+    /// 自分の投稿はフィルタ・推し設定に関わらず常に見せる（自分のグルームが地図/一覧から消えないように）。iter1226.392。
+    private func isOwnOrMatchesFilter(_ groom: GroomPost) -> Bool {
+        groom.authorID == appState.viewer?.id || contentFilter.matches(groom: groom)
+    }
+
     var visibleGrooms: [GroomPost] {
-        appState.grooms.filter { contentFilter.matches(groom: $0) }
+        appState.grooms.filter(isOwnOrMatchesFilter)
     }
 
     var visibleMapGrooms: [GroomPost] {
-        (appState.groomMapPosts.isEmpty ? appState.grooms : appState.groomMapPosts)
-            .filter { contentFilter.matches(groom: $0) }
+        // ガイドツアー中はサンプルピンを表示レイヤで注入する（実データ・フィルタ非依存で確実に見せる）。
+        if appState.isTutorialActive {
+            return TutorialSampleMeguriData.grooms
+        }
+        // iter1226.433：ビューポート読み込みで蓄積した圏外グルームも（再読み込み後も）消えずに出す。
+        return appState.meguriMapDisplayGrooms.filter(isOwnOrMatchesFilter)
     }
 
     var visibleThreads: [BoardThread] {
-        appState.threads.filter { contentFilter.matches(thread: $0) }
+        if appState.isTutorialActive {
+            return TutorialSampleMeguriData.threads
+        }
+        // iter1226.433：ビューポート読み込みで蓄積した圏外チャットルームも消えずに出す。
+        return appState.meguriMapDisplayThreads.filter { contentFilter.matches(thread: $0) }
     }
 
     var body: some View {
@@ -109,8 +127,12 @@ struct MeguriScreen: View {
             grooms: visibleGrooms,
             mapGrooms: visibleMapGrooms,
             threads: visibleThreads,
+            densityCells: appState.meguriMapDensityCells,
             replyPreviewsByThreadID: appState.boardReplyPreviewsByThreadID,
-            currentCoordinate: locationState.coordinate,
+            currentCoordinate: appState.isTutorialActive
+                ? TutorialSampleMeguriData.centerCoordinate
+                : locationState.coordinate,
+            viewedGroomIDs: appState.viewedGroomIDs,
             subscriptionState: appState.subscriptionState,
             notice: notice,
             isRequestingLocation: locationState.isRequestingLocation,
@@ -132,9 +154,50 @@ struct MeguriScreen: View {
             onOpenMeguriProfile: { isShowingMeguriProfileSettings = true },
             onOpenNotificationSettings: { isShowingNotificationSettings = true },
             isLoadingViewport: appState.isLoadingMeguriViewport,
-            onViewportChange: handleViewportChange
+            onViewportChange: handleViewportChange,
+            groomZoomNamespace: groomZoomNamespace
         )
         .allowsHitTesting(!isShowingGroomArchive)
+        #if os(iOS)
+        // iter1226.458：ホームレールと同一方式（fullScreenCover + 標準zoom）。
+        // source は地図overlayの常設ピン（MeguriHomeMapBackdrop）なのでタップ即・一体でズームする。
+        .fullScreenCover(item: $groomViewerZoomRoute) { route in
+            GroomViewerScreen(
+                grooms: route.grooms,
+                initialGroom: route.initialGroom,
+                appState: appState,
+                onDismiss: { groomViewerZoomRoute = nil },
+                onOpenMeguriUserProfile: { userID in
+                    groomViewerZoomRoute = nil
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+                        onOpenMeguriUserProfile(userID)
+                    }
+                }
+            )
+            .modifier(GroomMapZoomDestination(sourceID: route.sourceID, namespace: groomZoomNamespace))
+        }
+        .task(id: visibleMapGrooms.map(\.id)) {
+            // iter1226.458：ホームレール同様、タップ前に表示中グルームの画像をデコード済みで温める。
+            let urls = Array(visibleMapGrooms.prefix(16).map(\.imageURL))
+            guard !urls.isEmpty else { return }
+            await GroomImageMemoryStore.shared.prewarm(urls: urls)
+        }
+        #endif
+        // iter1226.421：右下の固定フッター＝チャットルーム一覧アイコン。
+        .overlay(alignment: .bottomTrailing) {
+            Button(action: onOpenBoardList) {
+                Image(systemName: "text.bubble")
+                    .font(.system(size: 21, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 54, height: 54)
+                    .background(MegrumTheme.primaryGradient, in: Circle())
+                    .shadow(color: MegrumTheme.primaryShadow, radius: 12, y: 5)
+            }
+            .buttonStyle(.plain)
+            .padding(.trailing, 18)
+            .padding(.bottom, 118)
+            .accessibilityLabel("チャットルーム一覧を開く")
+        }
         .ignoresSafeArea(.container, edges: .bottom)
         .background(MegrumTheme.canvas.ignoresSafeArea())
         .megrumHiddenNavigationBar()
@@ -163,6 +226,30 @@ struct MeguriScreen: View {
         }
         .task {
             requestInitialLocationIfNeeded()
+        }
+        .onChange(of: appState.isTutorialActive) { _, isActive in
+            // ツアー終了時に、抑制していた位置情報リクエストを呼び直す。
+            if !isActive {
+                requestInitialLocationIfNeeded()
+                withAnimation(.easeOut(duration: 0.16)) {
+                    pendingMapCreationCoordinate = nil
+                }
+            }
+        }
+        .onChange(of: appState.tutorialMeguriCalloutRequestID) { _, requestID in
+            // ガイドツアーの実演：指のタップに合わせて、地図中心付近に実物の作成コールアウトを出す。
+            // ツアー中は位置情報を抑制しているため 1km 判定は通さない（見せるだけで作成はしない）。
+            guard requestID != nil else { return }
+            // 指のタップ位置に吹き出しが出るよう、中心より北へずらす。
+            // 1km円（半径≈0.009度）の内側に収まるオフセットにする（円周ぎりぎりだと圏外に見える）。
+            let center = homeCameraPosition.region?.center
+                ?? CLLocationCoordinate2D(latitude: 35.7056, longitude: 139.7519)
+            withAnimation(.easeOut(duration: 0.16)) {
+                pendingMapCreationCoordinate = MegrumLocationCoordinate(
+                    latitude: center.latitude + 0.006,
+                    longitude: center.longitude
+                )
+            }
         }
         .onDisappear {
             locationState.stopUpdatingCurrentLocation()
@@ -283,7 +370,6 @@ struct MeguriScreen: View {
                 isShowingGroomArchive: $isShowingGroomArchive,
                 selectedGroom: $selectedGroom,
                 selectedGroomSourceAnchor: $selectedGroomSourceAnchor,
-                activeMap: $activeMap,
                 selectedPrefecture: selectedBoardPrefecture,
                 boardScope: selectedBoardScope,
                 canUseCamera: canUseCamera,
@@ -331,10 +417,42 @@ struct MeguriScreen: View {
     }
 
     private func handlePendingNotificationRouteIntent(_ intent: NotificationRouteIntent?) {
+        if case .groomDetail(let idString) = intent {
+            openGroomDetailFromNotification(idString: idString)
+            return
+        }
         guard case .ownGroom(let postIDString) = intent else {
             return
         }
         openOwnGroomFromNotification(postIDString: postIDString)
+    }
+
+    /// FB(iter1226.390): プッシュから特定グルームを開く。圏外は遭遇済み×プレミアムのゲートで判定する。
+    private func openGroomDetailFromNotification(idString: String) {
+        guard let id = UUID(uuidString: idString) else {
+            pendingNotificationRouteIntent = nil
+            return
+        }
+        if locationState.coordinate == nil {
+            locationState.startUpdatingCurrentLocation()
+        }
+        Task {
+            let existing = appState.groomMapPosts.first { $0.id == id }
+                ?? appState.grooms.first { $0.id == id }
+            let groom: GroomPost?
+            if let existing {
+                groom = existing
+            } else {
+                groom = await appState.loadGroomPost(id: id)
+            }
+            pendingNotificationRouteIntent = nil
+            guard let groom else {
+                showToast("グルームが見つかりませんでした")
+                return
+            }
+            // ゲート付きで開く（圏内=無料／圏外=遭遇済み×プレミアムのみ／それ以外はメッセージ）。
+            openGroomFromStrip(groom, sourceAnchor: .center)
+        }
     }
 
     private func openOwnGroomFromNotification(postIDString: String?) {

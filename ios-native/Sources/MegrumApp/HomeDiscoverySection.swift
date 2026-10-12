@@ -13,6 +13,8 @@ struct HomeDiscoverySection: View {
     var title: String
     var candidates: [HomeDiscoveryCandidate]
     var layout: HomeDiscoverySectionLayout
+    /// rail レイアウトを画面端までスクロールさせる（親の20pt余白を打ち消す）。iter1226.420。
+    var fullBleedRail: Bool = false
     var cardTitleStyle: HomeDiscoveryCardTitleStyle = .plain
     var showsGridHeaderTitle = true
     var showsSeeAllButton = false
@@ -20,8 +22,11 @@ struct HomeDiscoverySection: View {
     var displayLimit: Int? = nil
     /// 需要行のサムネイル用：自分のグッズID→画像URL。
     var viewerGoodsImageURLByID: [UUID: URL] = [:]
+    /// 「他にも交換できそうなもの」で既に交換に追加済みの候補（グッズID）。行にバッジを出す。iter1226.384 / FB7-1。
+    var addedCandidateIDs: Set<UUID> = []
+    /// タイトル横に出す小バッジ（ガイドツアー中の「サンプル」表示に使う）。
+    var badgeText: String? = nil
     var onSelect: (HomeDiscoverySheet) -> Void
-    var onSearchCandidate: (HomeDiscoveryCandidate, HomeMockGoods?) -> Void = { _, _ in }
     /// 「すべて見る」タップ時の遷移。未指定時は従来どおり先頭候補のシートを開く。
     var onSeeAll: (() -> Void)? = nil
 
@@ -33,6 +38,7 @@ struct HomeDiscoverySection: View {
                 showsGridHeaderTitle: showsGridHeaderTitle,
                 showsSeeAllButton: showsSeeAllButton,
                 isSeeAllDisabled: candidates.isEmpty,
+                badgeText: badgeText,
                 onSeeAll: onSeeAll ?? openFirstCandidate
             )
 
@@ -44,8 +50,7 @@ struct HomeDiscoverySection: View {
                             candidate: candidate,
                             titleStyle: cardTitleStyle,
                             cardHeight: 170,
-                            onSelect: onSelect,
-                            onSearch: onSearchCandidate
+                            onSelect: onSelect
                         )
                     }
                 }
@@ -60,8 +65,10 @@ struct HomeDiscoverySection: View {
                             .frame(width: 94)
                         }
                     }
+                    .padding(.leading, fullBleedRail ? 20 : 0)
                     .padding(.trailing, 20)
                 }
+                .padding(.horizontal, fullBleedRail ? -20 : 0)
             case .summaryRows:
                 VStack(spacing: 0) {
                     ForEach(Array(displayedCandidates.enumerated()), id: \.element.id) { index, candidate in
@@ -72,8 +79,8 @@ struct HomeDiscoverySection: View {
                             candidate: candidate,
                             titleStyle: cardTitleStyle,
                             viewerGoodsImageURLByID: viewerGoodsImageURLByID,
-                            onSelect: onSelect,
-                            onSearch: onSearchCandidate
+                            isAdded: isCandidateAdded(candidate),
+                            onSelect: onSelect
                         )
                         .padding(.vertical, 7)
                     }
@@ -88,6 +95,17 @@ struct HomeDiscoverySection: View {
             return candidates
         }
         return Array(candidates.prefix(displayLimit))
+    }
+
+    /// 候補の束ねるどれかのグッズが追加済みなら true。iter1226.384 / FB7-1。
+    private func isCandidateAdded(_ candidate: HomeDiscoveryCandidate) -> Bool {
+        guard !addedCandidateIDs.isEmpty else {
+            return false
+        }
+        if addedCandidateIDs.contains(candidate.id) {
+            return true
+        }
+        return candidate.goods.contains { addedCandidateIDs.contains($0.id) }
     }
 
     private var sectionSpacing: CGFloat {
@@ -111,6 +129,7 @@ private struct HomeDiscoverySectionHeader: View {
     var showsGridHeaderTitle: Bool
     var showsSeeAllButton: Bool
     var isSeeAllDisabled: Bool
+    var badgeText: String? = nil
     var onSeeAll: () -> Void
 
     var body: some View {
@@ -121,6 +140,15 @@ private struct HomeDiscoverySectionHeader: View {
                     .foregroundStyle(MegrumTheme.ink)
                     .lineLimit(1)
                     .minimumScaleFactor(0.78)
+            }
+
+            if let badgeText {
+                Text(badgeText)
+                    .font(.system(size: 11, weight: .black, design: .rounded))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(MegrumTheme.lavender, in: Capsule(style: .continuous))
             }
 
             Spacer()

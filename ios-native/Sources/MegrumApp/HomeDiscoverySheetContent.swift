@@ -6,6 +6,10 @@ struct HomeDiscoverySheetContent: View {
     let sheet: HomeDiscoverySheet
     let viewerOfferGoods: [HomeMockGoods]
     let addedExtraCandidateIDs: Set<UUID>
+    /// 「他にも交換できそうなもの」で追加済みの選択（確認画面・最終打診に含める）。iter1226.384 / FB7-1。
+    var addedExtraSelections: [HomeDiscoveryProposalSelection] = []
+    /// 「他にも交換できそうなもの」用の同じ相手の他候補（primaryシートのみ／入れ子は .empty）。iter1226.383 / FB6-1。
+    var otherExchangeCandidates: HomeOtherExchangeCandidateGroups = .empty
     let presentationContext: HomeDiscoverySheetPresentationContext
     let allowsNonOshiOfferSection: Bool
     let copyingWishGoodsID: UUID?
@@ -14,38 +18,85 @@ struct HomeDiscoverySheetContent: View {
     let onOpenNestedSheet: (HomeDiscoverySheet) -> Void
     let onStartProposal: (HomeDiscoveryProposalSelection) -> Void
     let onCopyToWish: (HomeMockGoods) -> Void
+    /// ガイドツアーのデモ用：グッズヒット詳細に選択済み状態を注入する（通常は nil）。
+    var initialGoodsHitSelectionState: HomeListingSheetSelectionState? = nil
 
     var body: some View {
         switch sheet {
         case .goodsHit(let payload):
+            // 「探し中」（マッチなし・探し物テキストのみ）は専用シートへ（iter1226.411 / FB項目3）。
+            if let lookingForText = payload.lookingForOnlyText {
+                HomeLookingForHitDetailSheet(
+                    selection: payload,
+                    lookingForText: lookingForText,
+                    viewerOfferGoods: viewerOfferGoods,
+                    addedExtraCandidateIDs: addedExtraCandidateIDs,
+                    showsOtherExchangeRows: presentationContext.showsOtherExchangeRows,
+                    otherExchangeCandidates: otherExchangeCandidates,
+                    addedExtraSelections: addedExtraSelections,
+                    showsProposalPreview: presentationContext.showsProposalPreview,
+                    onOpenOwnerProfile: onOpenOwnerProfile,
+                    onOpenNestedSheet: onOpenNestedSheet,
+                    onStartProposal: onStartProposal
+                )
+            } else {
             HomeGoodsHitDetailSheet(
                 selection: payload,
                 viewerOfferGoods: viewerOfferGoods,
                 addedExtraCandidateIDs: addedExtraCandidateIDs,
                 showsOtherExchangeRows: presentationContext.showsOtherExchangeRows,
+                otherExchangeCandidates: otherExchangeCandidates,
+                addedExtraSelections: addedExtraSelections,
                 bottomButtonTitle: presentationContext.bottomButtonTitle,
                 preselectPreferredOffer: presentationContext.preselectPreferredOffer,
+                showsProposalPreview: presentationContext.showsProposalPreview,
+                initialSelectionState: initialGoodsHitSelectionState,
                 onOpenOwnerProfile: onOpenOwnerProfile,
                 onOpenNestedSheet: onOpenNestedSheet,
                 onStartProposal: onStartProposal,
                 onCopyToWish: onCopyToWish,
                 isWishCopyInProgress: copyingWishGoodsID == payload.goods.id
             )
+            }
         case .wishHit(let payload):
+            // 求めてる？（不確定のみ）は超求めてる？と同じ3列リッチシートへ。
+            // 相手希望＝合成した条件選択肢、条件のグッズ確認（参考画像/画像検索）も出る（iter1226.417）。
+            if let richPayload = payload.wishTentativeRichPayload {
+                HomeGoodsHitDetailSheet(
+                    selection: richPayload,
+                    viewerOfferGoods: viewerOfferGoods,
+                    addedExtraCandidateIDs: addedExtraCandidateIDs,
+                    showsOtherExchangeRows: presentationContext.showsOtherExchangeRows,
+                    otherExchangeCandidates: otherExchangeCandidates,
+                    addedExtraSelections: addedExtraSelections,
+                    bottomButtonTitle: presentationContext.bottomButtonTitle,
+                    preselectPreferredOffer: presentationContext.preselectPreferredOffer,
+                    showsProposalPreview: presentationContext.showsProposalPreview,
+                    onOpenOwnerProfile: onOpenOwnerProfile,
+                    onOpenNestedSheet: onOpenNestedSheet,
+                    onStartProposal: onStartProposal,
+                    onCopyToWish: onCopyToWish,
+                    isWishCopyInProgress: copyingWishGoodsID == payload.goods.id
+                )
+            } else {
             HomeWishHitDetailSheet(
                 showsNonOshiOfferSection: allowsNonOshiOfferSection,
                 selection: payload,
                 viewerOfferGoods: viewerOfferGoods,
                 addedExtraCandidateIDs: addedExtraCandidateIDs,
                 showsOtherExchangeRows: presentationContext.showsOtherExchangeRows,
+                otherExchangeCandidates: otherExchangeCandidates,
+                addedExtraSelections: addedExtraSelections,
                 bottomButtonTitle: presentationContext.bottomButtonTitle,
                 preselectFirstOffer: presentationContext.preselectPreferredOffer,
+                showsProposalPreview: presentationContext.showsProposalPreview,
                 onOpenOwnerProfile: onOpenOwnerProfile,
                 onOpenNestedSheet: onOpenNestedSheet,
                 onStartProposal: onStartProposal,
                 onCopyToWish: onCopyToWish,
                 isWishCopyInProgress: copyingWishGoodsID == payload.goods.id
             )
+            }
         case .havesLookup(let payload):
             HomeHavesLookupSheet(
                 payload: payload,
@@ -75,6 +126,7 @@ struct HomeDiscoverySheetContent: View {
                     showsOtherExchangeRows: presentationContext.showsOtherExchangeRows,
                     bottomButtonTitle: presentationContext.bottomButtonTitle,
                     preselectFirstOffer: presentationContext.preselectPreferredOffer,
+                    showsProposalPreview: presentationContext.showsProposalPreview,
                     onOpenOwnerProfile: onOpenOwnerProfile,
                     onOpenNestedSheet: onOpenNestedSheet,
                     onStartProposal: onStartProposal,

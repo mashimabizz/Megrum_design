@@ -31,6 +31,7 @@ extension GoodsEditorSheet {
         tradingCardBulkStatusMessage = nil
         isProcessingTradingCardBulk = false
         cropSession = nil
+        pendingCropUploads = []
         showsCreateOshiMasterSheet = false
         createOshiRequestSheet = nil
         #if canImport(PhotosUI)
@@ -80,18 +81,41 @@ extension GoodsEditorSheet {
         guard let photo = createPhotos.first(where: { $0.id == photoID }) else {
             return
         }
+        // iter1226.436：初期枠は置かない（全体枠があるとドラッグが常に「枠の移動」になり
+        // 手動で枠を描けない）。枠なしのまま追加＝写真全体を使う。
         cropSession = GoodsPhotoCropSession(
             source: .selectedPhoto(photoID: photoID),
             upload: photo.upload
         )
     }
 
+    /// 追加された写真をトリミング待ちキューへ積む。
+    /// カメラ（連続撮影）中はシートが競合するため、閉じたタイミングで presentNextPendingCropSession が拾う。
+    func enqueueCropForNewUpload(_ upload: GoodsPhotoUpload) {
+        pendingCropUploads.append(upload)
+    }
+
+    /// トリミング待ちキューの先頭を crop sheet として提示する。
+    /// crop sheet / カメラ sheet の onDismiss から呼ばれて連鎖する。
+    func presentNextPendingCropSession() {
+        guard cropSession == nil, cameraCaptureRoute == nil, !pendingCropUploads.isEmpty else {
+            return
+        }
+        let upload = pendingCropUploads.removeFirst()
+        cropSession = GoodsPhotoCropSession(
+            source: .newPhoto,
+            upload: upload
+        )
+    }
+
     func cropSheetTitle(for session: GoodsPhotoCropSession) -> String {
         switch session.source {
+        case .newPhoto:
+            pendingCropUploads.isEmpty ? "トリミング" : "トリミング（あと\(pendingCropUploads.count)枚）"
         case .selectedPhoto:
-            "写真を切り取る"
+            "トリミング"
         case .tradingCardBulk:
-            "トレカAI一括登録"
+            "まとめて登録"
         }
     }
 
@@ -110,6 +134,9 @@ extension GoodsEditorSheet {
         }
 
         switch session.source {
+        case .newPhoto:
+            createPhotos.append(contentsOf: nextDrafts)
+            tradingCardBulkStatusMessage = nil
         case .selectedPhoto(let photoID):
             if let index = createPhotos.firstIndex(where: { $0.id == photoID }) {
                 createPhotos.replaceSubrange(index...index, with: nextDrafts)

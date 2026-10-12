@@ -129,6 +129,13 @@ struct ProfileVisualAvatar: View {
             .frame(width: size, height: size)
             .overlay {
                 if let url {
+                    #if canImport(UIKit)
+                    // iter1226.441：AsyncImage はビューを作り直すたびに人型プレースホルダを
+                    // 一瞬挟む（グルームビューアのキューブ回転等でチラつく）。デコード済みの
+                    // メモリキャッシュから同期表示できるローダーへ差し替え。
+                    ProfileAvatarCachedImage(url: url, placeholderSize: size)
+                        .clipShape(Circle())
+                    #else
                     AsyncImage(url: url, transaction: Transaction(animation: .easeInOut(duration: 0.18))) { phase in
                         switch phase {
                         case let .success(image):
@@ -140,6 +147,7 @@ struct ProfileVisualAvatar: View {
                         }
                     }
                     .clipShape(Circle())
+                    #endif
                 } else {
                     defaultPersonPlaceholder
                 }
@@ -148,9 +156,108 @@ struct ProfileVisualAvatar: View {
 
     /// アイコン未設定時の初期表示（グレーの人型シルエット）。
     private var defaultPersonPlaceholder: some View {
+        ProfileAvatarPersonPlaceholder(size: size)
+    }
+}
+
+/// アイコン未設定時の初期表示（グレーの人型シルエット）。
+struct ProfileAvatarPersonPlaceholder: View {
+    var size: CGFloat
+
+    var body: some View {
         Image(systemName: "person.fill")
             .font(.system(size: size * 0.5, weight: .medium))
             .foregroundStyle(Color(white: 0.62))
             .offset(y: size * 0.06)
     }
 }
+
+#if canImport(UIKit)
+/// アバターの瞬間表示用メモリキャッシュ（デコード済みUIImage）。iter1226.441。
+@MainActor
+final class ProfileAvatarImageStore {
+    static let shared = ProfileAvatarImageStore()
+    private let cache = NSCache<NSURL, UIImage>()
+
+    init() {
+        cache.countLimit = 300
+    }
+
+    func image(for url: URL) -> UIImage? {
+        cache.object(forKey: url as NSURL)
+    }
+
+    func insert(_ image: UIImage, for url: URL) {
+        cache.setObject(image, forKey: url as NSURL)
+    }
+
+    /// 未キャッシュのURLを順に読み込み・デコードして格納する（ベストエフォート）。
+    func prewarm(urls: [URL]) async {
+        for url in urls where image(for: url) == nil {
+            guard !Task.isCancelled else {
+                return
+            }
+            guard let data = try? await GoodsRemoteImageDataLoader.loadData(from: url),
+                  let loaded = UIImage(data: data)
+            else {
+                continue
+            }
+            let prepared = await loaded.byPreparingForDisplay() ?? loaded
+            insert(prepared, for: url)
+        }
+    }
+}
+
+/// キャッシュ済みなら生成時から同期表示するアバター画像。
+/// URLが差し替わっても読み込み完了まで直前の画像を出し続け、人型プレースホルダを挟まない。
+private struct ProfileAvatarCachedImage: View {
+    let url: URL
+    let placeholderSize: CGFloat
+
+    @State private var image: UIImage?
+
+    init(url: URL, placeholderSize: CGFloat) {
+        self.url = url
+        self.placeholderSize = placeholderSize
+        _image = State(initialValue: ProfileAvatarImageStore.shared.image(for: url))
+    }
+
+    var body: some View {
+        Group {
+            if let image {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                ProfileAvatarPersonPlaceholder(size: placeholderSize)
+            }
+        }
+        .task(id: url) {
+            if let cached = ProfileAvatarImageStore.shared.image(for: url) {
+                setImageWithoutAnimation(cached)
+                return
+            }
+            guard let data = try? await GoodsRemoteImageDataLoader.loadData(from: url),
+                  !Task.isCancelled,
+                  let loaded = UIImage(data: data)
+            else {
+                return
+            }
+            let prepared = await loaded.byPreparingForDisplay() ?? loaded
+            guard !Task.isCancelled else {
+                return
+            }
+            ProfileAvatarImageStore.shared.insert(prepared, for: url)
+            setImageWithoutAnimation(prepared)
+        }
+    }
+
+    private func setImageWithoutAnimation(_ newImage: UIImage) {
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            image = newImage
+        }
+    }
+}
+#endif

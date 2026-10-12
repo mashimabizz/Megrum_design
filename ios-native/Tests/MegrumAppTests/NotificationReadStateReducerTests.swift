@@ -3,7 +3,7 @@ import MegrumCore
 import XCTest
 
 final class NotificationReadStateReducerTests: XCTestCase {
-    func testNotificationCenterPresentationStateFiltersUnreadAndTradeNotifications() {
+    func testNotificationCenterPresentationStateFiltersTradeAndMeguriNotifications() {
         let unreadTradeID = UUID(uuidString: "00000000-0000-0000-0000-000000000111")!
         let readTradeID = UUID(uuidString: "00000000-0000-0000-0000-000000000112")!
         let communityID = UUID(uuidString: "00000000-0000-0000-0000-000000000113")!
@@ -18,13 +18,40 @@ final class NotificationReadStateReducerTests: XCTestCase {
         XCTAssertEqual(state.visibleNotifications(in: notifications).map(\.id), [unreadTradeID, readTradeID, communityID])
         XCTAssertEqual(state.emptyTitle, "まだ通知はありません")
 
-        state.filter = .unread
-        XCTAssertEqual(state.visibleNotifications(in: notifications).map(\.id), [unreadTradeID, communityID])
-        XCTAssertEqual(state.emptyTitle, "未読の通知はありません")
-
         state.filter = .trades
         XCTAssertEqual(state.visibleNotifications(in: notifications).map(\.id), [unreadTradeID, readTradeID])
         XCTAssertEqual(state.emptyTitle, "取引の通知はありません")
+
+        state.filter = .meguri
+        XCTAssertEqual(state.visibleNotifications(in: notifications).map(\.id), [communityID])
+        XCTAssertEqual(state.emptyTitle, "めぐりの通知はありません")
+    }
+
+    func testNotificationCenterPresentationStateGroupsSectionsByRecency() {
+        let now = Date(timeIntervalSince1970: 1_000_000)
+        let todayID = UUID(uuidString: "00000000-0000-0000-0000-000000000121")!
+        let thisWeekID = UUID(uuidString: "00000000-0000-0000-0000-000000000122")!
+        let earlierID = UUID(uuidString: "00000000-0000-0000-0000-000000000123")!
+        let notifications = [
+            makeNotification(id: todayID, createdAt: now.addingTimeInterval(-60)),
+            makeNotification(id: thisWeekID, createdAt: now.addingTimeInterval(-3 * 24 * 60 * 60)),
+            makeNotification(id: earlierID, createdAt: now.addingTimeInterval(-30 * 24 * 60 * 60)),
+        ]
+        let state = NotificationCenterPresentationState()
+
+        let sections = state.sections(in: notifications, now: now)
+
+        XCTAssertEqual(sections.map(\.title), ["今日", "今週", "それ以前"])
+        XCTAssertEqual(sections[0].notifications.map(\.id), [todayID])
+        XCTAssertEqual(sections[1].notifications.map(\.id), [thisWeekID])
+        XCTAssertEqual(sections[2].notifications.map(\.id), [earlierID])
+
+        // 空セクションは出さない。
+        let onlyToday = state.sections(
+            in: [makeNotification(id: todayID, createdAt: now)],
+            now: now
+        )
+        XCTAssertEqual(onlyToday.map(\.title), ["今日"])
     }
 
     func testMarkReadOnlyUpdatesUnreadMatchingNotification() {
@@ -104,20 +131,66 @@ final class NotificationReadStateReducerTests: XCTestCase {
         XCTAssertEqual(updated.first(where: { $0.id == otherID })?.title, "そのまま")
     }
 
+    func testDisplayItemsAggregateGroomLikesByTarget() {
+        let groomPath = "/grooms/00000000-0000-0000-0000-00000000aaaa"
+        let like1 = makeNotification(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000131")!,
+            kind: .groomLiked,
+            linkPath: groomPath,
+            actorDisplayName: "ハナ"
+        )
+        let like2 = makeNotification(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000132")!,
+            kind: .groomLiked,
+            linkPath: groomPath,
+            readAt: Date(timeIntervalSince1970: 10)
+        )
+        let otherLike = makeNotification(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000133")!,
+            kind: .groomLiked,
+            linkPath: "/grooms/00000000-0000-0000-0000-00000000bbbb"
+        )
+        let message = makeNotification(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000134")!,
+            kind: .messageReceived
+        )
+
+        let items = NotificationCenterDisplayItem.items(from: [like1, message, like2, otherLike])
+
+        XCTAssertEqual(items.count, 3)
+        guard case .groomLikeGroup(let group) = items[0] else {
+            return XCTFail("先頭は集約行のはず")
+        }
+        XCTAssertEqual(group.notifications.map(\.id), [like1.id, like2.id])
+        XCTAssertEqual(group.summaryText, "ハナさん、他1人がいいねしました")
+        XCTAssertTrue(group.isUnread)
+        guard case .single(let second) = items[1], second.id == message.id else {
+            return XCTFail("2番目はメッセージ単独行のはず")
+        }
+        // 1件だけのいいねは通常行のまま。
+        guard case .single(let third) = items[2], third.id == otherLike.id else {
+            return XCTFail("3番目は単独いいね行のはず")
+        }
+    }
+
     private func makeNotification(
         id: UUID,
         kind: MegrumNotificationKind = .proposalReceived,
         title: String = "通知",
-        readAt: Date? = nil
+        linkPath: String? = nil,
+        readAt: Date? = nil,
+        createdAt: Date = Date(timeIntervalSince1970: 0),
+        actorDisplayName: String? = nil
     ) -> MegrumNotification {
         MegrumNotification(
             id: id,
             kind: kind,
             title: title,
             body: "本文",
-            linkPath: "/proposals/\(id.uuidString)",
+            linkPath: linkPath ?? "/proposals/\(id.uuidString)",
             readAt: readAt,
-            createdAt: Date(timeIntervalSince1970: 0)
+            createdAt: createdAt,
+            actorDisplayName: actorDisplayName
         )
     }
 }

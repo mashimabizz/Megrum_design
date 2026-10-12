@@ -9,6 +9,8 @@ public enum SupabaseProposalClientError: Error, Equatable, Sendable {
     case malformedResponse
     case invalidRating
     case missingMeetup
+    /// iter1226.423：同じ取引を二重に評価した（unique違反）。
+    case alreadyEvaluated
 }
 
 enum SupabaseProposalSystemAction: String, Sendable {

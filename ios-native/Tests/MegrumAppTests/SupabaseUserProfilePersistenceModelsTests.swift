@@ -6,11 +6,11 @@ final class SupabaseUserProfilePersistenceModelsTests: XCTestCase {
     func testUserRowSelectsCurrentPaymentAndAgeColumns() {
         XCTAssertEqual(
             UserRow.select,
-            "id,handle,display_name,bio,avatar_url,gender,primary_area,birth_date,age,payment_methods,payment_note,account_status"
+            "id,handle,display_name,bio,avatar_url,gender,primary_area,birth_date,age,payment_methods,payment_note,payment_bank_names,account_status"
         )
         XCTAssertEqual(
             UserRow.paymentSummarySelect,
-            "id,handle,display_name,avatar_url,gender,primary_area,age,payment_methods,payment_note,account_status"
+            "id,handle,display_name,avatar_url,gender,primary_area,age,payment_methods,payment_note,payment_bank_names,account_status"
         )
         XCTAssertEqual(
             UserRow.legacySelect,

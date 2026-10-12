@@ -1,13 +1,14 @@
 import CoreGraphics
 
 /// グルームビューアの下スワイプ（閉じる）の見た目と判定。
-/// - 動くのは下方向のみ（縮小・角丸などの演出はなし）
-/// - 引っ張れるのは画面のおよそ1/10まで（ラバーバンドで漸近）
-/// - 生の引っ張り量が閾値を超えた状態で離したら閉じる
+/// FB(iter1226.424)：縮小はやめて「そのまま下へスライド」だけにする。
+/// - 追従は下方向のみ・画面高の1/10程度（約84pt）へラバーバンドで漸近
+/// - 生の引っ張り量が閾値を超えた状態で離したら閉じる（閉じる瞬間の縮小遷移は
+///   presentation 側の scale-to-anchor トランジションが担う）
 struct GroomViewerDragPresentationState: Equatable {
     static let dismissThreshold: CGFloat = 130
 
-    /// 画面高さ（約840pt級）の1/10相当の見た目上限。
+    /// 下方向の追従量の見た目上限（画面高852ptの約1/10）。
     private static let maxVisualOffset: CGFloat = 84
 
     var translation: CGSize = .zero
@@ -18,12 +19,12 @@ struct GroomViewerDragPresentationState: Equatable {
         return Self.maxVisualOffset * pull / (pull + Self.maxVisualOffset)
     }
 
-    /// 縮小演出は廃止（常に等倍）。
+    /// iter1226.424：ドラッグ中は縮小しない（閉じる時の縮小は遷移側）。
     var scale: CGFloat {
         1
     }
 
-    /// 角丸演出も廃止。
+    /// iter1226.424：ドラッグ中は角丸も付けない（純粋な下スライド）。
     var cornerRadius: CGFloat {
         0
     }

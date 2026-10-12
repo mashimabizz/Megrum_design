@@ -55,6 +55,8 @@ public struct UserProfile: Identifiable, Codable, Hashable, Sendable {
     public var age: Int?
     public var paymentMethods: [UserPaymentMethod]
     public var paymentNote: String?
+    /// 相手可視の受け取り銀行名（正規化済み・最大3）。口座番号など機微情報は含めない。
+    public var paymentBankNames: [String]
     public var accountStatus: AccountStatus
 
     public init(
@@ -69,6 +71,7 @@ public struct UserProfile: Identifiable, Codable, Hashable, Sendable {
         age: Int? = nil,
         paymentMethods: [UserPaymentMethod] = [],
         paymentNote: String? = nil,
+        paymentBankNames: [String] = [],
         accountStatus: AccountStatus = .active
     ) {
         self.id = id
@@ -82,6 +85,7 @@ public struct UserProfile: Identifiable, Codable, Hashable, Sendable {
         self.age = age
         self.paymentMethods = paymentMethods
         self.paymentNote = paymentNote
+        self.paymentBankNames = paymentBankNames
         self.accountStatus = accountStatus
     }
 

@@ -17,8 +17,9 @@ struct HomeDiscoveryCandidateSummaryRow: View {
     var titleStyle: HomeDiscoveryCardTitleStyle
     /// 需要行のサムネイル用：自分のグッズID→画像URL。
     var viewerGoodsImageURLByID: [UUID: URL] = [:]
+    /// この候補が「他にも交換できそうなもの」から既に交換に追加済みか。追加済みなら行にバッジを出す。iter1226.384 / FB7-1。
+    var isAdded: Bool = false
     var onSelect: (HomeDiscoverySheet) -> Void
-    var onSearch: (HomeDiscoveryCandidate, HomeMockGoods?) -> Void
 
     @State private var presentationState = HomeDiscoveryCandidateButtonPresentationState()
 
@@ -43,12 +44,17 @@ struct HomeDiscoveryCandidateSummaryRow: View {
         } label: {
             HStack(alignment: .center, spacing: 14) {
                 VStack(alignment: .leading, spacing: 6) {
-                    labelButton
+                    cardTitleLabel
                     rotaryCard
                 }
                 infoColumn
             }
             .contentShape(Rectangle())
+            .overlay(alignment: .topTrailing) {
+                if isAdded {
+                    addedBadge
+                }
+            }
         }
         .buttonStyle(MegrumPressHighlightButtonStyle(
             highlightOpacity: 0.06,
@@ -63,19 +69,28 @@ struct HomeDiscoveryCandidateSummaryRow: View {
         }
     }
 
-    private var labelButton: some View {
-        Button {
-            onSearch(candidate, selectedGoods)
-        } label: {
-            Text(cardTitle)
-                .font(.system(size: 12, weight: .regular))
-                .foregroundStyle(MegrumTheme.ink.opacity(0.82))
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-                .contentShape(Rectangle())
+    private var addedBadge: some View {
+        HStack(spacing: 3) {
+            Image(systemName: "checkmark.circle.fill")
+            Text("交換に追加済み")
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel("\(cardTitle)で検索")
+        .font(.system(size: 10.5, weight: .black, design: .rounded))
+        .foregroundStyle(.white)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(MegrumTheme.lavender, in: Capsule(style: .continuous))
+        .shadow(color: MegrumTheme.lavender.opacity(0.35), radius: 4, y: 2)
+        .padding(.top, 2)
+        .accessibilityLabel("交換に追加済み")
+    }
+
+    // 塊ラベルは表示のみ。タップは行全体のシート表示に委ねる（検索は走らせない）。iter1226.414。
+    private var cardTitleLabel: some View {
+        Text(cardTitle)
+            .font(.system(size: 12, weight: .regular))
+            .foregroundStyle(MegrumTheme.ink.opacity(0.82))
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
     }
 
     private var rotaryCard: some View {
@@ -163,9 +178,13 @@ struct HomeDiscoveryCandidateSummaryRow: View {
     private func demandAccessibilityText(_ demand: HomeCandidateDemandLine) -> String {
         switch demand {
         case .hotDemand(let ids):
-            ids.count > 1 ? "あなたのグッズ他\(ids.count - 1)点が激求" : "あなたのグッズが激求"
+            ids.count > 1 ? "あなたのグッズ他\(ids.count - 1)点を超求" : "あなたのグッズを超求"
+        case .hotDemandTentative(let ids):
+            ids.count > 1 ? "あなたのグッズ他\(ids.count - 1)点を超求めてる？" : "あなたのグッズを超求めてる？"
         case .demand(let ids):
-            ids.count > 1 ? "あなたのグッズ他\(ids.count - 1)点が求" : "あなたのグッズが求"
+            ids.count > 1 ? "あなたのグッズ他\(ids.count - 1)点を求" : "あなたのグッズを求"
+        case .demandTentative(let ids):
+            ids.count > 1 ? "あなたのグッズ他\(ids.count - 1)点を求めてる？" : "あなたのグッズを求めてる？"
         case .cash(let amount):
             amount.map { "定価（¥\($0.formatted())）と交換OK" } ?? "定価と交換OK"
         case .lookingFor(let text):
@@ -186,7 +205,7 @@ struct HomeCandidateDemandLineView: View {
         case .hotDemand(let goodsIDs):
             demandText(
                 goodsIDs: goodsIDs,
-                suffixBase: "が激求！",
+                suffixBase: "を超求！",
                 suffixStyle: AnyShapeStyle(
                     LinearGradient(
                         colors: [MegrumTheme.pink, Color(red: 0.94, green: 0.35, blue: 0.55)],
@@ -195,11 +214,25 @@ struct HomeCandidateDemandLineView: View {
                     )
                 )
             )
+        case .hotDemandTentative(let goodsIDs):
+            // 不確定＝ピンク系の淡いトーン＋末尾「？」（iter1226.363）。
+            demandText(
+                goodsIDs: goodsIDs,
+                suffixBase: "を超求めてる？",
+                suffixStyle: AnyShapeStyle(Color(red: 0.94, green: 0.35, blue: 0.55).opacity(0.5))
+            )
         case .demand(let goodsIDs):
             demandText(
                 goodsIDs: goodsIDs,
-                suffixBase: "が求！",
+                suffixBase: "を求！",
                 suffixStyle: AnyShapeStyle(MegrumTheme.lavender)
+            )
+        case .demandTentative(let goodsIDs):
+            // 不確定＝ラベンダー系の淡いトーン＋末尾「？」（iter1226.363）。
+            demandText(
+                goodsIDs: goodsIDs,
+                suffixBase: "を求めてる？",
+                suffixStyle: AnyShapeStyle(MegrumTheme.lavender.opacity(0.5))
             )
         case .cash(let amount):
             Text(amount.map { "定価（¥\($0.formatted())）と交換OK" } ?? "定価と交換OK")

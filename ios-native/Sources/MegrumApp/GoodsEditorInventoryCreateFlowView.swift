@@ -25,8 +25,7 @@ struct GoodsInventoryCreateFlowView: View {
     var isCreatingGoodsEntry: Bool
     var onShowOshiPicker: () -> Void
     var onCommonNext: () -> Void
-    var onPickCamera: () -> Void
-    var onPickPhotos: () -> Void
+    var onAddPhoto: () -> Void
     var onStartTradingCardBulk: () -> Void
     var onRemovePhoto: (UUID) -> Void
     var onCropPhoto: (UUID) -> Void
@@ -67,8 +66,7 @@ struct GoodsInventoryCreateFlowView: View {
                     tradingCardBulkStatusMessage: tradingCardBulkStatusMessage,
                     createError: createError,
                     isCreatingGoodsEntry: isCreatingGoodsEntry,
-                    onPickCamera: onPickCamera,
-                    onPickPhotos: onPickPhotos,
+                    onAddPhoto: onAddPhoto,
                     onStartTradingCardBulk: onStartTradingCardBulk,
                     onRemovePhoto: onRemovePhoto,
                     onCropPhoto: onCropPhoto,

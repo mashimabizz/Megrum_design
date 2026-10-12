@@ -2,11 +2,17 @@ import MegrumCore
 import MegrumDesign
 import SwiftUI
 
+/// 通知一覧（iter1226.408 刷新）：
+/// 「今日/今週/それ以前」の時系列セクション＋未読行は淡いラベンダー背景（未読チップ廃止）。
 struct NotificationCenterContent: View {
     @Binding var presentationState: NotificationCenterPresentationState
     var isLoading: Bool
     var notifications: [MegrumNotification]
+    /// 右端サムネの表示URL（appState側で署名URL解決済み）。iter1226.415。
+    var thumbnailURLByID: [UUID: URL] = [:]
     var onSelectNotification: (MegrumNotification) -> Void
+    /// いいね集約行のタップ（束ねた全通知を渡す。既読化は呼び出し側の責務）。iter1226.413。
+    var onSelectLikeGroup: ([MegrumNotification]) -> Void = { _ in }
 
     var body: some View {
         List {
@@ -20,20 +26,49 @@ struct NotificationCenterContent: View {
                 .listRowBackground(Color.clear)
             }
 
-            Section {
-                if isLoading {
+            if isLoading {
+                Section {
                     NotificationCenterLoadingRow()
-                } else if visibleNotifications.isEmpty {
+                }
+            } else if sections.isEmpty {
+                Section {
                     NotificationCenterEmptyRow(title: emptyTitle)
-                } else {
-                    ForEach(visibleNotifications) { notification in
-                        NotificationCenterRow(notification: notification) {
-                            onSelectNotification(notification)
+                }
+            } else {
+                ForEach(sections) { section in
+                    Section {
+                        ForEach(section.displayItems) { item in
+                            Group {
+                                switch item {
+                                case .single(let notification):
+                                    NotificationCenterRow(
+                                        notification: notification,
+                                        thumbnailURL: thumbnailURLByID[notification.id]
+                                    ) {
+                                        onSelectNotification(notification)
+                                    }
+                                case .groomLikeGroup(let group):
+                                    NotificationCenterLikeGroupRow(
+                                        group: group,
+                                        thumbnailURL: group.newest.flatMap { thumbnailURLByID[$0.id] }
+                                    ) {
+                                        onSelectLikeGroup(group.notifications)
+                                    }
+                                }
+                            }
+                            .listRowBackground(
+                                item.isUnread
+                                    ? MegrumTheme.lavender.opacity(0.07)
+                                    : Color.clear
+                            )
                         }
+                    } header: {
+                        Text(section.title)
+                            .font(.system(size: 13, weight: .bold, design: .rounded))
+                            .foregroundStyle(MegrumTheme.ink.opacity(0.72))
+                            .textCase(nil)
                     }
                 }
-            } header: {
-                Text("\(visibleNotifications.count)件")
             }
         }
     }
@@ -67,8 +102,8 @@ private struct NotificationCenterEmptyRow: View {
 }
 
 private extension NotificationCenterContent {
-    private var visibleNotifications: [MegrumNotification] {
-        presentationState.visibleNotifications(in: notifications)
+    private var sections: [NotificationCenterSection] {
+        presentationState.sections(in: notifications)
     }
 
     private var emptyTitle: String {

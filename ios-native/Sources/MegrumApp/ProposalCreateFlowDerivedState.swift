@@ -3,9 +3,13 @@ import MegrumCore
 
 extension ProposalCreateFlow {
     var visibleSteps: [ProposalCreateStep] {
-        // 個別募集エディタ準拠の3ステップ＋送信確認（iter1226.344）。
-        // 交換手段・現地・郵送・支払は 3/3 の「交換条件」にまとめる。
-        [.give, .receive, .conditions, .confirm]
+        // 個別募集エディタ準拠の3ステップ（譲/受/交換条件）＋送信確認（iter1226.344）。
+        // 交換手段・現地・郵送は 3/3 の「交換条件」にまとめる。
+        // 支払方法は金額が発生する時だけ、3/3 の後に独立した1画面として挿入する（iter1226.381）。
+        if requiresPaymentStep {
+            return [.give, .receive, .conditions, .payment, .confirm]
+        }
+        return [.give, .receive, .conditions, .confirm]
     }
 
     var configuration: ProposalCreateConfiguration {

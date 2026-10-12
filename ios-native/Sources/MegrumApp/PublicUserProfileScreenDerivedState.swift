@@ -33,6 +33,24 @@ extension PublicUserProfileScreen {
         appState.publicTradeGoodsByUserID[userID] ?? []
     }
 
+    /// 相手の交換条件カレンダー（打診フローの「＞」と同一シート）用コンテキスト。
+    var partnerExchangeCalendarContext: HomePartnerExchangeCalendarContext {
+        let summary = listings
+            .compactMap { IndividualListingExchangeSummary.extract(from: $0.note).summary }
+            .first { $0.includesLocal }
+        let displayName = displayedPublicProfile?.profile.displayName.nilIfBlank
+            ?? displayedPublicProfile?.profile.handle.nilIfBlank
+            ?? "相手"
+        return PartnerExchangeCalendarContextBuilder.context(
+            appState: appState,
+            userID: userID,
+            listingLocalPrefecture: summary?.localPrefecture,
+            listingLocalMemo: summary?.localPlaceMemo,
+            conditionText: summary?.localDetailTextForProposalDisplay,
+            displayName: displayName
+        )
+    }
+
     var listings: [IndividualListing] {
         appState.publicListingsByUserID[userID] ?? []
     }

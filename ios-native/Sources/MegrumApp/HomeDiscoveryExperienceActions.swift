@@ -30,20 +30,6 @@ extension HomeDiscoveryExperience {
         }
     }
 
-    func openSearch(
-        for candidate: HomeDiscoveryCandidate,
-        selectedGoods: HomeMockGoods?,
-        source: HomeDiscoveryCandidateSource
-    ) {
-        onOpenSearchWithCriteria(
-            HomeDiscoverySearchRoutePolicy.criteria(
-                for: candidate,
-                selectedGoods: selectedGoods,
-                source: source
-            )
-        )
-    }
-
     func requestProposalPresentation(_ selection: HomeDiscoveryProposalSelection) {
         pendingProposalSelection = nil
         selectedSheet = nil
@@ -96,6 +82,10 @@ extension HomeDiscoveryExperience {
 
     func handleCreatedListingShare(_ listing: IndividualListing) {
         guard let appState else {
+            return
+        }
+        // ガイドツアー中は共有プロンプトを出さない。
+        guard !appState.isTutorialActive else {
             return
         }
         Task { @MainActor in

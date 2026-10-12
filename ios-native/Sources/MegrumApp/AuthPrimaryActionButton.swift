@@ -1,9 +1,12 @@
 import MegrumDesign
 import SwiftUI
 
+/// 認証系の主アクション（iter1226.406 刷新）：
+/// 濃紫の独自グラデをやめ、共通 `MegrumPrimaryButtonStyle`（lavender→sky・radius14）へ統一。
 struct AuthPrimaryActionButton: View {
     var title: String
     var isLoading: Bool
+    var isDisabled: Bool = false
     var action: () -> Void
 
     var body: some View {
@@ -16,15 +19,9 @@ struct AuthPrimaryActionButton: View {
                         .tint(.white)
                 }
                 Text(title)
-                    .font(.system(size: 19, weight: .black, design: .rounded))
             }
-            .foregroundStyle(.white)
-            .frame(maxWidth: .infinity)
-            .frame(height: 66)
-            .background(AuthVisualStyle.primaryGradient, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
         }
-        .buttonStyle(.plain)
-        .disabled(isLoading)
-        .opacity(isLoading ? 0.72 : 1)
+        .buttonStyle(.megrumPrimary(height: 56))
+        .disabled(isLoading || isDisabled)
     }
 }

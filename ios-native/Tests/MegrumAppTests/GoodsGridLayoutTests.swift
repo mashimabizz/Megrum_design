@@ -352,7 +352,7 @@ final class GoodsGridLayoutTests: XCTestCase {
         XCTAssertEqual(GoodsQuickActionPreviewMetrics.height, 64)
         XCTAssertEqual(GoodsQuickActionPreviewMetrics.cornerRadius, 14)
         XCTAssertEqual(GoodsQuickActionPreviewMetrics.fallbackGlyphFontSize, 24)
-        XCTAssertEqual(TagCandidatePreviewMetrics.width, 232)
+        // iter1226.452：シリーズ候補のプレビューは吹き出し（固定幅）をやめ、候補列の下に別枠表示へ。
     }
 
     func testQuickActionHeaderUsesMasterNamesAndTags() {

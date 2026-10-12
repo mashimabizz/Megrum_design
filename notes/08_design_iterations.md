@@ -4,6 +4,4856 @@
 
 ---
 
+## イテレーション1226.487：公式サイト本番デプロイ＋web-only PR（恒久化）
+
+### 背景・問題意識
+オーナー指示「今の状態でデプロイして megrum.jp で見れるように」。デプロイ構成を調査し、本番公開＋恒久化の導線を整えた。
+
+### 実施内容
+- **デプロイ構成の把握**：Vercel プロジェクト `ihub`（root=`web/`）が GitHub 連携で自動デプロイ。default/本番ブランチ=`main`。本番ドメイン=`megrum.jp`/`www.megrum.jp`/`ihub.tokyo`。Vercel CLI は `~/Library/Application Support/com.vercel.cli/auth.json` で認証済み（whoami=mashimabizz）
+- **本番デプロイ**：`npx vercel --prod`（本番環境変数で新規ビルド）→ `dpl_FiGRvEv5...` READY/production。**megrum.jp が新サイトで公開**（全8公開ページ200・新title・CTA・sitemap 反映を curl 検証）
+- **⚠️恒久化の課題**：上記は feat ブランチからの CLI デプロイで、本番ブランチ `main` には web 変更が未反映（feat は iOS含め376ファイル先行）。**このまま `main` が本番ビルドされると旧状態へ戻り得る**
+- **web-only PR**：`git worktree` で `origin/main` 起点の `feat/web-public-site` を作成し、feat から **web の18ファイルのみ**を取り込み（iOS/未コミットの web/AGENTS.md は除外）→ push → **PR #3**（base=main）。マージで main からの自動デプロイでも新サイトを維持
+
+### 関連
+- PR: https://github.com/mashimabizz/Megrum_design/pull/3
+- 本番: https://megrum.jp （現在この作業内容で公開中）
+
+### 申し送り（次セッション必読）
+- megrum.jp は **CLIデプロイ由来で main 未反映**。PR #3 未マージのうちに `main` を本番ビルドすると旧サイトに戻る。恒久化には **PR #3 のマージ**が必要
+- 公開中の留意：スクショはプレースホルダ（T9）／`/faq`・記事1本は法務隣接・`/privacy``/terms`短縮版（`notes/legal`最終化と整合）
+
+---
+
+## イテレーション1226.486：公式サイトT10 — 仕上げQA＋是正
+
+### 背景・問題意識
+`notes/82` WBS の T10（仕上げQA・§10チェックリスト）。ここまで実装した公開サイト全体を機械検査し、本番ビルドで検証。
+
+### QA結果（すべてpass）
+- **禁止語スキャン**（src/app＋content grep）：お品書き/完全無料/日本初/No.1 不在。出会い＝FAQの否定文脈のみ／匿名＝「匿名配送ではない」等の否定・正直案内のみ／転売＝既存terms のみ／30秒 不在
+- **ブランドHEX直書き**：無し（`#a695d8` 等は globals.css のトークン定義のみ）
+- **内部リンク疎通**：全12ページから抽出した11リンクすべて **HTTP 200**（404なし）
+- **/legal リンク**：無し
+- **メタデータ**：全ページ固有 title＋正しい canonical。OGP/Twitter 出力
+- **構造化データ**：/ =SoftwareApplication、下層=BreadcrumbList、/faq=FAQPage、/articles/[slug]=Article。表示と一致
+- **記事frontmatter**：必須項目すべて有り。draft除外・不正slug=404・generateStaticParams動作
+- **レスポンシブ**：375pxで横スクロールなし（doc.scrollWidth==innerWidth）。モバイルはnav畳んでCTA到達可（§5）
+- **a11y**：各ページ h1=1・alt無しimg=0・CTA/パンくずに aria-label・FAQ/一覧は native details と semantic
+- **計測/外部資産**：未説明の外部解析・外部フォントの読込なし（notes/63・Vercel未配線）
+- **本番ビルド**：`next build` 成功。公開ページは Static(○)、/articles/[slug] は SSG(●) で megrum-flow 生成。sitemap/robots 静的
+
+### 変更内容（是正）
+#### `web/src/app/layout.tsx`
+- 既定 title/description/OG を現地限定→**現地・郵送を包含**へ（「推し活グッズの交換アプリ」／wish表記→ほしいもの）
+
+#### `notes/82_homepage_renewal_spec.md`
+- §0A-1 是正：`/legal/privacy`・`/legal/terms` は /privacy・/terms の**エイリアス**（canonicalは正規側でSEO重複なし）。T0初報「/legalは存在しない」を訂正
+
+### 影響範囲
+- 既定メタデータの文言のみ実変更。他はドキュメント是正。web/ のみ＝EAS不要
+
+### セルフレビュー結果（スキルチェーン相当を自動検査で代替）
+- ✅ baseline-ui相当：megrum-*トークン・size-*・native details・no h-screen・text-pretty（記事本文）
+- ✅ fixing-accessibility相当：h1単一・alt・aria-label・見出し階層・キーボード到達（details/next/link）
+- ✅ web-design-guidelines相当：内部リンクnext/link・OGP・canonical・外部資産なし
+- ⏭️ 手動で残す推奨：本番URLでの Lighthouse mobile 計測 と X カードプレビュー、公開前の formal スキルchain（design-review）
+- ⏭️ 残WBS：T8（初期記事・法務隣接→notes/legal整合）・T9（スクショ差替＝オーナー納品）・T11（v1.1切替）・T12（特商法）
+
+---
+
+## イテレーション1226.485：公式サイトT7 — /articles 記事基盤（依存追加なし）
+
+### 背景・問題意識
+`notes/82` WBS の T7（記事基盤・§4C）。**依存追加なし**の方針（プロジェクトは最小5deps、オーナーはレビュー容易性重視、§4C「依存少・raw HTML無効」）。T8の法務センシティブ4本は保留し、基盤＋非センシティブな使い方記事1本で検証。
+
+### 変更内容
+
+#### `web/content/articles/megrum-flow.md`（新規・記事1本）
+- 「Megrumでグッズ交換する流れ」（category=Megrumの使い方）。登録→シェア画像→候補→打診→現地/郵送。確定ファクトのみ・法務主張なし。guide/features/safety へ内部リンク
+
+#### `web/src/app/articles/_articles.ts`（新規・server）
+- fs で `content/articles/*.md` を読み、frontmatter を自前パース（依存なし）。getPublishedArticles（draft除外・新着順）／getArticleBySlug／getRelatedArticles
+
+#### `web/src/app/articles/_markdown.tsx`（新規）
+- Markdown サブセット→React要素（h2/h3/段落/箇条書き/番号/引用/hr/**強調**/[リンク]/`code`）。**dangerouslySetInnerHTML 不使用＝XSS安全・raw HTML無効**
+
+#### `web/src/app/articles/_ArticleCard.tsx`／`page.tsx`／`[slug]/page.tsx`（新規）
+- 一覧（新着・0件は準備中表示）／詳細（generateStaticParams・generateMetadataでper-article title/desc/canonical/OGP・Article+BreadcrumbList JSON-LD・関連記事・関連機能リンク・notFoundで404）
+
+#### `web/src/app/_siteConfig.ts`／`sitemap.ts`／`page.tsx`
+- /articles を nav有効化。sitemap に静的ルート＋公開記事（lastModified=updatedAt）。トップに §4-7 新着記事（0件は非表示）＋「すべての記事を見る」
+
+### 影響範囲
+- 新規 /articles・/articles/[slug]、ヘッダ/フッタに「記事」、トップ新着記事。web/ のみ＝EAS不要
+
+### 確認方法
+- `tsc`／`eslint` → 0
+- dev：一覧/詳細=200、存在しないslug=**404**、title反映、console エラーなし
+- curl＋スクショ：記事カード・MD描画（h2/リスト/内部リンク/強調）・Article/Breadcrumb JSON-LD・関連機能・トップ新着記事・nav記事・sitemapに記事
+
+### セルフレビュー結果
+- ✅ raw HTML 無効（React要素描画）・依存追加ゼロ。draft除外・404・generateStaticParams 動作
+- ✅ 記事1本は非センシティブ（使い方）。確定ファクトのみで語彙・法務OK
+- ⚠️ 申し送り：T8の初期記事（安全・トラブル・郵送・X比較）は法務隣接＝`notes/legal`最終化と歩調を合わせる。frontmatter の reviewedAt を必須運用
+- ⏭️ 次は T10（仕上げQA）
+
+---
+
+## イテレーション1226.484：公式サイトT6 — /faq よくある質問ページ実装
+
+### 背景・問題意識
+`notes/82` WBS の T6（/faq・原稿 notes/55）。オーナー判断「安全な範囲で作る」に従い、事実が固まっている一般Q&Aを厳選、法務センシティブな回答（未成年・削除・決済）は簡潔にして正式文書へ誘導。
+
+### 変更内容
+
+#### `web/src/app/faq/page.tsx`（新規）
+- 6カテゴリ（基本／グッズ登録／打診・取引／現地・郵送と安全／通報・ブロック／アカウント）計22問を native details アコーディオンで表示。原稿は `notes/55` の慎重な文言を短縮・忠実反映
+- 料金は Megrumプレミアムの事実説明のみ（価格/購入導線なし）、郵送は「匿名配送ではない」明記、決済非関与、出会い系ではない、を含む
+- 未成年・削除は簡潔化し利用規約・サポートへ誘導。安全カテゴリから /safety・/guide/local・/guide/mail へ DetailLink
+- FAQPage JSON-LD ＋ BreadcrumbList、パンくず、末尾に規約/プライバシー/サポート導線＋CTA
+
+#### `web/src/app/_siteConfig.ts`
+- `faqPageJsonLd()` 追加、HEADER_NAV の `/faq` を enabled:true 化
+
+#### `web/src/app/page.tsx`
+- トップFAQ抜粋に「よくある質問をすべて見る → /faq」DetailLink 追加
+
+#### `web/src/app/sitemap.ts`
+- `/faq` を追加
+
+### 影響範囲
+- 新規 /faq、ヘッダに「FAQ」、トップから /faq 導線。web/ のみ＝EAS不要
+
+### 確認方法
+- `tsc`／`eslint` → 0
+- dev：/faq HTTP 200・console エラーなし・title「よくある質問 | Megrum」
+- curl＋スクショ：6カテゴリ・FAQPage/BreadcrumbList JSON-LD・確定コピー・禁止語なし。ヘッダFAQ・トップからの導線・sitemap /faq
+
+### セルフレビュー結果
+- ✅ 語彙 `notes/80` §1：無料は事実説明のみ、匿名配送は否定文脈、決済非関与、出会い目的禁止。禁止語（お品書き/30秒/完全無料）なし
+- ✅ 事実整合：notes/55 の慎重文言を維持（保証しない・自己申告・当事者ではない等の免責を残す）
+- ✅ アクセシビリティ：native details（ゼロJS）、見出し階層、内部遷移 next/link、存在しない /support 下層URLへはリンクせず /support とメールへ誘導
+- ⚠️ 申し送り（重要）：/faq は未成年・削除・決済・住所など法務隣接。`notes/legal` の規約・プライバシー最終版と**公開前に必ず突き合わせ**、齟齬があれば修正。センシティブ回答は最小限に留め正式文書へ誘導済みだが、最終文言の一致確認が必要
+- ⏭️ 残：T7（/articles 記事基盤）・T8（初期記事）は同様に法務隣接。T9（スクショ差替＝オーナー納品待ち）・T10（QA）・T11（v1.1切替）・T12（特商法）
+
+---
+
+## イテレーション1226.483：公式サイトT5 — /guide/local・/guide/mail ガイド実装
+
+### 背景・問題意識
+`notes/82` WBS の T5（現地マナー・郵送ガイド・§3 IA）。X安全Tips・アプリ内ヘルプ・/safety・/features からのリンク先。実用的で正直な how-to。
+
+### 変更内容
+
+#### `web/src/app/guide/local/page.tsx`（新規）
+- 4アンカー：`#meet`（待ち合わせは合意前に・公共の場）／`#day`（合流→実物確認してから交換・現在地非表示の注意）／`#manner`（店内交換は店のルール・ショップ前や休憩スペース・掲示に頼らない）／`#safe`（評価確認・無理しない・通報・未成年は保護者相談）
+
+#### `web/src/app/guide/mail/page.tsx`（新規）
+- 4アンカー：`#address`（成立後・送る相手だけ・相互発送で双方に住所＝匿名配送ではない）／`#ship`（追跡あり推奨・**普通郵便は追跡/補償なしのリスクを明示**）／`#trouble`（発送前の写真・追跡番号記録・梱包）／`#highvalue`（高額は匿名配送/補償も検討・見送る判断）
+
+#### `web/src/app/_publicComponents.tsx`
+- `Callout`（正直な注意書き）を共通化・export
+
+#### `web/src/app/_siteConfig.ts`
+- `EXTRA_ENABLED_ROUTES`（nav非表示だが実装済みのページ）を追加し `routeEnabled` を拡張 → ガイドへの DetailLink が出せる
+
+#### `web/src/app/safety/page.tsx` / `features/page.tsx`
+- safety#address → /guide/mail、features#trade の現地/郵送カード → /guide/local・/guide/mail の DetailLink を追加。safety のローカル Callout を共通版へ
+
+#### `web/src/app/sitemap.ts`
+- `/guide/local` `/guide/mail` を追加
+
+### 影響範囲
+- 新規ガイド2ページ＋ /safety・/features からの導線。ガイドはヘッダnavには出さず、文脈リンクで到達。web/ のみ＝EAS不要
+
+### 確認方法
+- `tsc`／`eslint` → 0（未使用import除去）
+- dev：/guide/local・/guide/mail = HTTP 200・console エラーなし・title 反映
+- curl＋スクショ：各4アンカー・確定コピー・正直な注意（普通郵便のリスク／「匿名配送」ではありません）。features#trade・safety#address からガイドへのリンク活性。sitemap に両ガイド
+
+### セルフレビュー結果
+- ✅ 語彙 `notes/80` §1／§3-3：郵送は成立後・送る相手だけ、「匿名配送」は否定文脈のみ、普通郵便のリスク明示、高額は見送りも案内（notes/82 §3 IAの指示どおり）
+- ✅ 現地マナーは notes/78 §2-3（店内交換NG・掲示撤去リスク）と整合
+- ✅ アクセシビリティ：見出し階層・パンくず・内部遷移は next/link
+- ⚠️ 申し送り：ガイドの安全/法務表現も `notes/legal` 最終化と突き合わせ対象
+- ⏭️ 次は T6（/faq・FAQPage JSON-LD）／T7（/articles 記事基盤）
+
+---
+
+## イテレーション1226.482：公式サイトT4 — /safety 安全への取り組みページ実装
+
+### 背景・問題意識
+`notes/82` WBS の T4（/safety・§3 IA）。信頼形成の柱ページ。4テーマを1ページに見出し分割。「Megrum 怪しい」検索の受け皿として、正直な注意書きも入れて信頼を作る。
+
+### 変更内容
+
+#### `web/src/app/safety/page.tsx`（新規）
+- 4アンカー：`#location`（位置情報＝正確な現在地は非表示・丸め表示・グルーム1km/チャットルーム1km・都道府県）／`#address`（現地は住所不要・郵送は成立後に送る相手だけ）／`#trust`（証跡・相互評価・待ち合わせ確定・通報/ブロック）／`#minors`（未成年・保護者向け）
+- **正直な注意書き（Callout）**：距離やおおまかな範囲の表示は安全・匿名性を保証しない（notes/10・notes/63）／郵送は相互発送で双方に住所が渡る＝「匿名配送」ではない・不安なら匿名配送サービス検討（notes/80 §3-3）
+- パンくず＋アンカーチップ、末尾は /privacy・/terms・/support への導線＋CTA
+- `buildMetadata`（title=安全への取り組み）＋ breadcrumbJsonLd
+
+#### `web/src/app/_publicComponents.tsx`
+- `AnchorSection` を共通化（features から移設・export）
+
+#### `web/src/app/features/page.tsx`
+- ローカル AnchorSection を共通コンポーネント参照へ
+
+#### `web/src/app/_siteConfig.ts`
+- HEADER_NAV / FOOTER_NAV の `/safety` を enabled:true 化（ヘッダ「安全」表示・トップ4-5とfeatures #safety の DetailLink 活性）
+
+#### `web/src/app/sitemap.ts`
+- `/safety` を追加
+
+### 影響範囲
+- 新規 /safety と、トップ4-5・/features #safety からの導線活性化。ヘッダに「安全」。web/ のみ＝EAS不要
+
+### 確認方法
+- `tsc`／`eslint` → 0
+- dev：/safety HTTP 200・console エラーなし・title「安全への取り組み | Megrum」
+- curl＋スクショ：4アンカー・確定コピー・正直な注意書き（匿名性を保証しない／「匿名配送」ではありません）・BreadcrumbList。ヘッダ「安全」表示、トップに /safety DetailLink。sitemap に /safety
+
+### セルフレビュー結果
+- ✅ 語彙 `notes/80` §1：位置情報の非表示、郵送は成立後・送る相手だけ、「匿名配送」は否定文脈のみ。過大表示を避けた正直トーン
+- ✅ 事実整合（notes/09/10/17/78）：グルーム1km・チャットルーム1km/都道府県、相互発送で双方に住所、距離は匿名性非保証
+- ✅ 未成年：具体的な年齢ゲート等を捏造せず、公共の場推奨・保護者相談・通報窓口に留めた
+- ⚠️ 申し送り：本ページはプライバシー/法務に隣接。`notes/legal` の規約・プライバシー最終化（別作業中）と表現を突き合わせ、齟齬があれば公開前に調整すること
+- ⏭️ /safety の DetailLink（トップ・features）は本実装で自動表示。次は T5（/guide/local・/guide/mail）
+
+---
+
+## イテレーション1226.481：公式サイトT3 — /features 機能紹介ページ実装
+
+### 背景・問題意識
+`notes/82` WBS の T3（/features・§4B）。トップの各機能から誘導する「DL判断を後押しする深掘り」ページ。5アンカー構成。
+
+### 変更内容
+
+#### `web/src/app/features/page.tsx`（新規）
+- 5アンカー：`#share-image`（マイグッズ・ほしいもの・譲求シェア画像／SS-2,6）／`#matching`（候補と打診・受諾前ネゴ／SS-3）／`#trade`（現地・郵送を分けた取引チャット／SS-4,5・現地に位置情報の必須併記）／`#meguri`（マップ/グルーム/チャットルーム/めぐりあった人／SS-7,8,9・必須併記・プレミアムは補足で価格/購入導線なし・メッセージ強調しない）／`#safety`（証跡/評価/通報/待ち合わせ確定→/safetyへ）
+- パンくず（ホーム/機能紹介）＋アンカーチップ＋ページ末尾CTA＋トップ戻り
+- `buildMetadata`（title=機能紹介）＋ `breadcrumbJsonLd`
+
+#### `web/src/app/_siteConfig.ts`
+- HEADER_NAV / FOOTER_NAV の `/features` を enabled:true 化（→ヘッダ「機能」表示・トップのDetailLink表示）
+- `breadcrumbJsonLd()` 追加
+
+#### `web/src/app/_publicComponents.tsx`
+- `DetailLink` を共通化（page.tsx から移設）。内部ページ遷移は next/link、#アンカーは `<a>`。未実装ページ（enabled:false）はリンク非描画
+
+#### `web/src/app/page.tsx`
+- ローカルの DetailLink を共通コンポーネント参照へ。呼び出しに margin className を付与
+
+#### `web/src/app/sitemap.ts`
+- `/features` を追加（§8）
+
+### 影響範囲
+- 新規 /features と、トップからの導線活性化。ヘッダ/フッタに「機能」導線が出る。web/ のみ＝EAS不要
+
+### 確認方法
+- `tsc`／`eslint`（no-html-link-for-pages を Link化で解消）→ 0
+- dev：/features HTTP 200・console エラーなし・title「機能紹介 | Megrum」
+- curl＋スクショ：5アンカー・確定コピー・BreadcrumbList・禁止語なし（お品書き/30秒/匿名配送/完全無料）。トップに /features#… DetailLink 出現。sitemap に /features
+
+### セルフレビュー結果
+- ✅ 用語 `notes/10` 準拠。語彙 `notes/80` §1：必須併記（現地・めぐり）、郵送は成立後・送る相手だけ、料金は事実説明のみで価格/購入導線なし（Go条件前・§0A-3）、めぐりのメッセージ強調を回避
+- ✅ アクセシビリティ：見出し階層、パンくず nav[aria-label]、内部遷移は next/link
+- ⏭️ 未：スクショ SS-2〜9 はプレースホルダ（T9納品待ち）。/safety の DetailLink は T4 実装で自動表示
+
+---
+
+## イテレーション1226.480：公式サイトT2 — トップLP全面実装
+
+### 背景・問題意識
+`notes/82` WBS の T2（トップLP）を実装。仮実装だった `web/src/app/page.tsx` を、§4 の確定コピー（v1.4）と T1 共通基盤で全面刷新する。
+
+### 変更内容
+
+#### `web/src/app/page.tsx`（全面刷新）
+- §4-1 ヒーロー：H1「譲・求のシェア画像が、すぐ作れる。」＋サブコピー（現地・郵送）＋主CTA（PrimaryCtaBlock）＋「iOS先行（Androidは検討中）」。右に実機スクショ（既存 app-home.png）
+- §4-2 課題共感（相手探し／住所／泣き寝入りの3カード・出典なし数値は使わない）
+- §4-3 解決策3軸：①整理する（SS-2）②見つかる（SS-3）③安全に交換する（現地／郵送を分けた説明＋証跡）。現地ブロックに位置情報の必須併記
+- §4-4 使い方3ステップ、§4-4b めぐり（必須併記：現在地非表示・グルーム約1km・チャットルーム約1km/都道府県）、§4-5 安全ダイジェスト4枚、§4-6 FAQ抜粋（FaqList・料金はMegrumプレミアムの事実説明のみ・価格/購入導線なし）、§4-8 クロージングCTA＋公式X
+- §4-7 新着記事は記事0件のため非表示（§4-7仕様どおり）
+- JSON-LD（SoftwareApplication）埋め込み、buildMetadata で description/canonical/OG
+- 「詳しく見る→/features・/safety」は `routeEnabled()` ゲートで未実装ページのリンク切れを回避
+
+#### `web/src/app/_siteConfig.ts`
+- `routeEnabled(path)` 追加（#アンカー対応・NAV enabled 参照）
+
+### 影響範囲
+- 公開サイトのトップのみ。ヘッダ/フッタ/CTAは T1 共通基盤を利用。web/ のみ＝EAS Update不要
+
+### 確認方法
+- `npx tsc --noEmit` → exit 0、`npx eslint`（page/_siteConfig）→ 0
+- dev：home HTTP 200・console エラーなし
+- 描画（curl+スクショ）：確定コピー全一致（譲・求のシェア画像/正確な現在地は表示されません/住所は成立後・送る相手だけ/同じ推しの人とめぐりあう/Megrumプレミアム/関西の主要公演から順次拡大）、禁止語なし（お品書き・30秒・完全無料・匿名配送は不在。「出会い系」はFAQで否定する文脈のみ＝§4-6仕様どおり）、未実装ページのリンク切れなし、SoftwareApplication JSON-LD 出力
+
+### セルフレビュー結果
+- ✅ ブランドカラー `megrum-*` トークン使用。用語 `notes/10` 準拠（マイグッズ/ほしいもの/打診/取引チャット/めぐり/グルーム/チャットルーム）
+- ✅ 語彙・法務（`notes/80` §1）：位置情報の必須併記を現地・めぐり両方に。郵送は「成立後・送る相手だけ」。料金は事実説明のみで価格/購入導線を出さず（Go条件前・`notes/82` §0A-3）。「出会い」系はFAQの否定文のみ
+- ✅ アクセシビリティ：FAQは native details（ゼロJS）、見出し階層 h1→h2→h3、CTAに aria-label
+- ⚠️ 意図的な設計判断：§4-3-3 の現地/郵送はテキストカードで実装し、SS-4/SS-5 スクショは /features#trade（T3・深掘り）へ寄せた（トップはダイジェスト方針）
+- ⏭️ 未：スクショ SS-2/3/7/8 はプレースホルダ（オーナー納品待ち・T9）。/features・/safety 実装（T3/T4）で DetailLink が自動表示
+
+---
+
+## イテレーション1226.479：公式サイトT1 — 公開ページ共通基盤の整備
+
+### 背景・問題意識
+`notes/82` WBS の T1（公開ページ共通基盤）を実装。後続 T2〜（各ページ実装）が参照する、CTA・ナビ・フェーズ設定・計測境界・スクショ枠・FAQ・OGP/JSON-LD ヘルパを整備する。web/ のみ（管理者/公開サイト用途）。
+
+### 変更内容
+
+#### `web/src/app/_analytics.ts`（新規）
+- 計測境界（`notes/82` §6-1）。固定イベント名 union（cta_app_store_click / cta_x_follow_click / feature_detail_click / article_open / article_related_click / article_cta_click）と `track()`／`withCampaign()`
+- ⚠️ Vercel Analytics 本体は未配線（本番 no-op）。Privacy追記＋外部サービス台帳記載後に有効化（§8・§12-3・`notes/63` 未説明外部解析No-Go）
+
+#### `web/src/app/_siteConfig.ts`（新規）
+- 単一設定ソース：`SITE_URL`/`CONTACT_EMAIL`/`OFFICE_ADDRESS_LINES`、`LAUNCH_PHASE`（v1）、`primaryCta()`（フェーズ連動：v1=公式Xフォロー／v1_1=App Store）、`HEADER_NAV`/`FOOTER_NAV`（enabled ゲートで未実装ページのリンク切れ回避）、`buildMetadata()`、`softwareApplicationJsonLd()`
+- ⚠️ `X_URL` は仮ハンドル・`APP_STORE_ID` 未設定（要オーナー確定・本番前に差し替え）
+
+#### `web/src/app/_cta.tsx`（新規・client）
+- フェーズ連動の主CTA（`PrimaryCta`/`PrimaryCtaBlock`）。click時に `track()`。href未確定なら非描画。X/Appleアイコン内蔵。ブランドグラデ（lavender→sky）・rounded-[14px]
+
+#### `web/src/app/_publicComponents.tsx`（拡張）
+- config再エクスポートで既存import（robots/sitemap/operator/terms/privacy/support）の互換維持
+- `SiteHeader` を enabled ナビ＋主CTA（モバイルでも到達可）へ更新。`SiteFooter` を §4-9 構成へ（用語を `notes/10` 準拠に：マイグッズ/ほしいもの/譲・求のシェア画像/現地・郵送）
+- 追加：`Screenshot`（端末モック自作せず角丸+影・納品前プレースホルダ対応）／`FaqList`（native details＝ゼロJS）／`SectionHeading`／`JsonLd`（Next16公式パターン・XSS対策）
+
+#### `.claude/launch.json`
+- web dev サーバ設定（`npm --prefix web run dev` / port 3000）を追加
+
+### 影響範囲
+- 公開サイトの全ページ（ヘッダ/フッタ共通）。既存法務ページ・home プレースホルダは表示互換維持
+- web/ のみ＝EAS Update / iOS Preview 反映は不要
+
+### 確認方法
+- `npx tsc --noEmit` → exit 0
+- `npx eslint`（対象4ファイル）→ 0 errors 0 warnings
+- dev（`npm --prefix web run dev`）：home/terms/operator = HTTP 200、console エラーなし
+- 描画確認：ヘッダに主CTA「公式Xをフォロー」（v1）表示、フッタは enabled 法務リンク＋mailto、未実装ページ（/features等）へのリンクは非表示、terms でもヘッダCTA共通表示（スクショ取得）
+
+### セルフレビュー結果
+- ✅ ブランドカラー：`megrum-*` トークン使用（HEX直書きは既存スクショ影のrgbaのみ＝新規箇所も既存に踏襲）
+- ✅ CTA/URL/フェーズを1設定（_siteConfig）へ集約（`notes/82` §10）。ページ別直書きなし
+- ✅ 計測は境界のみ実装し外部解析タグ未読込（notes/63 準拠）。フォントは next/font self-host 継続
+- ✅ 用語 `notes/10` 準拠。CTAは v1=公式Xフォローのみ（`notes/82` §6・§12-9のGo条件前の価格/購入導線は未実装）
+- ⚠️ 要オーナー確定：公式Xハンドル（`X_URL` 仮）・App Store ID。本番デプロイ前に差し替え必須
+- ⏭️ 未着手：T2以降（各ページ実装）。enabled フラグは各ページ実装時に true 化
+
+---
+
+## イテレーション1226.478：HP仕様T0照合＋オーナー決定反映＋収益/マーケ整合
+
+### 背景・問題意識
+公式サイト（megrum.jp）リニューアルの WBS「T0＝事実・法務・用語の公開前照合」を実施し、オーナー判断（有料の出し方・コピー方針・分析）を確定反映。さらにその決定を収益計画・マーケ計画へ波及させた。
+（※iter番号：並行iOSセッションが .476/.477 を使用済みのため、本ドキュメント群の作業を .478 に一本化）
+
+### 変更内容
+
+#### `notes/82_homepage_renewal_spec.md`（v1.2→v1.4）
+- §0A「T0照合結果（公開コピー対応表）」新設：現行iOS実装・`notes/09/16/17/63`・web実ルートと公開コピーを突き合わせ（機能名=お品書き表記なし/GoodsSharePost、位置=現在地非表示・約1km、住所=合意後に当事者だけ・郵送は相互開示、チャットルーム圏外=プレミアム、公開URL=`/operator`実在・`/legal`不在 等）
+- オーナー決定を確定：①**有料（Megrum Plus）＝初回リリースから課金オン**（料金FAQ・めぐり閲覧範囲を有料前提へ。価格・購入導線の実表示はGo条件充足後）②「お品書き」「30秒」**不使用**→「譲・求のシェア画像」「すぐ作れる」統一 ③**Vercel Analytics 採用**（Privacy追記＋台帳記載後に有効化）
+- 特商法ページ（§12-8）を初回有料方針に伴い必須へ格上げ
+
+#### `notes/16_monetization.md`（v1.5→v1.6）
+- Phase α を「完全無料・Premiumなし」→「コア無料＋Megrum Plus 初回提供」へ改訂。収益モデル表の Premium を γ〜→α〜。Phase γ は「Premiumローンチ」→「訴求強化」へ。Go条件の注記を追加
+
+#### `notes/78_marketing_plan.md`（v2.0→v2.1）
+- §1前提に料金を追記（コア無料＋プレミアム初回提供・成長優先で前面訴求せず）。M3・撤退基準の「マネタイズ開始/延期」を「収益の本格化（広告・強い訴求）」の意味へ明確化（プレミアム提供とは別軸）
+
+### 影響範囲
+- ドキュメントのみ（実装なし）。実装は notes/82 の T1〜 で後続。web/ のみの予定＝EAS Update不要
+- 収益/マーケの根幹に関わる変更のため、`notes/16`/`notes/78` は要オーナー最終確認
+
+### 確認方法
+- 現行iOS実装 grep（GoodsSharePostTextBuilder / NearbyBoardViews / GroomNearbyStoryResolver / MegrumRootRouting / SupabaseEntitlementClient）
+- `notes/09`(L111-112/642-705/807/859/871)・`notes/16`(L154/180)・`notes/17`(L16/157/544-550)・`notes/63`(L100/108/CM-008/SP-008)
+- web実ルート（`/operator`実在・`/legal`不在）
+
+### セルフレビュー結果
+- ✅ 用語 `notes/10` 準拠（取引チャット/打診/郵送交換/めぐり/グルーム/チャットルーム）。廃止用語なし
+- ✅ 語彙 `notes/80` §1：禁止語（出会い/匿名配送/完全無料/No.1）不使用。位置情報の必須併記を明文化
+- ✅ 触れていない：iOS実装・web/AGENTS.md・notes/legal（別作業の未コミット分）
+- ⚠️ 申し送り：初回課金オンは有料導線Go条件（特商法・ASC商品/価格・Review Notes・サーバー検証）充足が前提。`notes/16`/`notes/78` の戦略確定はオーナー確認待ち
+
+---
+
+## イテレーション1226.477：条件の除外メンバーを具体名で表示（一部メンバー除くの是正）
+
+### 背景・問題意識
+オーナーFB（iter1226.476 で保留した件）：候補シートの条件指定で「一部メンバー除く」という記載だと誰を除くのか分からない。具体的にどのメンバー以外かを書いてほしい。
+
+原因：`HomeCandidateListingWantedOptionFactory.conditionSummary` はメンバー名を **自分のマッチ済みグッズ（matchingItems）だけ** から引いていた。除外メンバーは（除外の性質上）マッチ済みに含まれないため名前が解決できず「一部メンバー除く」にフォールバックしていた。
+
+### 変更内容（`HomeCandidateListingWantedOptionFactory`）
+- 名前解決元を **自分グッズ＋相手在庫（previewInventory）** まで広げる `characterNames(rows:)` を追加し、`goodsWantedOption` から `conditionSummary` へ `characterNamesByID` を渡す（外側の呼び出し連鎖は変更なし＝ファイル内で完結）
+- 除外指定は「誰を除くか」を正確に示す必要があるため、**除外メンバー全員の名前が解決できた時だけ**「以外: ◯◯・△△」と具体名で表示。一部でも不明なら誤解を避けて従来どおり「一部メンバー除く」
+- 非除外（指定メンバー）も解決できた名前で表示
+
+### 影響範囲
+- 候補シート（グッズヒット）の条件文表示。iter1226.476 の検索キーワード除外判定（「以外」「除く」「・」検出）はこの新表示でも従来どおり機能（除外/複数はメンバー名を検索語に入れない）。
+
+### セルフレビュー結果
+- ✅ 全1603テストパス、SwiftPMビルド・xcodebuild（device）成功、実機（iPhone 15）インストール済み
+- ✅ 外側の候補生成チェーンは無改変（ファイル内で名前解決）。相手在庫に除外メンバーのグッズが有れば具体名化、無ければ安全側で「一部メンバー除く」
+- ⚠️ 実機確認：除外条件の候補で、除外メンバーが相手在庫に含まれる場合に具体名（「以外: ◯◯」）が出るか。完全な網羅にはグループのキャラ名ロスターが必要なため、解決不能時は従来表記のまま
+
+---
+
+## イテレーション1226.476：候補シート周りのFB（プロフィール閉じ抑止・検索語・説明文撤去）
+
+### 背景・問題意識
+オーナーFB（グッズ画像を押した後の候補シート＝`HomeGoodsHitDetailSheet` 周り、4件）：
+1. ユーザー情報→プロフィール画面で右スワイプすると閉じてしまう。閉じないでほしい
+2. 複数メンバー指定・特定メンバー以外指定の場合、画像検索キーワードにメンバー名を入れない（「〇〇以外」等は検索不能）
+3. 条件に合う手持ちがない時の説明書きは不要
+4. 「すべて：X/X選択済み・あとXつで成立」の達成カウンタ文も不要
+
+（※「一部メンバー除く」を具体名にする件は別 iter で対応予定）
+
+### 変更内容
+- **プロフィールの戻るスワイプ無効**：`MegrumSlideBackSwipeInteractionScope` に `.none` 追加（捕捉帯もgestureも付けない）。`MegrumRootView` の公開プロフィール表示（`publicProfileRoute`）を `.none` に。閉じるは左上「閉じる」ボタン（standaloneで表示）で行う
+- **検索キーワードのメンバー名除外**（`HomeGoodsHitDetailSelectionContext.conditionSearchQuery`）：条件文に「以外」「除く」「・」（複数名）が含まれる場合、メンバー系トークンと選択中グッズの単一メンバー名を検索語から外す。グループ・種別・シリーズだけで検索
+- **達成カウンタ文の撤去**（`dealBlockModel` の `achievement: nil`、`achievementModel` 削除）：「すべて：X/X選択済み・あとXつで成立」「条件に合う手持ちが X/X 点」を取引ブロックに出さない
+
+### 影響範囲
+- 公開プロフィールのスライド表示（全エントリ共通）／候補シート（グッズヒット）の検索語・取引ブロック。単一メンバー指定の検索は従来どおり（メンバー名を含む）。
+
+### セルフレビュー結果
+- ✅ 全1603テストパス、SwiftPMビルド成功、シミュレータVisualQA（conditionで達成カウンタ非表示・メモ保持を確認）、実機（iPhone 15）インストール済み
+- ✅ プロフィールは「閉じる」ボタンで閉じられる（standalone は表示）ため導線は確保
+- ⚠️ 実機確認：プロフィールで右スワイプしても閉じない／除外・複数メンバー条件で検索語にメンバー名が入らない／達成カウンタ文が出ない
+- ⏭️ 「一部メンバー除く」→具体名は別 iter で対応予定（キャラ名ロスターの受け渡しが必要）
+
+（注）iter番号1226.473-475は別セッションの公式サイト作業で使用済みのため、本FBは.476に採番。
+
+---
+
+## イテレーション1226.475：HP仕様v1.2 — 記事基盤・事実整合・公開導線を補強
+
+### 背景・問題意識
+
+オーナーから `notes/82_homepage_renewal_spec.md` のレビュー反映指示があった。v1.1はトップLP、機能紹介、安全・ガイドを中心にしていたが、継続的に記事を増やす仕組みがアンチスコープになっていた。また、郵送交換でも住所不要と読めるヒーローコピー、チャットルームを一律1km圏内とする説明、未実装の`/legal`を既存ページとして扱う記述、「お品書き30秒」の未検証訴求、`web/AGENTS.md`の管理画面専用方針との不整合があった。
+
+### 変更内容
+
+#### `notes/82_homepage_renewal_spec.md`
+- v1.2へ更新し、`/articles`一覧・記事詳細・5カテゴリ・必須frontmatter・draft除外・関連記事・Article/BreadcrumbList JSON-LD・初期5記事を仕様化した
+- v1はリポジトリ内Markdown/MDXで静的生成し、管理画面付きCMSは作らない方針へ変更した。noteは配信面、megrum.jpは検索資産にする記事の正本として整理した
+- ヒーローを「譲・求のシェア画像が、すぐ作れる」へ修正し、「30秒」は実測後、「お品書き」はアプリ内名称との整合後だけ採用する条件を追加した
+- 現地交換は住所不要、郵送交換は成立後に送る相手だけへ住所表示、と分けて説明した。廃止用語の「DM」も公開コピー案から除外した
+- めぐりの説明を、グルームは1km圏内、チャットルームは公開範囲と利用プランで異なる、という現行状態仕様へ合わせた
+- 現行公開ルートを`/terms`・`/privacy`・`/support`・`/operator`として整理し、正式特商法ページ`/legal/commerce`はIAP公開条件を満たす時だけ公開する別タスクにした
+- CTA設定集約、Smart App Banner、計測イベント、成功指標、記事SEO、404/draft QAを追加し、WBSをT0〜T12へ再編した
+
+#### `web/AGENTS.md`
+- `web/`の許可範囲へ公式サイト、機能紹介、記事、安全ガイド、法務・サポート公開ページを追加した
+- Swift Native iOSを正とする方針と、会員向けアプリ機能をWebへ再実装しない境界は維持した
+
+### 影響範囲
+
+- ドキュメントと後続Web実装計画のみ。現行Web画面、Swift Nativeアプリ、Supabase、認証、課金、通知、状態遷移、データモデルは変更していない。
+- 後続実装では`web/src/app/articles/`と記事コンテンツ基盤が追加対象になる。既存法務ページ本文は本変更の対象外。
+
+### 確認方法
+
+- `git diff --check -- notes/82_homepage_renewal_spec.md web/AGENTS.md notes/08_design_iterations.md`
+  - passed
+- `rg -n '住所を教え合わ|お声がけDM|DMに住所|内容が見られるのは1km|/terms /privacy /support /legal|お品書き画像が30秒|#omishinagaki' notes/82_homepage_renewal_spec.md`
+  - no matches
+- `rg -n '/articles|譲・求のシェア画像|legal/commerce|cta_app_store_click|Article.*BreadcrumbList' notes/82_homepage_renewal_spec.md`
+  - passed
+
+### セルフレビュー結果
+
+- ✅ 記事を継続追加できる仕組みをv1へ含め、CMS管理画面は作らない範囲を明確化した
+- ✅ 郵送住所、めぐり閲覧範囲、法務URLを現行実装・状態仕様・法務整合メモへ合わせた
+- ✅ `notes/09_state_machines.md`は状態追加・削除・ルール変更がないため更新不要
+- ✅ `notes/10_glossary.md`はアプリ内の新用語・廃止用語がなく、サイト編集上の分類追加だけのため更新不要
+- ✅ `notes/05_data_model.md`はデータモデル変更がないため更新不要
+- ✅ 関連のないSwift Native差分と`notes/legal/00_ai_handoff_plan.md`には触れていない
+
+---
+
+## イテレーション1226.474：HP仕様v1.1 — /features新設・めぐり訴求追加・v1 CTA確定
+
+### 背景・問題意識
+オーナーFB（2026-07-12、iter1226.473 の仕様レビュー）：
+1. 「①v1のCTAにApp Store事前注文を使うか ②βテスター応募フォームURL → 不要」
+2. 「機能説明のページは不要ですか？価値訴求できないと意味ないと思う」
+3. 「めぐり機能について説明が不足している気がする」
+
+初版仕様は交換フロー（お品書き・マッチング・現地/郵送）のみで、5タブの柱である「めぐり」（マップ・グルーム・チャットルーム・めぐりあった人）が丸ごと欠けていた。
+
+### 変更内容
+
+#### `notes/82_homepage_renewal_spec.md`（v1.0→v1.1）
+- **IA に `/features` 機能紹介ページを新設**（§4B）：トップ=30秒ダイジェスト／features=DL判断を後押しする深掘り、の2層構造。アンカー5本（お品書き・候補打診・取引・めぐり・安全）
+- **トップLPに 4-4b「交換だけじゃない — めぐり」を追加**：グルーム/チャットルーム/めぐりあった人の訴求。「正確な現在地は表示されません」＋1km圏内限定の併記を同一ビュー必須に。「出会う」系語彙禁止・めぐりあう/すれ違うで通す実装メモを明文化（出会い系誤解の最重要警戒セクション）
+- **v1 CTA確定**：公式Xフォローのみ（事前注文・βフォーム不使用）。§12 の判断項目①②をクローズ
+- スクショ指示に SS-7（めぐりマップ・位置特定回避ルール付き）/SS-8（グルーム）/SS-9（チャットルーム）追加
+- WBS を T9 まで再編（T3=/features を挿入）
+
+### 影響範囲
+- ドキュメントのみ。web/ 実装は T1〜T9 で後続実施（EAS Update 不要）
+
+### 確認方法
+- `notes/82_homepage_renewal_spec.md` §4-4b・§4B・§6・§7・§9・§12
+
+### 関連ファイル
+- `notes/82_homepage_renewal_spec.md`
+
+### セルフレビュー結果
+- ✅ めぐり関連の用語は notes/10 §B と一致（めぐり/グルーム/チャットルーム/めぐりあった人/めぐり広場）
+- ✅ 語彙：4-4b/4B-4 のコピー案に「出会い」系なし・必須併記を仕様レベルで固定
+- ✅ めぐりメッセージの強調回避（出会い目的の誤読防止）を実装メモ化
+- ⚠️ 残オーナー判断3件（分析・/press・OGP文言）
+
+---
+
+## イテレーション1226.473：公式サイト（megrum.jp）リニューアルの要件定義・制作計画を策定
+
+### 背景・問題意識
+オーナー指示（2026-07-12）：「Megrumのホームページを今の機能に合わせてリニューアルしたい。現行 megrum.jp の内容はフル無視でOK。まずHPが果たすべき役割の整理など要件整理をし、他のAIに引き継いでも高品質に作れる後続計画・仕様まで作ってほしい。アプリスクショはオーナーが作成する」。
+
+### 変更内容
+
+#### `notes/82_homepage_renewal_spec.md`（新規）
+- HPの役割を優先順位つきで定義：①信頼形成（「Megrum 怪しい」検索の受け皿）②X→LP→DLコンバージョン ③安全ガイドの公式リファレンス ④審査・PR・店舗打診の公式らしさ ⑤SEO
+- ターゲット6シナリオ（ハナ／慎重派／保護者／記者／店舗オーナー／審査官）
+- IA：トップLP＋/safety＋/guide/local＋/guide/mail＋/faq。既存法務ページは変更なし
+- トップページのセクション別コピー確定版（notes/80 §1 語彙ルール・§3 二段訴求準拠）
+- CTAフェーズ制（v1=事前注文orXフォロー → v1.1=DLバッジ → v2=社会的証明追加）
+- オーナー作成スクショの指示リスト（SS-1〜SS-6・ダミーデータ規則）
+- 技術要件（web/ Next.js 16・SSG・OGP・JSON-LD・Lighthouse 90+）
+- 実装WBS T1〜T8（1タスク=1セッション粒度）＋品質チェックリスト＋後続AI引き継ぎプロンプト
+
+### 影響範囲
+- ドキュメントのみ（実装なし）。実装は T1〜T8 として後続セッションで実施
+- 実装先は web/ のみの予定 → EAS Update / iOS Preview 反映は不要
+
+### 確認方法
+- `notes/82_homepage_renewal_spec.md` を読む
+
+### 関連ファイル
+- `notes/82_homepage_renewal_spec.md`
+- `notes/78_marketing_plan.md`（戦略前提）／`notes/80_marketing_copy_kit.md`（語彙・コピー）
+
+### セルフレビュー結果
+- ✅ 語彙ルール準拠：仕様内の全コピー案で禁止語（出会い／匿名配送／完全無料／No.1）不使用、「正確な現在地は表示されません」併記ルールを明文化
+- ✅ 用語：取引チャット／打診／郵送交換（notes/10 準拠・廃止用語なし）
+- ✅ notes/17 整合：法務ページは変更なし・代表者非公表維持を仕様に明記
+- ⚠️ オーナー判断5件（事前注文CTA・βフォームURL・分析・/press・OGP文言）を §12 に残置
+
+---
+
+## イテレーション1226.472：グルームいいねのタップ判定を数字まで拡大（サイズは据え置き）
+
+### 背景・問題意識
+オーナーFB：「グルームのいいねのタップできる判定エリアを広げてほしい（アイコンの大きさや数字の大きさは変えずに）。少なくともいいね数のところを押しても押した判定になってほしい」。
+
+これまでタップ判定はハート（`GroomViewerLikeButton`＝48×44）だけで、直下の `Text("\(likeCount)")` はボタン外の単なるラベルだったため、数字を押しても反応しなかった。
+
+### 変更内容（`GroomViewerChromeViews.swift`）
+- `GroomViewerLikeButton` に `likeCount` を渡し、**いいね数を Button のラベル内**（ハートの下に `VStack(spacing:3)`）へ取り込み、`.contentShape(Rectangle())` でアイコン＋余白＋数字を**ひとまとまりのタップ判定**にした
+- `GroomViewerEngagementColumn` 側の外付け `Text("\(likeCount)")` を撤去（ボタンに内包）。長押し（いいね一覧）も同じ判定領域に拡大
+- アイコン30pt・数字12.5pt・フレーム48×44・行間3・列間14 は**すべて据え置き**（見た目・レイアウト不変、当たり判定だけ拡大）
+- `accessibilityValue` にいいね数を追加
+
+### 影響範囲
+- グルームビューアのいいね（自分/他人グルーム両方＝`GroomViewerEngagementColumn` 共通）。コメント数の当たり判定は対象外（要望どおりいいねのみ）。
+
+### セルフレビュー結果
+- ✅ 全1603 XCTestパス、SwiftPMビルド成功、実機（iPhone 15）インストール済み
+- ✅ サイズ・配置は数値据え置き（当たり判定のみ拡大）。ブランド外の色直書きなし
+- ⚠️ 実機確認：いいね数の数字部分を押しても「いいね」ON/OFFになること／長押しでいいね一覧が開くこと
+
+---
+
+## イテレーション1226.471：左タップ頭出しを「一連の最初の投稿者・最初のセグメント」限定に
+
+### 背景・問題意識
+オーナーFB（.470の是正）：「前の投稿者に戻るようにはしてほしい。一連のグルームで、最初の投稿者の場合にのみ、かつ、最初のセグメントを再生している時のみ、最初から再生し直すようにして欲しい」。
+
+.470は各投稿者ブロックの先頭で頭出ししてしまい、前の投稿者へ戻れなくなっていた。
+
+### 変更内容（`GroomViewerScreen.swift`）
+- 頭出し（`restartCurrentStory`）の条件を `isAtFirstGroomOfBlock`（各ブロック先頭）→ `isAtFirstAuthorFirstSegment`（**前の投稿者がいない＝ブロック先頭が index 0 かつ そのブロックの先頭**＝一連の絶対先頭）へ限定
+- これにより、2人目以降の投稿者の先頭セグメントで左タップすると従来どおり**前の投稿者へ戻る**（planner の transition）。同一投稿者の2件目以降の左タップは前のグルームへ。頭出しは戻り先が無い一連の先頭でのみ
+
+### 影響範囲
+- グルームビューアの左タップのみ。右タップ・スワイプ・自動送り・回転は不変。
+
+### セルフレビュー結果
+- ✅ 全1603 XCTestパス（判定テストを first-author-first-segment 用に更新：index0のみ true）、ビルド成功、実機（iPhone 15）インストール済み
+- ⚠️ 実機確認：1人目の1件目で左タップ→頭出し／2人目の1件目で左タップ→1人目へ戻る／各2件目以降の左タップ→前のグルームへ
+
+---
+
+## イテレーション1226.470：先頭セグメント再生中の左タップで現在グルームを最初から再生し直す
+
+### 背景・問題意識
+オーナーFB：「グルームが進捗ステータスバーのうち、最初のものを再生しているとき、画面の左側をタップしたら進捗が最初に戻るようにしてほしい」。インスタのストーリー準拠（先頭を見ている時の左タップは前へ戻らず“頭出し”）。
+
+### 変更内容（`GroomViewerScreen.swift`）
+- `move(by:)` の左タップ（delta<0・回転中でない）で、現在グルームがその投稿者の一連の**先頭セグメント**（`currentIndex == authorBlockRange.lowerBound`）なら、前の投稿者へ戻らず `restartCurrentStory()` で**現在グルームを最初から再生し直す**
+- `restartCurrentStory()`：`storyProgress=0`（非アニメーションTransaction）＋ `storyRestartToken` インクリメント
+- ストーリー進捗の `.task(id:)` を `StoryProgressTaskID(groomID:restartToken:)` にし、groom 変更でも restartToken 変更でも `runStoryProgress` を最初から回し直す（mark viewed/engagement の task は従来どおり groom 変更時のみ）
+- 先頭**以外**の左タップは従来どおり同一投稿者の前グルームへ。前の投稿者へ戻る導線は右スワイプで維持
+
+### 影響範囲
+- グルームビューアの左タップのみ。右タップ（次へ）・スワイプ（投稿者間）・自動送り・回転挙動は不変。
+
+### セルフレビュー結果
+- ✅ 全1603 XCTestパス（先頭セグメント判定テスト追加）、SwiftPMビルド成功、実機（iPhone 15）インストール済み
+- ✅ 用語・状態・DB・API変更なし（notes/09・10据え置き）
+- ⚠️ 実機確認：投稿者の1件目を再生中に画面左タップ→進捗バーが先頭に戻り再生し直し。2件目以降の左タップ→前のグルームへ。右スワイプで前の投稿者へ戻れること
+
+---
+
+## イテレーション1226.469：キューブ回転「完了時の一瞬停止」を面のhandoff統一で根治
+
+### 背景・問題意識
+オーナー＋別AIの精査：iter1226.467でタップ回転の「開始側」の経路差は解消したが、**回転完了時**にまだ一瞬止まって見える。原因は incoming→通常面の handoff：
+- viewerSurfaceで current 面（通常枝）と target 面（`cubeTransition`中だけの条件付き枝）が**別View**だった。
+- progress=1到達後、`commitCubeTransition` が同一Transactionで `currentIndex=targetIndex` と `cubeTransition=nil` を実行。
+- その結果、正面まで回った target 面が**削除**され、通常枝に同じグルームの**別View**が作り直される。この最終フレームで画像State・ページ進捗・静的ピル→実UITextField・`currentGroom.id`紐づきtask・いいね演出がまとめて差し替わる。
+- 特に `GroomViewerCachedImage` の `@State` 初期値はView生成時のみ有効で、作り直されると旧画像Stateを一時保持し、`.task(id:url)` で後追い更新になり得る。
+
+### 変更内容（面を「作り直す」のではなく「昇格させる」）
+
+#### `GroomViewerFaceLayer.swift`（新規・UIKit非依存）
+- `GroomViewerFaceLayer`（id=`groom.id` / groomIndex / role(current/outgoing/incoming) / zIndex / isInteractionEnabled）と純粋 planner `GroomViewerFacePlanner.layers`。通常=[current]／回転中=[outgoing,incoming]／完了後=[current]。**回転中のtarget(incoming)と完了後のcurrentが同じ`groom.id`** になる
+
+#### `GroomViewerScreen.swift`
+- viewerSurfaceを**単一の`ForEach(faceLayers)`**へ集約（current/target を別枝で描かない）。ID固定で target 面をcommit時に破棄・再生成しない
+- `groomFace`（巨大@ViewBuilder）を専用 **`GroomViewerFace` View** へ抽出。`isInteractive`で構造を変えず、操作可否は `isInteractionEnabled`（外側`allowsHitTesting`＋入力欄`disabled`）だけで切替
+- 実メッセージ入力欄（UITextField）は current／incoming（回転中）とも `isOpeningSettled` 後に**事前マウント**し、回転中は`disabled`。commitで target→current になっても `makeUIView` を呼ばせない（静的ピル→実入力欄の最終フレーム交換を排除）
+- `commitCubeTransition` で `storyProgress=0` を**同一非アニメーションTransaction**で設定し、旧ユーザーの進捗を1フレーム出さない（ReduceMotionのスワイプ確定も同様）
+- 左右タップ（90ms猶予）を `GroomViewerFace` 内へ移設し `onPageTap` で親の `move(by:)` へ委譲。回転中は面の`allowsHitTesting=false`で無効＝直列化
+- `GroomViewerCubeGeometry.resting`（恒等）を追加し、`incoming(progress:1)` を resting と**完全一致**（昇格時に変形差ゼロ）
+
+### 影響範囲
+- グルームビューアの面描画のみ。Reduce Motion・同一投稿者即切替・左右方向・スワイプ確定/キャンセル・末尾で閉じる・mark viewed/engagement取得のタイミングは不変。
+
+### やらなかったこと（明示）
+- 140ms固定待機の復活／`Task.yield`での次フレーム推測／viewer全体への`.id`付与／アニメーション時間だけの延長／スクリーンショット方式の復活 — いずれも禁止事項として不採用。
+
+### セルフレビュー結果
+- ✅ 全1602 XCTestパス（面レイヤーのplannerテスト追加：遷移中target=commit後currentのID一致／[source,target]→[target]／incoming(1)==resting／範囲外フォールバック 等）
+- ✅ `swift test --enable-xctest --disable-swift-testing -j 1` 成功、`xcodebuild ... iOS Simulator` 成功、実機（iPhone 15）Debugビルド・インストール済み
+- ⚠️ 実機A/B（投稿者境界タップ10回／target GroomViewerFaceのonAppearが遷移開始の1回だけ・commit時に再onAppearしない／`GroomMessageDarkTextField.makeUIView`がcommit瞬間に呼ばれない／`MEGRUM_VISUAL_QA_COLD_IMAGES=1`で旧画像に戻らない／Instrumentsでcommit周辺のhitch比較）はオーナー確認。構造修正後も減速感だけ残る場合に限り 0.16s easeOut と 0.18〜0.20s Animation.smooth を実機A/B比較
+- ✅ notes/09・10は状態/用語変更なしのため据え置き
+
+---
+
+## イテレーション1226.468：個別募集メモを「条件のグッズを確認！」の直上へ昇格表示
+
+### 背景・問題意識
+オーナーFB：「個別募集のメモ内容は『条件のグッズを確認！』のブロックの直上に記載してほしい。ホーム画面のマッチ候補の画像を押した後の画面。メモには重要なことが書かれている場合があるため、交換内容を選ぶ時に情報として出しておきたい」。
+
+これまでメモは `HomeCandidateDealAboutSection`（「交換の方法について」折りたたみ）の中に控えめに入っており、既定は畳まれていて読まれにくかった。
+
+### 変更内容
+
+#### `HomeDiscoveryHitDetailSheets.swift`（`HomeGoodsHitDetailSheet`）
+- 条件パターンで「条件のグッズを確認！」ブロック（`HomeConditionSeriesCheckSection`）を出す時、その**直上に**個別募集メモを昇格表示（`HomeListingMemoHighlight` 新規）。ラベン ダー枠＋左アクセントの強調カードで「出品者のメモ」を目立たせる
+- `listingNoteText` / `showsMemoAboveConditionBlock`（メモあり かつ 条件確認ブロックあり）を算出
+
+#### `HomeCandidateDealAboutSection.swift`
+- `showsListingNoteRow: Bool = true` を追加。メモを直上へ昇格した画面では折りたたみ内のメモ行を出さず**重複を防ぐ**（既定 true なので他シート＝Wish/LookingFor は不変）
+
+### 影響範囲
+- ホームのマッチ候補（グッズヒット）詳細シートのうち、条件のグッズ確認が出る候補のみメモを昇格。条件確認ブロックが無い候補（指名/定価）は従来どおり折りたたみ内にメモ表示（選択肢ピル切替で動的に切り替わる）。Wish/探し中シートは不変。
+
+### 確認方法
+- VisualQA：`MEGRUM_VISUAL_QA_INITIAL_SCREEN=candidate-sheet MEGRUM_VISUAL_QA_CANDIDATE_VARIANT=condition` → メモが「条件：…／条件のグッズを確認！」の直上に出て、下の折りたたみには重複しないことをスクショ確認
+- `variant=named` → 昇格メモ無し・折りたたみ内にメモ保持（消えない）ことを確認
+
+### セルフレビュー結果
+- ✅ ブランドカラー直書きなし（`MegrumTheme.lavender`/`.ink` 使用）。iOS標準の角丸カード・SF Symbol
+- ✅ 全テストパス、SwiftPMビルド・シミュレータVisualQA・実機（iPhone 15）インストール済み
+- ✅ 重複表示なし（`showsListingNoteRow` で抑止）。他シートは default 引数で不変
+- ✅ notes/09・10は状態/用語変更なしのため据え置き
+
+---
+
+## イテレーション1226.467：グルームビューアのタップ切替キューブ回転を滑らかに（経路差の解消）
+
+### 背景・問題意識
+オーナーFB：「グルームビューアの『タップで投稿者が切り替わる時』のキューブ回転を滑らかにして」。スワイプは滑らかなのにタップだけカクついていた。
+
+原因（経路差）：
+- スワイプは現在面と切替先面をSwiftUIで同時描画し `cubeDragProgress` を更新する滑らかな経路。
+- タップは `captureViewerSnapshot()`（`UIGraphicsImageRenderer` + `window.drawHierarchy` の全画面ラスタライズ）を**同期実行**し、かつ**回転開始前に `currentIndex` を変更**していた。この全画面ラスタライズと、index先行変更による `.task`再発火・story進捗リセット・画面全体の再評価がカクつきの主因。
+- 3Dジオメトリではなく経路差の問題なので、タップをスワイプと同じ描画経路へ寄せる。
+
+### 変更内容
+- **統一遷移状態**（`GroomViewerCubeTransition` 新規ファイル・UIKit非依存）：`sourceIndex / targetIndex / direction / progress / origin(gesture|tap|automatic) / id`。タップ・スワイプ・自動送りを1つの状態で扱う。純粋ロジック `GroomViewerCubeTransitionPlanner`（`decideMove` / `swipeCommits`）をViewから切り出しテスト可能にした
+- **削除**：`captureViewerSnapshot()` / `GroomViewerCubeSnapshotFace` / `GroomViewerCubeSpin` / `GroomViewerCubeDrag` / `startCubeSpin` と `cubeSpin/cubeProgress/cubeDrag/cubeDragProgress` state。全画面ラスタライズを回転経路から完全に外した
+- **タップ（投稿者境界）**：`currentIndex` を先に変えず、source=currentIndex / target=nextIndex の遷移をprogress=0で作り、source面(outgoing)・target面(incoming)を**実ビュー**で同時描画。progressを0→1へアニメーション。完了後、アニメ無しの同一Transactionで `currentIndex=target` に確定し遷移解除
+- **スワイプ**：同じ遷移状態で指追従・確定/キャンセルを維持（挙動不変）
+- **直列化**：回転中の追加タップは planner が `.ignore`、横ドラッグは origin判定で無視。二重遷移しない
+- **story進捗のpause**：`isCubeDragActive` → `isCubeTransitionActive`（全遷移中に拡大）
+- **先読み**：遷移開始時に切替先画像をprefetch（ネットワーク完了は待たずタップ応答を遅らせない）
+- **維持**：animationDuration 0.16s / pageTapGestureの90ms待ち / mark viewed・engagement/profile取得・story再開は遷移完了後に自然発火 / 同一投稿者は即切替 / Reduce Motionは即切替 / 閉じる・左右方向・下スワイプ・メッセージ入力・いいね・進捗バーの意味は不変
+
+### 影響範囲
+- グルームビューア（`GroomViewerScreen`）の投稿者切替のみ。画像・アバターは既存メモリキャッシュ（`GroomImageMemoryStore`）から同期表示するため、両面とも実ビューでも旧画像のチラつきは出ない。
+
+### セルフレビュー結果
+- ✅ 全1596 XCTestパス（planner判定テスト追加：境界タップで即commitしない/完了時targetへ1回commit/同一投稿者即/ReduceMotion即/未settled即/連打で二重遷移しない/左右方向/スワイプ確定・キャンセル）
+- ✅ `swift test --enable-xctest --disable-swift-testing -j 1` 成功、`xcodebuild ... iOS Simulator` 成功、実機（iPhone 15）Debugビルド・インストール済み
+- ✅ タップ経路から `drawHierarchy` / `UIGraphicsImageRenderer` を完全排除（grep確認）
+- ⚠️ 実機A/B（同一投稿者境界をタップ10回・スワイプ10回、Instruments Time Profiler、`MEGRUM_VISUAL_QA_COLD_IMAGES=1`でのチラつき有無）はオーナー確認。改善後も動きが急なら `Animation.smooth` の0.18〜0.20sを実機比較のうえ検討（時間延長だけを主修正にしない）
+- ✅ notes/09・10は状態/用語変更なしのため据え置き
+
+---
+
+## イテレーション1226.466：相手ユーザー情報（プロフィール辞書）も端末保持しオフライン表示
+
+### 背景・問題意識
+オーナーFB：「めぐりメッセージ上や取引一覧でのユーザー情報もアプリ内で保持してオフラインでも見れるようにして欲しい」。.464でオフライン一覧は出るが、相手の表示名・アバターが出ないことがあった。
+
+原因：取引一覧（`TradesScreen`）は `publicProfilesByUserID` を `.task` で**画面を開いた時に遅延ネットワークロード**する。めぐりメッセージ一覧の相手情報（public/meguriプロフィール）も同様に遅延取得。起動時の1回だけ保存するオフラインスナップショット（.464）では、後から開いた画面の相手情報を取りこぼしていた。
+
+### 変更内容
+- **相手プロフィール辞書の常時端末保持**（`ProfileDirectoryLocalStore` 新規）：`publicProfilesByUserID`＋`meguriProfilesByUserID` を認証ユーザーID単位でJSON保存（iOSはファイル保護付き）
+- **didSetデバウンス保存**：両辞書に didSet を付け、プロフィールが読み込まれるたびに `persistProfileDirectoryToLocalStore()`（500msデバウンスの detached 書き込み）。セッション中に一度でも表示した相手は蓄積されていく
+- **起動時復元**：`loadInitialData` 冒頭で `restoreProfileDirectoryIfAvailable()`。既存（今セッション取得済み）の値は上書きせず、欠けている相手だけ端末キャッシュから補完（fill-gaps）。これで取引一覧・めぐりメッセージ一覧の名前・アバターがオフラインでも出る
+
+### 影響範囲
+- 相手情報を引くすべての画面（取引一覧・取引チャット・めぐりメッセージ一覧/会話・グルーム作者名など）でオフライン表示が改善。UI・レイアウトは不変。アバター画像そのものは既存の画像メモリキャッシュ依存（未キャッシュはプレースホルダ）。
+
+### セルフレビュー結果
+- ✅ 全28テストパス（`ProfileDirectoryLocalStore` 往復テスト追加）、SwiftPMビルド成功、xcodebuild（device/Debug）成功・**実機インストール済み**
+- ✅ ユーザーID単位で保存＝別アカウントのキャッシュを混同しない。didSetガードで未認証（テスト）時は書き込まない
+- ✅ 用語「取引チャット/取引一覧」「めぐりメッセージ」は notes/10 準拠
+- ⚠️ 実機確認：オンラインで取引一覧・めぐりメッセージ一覧を一度開く→機内モードで再起動→相手の名前・アバターが出るか
+
+---
+
+## イテレーション1226.465：通信状態が悪くデータ取得できない時、ホームに「オフライン表示中」を出す
+
+### 背景・問題意識
+オーナーFB：「オフラインなど通信状態が悪くてデータ取得できない場合は、ホーム画面（グルームレーンがある画面）にその旨を表示するようにしてください」。.464でオフラインでも一覧は見られるようにしたが、「今オフラインで最新が取れていない」ことがユーザーに伝わらなかった。
+
+### 変更内容
+- **通信エラー判定**（`NetworkErrorClassifier` 新規・MegrumCore・テスト付き）：`NSURLErrorDomain` の到達性コード（notConnectedToInternet / networkConnectionLost / timedOut / cannotConnectToHost 等）だけを「通信状態の問題」と判定。サーバー4xx/5xx（`SupabaseRESTError`）やデコード失敗は除外
+- **状態フラグ**：`MegrumAppState.isShowingOfflineData`。`loadInitialData` / `refreshHomeDiscovery` の catch で通信エラーなら true、取得成功で false
+- **ホーム通知バナー**（`HomeOfflineNoticeBanner` 新規）：`HomeDiscoveryExperience` の先頭（グルームレーンの上）に表示。`wifi.slash` アイコン＋「オフライン表示中／通信状態が悪く最新のデータを取得できません。保存済みの内容を表示しています。」＋「再読み込み」ボタン（押すと `onRefresh` を再実行、実行中はスピナー）
+- **配線**：`HomeScreen` から `appState.isShowingOfflineData` を `showsOfflineNotice` として渡す
+
+### 影響範囲
+- ホーム画面（グルームレーンのある画面）。データ取得の成否表示のみで、既存レイアウト・グルームレーンの挙動は不変。プルリフレッシュ／再読み込みで最新取得に成功すればバナーは自動的に消える。
+
+### セルフレビュー結果
+- ✅ 全27テストパス（`NetworkErrorClassifier` 判定テスト2件追加）、SwiftPMビルド成功、xcodebuild（device/Debug）成功・**実機インストール済み**
+- ✅ ブランドカラー直書きなし（`MegrumTheme.conditionPossible`／`.ink`／`.muted` を使用）。共通トークン準拠。iOS標準の SF Symbol・`ProgressView` を使用
+- ✅ 到達性エラーのみを対象にしたため、サーバー起因の失敗で誤って「オフライン」と出さない
+- ⚠️ 実機確認：機内モードでアプリ起動／ホームでプルリフレッシュ→バナーが出るか、通信回復後に「再読み込み」またはプルで消えるか
+
+---
+
+## イテレーション1226.464：オフライン起動でも一覧（取引・めぐりメッセージ）を開けるようにする
+
+### 背景・問題意識
+オーナーFB：「オフライン状態だとログインができません。なので取引チャットやめぐりメッセージを見ることができません。オフライン状態でも開けるようにしてください。また一覧ごとオフラインで開きたい」。
+
+調査結果：ログインセッションは Keychain（`KeychainAuthSessionStore`）から起動時に復元されるため `isAuthenticated` はオフラインでも true になり、認証自体は通っていた。真因は別で、
+1. 起動時の `loadInitialData()` が最初の `loadInitialSnapshot()`（ネットワーク）でthrow→catchに飛び、**その後のキャッシュ復元処理（`loadMeguriMessages` 等）に一切到達しない**
+2. その結果 `viewer` が nil のままになり、`viewer` を前提とする一覧（`meguriMessageThreads` は `guard let viewer else { return [] }`）や取引一覧（`proposals`）がすべて空になる
+3. セッション期限切れ時の `refreshSessionIfNeeded` がオフラインで「ログイン情報を更新できません…」バナーを出し、「ログインできない」ように見えていた
+
+### 変更内容
+- **アプリ全体スナップショットの端末キャッシュ**（`MegrumOfflineSnapshotStore` 新規）：`MegrumAppSnapshot`（viewer/inventory/wishes/listings/proposals/grooms/threads/subscriptionState）＋相手プロフィール辞書（public/meguri）を認証ユーザーID単位でJSON保存（iOSはファイル保護付き）。`MegrumAppSnapshot` を `Codable` 化
+- **オフライン即時復元**：`loadInitialData` 冒頭で `viewer == nil` の時だけ `restoreOfflineSnapshotIfAvailable()` を呼び、`apply()`＋プロフィール辞書マージ＋めぐりメッセージ端末キャッシュ復元。オフラインでも取引一覧・めぐりメッセージ一覧が即表示される（オンライン時は直後の取得で最新へ置換）
+- **最新スナップショットの保存**：取得成功後に `persistOfflineSnapshot(snapshot)`（デバウンスの detached 書き込み）
+- **catchの非致命化**：最新取得に失敗しても、キャッシュ復元済み（`viewer != nil`）なら「データを読み込めませんでした」を出さない
+- **認証ユーザーIDの受け渡し**：`replaceRepository(_:authenticatedUserID:reloadsInitialData:)` に引数追加。`MegrumRootView` から `authState.session?.user.id` を渡す（viewer 未確定でもキャッシュを特定できる）
+- **オフライン時のセッション保持**：`refreshSessionIfNeeded` の接続エラー分岐でバナーを出さず、セッションを維持して静かに続行（400-403の失効時のみ従来通りサインインへ）
+
+### 影響範囲
+- 起動フロー（`loadInitialData` / `replaceRepository` / `MegrumRootView.syncRepositoryWithAuthSession`）、認証（`refreshSessionIfNeeded`）。取引チャット一覧・めぐりメッセージ一覧のオフライン表示。テキストのやりとり本体は既存の `TradeMessageLocalStore` / `MeguriMessageLocalStore` が保持（.462/.463）。
+
+### セルフレビュー結果
+- ✅ 全25 suite/テストパス（`MegrumOfflineSnapshotStore` 往復テスト追加）、SwiftPMビルド成功、xcodebuild（device/Debug）成功・**実機インストール済み**
+- ✅ iOS標準：セッションは Keychain 復元のまま（独自認証を足さない）。一覧はネットワーク→端末キャッシュのフォールバック方式で、UI構造は不変
+- ✅ 用語「取引チャット」「めぐりメッセージ」は notes/10 の正式用語
+- ⚠️ 実機確認：機内モードでアプリを再起動→ログイン画面に落ちず、取引チャット一覧・めぐりメッセージ一覧＋各やりとりが見えるか。相手名/アバターはキャッシュ済みプロフィールで表示（未キャッシュ分はフォールバック表示）
+- ⚠️ 画像など署名URLの実体はオフラインでは取得不可（テキストと一覧構造のみ保証）
+
+---
+
+## イテレーション1226.463：取引チャットにもページング・初回20件・端末保持（オフライン表示）を反映
+
+### 背景・問題意識
+オーナーFB：取引チャットもめぐりメッセージ同様に、ページング／初回読み込み件数／アプリでのメッセージ保持を反映して。保持は「アプリを閉じても・オフラインでも保持したメッセージを見れる」ように。
+
+### 変更内容
+- **端末保持（オフライン）**（`TradeMessageLocalStore` 新規）：`messagesByProposalID`（proposal毎の配列）をユーザー単位でJSON保存。`MegrumAppState` の didSet でデバウンス保存。`loadMessages` は未ロード時に端末キャッシュから即復元→裏でネットワーク更新（オフラインでも保持分を表示）
+- **初回20件**：`loadMessages(limit:)` 既定 80→20
+- **ページング**：`TradeDetailContent` に `visibleMessageCount`（既定20）＋ `windowedMessages`（最新N件）。`TradeDetailMessagesSection` に `hasOlderMessages`/`onLoadOlder` を追加し、上端スピナー行が見えたら1ページ拡張＋直前の先頭位置へ無アニメ復元。引用ジャンプはウィンドウ外なら拡張。proposal切替でウィンドウを20件へリセット
+
+### 影響範囲
+- 取引チャット（TradeDetail）の表示・保持。合意タイムライン・証跡・評価カードは不変（メッセージのみウィンドウ化）。
+
+### セルフレビュー結果
+- ✅ 全1587テストパス、sim/実機ビルド成功・実機インストール済み
+- ✅ 用語「取引チャット」は notes/10 の正式用語（旧「DM」ではない）
+- ⚠️ 実機確認：チャットを開いた瞬間に最新（飛びなし）／上へ遡ると20件ずつ／機内モードで再起動→保持したやりとりが見えるか
+- ⚠️ オフライン時にやりとり一覧（proposals）自体が空だとチャットへ到達できない可能性（proposalsのキャッシュは別途）。今回はメッセージ保持のみ対応
+
+---
+
+## イテレーション1226.462：メッセージのページ20件化＋テキスト端末保持＋画像14日期限（削除→写真アイコン）
+
+### 背景・問題意識
+オーナーFB 3件：ページサイズは20件に／テキストのやりとりはアプリ側で保持／画像は送信から2週間で有効期限切れ→削除し、写真アイコンに差し替え。
+
+### 変更内容
+- **ページ20件**：`MeguriMessagesScreen.messagePageSize` 30→20
+- **テキストの端末保持**（`MeguriMessageLocalStore` 新規）：やりとりをユーザーごとにJSONで端末保存（iOSはファイル保護付き）。`meguriMessages` の didSet でデバウンス保存し、`loadMeguriMessages` は空ならキャッシュから即復元→裏でネットワーク更新。アプリを開き直しても即表示
+- **画像の14日期限（クライアント）**：`MeguriMessageMediaPolicy`（MegrumCore・テスト付き）。`MeguriPhotoMessageBubble` は期限切れなら写真アイコンのプレースホルダ（「有効期限切れ」表記）に差し替え
+- **画像の14日期限（サーバー）**：`storage.objects` への直接SQL削除は禁止のため、Edge Function `expire-meguri-message-media`（service roleでStorage API削除＋`image_url`無効化、認証はAPNsと同じディスパッチシークレット共用）を新設・デプロイ。migration `20260712090000` で pg_cron（毎日03:20 UTC）→ `net.http_post` 起動（URLは `app.settings.apns_dispatch_url` から関数名置換で導出＝追加の手動設定なし）。`supabase db push` 適用済み・401検証済み
+
+### 影響範囲
+- めぐりメッセージ（表示・保持・画像寿命）。`image_path` はCHECK制約のためDB上は残す（実体とURLは消える）。
+
+### セルフレビュー結果
+- ✅ 全1587テストパス（ポリシー境界テスト4件追加）、simビルド成功、migration適用済み、Edge Functionデプロイ＋401（未認証拒否）確認
+- ⚠️ cron経由の実削除は次回実行（03:20 UTC）以降にダッシュボードで確認可能
+- ⚠️ 実機未接続のためインストール未完
+
+---
+
+## イテレーション1226.461：めぐりメッセージ画面を「最新位置で開く＋上へ遡るとページング」へ
+
+### 背景・問題意識
+オーナーFB（.460の是正）：「開いた瞬間に上から即スクロールするの？最初は最新のメッセージと画面内の近いメッセージだけ読み込んで、それより以前は上に遡るにつれてページング処理がかかってほしい」。
+.460の「onAppearで最下部へscrollTo」は開いた後に飛ぶ方式だったため撤回。
+
+### 変更内容（チャットアプリの定石構成）
+- **描画ウィンドウ**：`MeguriMessagesScreen` は最新30件（`messagePageSize`）だけをリストへ渡す。全件を一度に組み立てない
+- **最新位置で開く**：`MeguriMessageList` の ScrollView に `.defaultScrollAnchor(.bottom)`。スクロールで飛ばすのではなく初期アンカー自体を下端に
+- **上端ページング**：ウィンドウ外に古いメッセージが残っている時だけリスト最上部にスピナー行を出し、見えたら1ページ分ウィンドウを拡張。拡張後は直前の先頭メッセージ位置へ無アニメ復元（視点が動かない）
+- **新着スクロール**：`messages.count` ではなく**末尾ID変化**で最下部へ（ページングで件数が増えても飛ばない）
+- **引用ジャンプ**：引用元がウィンドウ外ならウィンドウを広げてからジャンプ
+
+### 補足
+- ネットワークは従来どおり全件一括取得（`loadMeguriMessages` は一覧と共用）。今回はUX/描画のページング。メッセージ量が増えたらサーバー側ページングを検討
+
+### セルフレビュー結果
+- ✅ 全1583テストパス、simビルド成功
+- ⚠️ 実機確認：開いた瞬間に最新やりとりが見えるか（飛びなし）／上へ遡るとスムーズに古いページが足されるか／新着受信時に最下部へ追従するか
+- ⚠️ 実機未接続のためインストール未完
+
+---
+
+## イテレーション1226.460：めぐりメッセージ画面のローディング差し替え解消＋候補シートの引き下げ閉じ復旧
+
+### 背景・問題意識
+オーナーFB 2件：
+- めぐりメッセージ画面（取引チャットではなく、めぐり内の相手とのやりとり画面）を開くと「表示→ローディング→再表示」と差し替わる。開いた瞬間から表示され、最新メッセージが見える位置であってほしい
+- ホームでグッズ画像を押した後の候補シートが、下スワイプで閉じられない（特に勢いよくスクロールした後）
+
+### 原因
+- メッセージ：`MeguriMessageList` が `isLoading` 中はキャッシュ済みメッセージを**スピナーに差し替える**作り。加えて初期スクロール位置の指定が無く先頭表示だった
+- シート：iter1226.424 の `bounces = false` 常時固定が原因。iOSのシートは**最上部のバウンス機構を使って下ドラッグをdismissへ引き継ぐ**ため、バウンスを切るとシートを引き下げて閉じる操作が効かなくなる
+
+### 変更内容
+- `MeguriMessageList`：ローディング表示は `messages.isEmpty` の時だけ。キャッシュがあれば裏の再取得中もそのまま表示し続ける
+- メッセージ画面：`onAppear` で最新メッセージへ即スクロール（アニメなし・次runloopでも再適用）
+- `MegrumScrollTopBounceDisabler`：contentOffset監視で**最上部にいる時だけ bounces=true**（＝閉じドラッグが効く）、スクロール中は false（＝下端のオーバースクロールなし）の動的切り替えへ改訂
+
+### 影響範囲
+- めぐりメッセージのやりとり画面。`megrumDisablesEnclosingScrollBounce` を使う全シート（候補シート群）。
+
+### セルフレビュー結果
+- ✅ 全1583テストパス、simビルド成功
+- ⚠️ 実機確認：メッセージ画面を開いた瞬間に最新やりとりが見えるか／候補シートで（スクロール後も）最上部へ戻して下スワイプで閉じられるか
+- ⚠️ 実機が一時未接続のためインストール未完（再接続後に投入）
+
+---
+
+## イテレーション1226.459：グルームアーカイブも標準zoomへ＋到達不能なMeguriMapScreenを削除
+
+### 背景・問題意識
+オーナー承認2件：
+1. 到達不能な `MeguriMapScreen`（フルスクリーンの拡大マップ。`activeMap` を立てる導線がどこにも無いデッドコード。iter1226.453〜457で誤ってここを修正し続けて混乱の元になった）を削除する
+2. グルームアーカイブも、めぐりホームと同じ標準zoom（source常設・タップ即提示）で開けるようにする
+
+### 変更内容
+**A. デッドコード削除**
+- `MeguriMapViews.swift` / `MeguriMapScreenActions.swift` / `MeguriMapScreenDerivedState.swift` / `MeguriMapScene.swift` を削除
+- `activeMap` の配線（`MeguriScreen` / `MeguriScreenPresentationModifiers` / `MeguriScreenResetActions`）と `GroomMapGroomSelection` の `GroomViewerImmersiveItem` 準拠を撤去
+- `MeguriMapChromeViews`（MapGlassHeader等）と `MeguriMapGeometry` / `MeguriMapKind` はホームで使用中のため残置
+
+**B. アーカイブの標準zoom化**（iter1226.457/458と同方式）
+- `GroomArchiveMap`：iOS18+はoverlay側の常設可視ピン（`GroomArchiveMapPin`＋matchedTransitionSource、モーフの位置/不透明度を`morphController.displayedElements`から共有）を唯一の見た目にし、Annotation側は透明タップ領域。`onMapCameraChange(.continuous)`tickで追従
+- `GroomArchiveScreen`：`openArchivedGroom` がiOS18+で `zoomRoute`（fullScreenCover＋`GroomMapZoomDestination`）を即セット。宛先は `GroomArchiveStoryScreen`。iOS17は旧immersiveオーバーレイへフォールバック
+
+### 影響範囲
+- グルームアーカイブのピン表示（iOS18+はoverlayピン）と開き遷移。クラスタピン・モーフ演出は不変。
+
+### セルフレビュー結果
+- ✅ 全1583テストパス、sim/実機ビルド成功・実機インストール済み
+- ✅ これでグルームを開く全経路（ホームレール・めぐりホーム・アーカイブ）が標準zoomに統一
+- ⚠️ 実機確認：アーカイブのピンからタップ即・一体ズームするか／日付ラベル付きピンの見た目が変わっていないか
+
+---
+
+## イテレーション1226.458：めぐりホーム（タブのインライン地図）のグルームも標準zoomへ＋初回1秒遅延の根治
+
+### 背景・問題意識
+実機コンソール計測で2つの事実が判明：
+1. オーナーが「めぐりホーム」と呼んでいたのは**めぐりタブのインライン地図（MeguriHomeMapBackdrop）**で、その経路はまだ旧方式（タブ上位の共有オーバーレイ＝スケール開き）のままだった（私はfullScreenCoverのマップだけ直していた）
+2. **「初回タップだけ1秒」の正体**＝旧方式の画像レディネスゲート。画像は115msで準備完了していたのに、ゲートのロード完了待ちが機能せず**タイムアウト(900ms)まで待ってから開いていた**（タップ→アニメ開始が940ms）。2回目はキャッシュヒットで即
+
+### 変更内容
+- **めぐりホームの単体グルームピンを標準zoom化**（`MeguriHomeMapBackdrop`）：iter1226.457のマップと同じ「source常設」方式。iOS18+はoverlay側の常設可視ピン（matchedTransitionSource付き・popIn/浮遊/モーフの位置と不透明度を`displayedElements`から共有）を唯一の見た目にし、Annotation側は透明タップ領域。`onMapCameraChange(.continuous)`tickで追従。スレッド・クラスタのピンとモーフ演出は不変
+- **提示をローカル化**（`MeguriScreen`）：`presentGroomViewer`はiOS18+で`groomViewerZoomRoute`（fullScreenCover＋`GroomMapZoomDestination`）を即セット。旧経路（onOpenGroomViewer→共有オーバーレイ）はiOS17フォールバックのみ
+- **prewarm**：表示中グルーム（先頭16件）の画像をタップ前にデコード済み化
+- `GroomMapZoomDestination`を`MeguriMapGroomZoom.swift`へ移して共用化
+
+### 影響範囲
+- めぐりタブのグルーム開き（iOS18+で標準zoom・1秒遅延消滅）。通知ディープリンク経由はsource無しのため中央からのzoomにフォールバック（正常動作）。
+
+### セルフレビュー結果
+- ✅ 全1583テストパス、sim/実機ビルド成功・実機インストール済み
+- ⚠️ 実機確認：めぐりタブのピンからタップ即・一体ズームするか／ピンのモーフ・浮遊演出がoverlay化後も自然か／パン中の追従
+- ⚠️ 共有オーバーレイ（旧方式）は通知経路・iOS17用に残置。ゲートのタイムアウト待ち問題は旧経路にまだあるが、主要経路はすべて標準zoomへ移行済み
+
+---
+
+## イテレーション1226.457：めぐりマップzoomを「source常設・タップ即提示」へ（ホームレール同等の開き心地）
+
+### 背景・問題意識
+iter1226.455（可視ミラー＋layout待ち＋push→fullScreenCover）でピンからのzoom自体は動いたが、オーナーFB：
+- ホームのグルームレールと開き心地が違う
+- 最初のタップでは開かない
+
+別AI相談の結論：
+1. **初回不発の原因**：PreferenceKey値がCGRectのみで「値が変わった時しか通知されない」＋dismiss後もpendingZoomが残る＋`Task.yield()`はlayout完了の保証にならない。二段階ゲート自体が壊れやすい
+2. **開き心地が違う原因**：ホームは「source常設・タップ即提示」、地図は「タップ後にミラー生成→待ち→提示」で、sourceが"タップした描画済みピン"ではなく"タップ後に生まれた複製"
+3. **本命**：表示中の単体ピン/クラスタ全部を常設sourceにし、タップでrouteを即セット（Apple Wishlistサンプルと同じ構造）
+
+### 変更内容
+- **source常設**（`MeguriMapScene`）：iOS18+では overlay 側の常設ピン（`GroomMapPin`/`GroomClusterMapPin`＋`matchedTransitionSource`）を唯一の可視ピンにし、MapKit `Annotation` 側は透明タップ領域（66pt）だけに。`onMapCameraChange(frequency: .continuous)` の tick でパン/ズーム中も追従。iOS17は従来どおりAnnotation内の可視ピン（zoomなし）
+- **安定source ID**：`GroomMapZoomSourceID`（`.groom(UUID)` / `.cluster(String)`）。route の presentation ID（`GroomMapViewerRoute.id`）とは分離
+- **タップ即提示**：`presentGroomViewer` が `viewerRoute` を即セット。`PendingGroomMapZoom`/`GroomZoomSourceFrameKey`/`handleZoomMirrorFrame`/`lastPresentedZoomID`/`Task.yield` を全削除
+- **画像prewarm**：表示中ピンの代表画像を `GroomImageMemoryStore.prewarm` でタップ前にデコード済み化（ホームと同じ）
+- 提示は fullScreenCover + `.navigationTransition(.zoom)`（ホームと同一方式）を維持
+
+### 影響範囲
+- めぐりマップのグルームピン表示（iOS18+はoverlayピン）・開き遷移。チャットルームピン・iOS17は不変。
+
+### 確認方法
+- 実機：めぐりマップのピンをタップ→初回から即・ピンから全画面へズーム。パン/ズーム中にピンが追従すること
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/MeguriMapGroomZoom.swift` / `MeguriMapScene.swift` / `MeguriMapViews.swift` / `MeguriMapScreenActions.swift`
+
+### セルフレビュー結果
+- ✅ 全1583テストパス、sim/実機ビルド成功・実機インストール済み
+- ⚠️ 実機確認ポイント：初回タップで即開くか／ホームレール同等の開き心地か／パン・ズーム中のoverlayピン追従（追従しない場合はUIKit MKMapView案へ）
+- ⚠️ sourceの見た目差（ホーム=84pt円タイル、地図=58pt円ピン）による拡大率の違いは標準zoomの仕様上残る
+
+---
+
+## イテレーション1226.456：左ドロワーの閉じスワイプが項目タップ扱いになる不具合を修正
+
+### 背景・問題意識
+オーナー報告：「左ドロワーを開いている時、その項目をタップしたような状態でドロワーを閉じるスワイプ動作をすると、その項目をタップした判定になってしまう」。項目はタップ時だけ反応し、閉じスワイプ中のタップには反応しないようにしたい。
+
+### 原因
+- ドロワーを閉じる pan は親 `AppDrawerInteractiveHost` の `drawerPanGesture`（`minimumDistance: 6`、慣性 `predictedEndTranslation` で閉じ判定）が担当。
+- 一方、子ボタン側のタップ抑制は `AppDrawerOverlay` 内の別ジェスチャ（`minimumDistance: 8`、実移動量ベース）だった。
+- **勢いのある小さなフリックで閉じる**と、親は慣性で閉じるのに子の抑制は実移動 8pt を満たさず発火せず、ボタンの `select()` が通ってタップ扱いになっていた。
+
+### 変更内容
+#### `ios-native/Sources/MegrumApp/MegrumAuthenticatedTabsView.swift`
+- `AppDrawerInteractiveHost` に `@State suppressesDrawerItemTap` を追加。閉じ判定の権威である親 pan が実ドラッグを開始した瞬間（`onChanged` で `activeTranslation` が非nil かつ `showsDrawer`）に true。フリックでもここは必ず通る。
+- `onEnded` の全経路で `scheduleDrawerItemTapSuppressionRelease()` を呼び、`drawerItemTapSuppressionDuration`(0.28s) 遅延で解除。指を離した後に発火するボタン action（onEnded とボタン action の順序は不定）を取りこぼさないため。
+- `suppressesDrawerItemTap` を `AppDrawerOverlay` へ受け渡し。
+
+#### `ios-native/Sources/MegrumApp/AppDrawerOverlay.swift`
+- `var suppressesItemTap: Bool` を追加し、`select()` の先頭で `guard !suppressesItemTap` を追加。既存の子ジェスチャ抑制（`presentationState`）はベルト＆サスペンダーとして併存。
+
+### 影響範囲
+- 左ドロワー（`AppDrawerOverlay` の項目タップ／閉じスワイプ）のみ。開くスワイプ・オーバーレイタップ閉じ・ログアウト等は不変。
+
+### セルフレビュー結果
+- ✅ `swift build --target MegrumApp` 成功（全1029ファイルコンパイル完了。末尾の build.db disk I/O は書込のみで無害）
+- ⚠️ Swift ネイティブ変更のため EAS Update では反映されない。実機確認は Xcode/EAS build 後（feature ブランチ）。
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/MegrumAuthenticatedTabsView.swift`
+- `ios-native/Sources/MegrumApp/AppDrawerOverlay.swift`
+- `ios-native/Sources/MegrumApp/AppDrawerModels.swift`（`drawerItemTapSuppressionDuration`）
+
+---
+
+## イテレーション1226.455：めぐりマップのグルームzoomを「可視ピンミラー＋layout待ち＋navigation push」方式へ全面再設計
+
+### 背景・問題意識
+iter1226.453/454（Annotation内matchedTransitionSource／不可視アンカー）でも実機でzoomにならず。ワークフロー＋別AI相談の結論：
+1. **透明アンカーはNG**：`Color.clear`はピンの見た目を持たず、Appleの契約（source Viewからzoom）を満たさない。
+2. **source生成と提示が同一トランザクション**：タップと同時にアンカーを出すと layout 未確定で zoom がマッチできない（ホームレールはタイル常設だから成功）。
+3. **二重fullScreenCoverは不要**：MapはすでにNavigationStack内。内側coverをやめ push にすべき。
+
+### 変更内容（別AI推奨構成）
+- **可視ピンミラー**：`MeguriMapScene` に、ピン画面位置へ実ピンと同じ `GroomMapPin`/`GroomClusterMapPin` のミラーを重ね、`matchedTransitionSource(id: pendingZoom.id)`。ミラー表示中は実Annotationピンを opacity 0 で隠す
+- **layout完了を待つ二段階提示**：タップ→`pendingZoom`（ミラーのみ）→ミラーの`GeometryReader`フレームを`GroomZoomSourceFrameKey`でpreference通知→`handleZoomMirrorFrame`が`Task.yield()`後に`viewerRoute`をセット。`lastPresentedZoomID`で閉じ後の再オープンを防止
+- **push化**：二重`fullScreenCover`を撤去し、Mapを包むNavigationStackへ`.navigationDestination(item: $viewerRoute)`。ビューアに`.navigationTransition(.zoom(sourceID:in:))`＋navバー非表示
+- 新型：`PendingGroomMapZoom` / `GroomMapViewerRoute` / `GroomZoomSourceFrameKey`（`MeguriMapGroomZoom.swift`）
+- `onOpenGroomCluster` に pin座標を渡すよう変更（ミラー位置＝クラスタ中心）
+
+### セルフレビュー結果
+- ✅ sim/generic-iOS ビルド成功、全1583テストパス
+- ⚠️ 実機でのピン→全画面zoom動作は要確認（この方式が本命。ダメなら次はMKMapView+preferredTransition.zoom）
+- ⚠️ 実機が一時的に unavailable のためインストール未完（再接続後に投入）
+
+---
+
+## イテレーション1226.454：プレミアム入力欄の崩れ修正・進捗バーを上端へ・めぐりマップzoomを不可視アンカー方式へ
+
+### 背景・問題意識
+オーナーFB（.453の是正3点）：
+- プレミアム状態でグルームを開くと、メッセージ入力欄が画面全体の巨大な楕円になり「メッセージを送信…」が中央左にズレる
+- ステータスバー（進捗バー）をもっと画面上部ぎりぎりへ
+- めぐりマップのグルームがピンからのzoomにならず普通に開く
+
+### 調査（ワークフロー）
+- **入力欄崩れの主因**：`GroomMessageDarkTextField`(UIViewRepresentable UITextField)に縦の高さ制約が無く、SwiftUIが縦いっぱいに引き伸ばし→カプセルが画面全体の楕円化。加えてUIViewRepresentableはzoom遷移(transform補間)に追従せず遷移中もズレる。
+- **マップzoom不発の主因**：MapKitの`Annotation`ラベルに付けた`matchedTransitionSource`は、中身がMapKit側レイヤ(MKAnnotationView相当)でホストされ遷移コーディネータがsource解決できないため機能しない。回避策はMapProxyで座標→画面点変換し不可視アンカーを重ねる方式。
+
+### 変更内容
+- **入力欄崩れ修正**：`GroomMessageDarkTextField` に縦 content hugging/compression = .required ＋ `sizeThatFits` で高さをintrinsic固定。さらに開閉遷移の間(`isOpeningSettled`前)は純SwiftUI静的ピルを出す
+- **進捗バーを上端へ**：`GroomViewerChromeLayout.topPadding` を `topObstructionHeight + 10`→`- 6`
+- **マップzoomを不可視アンカー方式へ**：`MeguriMapScene` を `MapReader` で包み、`MapProxy.convert` でピン位置に不可視アンカー＋`.matchedTransitionSource`。`MeguriMapScreen` に `@State groomZoomAnchor`、提示 `zoom(sourceID:)` を `initialGroom.id` に一致
+
+### セルフレビュー結果
+- ✅ プレミアム入力欄が正しいバー表示に（sim確認）、進捗バーが上端へ（sim確認）
+- ✅ 全1583テストパス（topPaddingテストを新値へ更新）
+- ⚠️ マップzoomは実機でのピン→全画面変形を要確認（不可視アンカーのsource登録タイミング・ネストfullScreenCover）。効かない場合も通常提示にフォールバック
+
+---
+
+## イテレーション1226.453：グルーム画像をステータスバー/入力欄手前に収める＋めぐりマップも標準zoom
+
+### 背景・問題意識
+オーナーFB（iter1226.450の是正）：
+- 「全画面（フルブリード）」を scaledToFill で画面端まで広げたが、意図はインスタのストーリー同様「ステータスバー領域・下の入力欄領域には画像を出さず、その手前まで」だった
+- 「めぐりホームも同仕様」＝ホームレールと同じ**標準zoom**でマップのグルームを開いてほしい（ホストのスケール開きではなく）
+
+### 変更内容
+- **画像を収める**（`GroomViewerScreen`）：`scaledToFill`→`scaledToFit`に戻し、画像領域に上下インセット（上＝ステータスバー高 `MegrumWindowInsets.top`、下＝入力欄/コントロール分 `imageBottomInset`）。合成キャンバスは9:16なのでこの領域にちょうど収まり、上下は黒地＝そこにクロームが載る（インスタと同じ）
+- **めぐりマップの標準zoom**：`MeguriMapScene` のピン（`GroomMapPin`/`GroomClusterMapPin`）に `matchedTransitionSource`、`MeguriMapScreen` は `.groomViewerImmersiveOverlay`→`.fullScreenCover`＋`.navigationTransition(.zoom)` に変更。ピンから全画面へ連続変形
+
+### 影響範囲
+- グルームビューアの画像レイアウト（全経路）。めぐりマップからのグルーム開き（iOS18+）。めぐりタブ feed / 通知経路の共有オーバーレイは現状維持。
+
+### セルフレビュー結果
+- ✅ 画像がステータスバー/入力欄手前に収まることをシミュレータで確認（インスタ参照画像と一致）
+- ✅ 全1583テストパス
+- ⚠️ MapKit の Annotation ラベルに対する `matchedTransitionSource` の zoom 挙動は実機で要確認（効かない場合も通常提示にフォールバックしクラッシュはしない）
+
+---
+
+## イテレーション1226.452：シリーズ登録の候補プレビューを列下へ・説明文削除／ホームのチャットルームにスケルトン
+
+### 背景・問題意識
+オーナーFB：
+- シリーズ登録で候補タグをタップすると、紐づく画像の吹き出しがタグのセル内に出て、折り返し順が変わりタグが押しづらくなる → 画像は候補タグ列の「下」に別枠で出す
+- 「候補は1タップで紐づく画像をプレビュー…」「X件の画像に同じシリーズを追加します」の説明文は不要
+- アプリ起動時、グルームやチャットルームがまばらにポップインする → スケルトンにして読み込めたものから表示
+
+### 変更内容
+- **候補プレビューを列下へ**（`TagCandidatePreviewSelector`）：吹き出し `TagCandidatePreviewPopover` を廃止し、候補タグ列の下に `TagCandidatePreviewGroup`（横スクロール画像＋「このシリーズを登録」ボタン）を表示。タグ自体の高さは固定なので折り返し順が変わらない
+- **説明文削除**（`GoodsBulkTagSheet`）：「候補は1タップで…」footer 削除、「X件の…追加します」は `footerText` を明示指定時のみ表示（`GoodsEditorScreen` の一括登録は nil）
+- **チャットルームのスケルトン**（`HomeNearbyBoardSection`）：`isLoading` 中は `NearbyBoardSkeletonRow`×2を表示（グルームレールは既存スケルトンあり）
+
+### セルフレビュー結果
+- ✅ 全1583テストパス（削除した `TagCandidatePreviewMetrics` 参照テストを更新）
+- ✅ グルームレールは既存の `GroomStorySkeletonTile`、チャットルームに同等のスケルトンを追加
+
+---
+
+## イテレーション1226.451：グルームのメッセージ機能を仕上げ（プレミアム必須・1ユーザー1ルーム・トースト・上スワイプ・暗キーボード）
+
+### 背景・問題意識
+オーナーFB（グルームのメッセージ入力に対する追加要望）：
+- グルームのコメント送信はプレミアム必須にし、非会員がコメントを打とうとしたら案内ポップアップを出す
+- 既に相手からのメッセージルームがあるのに、その人のグルームへコメントすると別ルームができていた → 1ユーザー1ルームに
+- 送信したら中央にトースト「メッセージが送信されました」（グレー背景・白文字）
+- 上スワイプでも入力モードへ。暗転はデジタルでなく徐々にフェードイン、解除は高速フェードアウト
+- キーボードを暗いものに
+
+### 変更内容
+- **プレミアム必須**：`GroomViewerMessageComposer` に `canSend`（`hasMeguriMessageAccess`）。非会員は入力欄タップ/上スワイプ/送信で `GroomMessageLockedPremiumSheet`（「グルームでコメントを送るには〜の入会が必要です」）
+- **1ユーザー1ルーム**：`MeguriMessageReadStateReducer` の会話キーを `peerID` のみに（`sourceGroomPostID` を無視）。既読化も相手単位。スレッドを開く時は `scope: .all`
+- **送信トースト**：`GroomMessageSentToast`（中央・グレー背景白文字）を1.6秒
+- **上スワイプ入力**：外側縦スワイプの上方向（−60pt超）で入力モード。暗転は非対称アニメ（in 0.38s easeIn / out 0.12s easeOut）
+- **暗キーボード**：`GroomMessageDarkTextField`（UITextField ラップ、`keyboardAppearance = .dark`・白文字・first responder 双方向）
+
+### 影響範囲
+- グルームビューア（ホーム/めぐり両経路）。メッセージルーム一覧のグルーピング（グルーム返信も相手単位で統合）。
+
+### セルフレビュー結果
+- ✅ 全1583テストパス（ルーム統合に伴い旧「グルーム毎に別ルーム」を前提とした5テストを新仕様へ更新）
+- ✅ 送信は既存 `sendGroomReply`（グルーム返信＝相手へのDM）を流用
+- ⚠️ プレミアム画面への直接導線はビューア内に無いため、案内シートは説明＋閉じるのみ
+
+---
+
+## イテレーション1226.450：グルームビューア仕上げ（全画面画像・上下スクリム・高速化・進捗・入力欄の面追従）
+
+### 背景・問題意識
+オーナーFB 9-14：画像をステータスバー手前まで全画面に／上部を少し暗く（名前可読）／開閉・立方体回転を高速化／プレースホルダ「メッセージを送信…」＋入力欄を立方体面に貼り付け／進捗をもっと細かく／めぐりホームも同仕様。
+
+### 変更内容
+- **全画面画像**：`GroomViewerCachedImage` を `scaledToFill`＋clip（ステータスバー手前まで。左右のはみ出し＝主にぼかし背景をクリップ）
+- **上下スクリム**：上部（ステータスバー〜名前）と下部（いいね/入力欄）に薄いダークグラデ。明るい画像でも白UIが沈まない
+- **高速化**：立方体 `animationDuration` 0.22→0.16・`settleDuration` 0.14→0.10、没入ホスト開閉 `response` 0.34→0.26
+- **進捗を滑らかに**：`runStoryProgress` を 100ms刻み/20秒 → 30fps(33ms)/約7秒
+- **入力欄の面追従**：メッセージ入力をいいね/メニューと同じ chrome VStack（グルーム面）へ移動＝立方体回転に追従。回転中の面は静的ピル。プレースホルダ「メッセージを送信…」
+- **めぐりホーム**：ビューアは共通コンポーネントなので自動適用
+
+### セルフレビュー結果
+- ✅ 実機/シミュレータで全画面画像・上下スクリム・プレースホルダを確認
+- ⚠️ 全画面化は左右を少しトリミングする（フルブリードの必然）。合成キャンバスは9:16のため主に周辺のぼかしをクリップ
+
+---
+
+## イテレーション1226.449：ユーザー名タップでプロフィールを重ねて開く／他人グルームにメッセージ入力
+
+### 背景・問題意識
+オーナーFB：ユーザー名タップでプロフィールは開くが、グルームを一旦止めて上に重ねて開き、閉じたら続行してほしい。他人のグルームには最下部にインスタのストーリー風メッセージ入力を。
+
+### 変更内容
+- **プロフィール重ね表示**：ユーザー名タップで `profileSheetRoute`（`MeguriUserProfileRouteScreen` を sheet で上に重ねる）。表示中は story 進捗を一時停止し、閉じると続行
+- **メッセージ入力**：他人グルーム最下部にインスタ風入力。タップで背景を薄暗く＋1文字で送信ボタン。`ignoresSafeArea` でキーボード自動回避が効かないため、キーボード高さを自前観測して持ち上げ
+
+### 関連ファイル
+- `GroomViewerScreen.swift` / `GroomViewerChromeViews.swift` / `MeguriMessageReadStateReducer.swift` / `MegrumAuthenticatedTabContentView.swift` / `MegrumAppStateGroomActions.swift`
+
+---
+
+## イテレーション1226.448：ホームのグルームを開くトランジションを iOS18 標準 zoom へ移植（ガクつき根治）
+
+### 背景・問題意識
+
+iter1226.444〜447 まで、手組みの scaleEffect オーバーレイ方式で「開き終わりに写真が下へガクッ」を4〜5回修正したが実機で治らず。ゼロベース調査（マルチエージェント＋実機レイアウト計測プローブ）の結論：
+
+1. **手組み方式は構造的にガクつく**：全画面の黒背景（`Color.black.opacity`）はスケールせず、ビューアだけを点アンカー＋固定0.08スケールで拡大していた＝「枠と中身が別レイヤー」。タイルの実矩形からではなく「タイル付近を支点に縦長全画面が拡大」しているだけ。
+2. **実機計測で判明した直接原因**：`.statusBarHidden(表示中)` が開くスプリングと並走し、ステータスバー非表示＝セーフエリア変化がスケール中の面で毎フレーム再解決→中央配置の写真が約10pt下がって戻る。画像がキャッシュ済みでも毎回発生（sim静的データでは再現しない）。加えて表示ビューと準備待ちの画像二重ダウンロード。
+
+### 変更内容
+
+**A. iOS18 標準 zoom へ移植（ホームレールのみ）**
+- `GroomStrip` のタイルに `matchedTransitionSource(id:in:)`（代表グルームID／自分タイルは固定ID `GroomStoryRailSource.ownTile`）
+- ホーム経路だけを新規 `HomeGroomZoomPresentation`（`fullScreenCover` + `.navigationTransition(.zoom)`）へ分離。`HomeGroomZoomRoute` でグルーム列・初期グルーム・sourceIDを保持
+- タブ上位の共有オーバーレイ（`meguriGroomViewerPost`）は **map / めぐり一覧が使い続けるため一切変更なし**
+- iOS17 は従来の `onOpenOwnGrooms`/`onOpenGroom`（タブ上位オーバーレイ）へフォールバック
+- 結果：タイルの実矩形から、枠と中身が最初のフレームから一体で連続変形（実機フレーム計測＋スパイクA/Bで確認）
+
+**B. 支えとなる修正（保持）**
+- `.statusBarHidden(isGroomViewerPresented)` を廃止（`MegrumAuthenticatedTabsView`）
+- 画像キャッシュキーをストレージパスへ正規化＋in-flightダウンロード共有＋デコードをdetached（`GroomImageMemoryStore`）
+- 開くスプリング完了をビューアへ通知する settle 同期（`megrumGroomViewerOpenSettled` 環境値。ホスト経路用。fullScreenCover経路はタイマーfallback）
+- VisualQA自動オープンの二重発火を停止（Viewインスタンス@State→セッション単位 `VisualQAAutoOpenGuard`）
+
+**C. 検証スパイク**
+- `GroomZoomTransitionSpike`（`MEGRUM_VISUAL_QA_INITIAL_SCREEN=groom-zoom-spike`）：ネットワーク・実データ排除で標準zoom vs 手組みscaleをA/Bトグル比較
+
+### 影響範囲
+
+- ホームのグルームレールからの開き（iOS18+）。map/めぐり/アーカイブ/通知経路は不変。
+
+### 確認方法
+
+- 実機：ホームのグルームタイルをタップ→タイル位置から枠＋写真が一体で連続拡大。下スワイプ閉じ・横スワイプ切替も動作
+- スパイク：`groom-zoom-spike` でトグルA/B
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/HomeGroomZoomPresentation.swift`（新規）
+- `ios-native/Sources/MegrumApp/GroomZoomTransitionSpike.swift`（新規・検証用）
+- `GroomStoryViews.swift` / `HomeDiscoveryExperience.swift` / `HomeScreen.swift`
+- `GroomViewerScreen.swift` / `GroomViewerImmersivePresentationChrome.swift` / `MegrumAuthenticatedTabsView.swift` / `MegrumAuthenticatedTabContentView.swift`
+
+### セルフレビュー結果
+- ✅ オーナー実機確認済み「最高の動き」
+- ✅ ホーム経路のみ分離。map/めぐり/アーカイブ/通知の既存オーバーレイは無変更
+- ✅ iOS17フォールバック・全1583テストパス
+- ⚠️ 下スワイプ閉じと標準zoomの interactive dismiss の共存は実機で要継続観察
+
+---
+
+## イテレーション1226.447：開くアニメーションに画像レディネスゲートを追加（枠と中身の分離を構造的に排除）
+
+### 背景・問題意識
+
+オーナーFB：iter1226.446（キャッシュキー正規化）でも実機で「治ってないです。多分、グルームの枠と、グルームの中のコンテンツの画像の大きさが違うから変なことになってるんじゃないかな？」。
+
+残っていた構造的な穴：キャッシュが**本当にコールド**（初見のグルーム・先読み未完了・キャッシュ追い出し後）の場合、枠（黒面＋クローム）だけが先に拡大して開き、写真が数百ms遅れて別サイズで出現する経路がまだ存在した。シミュレータは常にキャッシュヒットするためこのコールド経路を一度も検証できていなかった。
+
+### 変更内容
+
+#### `GroomViewerImmersivePresentationChrome.swift`
+- **`GroomViewerImmersiveItem` プロトコル追加**（`openReadyImageURL`）。`GroomPost` / `GroomMapGroomSelection` が準拠
+- **レディネスゲート**：開く時は progress=0 でコンテンツをマウントした後、主画像が `GroomImageMemoryStore` に載るまで待ってから（**最大600ms**）拡大アニメーションを開始。「枠が先に開いて中身が後から違うサイズで現れる」を構造的に不可能化
+- `openGeneration` 世代カウンタで連打・即閉じ時の古い待ちを破棄
+
+#### `GroomViewerScreen.swift`（`GroomImageMemoryStore`）
+- `ensureLoaded(url:timeoutNanoseconds:)` 追加：未キャッシュならダウンロード（`byPreparingForDisplay` でデコード済み化）をタイムアウトと競争させる
+- **`MEGRUM_VISUAL_QA_COLD_IMAGES=1`**：実機のコールド状態をシミュレータで再現する検証フラグ（キーごとに初回ミス＋450msの疑似ネットワーク遅延、先読み無効化）
+
+### 検証（コールドシミュレーション録画のフレーム計測）
+
+`AUTO_OPEN_GROOM=1` + `COLD_IMAGES=1` で録画→フレーム抽出→ピクセル計測：
+- スケールイン全フレームで写真が面内に存在（枠だけが先に開くフレームがゼロ）
+- 開き終わり後0.6秒間 photo=(32,623 1149x1568) で完全静止（ポップイン・サイズ変化なし）
+- 全テストパス（XCTest 1583 + swift-testing 24）
+
+### 影響範囲
+
+- グルームビューアを開く全経路（ホームレール・めぐりマップのピン/クラスタ）。コールド時のみ最大600msの「押してから開くまで」の待ちが増える（その間ソース画面は静止）
+
+### 確認方法
+
+- 実機：初見のグルーム（アプリ再起動直後など先読みが済んでいないもの）をタップ→写真が最初から載った完成形が一体で拡大すること
+- シミュレータ再現: `SIMCTL_CHILD_MEGRUM_VISUAL_QA_COLD_IMAGES=1` を追加して録画・計測
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/GroomViewerImmersivePresentationChrome.swift`
+- `ios-native/Sources/MegrumApp/GroomViewerScreen.swift`
+
+### セルフレビュー結果
+- ✅ 「枠と中身のサイズが違う」オーナー仮説に対し、中身が揃うまで枠を開かない構造で回答
+- ✅ コールド経路をシミュレータで初めて再現・計測して検証（sim/実機乖離の解消）
+- ✅ 世代ガードで連打・即閉じの競合を防止。タイムアウト600msで無限待ちなし
+- ⚠️ 600msを超える極端な低速回線では従来どおり読み込み表示になり得る（無限に待たせない意図的な上限）
+
+---
+
+## イテレーション1226.446：グルーム画像キャッシュのキーをストレージパスへ正規化（実機ポップイン解消）
+
+### 背景・問題意識
+
+オーナーFB：iter1226.445（progress駆動化）でも実機では「開くときのガクッ」が治っていない。あわせて「呼び出す画像は作成時の切り抜きではなく元画像をそのまま保存しているのでは？」という仮説の提示。
+
+### 調査結果
+
+1. **保存画像は合成済み**：全公開経路が `GroomStoryExportRenderer`（1080×1920キャンバス＝ぼかし背景＋写真fit＋テキスト焼き込み）を通しており、「元画像そのまま」ではない（オーナー仮説の直接の答え）
+2. **真の残存原因はキャッシュキー**：`GroomImageMemoryStore` / 先読みは**署名付きURL全体**をキーにしていた。署名トークンはフィード再取得（10m移動ごとの位置更新等）のたびに回転するため、**実機（移動中）ではほぼ毎回キャッシュミス**→ビューアはスピナーのまま開き、**開き終わった直後に写真がポップイン**（＝「開き終わった瞬間にガクッ」の正体）。シミュレータは静止・単発ロードで常にヒットするため iter1226.445 の検証では見えなかった（sim/実機の乖離の説明）
+
+### 変更内容
+
+#### `GroomViewerScreen.swift`
+- `GroomImageMemoryStore` のキーを **`GroomSignedURLPathExtractor.storagePath`（`<uid>/<file>.jpg`）へ正規化**（非グルームURLは absoluteString フォールバック）。トークン回転後も同一画像としてヒット
+- `GroomViewerCachedImage` はストアヒット時に**再ダウンロードせず即表示**（従来はURL変化のたびに再取得）
+- 先読み（prewarm）を直列→**TaskGroup並列**化
+
+#### テスト
+- 署名トークン回転で同一キーになること・非グルームURLの扱いのテスト追加（全1583テストパス）
+
+### 影響範囲
+
+- グルームビューアの開き（実機で写真が最初のフレームから表示）・キューブ回転の面・通信量（同一画像の再ダウンロード削減）
+
+### 確認方法
+
+- 実機：ホーム表示後にレール先読み完了→タップで開く→写真が最初から載った完成形が一体で拡大（位置が変わって署名が回転した後でも）
+- 完全初見のグルーム（先読み未完了）のみ従来どおり読み込み表示になり得る
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/GroomViewerScreen.swift` / `Tests/MegrumAppTests/GroomViewerCubeGeometryTests.swift`
+
+### セルフレビュー結果
+- ✅ オーナー仮説（元画像保存？）はコードで否定を確認し、真因（キー回転）に転換できた
+- ✅ グルーム画像は不変（同一パス＝同一内容）なのでパスキー化は安全
+- ✅ アバターは公開URL（安定）でキー回転問題なし（確認済み）
+- ⚠️ データ層キャッシュ（GoodsRemoteImageDataCache）はURL全体キーのまま（表示は正規化ストアが吸収。通信最適化は必要なら次で）
+
+---
+
+## イテレーション1226.445：開くトランジションを progress 駆動へ全面書き換え（枠/中身分離の根治）
+
+### 背景・問題意識
+
+オーナーFB：iter1226.444 の frame 固定でも「開くときの枠/中身のズレ（ガクガク）」が直っていない。
+
+### 調査手法（今回の要点）
+
+推測をやめ、**シミュレータで自動再現→録画→フレーム分解→数値計測**の検証ループを構築：
+- `MEGRUM_VISUAL_QA_AUTO_OPEN_GROOM=1` でタップ操作なしにグルームビューアを自動オープンするVisualQAフックを追加
+- `simctl io recordVideo` → AVFoundation スクリプトで30fps全フレーム抽出 → コンテナ矩形/写真矩形をピクセル計測
+- 並行してマルチエージェント調査（3レンズ→相互検証）で仮説を攻撃的に絞り込み
+
+**動かぬ証拠**：修正前の録画で、写真のアスペクト比がアニメ中に 1.31→1.366 へ連続ドリフト（scaledToFit の一様変形では不可能）＝**レイアウトそのものがアニメ補間されていた**。
+
+### 真因（フレーム計測とマルチエージェント検証が同一結論に収束）
+
+`.transition(.scale)` ＋ コンテナの `.animation(_:value:)` 構成では、挿入直後にビューア内部の **ignoresSafeArea 群・GeometryReader 依存値が1〜2フレーム遅れて多段解決**され、その遅延レイアウト確定が進行中のアニメ付きトランザクションに拾われて「スケール変形（t0開始）」と「内部レイアウト（t0+Δ開始）」の**2本の時間軸**に割れる。iter1226.444 の `.frame(width:height:)` は提案サイズを固定するだけで、safe-area 解決タイミングはその射程外（＝効かなかった理由）。
+
+### 変更内容
+
+#### `GroomViewerImmersivePresentationChrome.swift`（全面書き換え）
+- `.transition` ＋ 環境 `.animation(value:)` を**廃止**し、`GroomViewerImmersiveHost` を新設：
+  - 中身は常設フルスクリーンコンテナの実寸で**最初から最終レイアウト**（レイアウトは一切アニメしない）
+  - `compositingGroup()` で面全体を**1枚に合成**してから `scaleEffect(0.08+0.92×progress, anchor:)`（メインスレッドヒッチ時も一体で動く）
+  - スカラー `progress` だけを `withAnimation(spring 0.34/0.86)` で駆動（開閉とも）。バックドロップは `opacity(progress)`
+  - 閉じアニメ中も `presentedItem` を保持して面を描き続け、完了後にアンマウント
+
+#### `MegrumAuthenticatedTabContentView.swift`
+- VisualQA自動オープンフック（`MEGRUM_VISUAL_QA_AUTO_OPEN_GROOM=1`）追加（回帰検証ハーネス・環境変数ゲート）
+
+### 検証（修正後の録画をフレーム計測）
+
+- ユーザー名テキスト高さ比 1.30 ≒ コンテナ幅比 1.27（**一様スケール**）
+- 写真下端/コンテナ下端比 0.818→0.819 で**一定**（修正前は 0.79→0.82 と変動）
+- 中身は完成形のまま1枚の板として拡大されることを目視・数値の両方で確認
+
+### 影響範囲
+
+- グルームビューアの開閉トランジション全経路（ホーム・地図・アーカイブ）。`swift test` 1581件全パス
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/GroomViewerImmersivePresentationChrome.swift` / `MegrumAuthenticatedTabContentView.swift`
+
+### セルフレビュー結果
+- ✅ フレーム計測（前後比較）で一様スケール化を客観確認
+- ✅ マルチエージェント相互検証の最有力仮説・推奨修正と実装が一致
+- ✅ 連打・再オープン・タブ復帰（onAppear復元）・Reduce Motion経路を考慮
+- ⚠️ 残課題（別立て）：キャッシュミス時の写真ポップイン（めぐりタブ経由に prewarm 経路がない）。症状が出たら prewarm 横展開で対応
+
+---
+
+## イテレーション1226.444：開くトランジションの枠/中身分離を解消＋地図ピンの既読枠色
+
+### 背景・問題意識
+
+オーナーFB（連続スクショ4枚の証拠つき）：
+1. グルームを開く時、**画面（枠）とグルーム画像・上部バーが一致せず**ガクガク見える（進捗バーだけ先に全幅になる等、枠と中身が別々のロジックで展開されている）
+2. 既読と枠色（未読=グラデ/既読=グレー）は**めぐりホーム側でも**実装してほしい
+
+### 調査結果
+
+開くトランジションは scale 変形だが、**ビューア内部のセーフエリア解決（ignoresSafeArea）がトランジション中にレイアウトサイズを別途アニメーション**しており、「枠＝スケール変形」「中身＝レイアウト変化」が同時に走って互いにズレていた（スクショの 00:02.83 で進捗バーだけ全幅になっているのがその瞬間）。
+
+### 変更内容
+
+#### `GroomViewerImmersivePresentationChrome.swift`（1）
+- 常設フルスクリーンコンテナに `GeometryReader` を追加し、ビューア中身へ**実寸（最終フルスクリーンサイズ）を明示 frame で固定**。トランジション中もレイアウトは一切変化せず、拡大縮小は**スケール変形のみ**に。枠と中身（写真・ユーザー名バー・進捗・アイコン）が完全に一体で拡大される
+
+#### 地図ピンの既読枠色（2）
+- `GroomMapPin` に `isRead` を追加：既読はレールと同じ**グレー枠**（`GroomStoryMetrics.seenRing`）、未読は従来のブランドグラデ枠
+- クラスタ代表ピン（`MeguriClusterPin`）は**内包グルームが全て既読ならグレー**
+- 配線：めぐりホーム地図（`MeguriHomeMapBackdrop`）・フルスクリーン地図（`MeguriMapScene`）の両方に `viewedGroomIDs` を伝搬（iter1226.443 の永続化とセットで再起動後も維持）
+
+### 確認方法
+
+- `swift test` 全パス（0失敗）／実機ビルド→iPhoneへインストール
+- 実機：開く時に枠と中身が一体で拡大するか（スクショ再撮影で比較可）。めぐりホームのピンが既読でグレー枠になるか
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/GroomViewerImmersivePresentationChrome.swift`
+- `ios-native/Sources/MegrumApp/MeguriMapAnnotationViews.swift` / `MeguriHomeMapBackdrop.swift` / `MeguriHomeViews.swift` / `MeguriScreen.swift` / `MeguriMapScene.swift` / `MeguriMapViews.swift`
+
+### セルフレビュー結果
+- ✅ 固定フレームは常設コンテナの実寸由来（回転や画面サイズ変化にも追従）
+- ✅ ピンの枠色はレール（GroomStoryRing）と同じ色定数を共有
+- ⚠️ 開く動きの最終確認は実機で（スクショ4枚と同じ手順での比較を依頼）
+
+---
+
+## イテレーション1226.443：グルーム既読の永続化＋レール件数バッジ廃止
+
+### 背景・問題意識
+
+オーナーFB：
+1. 一度既読にしたグルームが、アプリを再起動すると未読扱い（レール枠がグラデ）に戻る
+2. レールのタイル右上の「1ユーザーのグルーム数」バッジは不要
+
+### 調査結果
+
+既読は `groom_views` へ**書き込むだけ**で、起動時に**読み戻していなかった**（`viewedGroomIDs` はメモリのみ）。いいねは `viewer_has_liked` をフィードRPCが返して復元済み（iter1226.428系）だったのに、既読は未対応だった。
+
+### 変更内容
+
+#### Supabase（`20260710230000_groom_feed_viewer_has_viewed.sql`・適用済み）
+- `list_groom_feed_nearby` に **`viewer_has_viewed`**（groom_views の存在）を追加（最新定義 20260709120000 を踏襲）
+
+#### クライアント
+- `GroomPost.viewed` 追加、`GroomFeedRow.viewerHasViewed` をマップ
+- `GroomInteractionStateReducer.viewedIDs(from:)` 追加。初期スナップショット・フィード読み込み・地図読み込み・ビューポート読み込みで `viewedGroomIDs` へ **union 同期**（既読は取り消さない）
+
+#### レール（`GroomStoryViews.swift`）
+- タイル右上の件数バッジを削除（accessibilityLabel の件数は維持）
+
+### 確認方法
+
+- `swift test` 全パス／`supabase db push` 適用済み／実機ビルド→iPhoneへインストール
+- 実機：グルームを見る→アプリを完全終了→再起動→レール枠がグレー（既読）のまま
+
+### 関連ファイル
+
+- `supabase/migrations/20260710230000_groom_feed_viewer_has_viewed.sql`
+- `ios-native/Sources/MegrumCore/GroomModels.swift` / `MegrumData/SupabaseGroomRows.swift`
+- `ios-native/Sources/MegrumApp/GroomInteractionStateReducer.swift` / `MegrumAppInitialSnapshotState.swift` / `MegrumAppStateGroomActions.swift` / `MegrumAppStateMeguriActions.swift` / `GroomStoryViews.swift`
+
+### セルフレビュー結果
+- ✅ いいね復元（viewer_has_liked）と同一パターンで一貫
+- ✅ union同期のため「ローカルで既読→直後の再取得」でも既読が消えない
+- ⚠️ 遭遇済みグルーム取得RPC（list_encountered_grooms）には未追加。圏外の遭遇済みタイルの既読復元が必要になったら同様に対応
+
+---
+
+## イテレーション1226.442：グルームのスワイプ不能を修正（ジェスチャ競合）
+
+### 背景・問題意識
+
+オーナー報告：グルームで横スワイプ（回転）も下スワイプ（閉じる）もできなくなった。
+
+### 調査結果
+
+iter1226.441 の押下即発火タップで、タップゾーンに `DragGesture(minimumDistance: 0)` を追加した際、**子ビューのジェスチャが先にタッチを取り、外側（画面全体）のスワイプ用 DragGesture が発火しなくなる** SwiftUI の優先規則を踏んだ（子の .simultaneousGesture は同一ビュー内の共存であり、祖先のジェスチャは負ける）。
+
+### 変更内容
+
+#### `GroomViewerScreen.swift`
+- 外側のスワイプジェスチャ（縦=閉じる／横=キューブ回転の軸ロック入り）を `.gesture` → **`.simultaneousGesture`** に変更し、タップゾーンと共存させる
+- タップ側は元々「12pt以上動いたらタップ扱いを取り消してスワイプに譲る」設計のため、両立で誤発火しない
+
+### 確認方法
+
+- `swift test` 全パス／実機ビルド→iPhoneへインストール
+- 実機：タップ即発火・横スワイプ回転・下スワイプ閉じるの3操作が全て効くこと
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/GroomViewerScreen.swift`
+
+### セルフレビュー結果
+- ✅ タップ(<12pt)では外側Drag(minimumDistance:12)は発火しない（誤動作なし）
+- ⚠️ ジェスチャ変更はシミュレータで再現確認できない環境のため、実機確認を依頼
+
+---
+
+## イテレーション1226.441：アバター/写真の先読みキャッシュ・押下即タップ・回転さらに高速化
+
+### 背景・問題意識
+
+オーナーFB：
+1. スワイプ回転後、切替先グルームのユーザーアイコンに一瞬処理が走って見える（チラつき）
+2. タップの回転は「押した瞬間」に回り始めてほしい
+3. 回転速度をもっと速く
+4. （追加報告）グルームを開いたとき、開き終わった瞬間に写真がガクッと下がる。枠と中身が別々のロジックで展開されているように見える
+
+### 調査結果
+
+- アバターは `AsyncImage` 直使用のため、面を作り直すたびに**グレー人型→画像**のフェーズを必ず踏む（キューブ回転・開閉のたびにチラつく）
+- レール（アバター列）はグルーム**写真**を先読みしない構造。ビューアを開くと写真は非同期で後から載る → 「枠（クローム）と中身（写真）が別々に展開」して見え、載った瞬間の変化がガクッと感じられる
+- タップは `TapGesture`（指を離した時）発火＋easeInOut（出だしが遅い）
+
+### 変更内容
+
+#### `ProfileVisualComponents.swift`（1）
+- `ProfileVisualAvatar` を**デコード済みメモリキャッシュ（`ProfileAvatarImageStore`）から同期表示**するローダーへ差し替え（アプリ全体のアバターが対象）。キャッシュ済みなら生成時から画像を表示、URL差し替え時も直前の画像を保持して人型を挟まない
+
+#### `GroomViewerScreen.swift` / `HomeScreen.swift`（4）
+- グルーム写真の**デコード済みストア（`GroomImageMemoryStore`）**を新設。`GroomViewerCachedImage` はキャッシュ済みなら**最初のフレームから同期表示**
+- ホームのレール表示時に、**各投稿者の初期表示グルーム（未読先頭）の写真＋投稿者アバターを先読み**（`.task(id: railItems)` でベストエフォート）→ 開いた瞬間から写真ごと拡大される
+
+#### タップの押下即発火（2）
+- タップゾーンを `DragGesture(minimumDistance: 0)` の**押下起点**方式へ：タッチ開始から90msで発火（素早いタップは離した瞬間に即発火）。指が12pt以上動いたらタップ扱いを取り消し、スワイプ（回転/閉じる）側に譲る。外側ジェスチャと共存させるため simultaneous 化
+
+#### 回転高速化（3）
+- 0.30s → **0.22s**（スワイプ後の残り回転 0.18 → 0.14s）。タップ回転の出だしを **easeOut** にして押した瞬間から回り始める体感に
+
+### 影響範囲
+
+- アバター表示（全アプリ・見た目は同一でキャッシュ挙動のみ改善）／グルームビューアのタップ・回転・開く体験
+
+### 確認方法
+
+- `swift test` 全パス／実機ビルド→iPhoneへインストール
+- 実機：スワイプ回転後のアイコン・開いた瞬間の写真・タップの即応をオーナーに確認依頼（開くガクッは先読みで解消想定。残る場合はトランジション側を追調査）
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/ProfileVisualComponents.swift` / `GroomViewerScreen.swift` / `HomeScreen.swift` / `GroomViewerCubeGeometry.swift`
+
+### セルフレビュー結果
+- ✅ アバターの見た目・フォールバック（人型/匿名アバター）は従来同一
+- ✅ 先読みはベストエフォート（失敗しても従来の非同期読み込みで表示）
+- ✅ 押下タップとスワイプは12pt移動で排他（誤発火なし）。Reduce Motion不変
+- ⚠️ 「開いた瞬間のガクッ」は実機再現ができない環境だったため解析ベースの修正。要実機確認
+
+---
+
+## イテレーション1226.440：ビューアの三点リーダー移動・コメント非表示・回転高速化・チラつき解消
+
+### 背景・問題意識
+
+オーナーFB（一連スコープ・進捗バーはOK）：
+1. 他人のグルームの三点リーダーを、自分のグルームと同様に右下（コメント位置の下）へ
+2. 他人のグルームではコメントアイコンを表示しない
+3. 立方体の回転速度をもう少し速く
+4. タップ回転時、元のグルーム側で一瞬ローディングが入り画面がチラつく。元のグルームのユーザーアイコンもグレー人型になる
+
+### 変更内容
+
+#### `GroomViewerChromeViews.swift`（1・2）
+- `GroomViewerTopBar` から通報/ブロックの三点リーダーを撤去（moderation系パラメータ削除）
+- `GroomViewerBottomControls`（他人用）を再構成：**いいねのみの列＋その下に三点リーダー**（通報/ブロック・54pt円形、Ownerの削除メニューと同スタイル）。コメントアイコンは非表示（`showsComments: false`）
+
+#### `GroomViewerCubeGeometry.swift`（3）
+- 回転時間 0.42s → **0.30s**、スワイプ後の残り回転 0.24s → **0.18s**
+
+#### `GroomViewerScreen.swift`（4）
+- タップ/自動送りの回転の「出ていく面」を、**切替直前の画面スナップショット**（`UIGraphicsImageRenderer` + `drawHierarchy`）に変更。従来は前のグルームの面をビューとして作り直しており、画像・アバターの非同期再読み込みでスピナー/グレー人型が一瞬映っていた
+- スナップショットは index 切替前に取得（表示済みピクセルをそのまま使用＝UIごと写り込み、チラつきゼロ）
+
+### 影響範囲
+
+- グルームビューアの右下コントロール・回転演出のみ
+
+### 確認方法
+
+- `swift test` 全パス／実機ビルド→iPhoneへインストール
+- 実機：他人グルームの右下＝いいね＋⋯（通報/ブロック）、コメントアイコン無し。タップ回転が速く・チラつき無し
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/GroomViewerChromeViews.swift` / `GroomViewerScreen.swift` / `GroomViewerCubeGeometry.swift`
+
+### セルフレビュー結果
+- ✅ 三点リーダーの見た目/位置は自分のグルームの削除メニューと統一
+- ✅ スナップショット方式は出ていく面のみ（入ってくる面は実UIのまま操作可能）
+- ✅ Reduce Motion・スワイプ回転の挙動は不変
+- ⚠️ 他人グルームのコメント送信導線はアイコンごと廃止（コメントシートは自分のグルーム専用に）
+
+---
+
+## イテレーション1226.439：グルームの一連スコープ統一＋投稿者単位の進捗バー
+
+### 背景・問題意識
+
+オーナーFB：
+1. 一連が終わる前に別ユーザーや自分のグルームへ切り替わってしまう
+2. 上の進捗バーは「そのユーザーのグルームのうち自分が見られる数」だけで分割してほしい
+3. みちりおんのグルームを見ている時だけ横スワイプでユーザーを切り替えられない
+
+### 調査結果
+
+ホームのレールに**二重構造**があった：
+- 複数枚持ちの投稿者のタイル → **そのユーザーだけ**のリストを渡す → 一連の終端で閉じ、**他ユーザーが居ないためスワイプが死ぬ**（=みちりおんの症状。複数枚持ちの投稿者で発生）
+- 1枚だけの投稿者のタイル → **全体混在リスト（appState.grooms・自分の投稿も含む）** → タップで即他人/自分のグルームへ流れる（=一連が終わる前に切り替わる症状）
+
+### 変更内容
+
+#### `HomeScreen.swift`（レールのタップを統一）
+- グループタップは常に**「レール表示順の開けるグルーム全体」**を sequence として渡す（枚数に関わらず同一経路）。initial はタップしたユーザーの未読先頭
+
+#### `GroomViewerScreen.swift`（一連のスコープ）
+- init で**自分/他人をスコープ**：他ユーザーのグルームを開いた時は自分の投稿を一連から除外、自分のグルームを開いた時は自分の一連だけ（iter1226.402踏襲）。地図・めぐりタブ経由の混在リストにも同じルールが効く
+- **進捗バーを投稿者ブロック単位に**：分母＝現在の投稿者のブロック内枚数（この一覧で見られる数）、位置＝ブロック内インデックス
+
+#### `GroomViewerCubeGeometry.swift`
+- `orderedGroupingAuthors` を**入力の先頭出現順を尊重**する安定グルーピングへ（レールの未読優先順を保持。ブロック内は古い→新しい）
+- `authorBlockRange`：現在位置が属する投稿者ブロックの範囲（進捗バー用）
+
+### 影響範囲
+
+- グルームビューアの一連の構成・進捗バー・スワイプ可否。回転演出そのものは不変
+
+### 確認方法
+
+- `swift test`：安定グルーピング＋ブロック範囲のテスト（全1581テストパス）
+- 実機：どのユーザーから開いても、タップは一連内→境界でキューブ、スワイプで隣のユーザーへ。自分の投稿は他人閲覧中に出ない。進捗バーはそのユーザーの枚数だけ
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/HomeScreen.swift` / `GroomViewerScreen.swift` / `GroomViewerCubeGeometry.swift`
+
+### セルフレビュー結果
+- ✅ みちりおん問題の根因（単独ユーザーリスト）を経路統一で解消
+- ✅ 自分のグルームは「自分のタイルから見る」動線に限定（他人閲覧中に混ざらない）
+- ✅ レールの未読優先順を壊さない安定グルーピング
+- ⚠️ ビルドDB破損（.build disk I/O error）で古いバイナリのままテストが通っていたため、クリーン後に再検証済み
+
+---
+
+## イテレーション1226.438：グルームの投稿者ブロック化＋キューブ面にUIごと張り付け
+
+### 背景・問題意識
+
+オーナーFB（回転の方向・スワイプ追従はOK）：
+1. 一連のグルームはタップしていったら一連で終わってほしい
+2. あるユーザーの途中でも、スワイプで次のユーザーへキューブ回転してほしい
+3. タップでユーザーが切り替わる時もキューブ回転してほしい
+4. 回転する面には、ユーザー名・グルーム画像・いいねやコメント等のアイコンが**張り付いたまま**回ってほしい
+
+### 調査結果
+
+1〜3の根因は**並び順**。ビューア内はグローバルの時刻順（`createdAt` 昇順）だったため、複数投稿者のグルームが交互に混ざり、「一連」がまとまらない／スワイプの「次の投稿者ブロック」も断片化していた。キューブ回転（境界）自体は実装済みだったが、境界が1枚ごとに現れる状態だった。
+
+### 変更内容
+
+#### `GroomViewerCubeGeometry.swift`
+- `GroomViewerAuthorNavigation.orderedGroupingAuthors`：グルーム列を**投稿者ごとのブロック**に並べ替える純ロジック（ブロック順＝各自の最古グルーム時刻の昇順、ブロック内＝古い→新しい）
+
+#### `GroomViewerScreen.swift`
+- init で上記グルーピングを適用 → タップは一連（同一投稿者ブロック）を順に進み、境界で自動的にキューブ回転（既存機構）。スワイプは途中からでも次/前の投稿者ブロック先頭へ（既存機構が正しく機能するように）
+- **キューブの面を「UIごと」に**：`groomFace(for:topPadding:isInteractive:)` を新設し、グルーム画像＋ページ進捗＋ユーザー名バー＋いいね/コメント/削除等の下部UIを1つの面として構成。出ていく面・入ってくる面・本体面のすべてでこの面を回転（回転中の面は表示のみ・操作は本体面だけ）
+- これに伴い、画像スナップ方式（`fromImage`/`displayedImage`/`onImageChange`）を廃止し、`cubeSpin.fromGroom`（直前のグルーム自体）から面を描画。current固定だった判定（いいね数・コメント数・本人判定・identity）をグルーム引数の関数に一般化
+
+### 影響範囲
+
+- グルームビューアの並び順と回転面の見た目。タップ/スワイプ/自動送り/閉じるスワイプの操作体系は不変
+
+### 確認方法
+
+- `swift test`：グルーピング1テスト追加（交互時刻の2投稿者がブロックにまとまる）・全パス
+- 実機：タップで一連→境界でキューブ（UIごと回転）→スワイプでも途中から次ユーザーへ
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/GroomViewerCubeGeometry.swift` / `GroomViewerScreen.swift`
+
+### セルフレビュー結果
+- ✅ ブロック内は従来の古い→新しい（iter1226.402）を維持
+- ✅ 回転中の面のUIは実データ（相手のいいね数等）で描画されるため、面の見た目と切替後の画面が一致
+- ✅ ページ進捗バーは現在面のみ進行（他の面は0%）
+- ⚠️ ページ進捗の分母は全グルーム数のまま（投稿者ごとの分母への変更は要望があれば次iterで）
+
+---
+
+## イテレーション1226.437：キューブ回転を外側視点＋スワイプ追従に
+
+### 背景・問題意識
+
+オーナーFB：「いま直方体のなかにユーザーがいて、立体物が回されている感じ。**立体物の外にユーザーがいて回す感じ**にしてほしい。あと、**グルームをスワイプすることで、その指の動きに従って立体を回転**させてほしい」。
+
+### 変更内容
+
+#### `GroomViewerCubeGeometry.swift`
+- 回転方向を反転（凹→凸）：外側視点で、面と面の共有辺が手前へ張り出しながら回る見え方に
+- インタラクティブ用の純ロジック追加：`dragProgress`（スワイプ量→進捗0〜1、逆方向は0でクランプ）、確定しきい値（進捗0.32 or 勢い0.5）、`GroomViewerAuthorNavigation.authorSwitchTargetIndex`（**横スワイプはインスタ同様「投稿者単位」**：進む＝次の投稿者ブロック先頭、戻る＝前の投稿者ブロック先頭）
+
+#### `GroomViewerScreen.swift`
+- ドラッグの**軸ロック**：開始時に縦横を判定し、縦＝従来の閉じるスワイプ、横＝キューブ回転（指に追従）
+- スワイプ中は現在面が出ていく変換・切替先（次/前の投稿者の先頭グルーム）面が回り込む変換で、`cubeDragProgress` を指の移動に同期。離すと閾値で確定（残りを回し切る）/キャンセル（戻す）
+- 確定時は切替先の面を数フレーム残して本体画像の読み込みを待つ（旧画像チラつき防止）。スワイプ開始時に切替先画像を先読み
+- スワイプ中はストーリー自動送りを一時停止。スクリプト回転（タップ/自動送り）とドラッグは相互排他。Reduce Motion 時は回転なしで即切替
+
+### 影響範囲
+
+- グルームビューアの操作系。タップ（前後1枚ずつ・同一投稿者は即切替/投稿者変化でキューブ）は従来どおり
+- 縦スワイプで閉じるは不変（軸ロックで共存）
+
+### 確認方法
+
+- `swift test`：ジオメトリ・ナビゲーションの6テスト（更新＋追加）全パス
+- 実機：横スワイプ→指に合わせて立体が回る→離して確定/戻る。凸の見え方の体感確認をオーナーに依頼
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/GroomViewerCubeGeometry.swift` / `GroomViewerScreen.swift`
+
+### セルフレビュー結果
+- ✅ 軸ロックで下スワイプ閉じると横スワイプ回転が干渉しない
+- ✅ 端（最初/最後の投稿者）ではスワイプ開始しない（誤動作なし）
+- ✅ 確定判定は距離＋勢いの2系統（軽いフリックでも切り替わる）
+- ⚠️ 凸の回転方向は実機の体感依存。逆に感じたら degrees の符号を再反転で対応
+
+---
+
+## イテレーション1226.436：トリミング初期枠の廃止＋メンバー登録シート化
+
+### 背景・問題意識
+
+オーナーFB：
+1. グッズ/ほしいもの追加のトリミングで「デフォルトで枠が大きく切り込まれてる」と、ドラッグが常に既存枠の移動になり**手動で枠を描けない**。最初の枠は不要。「枠を追加」ボタンも不要
+2. 詳細ステップの「メンバー登録」を押すと、**下から2〜3個のメンバーが最初表示されない**バグ
+
+### 変更内容
+
+#### トリミング（`GoodsPhotoCrop*` / `GoodsEditorSheetInventoryPhotoActions`）
+- 手動トリミング（新規追加・再トリミング）の**初期枠を廃止**（`.fullImage` 初期枠と `TradingCardCropFrame.fullImage` を削除）。写真の上をドラッグして枠を描くのが主操作に戻る
+- **「＋枠を追加」ボタンを削除**（`GoodsCropAddFrameButton` / `addCenteredFrame` 削除）
+- **枠なしのまま「この内容で追加」＝写真全体をそのまま使う**（ボタンは「この内容で追加（写真全体）」表示・再エンコードなし）。空枠エラーは廃止
+- ヒント文・プレビュー空メッセージを新仕様に更新。まとめて登録（AI初期枠）は従来どおり
+
+#### メンバー登録（`GoodsCreateMemberAssignSheet` 新規 / `GoodsInventoryCreateMetaFooterView`）
+- confirmationDialog はメンバー数が多いと下2〜3件が初期描画されないOS側バグがあるため、**標準の List シート**（medium/large detents）に置き換え。全メンバー＋「メンバー未設定に戻す」を確実に表示
+
+### 影響範囲
+
+- グッズ/ほしいもの登録のトリミング画面・詳細ステップのメンバー一括登録のみ
+
+### 確認方法
+
+- `swift test` 全パス／実機ビルド・インストール
+- 実機：写真追加→トリミングは枠なしで開く→ドラッグで枠作成 or そのまま「追加（写真全体）」／メンバー登録→全メンバーがシートに表示
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/GoodsPhotoCropViews.swift` / `GoodsPhotoCropSheetPresentationState.swift` / `GoodsPhotoCropPreviewViews.swift`
+- `ios-native/Sources/MegrumApp/GoodsEditorSheetInventoryPhotoActions.swift` / `TradingCardBulkRecognitionModels.swift`
+- `ios-native/Sources/MegrumApp/GoodsCreateMemberAssignSheet.swift`（新規）/ `GoodsInventoryCreateMetaFooterView.swift`
+
+### セルフレビュー結果
+- ✅ 「必ずトリミングを通す」フロー（iter1226.431）は維持。初期状態が「枠なし＝全体」になっただけ
+- ✅ 枠を描いた後の移動・四隅リサイズ・複数枠（ドラッグ追加）は従来どおり
+- ✅ メンバーシートは iOS標準 List/sheet（ブランド専用UIの新造なし）
+- ⚠️ まとめて登録でAI枠を全削除して追加すると「写真全体1枚」になる（従来はエラー）。挙動として自然なので許容
+
+---
+
+## イテレーション1226.435：グルームビューアの投稿者切替をキューブ回転に
+
+### 背景・問題意識
+
+オーナー要望：「ホームのグルーム一覧で、ユーザーが切り替わるときはインスタのストーリーのように、直方体が回転するように切り替わってほしい」。
+
+### 変更内容
+
+#### `GroomViewerCubeGeometry.swift`（新規）
+- キューブ回転の幾何計算（純ロジック）：進む時は現在の面が trailing 辺を軸に +90° へ倒れながら左へ抜け、次の面が右の側面（leading 辺・-90°）から起き上がる。戻る時は鏡映
+- perspective 0.7・時間 0.42s・奥へ向かう面に最大0.45の影（`GroomViewerCubeFaceModifier`）
+
+#### `GroomViewerScreen.swift`
+- `move(by:)`：**次のグルームの投稿者が変わる時だけ** `startCubeSpin` を発火（左右タップ・自動送りとも）。同一投稿者内は従来どおり「パッ」切替（iter1226.422）を維持
+- 「出ていく面」は直前まで表示していた画像のスナップ（`GroomViewerCachedImage` に `onImageChange` を追加して親が保持）。「入ってくる面」は現行の画像ビューに incoming 変換を適用
+- Reduce Motion 時・開くアニメ中はキューブ無し（即切替）。連打時は新しい回転が古い完了処理を破棄（UUIDガード）
+
+### 影響範囲
+
+- グルームビューア全般（ホームのグルーム列・地図・アーカイブから開く全経路で共通）
+- 状態遷移・データ影響なし
+
+### 確認方法
+
+- `swift test`：ジオメトリ4テスト追加・全パス
+- 実機で確認：別ユーザーのグルームへ左右タップ/自動送り → キューブ回転、同一ユーザー内 → 即切替
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/GroomViewerCubeGeometry.swift`
+- `ios-native/Sources/MegrumApp/GroomViewerScreen.swift`
+
+### セルフレビュー結果
+- ✅ 同一投稿者の連続表示は従来の即切替のまま（インスタと同じ使い分け）
+- ✅ Reduce Motion 尊重・開閉トランジションと非競合（isOpeningSettled ゲート）
+- ✅ 幾何は純ロジック化してテストで端点・方向対称性を担保
+- ⚠️ 回転するのは画像面のみ（上部バー等のchromeは即切替）。全面回転が欲しければ次iterで拡張
+
+---
+
+## イテレーション1226.434：地図ズームアウト時の「おおよその件数」バブル
+
+### 背景・問題意識
+
+オーナー要望：「3km圏外であっても、地図を縮小していったら大体でいいので、グルームやチャットルームがどれくらいあるか件数だけでもわかればいい。読み込む前に」。
+
+### 変更内容
+
+#### Supabase（`supabase/migrations/20260710220000_add_meguri_map_density.sql`・適用済み）
+- `meguri_map_density(min_lat, min_lng, max_lat, max_lng, cell_deg)` RPC 新設：表示範囲内の published グルームと visible チャットルームを**セル単位で件数だけ**集計して返す（最大300セル・security definer・authenticated のみ）
+- 「大体でいい」件数のため、hidden/ブロックの個人別フィルタは意図的に省略（軽さ優先）
+- `groom_posts` / `meguri_board_threads` の (origin_lat, origin_lng) 部分インデックス追加
+
+#### クライアント
+- `MeguriMapDensityCell`（MegrumCore）＋ RPC クライアント（MegrumData）＋ リポジトリのプロトコル/実装/Preview/デフォルト
+- `MeguriMapDensityPlanner`（純ロジック）：緯度スパン **0.12（約13km表示）超で密度モード**。セルサイズ＝スパン/5（0.02〜2.0度にクランプ）、取得範囲は表示より25%広め、バブルタップ時のズーム先は必ずピン表示モードに入るスパン
+- `MegrumAppState.loadMeguriMapDensity` ＋ `meguriMapDensityCells` ストア
+- `MeguriScreen.handleViewportChange`：密度モード中は**実データのビューポート読み込みをスキップ**して密度だけ取得（軽い）
+- `MeguriHomeMapBackdrop`：密度モード中は個別ピン/クラスタを出さず、**件数バブル**（📷グルーム数＋💬チャット数のカプセル）を表示。タップでそのセルへズーム→ピン表示モードに入り実データが読み込まれる
+
+### 影響範囲
+
+- ホーム地図（めぐりタブ）のズームアウト時のみ。ピン表示モード（±13km以下）の挙動は不変
+- フルスクリーン地図（MeguriMapScreen）はビューポート読み込み自体が無いため今回対象外（要望があれば横展開）
+
+### 確認方法
+
+- `swift test`：planner 5テスト追加・全パス
+- `supabase db push` 適用済み（RPC は本番反映済み）
+- 実機/シミュレータでめぐり地図をピンチアウト→件数バブル表示→タップでズームイン→実ピンに切替、をオーナーに確認依頼
+
+### 関連ファイル
+
+- `supabase/migrations/20260710220000_add_meguri_map_density.sql`
+- `ios-native/Sources/MegrumCore/MeguriMapDensityModels.swift`
+- `ios-native/Sources/MegrumData/SupabaseMeguriMapDensity.swift`
+- `ios-native/Sources/MegrumApp/MeguriMapDensityPlanner.swift` / `MeguriHomeMapBackdrop.swift` / `MeguriScreenBoardActions.swift` / `MeguriMapAnnotationViews.swift` ほか
+
+### セルフレビュー結果
+- ✅ 密度モード⇔ピンモードはスパンしきい値1つで排他（バブルとピンの二重表示なし）
+- ✅ RPC はセルクランプ＋LIMIT 300 でコスト上限あり。件数のみで内容は返さない
+- ✅ バブルタップのズーム先は必ず activation 未満（テストで担保）→ 実データ読み込みへ自然に接続
+- ⚠️ 密度は個人のブロック/非表示を反映しない概算値（仕様として許容）
+- ⚠️ グルームの1km閲覧制限とは独立に「存在の件数」だけを見せる。位置はセル中心に丸められるため個別特定はできない
+
+---
+
+## イテレーション1226.433：グルーム投稿の現在地更新＋圏外ピン消失修正＋圏外チャット閲覧のみ化
+
+### 背景・問題意識
+
+オーナー報告（FB 7・8）：
+1. ホーム経由のグルーム投稿で位置指定するとき、自分の位置がその時の場所に更新されていない
+2. 圏外のグルーム/チャットルームが表示されないことがある。チャットルームはたまに表示されるが、拡大や統合（クラスタ）タップで消える
+3. プレミアムの圏外チャットルームは閲覧のみなので、入力欄を出さないでほしい
+
+### 調査結果
+
+1. `GroomComposerContainer` は「座標が nil のときだけ」位置取得を開始していたため、前回取得の古い現在地が残っているとそのまま使われていた
+2. **読み込み経路の不整合**：地図パン/ズームのビューポート読み込みは `groomMapPosts`/`threads` へ**マージ**、一方で位置更新（10m毎）等で走る通常フィード読み込みは同じ配列を**置き換え**。ビューポートで取得した圏外ピンが、直後の再読み込みで丸ごと消えていた
+3. 返信ゲートは「現在地未取得」「都道府県未設定」しか見ておらず、圏外（1km外）でも現在地さえあれば入力欄が活きていた
+
+### 変更内容
+
+#### `GroomComposerContainer.swift`（FB7）
+- コンポーザを開くたびに必ず `startUpdatingCurrentLocation()`（閉じたら stop）
+- 新しい現在地が届いたら、**ユーザーが地図タップでピンを選ぶ前に限り**デフォルトピンも追随（手動選択はカスタム Binding で検知）
+
+#### `MegrumAppState`（FB8a：ビューポート蓄積ストアの分離）
+- `viewportGroomPosts` / `viewportBoardThreads` を新設。`loadMeguriMapViewport` はここへマージ（通常フィードの置き換えに消されない）
+- 地図表示は合成プロパティ `meguriMapDisplayGrooms` / `meguriMapDisplayThreads`（通常読み込み分が新鮮・優先、ビューポート蓄積分を補完）
+- いいね/削除/ブロック/遭遇フラグ/リアクション等のローカル変異・ロールバックをビューポートストアにもミラー
+- 読み取り側：ホーム地図（`MeguriScreen.visibleMapGrooms`/`visibleThreads`）とフルスクリーン地図（`MeguriMapScreen`）を合成プロパティへ切替。チャットルーム一覧（`homeNearbyBoardThreads`）は別ストアのため影響なし
+
+#### `MeguriAccessPolicy` / `BoardThreadDetailScreen.swift`（FB8b）
+- `canReplyToBoard`：書き込みは作成者か1km圏内のみ（位置なしスレッドは制約なし、現在地未取得は既存の案内に委譲）
+- 詳細画面：1km圏外（作成者以外）は**入力欄そのものを非表示**にし「1km圏外のチャットルームは閲覧のみ利用できます」バナーを表示
+- `currentThread` の解決をビューポート蓄積分も含む合成へ変更
+
+### 影響範囲
+
+- ホーム経由グルーム作成の位置プレビュー／めぐり地図（ホーム・フルスクリーン）のピン表示／チャットルーム詳細の入力欄
+- 状態遷移・DB・API 影響なし（クライアント内のデータ保持と表示ゲートのみ）
+
+### 確認方法
+
+- `swift test`：全テストパス（`canReplyToBoard` 5ケース＋ビューポートマージ1ケースを追加）
+- シミュレータビルド成功。地図の消失は実データ依存のため、実機での再現確認をオーナーに依頼
+- **ios-native のため実機反映はネイティブビルドが必要**
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/GroomComposerContainer.swift`
+- `ios-native/Sources/MegrumApp/MegrumAppState.swift` / `MegrumAppStateGroomActions.swift` / `MegrumAppStateGroomProximity.swift` / `MegrumAppStateMeguriActions.swift`
+- `ios-native/Sources/MegrumApp/MeguriScreen.swift` / `MeguriMapScreenDerivedState.swift` / `MeguriMapViews.swift` / `MeguriMapScreenActions.swift`
+- `ios-native/Sources/MegrumApp/MeguriAccessPolicy.swift` / `BoardThreadDetailScreen.swift`
+
+### セルフレビュー結果
+- ✅ ビューポート蓄積分は「新しい取得結果優先」で合成（古いデータが新鮮なデータを上書きしない）
+- ✅ ローカル変異（いいね・削除・ブロック・遭遇・リアクション）とその失敗ロールバックをミラー済み
+- ✅ チャットルーム一覧・掲示板一覧は別ストアで表示範囲の意味が変わらない
+- ✅ 入力欄の非表示は作成者を除外（自分のルームは圏外でも管理できる）
+- ⚠️ ビューポート蓄積はセッション中増える一方（削除通知が無い限り残る）。表示劣化があれば距離/件数で間引きを検討
+- ⚠️ 「圏外グルーム/チャットが最初から表示されない」ケースは 3km 取得範囲外の可能性あり。今回の修正は「取得済みが消える」問題の解消が主
+
+---
+
+## イテレーション1226.432：左スワイプのメッセージ一覧を常駐化（毎回の読み込み表示を解消）
+
+### 背景・問題意識
+
+オーナー報告：ホーム左スワイプが「結構カクカクしてる」「開くたびに読み込みしてるようです」。開く時には読み込みが終わっていて、スムーズに開くだけにしてほしい。
+
+### 調査結果
+
+データ（meguriMessages）は起動時にロード済みだが、見た目が毎回ロードに見えていた原因は2つ：
+
+1. `MegrumSlideBoolPresentationOverlay` は `isPresented || openDragOffset != nil` の時だけコンテンツをマウント → **閉じるたびに破棄・パン開始の瞬間に画面全体を再構築**（＝ドラッグ中のカクつき）
+2. さらに `MegrumDeferredContent(slidePresentation: 340ms)` で包んでいたため、**開くたびにスケルトン5行が表示**（＝毎回「読み込み中」に見える）
+
+### 変更内容
+
+#### `MegrumSlidePresentationOverlay.swift`（`MeguriInboxSlideHost` を keep-alive 化）
+- 汎用オーバーレイは使わず専用実装へ。**コンテンツを閉時も破棄せず、画面外 `screenWidth + 48pt` に退避**（+48 は presented content の影 radius24/x-8 が右端へ映り込まないためのマージン）
+- ホーム表示後 **1.2秒のアイドル時間で先読み構築**（`MegrumDeferredContentDelay.idlePrewarm` 新設）。先読み前にスワイプが始まった場合は従来どおりその場で構築（フォールバック）
+- 開閉は `restingOffset`（指追従 > 開=0 > 閉=画面外）のオフセット移動だけ。戻るスワイプ dismiss・`allowsHitTesting(isPresented)` は従来同等、閉時は `accessibilityHidden` でVoiceOver対象外に
+- `MeguriInboxSlideHostGeometry.restingOffset` として切り出しユニットテスト追加
+
+#### `MegrumAuthenticatedTabContentView.swift`
+- インボックスの `MegrumDeferredContent` ラッパーを撤去（スケルトン廃止）
+- keep-alive 化で画面の `.task` が開くたびに走らなくなったため、`isShowingMeguriMessageInbox == true` になったタイミングで `loadMeguriMessages(reportsFailure: false)` を**裏から静かに**実行（一覧は先読み済みで即表示、更新は差分反映）
+
+### 影響範囲
+
+- ホーム左スワイプ→めぐりメッセージ一覧の開閉のみ。汎用の `MegrumSlideBoolPresentationOverlay` / `MegrumSlideItemPresentationOverlay`（他画面のスライド遷移）は無変更
+- 状態遷移・データモデル影響なし
+
+### 確認方法
+
+- `swift test`：1562テスト全パス（restingOffset の3テスト追加）
+- シミュレータでビュー階層ダンプ（`MEGRUM_DEBUG_DUMP_HIERARCHY=1`）：ホーム表示中に `frame = (450 -62; 402 874)` でインボックス（ナビバー「メッセージ」・List・refresh control 含む）が**画面外に構築済み**であることを確認 = 開く前に準備完了
+- スワイプの触感は実機確認をオーナーに依頼（ios-native のため実機反映はネイティブビルドが必要）
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/MegrumSlidePresentationOverlay.swift`
+- `ios-native/Sources/MegrumApp/MegrumAuthenticatedTabContentView.swift`
+- `ios-native/Sources/MegrumApp/MegrumDeferredContent.swift`
+
+### セルフレビュー結果
+- ✅ 影の映り込み対策（+48pt退避）をテストで担保（margin > 32）
+- ✅ 閉時 `accessibilityHidden` / `allowsHitTesting(isPresented)` で操作・読み上げ対象外
+- ✅ 先読み前スワイプはその場構築フォールバックで従来と同等
+- ✅ 他画面のスライド遷移（汎用オーバーレイ）は無変更
+- ⚠️ 常駐化によりメモリ常用は一覧1画面ぶん増（List数十行想定で軽微）
+
+---
+
+## イテレーション1226.431：グッズ登録の写真〜トリミングを刷新
+
+### 背景・問題意識
+
+オーナー指摘：グッズ登録の写真ステップが「なんとなくダサい」、写真タップで手動切り抜きに入れることが伝わらない、切り抜き画面（多枠描画）もダサい。仕様から再設計し、モック（Artifact）で合意した上で実装。
+
+合意した方針：
+1. **トリミングを「隠し機能」から「追加の通り道」へ**：写真を追加した直後に必ずトリミング画面を通す
+2. **トリミング画面は1種類**：手動もまとめて登録（旧・トレカAI一括登録）も同じ画面。違いは「AIが枠を自動配置するか」だけ
+3. 手動時の初期枠は写真全体（そのまま追加でもOK）
+
+### 変更内容
+
+#### `GoodsInventoryCreateViews.swift` / `GoodsInventoryCreateActionControls.swift`（写真ステップ刷新）
+- 同大2ボタン（カメラ／写真を選ぶ）を廃止 → 破線ヒーロー「写真を追加」1枚に集約。タップでiOS標準 confirmationDialog（カメラで撮る／ライブラリから選ぶ（複数可））
+- 「トレカ専用 AIで一括登録」→「**まとめて登録**」に改名し、スカイ系グラデで色差別化＋シェブロン
+- 空状態に「追加した写真はトリミングで整えてから登録されます。」
+
+#### `GoodsInventoryCreatePhotoViews.swift`（フィルムストリップ）
+- ヘッダー「追加した写真 N件」、各サムネ右下に **cropバッジ**（タップ=再トリミングを明示）、末尾に破線＋タイル（写真追加）
+
+#### `GoodsEditorSheetPhotoActions.swift` / `GoodsEditorSheetInventoryPhotoActions.swift` / `GoodsEditorScreen.swift`（トリミング必須フロー）
+- `pendingCropUploads` キュー新設。カメラ撮影（連続撮影はカメラを閉じた後）・ライブラリ複数選択 → 1枚ずつ crop sheet を連鎖提示（sheet onDismiss 連鎖）
+- `GoodsPhotoCropSession.Source` に `.newPhoto` 追加。apply=追加＋顔タグ解析、閉じる=その写真は追加しない
+- 再トリミング（`.selectedPhoto`）も全体初期枠で開く
+
+#### `GoodsPhotoCropViews.swift` / `GoodsPhotoCropCanvasViews.swift` / `GoodsPhotoCropCanvasDragState.swift`（トリミング画面統一）
+- タイトル「トリミング」統一（まとめて登録時は「まとめて登録」＋「AIが枠を自動で配置しました」ピル）
+- **枠のドラッグ移動＋四隅ハンドルリサイズ**を実装（DragState を draw/move/resize の3モード化、最小28pt、表示領域クランプ）。空きドラッグの新規描画は補助として残置
+- 「＋ 枠を追加」破線ボタン（中央に0.4×0.4の枠を追加）
+- ツールバー「全削除」→「**リセット**」（初期枠へ戻す）
+- 追加ボタン「この切り取りで追加」→「**この内容で追加（N件）**」
+- ほぼ全体（許容2%）の枠は再エンコードせず元画像をそのまま使うパススルー（`isEffectivelyFullFrame`）
+
+#### 文言追随
+- `TutorialTourStep.swift` / `TutorialGoodsDemoScenes.swift` / `GoodsEditorDialogModifiers.swift`：「トレカ専用 AIで一括登録」→「まとめて登録」
+
+### 影響範囲
+
+- グッズ登録（マイグッズに追加）の写真ステップ・トリミング体験全般。③詳細（メンバー・シリーズ）は今回変更なし（タップ=単品編集シートは次回候補）
+- 状態遷移（notes/09）への影響なし。データモデル影響なし
+
+### 確認方法
+
+- `swift test`：1559テスト全パス（DragState の move/resize/フルフレーム判定テスト追加）
+- シミュレータ（iPhone 17 / iOS 26.5）で実操作確認：ヒーロー→ダイアログ→ライブラリ→**選択直後にトリミング自動表示**→初期枠全体→四隅リサイズ・枠移動・プレビュー連動・「この内容で追加（N件）」まで動作
+- **注意：ios-native（Swift）のためEAS Updateでは配信されない。実機反映はfeatureブランチからのネイティブビルドが必要**
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/GoodsInventoryCreate*.swift`
+- `ios-native/Sources/MegrumApp/GoodsPhotoCrop*.swift`
+- `ios-native/Sources/MegrumApp/GoodsEditorSheet*Actions.swift` / `GoodsEditorScreen.swift` / `GoodsEditorDialogModifiers.swift`
+
+### セルフレビュー結果
+- ✅ ブランドカラー直書きなし（`MegrumTheme.lavender/sky/ink/muted` を使用）
+- ✅ iOS標準コンポーネント優先（confirmationDialog・sheet・PhotosPicker を維持）
+- ✅ 用語：「まとめて登録」へ改名を notes/10 C章に反映（旧称併記）、「トリミング（グッズ登録）」を追加
+- ✅ 廃止用語（交換募集・DM等）不使用
+- ⚠️ 多枠ドラッグ描画はキャンバス上で縦スクロールを取るが、従来からの挙動で今回悪化なし
+- ⚠️ モックにあった「枠ごとの✓チェックでの採否」は、プレビューの✕削除で同等機能のため見送り
+
+---
+
+## イテレーション1226.430：左スワイプの即時反応化
+
+### 背景・問題意識
+
+オーナー報告：ホームの左スワイプでメッセージ一覧が「かなりスワイプしないと出てこない」。
+
+### 調査結果
+
+パン認識の開始条件が厳しすぎた（速度-60pt/s超＋水平1.4倍優位）。UIKitのパンは開始判定に一度失敗すると**そのタッチでは二度と始まらない**ため、ゆっくり始めたスワイプはパネルが出ないままになっていた。
+
+### 変更内容
+
+#### `MeguriInboxOpenPanGesture.swift`
+- 開始判定を「**左向きかつ水平優位ならすぐ**」へ緩和（UIPan標準の約10ptヒステリシス後の初回判定でそのまま開始）。速度の下限としきい値倍率を撤廃し、判定は移動方向ベース（移動ゼロ時のみ速度で判定）
+- スワイプ開始とほぼ同時にパネルが指に付いてくる。縦スクロール（縦優位）とタップ（移動なし）は従来どおり素通し
+
+### 影響範囲
+
+- ホームの左スワイプの開始感度のみ。コミット判定（78pt or 速度-600pt/s で開く）は不変
+
+### 確認方法
+
+- `swift test`：1556テスト全パス。触感は実機確認をオーナーに依頼
+
+### セルフレビュー結果
+- ✅ 水平優位判定は維持（縦スクロールを妨げない）
+- ✅ タップはパン不成立のため今までどおり通常発火
+
+---
+
+## イテレーション1226.429：タブ再タップで最上部へスクロール
+
+### 背景・問題意識
+
+オーナー要望：ホーム・やりとり・マイグッズ・ほしいものの各タブで、そのタブを表示中にタブアイコンを再タップしたら画面最上部へ戻ってほしい（iOS標準の挙動）。
+
+### 変更内容
+
+#### `MegrumTabScrollToTop.swift`（新規）/ `MegrumAuthenticatedTabContentView.swift`
+- 既存の `tabSelection` カスタムバインディング（同値セット時に `handleTabReselection` を呼ぶ・めぐりのリセットで実績あり）を拡張し、ホーム/やりとり/マイグッズ/ほしいものの再タップでタブごとのシグナルをインクリメント
+- `megrumScrollsToTopOnTabReselection(signal:)`：シグナル変化時にUIKit階層を幅優先で探索し、**タブ直下の最初の縦スクロールビュー**を `setContentOffset` でアニメーション付き最上部へ（横レールは縦判定で除外・既に最上部なら何もしない）。既存の suppressor / パン取付と同じUIKit走査パターンで、各画面への個別アンカー実装は不要
+
+### 影響範囲
+
+- タブ再タップ時のみ。めぐりタブの既存リセット挙動は不変
+
+### 確認方法
+
+- `swift test`：1556テスト全パス／シミュレータ起動回帰なし。再タップの実挙動は実機確認をオーナーに依頼
+
+### セルフレビュー結果
+- ✅ 再選択検出は実績ある既存機構（tabSelectionバインディング）の拡張のみ
+- ✅ 最上部にいる時の再タップは何もしない（無駄なアニメなし）
+
+---
+
+## イテレーション1226.428：いいね数の真因＝RLS修正＋pull-to-refresh退行修正（監査の反証検証より）
+
+### 背景・問題意識
+
+iter1226.427 の調査ワークフロー（15エージェント・反証検証つき）が完了し、いいね数問題の**真因**と、監査中に発見された**既存の退行**が確定した。
+
+### 調査結果（本番DBのRLSシミュレーションで裏取り済み）
+
+- **いいね数の真因はRLS**：自分のグルームのいいね数は `groom_reactions` のクライアント直読み件数が源泉だが、SELECTポリシーが「自分の行のみ」だったため、**投稿オーナーは他人のいいね行を構造的に1行も読めなかった**（実測：計2いいねの投稿でオーナー可視は1行）。何度取り直しても直らない。通知はサーバー側（security definer）生成なので「通知は来るのに数が増えない」非対称が起きていた。iter1226.427 のビューア再取得は他人グルーム・地図ピン向けには有効だが、自分のグルームには効かなかった
+- **pull-to-refresh の退行（既存）**：refresh の初期スナップショットが `groomMapPosts` を「自分の投稿のみ」で上書きした後もキャッシュキーが有効なままで再取得がスキップされ、**未遭遇の圏内他人グルームがレール・地図から消え、約100m移動か再起動まで戻らない**
+- 旧Expo端末行がオーナーに残存し、通知のたびに失敗確定のExpo送信が発火していた（ノイズ）
+
+### 変更内容
+
+#### `supabase/migrations/20260710200000_groom_reactions_owner_read.sql`（**db push適用済み**）
+- **投稿オーナーが自分の投稿のリアクションを読めるSELECTポリシーを追加**（OR合成のため既存はそのまま）。適用後のRLSシミュレーションで**オーナー可視 1→2行**を確認。クライアント無変更で、いいね数・いいねした人一覧・浮遊いいね演出・アーカイブ件数がすべて正しくなる
+
+#### `HomeScreen.swift`
+- pull-to-refresh 経路で `loadGroomMapPosts(force: true)`（未遭遇グルーム消失の退行と、いいね数のセッション内固着を同時に解消）
+
+#### `GroomViewerScreen.swift`
+- 自分のグルームの表示件数を `max(リアクション件数, フィードRPCのlike_count)` に（取得途中でも少なく見えない防御）
+
+#### 運用（本番）
+- 旧Expo端末行を revoke（毎通知の死にExpo送信を停止）
+
+### 影響範囲
+
+- グルームのいいね表示全般・ホームのpull-to-refresh。API不変（RLSポリシー追加のみ）
+
+### 確認方法
+
+- 本番RLSシミュレーション（set local role authenticated + jwt sub=オーナー）で対象投稿の可視リアクション 1→2 行を確認
+- `swift test`：1556テスト全パス
+- 実機：自分のグルームを開いていいね数が2になること（いいねした人一覧に相手が出ること）をオーナーに依頼
+
+### セルフレビュー結果
+- ✅ ポリシー追加は監査エージェントの反証検証（本番シミュレーション実測つき）を通過した案
+- ✅ 「いいねした人の開示」は元々オーナー向けUI（一覧・アバター演出）の前提どおり
+- ✅ force リフレッシュはプル操作時のみ（自動経路は従来のキャッシュ運用のまま）
+- ⚠️ 監査指摘の「APNs環境をトークン単位で持たない」設計課題はTestFlight移行時に対応
+
+---
+
+## イテレーション1226.427：左スワイプ品質・いいね数更新・プッシュ通知基盤の開通（FB3件）
+
+### 背景・問題意識
+
+オーナー報告3件：①左スワイプでチャットルーム/グルーム/グッズ画像がタップも同時発火＋スライドがカクつく ②グルームにいいねされても自分のグルームで数が増えない ③いいねのモバイルプッシュが来ない（バックグラウンドでも）。
+
+### 調査結果
+
+- **①タップ同時発火**：SwiftUIの `simultaneousGesture` は認識してもボタンタッチをキャンセルしない。**カクつき**：ドラッグの各フレームで TabContentView の @State を更新→全タブ＋全オーバーレイの body 再評価が毎フレーム走っていた
+- **②**：いいね数は `grooms`/`groomMapPosts` キャッシュの `likeCount` で、ビューア表示時に取り直していなかった（他者のいいねは自分のキャッシュへ反映されない）
+- **③本番調査で確定**：通知insert→プッシュのトリガー（`send_mobile_push_for_notification`）は存在し正しいが、(a) APNs分岐が読む `app.settings.apns_dispatch_url/secret` の**DB設定が未設定**（マネージドPostgresでは `ALTER DATABASE/ROLE ... SET` が permission denied で恒久設定不可）(b) **Edge Function `send-apns-notification` が未デプロイ** (c) APNs鍵などのシークレット未設定——プッシュ基盤は未開通だった。端末トークン登録（`notification_devices`）は正常（オーナー端末のAPNsトークンあり）
+
+### 変更内容
+
+#### ①（`MeguriInboxOpenPanGesture.swift` 新設 / `MegrumSlidePresentationOverlay` / `MegrumAuthenticatedTabContentView`）
+- **UIKitの`UIPanGestureRecognizer`へ置換**：認識開始時にUIKitが配下のタッチをキャンセルするため、行・タイル・画像上をなぞってもタップが発火しない。開始判定は左向き×水平優位（速度ベース）のみで、縦スクロールやタップは素通し
+- オフセットは `MeguriInboxOpenDragModel`（ObservableObject）へ分離し、**観測するのはスライドホスト（`MeguriInboxSlideHost`）だけ**。ドラッグ中の再描画がオーバーレイ局所に限定されカクつき解消
+
+#### ②（`MegrumAppStateGroomProximity` / `GroomViewerScreen`）
+- `refreshGroomPostSnapshot(postID:)` 新設：単発取得して `grooms`/`groomMapPosts`/`encounteredGrooms` へ差し替え。ビューアの `.task(id: currentGroom.id)` で表示のたびに取り直し、いいね数を最新化
+
+#### ③（`supabase/migrations/20260710190000_apns_dispatch_config_table.sql`・**db push適用済み**）
+- **`private.app_config` テーブル新設**（anon/authenticated から revoke、SECURITY DEFINER のトリガー関数のみ読める）。トリガーのGUC読みを `private.app_config_value()` へ差し替え
+- **`send-apns-notification` をデプロイ**し、`MEGRUM_APNS_TEAM_ID(3N67L2WV4F)/BUNDLE_ID(tokyo.megrum.native.preview)/ENVIRONMENT(development)/DISPATCH_SECRET` を設定。dispatch URL/secret を app_config へ投入
+- **配線のE2E検証済み**：テスト通知insert→トリガー→Edge Function到達（500 `missing_configuration`＝**Apple APNs鍵のみ未設定**という想定どおりのエラー）→テスト通知は削除済み
+- **残る唯一の手順（オーナー作業）**：Apple Developer > Certificates, Identifiers & Profiles > **Keys** で APNs キーを作成し `.p8` をダウンロード → リポジトリルートで
+  `supabase secrets set MEGRUM_APNS_KEY_ID=<キーID> MEGRUM_APNS_PRIVATE_KEY="$(cat ~/Downloads/AuthKey_<キーID>.p8)"`
+  を実行。これでいいね/返信/メッセージのプッシュが届く
+
+### 影響範囲
+
+- ホームの左スワイプ、グルームビューア、プッシュ通知基盤。TestFlight/本番ビルド（tokyo.megrum.native・production APNs）は別途 BUNDLE_ID/ENVIRONMENT 切替が必要（ビルド別トピック対応は今後の課題）
+
+### 確認方法
+
+- `swift test`：1556テスト全パス／シミュレータ home 回帰なし
+- プッシュ配線：本番DBで notifications insert→net._http_response にEdge Function応答を確認（実機受信はAPNs鍵設定後にいいね操作で確認）
+- スワイプの触感・タップ非発火は実機確認をオーナーに依頼
+
+### セルフレビュー結果
+- ✅ パン認識はホームタブ活性時のみ有効（isEnabledクロージャ）・縦スクロール/タップに干渉しない開始判定
+- ✅ dispatch secret はソース管理外（app_config直接INSERT＋Edge Function secrets）
+- ✅ テスト通知は検証後に削除済み
+- ⚠️ 横レール上の左スワイプはレールのパンが先に成立すればレール優先（従来どおり）
+
+---
+
+## イテレーション1226.426：グルーム列「読み込み中が続く」の根本修正（実機コンソールで特定）
+
+### 背景・問題意識
+
+iter1226.425（連続測位化）後も「アプリ起動直後のホームのグルームが読み込み中のまま」との報告。シミュレータでは再現しないため、**実機（接続済みiPhone）にデバッグログを仕込み、devicectl の --console でコールドスタートを実測**した。並行してマルチエージェント監査（ロード連鎖・測位・認証順序・表示条件・データ層の5観点＋反証検証）を実施。
+
+### 調査結果（実機ログが決定打）
+
+実機ログ：位置は数秒で到着、グルームは **8件ロード成功**、しかし **`publicProfilesByUserID` が0件のまま**。
+- レールのタイルは公開プロフィール（`publicProfilesByUserID`）で名前・アバターを表示するが、ホームのロード連鎖は**旧めぐりプロフィール（iter1226.296で表示から廃止済みの別ストア）だけを読んでいた**
+- iter1226.422 で「プロフィール未取得＝redacted（シマー）」にしたため、全タイルが**永遠に読み込み中の見た目**に（＝報告症状そのもの）。めぐりタブを開くと直るのは、めぐり側の `preloadGroomAuthorProfiles` が公開プロフィールを埋めていたから
+- 監査で確定した潜在バグ：屋内などで初回測位が来ない場合、連続測位は locationUnknown を握りつぶすため**座標もエラーも来ずスケルトンが無期限**。また `.task(id: 緯度生値)` はGPSの極小ジッタで再起動し全チェーンを再ロードする（内部キャッシュキーは1/1000度格子なのに task id だけ生値という粒度ミスマッチ）。なお「キャンセルで空フィードがキャッシュ確定する」仮説は反証済み（署名URL解決の実装上成立しない）——コミット前の isCancelled ガードは防御として追加
+
+### 変更内容
+
+#### `HomeScreen.swift`
+- ロード連鎖の著者プロフィール取得を**公開プロフィール**（`loadPublicUserProfile`、めぐりタブと同方式）へ変更
+- `.task(id:)` の座標キーを**約100m格子へ量子化**（ジッタ再起動と全チェーン再ロードを抑止）
+- **スケルトン12秒タイムアウト**：座標もエラーも来ない場合はスケルトンを畳む（座標が来れば task が読み込む）
+
+#### `MegrumAppStateGroomActions.swift`
+- グルーム取得結果のコミット前に `Task.isCancelled` を確認（キャンセル中のコミットと後続プロフィール読込を防ぐ防御。監査の反証により必須ではないが安全側）
+
+#### `GroomStoryTileViews.swift` / `GroomStoryViews.swift`
+- redacted は**初回ロード中だけ**。完了後もプロフィールが無いタイルは「ユーザー」フォールバック表示（無限シマーの再発防止）
+
+### 影響範囲
+
+- ホームのグルーム列の初期表示のみ。めぐりタブ・アーカイブのプロフィール読込は不変
+
+### 確認方法
+
+- **実機コンソール実測（修正後）**：`load.exit grooms=9 profiles=3` — 公開プロフィールが載ることを確認（修正前は profiles=0）
+- VisualQA `home` 回帰なし／`swift test` 1556テスト全パス
+- 監査ワークフロー：位置許可の再開ロジック・キャンセル→スケルトン持続説は反証済み（真因はプロフィールストア不一致で確定）
+
+### セルフレビュー結果
+- ✅ 実機のビフォー/アフターをコンソールログで裏取り（デバッグprintは検証後に全削除）
+- ✅ プロフィール取得は既存の per-user ロード＋既取得スキップを流用（新API追加なし）
+- ✅ タイムアウトは座標到着後の正常ロードを妨げない（スケルトンを畳むだけ）
+- ⚠️ 著者数が多い場合は per-user 逐次ロード。重くなれば一括APIを検討
+
+---
+
+## イテレーション1226.425：再打診の金額条件引き継ぎ・自分タイル枠・ホーム位置取得の信頼性（FB3件）
+
+### 背景・問題意識
+
+オーナー報告3件：①再打診で「打診を更新できませんでした（proposals_cash_offer_consistency違反）」②自分が何もグルーム投稿していない時は枠線を付けない ③ホームのグルーム一覧がめぐりホームを開かないと読み込まれない。
+
+### 調査結果
+
+- **①**：`proposals_cash_offer_consistency` は「金額指定あり＝金額1〜999万＋対象side＋反対側の品物≥1／金額なし＝金額・side両方NULL＋両側の品物≥1」を要求。再打診フローは**元の打診の金額条件（定価など）を引き継いでいなかった**ため、金額つき打診のカウンターで組み合わせが崩れて保存拒否（iter1226.423のエラー表示改善で今回原因が見えた）
+- **③**：ホームは一発取得（`requestLocation`）で、屋内では失敗・遅延しやすい。めぐりタブは連続更新（`startUpdatingLocation`）なので、めぐりを開くとフィード読込のグルームがホームにも現れる＝「めぐりを開かないと出ない」の正体
+
+### 変更内容
+
+#### ①金額条件の引き継ぎ＋整合の防波堤（`ProposalCreateFlow/InitialStateActions/InitialStateFlags` / `TradeDetailScreenDerivedState/Presentation` / `ProposalConfirmModels` / `MegrumAppStateTradeProposalActions`）
+- 再打診に **`initialCashSide`（ビューア視点へ変換：自分が元の受け手なら sender/receiver を反転）＋既存 `initialCashAmount`** をシード。金額側の選択モードを cash にして金額テキストへ反映
+- 入力組み立てで**金額と対象が両方そろった時だけ**送る（片方だけの残骸は落とす）
+- `cash_offer_consistency` 違反時の文言を専用化（「金額指定の条件が合っていません…」）
+
+#### ②自分タイルの枠線（`GroomStoryTileViews`）
+- 1件も投稿していない時（`hasAnyOwnGroom == false`）は**枠線を出さない**。既読のみ＝薄グレー、未読あり＝グラデは従来どおり
+
+#### ③ホームの位置取得（`HomeScreen` / `NearbyBoardViews` / `BoardThreadDetailScreen`）
+- ホーム（グルーム列・チャットルーム）を**めぐりと同じ連続更新**へ変更。屋内でも位置が取れ、めぐりタブを開かなくても読み込まれる。チャットルーム一覧・スレッド詳細のフォールバックも同様に変更
+
+### 影響範囲
+
+- 再打診（金額つき打診のカウンター）、ホームの初期読み込み、グルーム列の自分タイル。データモデル・API不変
+
+### 確認方法
+
+- `swift test`：1556テスト全パス／VisualQA `home` 回帰なし（自分グルームありのグラデ枠は維持）
+- 金額つき打診（現在 sent の2件）への再打診と、屋内でのホーム初期表示は実機確認をオーナーに依頼
+
+### セルフレビュー結果
+- ✅ ビューア視点の side 変換は「自分が元のsenderならそのまま／receiverなら反転」
+- ✅ 金額シードは既存の applyInitialCashAmountIfNeeded と衝突しない（claimフラグ別）
+- ✅ 連続更新は各画面の LocationState 解放で自動停止（画面を離れれば止まる）
+- ⚠️ 金額を「なし」に変えて再打診する場合は両側の品物が必要（制約どおり）。その際のエラー文言は具体化済み
+
+---
+
+## イテレーション1226.424：スワイプ/スライドの仕上げ＋チャットルーム2件化・未読バッジ（FB6件）
+
+### 背景・問題意識
+
+オーナー報告6件：①グルーム作成が左スライドになったがステータスバーに重なる ②グルームビューアの下スワイプで画面が縮小される→縮小せず下スライドのみ（最大で縦1/10）にしたい ③ホーム→メッセージ一覧のスワイプが指に追従せずデジタル切替になる＋チャットルーム一覧やマッチ候補の上でスワイプが反応しない ④めぐりメッセージ一覧の相手名を太字にしない ⑤候補シートで最上部からさらにスクロールでき、閉じるスワイプが奪われる ⑥近くのチャットルームは最大2件＋未読件数を右端にグラデバッジで。
+
+### 変更内容
+
+#### ①コンポーザのステータスバー重なり（`MegrumWindowInsets` / `MeguriGroomPresentationModifiers`）
+- スライドオーバーレイ配下は safe area がゼロ化されるため、**ウィンドウ実測インセット**（`MegrumWindowInsets.top/bottom`、bottomを新設）で上下を確保。黒背景のZStackで挟み、ヘッダーがステータスバー下に収まる（シミュレータで目視確認）
+
+#### ②ビューアの下スワイプ（`GroomViewerDragPresentationState`）
+- ドラッグ中の**縮小（scale）と角丸を全廃**し、下方向の追従のみに。追従上限を120pt→**84pt（画面高852ptの約1/10）**へ。閉じる判定（130pt超で離す）と、閉じる瞬間のタイルへ縮む遷移は従来どおり
+
+#### ③スワイプ追従と反応範囲（`MegrumAuthenticatedTabContentView`）
+- `.gesture` だと配下のScrollView（UIKit連携）に食われ、onChanged が届かず「終了時にいきなり開く」状態だった → **`.simultaneousGesture` に変更**し、左向き×水平優位（|横|>|縦|×1.4・-16pt超）の時だけ追従を開始。縦スクロール・タップとは併存し、チャットルーム一覧・マッチ候補の上でも反応する
+
+#### ④メッセージ一覧の相手名（`MeguriMessageViews`）
+- `.black` → `.medium`（太字をやめる）
+
+#### ⑤候補シートの上端バウンス（`MegrumScrollTopBounceDisabler` 新設 / `HomeSheetScaffold`）
+- 既存の scroll edge effect suppressor と同じUIKit走査パターンで、**囲みスクロールの bounces を無効化**。最上部からの下ドラッグが中身のバウンスに奪われず、そのままシートの閉じるジェスチャへ渡る
+
+#### ⑥チャットルーム2件＋未読バッジ（`NearbyBoardViews` / `MegrumAppState(MeguriActions/NotificationAutoRead)` / repository各層 / `SupabaseBoardClient`）
+- ホームの表示は**最大2件**（すべて見るは従来どおり）
+- `NearbyBoardUnreadPolicy`：訪問記録（`BoardThreadVisitStore`）基準の未読数（未訪問=本文+全リプライ、訪問後=以降のリプライのみ）
+- `loadBoardReplyActivity(threadIDs:)` 新設（リプライ投稿時刻の一括取得）→ `homeNearbyBoardUnreadCounts` をホーム・一覧の行右端に**紫→水色グラデのカプセルバッジ**で表示。ルームを開いた瞬間にバッジは消える（訪問記録＋即時ゼロ化）。ロック行（圏外）には出さない
+
+### 影響範囲
+
+- ホーム（チャットルームセクション・スワイプ）、グルーム作成/ビューア、めぐりメッセージ一覧、候補シート。データモデル・API不変（既存リプライテーブルへのSELECT追加のみ）
+
+### 確認方法
+
+- VisualQA: `home`（2件＋グラデバッジ3/1・すべて見る）/ `home-groom-composer`（ヘッダーがステータスバー下）確認済み
+- `swift test`：1556テスト（+1 未読ポリシー、ビューアドラッグのテストは新仕様へ更新）全パス
+- スワイプ追従・ビューアの下スライド・候補シートの閉じ操作は実機での触感確認をオーナーに依頼
+
+### セルフレビュー結果
+- ✅ バッジは共通 `MegrumTheme.primaryGradient`（直書きなし）
+- ✅ simultaneous 化の誤発火対策：水平優位1.4倍＋-16pt超のみ追従開始
+- ✅ bounce無効化は候補シートのスクロールのみ（新ヘルパーを局所適用）
+- ⚠️ 横レール上の左スワイプはレールのスクロールと同時にパネルも追従する（実機で気になるようなら次iterで調整）
+
+---
+
+## イテレーション1226.423：チャットルーム画像キャッシュ・現在地バグ・再打診/評価の詰まり修正（FB4件）
+
+### 背景・問題意識
+
+オーナー報告4件：①ホームの近くのチャットルームが開くたびに画像更新されて重い ②圏内なのにスレッドを開くと「返信には現在地が必要です」エラー＋そのメッセージが最上部でスクロールしないと見えない ③取引チャットの「条件を変えて再打診」が最後送信できない（画面も閉じない）④評価送信しても画面が閉じず完了できない。
+
+### 調査結果（③④は本番E2Eで根本原因を特定）
+
+- **③の正体はDB制約違反の闇落ち**：`proposals_meetup_required`（手渡し/両方は待ち合わせ日時・場所・座標が必須）に対し、再打診フローは待ち合わせが空のまま送信 → PATCH が 400 → 汎用「打診を更新できませんでした」で詰まる。QAユーザー＋実PATCHで再現（待ち合わせなし=400 / あり=200 negotiating で成功）
+- **④の正体は二重評価のunique違反**：`user_evaluations(proposal_id, rater_id)` はユニーク。評価済みの取引で再度送信すると 409 → 汎用エラー（画面に表示なし）で詰まる。E2Eで再現（1回目201 / 2回目409）
+- **②はルート起点の座標欠落**：ホーム/一覧からのスレッドは `coordinate: nil` で開いていた（iter1226.421の実装漏れ）
+- **①は署名URLの揮発**：取得のたびに署名トークンが変わり、URLキーのキャッシュが常にミス → AsyncImage が毎回再ダウンロード＆行の再構築
+
+### 変更内容
+
+#### ①サムネイルの安定キャッシュ（`NearbyBoardViews` / `MegrumAppStateMeguriActions`）
+- `NearbyBoardCachedThumbnail` 新設：**クエリ（署名トークン）を除いたURLをキー**に `GoodsRemoteImageDataCache` へ保存。リスト再取得で署名が変わっても再DLしない・表示も差し替えない
+- `loadHomeNearbyBoardThreads`：実内容（id/タイトル/本文/シリーズ/最新時刻/返信数/imagePaths）が同じなら published 値を更新しない（行の再構築自体を抑止）
+
+#### ②現在地の引き継ぎ＋フォールバック＋固定表示（`HomeScreen` / `NearbyBoardViews` / `MegrumAuthenticatedTabContentView` / `BoardThreadDetailScreen` / `BoardThreadDetailReplyViews`）
+- ホーム/一覧からスレッドを開く時に**現在地座標を添える**
+- `BoardThreadDetailScreen` に自前の `MegrumLocationState` フォールバック：座標未提供の圏内ルームでは自動で現在地を取得（取得中は「現在地を確認しています…」）
+- 「返信には現在地が必要です」等の注意は**タイムライン最上部→入力欄に覆い被せる固定表示**へ（ultraThinMaterial・入力欄は減光）
+
+#### ③再打診（`ProposalCreateFlow/InitialStateActions/InitialStateFlags` / `TradeDetailScreenPresentation` / `MegrumAppStateTradeProposalActions`）
+- 再打診フローに **`initialMeetup`（元の待ち合わせ）をシード**：手渡しのまま条件だけ変えて送っても待ち合わせが保持され、DB制約を満たす
+- 失敗時の文言を専用化：meetup_required →「手渡し交換は待ち合わせ（日時・場所）の設定が必要です…」、その他はサーバーメッセージ併記（確認ステップに表示される）
+
+#### ④評価（`SupabaseProposalClient` / `MegrumAppStateTradeResolutionActions` / `TradeEvaluationSheet`）
+- 二重評価（unique違反）→ 専用エラー `alreadyEvaluated` → **評価済みとして完了扱い**（画面を閉じ、評価済みフラグを永続化。以前は詰まっていた）
+- その他の失敗は原因つき文言（未完了取引→「取引完了後に評価できます」等）を**評価シート内に表示**（以前はどこにも出なかった）
+
+### 影響範囲
+
+- ホームのチャットルームセクション、チャットルーム詳細、取引チャットの再打診・評価。DBスキーマ・API不変
+
+### 確認方法
+
+- 本番E2E（QAユーザー2名＋打診を作成→再打診PATCH/評価INSERTを実行→**全データ削除済み**）で③④の再現と修正条件を確認
+- VisualQA: `home`（セクション表示の回帰なし・サムネ描画OK）
+- `swift test`：1555テスト（+4：`TradeSubmitErrorRecoveryTests`）全パス
+
+### セルフレビュー結果
+- ✅ サムネキャッシュのキーはクエリ除去のみ（パスが変われば正しく再取得）
+- ✅ 評価の「評価済み→完了扱い」はローカルフラグも更新するため評価ボタン自体が消える
+- ✅ 再打診の待ち合わせシードは既存の初期状態適用パターン（claimフラグ）に準拠
+- ⚠️ 再打診で待ち合わせを変えたいケースは既存の待ち合わせステップで編集可能（初期値が入るだけ）
+
+---
+
+## イテレーション1226.422：スワイプ追従・左スライド修正・ID重複NG・生年月日保存ほか（FB9件）
+
+### 背景・問題意識
+
+オーナー報告9件：①ホーム左スワイプは指に追従してスライドしてほしい＋メッセージ一覧の左上を「＜」に ②グルーム作成がまだ左下から出る ③認証画面のキーボード上「閉じる」が反応しない ④オンボ2/8の「グループ全体」不要＋未選択でも次へ ⑤グルームのダブルタップいいね廃止→タップで前後遷移 ⑥グルーム列が起動直後に出ず、後から「？/めぐり」で出る ⑦ユーザーID「megrum」が「megrum_(英数字)」に勝手に変わる ⑧オンボで登録した生年月日が未設定のまま ⑨通知の「いいねされました」がめぐりホーム経由で重い。
+
+### 調査結果（⑦⑧は根本原因を特定）
+
+- **⑦の正体はDB重複対策ではなくクライアントの黙殺リネーム**：`MegrumAppStateInputNormalizer.isGeneratedPlaceholderHandle` が「megrum」「megrum_〜」を自動生成プレースホルダ扱いし、保存時に `megrum_(uuid先頭12桁)` へ差し替えていた（オーナーの実データ `megrum_2bf485a05bfa` と一致）。なお「megrum」自体は5/16の旧アカウントが使用中
+- **⑧はレガシーフォールバックの黙殺**：アカウントセットアップ保存は失敗すると**無条件で** birth_date/age を含まない旧スキーマ用ペイロードへ再試行していた。本番E2Eで正常ペイロードは200で保存できること、`users_age_range_check`（age>=1）違反が400で落ちること（→旧ペイロード成功→**生年月日だけ静かに消える**）を確認
+
+### 変更内容
+
+#### ①指追従スワイプ＋「＜」戻る（`MegrumSlidePresentationOverlay/Components/Gesture` / `MegrumAuthenticatedTabContentView` / `MeguriMessageViews`）
+- `MegrumSlideBoolPresentationOverlay` に `openDragOffset`（指追従オープン用オフセット）を追加。ホームタブの低優先 DragGesture（水平優位×左向きのみ追従開始）が画面幅→0のオフセットを書き、しきい値（78pt/予測132pt）で確定＝一覧を開く／未満はキャンセルで戻す
+- メッセージ一覧の左上「閉じる」→ `chevron.backward` アイコンに変更
+
+#### ②グルーム作成を真左から（`MegrumSlidePresentation*` / `MeguriGroomPresentationModifiers` / `GroomStoryComposerViews` / `HomeScreen` / `MegrumAuthenticatedTabContentView`）
+- 原因：fullScreenCover 既定の「下から」アニメが transaction 無効化でも実機で残り、内部の左オフセットと合成されて斜めに見えていた
+- `presentationEdge: .leading` をスライド基盤に追加し、ホーム経由コンポーザは **cover をやめてタブ上位の ZStack オーバーレイ（zIndex 105）** で左からスライド。`GroomComposerLeadingSlideModifier`（内部オフセット方式）は削除。シミュレータ録画のフレーム分解で**垂直移動ゼロの純左スライド**を確認
+- 活性化アニメ予約は `appState.homeGroomActivationExpectationSignal` 経由でホームへ通知
+
+#### ③キーボードの死んだ「閉じる」（`AuthScreen`）
+- keyboard toolbar ごと削除（focusedField と各入力欄のフォーカスが紐づいておらず反応しなかった）
+
+#### ④オンボ2/8（`AccountSetupOshiMemberStep` / `AccountSetupScreen` / `OnboardingOshiSelection`）
+- 「グループ全体」行を削除。**未選択のまま次へ→そのグループを全体登録として自動補完**（`draftsFillingWholeGroupForUnselected` 新設）。サブタイトルも「選ばなければグループ・作品全体で登録されます」へ
+
+#### ⑤ビューアのタップ遷移（`GroomViewerScreen` / `GroomLikeAmbientEffects`）
+- ダブルタップいいね（0.3秒判定・ハート演出・最後の閉じ猶予）を全廃。左右タップで即前/次、最後の右タップで即閉じ。いいねは既存のボタンで
+
+#### ⑥グルーム列の初期表示（`GroomStoryViews/TileViews` / `HomeScreen` / `HomeDiscoveryExperience`）
+- 初回ロード中（位置情報→グルーム→プロフィール）は**スケルトンタイル4つ**（灰リング＋名前バー・脈動）。位置情報が拒否/エラーと確定したら畳む
+- プロフィール未取得のタイルは「？/めぐり」ではなく **redacted（読み込み中の見た目）** に
+
+#### ⑦ID重複はNG＋候補提示（`AccountHandleAvailabilityLogic` 新設 / `MegrumAppStateInputNormalizer` / repository各層 / `AccountSetupScreen/StepContent/StepViews`）
+- **黙殺リネームを廃止**：有効な入力IDはそのまま使う。ユーザーIDステップの「次へ」と最終保存前に `users` を照会（`takenAccountHandles`）し、重複なら「このユーザーIDは既に使われています」＋**空いている類似候補チップ（タップで採用）**を提示。保存時のサーバー側ユニーク違反も同文言へマッピング（レース対策）
+- プレビューは megrum / hana を使用済みとしてQA可能に
+
+#### ⑧生年月日の保存（`SupabaseAccountProfilePersistence` / `MegrumAppStateProfileSettingsActions`）
+- レガシーフォールバックを**「列が存在しない」エラー（400×column/schema cache）限定**に（セットアップ保存とプロフィール編集の両方）。制約違反・重複・通信断は闇落ちさせず、サーバーメッセージを括弧書きで表示
+- ※オーナーの既存アカウントの生年月日は消失済みのため、プロフィール編集からの再設定が必要（今回の修正で正しく保存される）
+
+#### ⑨通知→グルーム直接表示（`NotificationsScreen`）
+- グルーム系通知（ownGroom/groomDetail）は**通知一覧の上に直接ビューアを表示**（キャッシュ→単発フェッチ）。閉じると通知一覧に戻る。開けない場合（圏外×無料等）だけ従来のタブ遷移へフォールバック
+
+### 影響範囲
+
+- ホーム・めぐりメッセージ・グルーム作成/ビューア・認証・オンボーディング・通知・プロフィール保存。DBスキーマ・API不変（既存 users への SELECT 照会を追加）
+
+### 確認方法
+
+- VisualQA: `home-groom-composer`（新設・自動オープン）を録画→フレーム分解で左スライド確認 / `home`（スケルトン・位置拒否で畳む・データあり）/ 一連の既存ルート回帰
+- `swift test`：1551テスト（+7：`AccountHandleAvailabilityLogicTests`）全パス
+- 本番E2E（テストユーザー作成→確認→REST upsert→削除）で ⑧の再現と修正方針を確認
+
+### セルフレビュー結果
+- ✅ スライド基盤の変更は既存（trailing）の挙動を既定値で完全維持
+- ✅ ID照会は自分の行を除外（現IDのままはOK）・照会失敗時は保存時のサーバー判定に委譲
+- ✅ レガシーフォールバック判定は PGRST204/42703 のメッセージ実物でテスト
+- ⚠️ 指追従スワイプ・左スライドの触感、通知→ビューアの実データ挙動は実機確認をオーナーに依頼
+
+---
+
+## イテレーション1226.421：ホームに「近くのチャットルーム」＋一覧（フィルター／圏外プレミアムゲート）
+
+### 背景・問題意識
+
+オーナー要望：①ホームのグルーム列の下に圏内チャットルームを LINE のメッセージ一覧風（タイトル・最新メッセージ・サムネ・最新投稿日時）で出したい（導線のみ）。複数あれば「すべて見る＞」で一覧へ ②めぐりホームの右下に固定フッターでチャットルーム一覧アイコン ③一覧は固定フッターのフィルターでトピック・シリーズ名絞り込み ④圏外の掲示板は無料会員にも一覧表示するが開けず、プレミアム誘導ポップアップを出す。
+
+### 変更内容
+
+#### `NearbyBoardViews.swift`（新規）
+- `NearbyBoardListPolicy`：純ロジック（キーワード＝タイトル/本文/シリーズ名の部分一致、シリーズ絞り込み、**開ける→ロックの順＋各グループ内は最新アクティビティ降順**、シリーズ名一覧の重複除去）
+- `NearbyBoardThreadRow`：LINE風の行。48ptサムネ（画像なしは吹き出しプレースホルダ）・タイトル・最新メッセージ（リプライプレビュー→無ければ本文）・右端に相対日時。ロック時は錠アイコン＋減光
+- `HomeNearbyBoardSection`：ホーム用「近くのチャットルーム」カード（最大3行、**2件以上で「すべて見る＞」**）
+- `NearbyBoardListScreen`：一覧画面。右下**固定フッターのフィルターボタン**（54ptグラデ円）→ `NearbyBoardFilterSheet`（キーワード＋シリーズチップ）。適用中はヘッダー下に解除チップ
+- `BoardLockedPremiumSheet`：圏外×無料のポップアップ（「圏外のチャットルームです」→「Megrumプレミアムを見る」で `SubscriptionSettingsScreen`）
+
+#### `MegrumAppState` / `MegrumAppStateMeguriActions`
+- `homeNearbyBoardThreads` を新設。`loadHomeNearbyBoardThreads(latitude:longitude:)` は `allowsExtendedBoardAccess: true` で**圏外も含めて取得**（開けるかは既存 `MeguriAccessPolicy.canOpenBoard` でクライアント判定）＋先頭30件のリプライプレビューを先読み
+
+#### `HomeScreen` / `HomeDiscoveryExperience` / `MegrumAuthenticatedTabContentView` / `MeguriScreen`
+- ホーム：グルーム列直下にセクション表示。行タップ→既存のスレッド詳細スライド（zIndex 109）、ロック行→プレミアムポップアップ
+- 一覧は `MegrumSlideBoolPresentationOverlay`（zIndex 108＝詳細の下）でスライド表示
+- めぐりホーム右下に固定フッターアイコン（text.bubble・54ptグラデ円）→ 同じ一覧を開く
+
+#### 付随修正
+- `MeguriHomeChromeViews`：位置情報の許可促し文（「〜チャットルームを表示できます」）が「投稿できませんでした」見出しに誤マッチしていたのを修正（案内文は「現在地をオンにしよう」）
+- `PreviewMegrumRepositoryMeguri`：`loadBoardReplyPreviews` を本番同様（最新リプライ先頭）に実装、nearby3km のプレビュースレッドを3件へ増量（圏内2＋圏外1）
+- VisualQA：`nearby-board-list` / `nearby-board-filter` / `nearby-board-locked` ルート追加
+
+### 影響範囲
+
+- ホーム・めぐりホーム・チャットルーム一覧（新規）。取得は既存 `loadBoardThreads` の別バッファのため、めぐりタブのフィードとは独立。データモデル・API不変
+
+### 確認方法
+
+- VisualQA: `home`（セクション＋ロック行）/ `nearby-board-list`（無料・プレミアム両方）/ `nearby-board-filter` / `nearby-board-locked` / `meguri`（右下アイコン）スクショ確認済み
+- `swift test`：1544テスト（+5：`NearbyBoardListPolicyTests`）全パス
+
+### セルフレビュー結果
+- ✅ ブランドカラー直書きなし（MegrumTheme トークンのみ）
+- ✅ ロック判定は既存 `MeguriAccessPolicy.canOpenBoard` を流用（1km・作者・プレミアムの既存仕様に追従）
+- ✅ 一覧→詳細は既存スレッド詳細ルートを再利用（重複実装なし）
+- ⚠️ ホームのセクションは位置情報許可が前提（未許可時は非表示のまま）。許可導線はグルーム列の既存挙動に委ねる
+
+---
+
+## イテレーション1226.420：登録済みメール拒否・認証背景統一・グルーム列改善・ホーム導線刷新（FB6件）
+
+### 背景・問題意識
+
+オーナー報告6件：①登録済みメールで新規登録できてしまう（列挙防止の擬似成功）②新規登録画面のステータスバーが真っ白 ③初回起動でグルーム列が空＋同一ユーザーのグルームがバラバラに並ぶ ④ホーム経由のグルーム作成がステータスバーに被る＆左下からスライドして見える ⑤ホーム両端に謎の余白（レールが画面端まで行かない）⑥ヘッダーの「？」を紙飛行機（めぐりメッセージ）へ＋左スワイプ遷移。
+
+### 変更内容
+
+#### ①登録済みメールの拒否（`SupabaseAuthDTOs/ClientSupport/SupabaseAuthClient` / `MegrumAuthStateSignUpActions`）
+- GoTrue は登録済みメールでも列挙防止で200の擬似ユーザーを返すが、**identities が空配列**になる仕様を利用して検出。`SupabaseAuthError.emailAlreadyRegistered` を新設し、「このメールアドレスは登録済みです。ログインしてください」を表示（コード入力へは進ませない）
+
+#### ②認証画面の背景統一（`AuthScreen` ＋各認証画面）
+- グラデ背景（canvas＋radial lavender）を **AuthScreen の ScrollView 全体**へ一本化（ignoresSafeArea でステータスバーまで到達）。各画面個別の `authVisualBackground()` を撤去（二重描画によるトーン差も解消）
+
+#### ③グルーム列（`GroomStoryViews` / `HomeScreen`）
+- **初回空問題**：グルーム取得が認証データ同期より先に走ると空振りし、座標が変わらない限り再試行されなかった。`hasLoadedHomeCandidates` 確定を追加トリガーに再取得＋pull-to-refresh でも再取得
+- **ユーザー単位グルーピング**：同一投稿者のグルームを1タイルに集約（未読優先順は維持・複数件は件数バッジ）。タップでそのユーザーの開けるグルームを**古い→新しい順**に連続閲覧（既存のシーケンスビューアを再利用）。全件ロック（圏外×無料）ならプレミアム案内
+
+#### ④グルーム作成（`GroomStoryComposerViews`）
+- `GroomComposerLeadingSlideModifier` が GeometryReader＋ignoresSafeArea で包んでいたのが原因（ヘッダーがステータスバーへ食い込み・初回レイアウト揺れで左下から見えた）。**画面幅ぶんの単純オフセット**に変更し、safe area は中身に委ねる → 正しく「左から」スライド＆ヘッダーがステータスバー下に収まる
+
+#### ⑤レールのフルブリード（`HomeDiscoveryExperience` / `GroomStrip` / `HomeDiscoverySection`）
+- グルーム列・「求められているグッズ」列を **親の20pt余白を打ち消して画面端までスクロール**（コンテンツ先頭/末尾は20ptインセットで整列）。`HomeDiscoverySection` に `fullBleedRail` を追加（シート内の既存利用は不変）
+
+#### ⑥めぐりメッセージ導線（`HomeDiscoveryExperienceChrome` / `HomeScreen` / `MegrumAuthenticatedTabContentView`）
+- ヘッダー右端の「？」→ **紙飛行機（paperplane）** に置換し、タップで既存の `MeguriMessageInboxScreen` をスライド表示
+- ホームの**左スワイプ**（横-70pt超・縦60pt未満）でも同じ遷移。横レール上のドラッグは各レールの ScrollView が先に消費するため誤発火しない。ヘルプシート本体は残置（導線のみ撤去）
+
+### 影響範囲
+
+- 認証（登録判定・背景）、ホーム（レール・ヘッダー・ジェスチャ）、グルーム作成の表示のみ。データモデル・API不変
+
+### 確認方法
+
+- VisualQA: `auth-email-sign-in`（ステータスバーまでグラデ）/ `home`（紙飛行機・レール位置）目視確認済み。全1540テストパス
+
+### セルフレビュー結果
+- ✅ identities 検出は decode 失敗時も安全側（従来どおりコード入力へ）
+- ✅ グルーピングは表示専用（既読・ロック判定は従来ポリシー流用）
+- ⚠️ 左スワイプとホーム横レールの共存は実機での触感確認をオーナーに依頼
+
+---
+
+## イテレーション1226.419：パスワード変更エラーの誤文言修正＋設定画面からの再設定フロー
+
+### 背景・問題意識
+
+オーナー報告2件：①再設定コード検証後の新パスワード設定で「再設定メールを送れませんでした」エラー ②ログイン後の設定画面から再設定メールを送っても「6桁のコードを入力してください」と出るだけで入力先がない。
+
+### 調査結果（①はE2Eで根本原因を特定）
+
+- 本番相当のE2E（テストユーザー作成→SQLで確認済み化→ログイン→PUT /auth/v1/user→削除）で検証：
+  - **PUT自体は正常**（別パスワードなら200 → リクエスト形状に問題なし）
+  - **既存と同じパスワードを設定すると 422 `same_password`**（"New password should be different from the old password."）
+- 旧実装はこの422を `.passwordReset` コンテキストの汎用文言「再設定メールを送信できませんでした…」へフォールバックしていた＝**誤誘導**。オーナーは現在のパスワードを入力していた可能性が高い
+
+### 変更内容
+
+#### `MegrumAuthStateEmailCodeActions.swift`
+- パスワード更新の失敗を専用マッピング `passwordUpdateErrorMessage(from:)` へ：**同一パスワード→「現在のパスワードと同じです。別のパスワードを入力してください」**／8文字未満／401・403（コード期限切れ→やり直し誘導）／その他はサーバメッセージを括弧書きで表示（原因の闇落ち防止）
+
+#### `PasswordResetCodeFlowSheet.swift`（新規）/ `SettingsLoginSecurityViews.swift`
+- 設定＞ログインとセキュリティの「再設定メールを送る」成功時に、**確認コード入力→新パスワード設定のシート**を自動表示（AuthCodeEntryScreen / AuthNewPasswordScreen を再利用）。完了で自動クローズ＋「パスワードを変更しました」
+- フッター文言を確認コード方式の説明に更新（旧「再設定リンク」表現を撤去）
+
+### 影響範囲
+
+- パスワード再設定フロー（未ログイン/ログイン済み両方）。他の認証フローは不変
+
+### 確認方法
+
+- E2E手順は上記（テストユーザーは削除済み）。全1540テストパス
+
+### セルフレビュー結果
+- ✅ 422 same_password の再現と修正後文言をE2Eで確認
+- ✅ 設定からのフローは既存2画面の再利用（新規UIなし）
+- ⚠️ 設定シートの実機タップ確認はオーナーの次回試行時に
+
+---
+
+## イテレーション1226.418：メール認証を確認コード（OTP）方式へ
+
+### 背景・問題意識
+
+オーナー指示：「新規登録・ログイン・パスワード再設定は、リンクを送るのではなく確認番号を送ってアプリで入力したら次に進める設計にしたい」。リンク方式はメールアプリ↔ブラウザ↔アプリの往復が発生し、モバイルでの離脱要因だった。
+
+### 変更内容
+
+#### フロー（GoTrueのOTP検証 `/auth/v1/verify` を使用）
+- **新規登録**：signup → コード入力画面 → `verify(type=signup)` → セッション取得で**即ログイン**（オンボーディングへ）
+- **パスワード再設定**：recover → コード入力画面 → `verify(type=recovery)` → **新パスワード設定画面** → `PUT /auth/v1/user` → そのままログイン
+- **ログイン**：メール未確認のままログインした場合を検出し、確認コードを自動再送してコード入力画面へ誘導（パスワードログイン自体は従来どおり）
+
+#### Supabase側（Management APIで適用済み）
+- `mailer_otp_length` 8→**6**
+- 確認メール/再設定メールのテンプレートを**リンク→6桁コード表示**へ差し替え（{{ .Token }}・大きな等幅表示・有効期限1時間の注記）
+- ※この過程で**SMTPホストが smtppro.zoho.jp に修正済み**（オーナー対応）なのを確認し、`/auth/v1/recover` が **HTTP 200** を返すこと＝メール送信の復旧を確認
+
+#### アプリ（データ層→状態→UI）
+- `SupabaseAuthClient`: `verifyEmailOTP` / `updateUserPassword` / `resendEmailOTP` を追加（DTO・リクエストビルダー含む）
+- `MegrumAuthRepository`: `verifyEmailCode` / `resendEmailCode` / `updatePassword`（既定実装・Preview実装付き）
+- `MegrumAuthState`: `pendingSignUpCodeEmail` / `pendingRecoveryCodeEmail` / `recoverySession` と `MegrumAuthStateEmailCodeActions`（検証・再送・新パスワード確定。コード不一致/期限切れは専用文言）
+- UI: `AuthCodeEntryScreen`（6桁ボックス・`.oneTimeCode` でメールからの自動入力対応・6桁で自動送信・再送リンク）/ `AuthNewPasswordScreen`。`AuthFlowRoute` に signUpCode / recoveryCode / newPassword を追加
+- VisualQA: `auth-signup-code` / `auth-recovery-code` / `auth-new-password`
+
+### 影響範囲
+
+- メール系認証フロー全体。Apple/Googleログインは不変。旧リンクは無効化（テンプレートから撤去）
+- web/（管理画面）でメールリンクに依存する画面があれば要確認（ユーザー向けはiOSのみのため影響は限定的）
+
+### 確認方法
+
+- `/auth/v1/recover` 直叩きで200（テンプレ更新後）。VisualQAで3画面を目視確認
+- 全1540テストパス（成功メッセージ文言の期待値3件を更新）
+
+### セルフレビュー結果
+- ✅ コード検証失敗（401/403/otp/expired）は「再送してやり直し」の分かる文言に変換
+- ✅ 新パスワードは8文字以上バリデーション（登録時と同一基準）
+- ⚠️ 実機での端到端確認（実メール受信→コード入力）はオーナーの次回試行時に
+
+---
+
+## イテレーション1226.417：「求めてる？」を超求めてる？と同じ3列リッチシートへ＋やりとり一覧の未設定アバター
+
+### 背景・問題意識
+
+オーナー指示：「求めてる？のグッズ（相手のほしいものと自分のマイグッズに不確定要素がある時）も、超求めてる？と同じように相手の条件・条件のグッズ確認・画像検索を出し、相手希望/マイグッズに分けてほしい」「やりとり一覧のアイコン未設定はグレー人型に」。
+求めてる？は従来2列のwishシート（HomeWishHitDetailSheet）に落ち、相手のほしいものの条件が見えず、不確定（？）を自分で確かめる手段が無かった。
+
+### 変更内容
+
+#### `HomeWishWantedOptionFactory.swift`（新規）
+- 相手のほしいもの行（SupabaseHomeGoodsRow）を**条件型の選択肢**（HomeIndividualListingWantedOption / kind=.condition）へ合成：短文タイトル（「サナのトレカ」式）・条件文（TWICE / サナ / トレカ / #シリーズ）・確定/不確定の自分グッズID・ほしいもの写真を参考画像に
+
+#### signals 配線（`HomeCandidateConditionSignals(+Builder)` / `HomeCandidatePartnerDemandSummary` / `HomeCandidatePartnerOfferEvaluation`）
+- `wishWantedOptions` を**個別募集とは別フィールド**で追加。需要判定（超求＝個別募集）には使わないため、ホーム行の「求めてる？」表示は不変
+
+#### `HomeDiscoverySheetPayload.wishTentativeRichPayload` / `HomeDiscoverySheetContent`
+- **不確定のみ**（確定の求！を含まない）wishマッチの場合、合成選択肢を individualListingSelection に載せ替えた goodsHit 相当ペイロードで **HomeGoodsHitDetailSheet を表示**。3列（うけとる｜相手希望（？バッジ）｜マイグッズ）・条件カード・「条件のグッズを確認！」（参考画像/Google画像検索）・選択肢ピル（ほしいもの複数時）がそのまま出る
+- 確定を含む求！は従来の2列wishシートのまま
+
+#### `TradeCardComponents.swift`
+- やりとり一覧の相手アバター未設定時：頭文字ラベンダー地 → **グレー人型（person.fill）**プレースホルダ
+
+#### `CandidateSheetVisualQAPreview.swift`
+- variant `wish-tentative` を追加（条件=TWICE/サナ/トレカ/#Ready to be・不確定2件）
+
+### 影響範囲
+
+- 求めてる？のタップ後のみ。求！・超求系・探し中・ホーム行の需要表示は不変。打診の組み立ては goodsHit と同一機構
+
+### 確認方法
+
+- VisualQA: `candidate-sheet` + `MEGRUM_VISUAL_QA_CANDIDATE_VARIANT=wish-tentative`（3列・？バッジ・条件・画像検索を目視確認済み。`condition` バリアントと挙動一致）
+- 全1540テストパス
+
+### セルフレビュー結果
+- ✅ 需要ランク（超求/求の区別）へ影響なし（別フィールド設計）
+- ✅ 相手希望の？バッジ・マイグッズの畳み（＋選ぶ）は超求めてる？と同一コンポーネント
+- ⚠️ 確定+不確定が混在する求！は従来2列のまま（不確定分の確認導線は次段候補）
+
+---
+
+## イテレーション1226.416：支払い方法・交換条件・推しを追加シートを新デザイン言語へ刷新
+
+### 背景・問題意識
+
+オーナー指示：「支払い方法の設定画面や、交換条件の設定画面のデザインも新しいデザインに合わせて刷新して欲しい。推し設定の『推しを追加』のデザインも」。iter1226.404〜407 で確立した規約（semibold基調・40pt小アイコン・チェックマーク選択・淡い塗りフィールド・primaryGradient CTA・radius12/16/20）への追随。
+
+### 変更内容
+
+#### 支払い方法設定（`PaymentSettingsMethodViews/Components/BankAccountViews.swift`）
+- 方法行：左の大型ラジオ（28pt）＋68ptアイコンタイル → **40ptアイコン＋右端チェックマーク円（24pt）**。タイポ 18pt black→15.5pt semibold
+- 「その他」自由入力：左ラベル横並び → **上ラベル＋淡い塗り**（文字数カウンタはラベル行右端へ）
+- 銀行口座行・追加ボタン：48→40ptアイコン・black→semibold。口座エディタの入力行も上ラベル化
+- セクション見出し 20pt black→16pt bold。カード radius24→20。エラー色の茶系直書き→conditionExact
+- 下部バー：キャンセル=`.megrumSecondary`（幅132固定）／保存=`.megrumPrimary`
+
+#### 交換条件設定（`HomeExchangePreferenceCardViews` / `HomeExchangeSettingsChromeViews/Content/ScreenComponents.swift`）
+- 方法カード：左上の空ラジオ廃止 → **選択＝ラベンダー枠＋淡い塗り＋右上チェックバッジ**（グッズサムネと同作法）
+- 送料/発送目安チップ：選択＝単色ラベンダー → **primaryGradient**、black→semibold、高さ38
+- ヘッダー：title2 black→17pt bold、「閉じる」白ピル→中立カプセル。操作ガイドバナーを淡いラベンダー地に軽量化
+- 保存フッター：独自ラベンダーグラデ60pt → `.megrumPrimary`
+
+#### 推しを追加シート（`OshiMasterSelectHeader/Footer` / `OshiMasterCandidateTag` / `OshiGenreSegmentBar.swift`）
+- タイトル22pt black→20pt bold、×=40pt中立円、追加リクエスト=36ptチップ
+- 候補タグ：選択＝単色ラベンダー → **primaryGradient**（登録済みロックは淡ラベンダー維持）、black→semibold
+- ジャンルセグメント：選択＝primaryGradient。検索欄＝白ピル→ink4%塗り radius12。登録ボタン=`.megrumPrimary(height:54)`
+- `OshiMasterSelectLayoutMetrics`（テスト固定値）は不変
+
+#### VisualQA
+- `payment-settings` / `exchange-settings` / `oshi-master-select`（推し設定＋マスタシート自動表示）ルートを追加
+
+### 影響範囲
+
+- 3画面の見た目のみ。保存・選択ロジック、レイアウトメトリクス、口座エディタのForm構造は不変
+
+### 確認方法
+
+- 各ルートでbefore/afterスクショ比較済み。全1540テストパス
+
+### セルフレビュー結果
+- ✅ `.megrumPrimary`/`.megrumSecondary`/primaryGradient で単色ラベンダーの面塗りを一掃
+- ✅ 3画面とも選択表現を「チェックマーク」に統一（空ラジオ廃止）
+- ⚠️ 口座エディタシート（iOS標準Form）は標準準拠のため未改変
+
+---
+
+## イテレーション1226.415：通知の右端対象サムネ（storageパス保存＋表示時の署名URL解決）
+
+### 背景・問題意識
+
+iter1226.413 で見送った「右端の対象サムネ」をオーナー指示で実装。非公開バケットの署名URLは失効するため、URL焼き込みではなく**パス保存＋表示時解決**方式にする。
+
+### 変更内容
+
+#### `supabase/migrations/20260710170000_add_notification_thumbnail.sql`（新規・**db push 適用済み**）
+- `notifications` に `thumbnail_url`（公開URL用）/ `thumbnail_bucket` + `thumbnail_path`（非公開バケット用）を追加
+- サムネは**中央ヘルパー内で参照IDから導出**（呼び出し側の変更ゼロ）：
+  - 取引系＝proposal → 提示グッズ（receiver_have_ids[1] 優先）の `goods_inventory.photo_urls[1]`（**公開**goods-photos → thumbnail_url 焼き込み）
+  - めぐり系＝groom_reply / groom_reaction / meguri_message（source groom）→ `groom_posts.image_path`、board_thread → `image_paths[1]`（**非公開** groom-posts / meguri-board-media → bucket+path 保存）
+- 直接insertの `notify_groom_post_published` / `notify_meguri_board_thread_posted` も投稿画像を焼き込み
+
+#### Swift
+- `MegrumNotification` に thumbnailURL / thumbnailBucket / thumbnailPath。Row select に3列追加
+- `MegrumRepository.resolveNotificationThumbnailURL(bucket:path:)`（既定 nil / Supabase実装＝`createSignedURL` 1時間）。**通知ロード時に重複パスを1回だけ署名解決**して `notificationThumbnailURLByID` に保持（`MegrumAppState.resolveNotificationThumbnails`）
+- 行UI：右端に44pt角丸サムネ（単独行・いいね集約行とも）。閲覧権限なし・削除済み等で解決失敗した場合はサムネなしに退化
+- プレビューデータにサムネ付き通知を追加（VisualQA検証用）
+
+### 影響範囲
+
+- 通知センターの表示のみ。署名は閲覧者の権限で行われるため、非公開グルームの権限制御は Storage RLS 側で維持される
+
+### 確認方法
+
+- `supabase db push` 適用済み。全1540テストパス（select期待値を更新）。VisualQA `notifications` でサムネ表示を目視確認済み
+
+### セルフレビュー結果
+- ✅ 署名URLの失効問題なし（表示のたびに解決・1時間有効）
+- ✅ 呼び出し側トリガー無変更（中央ヘルパー導出）
+- ⚠️ 既存通知行はサムネ null（本マイグレーション以降の通知から有効）
+
+---
+
+## イテレーション1226.414：ホーム塊ラベルの検索起動を廃止＋認証メール不達の原因特定（Zoho SMTP認証失敗）
+
+### 背景・問題意識
+
+オーナー報告3件：①パスワード再設定メールが「送信できませんでした」②新規登録の確認メールが届かない（既存メールでも「送信しました」表示）③ホームのメンバー名（塊ラベル）タップで検索が走るのは不要。
+
+### 調査結果（①②はアプリではなくインフラ起因）
+
+- `/auth/v1/recover` 直叩き → **500 "Error sending recovery email"**、`/auth/v1/signup`（新規メール）→ **500 "Error sending confirmation email"**。GoTrueのメール送信自体が失敗
+- Management API で確認：カスタムSMTP＝**smtppro.zoho.com:587 / info@megrum.jp**。同ホストへのSMTPログインは **535 Authentication Failed**
+- → **Zoho側の認証情報が無効**（アプリパスワード未発行/失効、またはZoho Japan DCなら smtp.zoho.jp 系が正）。**修正はオーナーのZoho/Supabaseダッシュボード作業が必要**（本イテレーションでは変更不可）
+- 「既存メールで新規登録しても『確認メールを送信しました』と出る」のはSupabaseの**アカウント列挙防止仕様**（登録有無を漏らさないため常に同じ応答）。SMTP復旧後もこの表示自体は正常挙動
+
+### 変更内容（③）
+
+#### `HomeDiscoveryCandidateSummaryRow.swift` / `HomeDiscoveryCandidateButton.swift`
+- 塊ラベル（メンバー名/メンバー×シリーズ名）のButtonを**表示のみのText**に変更。タップは行全体のシート表示に委ねる
+
+#### `HomeDiscoverySection.swift` / `HomeDiscoverySeeAllSheet.swift` / `HomeDiscoveryExperience.swift` / `HomeDiscoveryExperienceActions.swift` / `HomeDiscoveryLookupSheets.swift`
+- 不要になった `onSearch` / `onSearchCandidate` パラメータと `openSearch(for:)` / `searchSource` を削除（デッドコード除去）。検索画面への他導線（虫眼鏡ボタン等）は不変
+
+### 影響範囲
+
+- ホーム候補行・グリッドカード・すべて見るシート・求められているグッズ一覧の塊ラベル。検索機能自体は不変
+
+### 確認方法
+
+- 全1540テストパス。実機再インストール済み
+
+### セルフレビュー結果
+- ✅ ラベルの見た目は不変（挙動のみ変更）、accessibilityの「◯◯で検索」ラベルも撤去
+- ⚠️ ①②の恒久対応はオーナー作業（Zohoアプリパスワード再発行→SupabaseダッシュボードのSMTP設定更新）待ち
+
+---
+
+## イテレーション1226.413：通知の行為者アバター・いいね集約＋シリーズ候補の3層化（iter1226.408/412の将来課題）
+
+### 背景・問題意識
+
+iter1226.408 の将来課題「行為者アバター先頭・『他N人』集約はDB拡張が必要」と、iter1226.412 の「よく使うシリーズはデータ供給拡張が必要」をオーナー指示でクリアする。
+
+### 変更内容
+
+#### `supabase/migrations/20260710150000_add_notification_actor.sql`（新規・**db push 適用済み**）
+- `notifications` に `actor_user_id`（FK users・on delete set null）/ `actor_display_name`（60）/ `actor_avatar_url`（1000）を追加。表示名・アバターは**挿入時スナップショットとして非正規化**（title の名前焼き込みと同方式。JOIN・grants・RLS複雑化を回避）
+- 挿入経路4つのうち中央2ヘルパー（`create_trade_notification` / `create_meguri_notification`）は **p_actor_id を既に受領していた**ため保存を追加するだけ（トリガー側は全て不変）。直接insertの `notify_groom_post_published` / `notify_meguri_board_thread_posted` は投稿者を actor として焼き込むよう最新本体を再作成
+- `megrum_notification_actor_avatar_url()` ヘルパー新設。運営アナウンス等 actor 不在は null
+
+#### Swift（MegrumCore/Data/App）
+- `MegrumNotification` に actorUserID / actorDisplayName / actorAvatarURL。`NotificationRow.select` に3列追加
+- **アバターファースト行**：actor がある通知は38ptアバター＋右下に種別ミニバッジ、無い通知は従来の種別アイコン円へフォールバック
+- **いいね集約**（`NotificationCenterDisplayItem`・純ロジック）：同じ linkPath（同じグルーム）への groom_liked 2件以上を「**ハナさん、他N人がいいねしました**」に集約。重ねアバター（重複行為者除外・最大3）＋ハートバッジ。タップで束ねた全通知を既読化→最新の遷移先へ。1件だけのいいねは通常行
+- プレビューデータに actor 付き通知＋同一グルームへのいいね2件を追加（VisualQA検証用）
+
+#### `GoodsEditorTagSuggestionBuilder.swift`（シリーズ候補の3層化）
+- ①同グループでよく使う（頻度順）→②**他グループ含む自分がよく使うシリーズ**（「会場限定」等の横断タグを拾う）→③定番、の3層に拡張。**グループ未選択時も②③を返す**（従来は空）。シリーズ登録シートの「候補」にそのまま供給される
+
+### 影響範囲
+
+- 通知センター（表示のみ・ルーティング/既読管理は不変）、シリーズ設定シートの候補。DBは追加列のみで既存行は actor null（フォールバック表示）
+
+### 確認方法
+
+- `supabase db push` 適用済み。`swift test` 全1540件パス（select期待値・プレビュー件数のテストを新仕様に更新）
+- VisualQA `notifications` で集約行・アバターバッジ・フォールバックを目視確認済み
+
+### セルフレビュー結果
+- ✅ 通知トリガーは中央ヘルパー差し替えのみで呼び出し側無変更（回帰リスク最小）
+- ✅ notes/05 を v2.65 に更新
+- ⚠️ 右端の対象サムネ（グッズ/グルーム画像）は Storage 署名URLの寿命問題があるため未実装のまま（実装するなら storage パス保存＋表示時解決が必要）
+- ⚠️ 既存通知行は actor null のため、新表示は本マイグレーション以降の通知から効く
+
+---
+
+## イテレーション1226.412：シリーズ登録シートを検索ファースト化（ペースト・絞り込み・新規追加行）
+
+### 背景・問題意識
+
+デザイン刷新FB項目8：「シリーズ登録の画面を洗練させたい。紐づく画像のプレビュー、文字入力中のサジェスト、新しく登録したい場合、Google Lensでコピーしてくるのでペーストボタン」。
+調査の結果、**候補チップの画像プレビュー（1タップ目でプレビュー・2タップ目で確定）と Google Lens 連携は実装済み**（TagCandidatePreviewSelector）。欠けていたのは①ペーストの1タップ導線、②入力中の絞り込み、③新規シリーズ追加の明示的な導線。
+
+### 変更内容
+
+#### `GoodsBulkTagSheet.swift`（構成刷新）
+- **検索ファースト**：入力欄をシート最上部へ移動。虫眼鏡＋TextField＋クリア（xmark.circle）＋**「ペースト」ボタン**（UIPasteboardから貼り付け→フォーカス、Google Lensでコピーした名前を1タップ投入）
+- **インクリメンタル絞り込み**：入力中に候補チップを部分一致（大文字小文字無視）でフィルタ。全滅時は全候補に戻す（選び直しやすさ優先）
+- **新規追加行**：既存候補と完全一致しない入力がある時「＋「◯◯」を新しいシリーズとして追加」行を表示（タップで即適用・従来のツールバー「追加」も残置）
+- Google Lens セクションのフッターに「コピーしたら上の『ペースト』で貼り付け」の案内。エラー文字色を .red → conditionExact
+
+#### `GoodsBulkTagSheetState.swift`
+- `filteredCandidates(from:)` / `showsNewSeriesRow(in:)` を追加（純ロジック）
+
+#### `Tests/MegrumAppTests/GoodsEditorDraftTests.swift`
+- 絞り込み・全滅時フォールバック・新規行の完全一致判定のテスト2件追加（38件パス）
+
+### 影響範囲
+
+- シリーズ設定シート4呼び出し箇所すべて（グッズ編集・一括登録・コレクション・個別募集条件）。呼び出しAPIは不変
+
+### 確認方法
+
+- `swift test --filter GoodsEditorDraftTests`／全体 1538テストパス
+
+### セルフレビュー結果
+- ✅ 呼び出し側の変更ゼロ（4箇所互換）
+- ✅ 既存のプレビュー/Google Lens 挙動を破壊していない（構成移動のみ）
+- ⚠️ 「あなたがよく使うシリーズ」セクションは candidateNames のデータ供給拡張が必要なため未実装（呼び出し側で使用履歴を混ぜる将来課題）
+
+---
+
+## イテレーション1226.411：「◯◯を探し中」候補の専用シート
+
+### 背景・問題意識
+
+デザイン刷新FB項目3：「『◯◯のトレカを探し中』みたいなパネルを押した後の画面について。何を表示すべき？」。lookingFor（マッチなし・相手の探し物テキストだけがある）候補は goodsHit シートのレガシーフォールバックUIに落ち、何をすべきか分からない画面だった。
+
+### 変更内容
+
+#### `HomeLookingForHitDetailSheet.swift`（新規）
+- **相手の探し物を主役に**：「この人が探しているもの／「◯◯」」の引用カード（虫眼鏡アイコン・ラベンダー6%地）を最上部に
+- 取引ブロックは求シートと同寸の2列：**うけとる＝相手グッズ確定（打診で相談）⇄ ゆずる＝全在庫から1件手動選択**。プリセレクトなし
+- **関連度順ソート** `HomeLookingForOfferOrdering`（純ロジック）：探し物テキストとタイトル(+4)/メンバー(+3)/シリーズ(+2)/グループ・種別(+1)の双方向部分一致でスコアリングし、ヒットを先頭に（サブタイトル「探し物に近い順・N件」）
+- 在庫ゼロ時は「マイグッズに登録すると打診できます／そのまま打診して相談も可」の案内パネル＋「交換内容を決める」で1/3へ直行（求シートと同作法）
+- CTA=「このグッズで打診してみる」（マッチ確定でないトーン）。達成バー「気になるグッズを1件選んで打診してみましょう」
+- 状態管理は `HomeWishHitDetailPresentationState` を再利用。プレビュー抑制（iter1226.404）にも対応
+
+#### `HomeDiscoverySheetModels.swift` / `HomeDiscoverySheetContent.swift`
+- `HomeDiscoverySheetPayload.lookingForOnlyText`（選択肢なし・wishマッチなし・探し物テキストあり）を追加し、goodsHit 分岐で専用シートへルーティング
+
+#### `CandidateSheetVisualQAPreview.swift`
+- variant `looking-for` を追加（探し物=「サナのトレカ」）
+
+### 影響範囲
+
+- lookingFor 候補（ホーム行の「◯◯を探し中」）のタップ後のみ。既存の指名/条件/定価/求シートは不変
+
+### 確認方法
+
+- VisualQA: `candidate-sheet` + `MEGRUM_VISUAL_QA_CANDIDATE_VARIANT=looking-for` で目視確認済み
+
+### セルフレビュー結果
+- ✅ 取引ブロック寸法・HomeDealThumb 作法は既存シートと完全一致
+- ✅ 状態名・用語（打診・マイグッズ）は notes/09/10 準拠
+- ⚠️ 関連度スコアの重み（4/3/2/1）は暫定。実データで精度を見て調整
+
+---
+
+## イテレーション1226.410：「求められているグッズ」一覧を需要軸に再構成
+
+### 背景・問題意識
+
+デザイン刷新FB項目5：「求められているグッズの一覧を押した時のデザインを刷新したい。何を表示すべき？」。この画面の目的は「このグッズを一番欲しがっているのは誰か」なのに、旧実装はマッチ経路（推し×シリーズ/推し）でセクションが分かれ、需要の強い相手が埋もれていた。選んだグッズの大カード（118×142）も場所を取るだけだった。
+
+### 変更内容
+
+#### `HomeDiscoveryLookupSheets.swift`（HomeHavesLookupSheet 再構成）
+- **選んだグッズ＝コンパクト行に降格**（46ptサムネ＋タイトル＋「このグッズを求めている人：N人」）
+- **需要の強さでグルーピング**：「超求！している人」（rank≥5・見出しは accentGradient のピンクグラデ）→「求めている人」（rank3-4・ラベンダー）→「その他のマッチ」（muted）。空セクション非表示
+- マッチ経路は行タイトルの塊ラベルスタイル（memberTag/member）として残す（セクション降格）
+- 統合ロジックは `HomeHavesDemandGrouping`（純ロジック）：推し×シリーズ→推しの順で重複除去し、需要ランク降順（同ランクは元順維持）
+
+#### `Tests/MegrumAppTests/HomeHavesDemandGroupingTests.swift`（新規）
+- 重複除去・ランク降順・3セクション振り分け・空セクション除外をテスト（2件パス）
+
+### 影響範囲
+
+- 「求められているグッズ」画像タップ→一覧シートのみ。行タップ後の入れ子候補シートは不変
+
+### 確認方法
+
+- `swift test --filter HomeHavesDemandGroupingTests`
+- 行コンポーネントはホームと同一（HomeDiscoveryCandidateSummaryRow）のため描画はホーム側で担保
+
+### セルフレビュー結果
+- ✅ 需要色はホーム需要行と同一トークン（accentGradient/lavender）
+- ✅ HomeSelectedGoodsSingleCard への依存を削除（未使用化）
+- ⚠️ home-haves-lookup の VisualQA ルートは実データ依存でシートが自動で開かないため、実機/実データでの見た目確認は次回оwnerセッション時に
+
+---
+
+## イテレーション1226.409：「交換の方法について」にヘッダーステータスチップ（畳んだまま成立状況が分かる）
+
+### 背景・問題意識
+
+デザイン刷新FB項目2：「『交換の方法について』をもう少し直感的なデザインにしたい。文字文字している」。折りたたみを開くまで中身が見えず、開いても判定文の羅列だった。
+
+### 変更内容
+
+#### `HomeCandidateDealAboutSection.swift`
+- DisclosureGroupヘッダー右側に**常時表示のステータスチップ列**（`HomeAboutStatusChipRow`）を追加
+- 3チャンネル＝現地（mappin.and.ellipse）/郵送（shippingbox）/支払（yensign）を24ptアイコン円で表示。状態色：**緑=そのままOK（ok）／オレンジ=要相談（needsTalk→conditionPossible）／赤=要確認（check→conditionExact）／グレー=対象外（相手がその方法を選んでいない）**
+- 判定データは既存 `HomeConditionVerdict`（kind+badge）をそのまま利用。支払は判定スキップ時のみチップ省略
+- 当初「アイコン＋短ラベル」カプセルで実装したが、ヘッダー幅でラベルが「…」に潰れたため**アイコンのみ円形**へ（ラベルはaccessibilityLabelで担保）
+- 展開時の内容（判定文・メモ・更新日）は不変
+
+#### `CandidateSheetVisualQAPreview.swift`
+- named/wish 系バリアントに実データ相当の条件シグナル（現地=府一致のみ・郵送OK送料相談・PayPay共通）を追加し、チップを実表示で検証可能に
+
+### 影響範囲
+
+- 候補シート（goodsHit/wishHit/探し中含む）の「交換の方法について」ヘッダーのみ
+
+### 確認方法
+
+- VisualQA: `candidate-sheet` + `MEGRUM_VISUAL_QA_CANDIDATE_VARIANT=named` で目視確認済み（橙mappin・橙box・緑¥）
+
+### セルフレビュー結果
+- ✅ 状態色は既存トークン（ok/conditionPossible/conditionExact）のみ使用
+- ✅ VoiceOver: 各チップに「現地：取引成立までに相談が必要です」等を付与
+- ⚠️ 展開時の判定文のさらなる図解化（行アイコンの状態色化）は次段候補
+
+---
+
+## イテレーション1226.408：通知センターのX/Instagram風刷新（時系列セクション・未読=背景色・行内アクション）
+
+### 背景・問題意識
+
+デザイン刷新FB項目9：「通知画面も刷新したい。XとかInstaのデザインを参考にする。まずどういうパターンで通知が飛ぶか確認するところから」。
+**現状の通知パターン（棚卸し結果・24種）**：①取引系＝打診の受信/承認/否認/修正・取引チャットメッセージ・証跡追加・取引完了・評価受領・異議3種・キャンセル要求・期限接近 ②めぐり系＝グルームのいいね/返信/新着・めぐりメッセージ・ボード返信/メンション/新着 ③運営アナウンス。
+**データ制約**：`MegrumNotification` は kind/title/body/linkPath/readAt/createdAt のみで**行為者（アバター・ユーザーID）や対象サムネイルを持たない**。完全なInstagram型（行為者アバター先頭・「◯◯さん他3人が…」集約・右端サムネ）はDB/API拡張が必要。
+
+### 変更内容（UIのみで可能な範囲）
+
+#### `NotificationCenterViews.swift`
+- **未読チップ廃止**。行レイアウトをX風に：種別アイコン38pt（tint12%円）＋タイトル15pt semibold＋時刻インライン右＋本文13pt regular muted
+- **行内アクションピル**：proposal_received=「確認する」/ evidence_added=「証跡を確認」（Xのフォローバック位置。行タップと同遷移）
+- フィルタを「すべて/取引/めぐり」に変更（`isMeguriRelatedForCenter` 新設）。tint整理：警告系=conditionPossible、完了系=ok、いいね/評価=濃ピンク（accentGradient系）
+
+#### `NotificationCenterPresentationState.swift`
+- **時系列セクション**（Instagram型）：「今日/今週/それ以前」へグルーピングする `sections(in:now:calendar:)` を追加（空セクションは非表示・並び順保持・now注入でテスト可能）
+
+#### `NotificationCenterContent.swift`
+- セクション見出し付きListへ。**未読行は `listRowBackground` でラベンダー7%**、既読はクリア。「N件」ヘッダー廃止
+
+#### `VisualQAPreviewMode.swift` / `MegrumRootView.swift`
+- VisualQA `notifications` ケース追加（drawerDestination 直マウント）
+
+### 影響範囲
+
+- 通知センター画面のみ。既読管理・ルーティング（NotificationRouteIntent）・プッシュ設定は不変
+
+### 将来課題（バックエンド拡張が必要なもの）
+
+- 行為者アバター先頭レイアウト／groom_liked の「他N人」集約／右端の対象サムネ → notifications テーブルに actor_user_id・thumbnail_url 等の追加が必要。実装時は notes/05・notes/13 を更新すること
+
+### 確認方法
+
+- `swift test --filter NotificationReadStateReducerTests`（6件パス）
+- VisualQA: `notifications` をシミュレータで目視確認済み（未読淡背景・確認するピル・今日セクション・3分割フィルタ）
+
+### セルフレビュー結果
+- ✅ 未読の可読性：チップよりも背景色の方が視線移動が少ない（X/Instagram準拠）
+- ✅ 用語（打診・取引チャット・グルーム・チャットルーム）は notes/10 準拠
+- ⚠️ 行為者アバター化は上記の将来課題に切り出し
+
+---
+
+## イテレーション1226.407：住所設定の刷新＋郵便番号自動入力のフィードバック＋打診確認で住所変更
+
+### 背景・問題意識
+
+デザイン刷新FB項目7：「住所設定の画面も洗練されていないので刷新したい。郵便番号を入れたら自動で入力されて欲しい。打診の送信内容確認で住所の変更もそこでできるようにしたい」。
+調査の結果、**郵便番号照会（7桁で自動照会→都道府県/市区町村/番地候補を充填）は既に実装済み**だったが、成功・失敗のフィードバックが皆無で気づけないのが実態。打診確認にも住所カード＋未登録ガードは実装済みで、**登録済み時の「変更」導線だけが欠けていた**。
+
+### 変更内容
+
+#### `AddressSettingsForm.swift`（全面書き換え）
+- フラットな7連TextField →「**お届け先**」「**連絡先（任意）**」の2枚のグループカード（白・radius20・見出しアイコン付き）
+- フィールドは**上ラベル＋淡い塗り（ink4%・radius12・48pt）＋フォーカス時ラベンダー枠**（認証画面 iter1226.406 と同作法）。placeholderに記入例を追加
+- **自動入力フラッシュ**：照会成功時に都道府県/市区町村/番地の3フィールドがラベンダー16%で0.75秒フラッシュ
+- **照会失敗通知**：「郵便番号から住所が見つかりませんでした。手入力してください。」を郵便番号欄直下に表示（再編集で消える）
+
+#### `AddressSettingsScreen.swift`
+- 照会成功時に `MegrumHaptics.success()`（新設・UINotificationFeedbackGenerator）＋ `autoFillPulse` 発火。失敗時に notice 設定
+
+#### `AddressSettingsContentViews.swift`
+- 34pt巨大タイトル（navigationTitleと重複）を廃止し説明キャプションに。「相手には双方の合意後にのみ表示されます」を明記
+- 保存ボタン：borderedProminent lavender → `.megrumPrimary`
+- エラーバナー：茶系直書き→ conditionExact
+
+#### `ProposalCreateConfirmViews.swift`
+- 住所カードのヘッダー右に**「変更」ボタン**（登録済み時のみ・既存の onOpenAddressSettings シートを再利用）
+- 「住所を登録する」を `.megrumPrimary(height: 44)` へ
+
+#### `MegrumInteractionFeedback.swift` / `VisualQAPreviewMode.swift` / `MegrumRootView.swift`
+- `MegrumHaptics.success()` 追加。VisualQA `address-settings` 直マウント追加
+
+### 影響範囲
+
+- 住所設定画面（設定・ドロワー・打診フローの3経路すべて同一コンポーネント）と打診送信確認の住所カード。保存・照会ロジックは不変
+
+### 確認方法
+
+- VisualQA: `address-settings` をシミュレータで目視確認済み（2カード・上ラベル・プレビューデータ充填）
+- 打診確認の「変更」はコードレビュー（既存シート配線の再利用のみ）
+
+### セルフレビュー結果
+- ✅ 項目6と同一のフィールド作法で統一（画面ごとの独自スタイル削減）
+- ✅ `.megrumPrimary` 適用2箇所、茶系エラー色を撤去
+- ✅ 住所開示タイミングの文言は notes/09 の仕様（合意後開示）と整合
+
+---
+
+## イテレーション1226.406：メールログイン/登録画面の刷新（上ラベル入力欄・グラデCTA・リンク整理）
+
+### 背景・問題意識
+
+デザイン刷新FB項目6：「ログイン画面を刷新したい。特にメアドとパスワードの入力画面が洗練されていない」。左アイコン付き70pt白カード入力欄、縦積みリンク4〜5本、独自の濃紫グラデCTAが原因。
+
+### 変更内容
+
+#### `AuthInputRow.swift`（全面書き換え）
+- 左アイコン＋白カード → **上ラベル（12pt semibold muted）＋淡い塗りフィールド**（ink 4.5%・radius12・高さ52pt・枠線なし）
+- **フォーカス時のみラベンダー1.5pt枠**がアニメーション表示（内部 `@FocusState`）。目玉トグルは維持
+- `systemImage` パラメータ廃止（呼び出し側2箇所更新）
+
+#### `AuthEmailScreen.swift`（全面書き換え）
+- **リアルタイムバリデーション**：`MegrumAuthInputValidator` の signIn/signUp 判定が通るまで主CTAを非活性
+- 主CTA：`AuthPrimaryActionButton` 経由で共通 `MegrumPrimaryButtonStyle`（lavender→sky・radius14・高さ56）へ
+- リンク整理：「パスワードを忘れた場合」＝パスワード欄右下13pt／「Apple/Googleに戻る」＝枠線ボタン→テキストリンク／切替＝最下部1行。ボタン数を実質2つに削減
+- 登録側の31pt巨大見出しを削除（トップバーのタイトルと重複）。パスワードヒント「8文字以上で入力してください」を常設
+
+#### `AuthPrimaryActionButton.swift`
+- 独自の濃紫グラデ（AuthVisualStyle.primaryGradient）をやめ `.megrumPrimary(height: 56)` へ。`isDisabled` パラメータ追加。パスワード再設定画面も自動で恩恵
+
+#### `AuthPasswordResetScreen.swift`
+- 見出し32pt black→24pt bold、リンク weight 調整、AuthInputRow 新シグネチャ対応
+
+#### `MegrumLocationState.swift`
+- **VisualQAプレビュー時は位置情報の許可要求をスキップ**（notDetermined時のrequestを抑止）。許可ダイアログが全スクショ検証を阻害していたため。本番挙動には無影響
+
+### 影響範囲
+
+- 認証フロー（メールログイン/登録/パスワード再設定）。AuthChoiceScreen（Apple/Google選択）は不変
+- AuthVisualStyle.primaryGradient は未参照化（定義は残置）
+
+### 確認方法
+
+- VisualQA: `auth-email-sign-in` / `auth-email-sign-up` をシミュレータで目視確認済み（上ラベル・淡い塗り・非活性グラデCTA・リンク配置）
+
+### セルフレビュー結果
+- ✅ 共通 MegrumPrimaryButtonStyle 使用（Web版 PrimaryButton と同一グラデ・radius）
+- ✅ ブランドカラー直書きなし
+- ✅ ラベンダー枠線ボタン2本を廃止（項目10方針）
+- ⚠️ AuthChoiceScreen 側の大型ボタンの統一は項目10の段階適用で後続
+
+---
+
+## イテレーション1226.405：推し設定画面の刷新（タイポ縮小・…メニュー削除・追加導線2本化）
+
+### 背景・問題意識
+
+デザイン刷新FB項目1：「推し設定画面がいけてない。文字でかい、削除ボタンが茶色でおしゃれじゃない、『推しメンバーX人』表記いらない、『推しを追加』ボタンもいけてない」。
+
+### 変更内容
+
+#### `OshiSettingsContentViews.swift`（全面書き換え）
+- ヘッダー：タイトル24pt black lavender→**17pt bold ink**。戻るボタンは56ptガラス円→40pt中立円（ink 4.5%塗り・chevron 17pt semibold）。右上に**グラデ「＋」ボタン**（40pt・primaryGradient・白plus）を新設
+- 巨大フローティング「推しを追加」ピル（高さ64pt・ZStack重ね）を**廃止**。代わりにリスト末尾へ**破線「＋ 推しを追加」カード**（56pt）を常設（空状態でも表示）
+- エラー文言色を茶系 OshiPalette.warn→`MegrumTheme.conditionExact`（赤）。`.black`ウェイト→semibold/boldに全体調整
+
+#### `OshiSettingsGroupCardViews.swift`（全面書き換え）
+- グループ名 22pt black→**17pt semibold**。「推しメンバーX人」サマリー行を**削除**
+- 茶色「削除」カプセル→右上の**「…」メニュー**（32pt中立円）→「この推しを削除」（`role: .destructive`）→**iOS標準 confirmationDialog** で最終確認。カスタム AnchoredDestructiveConfirmationPopover と遅延タップ防止ステートは本画面から撤去
+- カード radius 28→20・padding 18→16
+
+#### `OshiSettingsMemberTagViews.swift`
+- メンバータグの「×」：茶色テキスト→**9pt muted の xmark アイコン**。weight black→semibold。`OshiPalette` enum を削除
+
+#### `OshiSettingsScreen.swift` / `OshiSettingsPresentationState.swift` / `OshiSettingsGroupCardPresentationState.swift`（削除） / `OshiSettingsPresentationText.swift`
+- `activeRemoveConfirmationGroupKey` と `groupSummary` を廃止。関連テスト3件を削除（`OshiSettingsDraftTests` 21件パス）
+
+#### `VisualQAPreviewMode.swift` / `MegrumRootView.swift`
+- VisualQA に `oshi-settings` ケースを追加（drawerDestination 直マウント）。刷新の目視確認用
+
+### 影響範囲
+
+- 推し設定画面のみ。推しマスタ選択シート・リクエストシートは不変。永続化ロジック不変
+
+### 確認方法
+
+- `SIMCTL_CHILD_MEGRUM_VISUAL_QA_PREVIEW_AUTH=1 SIMCTL_CHILD_MEGRUM_VISUAL_QA_INITIAL_SCREEN=oshi-settings xcrun simctl launch <UDID> tokyo.megrum.native.preview`
+- シミュレータで目視確認済み（カード・タグ・ヘッダー・追加カード）
+
+### セルフレビュー結果
+- ✅ ブランドカラー直書きなし（茶色 warn を撤去、赤は既存 conditionExact を使用）
+- ✅ iOS標準コンポーネント優先（Menu + confirmationDialog へ置換）
+- ✅ 項目10の新トークン（primaryGradient/primaryShadow）を初適用
+- ⚠️ 位置情報ダイアログがシミュレータ起動時に毎回出る（既存挙動・本変更と無関係）
+
+---
+
+## イテレーション1226.404：デザイントークン基盤＋「他にも交換できそうなもの」の需要フィルタ・プレビュー抑制
+
+### 背景・問題意識
+
+オーナーからのデザイン刷新フィードバック10項目（2026-07-10）の実装開始。方針：①単色紫の面塗りを減らしWeb版PrimaryButton（135deg lavender→sky グラデ・radius14）とトーンを揃える、②「他にも交換できそうなもの」に定価/探し中/相談だけの候補が混ざってノイズ、③入れ子（追加候補）でも交換内容プレビューが挟まり冗長——元シートの統合プレビュー1回に集約したい。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumDesign/MegrumButtonStyles.swift`（新規）
+- グラデトークン：`MegrumTheme.primaryGradient`（lavender→sky、Web版と同一）/ `accentGradient`（pink→濃ピンク、需要行「超求！」と同系）/ `heroGradient`（3色、Welcome専用）/ `primaryShadow`
+- 共通ボタンスタイル：`MegrumPrimaryButtonStyle`（グラデ塗り・radius14・高さ52・押下scale0.97・disabled opacity0.5）/ `MegrumSecondaryButtonStyle`（ink5%中立塗り）。`.megrumPrimary` / `.megrumSecondary` で適用
+- 新規ボタンは原則この2種＋iOS標準destructiveの3択。ラベンダー枠線ボタンは廃止方針
+
+#### `HomeCandidateDemandPolicy.swift`
+- `bestDemandRank(of:)` / `candidatesWithDemand(atLeast:in:)` / `otherExchangeMinimumDemandRank`（=rank3・求めてる？）を追加
+
+#### `HomeDiscoveryExperienceDerivedState.swift`
+- `sameOwnerCandidates` で需要rank3未満（cash/lookingFor/discussのみ）の候補を足切り。不確定判定（超求めてる？/求めてる？）は含める（オーナー確認済み）
+
+#### `HomeDiscoverySheets.swift` / `HomeDiscoverySheetContent.swift` / `HomeDiscoveryHitDetailSheets.swift` / `HomeWishHitDetailSheet.swift`
+- `HomeDiscoverySheetPresentationContext.showsProposalPreview`（primaryのみtrue）を追加し、additionalCandidate では「このグッズも追加する」押下時に `HomeProposalStartConfirmationSheet` を挟まず即 `onStartProposal(merged)`。統合プレビューは元シートの「交換内容を確認する」1回だけ
+
+### 影響範囲
+
+- 候補シートの「他にも交換できそうなもの」セクション（表示件数が減る）と追加候補フロー（1タップ減る）。ホーム本体のセクション表示・並び順は不変
+- MegrumDesign は追加のみで既存APIに変更なし
+
+### 確認方法
+
+- `swift test --filter HomeCandidateDemandPolicyTests`（20件パス）
+- xcodebuild Debug ビルド成功（iPhone 17 シミュレータ）
+
+### セルフレビュー結果
+- ✅ ブランドカラー直書きなし（accentGradient の濃ピンクは既存 HomeCandidateDemandLineView と同値を昇格）
+- ✅ 状態名・用語は notes/09/10 に影響なし
+- ⚠️ ButtonStyle の既存画面への適用は後続 iter（1226.405〜）で段階実施
+
+---
+
+## イテレーション1226.403：Swift Native現行画面遷移図の法務レビュー用資料化
+
+### 背景・問題意識
+
+利用規約・プライバシーポリシー作成のため、専門家へ渡せるiOSアプリの画面遷移図が必要になった。既存の `notes/11_screen_inventory.md` は旧JSX/モック時代の参照が多く、現行Swift Nativeの画面遷移資料としてそのまま渡すと誤解が出る。
+
+### 変更内容
+
+#### `notes/81_ios_screen_transition_map_for_legal_review.md`
+- `ios-native/` の現行Swift Native実装を根拠に、認証、初期設定、メイン5タブ、ドロワー、設定、打診作成、通知/ディープリンクの主要遷移をMermaid図と表で整理。
+- 法務・プライバシー上の確認ポイントとして、位置情報、通知、写真、住所、支払方法、評価、異議申し立て、外部ブラウザ/Google Lens、広告/IAP等の接点を併記。
+- 旧 `notes/11_screen_inventory.md` は参考であり、現行Swift Native資料の代替にしないことを明記。
+
+#### `scripts/generate_ios_screen_flow_inventory.sh`
+- SwiftUIの `NavigationStack`、`sheet`、`fullScreenCover`、独自スライド表示、route/step型を抽出する棚卸しスクリプトを追加。
+- 完全自動生成ではなく、Mermaid図更新前の差分確認材料として使う運用を明記。
+
+### 影響範囲
+
+- ドキュメントと補助スクリプトのみ。iOSアプリの挙動、画面遷移、DB/API、通知、法務本文は変更しない。
+
+### 確認方法
+- `bash scripts/generate_ios_screen_flow_inventory.sh > /tmp/megrum-ios-navigation-surfaces.md`
+- `git diff --check`
+
+### セルフレビュー結果
+- ✅ 現行Swift Nativeの主要入口（Root/Auth/AccountSetup/Tab/Drawer/Settings/Home/Inventory/Wish/Trades/Meguri/NotificationRouteIntent）を根拠として記載した。
+- ✅ 専門家向けにユーザー表示名ベースで整理しつつ、根拠ファイルを併記した。
+- ✅ 自動化は静的抽出の限界を明記し、手確認前提の補助スクリプトに留めた。
+- ✅ アプリコード、状態遷移、DB/API、通知payload、法務本文は変更していない。
+
+### 関連ファイル
+- `notes/81_ios_screen_transition_map_for_legal_review.md`
+- `scripts/generate_ios_screen_flow_inventory.sh`
+
+---
+
+## イテレーション1226.403：グルームを開く/閉じる遷移のカクつき解消＋ホーム列はタップしたタイルの位置から拡大/縮小（FB）
+
+### 背景・問題意識
+オーナーFB：(1) めぐりホーム経由でもホーム経由でも、グルームを開いた時の画面遷移が少しカクつく → スムーズに。(2) ホーム経由で開いた時、いまは一覧の中央（固定アンカー）から拡大している → タップしたそのタイルの場所から拡大し、閉じる時も同じ場所へ縮小してほしい。
+
+### 変更内容
+
+#### 1. カクつき解消（`GroomViewerScreen.swift`）— 全経路（ホーム/めぐり地図/アーカイブ）共通
+- **原因3つ**を特定して対処：
+  - (a) 開くスケールアニメ（spring 0.34s）の最中に `.task` の重い処理（markGroomViewed / エンゲージ・プロフィール取得 / 隣接画像プリフェッチ）が走り、MainActor の状態更新がアニメと競合。→ `isOpeningSettled` フラグ（開いて0.43s後に true）を新設し、`waitUntilOpeningSettled()` で**トランジション終了まで重い処理を保留**。
+  - (b) ストーリー進捗ループ（100msごとの `storyProgress` 更新）が開くアニメ中から全画面再描画を起こしていた。→ settle 後に開始。**閉じ始めたら（`dismissViewer` で settle=false）進捗更新を即停止**し、閉じアニメとも競合させない。
+  - (c) 画像の**メインスレッド遅延デコード**：`UIImage(data:)` は初回描画時にデコードするため、開くアニメ中にデコードが走ってヒッチ。→ `byPreparingForDisplay()` で**表示前にバックグラウンドデコード**してから差し替え。
+- 常時演出（ハートレイン/いいねユーザー浮遊）も settle 後に表示開始（パーティクル更新が開閉アニメと競合しない）。
+
+#### 2. タップしたタイルの位置から拡大/縮小（`GroomStoryViews.swift`, `HomeDiscoveryExperience.swift`, `HomeScreen.swift`, `MegrumAuthenticatedTabContentView.swift`）
+- `GroomStrip` に `GroomRailTileFrameStore`（参照型の箱）を追加し、各タイルの画面上フレームを GeometryReader の onChange で記録（**クラスへの書き込みなので View 再評価ゼロ**＝ホーム縦スクロール/列横スクロールのコスト増なし）。
+- タップ時にタイル中心を画面比率の `UnitPoint` に変換し、`onSelect(groom, anchor)` / `onViewOwn(anchor)` として通知。
+- `HomeScreen.onOpenGroom` / `onOpenOwnGrooms` にアンカーを追加 → タブ側 `openMeguriGroomViewer(sourceAnchor: anchor)` へ。既存の `groomViewerImmersiveOverlay` の insertion/removal（scale-to-anchor）と `closeAnchor`（下スワイプ縮小の基点）がそのタイル位置になる → **タップした場所から拡大し、閉じるとそこへ縮む**。
+- めぐり地図は従来からマーカー位置をアンカーに渡しているため変更不要（#1の恩恵のみ受ける）。
+
+### 影響範囲
+- グルームビューアの開閉（全経路）と、ホーム上部グルーム列のタップ挙動。
+
+### 確認方法
+- `swift build`／`swift test` グリーン（XCTest 1536・0 failures、Swift Testing 24）。iOS device build **BUILD SUCCEEDED**。
+- 実機：ホーム列の右端寄り/左端寄りタイルをタップ → その位置から拡大・下スワイプでそこへ縮小。開閉のカクつきが消えていること。めぐり地図からも同様にスムーズなこと。
+
+### セルフレビュー結果
+- ✅ カクつきの根本原因（アニメ中の重い処理・毎フレーム進捗更新・メインスレッド画像デコード）をそれぞれ対処。演出や取得は最大0.43s遅延するだけで欠落なし。
+- ✅ フレーム記録は参照型ストアで View 無効化ゼロ（スクロール性能に影響なし）。
+- ✅ 自分タイル（アバター）タップも同様にタイル位置アンカー。
+- ⚠️ アンカーは keyWindow の bounds 基準（iPhone 単一ウィンドウ前提）。取れない場合は上部中央へフォールバック。
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/GroomViewerScreen.swift`
+- `ios-native/Sources/MegrumApp/GroomStoryViews.swift`
+- `ios-native/Sources/MegrumApp/HomeDiscoveryExperience.swift`
+- `ios-native/Sources/MegrumApp/HomeScreen.swift`
+- `ios-native/Sources/MegrumApp/MegrumAuthenticatedTabContentView.swift`
+
+---
+
+## イテレーション1226.402：グルーム枠を太く鮮やかに＋自分/地図/アーカイブのビューア順を古い→新しい（右タップで新しい方へ）＋既読でも自分グルーム閲覧可（FB）
+
+### 背景・問題意識
+オーナーFB（3点）：
+1. グルームの枠線をもっと太く、グラデーションをもっと鮮やかに。
+2. 自分のグルームを見ている時、右タップで「古い方」へ進むのが逆。古いものを左に並べ、右タップで「次に新しい」グルームへ。かつ自分のグルームが既読でもアバタータップで閲覧できるように。
+3. 上記の並び順（古い→新しい、右タップで新しい方へ）は、めぐり地図・グルームアーカイブで見る時も同じに。
+
+### 変更内容
+
+#### 1. 枠を太く・鮮やかに（`GroomStoryTileViews.swift`）
+- `GroomStoryMetrics.ringLineWidth` 2.5→3.5。
+- `unseenGradient` を彩度高めの3色（鮮やかな水色→紫→ピンク）に更新。自分タイル枠・ストーリー枠の両方に反映。
+
+#### 2/3. ビューアの並び順を統一（`GroomViewerScreen.swift`, `MegrumAuthenticatedTabContentView.swift`, `HomeScreen.swift`, 各所）
+- `GroomViewerScreen.init` で辿る配列を **createdAt 昇順（古い→新しい）** にソート。左が最古、右タップ（delta +1）で次に新しいものへ。ストーリー自動送りも +1（＝新しい方）で末尾（最新）到達時に閉じる＝IG準拠。この1か所の変更で **ホーム/めぐり地図/アーカイブすべて同仕様** になる。
+- 自分のグルーム閲覧を「自分のグルームだけ」の列に：`HomeScreen.onOpenOwnGrooms([GroomPost], GroomPost)` を新設し、`viewOwnGroom()` は自分グルームを昇順に並べ「最古の未読（無ければ最古）」を初期表示にして開く。タブ側 `openMeguriGroomViewer(_, sourceAnchor:, sequence:)` に列上書き（`meguriGroomViewerSequence`）を追加し、ビューアは `sequence` があればそれを、無ければ従来どおり `appState.grooms` を辿る。
+- 既読でも閲覧可：自分タイルのアバタータップ条件を「未読あり(hasActiveGroom)」から「自分グルームが1件でもある(hasAnyOwnGroom=!myActiveGrooms.isEmpty)」に変更。枠グラデは従来どおり未読のみ。`GroomMyStoryTile`/`GroomStrip`/`HomeDiscoveryExperience` に `hasAnyOwnGroom` を配線。
+
+### 影響範囲
+- ホーム上部グルーム列の枠見た目、グルームビューア（ホーム/めぐり地図/アーカイブ）のページ送り順、自分タイルのタップ挙動。
+
+### 確認方法
+- `swift build`／`swift test` グリーン（XCTest 1536・0 failures、Swift Testing 24）。iOS device build 予定。
+- 実機で①枠の太さ/鮮やかさ②自分グルームを古い→新しい順に右送り＋既読でも開ける③地図/アーカイブでも同順、を確認。
+
+### セルフレビュー結果
+- ✅ ビューア順は init の1か所ソートで全経路統一（地図・アーカイブ含む）。自動送りも新しい方向へ整合。
+- ✅ 自分閲覧は自分グルームだけの列に限定（他人グルームへ流れない）。
+- ✅ 既読でもタップで閲覧（枠グラデは未読限定を維持）。
+- ⚠️ 鮮やかグラデはブランドのパステルより彩度を上げた独自3色（オーナー「もっと鮮やかでOK」の指示に沿う）。
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/GroomStoryTileViews.swift`
+- `ios-native/Sources/MegrumApp/GroomStoryViews.swift`
+- `ios-native/Sources/MegrumApp/HomeDiscoveryExperience.swift`
+- `ios-native/Sources/MegrumApp/HomeScreen.swift`
+- `ios-native/Sources/MegrumApp/GroomViewerScreen.swift`
+- `ios-native/Sources/MegrumApp/MegrumAuthenticatedTabContentView.swift`
+
+---
+
+## イテレーション1226.401：グルーム文字編集の再修正（背景固定・完了ボタン廃止・2本指を全画面ジェスチャ化・ゴミ箱の引っ込み）＋投稿コンポーザ左スライド＋ビューア閉じで一覧へ縮小（FB再対応）
+
+### 背景・問題意識
+iter1226.398 のFB再指摘：(1) 文字入力中に背景グルームがキーボードで押し上げられる問題が直っていない。(2) 文字以外タップ＝完了はOKだが「完了」ボタン自体を無くしたい。(3) 2本指の拡大/縮小/回転がインスタ風に（1本目移動中に2本目追加で）効かない＝直っていない。追加で (4) 文字ドラッグ中に出るゴミ箱は指を離したら下へ引っ込んでほしい。(5) ホーム経由のグルーム投稿は下からでなく左からスライドイン＋触覚。(6) グルームを下スワイプで閉じる時、グルーム一覧の場所へ画面が縮小されていく感じにしてほしい。
+
+### 変更内容
+
+#### 1. 背景固定（`GroomStoryEditorView.swift`）
+- 原因：エディタの `GeometryReader` がキーボード回避コンテキスト内にあり `proxy.size` が縮む → canvasFrame も縮み背景が移動。
+- 対処：GeometryReader 全体に `.ignoresSafeArea(.keyboard, edges: .bottom)` を付け proxy を固定。カラーツールバーは `safeAreaInset` をやめ、`GroomKeyboardHeightObserver`（keyboardWillChangeFrame 監視）で得た高さ分だけ底上げして手動でキーボード上に浮かせる。入力欄もキーボードに隠れないよう Y をクランプ。
+
+#### 2. 「完了」ボタン廃止（`GroomStoryEditorView.swift`）
+- `GroomStoryTextInputLayer` から「完了」ボタンを削除。確定は「文字以外タップ（暗幕 onTapGesture→onCommit）」と「改行/onSubmit」で行う。
+
+#### 3. 2本指操作を全画面ジェスチャ面へ（`GroomStoryEditorView.swift`）
+- 真因：従来は各文字の小さな `.overlay` UIView に pan/pinch/rotation を付けていたため、2本目の指が文字枠の外に落ちると pinch/rotation が touches を拾えず発火しなかった（＝1本指移動でゴミ箱は出るが2本指が効かない現象）。
+- 対処：`GroomStoryCanvasGestureView`（画面いっぱいの1枚の UIView）に pan/pinch/rotation/tap を集約し、同時認識で束ねる。各文字の実フレームは `GroomOverlayFramesKey`（PreferenceKey）で収集し、ジェスチャ開始位置から当たり判定で対象オーバーレイを決定。以後の2本指はどこに置いても対象へ適用（インスタ同様）。tap は当たれば編集、外れれば新規作成。
+
+#### 4. ゴミ箱の引っ込み（`GroomStoryEditorView.swift`）
+- 新ジェスチャ面は pan/pinch/rotation の稼働数が 0 になった時に `draggingOverlayID = nil`。エディタ側は `.animation(value: draggingOverlayID)` ＋ `.transition(.move(edge:.bottom))` で、指を離すとゴミ箱が下へスッと引っ込む。
+
+#### 5. 投稿コンポーザの左スライドイン＋触覚（`GroomStoryComposerViews.swift`, `MeguriGroomPresentationModifiers.swift`, `GroomComposerContainer.swift`, `HomeScreen.swift`）
+- `GroomStoryComposerScreen` に `presentsFromLeading` を追加。`GroomComposerLeadingSlideModifier` で中身を `-画面幅→0` にスライドイン、onAppear で `MegrumHaptics.buttonTap()`。
+- HomeScreen の `onAddGroom` は `Transaction.disablesAnimations` で fullScreenCover 既定の「下から」を無効化し、中身の左スライドだけで見せる。ホーム経由（`GroomComposerContainer`）のみ `presentsFromLeading: true`。
+
+#### 6. ビューア閉じで一覧へ縮小（`GroomViewerDragPresentationState.swift`, `GroomViewerScreen.swift`, `MegrumAuthenticatedTabContentView.swift`）
+- `GroomViewerDragPresentationState`：下スワイプで scale が 1→約0.8 へ縮小、角丸が付き、下方向に追従（縮小演出を復活）。
+- `GroomViewerScreen` に `closeAnchor` を追加し、下スワイプの `scaleEffect(anchor:)` の基点に使用。既存の `groomViewerImmersiveOverlay` の scale-to-anchor（removal）と合わせ、離した後も同じ基点へ吸い込まれる。
+- ホームのグルーム一覧から開く時の `sourceAnchor`/`closeAnchor` を `.center` → `UnitPoint(0.5, 0.12)`（上部の一覧付近）に。閉じると一覧の場所へ縮んでいく。
+- 既存テスト（`GroomViewerPresentationTests`）を新挙動（scale<1・角丸>0・追従上限120pt）に更新。
+
+### 影響範囲
+- グルーム文字編集画面、ホーム経由グルーム投稿の登場アニメ、グルームビューアの閉じ演出。めぐり地図経由の投稿は従来どおり（`presentsFromLeading` 既定 false）。
+
+### 確認方法
+- `swift build`／`swift test` グリーン（XCTest 1536・0 failures、Swift Testing 24）。iOS device build **BUILD SUCCEEDED**。
+- マルチタッチ・キーボード・スライド・地図/縮小演出は実機でのみ検証可能 → device build + install。
+
+### セルフレビュー結果
+- ✅ 2本指の真因（小さな当たり判定）を全画面ジェスチャ面＋フレーム当たり判定で解消。
+- ✅ 背景固定は proxy.size を縮ませない方式に変更（前回の ZStack だけの ignoresSafeArea では不十分だった）。
+- ✅ iOS標準の Pan/Pinch/Rotation/Tap 認識器を同時認識で使用。左スライドは fullScreenCover の既定アニメを無効化して二重アニメを回避。
+- ⚠️ 左スライドの「戻り」は既定 dismiss（下方向）のまま。ビューアの「離した後に一覧へ飛ぶ」最終段は overlay の scale-to-anchor に委譲（正確なタイル座標ではなく上部固定アンカー近似）。
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/GroomStoryEditorView.swift`
+- `ios-native/Sources/MegrumApp/GroomStoryComposerViews.swift`
+- `ios-native/Sources/MegrumApp/MeguriGroomPresentationModifiers.swift`
+- `ios-native/Sources/MegrumApp/GroomComposerContainer.swift`
+- `ios-native/Sources/MegrumApp/HomeScreen.swift`
+- `ios-native/Sources/MegrumApp/GroomViewerDragPresentationState.swift`
+- `ios-native/Sources/MegrumApp/GroomViewerScreen.swift`
+- `ios-native/Sources/MegrumApp/MegrumAuthenticatedTabContentView.swift`
+
+---
+
+## イテレーション1226.400：ホーム経由グルーム投稿の場所選択を全画面地図＋降下ピンに／確定で即ホーム＆背後投稿／＋バッジ黒く大きく（FB）
+
+### 背景・問題意識
+オーナーFB（3点）：
+1. 投稿する場所を選ぶ画面を、めぐりホームのように画面いっぱいの地図にしてほしい。ヘッダーも背景は地図。タップした時は「前に実装したピンが上から降りてくる」UIで、ピンのアイコンは自分が投稿するグルーム画像（文字は不要）。「現在地からXX」表記も不要。
+2. 「この場所にする」を押したら前の画面ではなく即ホームへ戻り、自分アイコンの枠がぐるっと活性化するアニメが見えるようにしてほしい。投稿処理はバックグラウンドで。
+3. グルーム一覧の自分タイル右下の「＋」アイコンは青ではなく黒、少し大きく。
+
+### 変更内容
+
+#### 1. 全画面地図の場所選択（`GroomStoryLocationStepView.swift` 全面書き換え）
+- 共有カード型 `MeguriCreationLocationPicker` の利用をやめ、専用の全画面 `Map`（`MeguriMapVisualStyle.quietStandard`＋ブランドトーンoverlay）に。`ZStack` で地図を `ignoresSafeArea` して画面いっぱいに広げ、ヘッダー（戻る＋タイトル）は地図の上に透過ピル配置。
+- タップ地点のピンを `GroomLocationDropPin` に。作成プロンプトと同じ `MeguriMapCreationPromptPresentationState` の降下アニメ（上から spring で降りてくる）を流用し、`Annotation(anchor: .bottom)` ＋ 選択座標の `.id()` で毎タップ再生。アイコンは投稿するグルーム画像を円形表示、文字・吹き出しは無し。
+- 「現在地からXX」距離キャプションを撤去。範囲判定（`MeguriAccessPolicy.canCreateAt`／圏外メッセージ）は維持。
+
+#### 2. 確定で即ホーム＋背後投稿＋枠活性化（`GroomStoryComposerViews.swift`, `GroomComposerContainer.swift`, `MeguriGroomPresentationModifiers.swift`, `HomeScreen.swift`）
+- `GroomStoryComposerScreen` に `onPublishInBackground`（既定no-op）を追加。「この場所にする」は `publishDraftPhotoInBackground()` を呼ぶ：写真を書き出したら `onPublishInBackground` に渡し、即 `onDiscard()`＋`dismiss()` でホームへ戻す（投稿完了を待たない）。
+- `GroomComposerContainer.publishInBackground`：`onGroomPublishStarted()` を通知後、`Task` で `createGroomPost` → 成功時 `loadGroomMapPosts(force:)`。写真データ・座標は値渡しで捕捉済みなので、コンポーザ破棄と競合しない。
+- `HomeScreen`：`expectsGroomActivation` フラグを新設。`onGroomPublishStarted` で true。活性化トリガを「コンポーザdismiss時の件数比較」から「`myActiveGrooms.count` の増加（＝背後投稿が着地）」に変更。増えた瞬間 0.45s 後に `groomActivationSignal += 1`（列が見える状態で枠がぐるっと）。アプリ起動時の 0→N はフラグ false のため発火しない。
+
+#### 3. ＋バッジを黒く大きく（`GroomStoryTileViews.swift`）
+- `addBadgeBlue`（IG青 #0095F6）→ `addBadgeFill`（黒 rgb 0.09,0.09,0.11）。サイズ 20→26、＋記号 13→16pt、白縁 2→2.5、offset 2→3。
+
+### 影響範囲
+- ホーム経由グルーム投稿の「場所選択」ステップと投稿完了フロー、ホーム上部グルーム列の自分タイル＋バッジ。めぐり地図経由の投稿（locksCreationCoordinate=true）は従来どおり awaited publish（onPublishInBackground は既定no-op）。
+
+### 確認方法
+- `swift build`／`swift test` グリーン（XCTest 1536・0 failures、Swift Testing 24）。iOS device build **BUILD SUCCEEDED**。
+- 地図・降下ピン・背後投稿・枠活性化は実機でのみ検証可能 → device build + install。ImageRenderer は MapKit を描画できないためスナップショット非適用。
+
+### セルフレビュー結果
+- ✅ 全画面地図はめぐり系と同じ `MeguriMapVisualStyle.quietStandard`＋ブランドトーンを使用（iOS標準 Map）。
+- ✅ 降下アニメは既存 `MeguriMapCreationPromptPresentationState` を流用（新規物理演算なし）。
+- ✅ 投稿失敗時は expectsGroomActivation が残るが、発火は自分グルーム件数の増加時のみ＝他人グルームでは誤発火しない。
+- ⚠️ 背後投稿が失敗してもホームには戻る（トーストは出ない）。失敗時のリトライ導線は今後の課題。
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/GroomStoryLocationStepView.swift`
+- `ios-native/Sources/MegrumApp/GroomStoryComposerViews.swift`
+- `ios-native/Sources/MegrumApp/GroomComposerContainer.swift`
+- `ios-native/Sources/MegrumApp/MeguriGroomPresentationModifiers.swift`
+- `ios-native/Sources/MegrumApp/HomeScreen.swift`
+- `ios-native/Sources/MegrumApp/GroomStoryTileViews.swift`
+
+---
+
+## イテレーション1226.399：マーケ計画を関西拠点版v2へ全面改訂＋実行トラッカー・コピーキット・管理体制の整備（FB）
+
+### 背景・問題意識
+オーナーFB（iter1226.396のv1計画に対して）：(1) 大阪在住なので関西周りで活動したい。(2) 交換会の自主開催はハードルが高いのでやめたい。(3) Megrumは郵送交換にも対応している（住所は取引成立時のみ相手に公開）。(4) 公式Xは開設済み・フォロワー500人。(5) 商標出願は当面考えない。(6) Android方針の対外表明はOK。(7) App Store提出用の文章・画像の用意も必要。(8) 7/12以降モデルが変わるため、別モデルでもマーケ計画と実行作業を再現できるようフォルダを整理し、オーナー自身も計画を管理しやすくしたい。
+
+### 変更内容
+
+#### `notes/78_marketing_plan.md`（v2.0 全面改訂）
+- 関西拠点の二正面作戦へ：**郵送交換で全国の流動性を底支え＋現地交換は関西の原子ネットワークで点火**
+- 追加リサーチ（3エージェント：関西イベント・関西スポット・郵送ポジショニング）を反映
+- 初戦＝**9/19-23 京セラK-POPウィーク**（Stray Kids 9/19-20＋BABYMONSTER 9/22-23）、本戦＝**11月京セラ3連戦**（INI→MAMA AWARDS 11/20-21公式確定→BIGBANG）
+- 交換会関連の施策・予算を全廃 → 代替は鶴橋コリアタウンの店舗QR掲示・センイルカプホ連動AW発信・会場ジオフェンス演出・X種まき
+- 郵送の表現ルール（「匿名」と名乗らない・成立後に発送相手だけへ開示を正確に）と「現地が主・郵送が従」の順序を明文化
+- 予算を月平均1〜2万円へ軽量化。WBSは79へ、文面・法務は80へ分離
+
+#### `notes/79_marketing_action_tracker.md`（新規）
+- 週次タスク（W1〜W10）＋月次マイルストーン＋判断待ち表＋実施ログ＋KPI記録表の実行管理ファイル
+- オーナーは「79を見て今週のAI担当タスクを進めて」の一言で任意のAIモデルに作業を再開させられる
+
+#### `notes/80_marketing_copy_kit.md`（新規・※iter1226.398コミットに混入済み）
+- 語彙ルール（出会い/転売/匿名禁止等）・法務チェックリスト・Xテンプレ・PR骨子・想定問答・危機管理初動テンプレ
+
+#### `CLAUDE.md`・`notes/USER_PLAYBOOK.md`（※iter1226.398コミットに混入済み）
+- CLAUDE.md：古い「郵送=廃止用語」「MVP=現地のみ」記述を修正（glossary iter168.71 の郵送交換復活が正）。ブートストラップ手順にマーケ3点セット（78→79→80）を追加
+- USER_PLAYBOOK：§1にマーケティングフェーズ節（3ファイル構成・オーナー指示テンプレ・AIモデル側の約束）を追加
+
+### 影響範囲
+- ドキュメントのみ（コード・DB変更なし）。iOS Preview更新不要
+- App Store初回提出に郵送交換を含めるか（notes/40の旧デフォルトは非表示）がオーナー判断待ち（78 §13-1）
+
+### 確認方法
+- `notes/78`（戦略）→`notes/79`（今週のタスク）→`notes/80`（文面）の順に読む
+
+### 関連ファイル
+- `notes/78_marketing_plan.md`, `notes/79_marketing_action_tracker.md`, `notes/80_marketing_copy_kit.md`, `CLAUDE.md`, `notes/USER_PLAYBOOK.md`
+
+---
+
+## イテレーション1226.396：マーケティング計画（ローンチGTM）を新規策定（notes/78）
+
+### 背景・問題意識
+オーナー依頼：「Megrumがそろそろ完成するので、今後のマーケティング活動の計画と、実行に移すまでの作業計画まで立てたい」。既存notesにマーケ専用ドキュメントが無かった（notes/16はマネタイズ、notes/24〜75はリリース運用）。
+
+### 変更内容
+
+#### `notes/78_marketing_plan.md`（新規）
+- 多エージェントワークフロー（7方面Webリサーチ→3視点GTM戦略案→実行可能性/ユーザー共感/欠落チェックの3審査）で策定
+- 採用戦略：**X共生×原子ネットワーク点火**（1推しグループ×1公演×1日への集中、二段訴求＝お品書き生成ツール→現地で会える）
+- 初戦は8/10判断ゲートで確定（スキズ国立8/29-30→INI東京D 9/16-17→TXTベルーナ9/22-23 の3段フォールバック）。App Store審査提出（7月中旬）を全体のクリティカルパスに設定
+- KPI（10月末2,000DL・DAU100／12月末6,000・DAU200／2027年3月末10,000・DAU300）、予算（月平均3万円・単月上限6万円）、稼働規律（マーケ1日1時間・現場月2回上限）
+- 語彙・炎上・法務ルール（「出会い」全面禁止、譲求タグへの営業リプ禁止、アーティスト名冠称禁止、ステマ規制/景表法/Apple規約チェックリスト）
+- 直近30日のWBS（週単位・オーナー/Claude担当分担）と月次マイルストーン、撤退・ピボット基準、オーナー判断8項目（公式X前倒し開設・商標出願など）
+
+### 影響範囲
+- ドキュメントのみ（コード・画面・DB変更なし）。iOS Preview更新不要
+- notes/16 の「公式Xアカウント当面なし」決定の変更を提案（notes/78 §13-1、オーナー承認待ち）
+
+### 用語について
+- 計画内のマーケ用語（原子ネットワーク・密度KPI・FM・二段訴求等）は notes/78 内で定義。プロダクト仕様用語ではないため notes/10 glossary へは追加しない
+
+### 確認方法
+- `notes/78_marketing_plan.md` を読む
+
+### 関連ファイル
+- `notes/78_marketing_plan.md`
+
+---
+
+## イテレーション1226.398：グルーム文字編集を刷新（背景固定・外側タップで確定・IG風の2本指操作）（FB）
+
+### 背景・問題意識
+オーナーFB（3点）：
+1. 文字入力中に背景のグルームが移動・縮小しないでほしい（キーボードで押し上げられていた）。
+2. 入力中に文字以外をタップするとキーボードが下がるが、それだけでなく「完了」を押したのと同じ挙動（＝入力を確定してオーバーレイ化）にしてほしい。
+3. 文字の拡大縮小/回転が2本指でできるが、インスタのストーリー編集と同じく「1本目で文字をタップして移動させている途中に2本目を置いたら、そこから拡大縮小・回転・移動が同時にできる」操作感にしてほしい。
+
+### 変更内容（`GroomStoryEditorView.swift`）
+1. **背景固定**：エディタ本体の ZStack に `.ignoresSafeArea(.keyboard, edges: .bottom)` を付与。キーボード表示でも背景グルーム（写真キャンバス）が押し上げ・縮小しなくなった。カラーツールバー（`safeAreaInset(.bottom)`）は従来どおりキーボード上に浮く。
+2. **外側タップ＝完了**：入力レイヤーの暗幕 `Color.black.opacity(0.28)` に `.contentShape(Rectangle()).onTapGesture(perform: onCommit)` を追加。文字以外をタップすると `commitDraftText`（＝「完了」と同一処理）が走り、入力が確定してオーバーレイになる。
+3. **IG風の複合ジェスチャ**：SwiftUIの `DragGesture`/`MagnificationGesture`/`RotationGesture` の同時付与をやめ、UIKitの `UIPanGestureRecognizer`＋`UIPinchGestureRecognizer`＋`UIRotationGestureRecognizer`＋`UITapGestureRecognizer` を `UIViewRepresentable`（`GroomStoryTextGestureSurface`）で束ねた。
+   - `UIGestureRecognizerDelegate.shouldRecognizeSimultaneouslyWith` で pan/pinch/rotation を相互に同時認識（タップだけは非同時）。→ 1本目で移動中に2本目を足すと、そのまま拡大縮小・回転・移動が同時にできる。
+   - pan は window 基準の移動量を毎フレーム `setTranslation(.zero)` して増分適用。指の増減時は重心ジャンプを1フレーム吸収。移動量を正規化座標へ換算し、`y > 0.84` でゴミ箱ホバー→離すと削除（従来仕様を踏襲）。
+   - pinch は `scale` を毎回1にリセットして 0.55〜2.6 にクランプ。rotation は増分角度を度に変換して加算。
+   - タップ＝`onEdit`（編集を開く）。移動/拡大/回転の稼働数を数え、全終了で `draggingOverlayID`/`isHoveringDeleteTarget` を解除。
+   - `#if canImport(UIKit)` でiOSのみUIKit実装、テストホスト等は操作なしのフォールバック。
+
+### 影響範囲
+- グルーム作成の文字オーバーレイ編集画面（`GroomStoryEditorView`）のみ。データモデル・状態遷移に変更なし。
+
+### 確認方法
+- `swift build`（macOS, フォールバック経路）成功、`swift test` グリーン（XCTest 1536 / 0 failures、Swift Testing 24）。
+- iOS device build（UIKit経路）**BUILD SUCCEEDED**。
+- 触覚/マルチタッチは実機でのみ検証可能 → device build + install。
+
+### セルフレビュー結果
+- ✅ iOS標準のジェスチャ認識器（Pan/Pinch/Rotation/Tap）を使用し、同時認識で自然な複合操作を実現（独自の物理演算は書いていない）。
+- ✅ 削除ゾーン・タップ編集の既存挙動を維持。
+- ⚠️ 文字の当たり判定はレイアウト枠（横約0.82×キャンバス幅）で従来と同等。極端な回転時に当たり判定が視覚とわずかにずれるが従来同等。
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/GroomStoryEditorView.swift`
+
+---
+
+## イテレーション1226.397：左ドロワーのスワイプ触覚を「指が離れ開閉確定した瞬間」に＋閉じる時は微弱化（FB）
+
+### 背景・問題意識
+オーナーFB：左ドロワーをスワイプで開いた時の触覚は、開き終わった直後ではなく「開くためのスワイプの指が離れた瞬間」に鳴らしてほしい。閉じる時も同様に指が離れた瞬間に。かつ閉じる時はほんの少しだけ弱い触覚に。
+
+### 変更内容（`MegrumInteractionFeedback.swift`, `MegrumAuthenticatedTabsView.swift`）
+- `MegrumHaptics.drawerClose()` を追加（`.light` / intensity 0.42、開く `buttonTap` の 0.58 より微弱）。
+- `drawerPanGesture` の `.onEnded`：従来は `withAnimation(..., completionCriteria:.logicallyComplete){} completion:{ buttonTap }` で「開き終えた瞬間」に鳴らしていたのを廃止。指が離れて開閉が確定した `.onEnded` の時点で即発火に変更：
+  - 開く方向へ確定（`targetVisibility && !showsDrawer`）→ `buttonTap()`
+  - 閉じる方向へ確定（`!targetVisibility && showsDrawer`）→ `drawerClose()`（微弱）
+- アニメーションは `completion:` を外した通常の `withAnimation` に戻した（触覚はアニメ完了と切り離し）。
+- タップでの開閉（`openDrawer`/ボタン閉じ）は従来どおり即時 `buttonTap`（スワイプ限定の要望のため据え置き）。
+
+### 影響範囲
+- 左ドロワー（AppDrawer）を端スワイプで開閉する操作の触覚タイミングと強さ。
+
+### 確認方法
+- `swift build` 成功、`swift test` グリーン（XCTest 1536 / 0 failures、Swift Testing 24）。
+- 触覚は実機でのみ体感可能 → device build + install で確認。
+
+### セルフレビュー結果
+- ✅ 開く=buttonTap / 閉じる=drawerClose の2段強度。指が離れた瞬間（`.onEnded`）に発火。
+- ✅ 「開いたまま/閉じたまま」に確定した場合（スナップバック）は無音のまま。
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/MegrumInteractionFeedback.swift`
+- `ios-native/Sources/MegrumApp/MegrumAuthenticatedTabsView.swift`
+
+---
+
+## イテレーション1226.395：自分グルーム削除で前後へ遷移／枠グラデは「有効かつ未読」／活性化アニメは列が見えた後／タイル拡大（約3.8個）（FB）
+
+### 背景・問題意識
+オーナーFB（4点）：
+1. 自分のグルームを開いている時に削除したら、ビューアを閉じず前後のグルームへ移る。
+2. 枠グラデは「有効なグルームがある間」ではなく「有効かつ未読のものがある場合」に限定。
+3. 活性化アニメが確認できない → 投稿処理中（コンポーザが列を覆う間）に走っている疑い。グルーム列が実際に見えた時に走らせる。
+4. グルームタイルを、最初の画面で約3.8個見える大きさに拡大。
+
+### 変更内容（`GroomViewerScreen.swift`, `GroomStoryTileViews.swift`, `GroomStoryViews.swift`, `HomeDiscoveryExperience.swift`, `HomeScreen.swift`）
+
+#### 1. 削除→前後へ（`GroomViewerScreen.swift`）
+- `grooms` を `let` から `@State` に変更。`deleteCurrentGroom()` を書き換え：`deleteOwnGroom` 成功後、配列から当該グルームを除去し `currentIndex = min(removeAt, count-1)`（前後の残りグルームへ移動）。空になった時のみ `dismissViewer()`。除去はアニメ無効トランザクションで実施。
+- `.task(id: currentGroom.id)` の `markGroomViewed` は自分のグルームでも発火 → 未読/既読判定（#2）を支える。
+
+#### 2. グラデは「有効かつ未読」（`HomeScreen.swift`）
+- `myActiveUnreadGrooms`（= 自分の有効グルームのうち `viewedGroomIDs` に無いもの）を新設。`groomRailHasOwnActiveGroom` へ `!myActiveUnreadGrooms.isEmpty` を渡す。既読化されるとグラデが消えグレーに戻る。
+- `viewOwnGroom()` は未読があればそこから、無ければ最新から開く（開いた瞬間 `markGroomViewed` で既読化 → グラデ解除）。
+
+#### 3. 活性化アニメは列が見えた後（`HomeScreen.swift` → `HomeDiscoveryExperience.swift` → `GroomStoryViews.swift` → `GroomStoryTileViews.swift`）
+- `GroomMyStoryAvatar` の `celebrate()` トリガを `isLoading` の false 遷移から、明示的な `activationSignal: Int` の変化に変更。`isLoading` false 時は `phase = .idle` に戻すだけ。
+- `activationSignal` を `GroomMyStoryTile`→`GroomStrip`→`HomeDiscoveryExperience`（`groomRailActivationSignal`）へ配線。
+- `HomeScreen` で `.onChange(of: isGroomComposerPresented)`：開いた時に自分グルーム件数を控え、閉じた時に件数が増えていれば（新規投稿）0.45秒後に `groomActivationSignal += 1`。コンポーザ／fullScreenCover が消えて列が見えてからスイープが走る。
+
+#### 4. タイル拡大 約3.8個（`GroomStoryTileViews.swift` の `GroomStoryMetrics`）
+- `ringDiameter 64→84`、`ringLineWidth 2→2.5`、`avatarDiameter 56→74`、`labelWidth 66→86`、`itemSpacing 12→14`。1タイル ≈ 86+14=100pt、(393−12 先頭余白)/100 ≈ 3.81 → 最初の画面で約3.8個表示。
+
+### 影響範囲
+- ホーム上部グルーム列（自分タイル＋ストーリータイル）／自分グルームビューア。
+
+### 確認方法
+- `swift build` 成功（`.build/build.db` の disk I/O error は既知の無害エラー、`Build complete!` 出力）。
+- `swift test`：XCTest 1536（3 skipped, 0 failures）＋ Swift Testing 24 tests / 9 suites すべてパス。
+- ImageRenderer スナップショットは `GroomStrip` が水平 `ScrollView` を内包し、tile struct が `private` のため macOS テストホストで中身を捕捉できず（既知の ImageRenderer 制約）→ コードレベル検証＋実機ビルドで確認。
+- 実機（オーナー iPhone）へ device build + install。
+
+### セルフレビュー結果
+- ✅ ブランドカラー直書きなし（グラデは `MegrumTheme.sky→lavender` を既存 `GroomMyStoryAvatar` 経由）。
+- ✅ 用語 OK（グルーム／未読／有効）。廃止用語なし。
+- ✅ 削除→前後遷移は `@State grooms` の局所更新で完結（再フェッチ不要）。
+- ⚠️ バックグラウンドのリアルタイム push は引き続き保留（フォアグラウンドのネイティブバナーは配信済み）。
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/GroomViewerScreen.swift`
+- `ios-native/Sources/MegrumApp/GroomStoryTileViews.swift`
+- `ios-native/Sources/MegrumApp/GroomStoryViews.swift`
+- `ios-native/Sources/MegrumApp/HomeDiscoveryExperience.swift`
+- `ios-native/Sources/MegrumApp/HomeScreen.swift`
+
+---
+
+## イテレーション1226.394：自分グルーム投稿後は自分タイル枠を水色→紫グラデに活性化（IG風スイープ）＋アバタータップで自分のグルーム閲覧（FB）
+
+### 背景・問題意識
+オーナーFB：(1) 自分のグルームを投稿したら、ホームの自分アイコンの枠が水色→紫グラデ（未読ストーリー相当）に活性化してほしい。アニメーションもインスタ風に「おしゃれにぐるっと枠が活性化」。(2) 自分アイコンの右下「＋」以外（アバター）をタップしたら自分のグルームを見られるように。
+
+### 変更内容（`GroomStoryTileViews.swift`, `GroomStoryViews.swift`, `HomeDiscoveryExperience.swift`, `HomeScreen.swift`）
+- `GroomMyStoryAvatar` に `hasActiveGroom` を追加。idle枠を「有効な自分グルームあり＝水色→紫グラデ／なし＝薄グレー」に。投稿完了時の celebrate()（12時から時計回りに一周スイープ＋スプリング）はそのまま、着地先が idle=グラデになったので投稿後もグラデが残る（IG風の活性化）。
+- 自分タイルのタップを分割：アバター＝（自分グルームあれば）閲覧 / なければ投稿、右下「＋」＝常に投稿。ZStack内の独立ボタン2つで実装（＋バッジは `GroomMyStoryAddBadge` に切り出し）。
+- `hasOwnActiveGroom`/`onViewOwn` を GroomStrip→HomeDiscoveryExperience→HomeScreen に配線。HomeScreen は `myActiveGrooms`（groomMapPosts の自分投稿・新しい順）から算出し、閲覧は最新の自分グルームを開く。
+
+### 確認方法
+- `ImageRenderer` スナップショットで idle（グレー）/活性（グラデ）＋＋バッジを確認。`swift test`（XCTest 1536＋Swift Testing 24）緑。実機。
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/GroomStoryTileViews.swift`, `GroomStoryViews.swift`, `HomeDiscoveryExperience.swift`, `HomeScreen.swift`
+
+---
+
+## イテレーション1226.393：推しごと通知の保存失敗を修正（snake_case変換の不一致）＋端スワイプで開き終えた瞬間に触覚（FB）
+
+### 背景・問題意識
+オーナーFB：(1) めぐりの推しごと通知設定で「全メンバーを通知」トグルがオフにできない／めぐりホームに戻ると「通知設定を保存できませんでした」エラー。(2) 左ドロワーを画面端スワイプで開き終えた瞬間にも触覚フィードバックを出したい。
+
+### 原因と修正
+(1) **snake_case変換のプロパティ名不一致**：Foundation の `convertToSnakeCase("memberCharacterIDs")` は `member_character_i_ds`（「IDs」の分割ミス）となり、存在しない列名で upsert → PostgREST が拒否 → 毎回保存失敗（楽観更新が巻き戻り「オフにできない」ように見えた）。加えて `convertFromSnakeCase("group_id")` は `groupId` なのに Row 側が `groupID` で復号も失敗していた。
+- `GroomNotifyPrefPayload.memberCharacterIDs` → `memberCharacterIds`、`GroomNotifyPrefRow.groupID/memberCharacterIDs` → `groupId/memberCharacterIds` に修正。エンコード/デコードのラウンドトリップを Swift で実測確認（`member_character_ids`）。
+
+(2) **端スワイプの開き完了で触覚**：`MegrumAuthenticatedTabsView.drawerPanGesture` の `.onEnded` で、閉→開に確定した時だけ `withAnimation(..., completionCriteria: .logicallyComplete){...} completion: { MegrumHaptics.buttonTap() }` を呼び、開き「終えた」瞬間に触覚を出す（閉じる/開いたままは対象外。ボタン開きは従来どおり）。
+
+### 確認方法
+- Swift スニペットで convertToSnakeCase/FromSnakeCase のラウンドトリップ確認。`swift test`（XCTest 1536＋Swift Testing 24）緑。実機。
+
+### 関連ファイル
+- `ios-native/Sources/MegrumData/SupabaseNotificationRows.swift`, `SupabaseNotificationPayloads.swift`, `SupabaseNotificationClient.swift`, `MegrumAuthenticatedTabsView.swift`
+
+---
+
+## イテレーション1226.392：ホーム投稿を「種別→全画面地図」順に＋自分グルームが地図に出るよう修正＋出会ったグルームをロック付きで表示＋空吹き出し撤去（FB）
+
+### 背景・問題意識
+オーナーFB：(1) ホーム経由投稿は「トピック/シリーズのポップアップ→全画面の地図で場所決定」の順にしたい。(2) そのフローで投稿しても自分のグルームがめぐり地図に出ない、ちゃんと投稿できるように。(3) ホームのグルーム列は、近くに無くても「出会った(遭遇済み)」グルームも表示。ただし無料会員は開けないので右下にうすい鍵アイコン。(4) 列が0件でも「近くのグルームはまだありません」の吹き出しは不要。
+
+### 変更内容
+- **投稿フロー順の変更**（`GroomStoryComposerViews.swift`）：写真編集→トピック/シリーズのポップアップ→（ホーム等）全画面地図で場所選択→投稿。めぐり地図経由（場所確定済み）はポップアップ後そのまま投稿。地図ステップ `GroomStoryLocationStepView` を全画面化（`MeguriCreationLocationPicker` に `mapHeight` 追加）。
+- **自分グルームが地図に出ない不具合**（`MeguriScreen.swift`）：DBには正しく保存されていた（座標・published）。原因はコンテンツフィルタが未タグ(group_id null)の自分投稿を除外していた。自分の投稿はフィルタ・推し設定に関わらず常に表示するよう `isOwnOrMatchesFilter` を導入。
+- **出会ったグルームをロック付きで表示**：`list_encountered_grooms` RPC（距離条件なし）追加。`appState.encounteredGrooms` を読み込み、ホーム列に「開けるグルーム＋遭遇済み」をマージ。開けないものは `GroomStoryTile` の右下にうすい鍵アイコン、タップでプレミアム案内シート。
+- **空吹き出し撤去**（`GroomStoryViews.swift`）：`GroomEmptyStoryHint` の表示を削除。
+
+### 確認方法
+- `ImageRenderer` スナップショットでロック鍵・同心円・空吹き出し無しを確認。`swift test`（XCTest 1536＋Swift Testing 24）緑。実機。
+
+### 関連ファイル
+- `supabase/migrations/20260710120000_list_encountered_grooms.sql`
+- `ios-native/Sources/MegrumApp/GroomStoryComposerViews.swift`, `GroomStoryLocationStepView.swift`, `MeguriCreationLocationPicker.swift`, `MeguriScreen.swift`, `HomeScreen.swift`, `HomeDiscoveryExperience.swift`, `GroomStoryViews.swift`, `GroomStoryTileViews.swift`, `MegrumAppStateGroomProximity.swift`
+
+---
+
+## イテレーション1226.391：自分グルームタイルの枠ずれ修正＋ホーム投稿に地図で場所を選ぶステップを追加（FB）
+
+### 背景・問題意識
+オーナーFB：(1) ホーム上部の一番左「自分のグルーム」タイルで、グレー枠と内側の丸がずれている。ずれないでほしい。(2) このホーム経由でグルーム投稿する時「最後に位置を決めてください」と出て投稿できない。最後に地図が出て、どこに投稿するか決めるステップを挟んでほしい。
+
+### 変更内容
+- `GroomStoryTileViews.swift`：`GroomMyStoryAvatar` の `ZStack(alignment: .bottomTrailing)` が枠とアバターまで右下寄せにしていた。中央合わせの `ZStack` に戻し、「＋」バッジのみ `.overlay(alignment: .bottomTrailing)` で右下に重ねる（枠とアバターは同心円）。
+- `GroomStoryLocationStepView.swift`（新規）：写真編集の後に地図で投稿場所を選ぶステップ（既存 `MeguriCreationLocationPicker` を使用・現在地から半径1km以内）。
+- `GroomStoryComposerViews.swift`：写真編集の「投稿」を `beginPublishFlow` に変更。めぐり地図経由（場所を先に決めた locks=true）はそのまま、ホーム等（場所未確定）は地図ステップ→「この場所にする」→トピック/シリーズ→投稿の順に。
+
+### 影響範囲
+ホーム上部グルーム列の自分タイル表示、ホーム経由のグルーム投稿フロー（めぐり経由は不変）。
+
+### 確認方法
+- `ImageRenderer` スナップショットで自分タイルの同心円＋右下バッジを確認。`swift test`（XCTest 1536＋Swift Testing 24）緑。実機。
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/GroomStoryTileViews.swift`, `GroomStoryLocationStepView.swift`, `GroomStoryComposerViews.swift`
+
+---
+
+## イテレーション1226.390：グルーム通知を「現在地1km圏内×同一推し」のリアルタイム化＋遭遇プレミアム閲覧＋メンバー個別選択＋プッシュ直接ディープリンク（FB）
+
+### 背景・問題意識
+オーナーFB：
+1. プッシュタップで特定グルームを直接開けるように（前回は /meguri 止まり）。
+2. 推しごと通知の「登録メンバーのみ」がONにできない＋どのメンバーを通知対象にするか個別選択したい。
+3. 通知条件は「最後に開いた場所から3km」ではなく「**現在地のリアルタイム1km圏内**」が正。位置情報が常に許可ならリアルタイム通知、アプリ内のみなら**アプリ内でiOS標準の通知（画面上部バナー）**を出す。
+4. アプリ内通知はiOS標準のバナー風に。
+5. 圏外プレミアム閲覧の条件を「通知が飛んだもの」ではなく「**一度でも自分の1km圏内に入り、その時自分の推しに紐づいていたグルーム**」に（通知の有無は不問）。
+6. これをMegrumプレミアムの説明に含める。
+
+### 変更内容
+
+#### バックエンド（migration 20260709120000・push済み）
+- `groom_encounters(user_id, groom_post_id)`：1km圏内×推し一致の遭遇記録（RLS本人）。
+- 推しごと通知に `notify_all_members` / `member_character_ids` を追加（`members_only` は廃止扱い）。
+- 投稿時サーバファンアウト `notify_groom_post_published` を**無効化**（検知はクライアント側リアルタイムへ移行）。
+- フィードRPC `list_groom_feed_nearby` に `viewer_encountered` を追加。
+- 単一グルーム取得 `get_groom_feed_item(p_groom_id)`（プッシュのディープリンク用・距離条件なし）。
+
+#### クライアント
+- 圏外ゲートを「通知済み」→「**遭遇済み(encountered)×プレミアム**」へ（`GroomPost.encounteredInRange`／`MeguriAccessPolicy.canOpenGroom(hasEncountered:)`／全呼び出し配線）。
+- リアルタイム近接検知：`GroomProximityEvaluator`（純粋・テスト済み）＋`MegrumAppState.evaluateGroomProximity`。1km圏内×推し一致の新規グルームを遭遇記録し、設定合致時に**ローカル通知（iOS標準）**を発行。フォアグラウンドは willPresent が `.banner` を返すため画面上部バナーで表示（item4をiOS標準で満たす）。ホーム・めぐり地図のグルーム読み込み後に評価。
+- 推しごと通知UIを刷新：グループON/OFF＋「全メンバー」トグル＋メンバー個別チェックで通知対象を選択（`GroomNotifyPref{enabled, notifyAllMembers, memberCharacterIDs}`）。
+- プッシュのディープリンク：`groom_posted` は `/grooms/{id}` → `NotificationRouteIntent.groomDetail` → めぐりで取得＋ゲート付き表示（`loadGroomPost`／`get_groom_feed_item`）。
+- プレミアム説明に「出会った推しグルームを圏外でも閲覧」行を追加。
+
+### 影響範囲
+めぐり通知・グルーム閲覧ゲート・プッシュ導線・推しごと通知設定・プレミアム説明。
+
+### 確認方法
+- `swift test`（XCTest 1536＋Swift Testing 24：新規 `GroomProximityEvaluatorTests` 3件＋ゲート5件、すべて緑）。実機。
+
+### セルフレビュー結果
+- ✅ 圏外閲覧は「遭遇済み×プレミアム」（通知不問）
+- ✅ 通知は現在地リアルタイム1km×同一推し＋推しごと（メンバー個別選択）
+- ✅ アプリ内はiOS標準バナー（willPresent .banner）
+- ✅ プッシュ→特定グルームのゲート付きディープリンク
+- ⚠️ **バックグラウンド（アプリ非表示/終了時）のプッシュは未配線**。現状はフォアグラウンド（アプリ内バナー）＋位置更新時に発火。常時位置でのバックグラウンド通知は、アプリレベルの位置サービス（significant-change / region monitoring）が必要で実機検証前提のため次段で対応予定。
+
+### 関連ファイル
+- `supabase/migrations/20260709120000_groom_encounters_and_realtime_notify.sql`
+- `ios-native/Sources/MegrumApp/GroomProximityMonitor.swift`, `MegrumAppStateGroomProximity.swift`, `MeguriGroomOshiNotifySettingsScreen.swift`, `NotificationRouteIntent.swift`, `MeguriAccessPolicy.swift`
+- `ios-native/Sources/MegrumCore/GroomNotifyPref.swift`, `GroomModels.swift`
+
+---
+
+## イテレーション1226.389：ホームのグルーム列を Instagram ストーリー列と同寸・同色に（枠の色づきアニメ付き）
+
+### 背景・問題意識
+オーナーFB（IGスクショ添付）：「ホームのグルームのデザインをこの画像のストーリーと全く同じ大きさ・色に。グラデーションの色だけは今と同じでOK。ストーリーズのラベルは『グルーム』。既読の枠は一番左のストーリーの枠（薄グレー）と同じ。自分がグルームをあげたときに枠が色づく動きもインスタを模倣（わからなければ調べて）。」
+
+### 調査（ワークフローで並行リサーチ）
+IG ストーリートレイの実寸（2024-25）＝ 外枠 約64pt／線 約2pt（細い）／アバター 約56pt／枠-アバター間 約2.5pt／タイル間 約12pt／ラベル 11pt regular（未読 #262626・既読 #8E8E8E）／既読リング #C7C7C7／「+」バッジ #0095F6・20pt。色づきアニメ＝アップロード中は色を抑えた短い弧が時計回りに回転、完了時に上（12時）から時計回りにグラデが一周（`Circle().trim` を 0→1、easeOut ~0.42s）＋小さなスプリングのポップ。
+
+### 変更内容
+
+#### `Sources/MegrumApp/GroomStoryTileViews.swift`（全面刷新）
+- `GroomStoryMetrics`：IG準拠の寸法・色を集約（ring64/stroke2/avatar56/spacing12/label11、seen #C7C7C7、addBadge #0095F6、labelUnseen #262626/labelSeen #8E8E8E、未読グラデは現状どおり 水色→紫）。
+- リングを IG同寸の細枠（`strokeBorder` lineWidth2）に。未読＝水色→紫グラデ／既読＝薄グレー。旧5ptチャンキー枠・影・アバター減光を撤去。
+- ラベルを 11pt regular・省略1行・IG色に。
+- `GroomMyStoryTile`：自分タイルにラベル「グルーム」を追加。アイドル時は薄グレー枠＋青「+」バッジ。
+- `GroomMyStoryAvatar`：投稿の「色づき」アニメを実装（idle/uploading/celebrating）。アップロード中は回転する短い弧、完了で `trim 0→1` の一周スイープ＋スプリングのポップ、その後アイドルへ戻す。
+
+#### `Sources/MegrumApp/GroomStoryViews.swift`
+- `GroomStrip` の HStack spacing 22→12（`GroomStoryMetrics.itemSpacing`）、縦padding 4→8。
+
+#### `Sources/MegrumApp/HomeDiscoveryExperience.swift`
+- 列の leading padding 16→12（IG寄せ）。
+
+### 影響範囲
+ホーム最上部のグルーム列（表示のみ）。ロジック・データは不変。
+
+### 確認方法
+- `ImageRenderer` による静止画スナップショット（scratchpad/groom-rail.png）で目視：細枠・未読グラデ・既読グレー・「グルーム」＋青バッジ・小ラベルを確認（確認後スナップショットテストは削除）。
+- `swift test`：XCTest 1536＋Swift Testing 21 すべて緑。
+- 実機（feat/candidate-sheet-redesign）。
+
+### セルフレビュー結果
+- ✅ IG同寸（64/2/56/12/11）
+- ✅ 未読グラデは現状色（水色→紫）維持
+- ✅ 既読＝一番左（自分）の枠と同じ薄グレー #C7C7C7
+- ✅ 「グルーム」ラベル＋IG青の「+」バッジ
+- ✅ 投稿時の枠の色づきアニメ（回転→一周スイープ＋ポップ）を IG リサーチに沿って実装
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/GroomStoryTileViews.swift`, `GroomStoryViews.swift`, `HomeDiscoveryExperience.swift`
+
+---
+
+## イテレーション1226.388：圏外グルームは通知が飛んだものだけプレミアム閲覧＋通知は圏内同一推しのみ＋推しごと通知設定（FB8-7）
+
+### 背景・問題意識
+オーナーFB（FB8-7）：「圏内のグルームなら見れるけど、圏外のグルームなら、通知が飛んだものだけ、プレミアムに入らないと見れないようにしてほしい。通知が飛ぶものは、圏内の同じ推しに設定しているグルームのみ。」追加要望：推し（L1グループ）ごとに圏内グルーム通知のON/OFFを制御したい（＋メンバー絞り込み、既定OFF）。めぐりホームの通知アイコンから設定。マッチはグループ単位（モモ紐づけグルーム＋TWICE推し設定→モモ未登録でも通知）。オーナー指示：「バックエンドのプッシュ送信もあなたの方でしてください。Aで（アプリ側先行）」。
+
+### 前提の再確認（既存バックエンド）
+`20260704120000_add_meguri_subscription_push_settings.sql` が既に多くを実装済み：`user_notification_settings` に `groom_oshi_push_enabled`/`groom_nearby_push_enabled`/`push_location_lat|lng|updated_at`、`notifications.groom_post_id`＋kind `groom_posted`、ファンアウト `notify_groom_post_published()`（当時は「推し一致 OR 圏内」の論理和）。位置はオプトインでサーバ保存済み。
+
+### 変更内容
+
+#### バックエンド（2 migration・push 済み）
+`supabase/migrations/20260708160000_groom_oshi_nearby_notify_prefs.sql`
+- `user_groom_notify_prefs(user_id, group_id, enabled, members_only)`（RLS 本人のみ、既定＝通知ON・全メンバー）
+- `notify_groom_post_published()` を「**圏内 かつ 同一推し ＋ 推しごと設定**」の論理積に張り替え。グルームの所属グループは `group_id` 無しでも character から解決。`members_only=true` は登録メンバー(L2)一致を要求。
+- `groom_viewer_was_notified(uuid)`：圏外グルームのプレミアム閲覧判定用ヘルパー。
+
+`supabase/migrations/20260708170000_groom_feed_viewer_was_notified.sql`
+- `list_groom_feed_nearby` に `viewer_was_notified` を追加（20260706210000 本体を踏襲）。
+- `groom_posted` 通知リンクを `/meguri` に（特定グルームへのディープリンクは未実装のため、めぐりマップ経由で開かせる）。
+
+#### クライアント
+- `SubscriptionModels.swift`：`hasMeguriGroomExtendedAccess`（プレミアム条件）。
+- `MeguriAccessPolicy.swift`：`canOpenGroom`/`groomAccessMessage` に `wasNotified`＋`subscriptionState`。圏内＝無料、圏外＝通知済み×プレミアムのみ、それ以外の圏外は従来どおり不可。
+- `GroomModels.swift`：`GroomPost.wasNotified`。`SupabaseGroomRows.swift`：`viewer_was_notified` をデコードして反映。
+- 全グルーム開閉呼び出し（strip/map/backdrop/rangeNotice）に `wasNotified`＋`subscriptionState` を配線。`HomeScreen.swift`：ホーム上部の列を「開けるグルームだけ」にフィルタ（FB8-6 の圏内意図とも整合）。
+- 推しごと通知設定の縦スライス：`GroomNotifyPref`（Core）→ `SupabaseNotificationClient`（Row/Payload/load/set）→ `MegrumRepository`（protocol/defaults/Supabase）→ `MegrumAppState`（`groomNotifyPrefsByGroupID`＋load/set/楽観更新）→ `MeguriGroomOshiNotifySettingsScreen`（L1ごとON/OFF＋登録メンバーのみ）。
+- `MeguriNotificationSettingsSheet.swift`：グルーム欄を「圏内の推しグルーム通知（親スイッチ）」＋「推しごとの通知設定（NavigationLink）」に再構成。親ON時は現在地を基準位置として保存。
+
+### 影響範囲
+めぐり（グルーム閲覧の圏内/圏外/プレミアム判定）、めぐり通知設定、ホーム上部グルーム列、通知ファンアウト。
+
+### 確認方法
+- `swift test`（XCTest 1536＋Swift Testing 21：新規 `MeguriAccessPolicyGroomGateTests` 5件含む、すべて緑）
+- 実機（feat/candidate-sheet-redesign）
+
+### セルフレビュー結果
+- ✅ 圏内=無料／圏外=通知済み×プレミアムのみ（テストで固定）
+- ✅ 通知は「圏内 かつ 同一推し ＋ 推しごと設定」の論理積（従来の論理和から張替え）
+- ✅ グループ単位マッチ（character から所属グループ解決）
+- ✅ 既存呼び出しはデフォルト引数で挙動不変（後方互換）
+- ⚠️ 特定グルームへのプッシュ・ディープリンクは未実装（通知は /meguri へ。圏外通知済みグルームはマップ経由でプレミアム閲覧）。フォローアップ候補。
+
+### 関連ファイル
+- `supabase/migrations/20260708160000_*.sql`, `supabase/migrations/20260708170000_*.sql`
+- `ios-native/Sources/MegrumApp/MeguriAccessPolicy.swift`, `MeguriGroomOshiNotifySettingsScreen.swift`, `MeguriNotificationSettingsSheet.swift`, `HomeScreen.swift`
+- `ios-native/Sources/MegrumCore/GroomNotifyPref.swift`, `SubscriptionModels.swift`, `GroomModels.swift`
+
+---
+
+## イテレーション1226.387：ホーム上部に圏内グルームのストーリー列（その場で閲覧・投稿）（FB8-6）
+
+### 背景・問題意識
+オーナーFB（FB8-6）：ホーム画面の上に、インスタのストーリー一覧のように圏内グルームを横並び。既読=グレー枠／未読=水色→紫グラデ枠で区別し未読を前に。左端は自分アイコン＋右下に＋（グルーム投稿）。確認の結果、閲覧・投稿とも「**ホーム上でそのまま開く**」。
+
+### 変更内容
+- **部品流用**：`GroomStrip`（自分ストーリー＋「＋」タイル・未読先頭ソート `GroomFeedOrdering`・`GroomStoryTile`＋`GroomStoryRing`）は元から存在し未使用だったので、これをホーム上部に配置。
+- **未読リング色**：`GroomStoryRing` の未読を IGレインボー→**水色→紫のブランドグラデ**（`MegrumTheme.sky→lavender`）に変更。既読はグレーのまま。めぐり側の表示にも反映（ブランド統一）。
+- **その場投稿コンポーザ**：`GroomComposerContainer`（新規・自己完結）を追加。めぐり画面の状態機械には手を入れず、下書き状態＋写真/カメラ/投稿処理を内包し `MeguriGroomComposerPresentationModifier` を適用。ホーム側でこれをラップし「＋」でその場表示。投稿後は `loadGroomMapPosts(force:)` で列を更新。
+- **その場閲覧**：タブ上位（`MegrumAuthenticatedTabContentView`）に既存のイマーシブ・グルームビューア（`meguriGroomViewerPost`）があるので、ホームの `onOpenGroom` → `openMeguriGroomViewer` で全タブ上に表示。`GroomViewerScreen` は initialGroom が list に無くても先頭に差し込む実装なので、`groomMapPosts` 由来のグルームでも安全。
+- **データ/位置**：`HomeScreen` に `MegrumLocationState` を持たせ、出現時に現在地取得→`appState.loadGroomMapPosts(lat,long)`（約3km＝圏内）＋著者プロフィール読み込み。列は `groomMapPosts`／既読 `viewedGroomIDs`／プロフィール `publicProfilesByUserID` を渡す。ガイドツアー中は非表示。
+
+### 影響範囲
+- ホームタブ上部（新規のグルーム列）。めぐりタブのグルーム機能は不変（状態機械に触れていない）。`GroomStoryRing` の未読色はめぐり側にも反映。
+
+### 確認方法
+- `swift build` / `swift test` 1536件 green（`OshiRequestKind` allCases のテストも アクティビティ 込みに更新）。
+- 実機：現在地の約3km圏内にグルームがある状態でホーム上部に列が出ること、未読が水色→紫枠で先頭、既読がグレー、タップでその場閲覧、「＋」でその場投稿できることを確認（要位置情報許可）。
+
+### セルフレビュー結果
+- ✅ めぐりの状態機械を触らず、投稿は独立した `GroomComposerContainer` に隔離（回帰リスク低）。
+- ✅ 閲覧は既存のタブ上位ビューアを再利用。
+- ⚠️ ホーム出現時に位置情報を要求するようになる（圏内グルーム表示に必須のため）。
+- ⚠️ FB8-7（圏外グルームのプレミアム制限＋通知）は別途バックエンド設計。
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/GroomComposerContainer.swift`（新規）/ `GroomStoryTileViews.swift` / `HomeDiscoveryExperience.swift` / `HomeScreen.swift` / `MegrumAuthenticatedTabContentView.swift`
+- `ios-native/Tests/MegrumCoreTests/MegrumCoreTests.swift`（アクティビティ種別のテスト更新）
+
+---
+
+## イテレーション1226.386：推し種別に「アクティビティ」を追加（FB8-10 種別追加のみ）
+
+### 背景・問題意識
+オーナーFB（FB8-10）。確認の結果、今回のスコープは「**種別追加のみ**（マスタ登録は後日／「Me」への改名は保留）」。
+
+### 変更内容
+- `OshiRequestKind` に `.activity`（displayName「アクティビティ」、`supportsMemberSelection = false`＝ソロ同様の単体扱い）を追加。推し追加リクエストの種別セレクタは `OshiRequestKind.allCases` を回すため、UIに自動でチップが追加される。
+- DBマイグレーション `20260708140000_add_activity_oshi_kind.sql`：`groups_master.kind` と `oshi_requests.requested_kind` の CHECK 制約を `('group','work','solo','activity')` に張り替え。`supabase db push` 適用済み。
+
+### 保留（オーナー指示）
+- 「趣味」カテゴリ（genre）とアクティビティのマスタ登録は後日（管理画面から追加する想定）。
+- 「推しを追加→『Me』を登録」の改名は保留（趣味/アクティビティが揃ってから）。
+
+### 影響範囲
+- 推し追加リクエストの種別選択。既存 group/work/solo は不変。
+
+### 確認方法
+- `swift build` OK。`supabase db push` 適用済み（`20260708140000`）。
+
+### 関連ファイル
+- `ios-native/Sources/MegrumCore/OshiModels.swift` / `supabase/migrations/20260708140000_add_activity_oshi_kind.sql`
+
+---
+
+## イテレーション1226.385：グッズ種別に最近使った5件＋マイグッズ/ほしいものフッターを右・文字付きに（FB8-8/9）
+
+### 背景・問題意識
+オーナーFB（FB8の一部）：
+- **FB8-8**：マイグッズ/ほしいものでグッズ種別を選ぶとき、登録履歴が5個まで残って上に表示されてほしい。
+- **FB8-9**：マイグッズ/ほしいもののフッターのアイコン位置を左右逆に。「グッズを追加」「ほしいものを追加」の文字を書く。
+
+### 変更内容
+- **FB8-8**：`GoodsTypeRecentSelection`（UserDefaults に UUID をカンマ区切り、最大5件・最近順・重複排除）を新設。`GoodsTypeSelectSheet`（単一選択の登録フロー・未検索時のみ）で上部に「最近使った」セクションを追加し、選択時に記録。複数選択（フィルター）モードでは出さない。
+- **FB8-9**：`AddGoodsButton` を丸FABから「＋ グッズを追加／＋ ほしいものを追加」の文字付きカプセルに変更。フッターの配置を入れ替え（追加ボタン＝右下、フィルタ＝左下）。追加ボタンの文字は `addButtonTitle`（inventory=「グッズを追加」/ wish=「ほしいものを追加」）。
+
+### 影響範囲
+- マイグッズ/ほしいもの一覧のフッター、グッズ種別選択シート（登録・編集から呼ばれる）。
+
+### 確認方法
+- `swift test` 1536件 green（`GoodsTypeRecentSelection` の 最近順/重複/上限5/不正値無視 を3ケースで固定）。
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/GoodsTypeRecentSelection.swift`（新規）/ `GoodsTypeSelectSheet.swift` / `GoodsCollectionDisplayViews.swift` / `GoodsCollectionActionViews.swift` / `GoodsCollectionScreenBody.swift` / `GoodsCollectionScreenDerivedState.swift`
+- `ios-native/Tests/MegrumAppTests/GoodsTypeRecentSelectionTests.swift`（新規）
+
+---
+
+## イテレーション1226.384：他にも交換の追加候補を確認/打診に反映＋追加済みバッジ＋ゆずる選択マーク修正＋交換方法の自動展開（FB7）
+
+### 背景・問題意識
+オーナーFB（3件）：
+- **FB7-1**：「他にも交換できそうなもの」で画像タップ→入れ子で交換内容が決まったら元シートに戻り、そのパネルに「交換に含む」と分かる簡単なアイコン表示がほしい。元シートの「交換内容を確認する」で、追加したものも含めて何を交換するか最終的に決まるようにしたい（確認画面に反映）。
+- **FB7-2**：ゆずるのマイグッズ選択ポップアップで、選択肢をタップしても行右側の丸に選択マークが付かないことがある。
+- **FB7-3**：「交換の方法について」を、「交換内容を確認する」ボタンが有効になった瞬間に自動展開したい。
+
+### 変更内容
+- **FB7-1**：
+  - 追加済みバッジ：`HomeDiscoveryCandidateSummaryRow` に `isAdded`、`HomeDiscoverySection`/`HomeSamePartnerExchangeSection` に `addedCandidateIDs` を追加。追加済み候補の行右上に「✓ 交換に追加済み」バッジ。追加状態は `presentationState.addedExtraCandidateIDs`（＝追加済み選択の receiverGoodsIDs）から判定。
+  - 確認画面に反映：`addedExtraSelections` を `HomeDiscoverySheetView → Content → 両ヒットシート` に配線。`startProposal()` で `proposalSelection.includingExtraSelections(addedExtraSelections)` を確認ペイロードに使い、受け取り一覧も追加分の相手グッズを合流（ID重複除去）。`includingExtraSelections` はID重複を除くため、後段 `submitSelection`→`primaryProposalSelection` の再マージでも二重にならない（冪等）。
+- **FB7-2**：`HomeOfferGoodsPickerSheet` に渡すセルを、開いた瞬間のスナップショット（`ctx.cells`）ではなく毎回ライブの `model.offer`（flatCells＋rows）から `liveOfferCells(for:)` で引き直すよう変更。トグル直後にチェックマークが確実に反映される。
+- **FB7-3**：`HomeCandidateDealAboutSection` に `isReadyToConfirm` を追加。`onAppear`（既に成立可能なら初期展開）＋`onChange`（false→true になった瞬間に `withAnimation` で展開）。両ヒットシートから `canStartProposal` を渡す。ユーザーが後から畳むのは自由。
+
+### 影響範囲
+- ホーム候補の超求/求シート下部「他にも交換できそうなもの」＋確認画面、ゆずる選択ポップアップ、「交換の方法について」折りたたみ。`HomeDiscoverySection`/`HomeDiscoveryCandidateSummaryRow` はホーム本体でも使うが、`addedCandidateIDs`/`isAdded` は既定 empty/false で挙動不変。
+
+### 確認方法
+- `swift build` / `swift test` 1533件 green。
+- 実機：他にも交換パネルの候補をタップ→入れ子で追加→戻ると行にバッジ、確認画面に受け取り分が合流。ゆずるポップアップでタップ即チェック。成立可能になった瞬間に交換方法が展開。
+
+### セルフレビュー結果
+- ✅ 追加候補の合流は `includingExtraSelections`（既存・冪等）を再利用。二重加算なし（確認・submitSelectionの両方でID重複除去）。
+- ✅ ピッカーのライブ引き直しで状態源を一本化（スナップショット依存を解消）。
+- ✅ 自動展開は onChange のみで強制せず、ユーザー操作を尊重。
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/HomeDiscoveryCandidateSummaryRow.swift` / `HomeDiscoverySection.swift` / `HomeSamePartnerExchangeSection.swift`
+- `ios-native/Sources/MegrumApp/HomeDiscoveryHitDetailSheets.swift` / `HomeWishHitDetailSheet.swift` / `HomeDiscoverySheetContent.swift` / `HomeDiscoverySheets.swift`
+- `ios-native/Sources/MegrumApp/HomeCandidateDealBlockViews.swift`（FB7-2）/ `HomeCandidateDealAboutSection.swift`（FB7-3）/ `HomeMockGoodsModels.swift`（dedup helper）
+
+---
+
+## イテレーション1226.383：候補シートの「他にも交換できそうなもの」を同じ相手のホーム構造一覧に（FB6-1）
+
+### 背景・問題意識
+オーナーFB（FB6-1）：候補シート下部の「他にも交換できそうなもの」がいま機能しておらず、常に「他に交換できそうなものはありません」だった（payload 未配線）。同じユーザーというくくりで、ホーム画面と同じ構造（「推し×シリーズでマッチ」「推しでマッチ」の2セクション）で一覧を出したい。ただしそこでグッズ画像をタップして開いた先の画面では、このセクションは出さない。
+
+### 変更内容
+- 新規 `HomeSamePartnerExchangeSection`＋`HomeOtherExchangeCandidateGroups`：同じ相手の他候補を、ホームと同じ `HomeDiscoverySection`（summaryRows）で「推し×シリーズでマッチ」（.memberTag）／「推しでマッチ」（.member）の2セクションに並べる。候補タップは `onOpenNestedSheet` で入れ子シートを開く。
+- `HomeDiscoveryExperienceDerivedState` に owner スコープの候補ビルダーを追加：`sameOwnerExchangeCandidateGroups(ownerID:excludingGoodsID:)`。ホームと同じ eligibility（`isMemberTagMatchEligible`/`isMemberMatchEligible`）・`HomeDiscoveryCandidateFactory`・並び順（`HomeCandidateDemandPolicy`）を使い、`matchedItems + possibleItems` を相手ID一致＋現在のグッズ除外でスコープ。`otherExchangeGroups(for sheet:)` で開くシートの primaryGoods から相手を特定。
+- `HomeDiscoverySheet.primaryGoods` を追加（相手在庫の主対象グッズ）。
+- 配線：`HomeDiscoveryExperience` の `.sheet` で groups を計算 → `HomeDiscoverySheetView` → `HomeDiscoverySheetContent` → `HomeGoodsHitDetailSheet`/`HomeWishHitDetailSheet` に `otherExchangeCandidates` を渡す。両シートの旧・空の `HomeOtherExchangeRows` を `HomeSamePartnerExchangeSection` に置換。
+- 「グッズ画像タップ後の画面では非表示」は既存の仕組みで担保：入れ子は `presentationContext == .additionalCandidate` で `showsOtherExchangeRows == false`、かつ入れ子には groups を渡さない（`.empty`）。
+
+### 影響範囲
+- ホーム候補の超求（`HomeGoodsHitDetailSheet`）／求（`HomeWishHitDetailSheet`）シート下部。`HomeMutualMatchDetailSheet` の `HomeOtherExchangeRows` は不変。
+
+### 確認方法
+- `swift build` / `swift test` 1533件 green。
+- 実機（michilion 実データ）で、同じ相手が複数の候補グッズを持つケースを開き、「他にも交換できそうなもの」に推し×シリーズ／推しの2セクションが出ること、タップで入れ子シートが開きそこでは同セクションが出ないことを確認。
+- ※ セクションは「同じ相手の他候補が存在する時のみ」表示（無ければ非表示）。VisualQA ハーネスは `showsOtherExchangeRows=false` のため直接は映らない。
+
+### セルフレビュー結果
+- ✅ ホームの eligibility / factory / 並び順を再利用（分類ロジックの二重化なし）。
+- ✅ 入れ子非表示は既存の presentationContext で担保（新フラグ追加なし）。
+- ⚠️ セクションの候補タップは既存の「このグッズも追加する」（additionalCandidate）動線に接続。閲覧のみにしたい要望が出たら別途調整。
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/HomeSamePartnerExchangeSection.swift`（新規）/ `HomeDiscoverySheetModels.swift` / `HomeDiscoveryExperienceDerivedState.swift` / `HomeDiscoveryExperience.swift` / `HomeDiscoverySheets.swift` / `HomeDiscoverySheetContent.swift` / `HomeDiscoveryHitDetailSheets.swift` / `HomeWishHitDetailSheet.swift`
+
+---
+
+## イテレーション1226.382：評価表記を黄色星に統一＋候補ヘッダーにアイコン＋プレミアム広告非表示＋ゆずる間隔（FB6の一部）
+
+### 背景・問題意識
+オーナーFB（FB6バッチのうち3件）：
+- **FB6-2**：Megrumプレミアムの紹介画面に「広告の非表示」を追加。
+- **FB6-3**：候補シートのゆずる候補が近接し「＋」が窮屈 → サムネ間隔を少し広げる。
+- **FB6-4**：候補シート最上部のユーザー名/性別行の左にユーザーアイコンを表示。評価表記を「評価X件 平均評価X.X」から、やりとり一覧と同じ「★ X.X（X件）」に統一。★はやりとり一覧・候補シート・評価入力・取引チャットヘッダーすべてで黄色の星アイコンに。取引チャットのヘッダーにも同じ評価表記を出す。
+
+### 変更内容
+- **FB6-2**：`SubscriptionComparisonRow.rows`（プレミアム「できること」表）に「広告の非表示」行を追加（無料×／プレミアム○、アイコン `nosign`）。
+- **FB6-3**：`HomeWishHitDetailSheet.offerRail` の `HStack(spacing: 8→12)`。
+- **FB6-4**：
+  - 共通部品 `MegrumRatingLabel`／`MegrumRating`（黄色星色＋「X.X（X件）」文言）を新設。評価表記をここに集約。
+  - `HomeCandidateSheetHeader`：左に `ProfileVisualAvatar`（44）、右に名前＋性別＋`MegrumRatingLabel`。旧 `profileMetaText`（評価X件 平均評価X.X）を廃止。
+  - やりとり一覧（`TradeCardPresentation`/`TradeCardComponents`）：`partnerAverageStars`/`partnerEvaluationCount` を追加し、テキスト★を `MegrumRatingLabel`（黄色星）に置換。
+  - 取引チャットヘッダー（`TradeDetailHeroPresentation`/`TradeDetailHeroView`）：相手の評価を `MegrumRatingLabel` で表示（@handle・関係性の下）。
+  - 評価入力（`TradeEvaluationSheet`）：星の色を lavender → `MegrumRating.starColor`（選択=黄色／未選択=グレー）。
+
+### 影響範囲
+- 候補シート（超求/求）ヘッダー、やりとり一覧カード、取引チャットヘッダー、評価送信シート、プレミアム紹介画面。
+
+### 確認方法
+- `swift test` 1533件 green（0 failures）。実機で候補シートヘッダー・やりとり一覧・取引チャットヘッダー・評価シート・プレミアム表を目視。
+
+### セルフレビュー結果
+- ✅ 評価表記・星色を `MegrumRatingLabel`/`MegrumRating` に一元化（4画面で再利用）。
+- ✅ ブランドカラー直書きは星の黄色のみ（意味色として `MegrumRating.starColor` に定義）。
+- ⚠️ FB6-1（「他にも交換できそうなもの」のホーム構造化）は別iterで対応。
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/MegrumRatingLabel.swift`（新規）/ `HomeCandidateSheetHeaderViews.swift` / `TradeCardPresentation.swift` / `TradeCardComponents.swift` / `TradeDetailHeroPresentation.swift` / `TradeDetailHeroView.swift` / `TradeEvaluationSheet.swift` / `SubscriptionPremiumPlanCatalog.swift` / `HomeWishHitDetailSheet.swift`
+
+---
+
+## イテレーション1226.381：打診の支払方法を独立ステップ化＋取引チャットの情報開示を役割ベースに＋ロータリー回転のz-order修正（FB5）
+
+### 背景・問題意識
+オーナーFB（3件）：
+1. **FB5-1**：提示物の選択（打診）3/3 に支払い方法の画面が含まれてしまっている。3/3 が終わった後に、独立した1画面で支払い方法を選ばせたい（金額のやりとりが発生する場合のみ）。
+2. **FB5-2**：郵送/現金のやりとりで、**情報を公開すべき側だけ**が公開されるようにしたい。郵送ぶつぶつ交換なら双方が住所開示。片方郵送・片方お金なら、グッズを送られる側が住所を開示し、お金を送られる側は支払い先が表示される。「これは取引チャット内のヘッダー部分のボタンのこと」。
+3. **FB5-3**：グッズ画像をスワイプして回転させるやつで、3枚以上あると左スワイプ時に元々左奥のカードが真ん中のカードを**貫通**して右へ抜けて不自然。貫通ではなく後ろを通るようにしたい。
+
+### 変更内容
+
+#### FB5-1：支払方法を 3/3 の後の独立ステップへ
+- `ProposalExchangeConditionsStep`（3/3 交換条件）から**支払方法セクションを撤去**（`requiresPaymentSelection`/`paymentContent`/generic `PaymentContent` を削除。交換手段・現地・郵送のみ）。
+- `visibleSteps` に、**金額発生時だけ** `.payment` を `.conditions` と `.confirm` の間に挿入（`[.give, .receive, .conditions, .payment, .confirm]`）。`.payment` は元から content route・画面タイトル「支払方法」・フッター「この方法にする」・`canAdvance` が実装済みで、`selectionTabs` からは除外されるため 3/3 ピルは不変。
+- ナビゲーション：`canAdvance(.conditions)` を `targetStatus != nil` のみに（支払要件を外す）。`.conditions` の遷移先は金額発生時 `.payment`、なければ `.confirm`。フッター文言も `.conditions` で「支払方法へ進む」/「次へ：送信確認」。
+- 最終送信要件（`canSubmit`）は従来通り支払選択を要求。`.payment` ステップで選択を強制してから `.confirm` へ。
+
+#### FB5-2：取引チャットの情報開示を役割ベースに
+- 共有判定 `TradeAgreementDisclosureVisibility(proposal:viewerID:)` を新設：
+  - **郵送先（相手の住所）**：郵送/両対応 かつ **閲覧者が相手にグッズを送る側**（自分側の提示グッズがある）のときだけ表示。→ 郵送ぶつぶつは双方、片方お金側は非表示。
+  - **支払い情報（相手の支払い先）**：**閲覧者が金額を支払う側**（`cashAmountSide` が自分側）のときだけ表示。支払い側不明時は安全側で従来通り表示。
+- 取引チャット**ヘッダーの開示ボタン**（`TradeDetailPinnedSummaryArea` → `TradeAgreementDisclosureActionsCard`）と、成立タイムライン（`TradeAgreementSystemTimeline`）の両方をこの判定に統一（`viewerID` を渡す）。
+
+#### FB5-3：ロータリー回転の貫通を後ろ通しへ
+- `HomeDiscoveryRotaryCard.visibleEntries` を、位置順ではなく **index 固定の宣言順**で並べるよう変更。位置順で並べ替えると回転アニメ中に ZStack の宣言順が入れ替わり、奥のカードが一瞬手前に描画されて貫通して見えていた。宣言順を安定させ、前後は `zIndex`（`20 - distance`）だけで決めることで奥を通るように。
+
+### 影響範囲
+- 打診作成フロー（`ProposalCreateFlow`：3/3 と支払方法）。金額なしの打診はステップ数不変。
+- 取引チャット詳細（`TradeDetailContentView` 配下のヘッダー開示ボタン＋成立タイムライン）。
+- ホーム候補シートのロータリー画像（超求/求 両方）。
+
+### 確認方法
+- `swift test`：1533件 green（0 failures）。
+  - FB5-2：`TradeAgreementDisclosureVisibility`（郵送ぶつぶつ＝双方郵送先／片方郵送片方お金＝送る側だけ郵送先・払う側だけ支払い情報／現地手渡し金額なし＝双方非表示）を新規4ケースで固定。
+  - FB5-1：`ProposalCreateSheetTests` に、`.conditions` が支払未選択でも進める・金額有なら遷移先 `.payment`・金額無なら `.confirm`・`.payment`→`.confirm`・フッター文言、の5ケースを追加。
+- FB5-3 は回転アニメ中の見え方のため静的スクショでは判定不可（実機スワイプで確認）。
+
+### セルフレビュー結果
+- ✅ 開示ロジックを1つの `TradeAgreementDisclosureVisibility` に集約し、ヘッダーとタイムラインで再利用（二重定義解消）。
+- ✅ 支払方法ステップは既存の `.payment` 資産（title/フッター/canAdvance/content route）を再利用。新規UIなし。
+- ✅ iOS標準のステップ遷移・ZStack z-index の範囲内（独自アニメの新規追加なし）。
+- ⚠️ `ProposalInitialStepResolver.normalized` は `.payment→.conditions` の旧読み替えを残置（実使用の initialStep は 3/3=`.conditions` までで、支払を直接初期表示する経路は無いため）。
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/ProposalCreateConditionSteps.swift` / `ProposalCreateFlowStepContent.swift` / `ProposalCreateFlowDerivedState.swift` / `ProposalCreateNavigationPolicy.swift`
+- `ios-native/Sources/MegrumApp/TradeAgreementAfterDealViews.swift` / `TradeDetailPinnedSummaryArea.swift` / `TradeDetailMessagesSection.swift`
+- `ios-native/Sources/MegrumApp/HomeDiscoveryRotaryCard.swift`
+- `ios-native/Tests/MegrumAppTests/TradeAgreementDisclosureVisibilityTests.swift` / `ProposalCreateSheetTests.swift`
+
+---
+
+## イテレーション1226.380：求！/求めてる？シートを超求と同じ「うけとる ⇄ ゆずる」取引ブロックに統一
+
+> ※ 実装コミットは `[iter1226.379]`（e1177589a）だが、同番号が別作業（定価⇄ゆずる化）と衝突したため、記録上は 380 に採番し直した。
+
+### 背景・問題意識
+オーナー指摘：求！/求めてる？（wishマッチ）の詳細シートが、超求（個別募集マッチ）の再設計に比べてイマイチ。単一グリッド＋「これを譲る」紫バナー＋浮いた「N件の候補」ピル＋大きな空白で、超求と「別画面」に見えていた。
+
+### 気づき（重要）
+`HomeWishHitDetailPresentationState.proposalSelection` は元々 `receiverGoods: selection.goods` を設定していた＝「受け取るもの」はデータ上は常に確定していたのに、旧UIは画面に出していなかった。求は「片側だけ」ではなく、**うけとる（相手グッズ）⇄ ゆずる（相手が求める自分のグッズ1件）**の両側を出せる。
+
+### 変更内容
+#### `HomeWishHitDetailSheet.swift`（本体を全面書き換え、打診ロジックは不変）
+- 本体を超求（`HomeDealBlockView`）と同じ文法の**2列取引ブロック**に：
+  - **うけとる**：`selection.goods`（＝打診の receiverGoods）を固定表示（グラデチェック）。サブラベル「打診で相談」。
+  - **⇄**：`arrow.left.arrow.right`（超求と同じ位置・寸法）。
+  - **ゆずる**：相手が求める自分のグッズを横スクロール列で1件選ぶ。サブラベル「相手が求めてる · N件」。
+- 選択作法を超求と統一：`HomeDealThumb`（選択済み＝水色→紫グラデチェック／未選択＝破線＋）を再利用。紫「これを譲る」バナーを撤去。
+- 浮いた「N件の候補」ピルを撤去し、件数を「ゆずる」段ラベルに吸収。
+- 達成カウンタ `HomeDealAchievementBar` を追加（選択済み「1件選択済み・このまま打診に進めます」／未選択「譲るグッズを1件選んでください」）。
+- 段ラベル・矢印は超求 `HomeDealBlockView` の private 実装と同じ見た目・寸法（thumbSide 58 等）でローカル定義。`HomeDealThumb`/`HomeDealGoodsCell`/`HomeDealAchievement(Bar)` は再利用。
+- 「推し以外でマッチ」も同じグラデチェック列に統一（通し index で単一選択を共有）。
+- ヘッダー・「交換の方法について」折りたたみ・打診生成/確認・空候補フォールバック（「交換内容を決める」）は不変。
+
+### 影響範囲
+- ホーム候補の求！/求めてる？詳細シート（`HomeWishHitDetailSheet`）。超求（`HomeGoodsHitDetailSheet`）は不変。打診の組み立て・確認フローは不変。
+
+### 確認方法
+- VisualQA：`SIMCTL_CHILD_MEGRUM_VISUAL_QA_CANDIDATE_VARIANT=wish`（求）と `=named`（超求）を並べてスクショ比較。うけとる ⇄ ゆずる・グラデチェック・達成カウンタが超求と一体化し「別画面」感が解消。求で従来隠れていた「受け取るもの」も可視化。
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'platform=iOS Simulator,id=C70DDDBB-2602-49E0-8F95-1F043BCCED76' -derivedDataPath /tmp/megrum-native-xcodebuild CODE_SIGNING_ALLOWED=NO build` → BUILD SUCCEEDED。
+
+### セルフレビュー結果
+- ✅ ブランドカラー直書きなし（`MegrumTheme` 経由、選択チェックは `HomeDealGradient.selection` 再利用）。
+- ✅ 共通部品 `HomeDealThumb`/`HomeDealAchievementBar` を再利用（新規は段ラベル・矢印のみ、超求と同寸法）。
+- ✅ notes/19 の「装飾色なし・意味色のみ」に沿って紫バナー撤去。
+- ⚠️ 直接マウントの VisualQA では下部空白が大きめ。実シートの detent では詰まる想定（要実機確認）。
+- ⚠️ `HomeDealThumb` 等は別セッションが編集中の `HomeCandidateDealBlockViews.swift` の型。再利用のため同ファイルのAPI変更時は追従が必要。
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/HomeWishHitDetailSheet.swift` / `HomeCandidateDealBlockViews.swift`（再利用）/ `notes/19_candidate_sheet_redesign.md`
+
+---
+
+## イテレーション1226.378：条件確認セクションの表示条件＋検索ワード調整
+
+### 背景・問題意識
+iter1226.377 実機確認後のオーナーFB。
+
+### 変更内容
+- 条件に**シリーズ指定が無ければ**「条件のグッズを確認！」以下（参考画像/検索ボタン）を出さず、条件文（例「条件：BTS / トレカ」）だけ1行で表示。`HomeConditionSeriesCheckModel.hasSeries` を追加し分岐。
+- 画像検索クエリから**シリーズ先頭の # を除去**（`#DICON D'FESTA` → `DICON D'FESTA`）。表示上の条件文の # は据え置き。
+- （関連）求（wishHit）シートの本体も超求と同じ取引ブロック（うけとる ⇄ ゆずる）に統一。
+
+### 確認方法
+- VisualQA `candidate-sheet` の `condition`（シリーズ有り＝確認セクション表示・検索#なし）と `conditionNoSeries`（確認セクション非表示・条件文のみ）で確認。swift test 1528件 green・実機反映済み。
+
+---
+
+## イテレーション1226.377：候補シートFB第2弾（数量以上・アプリ内検索・レイアウト刷新）
+
+### 背景・問題意識
+iter1226.376 実機確認後のオーナーFB。
+
+### 変更内容
+- **必要選択数を「数量以上」に**：条件指定は合致する全部でなく決まった数量（`wish_quantity`）以上を選べば成立。`HomeIndividualListingWantedOption.quantity` を追加し factory で `option.wishQuantity` を流す。`offerRequiredCount`/達成カウンタ/マイグッズ数量ラベルを条件は「N個以上」に。
+- **画像検索**：「シリーズが合えば〜」の説明文を削除。ボタンで別アプリに飛ばさず Megrum 内ブラウザ（`MegrumSafariView`＝SFSafariViewController）で開く。クエリはグループ・種別を条件文の非#トークンから確実に拾い、メンバー・種別を選択中グッズから補完（例「BTS トレカ RM #DICON D'FESTA」）。
+- **取引ブロックのレイアウト刷新**：大枠（角丸カード）撤去。見出しを二段化＝上段「うけとる／ゆずる」、下段「相手希望／マイグッズ」。ゆずる列を「マイグッズ」に改名し相手希望と近接。見出しと本文を分離して確実に縦揃え。
+- **指名の1対1スロット**：相手希望の画像ごとに →候補スロット、タップでその画像に合致する候補ポップアップ（`HomeDealOfferPickerContext`）。相手希望3件以上は折りたたみ（他N件を見る）。
+- **「この取引について」→「交換の方法について」**。
+
+### 影響範囲
+- ホーム候補シートの取引ブロック・条件確認セクション・折りたたみ見出し。
+
+### 確認方法
+- VisualQA `candidate-sheet`（named=指名2件の1対1スロット、condition/crowded=条件のN個以上）で確認。swift test 1528件 green。実機反映済み（要オーナー確認）。
+
+---
+
+## イテレーション1226.376：候補シート再設計の実機FB反映＋指名候補データ整備
+
+### 背景・問題意識
+iter1226.374/375 を実機で確認したオーナーからのFB（実データ「ihub 超求めてる？」で確認）。
+
+### 変更内容（UI）
+- **需要チップ撤去**：ヘッダーの「超求めてる？」等を削除（名前＋評価のみ）。`HomeCandidateSheetHeader` から `demand` と `HomeCandidateDemandChip` を撤去。
+- **サムネ整理**：取引ブロック各サムネ下のグッズ名を撤去。うけとる等のチェック/?を枠からはみ出す位置（左上/右上オフセット）に。
+- **条件パターンの相手希望＝アイコンのみ**：`HomeDealConditionIcon`（スライダー＋不確定「?」）。条件文「条件：…」＋「条件のグッズを確認！」＋検索ボタンを取引ブロック下の確認セクションにデザイン通り集約。列間に ⇄/→ の矢印。
+- **ゆずるをポップアップ選択に**：`HomeOfferGoodsPickerSheet`。ゆずる列は選択済み＋「選ぶ」タイル、タップで条件に合致する手持ちを一覧選択。
+- **画像検索クエリにグッズ種別追加**：`グループ メンバー 種別 #シリーズ`（例「BTS RM トレカ #DICON D'FESTA」）。
+- 列見出しの数量ラベルを短縮（すべて／N個以上／単一は無し）。
+
+### 変更内容（データ：指名候補整備）
+michilion のホームに「相手希望＝指名（欲しいものから選ぶ／画像）」の候補が出るよう Supabase 実データを整備（開発DB kwpnlcojzseicqbxefih、`web/.env.local` の service key）。
+- 非テスト相手 `ren`（指名2件：ジョングク＋ミナ／譲=V）、`mmm0113`（指名5件：JK/CY/MINA/松村北斗/JIMIN／譲=RM）、`kty`（指名2件＋条件＋定価の複数選択肢／譲=ニンニン）に、ほしいもの（指名対象）＋提示グッズ＋個別募集＋wish_options を作成。
+- 制約メモ：`listings` は無料プラン3件/人まで（room のある相手を使う）。`listing_wish_options.min_count` は logic=and/or では 1 必須（「すべてN件」は logic=and で表現、min_count は at_least 専用）。混在グループの指名は可。
+- **デモ行の目印**：ID に `4fbd`、listing.note に「🔧FB指名…」。cleanup 用スクリプトは scratchpad（`fbdemo-cleanup.py` 相当）。
+
+### 影響範囲
+- ホーム候補シート（goodsHit/wishHit）。打診の組み立て・確認は不変。
+
+### 確認方法
+- VisualQA `candidate-sheet`（named/condition/crowded/cash/conditionRef/wish）で各見た目を確認。
+- 実機：michilion で ren/mmm0113/kty の指名候補（2件/5件/複数選択肢）を確認（要オーナー確認）。
+
+---
+
+## イテレーション1226.374/375：ホーム候補シートを「打診の組み立て」に振り切る再設計
+
+### 背景・問題意識
+オーナーとモック往復で確定（`notes/19_candidate_sheet_redesign.md`）。従来シートは「①相手が信頼できるか ②なぜマッチか ③打診の組み立て」を1画面で兼務し、一番大きい要素（グッズ画像）が判断の主役でなかった。→ ③に振り切り、①②は折りたたみへ降格。装飾色はやめ、意味のある色（需要チップ＝ピンク/ラベンダー、CTA、選択済み＝水色→紫グラデ）だけ残す。
+
+### 変更内容（Phase 1〜6）
+#### 新規ファイル
+- `HomeCandidateSheetHeaderViews.swift`：`HomeCandidateSheetHeader`（名前＋評価＋需要チップのみ、大画像・判定羅列を撤去）＋`HomeCandidateDemandChip`（超求！/超求めてる？/求！/求めてる？/定価/探し中/相談）。
+- `HomeCandidateDealAboutSection.swift`：「この取引について」iOS標準 DisclosureGroup（既定閉じ）。現地/日程・支払い（`HomeConditionVerdictBlock` 再利用）＋メモ・更新日。
+- `HomeCandidateDealBlockModel.swift`：取引ブロック（3列）＋条件シリーズ確認の描画モデル（純粋データ）。
+- `HomeCandidateDealBlockViews.swift`：`HomeDealBlockView`（受け取る｜相手希望｜譲る）／`HomeWantedOptionPills`（選択肢ピル常時表示）／`HomeReceiveGoodsListSheet`（受け取る一覧ポップアップ）／`HomeConditionSeriesCheckSection`（条件のグッズを確認！）。
+- `CandidateSheetVisualQAPreview.swift`：`candidate-sheet` VisualQA画面（`MEGRUM_VISUAL_QA_CANDIDATE_VARIANT=named/condition/conditionRef/cash/crowded/wish`）。
+
+#### 主な挙動
+- **3列取引ブロック**：数量ラベル（すべて/N個以上）を受け取る・譲る両方に。達成カウンタ（例「すべて：1/2 選択済み・あと1つで成立」）をブロック直下固定。選択済み＝水色→紫グラデチェック、未選択＝破線＋。
+- **指名**：相手のほしいもの画像↔自分の候補を1対1（相手RM→あなたのRM）。データは `HomeWantedNamedPairing`（iter1226.373）を factory で算出。
+- **条件**：条件タイル（スライダー＋不確定なら「?」）＋条件文。取引ブロック下に「条件のグッズを確認！」＝①参考画像2枚（自分の手持ち以外）or ②「グループ メンバー #シリーズ」でGoogle画像検索。①②排他。
+- **定価**：金額入力（¥）＋「相手の指定：定価 or 〇〇円」。差額/もらうトグル無し。
+- **多数（4枚超）**：受け取る＝サムネ2枚＋「+N すべて見る」→一覧ポップアップ。譲る＝未選択優先3件＋「他N件を見る」で列を縦展開。
+- **選択肢ピル**を常時表示にし旧「他の選択肢」を廃止。初期表示で先頭の相手希望を自動選択し組み立て可能状態にする。
+- **wishHit（求！/求めてる？）**：goodsHit と割れないよう、ヘッダー＋折りたたみだけ統一（本体グリッドは据え置き）。
+
+### 影響範囲
+- ホーム「推しでマッチ」候補の詳細シート（`HomeGoodsHitDetailSheet` = 超求/超求めてる/定価、`HomeWishHitDetailSheet` = 求/求めてる）。打診の組み立て・確認フローは不変（既存の選択状態・`proposalSelection()` を再利用）。
+- 個別募集の選択肢が無い候補は旧UIにフォールバック。
+
+### 確認方法
+- VisualQA：`SIMCTL_CHILD_MEGRUM_VISUAL_QA_PREVIEW_AUTH=1 SIMCTL_CHILD_MEGRUM_VISUAL_QA_INITIAL_SCREEN=candidate-sheet SIMCTL_CHILD_MEGRUM_VISUAL_QA_CANDIDATE_VARIANT=<named|condition|conditionRef|cash|crowded|wish> xcrun simctl launch <UDID> tokyo.megrum.native.preview`。named/condition/conditionRef/cash/crowded/wish の各パターンをスクショ確認済み。
+- swift test 1528件 green（`HomeCandidateComposerTests/testComposerBuildsNamedPairingsForNamedOption` 追加）。
+- 実機：michilion 5段階検証データ（iter1226.370）で確認（要オーナー確認）。
+
+### 関連ファイル
+- `notes/19_candidate_sheet_redesign.md`（確定仕様＋実装計画）
+- `HomeDiscoveryHitDetailSheets.swift` / `HomeGoodsHitDetailSelectionContext.swift` / `HomeCandidateListingWantedOptionFactory.swift` / `HomeWishHitDetailSheet.swift`
+
+### 未確定・要オーナー確認
+- CTA は選択未充足時は無効化のまま（notes/19 の「CTAは無効化しない」は、無効タップが無反応になるのを避け安全側を採用。counter で案内）。要否確認。
+- 条件①参考画像の実データ経路（現状は自分の手持ち以外のプレビューが無いと②検索にフォールバック）。シリーズ参考画像のマスタ経路が要れば①が常時出せる。
+
+---
+
+## イテレーション1226.372：ホーム候補シート「相手の希望」を選択肢1件なら文脈行に
+
+### 背景・問題意識
+オーナー指摘（UX相談 B案）：相手の個別募集の求めるものが1件だけのとき、タップ選択させる「選ぶカード」は不要。1行の文脈で見せて、そのまま「譲るグッズを選ぶ」へ進ませたい。
+
+### 変更内容
+- 新規 `HomeWantedSingleOptionViews.swift`：`HomeWantedSingleOptionSummary`＋`HomeWantedSingleOptionContextRow`（相手が求めるものを1行で表示。条件/指名/定価で見せ分け、条件の不確定は「条件（？）」＋「（シリーズ未確認）」）。
+- `HomeGoodsHitDetailSelectionContext.swift`：`singleWantedOptionSummary`（`usesListingWantedOptions && !showsWantedOptionPicker` の1件時のみ non-nil）。
+- `HomeDiscoveryHitDetailSheets.swift`：1件→文脈行／2件以上→従来の選択カード＋「他の選択肢」に分岐。
+
+### 影響範囲
+- 超求！/超求めてる？/求！/求めてる？/定価 の候補詳細シートのうち、相手希望が1件のもの。選択は自動選択のまま、下の「譲るグッズを選ぶ」に直行。
+
+### 確認方法
+- device BUILD SUCCEEDED・実機で ihub「超求めてる？」（条件1件）が文脈行になることを確認。
+
+---
+
+## イテレーション1226.371：ホーム候補シートのヘッダー整理＋条件選択肢を条件文で表示
+
+### 背景・問題意識
+オーナー指摘：(1) 条件指定の選択肢が「相手の希望から譲るを選ぶ」でマッチしたグッズ名（例「ミナ TWICE トレカ」）になっていたが、募集の条件そのもの（TWICE / トレカ / #DICON…）を出すべき。(2) ヘッダーが窮屈。画像を小さく、要相談/OKバッジと文字の中央揃え、「個別募集の詳細を見る」ボタンは不要。
+
+### 変更内容
+- `HomeIndividualListingSelectionContext.swift`：`HomeIndividualListingWantedOption` に `conditionSummary` を追加。
+- `HomeCandidateListingWantedOptionFactory.swift`：条件選択肢の `conditionSummary` を「グループ名/種別名/メンバー名/#シリーズ」でプロフィールと同じ組み立てで生成（名前はマッチ済みグッズ＝同属性から取得）。
+- `HomeGoodsHitWantedSelectionViews.swift`：条件カードは `conditionSummary` を表示。
+- `HomeDiscoverySheetSharedViews.swift`：右のグッズ画像を 136×162→108×130 に縮小、「個別募集の詳細を見る」ボタンを撤去。
+- `HomeConditionVerdictViews.swift`：判定バッジ（要相談/OK）と本文を中央揃え（`.firstTextBaseline`→`.center`）。
+- データ：条件シリーズ名の先頭 `#` を除去（`##DICON` 二重表示の解消。表示側でも二重化ガード）。
+
+### 影響範囲
+- ホーム候補の詳細シート（超求/求/定価）のヘッダーと「相手の希望から譲るを選ぶ」。
+
+### 確認方法
+- device BUILD SUCCEEDED・実機で条件カードが「TWICE / トレカ / #DICON D'FESTA MINI EDITION」表示になることを確認。
+
+> ※ このコミットには、別ワークストリームの進行中変更（`HomeConditionVerdict*`「この人とどう交換できそう？」ブロック、決済/銀行口座まわり、bank_accounts マイグレーション等）も同梱されている（同一ファイルにまたがるため分離不可、オーナー了承のうえ一括コミット）。bank_accounts マイグレーションの `supabase db push` は別作業側の責務。
+
+---
+
+## イテレーション1226.370：michilion ホームの需要5段階を「正しい経路のみ」の実データで再現
+
+### 背景・問題意識
+オーナー要望：michilion のホーム「推しでマッチ」で 超求！/超求めてる？/求！/求めてる？/定価 の各段階を実データで見たい。iter1226.368 で撤去した「別ユーザー間ID直接指名」は使わず、**相手自身のほしいもの（指名）／条件／金額**の正しい経路だけで用意する。
+
+### ホーム候補が「マッチ」に出る2条件（実データ検証で判明）
+`HomeCandidatePartnerOfferEvaluation` の bucket=.matched は **satisfiesViewerWish && partnerWantsViewerGoods** の両立が必要：
+1. **satisfiesViewerWish**：候補（相手の for_trade）が **viewer の interest に一致**。`HomeCandidateCompositionContext.viewerInterests` は「viewer がほしいものを1件でも持つ場合はほしいもの（グループ＋メンバー＋**種別**）のみ」で構成され、推しは**ほしいもの0件時のフォールバック**。→ 候補は michilion の**アクティブなほしいものとメンバー＋種別まで一致**している必要がある。
+2. **partnerWantsViewerGoods**：相手が michilion の譲を欲しがっている（ほしいもの一致／個別募集選択肢一致／現金選択肢）。
+
+さらに `HomeCandidatePartnerScope` は **viewer が非テストアカウントの場合、`is_test_account=true` の相手を除外**する。cxp_* はテストアカウントなので michilion には出ない。
+
+### 用意した実データ（Supabase dev / service_role・全て非テスト相手）
+候補は全て michilion がアクティブにほしがる **BTS トレカ**（RM/V/ジミン/ジョングク）に統一（＝上記条件1を満たす）。需要ターゲットは michilion の active 譲（ジョングク/チェヨン/ミナ）。
+
+| 段階 | 相手 | 候補 | 経路 | ターゲット |
+|---|---|---|---|---|
+| 超求！ | haru | RM トレカ | 個別募集・**条件**（BTS＋トレカ） | ジョングク → 確定 |
+| 超求めてる？ | ihub | V トレカ | 個別募集・**条件**（TWICE＋トレカ＋シリーズ指定） | チェヨン/ミナ（無記載）→ 不確定 |
+| 定価 | ihub | ジミン トレカ | 個別募集・**金額**（¥1,500） | － |
+| 求！ | mashima | ジョングク トレカ | **ほしいもの（指名）** ミナ | ミナ → 確定 |
+| 求めてる？ | ren | V トレカ | **ほしいもの（指名）** チェヨン＋シリーズタグ | チェヨン（無記載）→ 不確定 |
+
+wish_ids/指名は全て相手自身のほしいものを指す（別ユーザー間ID一致は不使用）。
+
+### 検証（実データ probe）
+一時的な probe test（`HomeCandidateComposer.sections` を live fetch で実行、後で削除）で **matchedItems=5・各 bucket=matched・demand が hotDemand/hotDemandTentative/cash/demand/demandTentative** を確認済み。
+
+### クリーンアップ用ID（不要になったら削除）
+- goods_inventory 候補: `12260369-0011-…-011`(haru RM) / `-0012-…-012`(ihub V) / `-0013-…-013`(ihub ジミン) / `-0044-…-044`(mashima ジョングク) / `-0055-…-055`(ren V)
+- listings: `12260369-0001-…-001`(haru) / `-0002-…-002`(ihub 超求めてる？) / `-0003-…-003`(ihub 定価) ＋各 options（`…-101/-102/-103`）
+- goods_inventory ほしいもの: `12260369-0004-…-004`(mashima ミナ) / `-0005-…-005`(ren チェヨン)＋その goods_inventory_tags
+
+### 確認方法
+- michilion 実機でホーム引っ張り更新 → 5段階が並ぶこと。
+- 需要判定ロジックは iter1226.363/366/368 のユニットテスト（1517 green）で担保。
+
+---
+
+## イテレーション1226.369：ホーム候補シートのヘッダーで画像と交換条件ブロックの左右を入れ替え
+
+### 背景・問題意識
+オーナー要望：ホーム候補の詳細シート（超求！/求！等）で、上側のグッズ画像（左）と、交換条件・支払い条件・「個別募集の詳細を見る」ボタン（右）の**左右の位置を逆に**したい。
+
+### 変更内容
+#### `ios-native/Sources/MegrumApp/HomeDiscoverySheetSharedViews.swift`
+- `HomeSelectedGoodsHeader` の `HStack` 内の2カラムの順序を入れ替え。
+  - 左：交換条件（`HomeExchangeMethodBlock`）＋支払い条件（`HomePaymentBox`）＋個別募集の詳細ボタン（`HomeListingDetailButton`）。`.frame(maxWidth: .infinity, alignment: .leading)` で横幅を占有。
+  - 右：グッズ画像（`HomeSelectedGoodsSingleCard` 136×162）＋メモ無し時の日時。
+- 共有ヘッダーのため、超求/求のヒット詳細（`HomeGoodsHitDetailSheet` / `HomeWishHitDetailSheet`）と「求められているグッズ」ルックアップ（`HomeDiscoveryLookupSheets`）の全てに一貫適用。
+
+### 影響範囲
+- ホーム候補の詳細シート全種のヘッダー。ロジック・データは不変（レイアウトのみ）。
+
+### 確認方法
+- シミュレータ VisualQA（tutorial 章 proposal / step 7-5）で `HomeSelectedGoodsHeader` を描画し、画像＝右・交換条件/支払い/詳細＝左に入れ替わっていることをスクショ確認。
+- swift test 1517件 green。
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/HomeDiscoverySheetSharedViews.swift`
+
+---
+
+## イテレーション1226.368：個別募集マッチから「別ユーザー間ID直接指名」ロジックを撤去
+
+### 背景・問題意識
+オーナー指摘：iter1226.366 で用意した検証データがおかしい。「個別募集で相手のほしいもの選択肢が、自分（viewer）の『ほしいもの』を指定できる」経路は存在しない。個別募集の選択肢が求めるものは **①相手自身のほしいもの（指名）／②条件／③金額** のいずれかだけ。「自分のほしいものと相手の欲しいもの選択肢のIDが一致していればOK」というロジックを無くしてほしい。
+
+該当していたのは以前の説明の **1.「選択肢がそのグッズIDを直接指名していれば合致」**（別ユーザー間の `wishIds.contains(counterpartItem.id)` によるID一致マッチ）。これは相手の選択肢が「自分の在庫ID」を直接指名しているケースを合致扱いにしていた。別ユーザーの行なので本来一致し得ず、意味も無い。
+
+### 変更内容
+#### `ios-native/Sources/MegrumApp/HomeMutualMatchListingEvaluation.swift`
+- `mutualOptionMatchConfidence` から **1.（`option.wishIds.contains(counterpartItem.id)` → `.confirmed`）を削除**。
+- 残す判定は、
+  - 指名（`wishIds` → 相手自身のほしいもの行）を**属性（グループ・メンバー・種別・シリーズ）**で `wishGoodsConfidence` により突き合わせ、
+  - 条件（`wishGroupId`/`wishGoodsTypeId`＋メンバー/シリーズ/数量）で判定、
+  - 現金（`isCashOffer`）は非対象。
+- ※ `wishIds` は常に「募集オーナー自身のほしいもの（kind=wanted）」を指す。別ユーザー間のID比較はしない旨をコメントで明示。
+
+#### `ios-native/Tests/MegrumAppTests/HomeCandidateComposerTests.swift`
+- 撤去した「別ユーザー間ID直接指名」を前提にしていた2テストのフィクスチャを正しいモデルに修正。
+  - `testComposerMarksIndividualListingHitAsGoodsConditionDirect`：選択肢を **条件指定（グループ＋種別）** に変更（viewer在庫がその条件を満たす形）。
+  - `testComposerPassesIndividualListingWantedOptionsToHomeSheetContext`：option[0] を **相手自身のほしいもの（同属性）を指名** する形に変更（`partnerWishForExactID` を partnerWishes に追加）。指名オプションのプレビューは相手のほしいもの画像を表示する仕様に合わせ、画像アサーションを更新。
+
+### 影響範囲
+- ホーム「推しでマッチ」の個別募集マッチ（超求！/超求めてる？）。実データでは選択肢の `wishIds` はオーナー自身のほしいものを指すため挙動不変。撤去したのは、フィクスチャ／不正データ経由でのみ発火し得た別ユーザー間ID一致の誤マッチ。
+
+### 確認方法
+- swift test 1517件 green（3 skipped, 0 failures）。
+- sim/実機でホーム候補のマッチ表示にリグレッションが無いこと。
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/HomeMutualMatchListingEvaluation.swift`
+- `ios-native/Tests/MegrumAppTests/HomeCandidateComposerTests.swift`
+- `notes/18_demand_matching_logic.md`
+
+---
+
+## イテレーション1226.367：交換条件でデフォルト都道府県を設定していれば左ドロワーの「要設定」を出さない
+
+### 背景・問題意識
+オーナー指摘：交換条件の設定でデフォルト都道府県を設定していても、左ドロワーの「交換条件の設定」に「要設定」バッジが出てしまう。直近の現地交換日程が無いと要設定扱いになっていたため。
+
+### 変更内容
+#### `ios-native/Sources/MegrumApp/HomeExchangeConditionSettings.swift`
+- `HomeDefaultExchangeSettings.needsConfiguration`：現地を受け付ける設定でも、判定を「デフォルト都道府県が空か」だけに変更（直近日程 `hasUsableDate` の必須条件を撤去）。都道府県を設定していれば要設定にしない。
+
+### 影響範囲
+- 左ドロワーの「交換条件の設定」バッジ。都道府県設定済みなら「要設定」が消える。郵送のみ設定は従来どおり要設定にしない。未保存は要設定。
+
+### 確認方法
+- swift test（`needsConfiguration`／`exchangeBadgeText` テストを新仕様に更新、1517件 green）。
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/HomeExchangeConditionSettings.swift`
+
+---
+
+## イテレーション1226.366：ホーム候補（相手側）のほしいもの判定も確度付き（求めてる？対応）
+
+### 背景・問題意識
+iter1226.363 で確度（確定/不確定）を導入したが、ホーム「推しでマッチ」の相手候補の需要は `HomeCandidatePartnerDemandSummary` → `HomeCandidateConditionSignalsBuilder` 経由で、`wishTentativeOfferGoodsIDs` が伝搬されておらず、相手候補では「求めてる？」（ほしいもの不確定）が出せなかった。実データ検証（michilionのホームで4段階を見る）で判明。
+
+### 変更内容
+#### `ios-native/Sources/MegrumApp/HomeCandidatePartnerDemandSummary.swift`
+- ほしいもの一致を `HomeCandidateComposer.wishRow`（グループ+メンバー+種別）→ `HomeMutualMatchListingEvaluator.wishGoodsConfidence`（＋シリーズ、無記載は不確定）に置換。`wishMatchedOfferGoodsIDs`＋`wishTentativeOfferGoodsIDs` を確度付きで算出。
+
+#### `ios-native/Sources/MegrumApp/HomeCandidatePartnerOfferEvaluation.swift`
+- `HomeCandidateConditionSignalsBuilder.signals(...)` に `wishTentativeOfferGoodsIDs: partnerDemand.wishTentativeOfferGoodsIDs` を渡す。
+
+### 影響範囲
+- ホーム「推しでマッチ」の相手候補の需要行。相手のほしいものがシリーズ指定で自分側が無記載の場合、「求めてる？」表示になる（iter1226.363 の仕様を相手候補側にも適用）。
+
+### 確認方法
+- swift test green。michilion アカウントのホームで 超求！/求！/求めてる？ を実データで確認（テスト用データを Supabase に投入）。
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/HomeCandidatePartnerDemandSummary.swift`
+- `ios-native/Sources/MegrumApp/HomeCandidatePartnerOfferEvaluation.swift`
+
+---
+
+## イテレーション1226.365：求の詳細で譲れる候補が無くても「交換内容を決める」で1/3へ進める
+
+### 背景・問題意識
+オーナー指摘：ホームの「求」詳細シート（HomeWishHitDetailSheet）で「あなたが譲れる相手のほしいもの」が「一致する候補はまだありません」の場合、下の「交換内容を確認する」ボタンが無効で打診に進めなかった。候補が無くても打診に進めるようにしたい。文言は「交換内容を決める」、まず1/3へ。
+
+### 変更内容
+#### `ios-native/Sources/MegrumApp/HomeWishHitDetailSheet.swift`
+- `hasOfferCandidates`（offerGoodsが空でない）を追加。
+- 候補なし時：ボタン文言を「交換内容を決める」、`bottomButtonDisabled=false`（常時有効）。
+- `startProposal()`：候補なし時は提示物未選択のまま `HomeDiscoveryProposalSelection(exchangeMethod: nil)` で `onStartProposal` を直接呼ぶ。`HomeDiscoveryProposalRouteResolver.initialStep(for: nil)=.give` により打診1/3（譲るものを選ぶ）から開始。
+- 候補あり時は従来どおり（プレビュー→3/3）。
+
+### 影響範囲
+- ホーム「求」詳細シートの下部ボタン（候補なしケース）。
+
+### 確認方法
+- swift test 1517件 green。sim/実機でホームの求候補（譲れる候補なし）→ボタン有効・1/3へ。
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/HomeWishHitDetailSheet.swift`
+
+---
+
+## イテレーション1226.364：チャットルーム入力文字を黒/非太字＋グルームアーカイブは自分の失効投稿も表示
+
+### 背景・問題意識
+オーナー指摘2件：
+1. めぐりチャットルームの入力欄の文字が紫の太字 → 黒・非太字にしたい。
+2. グルームアーカイブが1日で消える（自分の投稿も）→ 自分の投稿は失効後も見れるように。無料10件・プレミアム無制限。
+
+### 変更内容
+#### `ios-native/Sources/MegrumApp/BoardReplyInputView.swift`
+- 入力 TextField の親HStackが `.foregroundStyle(lavender)` を持ち、TextFieldが継承して紫＋`weight: .heavy`（太字）だった。TextField に `.foregroundStyle(MegrumTheme.ink)`（黒）＋`weight: .regular`（非太字）を明示。カーソルは `.tint(lavender)` でブランド色を維持。
+
+#### `ios-native/Sources/MegrumData/SupabaseGroomClientSupport.swift`
+- `ownGroomArchiveQueryItems` の `status=eq.published` → `status=in.(published,expired)`。DBは24hで status を expired にするため、published だけだと自分の投稿が1日で消えていた。owner の RLS（`auth.uid() = user_id`）は全statusを読めるので、失効投稿も自分は取得可。
+- 無料10件/プレミアム無制限は既存（`MegrumPlusAccessPolicy.groomArchiveRequestLimit` が free を `freeGroomArchiveLimit=10` にクランプ、premium は無制限）。マイグレーション不要。
+
+### 影響範囲
+- めぐりチャットルームの入力欄表示。グルームアーカイブの取得（自分の失効グルームが残る）。
+
+### 確認方法
+- swift test（archive query URL が `status=in.(published,expired)` を検証）。sim ホーム/チャットは既存動作維持。
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/BoardReplyInputView.swift`
+- `ios-native/Sources/MegrumData/SupabaseGroomClientSupport.swift`
+
+---
+
+## イテレーション1226.363：無記載は不確定「？」＋激求→超求リネーム（超求めてる？/求めてる？）
+
+### 背景・問題意識
+オーナーとの認識合わせで確定：メンバー・種別・シリーズが「相手指定あり・自分無記載」のケースは、断定せず不確定「？」表記にしたい。別シリーズ（両方記載・不一致）は非マッチ。表示は激求→**超求**へリネーム、助詞「が」→「を」。
+
+### 変更内容
+- **確度の導入**（`HomeCandidateMatchConfidence` 新設）：軸ごとに ok/不確定/不一致 → 統合で 確定/不確定/非マッチ。相手指定ありで自分が無記載＝不確定、別値＝非マッチ。
+- `HomeMutualMatchListingEvaluator`：`mutualOptionMatchConfidence`／`wishGoodsConfidence` を追加（条件・指名・ほしいものを確度付きで判定）。`mutualOptionWantsCounterpartGoods` は確度≠nil のラッパに。指名経路もシリーズを見るように統一。
+- `HomeIndividualListingWantedOption` に `tentativeGoodsIDs`、`HomeCandidateConditionSignals` に `wishTentativeOfferGoodsIDs` を追加し、確度をホームまで伝搬。
+- `HomeCandidateDemandPolicy.demandLine`：**8段階**に（超求！/超求めてる？/求！/求めてる？/定価/探し中/相談）。確定満たせる=超求！、不確定含む=超求めてる？、ほしもの確定=求！、不確定=求めてる？。ランク6..0。副次ソートは rank≥4。
+- 表示（`HomeDiscoveryCandidateSummaryRow`）：「を超求！」「を超求めてる？」「を求！」「を求めてる？」。？系はピンク/ラベンダーの淡いトーン。
+- `notes/18` を最終仕様に更新。テスト（DemandPolicy/Composer）を確度・8段階に合わせて更新。
+
+### 影響範囲
+- ホーム候補の需要行（バッジ・色・並び順）。マッチ判定（`mutualOptionWantsCounterpartGoods` は不確定も true になる＝無記載も一致扱いに拡大、別シリーズは除外）。
+
+### 確認方法
+- swift test 1517件 green（軸ごと確度・8段階・別シリーズ非マッチを担保）。sim ホームで「を求！」表記・クラッシュ無しを確認。
+
+### 関連ファイル
+- `HomeCandidateMatchConfidence.swift` / `HomeMutualMatchListingEvaluation.swift` / `HomeCandidateDemandPolicy.swift` / `HomeDiscoveryCandidateSummaryRow.swift` / `notes/18_demand_matching_logic.md`
+
+---
+
+## イテレーション1226.362：激求！の定義変更（個別募集=激求／ほしいもの=求）＋需要仕様の言語化
+
+### 背景・問題意識
+オーナーとの対話で需要行ロジックを全面的に言語化（notes/18 新設）。その中で確定した仕様変更：
+- **条件選択肢のヒットも激求！にしたい**（従来は 指名=激求／条件=求）。
+- 併せて `logic` のUI実態を整理（ほしいもの指定側は「すべて／N個以上」の2択で `.one` は出ない、等）。
+- オーナー選択（AskUserQuestion）：**激求＝個別募集の選択肢（指名・条件どちらも）を満たせた／求＝相手のほしいもの（単独リスト）にヒット**。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeCandidateDemandPolicy.swift`
+- `demandLine`：
+  - 旧：`goods` 満たせる→激求／`condition` 満たせる or ほしいもの→求。
+  - 新：**`goods` または `condition` の満たせる個別募集選択肢→激求**／**`wishMatchedOfferGoodsIDs`（ほしいもの由来）→求**。
+- `isOfferSatisfiable`（必要提示数を満たすか）は据え置き（激求・求どちらも「満たせない選択肢は数えない」を継続）。
+
+#### `notes/18_demand_matching_logic.md`（新設・iter1226.361で作成、本iterで更新）
+- 需要行ロジック全体の決定版仕様書。`logic` のUI実態、激求/求の新定義（旧→新）を追記。
+
+#### `ios-native/Tests/MegrumAppTests/HomeCandidateDemandPolicyTests.swift`
+- 条件選択肢→激求、個別募集は激求でほしいもの（求）より優先、激求IDの横断重複排除、を検証するようテスト更新。
+
+### 影響範囲
+- ホーム候補の需要行（激求！/求！のバッジ・並び順）。条件マッチが激求に格上げされる。
+
+### 確認方法
+- `HomeCandidateDemandPolicyTests`（swift test）で新定義を担保。
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/HomeCandidateDemandPolicy.swift`
+- `notes/18_demand_matching_logic.md`
+- `ios-native/Tests/MegrumAppTests/HomeCandidateDemandPolicyTests.swift`
+
+---
+
+## イテレーション1226.361：提示物選択のUI微調整3件＋激求は満たせる選択肢のみに
+
+### 背景・問題意識
+オーナー要望4件（うち1件は既にiter1226.360で対応済みの自分カレンダー系の続き）：
+1. 提示物の選択・現地交換条件で「都道府県」の文字色が青いので黒にしたい。
+2. その下の行が項目名なし入力欄のみ→「メモ」という項目名＋右横に自由入力に。
+3. 郵送交換の条件のボタン（送料/発送目安）の紫がダサい→紫×水色グラデに（既存の送信確認ボタンと同じ）。
+4. 激求！のグッズをタップ→相手の希望から譲を選ぶで、相手が2つ全て希望していて自分は1つしか譲れず打診に進めないケースは激求に合致しないでほしい。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateConditionSteps.swift`
+- 待ち合わせカードを再構成：
+  - 「都道府県」ラベルを黒（`MegrumTheme.ink`）に。Picker(.navigationLink)はリンク色（青）になるため、ラベル＋右側 Menu（選択値＋chevron.up.chevron.down）の自前行に変更。
+  - 「メモ」行に項目名「メモ」を追加し、その右横に自由入力（trailing寄せ TextField）。
+  - 日程 DatePicker の tint を lavender に。
+
+#### `ios-native/Sources/MegrumApp/ProposalConditionSegmentRow.swift`
+- 選択中セグメントの背景を solid lavender → `[lavender, sky]` の LinearGradient（送信確認ボタンと同じ）に。
+
+#### `ios-native/Sources/MegrumApp/HomeCandidateDemandPolicy.swift`
+- `demandLine`：goods/condition 選択肢を「自分が手持ちで満たせる（一致数 ≥ requiredOfferCount）」ものだけ需要に数えるよう `isOfferSatisfiable` フィルタを追加。相手が2つ全て希望で自分が1つしか譲れない選択肢は、激求・求のどちらにも数えない。
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlowInitialStateActions.swift`
+- （検証用フックの微調整のみ。iter1226.360 の proposal-meetup シードを流用）
+
+### 影響範囲
+- 打診3/3 現地/郵送の条件UI。ホーム候補の需要行分類（激求/求）と並び順。
+
+### 確認方法
+- sim（proposal-meetup）で 都道府県ラベル黒／メモ項目名＋入力／郵送セグメントのグラデを確認済み。
+- 激求判定は HomeCandidateDemandPolicy のユニットテストで担保。
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/ProposalCreateConditionSteps.swift`
+- `ios-native/Sources/MegrumApp/ProposalConditionSegmentRow.swift`
+- `ios-native/Sources/MegrumApp/HomeCandidateDemandPolicy.swift`
+
+---
+
+## イテレーション1226.360：提示物の選択で「自分の希望条件」も相手と同ロジック表示＋「＞」で自分のカレンダー
+
+### 背景・問題意識
+オーナー要望：提示物の選択（打診3/3「お互いの希望条件」）で、自分の希望条件も相手と同じロジックで表示してほしい。また「＞」で自分の交換条件カレンダーも開けるようにしたい。従来 自分行は個別募集の現地条件テキストのみ・「＞」なしだった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlowExchangeDerivedState.swift`
+- 現地交換条件テキストのロジックを自分・相手で共通化：`upcomingLocalDateKeys(userID:settings:)` と `localConditionText(settings:summary:upcomingKeys:)` を新設。相手（partnerLocalConditionText/partnerUpcomingLocalDateKeys）はこれを呼ぶだけに。
+- 自分用を追加：`viewerExchangeSettings`（map になければ `appState.exchangeSettings` にフォールバック）、`viewerUpcomingLocalDateKeys`、`viewerLocalConditionText`（3段階＝直近日／個別募集現地／「◯◯（デフォルト設定）」／未設定）、`viewerExchangeCalendarContext`（headerTitle「あなたの交換条件」）。
+
+#### `ios-native/Sources/MegrumApp/HomePartnerExchangeCalendarSheet.swift`
+- `HomePartnerExchangeCalendarContext` に `headerTitle`（既定「相手の交換条件」）を追加。シート大見出しをこの値に。自分は「あなたの交換条件」。
+
+#### `ios-native/Sources/MegrumApp/PartnerExchangeCalendarContextBuilder.swift`
+- `userID: UUID?` に変更（自分＝viewer.id、相手＝ownerID を同一経路で扱う）。`headerTitle` 引数追加。`ownerName` は `displayName.nilIfBlank`（自分は空→サブタイトルが「現地交換の条件」のみ）。
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateConditionSteps.swift`
+- `ProposalMutualConditionCard` に `onViewerDetail` を追加し、行ラベルに応じて自分＝onViewerDetail／相手＝onPartnerDetail で「＞」を出す。
+- `ProposalMeetupConditionStep` に `onOpenViewerCalendar` を追加。
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlow*.swift`
+- `showsViewerScheduleCalendar` 状態＋自分カレンダーの `.sheet` を追加。meetupStep で自分行「＞」→表示。
+- `loadTargetOwnerExchangeContent`：自分（viewer.id）の交換設定・AW も読み込み（相手と同一表示に必要）。
+- VisualQA：`proposal-meetup` ルートで提示物・受け取りを1件ずつシードして3/3へ到達可能に。`MEGRUM_VISUAL_QA_OPEN_VIEWER_CALENDAR` で自分カレンダーを自動オープン。
+
+### 影響範囲
+- 打診フロー3/3「お互いの希望条件」（自分行の表示テキスト＋「＞」）。相手行・カレンダーモジュールは既存のまま流用。
+
+### 確認方法
+- sim（proposal-meetup）で 自分＝「東京都（デフォルト設定）」＋「＞」、タップで「あなたの交換条件」カレンダー（既定 東京・矢印は月表示横）を確認済み。
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/ProposalCreateFlowExchangeDerivedState.swift`
+- `ios-native/Sources/MegrumApp/ProposalCreateConditionSteps.swift`
+- `ios-native/Sources/MegrumApp/HomePartnerExchangeCalendarSheet.swift`
+- `ios-native/Sources/MegrumApp/PartnerExchangeCalendarContextBuilder.swift`
+
+---
+
+## イテレーション1226.359：相手の交換条件カレンダー右上にデフォルト都道府県を表示・矢印を月表示横へ
+
+### 背景・問題意識
+オーナー要望：相手の交換条件シート（HomePartnerExchangeCalendarSheet）に、相手のデフォルト（既定）交換都道府県も表示したい。自分の交換設定カレンダーと同じく「カレンダー右上」に出すイメージ。あわせて月切り替えの矢印は「月表示の右横」に置いてほしい。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomePartnerExchangeCalendarComponents.swift`
+- `HomePartnerExchangeCalendarCard.header` を再構成：
+  - 左：キャプション「現地交換可能な場所と日程」＋その下に `月表示 + <前月> + <次月>` を横並び（矢印を月表示の右横へ）。
+  - 右上：`HomePartnerDefaultPrefectureChip`（読み取り専用チップ）でデフォルト都道府県を表示。
+- 新規 `HomePartnerDefaultPrefectureChip`：自分の交換設定カレンダー右上の「既定 ◯◯」チップと同じ見た目（白カプセル＋lavender枠）。`context.fallbackPrefecture` を `HomePartnerExchangePrefecturePresentation.shortName` で短縮表示。nil のときは「未設定」。編集用のメニュー/シェブロンは持たない。
+
+#### `ios-native/Sources/MegrumApp/PublicUserProfileScreen.swift`
+- VisualQA 検証用フック追加：環境変数 `MEGRUM_VISUAL_QA_OPEN_EXCHANGE_CONDITIONS` があればプロフィール読み込み後に交換条件シートを自動オープン（タップ操作なしで検証可能）。
+
+### 影響範囲
+- 相手の交換条件カレンダーシート（打診フローの「＞」・相手プロフィールの「交換条件」の両方で共通表示）。
+
+### 確認方法
+- sim（public-profile / michi1 / OPEN_EXCHANGE_CONDITIONS=1）で、右上に「既定 北海道」、月表示「2026年5月」の右横に `<` `>`、サブタイトル「みちさんの現地交換の条件」を確認済み。
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/HomePartnerExchangeCalendarComponents.swift`
+- `ios-native/Sources/MegrumApp/PublicUserProfileScreen.swift`
+
+---
+
+## イテレーション1226.358：相手プロフィールの「交換条件」を打診フローと同じカレンダーシートに
+
+### 背景・問題意識
+オーナー要望：相手プロフィールの「交換条件」を押すと「交換条件はまだ公開されていません」が出るが、公開可否の設定は廃止済み（全員一律閲覧）。打診の「＞」で開く相手の交換条件カレンダー（HomePartnerExchangeCalendarSheet）と同じシートを出したい。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/PartnerExchangeCalendarContextBuilder.swift`（新規）
+- 相手のAW・デフォルト交換設定・個別募集の現地条件からカレンダーコンテキストを組み立てる共通ビルダー（@MainActor）。打診フローとプロフィール両方から使用
+
+#### `ProposalCreateFlowExchangeDerivedState.swift` / `ProposalCreateFlowBody.swift`
+- 打診フローの `partnerExchangeCalendarContext` を共通ビルダー利用に置換（非optional化してbodyのelse分岐を撤去）
+
+#### `PublicUserProfileScreen.swift` / `PublicUserProfileScreenDerivedState.swift`
+- 「交換条件」シートを `PublicExchangeConditionsScreen`（公開/非公開表示）から `HomePartnerExchangeCalendarSheet` に差し替え
+- プロフィール .task に `loadPartnerActivityWindows(userID:)` を追加（カレンダー日程用）
+- プロフィール用 `partnerExchangeCalendarContext` を追加（現地条件を持つ最初のactive個別募集から都道府県/メモを解決）
+
+### 影響範囲
+- 相手プロフィールの「交換条件」ボタン、打診3/3の「＞」（共通化）
+
+### 確認方法
+- swift test: 1513件 0 failures
+- シミュレータ: 相手プロフィール（みち @michi1）が正しく表示され「交換条件」ボタンあり
+
+### セルフレビュー結果
+- ✅ 打診フローとプロフィールで同一シート・同一ビルダー
+- ✅ 「公開されていません」画面は使わない（PublicExchangeConditionsScreen は未参照になるが残置）
+- ⚠️ 相手が日程を全く設定していない場合はカレンダー空（データ無しのため妥当）
+
+---
+
+## イテレーション1226.357：相手の現地交換条件テキストを「直近日つき／未設定はデフォルト設定」に
+
+### 背景・問題意識
+オーナー要望：打診3/3の「お互いの希望条件」の相手行が「未設定」の時は、相手のデフォルト交換設定の都道府県を「大阪府（デフォルト設定）」のように出す。また当日以降で直近の現地交換条件があれば「大阪府/メモ内容/7/21他」のように出す。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlowExchangeDerivedState.swift`
+- `partnerUpcomingLocalDateKeys`：相手のAW＋デフォルト交換設定の日付キーを当日以降でフィルタし直近順にソート
+- `partnerLocalConditionText` を三段階に：
+  1. 直近日あり → 「都道府県 / メモ / 7/21他」（`compactDisplayText`＋2件以上で「他」。都道府県・メモは日付ごとの詳細→デフォルト設定→個別募集の順で解決）
+  2. 個別募集に現地条件（都道府県）あり → 「都道府県 / メモ」
+  3. どちらも無し → デフォルト交換設定の都道府県「大阪府（デフォルト設定）」
+- 相手カレンダー（`partnerExchangeCalendarContext`）にもデフォルト交換設定の日付ごと詳細を統合（AWと併用）
+
+### 影響範囲
+- 打診3/3 現地交換の条件・お互いの希望条件（相手行）と相手カレンダー
+
+### 確認方法
+- swift test: 1513件 0 failures
+
+### セルフレビュー結果
+- ✅ 日付ソースはAW＋デフォルト設定を統合、都道府県/メモは日付詳細→デフォルト→個別募集の優先順
+- ✅ 「他」は直近日以外にも予定がある場合のみ付与
+
+---
+
+## イテレーション1226.356：打診の相手カレンダーが空・「@相手さん」表記になる問題を修正
+
+### 背景・問題意識
+オーナー指摘：3/3現地条件の「＞」で開く相手カレンダーが空で、サブタイトルも「@相手さん」の仮名。iter1226.351 の実装が相手の交換日程を `publicExchangeSettingsByUserID`（＝閲覧者のローカルモード設定。相手では空）から取っていたのが原因。相手の現地交換日程の実体は相手の**アクティビティウィンドウ（AW）**、都道府県は個別募集の現地条件、表示名は相手プロフィールにある。
+
+### 変更内容
+
+#### データ層
+- `MegrumRepository.loadUserActivityWindows(userID:)` 新設（default `[]`、Supabase実装は `SupabaseActivityWindowClient.loadActivityWindows(status:.enabled)` で相手の有効AWを取得）
+- `HomeCandidateExchangePolicy.localDateKeys(fromStartEndPairs:)` 公開ヘルパー追加
+
+#### `MegrumAppState`
+- `partnerActivityWindowVenuesByUserID`（日付キー→会場名）＋ `loadPartnerActivityWindows(userID:)`（相手AWを日付キーへ展開）
+
+#### 打診フロー
+- `loadTargetOwnerExchangeContent` で相手プロフィール・交換設定・AWを読み込み
+- `partnerExchangeCalendarContext` を再構築：日程は相手AW（無ければ現地条件テキスト「5/5他」等を解析してフォールバック）、都道府県は個別募集の `localPrefecture`、名前は `partnerDisplayName`（表示名→handle→「相手」）
+- カレンダーのサブタイトルが「◯◯さんの現地交換の条件」になる
+
+### 影響範囲
+- 打診3/3 相手カレンダーシート
+
+### 確認方法
+- swift test: 1513件 0 failures
+- REST: 相手の有効AW（venue・start/end）がRLSで読めることを確認
+
+### セルフレビュー結果
+- ✅ ホームの「相手の交換条件」と同一シート（HomePartnerExchangeCalendarSheet）を継続利用
+- ✅ AWが無い相手でも現地条件テキストの日付解析でフォールバック表示
+- ⚠️ 相手が日程を全く設定していない場合はカレンダー空（データ無しのため妥当）
+
+---
+
+## イテレーション1226.355：ガイドツアー見直し3周目（修正確認＋章別再生の実機検証）
+
+### 背景・問題意識
+オーナー指示による3周目の見直し。2周目修正の残り確認に加えて、これまで単体テストでしか
+担保できていなかった「ヘルプ＞使い方ガイド」相当の章別再生を画面で検証できるようにした。
+
+### 変更内容
+- **VisualQAに章別再生の直接起動を追加**：`MEGRUM_VISUAL_QA_TUTORIAL_CHAPTER=<章名>`
+  （例: meguri）で `startChapter` 相当を起動（STEP指定より優先）。パースのユニットテスト追加
+- **8-1のサンプル打診の間引きをステージ単位に強化**：ステータス単位だと「打診中」ステージ内に
+  同ステータス扱いの類似カードが複数残るため、表示ステージごとに1件へ
+- 2周目修正の残り7ビートを目視確認（4-12/4-13/4-14/6-7/6-11/6-13は期待どおり）
+
+### 検証で確認できたこと
+- 章別再生（ch-wish / ch-meguri 実機スクショ）：つなぎビートを飛ばして 5-2 / 9-2 から開始、
+  正しいタブに切替、範囲先頭では「戻る」非表示 — ヘルプ導線の挙動が画面で確認できた
+- 8-1のVisualQAスクショで類似カードが残るのは、プレビューアカウントは appState.proposals 自体に
+  サンプル打診があり空データ用フォールバック（間引き済み）を通らないため。実際の新規ユーザー
+  （打診0件）では間引きが効く。実データがある場合に本物の打診を隠さないのは意図どおり
+
+### 確認方法
+- `swift test` 1513件 0失敗
+- `SIMCTL_CHILD_MEGRUM_VISUAL_QA_TUTORIAL_CHAPTER=wish|meguri` 等で章別再生を直接起動して撮影（review6/）
+
+### セルフレビュー結果
+- ✅ 3周目で新規の実在問題なし（2周目までの修正は全て画面で確認済み）
+- ✅ 章別再生の実機挙動を初めて画面で担保（従来はコーディネータのユニットテストのみ）
+- ⚠️ VisualQAプレビューアカウントでは8-1の間引きが見えない（上記の理由・実利用では有効）
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/VisualQAPreviewMode.swift` / `MegrumRootView.swift` / `TradesScreen.swift`
+- `ios-native/Tests/MegrumAppTests/TutorialTourCoordinatorTests.swift`
+
+---
+
+## イテレーション1226.354：ガイドツアー最終監査2周目（回帰込み再スキャン→13指摘対応）
+
+### 背景・問題意識
+iter1226.353の修正を織り込んだ最新ビルドで全61ビートを撮り直し、同じ体制（並列レビュー→敵対的検証）で
+2周目の監査を実施。1周目の許容事項を基準に織り込んだ上で、より細かい13件（全てlow）が確定した。
+
+### 変更内容（10件修正）
+- **4-14**：ペースト時点で背景グリッドにタグが先行反映され左上カードだけ緑チェックになる1ビート早い
+  状態ジャンプを解消（タグ適用は「登録」後＝実アプリ同様に）
+- **4-15**：完了一覧をデモの実演どおりに（メンバー名はサナ・モモの2枚だけ。全員に名前が付いていると
+  「いつ付けたのか」が飛んで見える）。タイルの文脈を `.inventory` にして「交換候補」表記の揺れも解消
+- **4-12/4-13**：Lensモックの「12TH MINI ALBUM」を実ディスコグラフィに合わせ「日本5thアルバム」へ。
+  指ポインタを選択反転＋コピーボタンが出ている検索行の「DIVE」位置へ
+- **6-7**：「条件で指定する」→ 実タブ名「条件から選ぶ」に統一
+- **6-13**：鉤括弧引用を実トグルラベル「条件外の打診も受け付ける」に一致
+- **6-16**：編集画面の場所メモを完成カードと逐語一致（「東京ドーム周辺」）
+- **7-12**：説明カードを下置きへ（確認対象の交換内容サマリーを隠さない。送信ボタン＋指はカードの下に見える）
+- **8-1**：ツアー中のサンプル打診をステータスごとに1件へ間引き（ほぼ同一カードが並ぶ違和感を解消）
+
+### 見送り（既知の許容として記録）
+- 6-4：シリーズフィルタのチップにグループ名（#aespa等）が混じるのは共有プレビューデータのタグ命名。
+  マッチング物語と連動するため単独では触らない
+- 6-8：選択ピルが隣タブ文字に密着して見えるのは実UI側のセグメント実装の余白問題（ツアー外）。
+  別セッションのタスクとして切り出し済み
+- 8-2：サンプル取引チャットに郵送/現地の話題が混在するのは共有フィクスチャの内容。実害なし
+
+### 確認方法
+- `swift test` 1512件 0失敗
+- 2周目監査：review4/（61ビート・確定13件）→修正後 review5/ で対象9ビート再確認
+- 監査は途中でセッション上限により中断→ `resumeFromRunId` で成功済みエージェントをキャッシュ再利用して完走
+
+### セルフレビュー結果
+- ✅ 2周目の確定13件のうち10件修正・3件を根拠付きで許容（上記）
+- ✅ 修正後の対象ビートを再撮影して目視確認（4-15の連続性・7-12のサマリー可視・8-1の間引き）
+- ⚠️ 6-8のセグメント余白は実UI側の調整として別タスク化
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/TutorialGoodsDemoScenes.swift` / `TutorialTourStep.swift` / `TutorialTourOverlay.swift`
+- `ios-native/Sources/MegrumApp/TutorialListingDemoScenes.swift` / `TradesScreen.swift`
+
+---
+
+## イテレーション1226.353：ガイドツアー総仕上げレビュー（全61ビート監査→38指摘修正）
+
+### 背景・問題意識
+オーナー指示「全部終わったらもう一度オンボーディングを見直して、変なところをレビューして修正」。
+全61ビートをVisualQAでスクショ→9グループ並列の目視レビュー→指摘ごとに敵対的検証、で38件を確定し修正した。
+
+### 変更内容
+- **文言と実UIの一致**：4-7「トレカ専用 AIで一括登録」/4-9「メンバー登録」/4-10「シリーズ登録」/
+  4-13「シリーズ名「DIVE」をコピー」/4-14「シリーズ欄にペースト・「登録」」/7-12は前回対応済み。
+  1-1の「この章をとばす」残存文言を「戻る」＋「使い方ガイド」案内に差し替え。6-2は3行以内に短縮
+- **デモの物語の連続性**：4-9で付けたサナ/モモのメンバーチップを4-10以降も保持。4-15の完了一覧の
+  先頭2枚をサナ/モモに一致。シリーズシートのCTAを実物同様「登録」に固定。Lens結果の選択反転を「DIVE」だけに
+- **打診章を「本物の選択状態」に**：`HomeGoodsHitDetailSheet` に `initialSelectionState`（デフォルトnil・
+  通常動作不変）を追加してシート/コンテンツ経由で注入。受け取り2点・希望からの譲る・譲るグッズまで
+  実選択になり、7-11で「交換内容を確認する」が実際に活性。チェックの偽オーバーレイは全廃。
+  希望オプションの指名先をデモ在庫の実アイテムに揃え「譲るグッズを選ぶ」が空にならないように
+- **相手の一貫性**：候補シートのオーナー表示を実プロフィール（michi・女性・評価4.5）と一致させ、
+  ホームのサンプル行にも実名（michi/hana/yuzu）を付与（「ユーザー」プレースホルダ廃止）
+- **配置調整**：6-4〜6-10の説明カードを下置きに（上部のタブ行・受け渡しカードを隠さない）。
+  6-5/6-8/6-9/6-10/6-11の指座標を実測位置へ。8-1の説明カードを上置きに（下部のステージ切替を隠さない）。
+  9-5（グルームプレビュー）を上置きに（いいね/コメントを隠さない）。4-8はドラッグ後に指を消す
+- **タブ帯の切り抜き**：dim側の+26pt拡張を織り込んだ実寸矩形（高さ38pt・下33pt）に修正。
+  ピル上下のコンテンツ断片の写り込みを解消（3-1/5-1/9-1）
+- **めぐり**：作成コールアウトの座標を1km円の内側（+0.006度）へ、指のタップ位置も一致（9-4）。
+  チャットルームデモは現在地ありで表示（「返信には現在地が必要」の注意とヘッダー重なりを解消）。
+  プレビュースレッドに createdAt を固定し日付逆行を解消（9-6）
+- **完了ビート**：範囲最終ビートの主ボタンを「次へ」から差し替える仕組みを追加（全編=はじめる/章別=閉じる。
+  10-1は専用カードが元々「はじめる」なので変化なし）。章別再生はタブ帯つなぎビート（5-1/9-1）を飛ばして本編から開始
+- 掃除：未使用の `firstBeatOfNextChapter`（章スキップ廃止の残骸）を削除
+
+### 見送り（既知の限界として記録）
+- 6-16：完成カードの譲るもの「金額指定 ¥1,500」表示は、このブランチの listing モデルに haves側cash 列が
+  未取込（mainのiter1226.350前後が先行）のため main 合流後に対応
+- 9-6：日付チップが半透明ヘッダー越しに薄く見えるのはアプリ共通の translucent chrome 挙動
+- 7-12/8-2 の説明カードと画面上部情報の軽い重なりはドラッグ移動で回避可能として許容
+
+### 確認方法
+- `swift test` 1512件 0失敗（章別再生の先頭スキップ・戻る境界のテスト追加）
+- 全61ビートのVisualQAスクショ監査（review/）→修正32ビート再検証（review2/・32件中27件pass）→
+  残5件修正後に再々検証（review3/）で全件解消（10-1は誤検知、9-6の1件は上記の許容）
+
+### セルフレビュー結果
+- ✅ 指摘38件のうち35件修正・3件を根拠付きで許容/繰り延べ（上記）
+- ✅ 実UIの選択状態・実名・実ボタン文言に統一され、偽オーバーレイはゼロに
+- ⚠️ 座標定数は実測ベース。実UI側のレイアウト変更時は VisualQA スクショで再調整
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/TutorialTourStep.swift` / `TutorialTourOverlay.swift` / `TutorialTourCoordinator.swift`
+- `ios-native/Sources/MegrumApp/TutorialGoodsDemoScenes.swift` / `TutorialListingDemoScenes.swift` / `TutorialProposalDemoScenes.swift` / `TutorialSampleHomeData.swift`
+- `ios-native/Sources/MegrumApp/HomeDiscoveryHitDetailSheets.swift` / `HomeDiscoverySheetContent.swift` / `HomeDiscoverySheets.swift`（選択状態注入・通常動作不変）
+- `ios-native/Sources/MegrumApp/MeguriScreen.swift` / `NativePreviewMeguriData.swift` / `MegrumAuthenticatedTabContentView.swift`
+
+---
+
+## イテレーション1226.352：ガイドツアーv3.3（FB第3弾11-22＋総括反映・章別再生）
+
+### 背景・問題意識
+v3.2 スクショレビューのFB第3弾（11〜22枚目＋総括）を反映。総括の要点は
+「実際の画面の状態を撮る」「ヘッダー/フッターを消さない」「吹き出しは3行以内＋戻るボタン」
+「この章をとばすは不要」「エラートースト抑制」「ヘルプから章別にいつでも再生できる導線」。
+
+### 変更内容
+- **章別再生（総括）**：`TutorialPlaybackScope`（.full / .chapter）を導入。ヘルプ＞問い合わせの下に
+  「使い方ガイド」セクション（ホーム/マイグッズ/ほしいもの/個別募集/打診/やりとり/めぐり の7章）を新設し、
+  シートを閉じてから `startChapter` で該当章だけ再生・章末で自動終了。既読フラグは全編再生時のみ保存
+- **「戻る」ボタン（総括）**：全吹き出しに 戻る を常設（範囲先頭では非表示）。「この章をとばす」を廃止
+- **⑪⑫⑬ 個別募集章の実セクション表示**：エディタ本体を「画面高＋lift」の背高フレームで描画してから
+  上へオフセットする方式に変更（単純offsetではScrollViewの初期ビューポート外が描画されない）。
+  郵送条件（送料 要相談・発送2〜4日選択済み）/条件外トグルON/その他メモ/保存 が実状態で見える。
+  6-16は実物 `IndividualListingsScreen`（プレビュー募集カード付き）
+- **⑭〜⑲ 打診章を13ビートへ再構成**：7-1はホーム激求行のスポットライト＋指タップ（激求の説明つき）。
+  実 `PublicUserProfileScreen`（NavigationStack内・レイアウト正常化）、受け取り2点チェックは
+  実測レール位置（x 0.12/0.34, y 0.478）へ、pickMoreはシート持ち上げ0.22H＋実物の
+  「他にも交換できそうなもの」枠（実挙動どおり空表示）、確認ボタンは下部固定のまま指差し（liftなし）、
+  7-12は実 `ProposalCreateFlow`(.confirm) で「この内容で打診を送信」を指差し（文言も実ボタンに一致）
+- **⑳㉑ キャプション**：3行超の文言を分割済み・コンパクト幅・ドラッグ移動可。pickFromWantedは上置きに変更
+  （下置きだと題材のレールを隠すため）
+- **㉒ めぐり章6ビート**：擬似現在地（1km円＋現在地ドット）・円内タップ地点に作成コールアウト・
+  グルームプレビュー（GroomViewerScreen）・チャットルームプレビュー（BoardThreadDetailScreen）各1画面
+- **ツアー中の広告抑制（総括）**：やりとり一覧上部バナー（TradesScreen）とチャットルームヘッダーバナー
+  （BoardThreadDetailScreen）を isTutorialActive で抑制。デモ用AppStateにも setTutorialActive(true) を付与
+- 8-1はバナー提示のまま実 `TradesScreen`＋サンプル打診（実データ空時のみ・実データ不変）
+- 掃除：旧 afterSave 再現ビュー（summaryPanel）と「この章をとばす」残置コメントを削除
+
+### 影響範囲
+ガイドツアー全章（約61ビート）・ヘルプ画面・やりとり一覧/チャットルームの広告表示（ツアー中のみ）
+
+### 確認方法
+- `swift test` 1511件 0失敗（3 skipped）
+- VisualQA per-beat スクショ検証：`SIMCTL_CHILD_MEGRUM_VISUAL_QA_PREVIEW_AUTH=1`
+  `SIMCTL_CHILD_MEGRUM_VISUAL_QA_INITIAL_SCREEN=tutorial` `SIMCTL_CHILD_MEGRUM_VISUAL_QA_TUTORIAL_STEP=<ビートID>`
+  で 6-12〜6-16 / 7-1,7-4,7-7〜7-12 / 8-1 / 9-4〜9-6 を目視確認（v33）
+- 注意：シミュレータ検証時は derivedData をセッション専用パスにする（並行セッションの main ビルドに
+  上書きされ、ツアー未搭載バイナリを検証してしまう事故が起きた）
+
+### セルフレビュー結果
+- ✅ 実UI部品のみで各ビートの「実際の画面状態」を再現（募集エディタ/一覧・打診シート/確認画面・やりとり・チャットルーム）
+- ✅ 実ヘッダー/フッター維持・吹き出し3行以内＋戻る・章とばし廃止・広告/トースト抑制
+- ✅ ヘルプ＞使い方ガイドの章別再生（コーディネータのscope挙動はユニットテストで担保）
+- ⚠️ 指ポインタ座標・持ち上げ量は実測ベースの定数。実UI側のレイアウト変更時は再調整が必要
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/TutorialTourCoordinator.swift` / `TutorialTourOverlay.swift` / `TutorialTourStep.swift`
+- `ios-native/Sources/MegrumApp/TutorialListingDemoScenes.swift` / `TutorialProposalDemoScenes.swift` / `TutorialDemoStage.swift`
+- `ios-native/Sources/MegrumApp/SettingsHelpViews.swift` / `MegrumRootDrawerDestinationSheet.swift` / `MegrumRootView.swift`
+- `ios-native/Sources/MegrumApp/TradesScreen.swift` / `BoardThreadDetailScreen.swift` / `MeguriScreen.swift` / `MeguriScreenFeedback.swift`
+
+---
+
+## イテレーション1226.346：ガイドツアーv3.2（オーナーFB10点反映）
+
+### 背景・問題意識
+v3.1 スクショレビューのFB10点（1〜10枚目）を反映。
+
+### 変更内容
+- **①推しでマッチが非表示**：possibleItems が空でセクションごと消えていた → サンプル3件を供給（`TutorialSampleHomeData.possibleItems = matchedItems`）
+- **②選択済み表示**：デモ用マスタfixture `TutorialSampleMasterData`（TWICE/トレカ/サナ・モモ・ダヒョン）を新設し、推し欄「TWICE」種別欄「トレカ」入り＋「次へ」活性を確実に描画
+- **③一括読み取りの流れ**：4-7を2段階化（元の9枚グリッド写真＋ボタン→指がタップ→切り抜き7枚＋ステータス）
+- **④手動切り抜き**：枠を実物同様の黄色へ。指が対象カードの左上→右下へドラッグし、枠が追従して広がる実演に変更
+- **⑤画像リンク切れ**：写真ドラフトをビート毎に1回生成するキャッシュ方式へ（メタのphotoID整合）
+- **⑥シリーズ/メンバーのボタン可視＋Lens分割**：詳細ステップに実物 `GoodsInventoryCreateMetaFooterView`（メンバー登録/シリーズ登録/9件まとめて登録）を表示。Lens流れを5ビートに分割（シリーズボタン→シートでLens→Lens起動→結果コピー→ペースト適用）。4章は15ビートに
+- **⑦完了一覧**：実物 `GoodsTile`（タグ右上・メンバー名右下）＋登録直後の緑チェックを左上に重ねる構成へ
+- **⑧**5-1タイトルの❤️削除
+- **⑨6-3**：偽の空一覧デモを廃止し、実画面のまま「募集を追加」をスポットライト（前ビートと連続性維持）
+- **⑩実エディタクローム**：第6章は実物 `IndividualListingEditorContent`（ヘッダー/3ドット込み）＋`IndividualListingEditorBottomBar` をスクリプト済み draft で駆動。説明カードはコンパクト化＋**ドラッグで移動可能**に（全提示形式）
+
+### 確認方法
+- swift test 1511件 0失敗、修正13ビートをシミュレータ再検証（4-5選択済み・4-8黄枠ドラッグ・4-9実画像＋ボタン・6-11実エディタ等）
+
+### セルフレビュー結果
+- ✅ FB10点すべて反映。デモの実UI率がさらに向上（recreationはLens画面・シリーズシート・完了サマリのみ）
+- ⚠️ 説明カードの既定位置は画面により要微調整の可能性（ドラッグ移動で回避可能）
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/TutorialGoodsDemoScenes.swift` / `TutorialListingDemoScenes.swift` / `TutorialTourOverlay.swift` / `TutorialTourStep.swift` / `TutorialSampleHomeData.swift`
+
+---
+
+## イテレーション1226.345：ガイドツアーv3.1（10章・約50ビートの指アイコン実演デモ）
+
+### 背景・問題意識
+オーナーFB（v2への詳細指摘）を反映した大改訂。①ホーム文言の指定差し替え＋サンプルを「サナ×#DICON D'FESTA MINI EDITION／ニンニン×#MY WORLD／V×#LOVE YOURSELF: SPEAK YOURSELF」・需要行バリエーション（激求！/求！/定価¥1,500）へ ②タブ移動前にフッター帯で予告 ③各タブは全体説明→操作の2段 ④マイグッズは登録一連（TWICE×トレカ→9枚グリッド写真→トレカAI一括7枚→残り2枚を指で手動切り抜き→メンバー→シリーズ+Google Lensで#DIVE→9件登録→一覧反映）を実演 ⑤個別募集はオーナー指定の13区切りを1画面ずつ ⑥打診は激求例で項目ごと（プロフィール/交換条件/募集詳細/相手の希望から/自分のグッズから/追加選択/確認/打診に進む→やりとりへ） ⑦めぐりは新文言＋サンプルピン表示＋指タップで実物の作成コールアウト出現。承認済み仕様（会話ログ2026-07-07）。
+
+### 変更内容
+
+#### 1. 章×ビートモデルへ全面改訂（`TutorialTourStep.swift`＝TutorialScript / `TutorialTourCoordinator.swift` / `TutorialTourOverlay.swift`）
+- 10章・50ビートのデータ駆動台本（id="4-7"等）。上部に全体プログレスバー、吹き出しは章内カウンタ「マイグッズ 7/11」＋「終了／この章をとばす／次へ」
+- 見せ方6種：centerCard／spotlight（切り抜き余白+26）／banner／tabBand（下部タブ帯の幾何切り抜き）／demo（デモステージ）／meguriTapDemo
+- VisualQA：`MEGRUM_VISUAL_QA_TUTORIAL_STEP` はビートID（4-7等）or 通し番号で直接起動
+
+#### 2. デモステージ基盤（`TutorialDemoStage.swift` / `TutorialPointerView.swift`）
+- 分離した PreviewMegrumRepository ベースの demoAppState で実UI部品をスクリプト状態描画（実データ不変・通信なし）
+- 指アイコン（TutorialPointerChoreographer：move/tap/drag、reduceMotion対応）
+- アセット：`TWICE トレカAI用.jpg` を9分割（twice_dive_card_1..9.png / twice_dive_grid.jpg、白余白トリム済）
+
+#### 3. 第4章 マイグッズ登録デモ（`TutorialGoodsDemoScenes.swift`）
+- 実物 `GoodsInventoryCreateFlowView` を draft/photos/step 注入で駆動（共通条件=TWICE×トレカ→写真=9枚グリッド→一括読み取り結果7枚＋ステータス文言→メンバー割当→シリーズ+Lens結果カード）
+- 手動切り抜きは元写真上で切り抜き枠が右下カードへドラッグされるアニメ、完了は一覧グリッド再現＋「9件登録しました」
+
+#### 4. 第6章 個別募集作成デモ（`TutorialListingDemoScenes.swift`）
+- 実物 `IndividualListingHavesStep/OptionsStep/ExchangeStep` をローカルBinding注入で駆動。定価で選ぶ→金額指定¥1,500、条件から選ぶ=TWICE×トレカ、定価タブ、現地・郵送OK→現地/郵送/条件外/メモ→保存→完了後カード
+
+#### 5. 第7-8章 打診・やりとりデモ（`TutorialProposalDemoScenes.swift`）
+- 実物 `HomeDiscoverySheetView(goodsHit)`（激求ヒット）/ `PublicUserProfileScreen` / `ProposalCreateFlow(initialStep: .confirm)` / `TradesScreen`（広告はプレミアム扱いで抑制）/ `TradeDetailScreen` をプレビューデータで描画
+
+#### 6. 第9章 めぐり（`MeguriScreen.swift` / `TutorialSampleMeguriData`）
+- サンプルピンは表示レイヤ注入（visibleMapGrooms/visibleThreads がツアー中フィクスチャを返す。実データ・フィルタ・後発ロードに非依存）。クラスタ闾値=実効緯度スパン(約0.067)/6.5≈0.0105度を全ペアが超える配置で丸ピン/角ピン個別表示
+- `appState.requestTutorialMeguriCallout()`（指タップ演出と同期）→ 地図中心に実物の「作成しますか？」コールアウトを表示（1km判定はツアー中バイパス、作成はしない）。ツアー終了で解除
+
+#### 7. ホームサンプル刷新（`TutorialSampleHomeData.swift` / `HomeScreen` / `HavesDerivedState`）
+- オーナー指定3行＋メンバー名ラベル（memberID/memberName設定）。激求はあなたのモモトレカ指名（wantedOptions kind .goods）、求はダヒョン他条件一致、定価は cashAmount 1500
+- inventoryItemsOverride（あなたのグッズ4点）で激求サムネイル＆求められているグッズrail（N件バッジ）を成立させる
+
+### 影響範囲
+- ガイドツアー全面、ホーム（ツアー中のみ）、めぐり（ツアー中のみ）、AppState（isTutorialActive/コールアウト要求）。実データ書き込みなし
+
+### 確認方法
+- swift test 1511件 0失敗（台本整合性テスト含む：ID一意・章単調・章内件数）
+- シミュレータ（iPhone 17）で29ビートをスクショ検証：`SIMCTL_CHILD_MEGRUM_VISUAL_QA_INITIAL_SCREEN=tutorial SIMCTL_CHILD_MEGRUM_VISUAL_QA_TUTORIAL_STEP=<beat-id>`
+
+### セルフレビュー結果
+- ✅ オーナー指定の文言・行内容・区切り（13画面）・打診9項目・めぐり新文言をそのまま実装
+- ✅ デモは実UI部品を状態注入で駆動（recreationは登録完了一覧/募集完了カード/Lens結果カード/エディタ薄クロームのみ）
+- ✅ 切り抜きズレ座標系・広告/共有/通知/位置/通知許可の抑制はv2から継続
+- ⚠️ デモ内の指タップ位置は代表座標（画面比率指定）。文言・位置の微調整はビートID指定で1画面ずつ再検証可能
+- ⚠️ ツアー途中でアプリを強制終了すると再開しない（既知・再視聴導線は今後）。TestGoodsImages に実写真を同梱するため権利面はオーナー判断（既存準拠）
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/TutorialTourStep.swift`（台本）/ `TutorialTourOverlay.swift` / `TutorialTourCoordinator.swift` / `TutorialDemoStage.swift` / `TutorialPointerView.swift`
+- `ios-native/Sources/MegrumApp/TutorialGoodsDemoScenes.swift` / `TutorialListingDemoScenes.swift` / `TutorialProposalDemoScenes.swift`
+- `ios-native/Sources/MegrumApp/TutorialSampleHomeData.swift`（ホーム/めぐりフィクスチャ）
+- `ios-native/Sources/MegrumApp/MeguriScreen.swift` / `MegrumAppState.swift` / `WishCollectionScreen.swift`（セグメントアンカー）
+- `notes/77_onboarding_tutorial_implementation_plan.md`（v3.1追記）
 ## イテレーション1226.351：相手の「＞」で開くカレンダーをホームの相手交換条件モジュールに差し替え
 
 ### 背景・問題意識
@@ -420,6 +5270,120 @@ iter1226.339（評価済みIDのローカル保存）後もオーナーから「
 - ✅ RLS・データ取得はRESTで実データ検証済み
 - ✅ 会話グルーピングキー（sourceGroomPostID）は維持したままカード表示だけ抑制
 - ⚠️ マッチ厳格化により既存の「激求/求」表示は減る方向（仕様通り）。数量条件は「相手の出せる数量>=wishQuantity」と解釈
+## イテレーション1226.337：ガイドツアーv2（オーナーFB反映：分割・隣接吹き出し・切り抜き修正）
+
+### 背景・問題意識
+iter1226.336 のガイドツアーをオーナーが実機確認し、指摘5点：①ホーム説明が1パネル詰め込みすぎ→3分割して対象だけハイライト ②〜⑥スポットライトの切り抜き位置が微妙にズレる ③説明ポップアップが常に画面中央で画面が見えない ④タップさせたいのか見せたいのか不明でユーザーが迷子 ⑤ボタンだけ見せても意味不明。「仕様を考え直して」。
+
+### 変更内容
+
+#### 1. ステップ構成を7→10に再編（`TutorialTourStep.swift` 全面改訂）
+- ホーム紹介を3分割：`homeSectionUserTag` / `homeSectionUser` / `homeSectionHaves`（各セクションをdim＋切り抜きでハイライトし、他は暗く）
+- 見せ方を3種に整理：`TutorialTourPresentation`（centerCard=ようこそ/完了、spotlight=対象切り抜き＋隣接吹き出し、banner=めぐり用の下部バナー。マップ全面を見せるためdimなし）
+- 文言を「この画面が何か→なぜ→どこを押すか」の順に全面書き直し（例：マイグッズ=「交換に出せる手持ちグッズを置いておく場所。左下の＋から、写真を撮るだけで登録できるよ」）
+
+#### 2. 切り抜きズレの根本修正（`MegrumAuthenticatedTabContentView.swift` / `TutorialTourOverlay.swift`）
+- 原因：dim側だけ `ignoresSafeArea` していたため、アンカー解決（セーフエリア内座標）と切り抜き描画（全画面座標）がセーフエリア分ズレていた
+- `overlayPreferenceValue` の GeometryReader ごと `ignoresSafeArea()` し、アンカー解決・dim・吹き出しを同一のフルスクリーン座標系に統一
+- 切り抜き角丸を対象サイズに適応（+ボタンは正円、セクションは角丸大）
+
+#### 3. 吹き出しの隣接配置（`TutorialTourOverlay.swift` 全面改訂）
+- 中央固定をやめ、対象の上下の広い側に隣接配置（実測サイズを PreferenceKey で取得して重なり防止、画面端クランプ）
+- ステップカウンタ「n/10」を常設（ドット列を置換）、スキップ/次へをカード内に固定
+- ようこそカードに「画面のどこでもタップで進めます」ヒントを追加
+
+#### 4. ホーム3ステップの自動スクロール（`HomeDiscoveryExperience.swift`）
+- `ScrollViewReader` でハイライト対象セクションへ `.scrollTo(anchor: .center)`（`tutorialFocusAnchor` を TabContentView→HomeScreen→Experience へ伝搬）
+- 3セクションに `.tutorialAnchor` + `.id` を付与（ツアー中のみ）
+
+#### 5. サンプルの充実（`HomeDiscoveryExperienceDerivedState.swift` / `HavesDerivedState.swift` / `TutorialSampleHomeData.swift`）
+- 「求められているグッズ」にツアー用サンプル経路を追加（実在庫・シグナル突き合わせ非依存。新規ユーザーでもrailが出る）
+- factory の `.haves` は空 havesLookup payload で件数が0件表示になるため、sheet を goodsHit に差し替えて linkCounts ベースの「N件」を表示。サンプルシグナルに求められ件数も付与
+
+#### 6. 通知許可ダイアログの抑制（`App/MegrumNativeApp.swift`）
+- ツアー中に iOS 通知許可ダイアログが割り込む問題を発見（オーナー指摘外）。`requestNativePushAuthorizationIfReady` に `isTutorialActive` ガード＋ツアー終了時 onChange で再要求。VisualQAツアー起動は環境変数でも判定（.task が coordinator 起動より先行する競合対策）
+
+#### 7. QA基盤（`VisualQAPreviewMode.swift` / `MegrumRootView.swift`）
+- `MEGRUM_VISUAL_QA_TUTORIAL_STEP`（数字 or kebab名: home-1/inventory等）で任意ステップから直接起動できるようにし、全ステップをスクショ検証可能に
+
+### 影響範囲
+- ガイドツアー全体、ホーム3セクション（ツアー中のみ）、アプリ起動時の通知許可タイミング（ツアー中のみ遅延）
+
+### 確認方法
+- swift test 1512件 0失敗
+- シミュレータで全10ステップをスクショ検証：ホーム3分割ハイライト＋自動スクロール、+ボタン正円切り抜き（ズレなし）、募集を追加/ステージバー切り抜き、めぐり下部バナー（マップ全面）、求められているグッズのN件表示、通知ダイアログ非表示
+- 起動例：`SIMCTL_CHILD_MEGRUM_VISUAL_QA_PREVIEW_AUTH=1 SIMCTL_CHILD_MEGRUM_VISUAL_QA_INITIAL_SCREEN=tutorial SIMCTL_CHILD_MEGRUM_VISUAL_QA_TUTORIAL_STEP=home-3 xcrun simctl launch ...`
+
+### セルフレビュー結果
+- ✅ オーナー指摘5点すべてに対応（3分割ハイライト／切り抜き座標修正／隣接配置／n/10カウンタ＋次へ常設／画面の意味→操作の順の文言）
+- ✅ 追加で発見した通知許可ダイアログの割り込みも抑制
+- ⚠️ アプリをツアー途中で強制終了すると再開しない（発火はaccountStatus遷移時のみ）。ミッションカードが後続導線になるが、再視聴導線（Phase 3）実装時に「途中離脱の再開」も検討
+- ⚠️ ツアー中フラグ同期は coordinator→onChange 経由のため、起動直後の割り込みは環境変数ガードで補完（VisualQA時のみ）
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/TutorialTourStep.swift` / `TutorialTourOverlay.swift` / `TutorialTourCoordinator.swift` / `TutorialAnchorPreferenceKey.swift` / `TutorialSampleHomeData.swift`
+- `ios-native/Sources/MegrumApp/HomeDiscoveryExperience.swift` / `HomeDiscoveryExperienceDerivedState.swift` / `HomeDiscoveryExperienceHavesDerivedState.swift` / `HomeScreen.swift` / `MegrumAuthenticatedTabContentView.swift`
+- `ios-native/Sources/MegrumApp/VisualQAPreviewMode.swift` / `MegrumRootView.swift` / `ios-native/App/MegrumNativeApp.swift`
+
+---
+
+## イテレーション1226.336：初回オンボーディング・ガイドツアー＋最初の3ステップ・ミッションカード
+
+### 背景・問題意識
+新規登録→初期設定（AccountSetup 8ステップ）完了後、ユーザーは無言でホームに着地し、マイグッズ0件だとホーム3セクションが丸ごと非表示のため「ほぼ真っ白なホーム」を見ることになっていた（既存ガイダンスは?ボタンのヘルプシートのみ）。オーナー要望：StoryLane風に「案内を出しながらタップで一通りの流れを体験してもらう」オンボーディング。決定：A=サンプル表示方式（ツアー中のホームに「サンプル」バッジ付きデモ候補を本物のレイアウトで表示）、B=iOS標準TipKitでは暗転スポットライト＋強制ツアーが実現不能なためカスタムオーバーレイを新設（CLAUDE.mdのiOS標準優先の例外条項に基づきオーナー承認済み）。計画書は `notes/77_onboarding_tutorial_implementation_plan.md`。
+
+### 変更内容
+
+#### 1. ガイドツアー（7ステップ・タップで進む・スキップ可）
+- `TutorialTourStep`（新規）：welcome→homeSections→inventory→wish→listing→trades→meguri→completion の8ケース。各ステップの `targetTab` / `requestedWishSection` / `spotlightAnchor` / 吹き出し文言を定義
+- `TutorialTourCoordinator`（新規, ObservableObject）：`currentStep` / `isActive` / `advance()` / `skip()` / `finish()`。`MegrumRootView` が `@StateObject` で保持
+- `TutorialTourOverlay`（新規）：dim＋スポットライト（`blendMode(.destinationOut)`+`compositingGroup`で対象を切り抜き）＋吹き出しカード、welcome/completionは中央カード。全面タップで前進。reduceMotion対応。差し込みは `MegrumAuthenticatedTabContentView` の ZStack に `.overlayPreferenceValue`（兄弟の `tabs` に付けたアンカーを解決するため。groomViewerImmersiveOverlay より前＝下）
+- `TutorialAnchorPreferenceKey` / `.tutorialAnchor(_:)`（新規）：`HomeDiscoveryTabSwitcher` の anchorPreference パターンを踏襲。マイグッズ/ほしいもの/個別募集の+ボタン・やりとりのステージバーに付与
+- 発火：`MegrumRootView` の `.onChange(of: appState.viewer?.accountStatus)` で `old.requiresSetup==true && new==.active` の初回のみ。二重ガードに `OnboardingTutorialProgressStore`（per-user UserDefaults 既読フラグ）
+- タブ自動遷移：`.onChange(of: coordinator.currentStep)` で `selectedTab = step.targetTab`
+
+#### 2. サンプル表示（オプションA）
+- `TutorialSampleHomeData`（新規）：`NativePreviewData.homeMatchedItems/homePossibleItems` + `previewSignals`（`PreviewMegrumRepository` と同組み立て）
+- `MegrumAuthenticatedTabContentView.homeTab`：ツアー中は matched/possible/signals をサンプルに差し替えて `HomeScreen` へ
+- `HomeDiscoveryExperienceDerivedState`：ツアー中は推し一致フィルタ（isMemberMatchEligible等）を外し、任意ユーザーでもサンプルが本物のレイアウトで並ぶよう `tutorialSampleCandidates` を追加
+- `HomeDiscoverySection`：`badgeText`（「サンプル」カプセル）追加。候補タップはツアー中 no-op
+
+#### 3. 最初の3ステップ・ミッションカード
+- `HomeStarterMissionState`（新規, 純ロジック）：inventory/wishes/listings（closed除外）から3タスクの done を判定
+- `HomeStarterMissionCard`（新規）：ホーム最上部に常駐。実登録でチェックが付き、3完了 or 手動×で `markMissionCompleted` して以後非表示。表示中は既存 `HomeEmptyCandidateCTACard`（導線重複）を抑止
+
+#### 4. 割り込み抑制（`MegrumAppState.isTutorialActive`）
+- 広告：`MegrumRootView.requestInterstitial` 冒頭ガード（大元1本）
+- X共有プロンプト：`GoodsCollectionShareActions` / `IndividualListingsScreen` / `HomeDiscoveryExperienceActions` の3経路をガード
+- めぐり位置情報：`MeguriScreenBoardActions.requestInitialLocationIfNeeded` ガード＋ツアー終了時 `.onChange(of: appState.isTutorialActive)` で再実行
+- 通知タブ遷移：`MegrumRootView` の通知 onChange をツアー中は破棄
+
+#### 5. 検証
+- `VisualQAInitialScreen.tutorial` 追加（`SIMCTL_CHILD_MEGRUM_VISUAL_QA_INITIAL_SCREEN=tutorial`。既読フラグを無視して強制起動）
+- ユニットテスト3本（`TutorialTourCoordinatorTests` / `OnboardingTutorialProgressStoreTests` / `HomeStarterMissionStateTests`）
+
+### 影響範囲
+- 認証後ルート（MegrumRootView / TabsView / TabContentView）、ホーム（HomeScreen / HomeDiscoveryExperience）、マイグッズ/ほしいもの/個別募集の+ボタン、やりとりのステージバー、めぐりの位置情報、広告・共有プロンプト。既存ユーザーのログイン・セッション復帰では発火しない
+
+### 確認方法
+- `swift build` 成功、`swift test` 1507件 0失敗（新規16件含む）
+- シミュレータ（iPhone 17, VisualQA=tutorial）で ①ウェルカムカード＋背後のサンプル3セクション（「サンプル」バッジ付き）②マイグッズタブへ自動遷移＋を+ボタンをスポットライト＋吹き出し を目視確認
+
+### セルフレビュー結果
+- ✅ ブランドカラー直書きなし（MegrumTheme トークン、フォントは .rounded）
+- ✅ 既存パターン踏襲（anchorPreference / BoardRoomEntryNoticeOverlay スタイル / MeguriRoomIdentityStore 型ストア / VisualQA / 純ロジック+XCTest）
+- ✅ iOS標準タブバーの UIKit isHidden/toolbar 切替は不使用（dim で覆う）
+- ⚠️ 吹き出しは矢印を付けず、スポットライトの切り抜き自体を指示にした（矢印の位置合わせ脆弱性を回避）
+- ⚠️ タブアイテム個別の精密スポットライトは非対応（UIKit管理で SwiftUI から frame 取得不可）。タブへは実遷移して見せる方式
+- ⚠️ 計画のZStack子（zIndex 5000）案は兄弟アンカーを読めないため `.overlayPreferenceValue` 方式に変更（上下関係は計画通り維持）
+
+### 関連ファイル
+- `ios-native/Sources/MegrumApp/TutorialTourStep.swift` / `TutorialTourCoordinator.swift` / `TutorialTourOverlay.swift` / `TutorialAnchorPreferenceKey.swift` / `TutorialSampleHomeData.swift` / `OnboardingTutorialProgressStore.swift`
+- `ios-native/Sources/MegrumApp/HomeStarterMissionState.swift` / `HomeStarterMissionCard.swift`
+- `ios-native/Sources/MegrumApp/MegrumRootView.swift` / `MegrumRootAuthenticatedContent.swift`（未変更）/ `MegrumAuthenticatedTabsView.swift` / `MegrumAuthenticatedTabContentView.swift`
+- `ios-native/Sources/MegrumApp/HomeScreen.swift` / `HomeDiscoveryExperience.swift` / `HomeDiscoveryExperienceDerivedState.swift` / `HomeDiscoverySection.swift`
+- `ios-native/Sources/MegrumApp/MegrumAppState.swift`（isTutorialActive）/ 割り込み抑制3ファイル / `MeguriScreen*.swift` / `VisualQAPreviewMode.swift`
+- `notes/77_onboarding_tutorial_implementation_plan.md`（計画書）
 
 ---
 
@@ -86920,7 +91884,7 @@ iter165 実装後の再レビューで、グルーム投稿のStorage権限を `
 - `groom_hidden_posts` / `groom_user_blocks` / `groom_reports` を追加し、非表示・ブロック・通報をDB管理にした。
 - `meguri_messages` と `meguri-message-media` private Storage を追加し、グルーム返信後の通常会話と画像送信を永続化した。
 - `notifications.kind='meguri_message'` と `notifications.meguri_message_id` を追加した。
-- pg_cron が利用できる環境では `expire_groom_posts()` を15分ごとに実行するようにした。
+- pg_cron が利用できる環境では `expire_groom_posts()` を5時間ごとに実行するようにした。
 
 #### `mobile/src/lib/groom.ts`
 - グルーム画像を private Storage path として保存し、フィード取得時に署名URLへ差し替えるようにした。

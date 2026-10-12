@@ -61,17 +61,29 @@ final class AppDrawerGestureTests: XCTestCase {
         )
     }
 
-    func testDrawerExchangeBadgeRequiresFutureLocalDateForLocalMethods() {
+    func testDrawerExchangeBadgeDependsOnDefaultPrefecture() {
         let calendar = Calendar.current
         let yesterday = calendar.date(byAdding: .day, value: -1, to: Date()) ?? Date()
         let expiredKey = HomeExchangeDateKey.key(for: yesterday, calendar: calendar)
 
-        XCTAssertEqual(
+        // iter1226.367：デフォルト都道府県を設定していれば、直近日程が無くても要設定を出さない。
+        XCTAssertNil(
             AppDrawerSettingsBadgePolicy.exchangeBadgeText(
                 settings: HomeDefaultExchangeSettings(
                     preference: .local,
                     localPrefecture: "東京都",
                     localDateKeys: [expiredKey]
+                ),
+                isExplicitlyConfigured: true
+            )
+        )
+        // 現地を受け付ける設定で都道府県が空なら要設定。
+        XCTAssertEqual(
+            AppDrawerSettingsBadgePolicy.exchangeBadgeText(
+                settings: HomeDefaultExchangeSettings(
+                    preference: .local,
+                    localPrefecture: "",
+                    localDateKeys: []
                 ),
                 isExplicitlyConfigured: true
             ),

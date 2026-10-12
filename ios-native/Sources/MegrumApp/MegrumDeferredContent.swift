@@ -12,6 +12,9 @@ enum MegrumDeferredContentDelay {
     /// 右スライド遷移など：アニメーション（~0.32s）が終わってから構築。
     /// 遷移中に重いビュー構築が走るとスライドがカクつくため。
     static let slidePresentation: UInt64 = 340_000_000
+    /// keep-alive パネルの先読み構築（iter1226.432）：起動直後の負荷を避けつつ、
+    /// 最初のスワイプより前にアイドル時間で構築を済ませる。
+    static let idlePrewarm: UInt64 = 1_200_000_000
 }
 
 struct MegrumDeferredContent<Content: View>: View {

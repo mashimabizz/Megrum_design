@@ -19,6 +19,9 @@ struct AccountSetupStepContent: View {
     @Binding var prefectureSearchText: String
     @Binding var displayName: String
     @Binding var handle: String
+    /// iter1226.422：ユーザーID重複時の代替候補（タップで入力欄へ反映）。
+    var handleSuggestions: [String] = []
+    var onSelectHandleSuggestion: (String) -> Void = { _ in }
     @Binding var birthDate: Date
     @Binding var gender: UserGender?
     var isSaving: Bool
@@ -69,6 +72,8 @@ struct AccountSetupStepContent: View {
                 isHandleField: true,
                 footnote: "半角英数字と _ の3〜20文字で設定してください。ユーザーIDは登録後に変更できません。",
                 errorMessage: setupErrorMessage,
+                suggestions: handleSuggestions,
+                onSelectSuggestion: onSelectHandleSuggestion,
                 onClearError: onClearError
             )
         case .birthDate:

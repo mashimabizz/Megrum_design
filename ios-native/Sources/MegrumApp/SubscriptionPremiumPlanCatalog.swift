@@ -88,6 +88,13 @@ struct SubscriptionComparisonRow: Identifiable, Equatable, Sendable {
             systemImage: "arrow.up.forward.circle.fill"
         ),
         SubscriptionComparisonRow(
+            title: "広告の非表示",
+            freeText: "×",
+            premiumText: "○",
+            freeIsAvailable: false,
+            systemImage: "nosign"
+        ),
+        SubscriptionComparisonRow(
             title: "グルームアーカイブ",
             freeText: "10件まで",
             premiumText: "無制限",
@@ -107,6 +114,13 @@ struct SubscriptionComparisonRow: Identifiable, Equatable, Sendable {
             premiumText: "○",
             freeIsAvailable: false,
             systemImage: "map.fill"
+        ),
+        SubscriptionComparisonRow(
+            title: "出会った推しグルームを圏外でも閲覧",
+            freeText: "圏内のみ",
+            premiumText: "○",
+            freeIsAvailable: false,
+            systemImage: "location.circle.fill"
         )
     ]
 }

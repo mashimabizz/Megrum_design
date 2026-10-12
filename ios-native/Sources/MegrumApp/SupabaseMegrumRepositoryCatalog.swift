@@ -127,6 +127,12 @@ public extension SupabaseMegrumRepository {
         try await ownedGoodsPersistence.loadPublicWishes(of: userID)
     }
 
+    func loadUserActivityWindows(userID: UUID) async throws -> [SupabaseActivityWindow] {
+        // 相手（対象ユーザー）の有効なアクティビティウィンドウ＝現地交換可能な日程・会場。
+        try await SupabaseActivityWindowClient(client: client)
+            .loadActivityWindows(userID: userID, status: .enabled)
+    }
+
     func loadPublicUserProfile(userID: UUID) async throws -> PublicUserProfile? {
         try await publicProfilePersistence.loadProfile(userID: userID)
     }

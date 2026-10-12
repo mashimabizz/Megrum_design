@@ -115,7 +115,7 @@ public enum MeguriMessageReadStateReducer {
             return MeguriMessageThread(
                 conversationKey: conversationKey,
                 peerID: peerID,
-                sourceGroomPostID: conversationKey.sourceGroomPostID,
+                sourceGroomPostID: lastMessage.sourceGroomPostID,
                 sourceGroomOwnerID: lastMessage.sourceGroomOwnerID,
                 sourceGroomImageURL: lastMessage.sourceGroomImageURL,
                 displayName: identity.displayName,
@@ -258,9 +258,9 @@ public enum MeguriMessageReadStateReducer {
         conversationKey: MeguriMessageConversationKey,
         viewerID: UUID
     ) -> Bool {
+        // iter1226.451：ルームは相手単位（sourceGroomPostID は問わない）。
         message.senderID == conversationKey.peerID
             && message.recipientID == viewerID
-            && message.sourceGroomPostID == conversationKey.sourceGroomPostID
             && message.readAt == nil
     }
 
@@ -268,9 +268,11 @@ public enum MeguriMessageReadStateReducer {
         for message: MeguriMessage,
         viewerID: UUID
     ) -> MeguriMessageConversationKey {
+        // iter1226.451：メッセージルームは1ユーザーにつき1つ。グルーム返信（sourceGroomPostID付き）も
+        // 直接メッセージも、同じ相手なら同一ルームへまとめる（グルーム毎に別ルームを作らない）。
         MeguriMessageConversationKey(
             peerID: message.senderID == viewerID ? message.recipientID : message.senderID,
-            sourceGroomPostID: message.sourceGroomPostID
+            sourceGroomPostID: nil
         )
     }
 

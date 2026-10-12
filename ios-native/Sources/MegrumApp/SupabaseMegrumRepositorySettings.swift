@@ -84,6 +84,10 @@ public extension SupabaseMegrumRepository {
         try await notificationClient.loadNotifications(userID: viewerID, limit: limit)
     }
 
+    func resolveNotificationThumbnailURL(bucket: String, path: String) async -> URL? {
+        await notificationClient.resolveThumbnailURL(bucket: bucket, path: path)
+    }
+
     func markNotificationRead(_ notificationID: UUID) async throws -> MegrumNotification? {
         try await notificationClient.markNotificationRead(userID: viewerID, notificationID: notificationID)
     }
@@ -116,6 +120,29 @@ public extension SupabaseMegrumRepository {
         try await notificationClient.setMeguriSubscriptionPushSettings(userID: viewerID, input: input)
     }
 
+    func loadGroomNotifyPrefs() async throws -> [GroomNotifyPref] {
+        try await notificationClient.loadGroomNotifyPrefs(userID: viewerID)
+    }
+
+    func setGroomNotifyPref(
+        groupID: UUID,
+        enabled: Bool,
+        notifyAllMembers: Bool,
+        memberCharacterIDs: [UUID]
+    ) async throws -> GroomNotifyPref {
+        try await notificationClient.setGroomNotifyPref(
+            userID: viewerID,
+            groupID: groupID,
+            enabled: enabled,
+            notifyAllMembers: notifyAllMembers,
+            memberCharacterIDs: memberCharacterIDs
+        )
+    }
+
+    func recordGroomEncounters(groomPostIDs: [UUID]) async throws {
+        try await notificationClient.recordGroomEncounters(userID: viewerID, groomPostIDs: groomPostIDs)
+    }
+
     func updatePushNotificationLocation(latitude: Double, longitude: Double) async throws {
         try await notificationClient.updatePushNotificationLocation(
             userID: viewerID,
@@ -146,6 +173,10 @@ public extension SupabaseMegrumRepository {
 
     func completeAccountSetup(_ input: AccountSetupInput) async throws -> UserProfile {
         try await accountProfilePersistence.completeAccountSetup(input)
+    }
+
+    func takenAccountHandles(among handles: [String]) async throws -> Set<String> {
+        try await accountProfilePersistence.takenAccountHandles(among: handles)
     }
 
     func requestAccountDeletion(_ input: AccountDeletionRequestInput) async throws -> AccountDeletionRequestResult {

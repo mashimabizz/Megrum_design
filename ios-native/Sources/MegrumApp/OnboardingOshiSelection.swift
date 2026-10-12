@@ -90,6 +90,30 @@ enum OnboardingOshiSelectionLogic {
         }
     }
 
+    /// FB(iter1226.422)：メンバー未選択のグループを「グループ全体」ドラフトで埋める。
+    /// 2/8で何も選ばず次へ進んだ時に、選択済みグループを全体登録として扱うために使う。
+    static func draftsFillingWholeGroupForUnselected(
+        selectedGroups: [OshiGroup],
+        currentDrafts: [OnboardingOshiDraft]
+    ) -> [OnboardingOshiDraft] {
+        var updatedDrafts = currentDrafts
+        for group in selectedGroups {
+            let hasSelection = updatedDrafts.contains { $0.groupID == group.id }
+            guard !hasSelection else {
+                continue
+            }
+            updatedDrafts.append(
+                OnboardingOshiDraft(
+                    groupID: group.id,
+                    groupName: group.name,
+                    characterID: nil,
+                    characterName: nil
+                )
+            )
+        }
+        return updatedDrafts
+    }
+
     static func draftsAfterSeedingWholeGroupSelections(
         selectedGroups: [OshiGroup],
         currentDrafts: [OnboardingOshiDraft]

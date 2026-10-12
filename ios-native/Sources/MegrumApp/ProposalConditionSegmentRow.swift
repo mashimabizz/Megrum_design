@@ -26,7 +26,15 @@ struct ProposalConditionSegmentRow<Value: Identifiable & Equatable>: View where 
                             .frame(maxWidth: .infinity)
                             .frame(height: 36)
                             .background(
-                                selection == value ? MegrumTheme.lavender : MegrumTheme.ink.opacity(0.05),
+                                selection == value
+                                    ? AnyShapeStyle(
+                                        LinearGradient(
+                                            colors: [MegrumTheme.lavender, MegrumTheme.sky],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                    : AnyShapeStyle(MegrumTheme.ink.opacity(0.05)),
                                 in: Capsule()
                             )
                     }

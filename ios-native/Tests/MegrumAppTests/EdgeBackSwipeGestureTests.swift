@@ -264,3 +264,49 @@ final class EdgeBackSwipeGestureTests: XCTestCase {
         XCTAssertEqual(state.dragOffset, 0)
     }
 }
+
+final class MeguriInboxSlideHostGeometryTests: XCTestCase {
+    func testRestingOffsetFollowsFingerDuringOpenDrag() {
+        XCTAssertEqual(
+            MeguriInboxSlideHostGeometry.restingOffset(
+                isPresented: false,
+                openDragOffset: 214,
+                screenWidth: 390
+            ),
+            214
+        )
+        // コミット後（isPresented=true）もドラッグ用オフセットが残っている間はそれを優先
+        XCTAssertEqual(
+            MeguriInboxSlideHostGeometry.restingOffset(
+                isPresented: true,
+                openDragOffset: 42,
+                screenWidth: 390
+            ),
+            42
+        )
+    }
+
+    func testRestingOffsetIsZeroWhenPresented() {
+        XCTAssertEqual(
+            MeguriInboxSlideHostGeometry.restingOffset(
+                isPresented: true,
+                openDragOffset: nil,
+                screenWidth: 390
+            ),
+            0
+        )
+    }
+
+    func testRestingOffsetParksBeyondShadowWhenClosed() {
+        // 閉時は影（radius 24, x:-8）が右端へ映り込まないよう画面幅より余分に退避
+        XCTAssertEqual(
+            MeguriInboxSlideHostGeometry.restingOffset(
+                isPresented: false,
+                openDragOffset: nil,
+                screenWidth: 390
+            ),
+            390 + MeguriInboxSlideHostGeometry.parkedShadowMargin
+        )
+        XCTAssertGreaterThan(MeguriInboxSlideHostGeometry.parkedShadowMargin, 32)
+    }
+}

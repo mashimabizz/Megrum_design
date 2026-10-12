@@ -71,7 +71,8 @@ final class MeguriMessageReadStateReducerTests: XCTestCase {
         XCTAssertEqual(threads.first?.lastMessagePreview, "未読")
     }
 
-    func testConversationThreadsSplitSamePeerBySourceGroomPost() {
+    func testConversationThreadsMergeSamePeerAcrossSourceGroomPosts() {
+        // iter1226.451：ルームは1ユーザーにつき1つ。異なるグルームへの返信も同じ相手なら1ルームへ。
         let viewerID = UUID(uuidString: "00000000-0000-0000-0000-000000000280")!
         let peerID = UUID(uuidString: "00000000-0000-0000-0000-000000000281")!
         let firstGroomPostID = UUID(uuidString: "00000000-0000-0000-0000-000000000501")!
@@ -98,11 +99,11 @@ final class MeguriMessageReadStateReducerTests: XCTestCase {
             viewerID: viewerID
         )
 
-        XCTAssertEqual(threads.count, 2)
-        XCTAssertEqual(
-            threads.map { $0.sourceGroomPostID },
-            [secondGroomPostID, firstGroomPostID]
-        )
+        // 1ルームに統合される。sourceGroomPostID は最新メッセージ由来。
+        XCTAssertEqual(threads.count, 1)
+        XCTAssertEqual(threads.first?.peerID, peerID)
+        XCTAssertEqual(threads.first?.sourceGroomPostID, secondGroomPostID)
+        XCTAssertEqual(threads.first?.unreadCount, 2)
     }
 
     func testVisibleMessagesExcludeBlockedPeersWithoutDroppingOtherThreads() {
@@ -293,7 +294,8 @@ final class MeguriMessageReadStateReducerTests: XCTestCase {
         )
     }
 
-    func testPendingReplyThreadCountCountsMultipleSourceThreadsFromSamePeerSeparately() {
+    func testPendingReplyThreadCountMergesMultipleSourceThreadsFromSamePeer() {
+        // iter1226.451：同じ相手からの複数グルーム返信は1ルームに統合され、未返信ルーム数も1。
         let viewerID = UUID(uuidString: "00000000-0000-0000-0000-000000000282")!
         let peerID = UUID(uuidString: "00000000-0000-0000-0000-000000000283")!
         let messages = [
@@ -315,7 +317,7 @@ final class MeguriMessageReadStateReducerTests: XCTestCase {
 
         XCTAssertEqual(
             MeguriMessageReadStateReducer.pendingReplyThreadCount(messages, viewerID: viewerID),
-            2
+            1
         )
     }
 
@@ -395,7 +397,8 @@ final class MeguriMessageReadStateReducerTests: XCTestCase {
         )
     }
 
-    func testMarkIncomingMessagesReadOnlyUpdatesMatchingSourceThread() {
+    func testMarkIncomingMessagesReadUpdatesAllPeerMessagesRegardlessOfSource() {
+        // iter1226.451：ルームは相手単位。既読化は sourceGroomPostID に関わらず相手からの全未読に及ぶ。
         let viewerID = UUID(uuidString: "00000000-0000-0000-0000-000000000284")!
         let peerID = UUID(uuidString: "00000000-0000-0000-0000-000000000285")!
         let targetSourceID = UUID(uuidString: "00000000-0000-0000-0000-000000000505")!
@@ -416,16 +419,13 @@ final class MeguriMessageReadStateReducerTests: XCTestCase {
 
         let updated = MeguriMessageReadStateReducer.markIncomingMessagesRead(
             messages,
-            conversationKey: MeguriMessageConversationKey(
-                peerID: peerID,
-                sourceGroomPostID: targetSourceID
-            ),
+            conversationKey: MeguriMessageConversationKey(peerID: peerID),
             viewerID: viewerID,
             readAt: readAt
         )
 
         XCTAssertEqual(updated[0].readAt, readAt)
-        XCTAssertNil(updated[1].readAt)
+        XCTAssertEqual(updated[1].readAt, readAt)
     }
 
     func testMergingUpdatedReplacesOnlyReturnedMessages() {

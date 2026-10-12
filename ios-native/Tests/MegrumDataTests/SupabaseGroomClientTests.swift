@@ -496,7 +496,7 @@ final class SupabaseGroomClientTests: XCTestCase {
         let archiveRequest = try client.makeLoadOwnGroomArchiveRequest(userID: userID, limit: 42)
         XCTAssertEqual(
             archiveRequest.url?.absoluteString,
-            "https://example.supabase.co/rest/v1/groom_posts?select=id,user_id,image_url,image_path,published_at,expires_at,created_at,origin_lat,origin_lng,group_id,character_id,series_name&user_id=eq.00000000-0000-0000-0000-000000000001&status=eq.published&order=published_at.desc.nullslast,created_at.desc&limit=42"
+            "https://example.supabase.co/rest/v1/groom_posts?select=id,user_id,image_url,image_path,published_at,expires_at,created_at,origin_lat,origin_lng,group_id,character_id,series_name&user_id=eq.00000000-0000-0000-0000-000000000001&status=in.(published,expired)&order=published_at.desc.nullslast,created_at.desc&limit=42"
         )
 
         let reactionsRequest = try client.makeLoadReactionsRequest(postIDs: [secondPostID, firstPostID])

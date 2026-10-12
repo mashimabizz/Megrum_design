@@ -38,8 +38,22 @@ struct PaymentSettingsEditingState: Equatable, Sendable {
         markEdited()
     }
 
-    mutating func updateText(_ keyPath: WritableKeyPath<PaymentSettingsDraft, String>, value: String) {
-        draft[keyPath: keyPath] = value
+    @discardableResult
+    mutating func appendAccount(_ account: BankReceivingAccount) -> Bool {
+        let added = draft.appendAccount(account)
+        if added {
+            markEdited()
+        }
+        return added
+    }
+
+    mutating func removeAccount(id: UUID) {
+        draft.removeAccount(id: id)
+        markEdited()
+    }
+
+    mutating func updateAccount(_ account: BankReceivingAccount) {
+        draft.updateAccount(account)
         markEdited()
     }
 

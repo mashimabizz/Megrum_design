@@ -53,9 +53,9 @@ struct HomeExchangeSettingsContent: View {
     private var localConditionsSection: some View {
         if draftPreference.acceptsLocal {
             Text("現地交換可能な場所と日程")
-                .font(.subheadline.weight(.black))
+                .font(.system(size: 16, weight: .bold, design: .rounded))
                 .foregroundStyle(MegrumTheme.ink)
-                .padding(.horizontal, 8)
+                .padding(.horizontal, 2)
 
             HomeExchangeSettingsCalendarCard(
                 visibleMonth: $visibleMonth,

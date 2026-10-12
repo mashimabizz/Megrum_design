@@ -12,8 +12,9 @@ final class GroomViewerPresentationTests: XCTestCase {
         // 見た目のオフセットはラバーバンドで実移動より小さくなる。
         XCTAssertLessThan(state.verticalOffset, 160)
         XCTAssertGreaterThan(state.verticalOffset, 0)
-        XCTAssertEqual(state.scale, 1, accuracy: 0.0001)
-        XCTAssertEqual(state.cornerRadius, 0, accuracy: 0.0001)
+        // FB(iter1226.424)：ドラッグ中は縮小も角丸も付けない（純粋な下スライド）。
+        XCTAssertEqual(state.scale, 1)
+        XCTAssertEqual(state.cornerRadius, 0)
         XCTAssertFalse(state.shouldDismiss(for: CGSize(width: 0, height: 130)))
         XCTAssertTrue(state.shouldDismiss(for: CGSize(width: 0, height: 131)))
 
@@ -33,12 +34,11 @@ final class GroomViewerPresentationTests: XCTestCase {
 
         // 横方向は無視され、下方向のみ反映される。
         XCTAssertEqual(state.translation.width, 0, accuracy: 0.0001)
-        // 見た目のオフセットは画面1/10相当（84pt）へラバーバンドで漸近し、超えない。
+        // FB(iter1226.424)：追従量の上限は画面高の約1/10（84pt）。ラバーバンドで漸近し超えない。
         XCTAssertLessThan(state.verticalOffset, 84)
         XCTAssertGreaterThan(state.verticalOffset, 70)
-        // 縮小・角丸の演出は無し。
-        XCTAssertEqual(state.scale, 1, accuracy: 0.0001)
-        XCTAssertEqual(state.cornerRadius, 0, accuracy: 0.0001)
+        XCTAssertEqual(state.scale, 1)
+        XCTAssertEqual(state.cornerRadius, 0)
     }
 
     func testRelativeTimeFormatterUsesCompactJapaneseLabels() {
@@ -63,11 +63,11 @@ final class GroomViewerPresentationTests: XCTestCase {
     }
 
     @MainActor
-    func testGroomViewerChromeLayoutKeepsChromeBelowTopObstruction() {
-        // 黒帯はステータスバー実測高（テスト環境ではウィンドウなし=0）と
-        // 渡された safeAreaTop の大きい方。クロームはその 10pt 下から始まる。
+    func testGroomViewerChromeLayoutKeepsChromeNearTop() {
+        // iter1226.454：進捗バー・ユーザー名を画面上部ぎりぎりへ。
+        // クロームはステータスバー実測高（safeAreaTop と window 実測の大きい方）の 6pt 上から始まる。
         XCTAssertEqual(GroomViewerChromeLayout.topObstructionHeight(safeAreaTop: 64), 64, accuracy: 0.0001)
-        XCTAssertEqual(GroomViewerChromeLayout.topPadding(safeAreaTop: 64), 74, accuracy: 0.0001)
-        XCTAssertEqual(GroomViewerChromeLayout.topPadding(safeAreaTop: 88), 98, accuracy: 0.0001)
+        XCTAssertEqual(GroomViewerChromeLayout.topPadding(safeAreaTop: 64), 58, accuracy: 0.0001)
+        XCTAssertEqual(GroomViewerChromeLayout.topPadding(safeAreaTop: 88), 82, accuracy: 0.0001)
     }
 }

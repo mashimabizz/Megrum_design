@@ -64,18 +64,27 @@ enum MeguriAccessPolicy {
         return currentLocation.distance(from: selectedLocation)
     }
 
+    /// FB(iter1226.390): 圏内グルームは無料で閲覧可。圏外グルームは「一度でも自分の1km圏内で
+    /// 自分の推しに一致して遭遇した」もののみ、プレミアム加入で閲覧できる（通知の有無は不問）。
     static func canOpenGroom(
         _ groom: GroomPost,
         currentCoordinate: MegrumLocationCoordinate?,
-        viewerID: UUID?
+        viewerID: UUID?,
+        hasEncountered: Bool = false,
+        subscriptionState: UserSubscriptionState = .free
     ) -> Bool {
         if groom.authorID == viewerID {
             return true
         }
-        guard let distance = distanceMeters(from: currentCoordinate, to: groom) else {
-            return false
+        if let distance = distanceMeters(from: currentCoordinate, to: groom),
+           distance <= groomOpenRadiusMeters {
+            return true
         }
-        return distance <= groomOpenRadiusMeters
+        // 圏外（または現在地未取得）：遭遇済みグルームのみ、プレミアムで閲覧できる。
+        if hasEncountered, subscriptionState.hasMeguriGroomExtendedAccess {
+            return true
+        }
+        return false
     }
 
     static func canOpenBoard(
@@ -88,6 +97,27 @@ enum MeguriAccessPolicy {
             return true
         }
         if subscriptionState.hasMeguriBoardExtendedAccess {
+            return true
+        }
+        guard let distance = distanceMeters(from: currentCoordinate, to: thread) else {
+            return false
+        }
+        return distance <= boardOpenRadiusMeters
+    }
+
+    /// 位置つきチャットルームへの書き込み可否（iter1226.433）。
+    /// プレミアムで圏外を「閲覧」できても、書き込みは作成者か1km圏内のみ。
+    /// 位置なしスレッドは距離制約なし。現在地未取得は判定不能として false
+    ///（呼び出し側が「現在地が必要」の案内を出す）。
+    static func canReplyToBoard(
+        _ thread: BoardThread,
+        currentCoordinate: MegrumLocationCoordinate?,
+        viewerID: UUID?
+    ) -> Bool {
+        if thread.authorID == viewerID {
+            return true
+        }
+        if thread.latitude == nil || thread.longitude == nil {
             return true
         }
         guard let distance = distanceMeters(from: currentCoordinate, to: thread) else {
@@ -112,13 +142,25 @@ enum MeguriAccessPolicy {
     static func groomAccessMessage(
         _ groom: GroomPost,
         currentCoordinate: MegrumLocationCoordinate?,
-        viewerID: UUID?
+        viewerID: UUID?,
+        hasEncountered: Bool = false,
+        subscriptionState: UserSubscriptionState = .free
     ) -> String {
         if groom.authorID == viewerID {
             return ""
         }
         guard let distance = distanceMeters(from: currentCoordinate, to: groom) else {
             return "現在地取得後にグルームを開けます"
+        }
+        if distance <= groomOpenRadiusMeters {
+            return ""
+        }
+        // 圏外：一度でも自分の圏内で推し一致して遭遇したグルームだけ、プレミアムで閲覧できる。
+        if hasEncountered {
+            if subscriptionState.hasMeguriGroomExtendedAccess {
+                return ""
+            }
+            return "圏外のグルームです。一度圏内で出会った推しのグルームはMegrumプレミアムで閲覧できます"
         }
         return "現在地から\(distance.meguriDistanceText)。1km圏外のグルームは見ることができません"
     }

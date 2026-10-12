@@ -9,6 +9,8 @@ struct MeguriCreationLocationPicker: View {
     var currentCoordinate: MegrumLocationCoordinate?
     var isRequestingLocation: Bool
     var preview: MeguriCreationLocationPreview = .pin
+    /// 地図の高さ。全画面ステップでは大きくする。iter1226.392。
+    var mapHeight: CGFloat = 220
     @Binding var selectedCoordinate: MegrumLocationCoordinate?
     var onRequestLocation: () -> Void
     var onOutOfRange: (String) -> Void
@@ -52,7 +54,7 @@ struct MeguriCreationLocationPicker: View {
                     )
                 }
             }
-            .frame(height: 220)
+            .frame(height: mapHeight)
             .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: 20, style: .continuous)

@@ -70,10 +70,29 @@ final class GoodsEditorDraftTests: XCTestCase {
             limit: 4
         )
 
+        // ①同グループ頻度順 → ②他グループ含む自分の使用タグ → ③定番（iter1226.413で3層化）。
         XCTAssertEqual(Array(suggestions.prefix(2)), ["alpha", "zeta"])
         XCTAssertFalse(suggestions.contains("LIVE"))
-        XCTAssertFalse(suggestions.contains("otherOnly"))
+        XCTAssertEqual(suggestions[2], "otherOnly")
         XCTAssertEqual(suggestions.count, 4)
+    }
+
+    func testGoodsEditorTagSuggestionBuilderReturnsOwnUsageWithoutGroup() {
+        let ownerID = UUID()
+        let inventory = [
+            makeGoodsItem(ownerID: ownerID, groupID: UUID(), tagNames: ["会場ガチャ"])
+        ]
+
+        // グループ未選択でも自分の使用タグ＋定番を返す（従来は空だった）。
+        let suggestions = GoodsEditorTagSuggestionBuilder.suggestions(
+            groupID: nil,
+            selectedTags: [],
+            inventory: inventory,
+            wishes: [],
+            limit: 3
+        )
+
+        XCTAssertEqual(suggestions, ["会場ガチャ", "会場限定", "未開封"])
     }
 
     func testGoodsEditorTagSuggestionBuilderUsesFallbackOrderWhenHistoryIsEmpty() {
@@ -97,6 +116,33 @@ final class GoodsEditorDraftTests: XCTestCase {
 
         XCTAssertEqual(state.trimmedTag, "会場限定")
         XCTAssertTrue(state.canApply)
+    }
+
+    func testGoodsBulkTagSheetStateFiltersCandidatesIncrementally() {
+        var state = GoodsBulkTagSheetState()
+        let candidates = ["会場限定", "ラキドロ", "Ready to be 会場ガチャ"]
+
+        XCTAssertEqual(state.filteredCandidates(from: candidates), candidates)
+
+        state.tagDraft = "会場"
+        XCTAssertEqual(state.filteredCandidates(from: candidates), ["会場限定", "Ready to be 会場ガチャ"])
+
+        // 全滅時は全候補に戻す（選び直しやすさ優先）。
+        state.tagDraft = "存在しない名前"
+        XCTAssertEqual(state.filteredCandidates(from: candidates), candidates)
+    }
+
+    func testGoodsBulkTagSheetStateShowsNewSeriesRowOnlyWhenNoExactMatch() {
+        var state = GoodsBulkTagSheetState()
+        let candidates = ["会場限定", "ラキドロ"]
+
+        XCTAssertFalse(state.showsNewSeriesRow(in: candidates))
+
+        state.tagDraft = "会場限定"
+        XCTAssertFalse(state.showsNewSeriesRow(in: candidates))
+
+        state.tagDraft = "会場限定 A賞"
+        XCTAssertTrue(state.showsNewSeriesRow(in: candidates))
     }
 
     func testGoodsBulkTagSheetStateTogglesCandidateIntoDraft() {
@@ -659,27 +705,34 @@ final class GoodsEditorDraftTests: XCTestCase {
         XCTAssertEqual(state.frames.map(\.id), [first.id])
         XCTAssertEqual(state.selectedFrameID, first.id)
 
-        state.showEmptyFrameMessage()
-        XCTAssertEqual(state.message, "切り取り枠を追加してください。")
-
         state.showFailureMessage("画像を読み込めませんでした。")
         XCTAssertEqual(state.message, "画像を読み込めませんでした。")
 
         state.clearFrames()
         XCTAssertFalse(state.canApply)
         XCTAssertNil(state.selectedFrameID)
+
+        state.reset(to: [first, second])
+        XCTAssertEqual(state.frames.map(\.id), [first.id, second.id])
+        XCTAssertEqual(state.selectedFrameID, first.id)
+        XCTAssertNil(state.message)
     }
 
     func testGoodsPhotoCropCanvasDragStateBuildsFrameAndResetsDraft() {
         let displayRect = CGRect(x: 10, y: 20, width: 100, height: 200)
         var state = GoodsPhotoCropCanvasDragState()
 
-        state.update(
-            startLocation: CGPoint(x: -5, y: 10),
-            location: CGPoint(x: 60, y: 120),
+        // 枠の外からの開始 → 新規描画モード
+        let selection = state.begin(
+            at: CGPoint(x: -5, y: 10),
+            frames: [],
+            selectedFrameID: nil,
             in: displayRect
         )
+        XCTAssertNil(selection)
+        XCTAssertEqual(state.mode, .draw)
 
+        XCTAssertNil(state.update(location: CGPoint(x: 60, y: 120), in: displayRect))
         XCTAssertEqual(state.draftRect, CGRect(x: 10, y: 20, width: 50, height: 100))
 
         let frame = state.finish(location: CGPoint(x: 60, y: 120), in: displayRect)
@@ -688,6 +741,7 @@ final class GoodsEditorDraftTests: XCTestCase {
         XCTAssertEqual(frame?.rect.minY ?? -1, 0, accuracy: 0.001)
         XCTAssertEqual(frame?.rect.width ?? -1, 0.5, accuracy: 0.001)
         XCTAssertEqual(frame?.rect.height ?? -1, 0.5, accuracy: 0.001)
+        XCTAssertNil(state.mode)
         XCTAssertNil(state.dragStart)
         XCTAssertNil(state.draftRect)
     }
@@ -696,15 +750,81 @@ final class GoodsEditorDraftTests: XCTestCase {
         let displayRect = CGRect(x: 0, y: 0, width: 100, height: 100)
         var state = GoodsPhotoCropCanvasDragState()
 
-        state.update(
-            startLocation: CGPoint(x: 10, y: 10),
-            location: CGPoint(x: 24, y: 24),
-            in: displayRect
-        )
+        _ = state.begin(at: CGPoint(x: 10, y: 10), frames: [], selectedFrameID: nil, in: displayRect)
+        _ = state.update(location: CGPoint(x: 24, y: 24), in: displayRect)
 
         XCTAssertNil(state.finish(location: CGPoint(x: 24, y: 24), in: displayRect))
+        XCTAssertNil(state.mode)
         XCTAssertNil(state.dragStart)
         XCTAssertNil(state.draftRect)
+    }
+
+    func testGoodsPhotoCropCanvasDragStateMovesFrameInsideBounds() {
+        let displayRect = CGRect(x: 0, y: 0, width: 100, height: 100)
+        let frame = TradingCardCropFrame(rect: CGRect(x: 0.1, y: 0.1, width: 0.4, height: 0.4))
+        var state = GoodsPhotoCropCanvasDragState()
+
+        // 枠内からの開始 → 移動モード＋その枠を選択
+        let selection = state.begin(
+            at: CGPoint(x: 30, y: 30),
+            frames: [frame],
+            selectedFrameID: nil,
+            in: displayRect
+        )
+        XCTAssertEqual(selection, frame.id)
+
+        let update = state.update(location: CGPoint(x: 50, y: 40), in: displayRect)
+        XCTAssertEqual(update?.frameID, frame.id)
+        XCTAssertEqual(update?.rect ?? .zero, CGRect(x: 30, y: 20, width: 40, height: 40))
+
+        // 端を超えるドラッグは表示領域内へクランプされる
+        let clamped = state.update(location: CGPoint(x: 500, y: 500), in: displayRect)
+        XCTAssertEqual(clamped?.rect ?? .zero, CGRect(x: 60, y: 60, width: 40, height: 40))
+
+        XCTAssertNil(state.finish(location: CGPoint(x: 500, y: 500), in: displayRect))
+    }
+
+    func testGoodsPhotoCropCanvasDragStateResizesSelectedFrameFromCorner() {
+        let displayRect = CGRect(x: 0, y: 0, width: 100, height: 100)
+        let frame = TradingCardCropFrame(rect: CGRect(x: 0.2, y: 0.2, width: 0.4, height: 0.4))
+        var state = GoodsPhotoCropCanvasDragState()
+
+        // 選択枠の右下コーナー付近からの開始 → リサイズモード
+        let selection = state.begin(
+            at: CGPoint(x: 60, y: 60),
+            frames: [frame],
+            selectedFrameID: frame.id,
+            in: displayRect
+        )
+        XCTAssertNil(selection)
+        guard case .resize(let frameID, let corner, let originalRect) = state.mode else {
+            XCTFail("Expected resize mode, got \(String(describing: state.mode))")
+            return
+        }
+        XCTAssertEqual(frameID, frame.id)
+        XCTAssertEqual(corner, .bottomTrailing)
+        XCTAssertEqual(originalRect.minX, 20, accuracy: 0.001)
+        XCTAssertEqual(originalRect.minY, 20, accuracy: 0.001)
+        XCTAssertEqual(originalRect.width, 40, accuracy: 0.001)
+        XCTAssertEqual(originalRect.height, 40, accuracy: 0.001)
+
+        let update = state.update(location: CGPoint(x: 90, y: 80), in: displayRect)
+        XCTAssertEqual(update?.rect.minX ?? -1, 20, accuracy: 0.001)
+        XCTAssertEqual(update?.rect.minY ?? -1, 20, accuracy: 0.001)
+        XCTAssertEqual(update?.rect.width ?? -1, 70, accuracy: 0.001)
+        XCTAssertEqual(update?.rect.height ?? -1, 60, accuracy: 0.001)
+
+        // 最小サイズを下回るリサイズは 28pt 辺で止まる
+        let tiny = state.update(location: CGPoint(x: 22, y: 22), in: displayRect)
+        XCTAssertEqual(tiny?.rect.width ?? 0, GoodsPhotoCropCanvasDragState.minFrameSide)
+        XCTAssertEqual(tiny?.rect.height ?? 0, GoodsPhotoCropCanvasDragState.minFrameSide)
+    }
+
+    func testGoodsPhotoCropSheetDetectsEffectivelyFullFrame() {
+        XCTAssertTrue(GoodsPhotoCropSheet.isEffectivelyFullFrame(CGRect(x: 0, y: 0, width: 1, height: 1)))
+        XCTAssertTrue(GoodsPhotoCropSheet.isEffectivelyFullFrame(CGRect(x: 0.01, y: 0.015, width: 0.98, height: 0.98)))
+        XCTAssertFalse(GoodsPhotoCropSheet.isEffectivelyFullFrame(CGRect(x: 0.1, y: 0, width: 0.9, height: 1)))
+        XCTAssertFalse(GoodsPhotoCropSheet.isEffectivelyFullFrame(CGRect(x: 0, y: 0, width: 0.8, height: 1)))
     }
 
     func testTradingCardBulkRecognizerRejectsInvalidImageData() async {

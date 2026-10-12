@@ -6,6 +6,8 @@ struct TradeCardPresentation: Equatable {
     var partnerInitial: String
     var partnerAvatarURL: URL?
     var partnerRatingText: String?
+    var partnerAverageStars: Double?
+    var partnerEvaluationCount: Int?
     var partnerDemographicText: String?
     var updatedText: String
     var readState: TradeCardReadState
@@ -33,6 +35,8 @@ struct TradeCardPresentation: Equatable {
         self.partnerInitial = String(handle.prefix(1)).uppercased()
         self.partnerAvatarURL = partnerProfile?.profile.avatarURL
         self.partnerRatingText = Self.ratingText(for: partnerProfile)
+        self.partnerAverageStars = partnerProfile?.averageStars
+        self.partnerEvaluationCount = partnerProfile.map(\.evaluationCount)
         self.partnerDemographicText = Self.demographicText(for: partnerProfile?.profile)
         let activityAt = lastActivityAt ?? proposal.updatedAt ?? proposal.createdAt
         self.updatedText = Self.relativeTimeText(from: activityAt, now: now)

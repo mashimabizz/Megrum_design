@@ -64,6 +64,7 @@ extension MegrumAppState {
             let nextThreads = try await loadedThreads
             grooms = nextGrooms
             syncLikedGroomIDs(with: nextGrooms)
+            syncViewedGroomIDs(with: nextGrooms)
             threads = nextThreads
             meguriFeedCacheKey = cacheKey
             await loadMeguriProfiles(
@@ -224,16 +225,23 @@ extension MegrumAppState {
 
     public func setBoardThreadReaction(threadID: UUID, reaction: BoardMessageReaction?) async {
         let previousThreads = threads
+        let previousViewportThreads = viewportBoardThreads
         threads = ReplyThreadStateReducer.settingBoardThreadReaction(
             reaction,
             threadID: threadID,
             in: threads
+        )
+        viewportBoardThreads = ReplyThreadStateReducer.settingBoardThreadReaction(
+            reaction,
+            threadID: threadID,
+            in: viewportBoardThreads
         )
         errorMessage = nil
         do {
             try await repository.setBoardThreadReaction(threadID: threadID, reaction: reaction)
         } catch {
             threads = previousThreads
+            viewportBoardThreads = previousViewportThreads
             errorMessage = "リアクションを更新できませんでした"
         }
     }
@@ -380,6 +388,67 @@ extension MegrumAppState {
             errorMessage = "チャットルームを作成できませんでした"
             isCreatingBoardThread = false
             return nil
+        }
+    }
+
+    /// ホームの「近くのチャットルーム」と一覧用。圏外も一覧に出すため拡張アクセスで取得し、
+    /// 開閉はクライアントの MeguriAccessPolicy.canOpenBoard で判定する（無料×圏外はロック表示）。iter1226.421。
+    public func loadHomeNearbyBoardThreads(latitude: Double, longitude: Double) async {
+        let prefecture = MegrumAppStateInputNormalizer.prefecture(viewer?.prefecture)
+        guard let threads = try? await repository.loadBoardThreads(
+            latitude: latitude,
+            longitude: longitude,
+            prefecture: prefecture,
+            scope: .nearby3km,
+            allowsExtendedBoardAccess: true
+        ) else {
+            return
+        }
+        let sorted = threads.sorted { $0.latestActivityAt > $1.latestActivityAt }
+        // iter1226.423：署名URLは取得のたびに変わるため、実質同じ内容なら公開値を触らない
+        //（ホームを開くたびに行が作り直されてサムネイルが更新される問題の防止）。
+        if !Self.homeNearbyBoardContentEquals(homeNearbyBoardThreads, sorted) {
+            homeNearbyBoardThreads = sorted
+        }
+        let previewIDs = Array(sorted.prefix(30).map(\.id))
+        await loadBoardReplyPreviews(threadIDs: previewIDs)
+        await refreshHomeNearbyBoardUnreadCounts(threadIDs: previewIDs)
+    }
+
+    /// FB(iter1226.424)：訪問記録（BoardThreadVisitStore）を基準に未読メッセージ数を計算する。
+    func refreshHomeNearbyBoardUnreadCounts(threadIDs: [UUID]) async {
+        guard let viewerID = viewer?.id, !threadIDs.isEmpty else {
+            return
+        }
+        guard let activity = try? await repository.loadBoardReplyActivity(threadIDs: threadIDs) else {
+            return
+        }
+        var counts: [UUID: Int] = [:]
+        for threadID in threadIDs {
+            counts[threadID] = NearbyBoardUnreadPolicy.unreadCount(
+                replyDates: activity[threadID] ?? [],
+                visitedAt: BoardThreadVisitStore.visitedAt(threadID: threadID, viewerID: viewerID)
+            )
+        }
+        if counts != homeNearbyBoardUnreadCounts {
+            homeNearbyBoardUnreadCounts = counts
+        }
+    }
+
+    /// 署名つき画像URLなどの揮発値を除いた実内容の比較。
+    static func homeNearbyBoardContentEquals(_ lhs: [BoardThread], _ rhs: [BoardThread]) -> Bool {
+        guard lhs.count == rhs.count else {
+            return false
+        }
+        return zip(lhs, rhs).allSatisfy { a, b in
+            a.id == b.id
+                && a.title == b.title
+                && a.body == b.body
+                && a.seriesName == b.seriesName
+                && a.latestActivityAt == b.latestActivityAt
+                && a.replyCount == b.replyCount
+                && a.status == b.status
+                && (a.imagePaths ?? []) == (b.imagePaths ?? [])
         }
     }
 

@@ -83,27 +83,62 @@ public struct AuthScreen: View {
                         onBack: { setRoute(.signInEmail) },
                         onLogin: { setRoute(.signInEmail) }
                     )
+                case .signUpCode:
+                    AuthCodeEntryScreen(
+                        purpose: .signUp,
+                        email: authState.pendingSignUpCodeEmail ?? inputState.email,
+                        isLoading: authState.isLoading,
+                        feedback: feedbackMessage,
+                        onSubmit: verifySignUpCodeFromButton,
+                        onResend: { resendEmailCodeFromButton(purpose: .signUp) },
+                        onBack: {
+                            authState.cancelPendingEmailCode(purpose: .signUp)
+                            setRoute(.signUpEmail)
+                        }
+                    )
+                case .recoveryCode:
+                    AuthCodeEntryScreen(
+                        purpose: .recovery,
+                        email: authState.pendingRecoveryCodeEmail ?? inputState.passwordResetEmail,
+                        isLoading: authState.isLoading,
+                        feedback: passwordResetFeedbackMessage,
+                        onSubmit: verifyRecoveryCodeFromButton,
+                        onResend: { resendEmailCodeFromButton(purpose: .recovery) },
+                        onBack: {
+                            authState.cancelPendingEmailCode(purpose: .recovery)
+                            setRoute(.passwordReset)
+                        }
+                    )
+                case .newPassword:
+                    AuthNewPasswordScreen(
+                        password: $inputState.password,
+                        isLoading: authState.isLoading,
+                        feedback: passwordResetFeedbackMessage,
+                        onSubmit: completeNewPasswordFromButton,
+                        onBack: {
+                            authState.cancelPendingEmailCode(purpose: .recovery)
+                            setRoute(.passwordReset)
+                        }
+                    )
                 }
             }
-            .background(MegrumTheme.canvas.ignoresSafeArea())
             .scrollDismissesKeyboard(.interactively)
+            // ステータスバー領域まで同一グラデで塗る（iter1226.420）。個別画面側の背景指定は撤去済み。
             .background(
-                MegrumTheme.canvas
-                    .ignoresSafeArea()
-                    .onTapGesture {
-                        focusedField = nil
-                    }
-            )
-            #if os(iOS)
-            .toolbar {
-                ToolbarItemGroup(placement: .keyboard) {
-                    Spacer()
-                    Button("閉じる") {
-                        focusedField = nil
-                    }
+                ZStack {
+                    MegrumTheme.canvas
+                    RadialGradient(
+                        colors: [MegrumTheme.lavender.opacity(0.15), .clear],
+                        center: .top,
+                        startRadius: 40,
+                        endRadius: 430
+                    )
                 }
-            }
-            #endif
+                .ignoresSafeArea()
+                .onTapGesture {
+                    focusedField = nil
+                }
+            )
         }
         .onChange(of: inputState.email) { _, _ in
             clearFeedback()

@@ -7,6 +7,8 @@ struct HomeDiscoverySheetView: View {
     var sheet: HomeDiscoverySheet
     var appState: MegrumAppState?
     var viewerOfferGoods: [HomeMockGoods] = []
+    /// 「他にも交換できそうなもの」用の同じ相手の他候補（primaryのみ。入れ子は付けない）。iter1226.383 / FB6-1。
+    var otherExchangeCandidates: HomeOtherExchangeCandidateGroups = .empty
     var presentationContext: HomeDiscoverySheetPresentationContext = .primary
     /// 「求められているグッズ」画像タップ経由の画面（とその入れ子）でのみ
     /// 推し以外でマッチ を表示する。
@@ -16,6 +18,8 @@ struct HomeDiscoverySheetView: View {
     var onAddExtraProposalSelection: (HomeDiscoveryProposalSelection) -> Void = { _ in }
     var onOpenOwnerProfile: (UUID) -> Void = { _ in }
     var onStartProposal: (HomeDiscoveryProposalSelection) -> Void = { _ in }
+    /// ガイドツアーのデモ用：グッズヒット詳細に選択済み状態を注入する（通常は nil）。
+    var initialGoodsHitSelectionState: HomeListingSheetSelectionState? = nil
     @State private var presentationState = HomeDiscoverySheetPresentationState()
 
     private var sheetIsHavesLookup: Bool {
@@ -30,6 +34,8 @@ struct HomeDiscoverySheetView: View {
             sheet: sheet,
             viewerOfferGoods: viewerOfferGoods,
             addedExtraCandidateIDs: addedExtraCandidateIDs,
+            addedExtraSelections: presentationState.addedExtraSelections,
+            otherExchangeCandidates: otherExchangeCandidates,
             presentationContext: presentationContext,
             allowsNonOshiOfferSection: allowsNonOshiOfferSection || sheetIsHavesLookup,
             copyingWishGoodsID: presentationState.copyingWishGoodsID,
@@ -37,7 +43,8 @@ struct HomeDiscoverySheetView: View {
             onOpenOwnerProfile: openOwnerProfile,
             onOpenNestedSheet: { presentationState.showNestedSheet($0) },
             onStartProposal: submitSelection,
-            onCopyToWish: copyGoodsToWish
+            onCopyToWish: copyGoodsToWish,
+            initialGoodsHitSelectionState: initialGoodsHitSelectionState
         )
             .overlay(alignment: .bottom) {
                 if let wishCopyToastMessage = presentationState.wishCopyToastMessage {
@@ -178,6 +185,13 @@ enum HomeDiscoverySheetPresentationContext: Equatable {
     }
 
     var preselectPreferredOffer: Bool {
+        self == .primary
+    }
+
+    /// 交換内容プレビュー（HomeProposalStartConfirmationSheet）を挟むか。
+    /// 「他にも交換できそうなもの」からの追加（additionalCandidate）は軽い操作なので挟まず、
+    /// 元シートの「交換内容を確認する」で統合プレビューを1回だけ出す（iter1226.404 / FB項目4）。
+    var showsProposalPreview: Bool {
         self == .primary
     }
 }

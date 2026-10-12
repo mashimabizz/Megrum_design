@@ -93,6 +93,7 @@ private struct GridColumnGlyph: View {
 }
 
 struct AddGoodsButton: View {
+    var title: String
     var accessibilityLabel: String
     var accessibilityHint: String
     var action: () -> Void
@@ -101,23 +102,30 @@ struct AddGoodsButton: View {
         Button {
             MegrumHaptics.performButtonTap(action)
         } label: {
-            Image(systemName: "plus")
-                .font(.system(size: 26, weight: .heavy, design: .rounded))
-                .foregroundStyle(.white)
-                .frame(width: 68, height: 68)
-                .background(
-                    LinearGradient(
-                        colors: [MegrumTheme.lavender, MegrumTheme.pink],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    in: Circle()
-                )
-                .overlay {
-                    Circle()
-                        .strokeBorder(.white.opacity(0.65), lineWidth: 1)
-                }
-                .shadow(color: MegrumTheme.ink.opacity(0.16), radius: 18, y: 10)
+            HStack(spacing: 8) {
+                Image(systemName: "plus")
+                    .font(.system(size: 20, weight: .heavy, design: .rounded))
+                Text(title)
+                    .font(.system(size: 15.5, weight: .black, design: .rounded))
+                    .lineLimit(1)
+                    .fixedSize()
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 22)
+            .frame(height: 56)
+            .background(
+                LinearGradient(
+                    colors: [MegrumTheme.lavender, MegrumTheme.pink],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ),
+                in: Capsule(style: .continuous)
+            )
+            .overlay {
+                Capsule(style: .continuous)
+                    .strokeBorder(.white.opacity(0.65), lineWidth: 1)
+            }
+            .shadow(color: MegrumTheme.ink.opacity(0.16), radius: 18, y: 10)
         }
         .buttonStyle(.plain)
         .accessibilityLabel(accessibilityLabel)

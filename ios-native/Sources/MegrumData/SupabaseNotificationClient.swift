@@ -147,6 +147,62 @@ public final class SupabaseNotificationClient: @unchecked Sendable {
         )
     }
 
+    /// FB8-7: 推し(L1)ごとの圏内グルーム通知設定を読む。行が無ければ既定（通知ON・全メンバー）。iter1226.388。
+    public func loadGroomNotifyPrefs(userID: UUID) async throws -> [GroomNotifyPref] {
+        let rows: [GroomNotifyPrefRow] = try await client.fetchRows(
+            from: "user_groom_notify_prefs",
+            select: GroomNotifyPrefRow.select,
+            queryItems: [
+                URLQueryItem(name: "user_id", value: "eq.\(userID.uuidString.lowercased())")
+            ]
+        )
+        return rows.map(\.pref)
+    }
+
+    @discardableResult
+    public func setGroomNotifyPref(
+        userID: UUID,
+        groupID: UUID,
+        enabled: Bool,
+        notifyAllMembers: Bool,
+        memberCharacterIDs: [UUID],
+        updatedAt: Date = .now
+    ) async throws -> GroomNotifyPref {
+        let rows: [GroomNotifyPrefRow] = try await client.upsertRows(
+            into: "user_groom_notify_prefs",
+            values: [
+                GroomNotifyPrefPayload(
+                    userID: userID,
+                    groupID: groupID,
+                    enabled: enabled,
+                    notifyAllMembers: notifyAllMembers,
+                    memberCharacterIds: memberCharacterIDs,
+                    updatedAt: notificationISOTimestamp(updatedAt)
+                )
+            ],
+            select: GroomNotifyPrefRow.select,
+            onConflict: "user_id,group_id"
+        )
+        return rows.first?.pref ?? GroomNotifyPref(
+            groupID: groupID,
+            enabled: enabled,
+            notifyAllMembers: notifyAllMembers,
+            memberCharacterIDs: memberCharacterIDs
+        )
+    }
+
+    /// FB(iter1226.390): 1km圏内で推し一致したグルームを遭遇として記録する（プレミアム圏外閲覧用）。
+    public func recordGroomEncounters(userID: UUID, groomPostIDs: [UUID]) async throws {
+        guard !groomPostIDs.isEmpty else { return }
+        let payloads = groomPostIDs.map { GroomEncounterPayload(userID: userID, groomPostID: $0) }
+        let _: [GroomEncounterRow] = try await client.upsertRows(
+            into: "groom_encounters",
+            values: payloads,
+            select: GroomEncounterRow.select,
+            onConflict: "user_id,groom_post_id"
+        )
+    }
+
     @discardableResult
     public func registerNativePushDevice(
         userID: UUID,
@@ -183,6 +239,12 @@ public final class SupabaseNotificationClient: @unchecked Sendable {
             queryItems: revokeNativePushDeviceQueryItems(userID: userID, deviceToken: deviceToken)
         )
         return rows.first?.id
+    }
+
+    /// 非公開バケット（groom-posts / meguri-board-media）の通知サムネを署名URLへ解決する。
+    /// 閲覧権限が無い・削除済みなどで失敗した場合は nil（サムネなし表示に退化）。iter1226.415。
+    public func resolveThumbnailURL(bucket: String, path: String) async -> URL? {
+        try? await client.createSignedURL(bucket: bucket, path: path)
     }
 
     public static func nativeDeviceTokenString(from data: Data) -> String {

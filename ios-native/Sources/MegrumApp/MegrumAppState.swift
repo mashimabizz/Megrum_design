@@ -5,6 +5,23 @@ import MegrumCore
 @MainActor
 public final class MegrumAppState: ObservableObject {
     @Published public internal(set) var viewer: UserProfile?
+    /// 認証済みユーザーID（`replaceRepository` 経由で受け取る）。オフライン起動時に
+    /// `viewer` がまだ無い状態でも端末キャッシュ（`MegrumOfflineSnapshotStore`）を
+    /// 特定・復元するために保持する（iter1226.464）。
+    public internal(set) var authenticatedUserID: UUID?
+    /// オフラインスナップショット書き込みのデバウンス用。
+    var offlineSnapshotPersistTask: Task<Void, Never>?
+    /// 相手プロフィール辞書の端末保存デバウンス用（iter1226.466）。
+    var profileDirectoryPersistTask: Task<Void, Never>?
+    /// iter1226.465：直近のデータ取得が通信状態の問題（オフライン・電波弱）で失敗し、
+    /// 端末キャッシュ（または空）を表示している状態。ホーム画面でその旨を表示する。
+    /// 取得に成功したら false へ戻す。
+    @Published public internal(set) var isShowingOfflineData = false
+    /// 初回ガイドツアー実行中フラグ。広告・共有プロンプト・位置情報・通知遷移などの
+    /// 割り込みを抑制するために深い階層からも参照する（`setTutorialActive` で更新）。
+    @Published public internal(set) var isTutorialActive = false
+    /// ガイドツアー（めぐり章）で作成コールアウトを出す実演リクエスト（nil で不要）。
+    @Published public internal(set) var tutorialMeguriCalloutRequestID: UUID?
     @Published public internal(set) var inventory: [GoodsItem] = []
     @Published public internal(set) var wishes: [WishItem] = []
     @Published public internal(set) var homeMatchedItems: [GoodsItem] = []
@@ -17,7 +34,14 @@ public final class MegrumAppState: ObservableObject {
     @Published public internal(set) var homeMutualMatchCandidates: [HomeMutualMatchCandidateData] = []
     @Published public internal(set) var listings: [IndividualListing] = []
     @Published public internal(set) var proposals: [TradeProposal] = []
-    @Published public internal(set) var messagesByProposalID: [UUID: [TradeMessage]] = [:]
+    // iter1226.463：取引チャットも端末側に保持する（アプリを閉じても・オフラインでも表示）。
+    @Published public internal(set) var messagesByProposalID: [UUID: [TradeMessage]] = [:] {
+        didSet {
+            persistTradeMessagesToLocalStore()
+        }
+    }
+    /// 端末キャッシュ書き込みのデバウンス用。
+    var tradeMessagePersistTask: Task<Void, Never>?
     /// 自分が評価済みの proposal ID（サーバー基準）。チャット未読込でも
     /// 「評価待ち」タグ・バッジをサーバーの評価状態で判定するために持つ。
     @Published public internal(set) var viewerEvaluatedProposalIDs: Set<UUID> = []
@@ -30,13 +54,36 @@ public final class MegrumAppState: ObservableObject {
     @Published public internal(set) var boardRepliesByThreadID: [UUID: [BoardReply]] = [:]
     /// 地図の吹き出し用：スレッドごとの最新リプライ本文（最大3件・引用行は除去済み）。
     @Published public internal(set) var boardReplyPreviewsByThreadID: [UUID: [String]] = [:]
+    /// ホーム/一覧用の圏内チャットルーム（圏外も含めて取得し、開閉はクライアントで判定）。iter1226.421。
+    @Published public internal(set) var homeNearbyBoardThreads: [BoardThread] = []
+    /// iter1226.424：近くのチャットルームの未読メッセージ件数（訪問記録基準）。
+    @Published public internal(set) var homeNearbyBoardUnreadCounts: [UUID: Int] = [:]
     @Published public internal(set) var groomRepliesByPostID: [UUID: [GroomReply]] = [:]
     @Published public internal(set) var groomReactionsByPostID: [UUID: [GroomReaction]] = [:]
-    @Published public internal(set) var meguriMessages: [MeguriMessage] = []
+    // iter1226.462：テキストのやりとりは端末側にも保持する（開き直しても即表示）。
+    @Published public internal(set) var meguriMessages: [MeguriMessage] = [] {
+        didSet {
+            persistMeguriMessagesToLocalStore()
+        }
+    }
+    /// 端末キャッシュ書き込みのデバウンス用。
+    var meguriMessagePersistTask: Task<Void, Never>?
     @Published public internal(set) var meguriProfile: MeguriProfile?
-    @Published public internal(set) var meguriProfilesByUserID: [UUID: MeguriProfile] = [:]
+    // iter1226.466：相手のめぐりプロフィールも端末保持（オフラインでも一覧の名前・アバターを表示）。
+    @Published public internal(set) var meguriProfilesByUserID: [UUID: MeguriProfile] = [:] {
+        didSet {
+            persistProfileDirectoryToLocalStore()
+        }
+    }
     @Published public internal(set) var grooms: [GroomPost] = []
     @Published public internal(set) var groomMapPosts: [GroomPost] = []
+    /// 地図のパン/ズーム（ビューポート読み込み）で取得したグルームの蓄積（iter1226.433）。
+    /// 通常フィード（置き換え型）の読み込みで消されないよう専用ストアに分離する。
+    @Published public internal(set) var viewportGroomPosts: [GroomPost] = []
+    /// 同上：ビューポート読み込みで取得したチャットルームの蓄積。
+    @Published public internal(set) var viewportBoardThreads: [BoardThread] = []
+    /// 地図ズームアウト時の「おおよその件数」セル（iter1226.434）。
+    @Published public internal(set) var meguriMapDensityCells: [MeguriMapDensityCell] = []
     @Published public internal(set) var ownGroomArchive: [GroomPost] = []
     @Published public internal(set) var viewedGroomIDs: Set<UUID> = []
     @Published public internal(set) var likedGroomIDs: Set<UUID> = []
@@ -47,11 +94,18 @@ public final class MegrumAppState: ObservableObject {
     @Published public internal(set) var userOshiSelections: [UserOshiSelection] = []
     @Published public internal(set) var goodsTypes: [GoodsType] = []
     @Published public internal(set) var searchResults: [SearchResultItem] = []
-    @Published public internal(set) var publicProfilesByUserID: [UUID: PublicUserProfile] = [:]
+    // iter1226.466：相手の公開プロフィールも端末保持（取引一覧・めぐりメッセージ一覧の名前/アバター）。
+    @Published public internal(set) var publicProfilesByUserID: [UUID: PublicUserProfile] = [:] {
+        didSet {
+            persistProfileDirectoryToLocalStore()
+        }
+    }
     @Published public internal(set) var publicTradeGoodsByUserID: [UUID: [GoodsItem]] = [:]
     @Published public internal(set) var publicListingsByUserID: [UUID: [IndividualListing]] = [:]
     /// 他人プロフィールのほしいもの（userIDごと）。
     @Published public internal(set) var publicWishesByUserID: [UUID: [WishItem]] = [:]
+    /// 相手（打診対象）の現地交換カレンダー用：日付キー→会場名。相手のAWから生成。
+    @Published public internal(set) var partnerActivityWindowVenuesByUserID: [UUID: [String: String]] = [:]
     @Published public internal(set) var publicExchangeSettingsByUserID: [UUID: HomeDefaultExchangeSettings] = [:]
     @Published public internal(set) var userEvaluationsByUserID: [UUID: [UserEvaluation]] = [:]
     @Published public internal(set) var groomLikeCountByUserID: [UUID: Int] = [:]
@@ -63,6 +117,8 @@ public final class MegrumAppState: ObservableObject {
     @Published public internal(set) var blockedUsers: [BlockedUser] = []
     @Published public internal(set) var blockedContentUserIDs: Set<UUID> = []
     @Published public internal(set) var notifications: [MegrumNotification] = []
+    /// 通知の右端サムネの表示URL（非公開バケットは署名URLへ解決済み）。iter1226.415。
+    @Published public internal(set) var notificationThumbnailURLByID: [UUID: URL] = [:]
     @Published public internal(set) var pushNotificationsEnabled = true
     @Published public internal(set) var groomActivityPushNotificationsEnabled = true
     @Published public internal(set) var chatroomActivityPushNotificationsEnabled = true
@@ -70,6 +126,14 @@ public final class MegrumAppState: ObservableObject {
     @Published public internal(set) var groomNearbyPushNotificationsEnabled = false
     @Published public internal(set) var chatroomOshiPushNotificationsEnabled = false
     @Published public internal(set) var chatroomNearbyPushNotificationsEnabled = false
+    /// FB8-7: 推し(L1)ごとの圏内グルーム通知設定。groupID -> 設定。未収載は既定（ON・全メンバー）。iter1226.388。
+    @Published public internal(set) var groomNotifyPrefsByGroupID: [UUID: GroomNotifyPref] = [:]
+    /// 通知設定を一度でも読み込んだか（近接検知で毎回読まないためのガード）。iter1226.390。
+    @Published public internal(set) var hasLoadedGroomNotifyPrefs = false
+    /// FB(iter1226.390): 近接検知でこのセッション中に既に通知/遭遇処理したグルームID（連続発火の抑制）。
+    @Published public internal(set) var processedProximityGroomIDs: Set<UUID> = []
+    /// FB(iter1226.392): 出会った(遭遇済み)グルーム。ホーム列で近くに無くても表示する（無料はロック）。
+    @Published public internal(set) var encounteredGrooms: [GroomPost] = []
     @Published public internal(set) var isLoading = false
     @Published public internal(set) var isLoadingOshiGroups = false
     @Published public internal(set) var isLoadingOshiCharacters = false
@@ -91,6 +155,7 @@ public final class MegrumAppState: ObservableObject {
     @Published public internal(set) var isLoadingMeguri = false
     /// めぐり地図のビューポート追加読み込み中（地図中央下の「読み込み中…」表示用）。
     @Published public internal(set) var isLoadingMeguriViewport = false
+    @Published public internal(set) var isLoadingMeguriMapDensity = false
     @Published public internal(set) var isLoadingMeguriProfile = false
     @Published public internal(set) var isSavingMeguriProfile = false
     @Published public internal(set) var isLoadingGroomMap = false
@@ -114,6 +179,10 @@ public final class MegrumAppState: ObservableObject {
     @Published public internal(set) var submittingEvaluationProposalID: UUID?
     @Published public internal(set) var filingDisputeProposalID: UUID?
     @Published public internal(set) var isCreatingGroomPost = false
+    /// iter1226.422：ホーム経由のバックグラウンド投稿開始をホーム画面（活性化アニメ予約）へ伝えるシグナル。
+    @Published public internal(set) var homeGroomActivationExpectationSignal = 0
+    /// iter1226.422：ユーザーID重複時の代替候補（アカウントセットアップの保存前チェックで供給）。
+    @Published public internal(set) var accountSetupHandleSuggestions: [String] = []
     @Published public internal(set) var isCreatingBoardThread = false
     @Published public internal(set) var deletingGroomPostID: UUID?
     @Published public internal(set) var reportingGroomPostID: UUID?
@@ -262,6 +331,22 @@ public final class MegrumAppState: ObservableObject {
         errorMessage = nil
     }
 
+    /// 初回ガイドツアーの実行状態を更新する。割り込み抑制の可否をこのフラグで判定する。
+    /// めぐり章のサンプルピンは MeguriScreen 側が表示レイヤで注入する（実データは触らない）。
+    public func setTutorialActive(_ isActive: Bool) {
+        guard isTutorialActive != isActive else { return }
+        isTutorialActive = isActive
+        if !isActive {
+            tutorialMeguriCalloutRequestID = nil
+        }
+    }
+
+    /// ガイドツアー（めぐり章）の実演：地図中心付近に作成コールアウトを出すリクエスト。
+    /// MeguriScreen が onChange で拾い、実物のコールアウト表示処理を呼ぶ。
+    public func requestTutorialMeguriCallout() {
+        tutorialMeguriCalloutRequestID = UUID()
+    }
+
     public func evidencePhotos(for proposal: TradeProposal) -> [TradeEvidencePhoto] {
         TradeEvidencePhotoStateReducer.photos(
             for: proposal,
@@ -351,6 +436,15 @@ public final class MegrumAppState: ObservableObject {
         isLoading = true
         errorMessage = nil
 
+        // iter1226.464：ネットワーク取得の前に端末キャッシュから一覧を即復元する。
+        // オフライン起動でもここで viewer / proposals / めぐりメッセージ一覧が揃うため、
+        // 取引チャット・めぐりメッセージの「一覧ごと」オフライン閲覧ができる。
+        // オンライン時はこの後の取得で最新に置き換わる。
+        restoreOfflineSnapshotIfAvailable()
+        // iter1226.466：一覧の相手情報（名前・アバター）もオフラインで出せるよう、
+        // セッションを跨いで蓄積した相手プロフィール辞書を復元する。
+        restoreProfileDirectoryIfAvailable()
+
         do {
             // 評価済みIDはスナップショットと並行で取得し、proposals を公開する前に
             // 反映する。後から反映するとやりとりバッジが「開いた直後だけ多い→減る」
@@ -370,11 +464,23 @@ public final class MegrumAppState: ObservableObject {
             await loadMeguriMessages(reportsFailure: false)
             await preloadTradeMessages()
             await preloadTradeEvidencePhotos()
+            // iter1226.464：取得できた最新スナップショットを端末へ保存し、次回オフライン
+            // 起動時に一覧を復元できるようにする（相手プロフィール辞書も含めて保存）。
+            persistOfflineSnapshot(snapshot)
+            // iter1226.465：最新取得に成功したのでオフライン表示は解除。
+            isShowingOfflineData = false
         } catch {
             #if DEBUG
             print("MEGRUM_DEBUG_SNAPSHOT error: \(error)")
             #endif
-            errorMessage = "データを読み込めませんでした"
+            // iter1226.465：通信状態の問題ならホームで「オフライン表示中」を出す。
+            isShowingOfflineData = NetworkErrorClassifier.isConnectivityError(error)
+            // オフライン等で最新取得に失敗しても、端末キャッシュを復元済み（viewer あり）なら
+            // 一覧はそのまま見られる（めぐりメッセージ一覧は restoreOfflineSnapshotIfAvailable
+            // で復元済み）。致命的エラー表示は「見せられる中身が何も無い」時だけ。
+            if viewer == nil {
+                errorMessage = "データを読み込めませんでした"
+            }
         }
 
         isLoading = false
@@ -402,8 +508,14 @@ public final class MegrumAppState: ObservableObject {
             await loadMeguriMessages(reportsFailure: false)
             await preloadTradeMessages()
             await preloadTradeEvidencePhotos()
+            isShowingOfflineData = false
         } catch {
-            errorMessage = "ホームを更新できませんでした"
+            // iter1226.465：更新失敗が通信状態の問題ならオフライン表示、それ以外は従来のエラー。
+            if NetworkErrorClassifier.isConnectivityError(error) {
+                isShowingOfflineData = true
+            } else {
+                errorMessage = "ホームを更新できませんでした"
+            }
         }
     }
 
@@ -436,9 +548,13 @@ public final class MegrumAppState: ObservableObject {
 
     public func replaceRepository(
         _ repository: any MegrumRepository,
+        authenticatedUserID: UUID? = nil,
         reloadsInitialData: Bool = true
     ) async {
         self.repository = repository
+        if let authenticatedUserID {
+            self.authenticatedUserID = authenticatedUserID
+        }
         guard reloadsInitialData else {
             return
         }
@@ -467,6 +583,88 @@ public final class MegrumAppState: ObservableObject {
         likedGroomIDs = state.likedGroomIDs
         threads = state.threads
         subscriptionState = state.subscriptionState
+    }
+
+    /// iter1226.464：オフライン起動時などで `viewer` がまだ無い時に、端末に保存した
+    /// アプリ全体スナップショットを復元して一覧を即表示する。オンライン時は直後の
+    /// ネットワーク取得で最新に置き換わるため、ここでの復元は「初期表示」の役割。
+    func restoreOfflineSnapshotIfAvailable() {
+        // すでに中身がある（再同期など）なら、キャッシュで上書きしない。
+        guard viewer == nil else {
+            return
+        }
+        guard let userID = authenticatedUserID,
+              let payload = MegrumOfflineSnapshotStore.load(userID: userID)
+        else {
+            return
+        }
+        apply(payload.snapshot)
+        // 一覧の表示名・アバターに使う相手プロフィール辞書も復元する。
+        publicProfilesByUserID.merge(payload.publicProfiles) { _, cached in cached }
+        meguriProfilesByUserID.merge(payload.meguriProfiles) { _, cached in cached }
+        // めぐりメッセージ一覧（テキストのやりとり）は別ストアから復元する。
+        if meguriMessages.isEmpty {
+            let cached = MeguriMessageLocalStore.load(viewerID: userID)
+            if !cached.isEmpty {
+                meguriMessages = cached
+            }
+        }
+    }
+
+    /// iter1226.464：取得できた最新スナップショットを端末へ保存する（次回オフライン起動用）。
+    func persistOfflineSnapshot(_ snapshot: MegrumAppSnapshot) {
+        let userID = snapshot.viewer.id
+        authenticatedUserID = userID
+        let payload = MegrumOfflineSnapshotStore.Payload(
+            snapshot: snapshot,
+            publicProfiles: publicProfilesByUserID,
+            meguriProfiles: meguriProfilesByUserID
+        )
+        offlineSnapshotPersistTask?.cancel()
+        offlineSnapshotPersistTask = Task.detached(priority: .utility) {
+            try? await Task.sleep(nanoseconds: 400_000_000)
+            guard !Task.isCancelled else {
+                return
+            }
+            MegrumOfflineSnapshotStore.save(payload, userID: userID)
+        }
+    }
+
+    /// iter1226.466：セッション中に読み込んだ相手プロフィール辞書を端末へ保存する。
+    /// 取引一覧・めぐりメッセージ一覧を開いた時に遅延ロードされる相手情報も、
+    /// これで次回オフライン起動時に表示できる。didSet からデバウンス呼び出し。
+    func persistProfileDirectoryToLocalStore() {
+        guard let userID = authenticatedUserID else {
+            return
+        }
+        let payload = ProfileDirectoryLocalStore.Payload(
+            publicProfiles: publicProfilesByUserID,
+            meguriProfiles: meguriProfilesByUserID
+        )
+        profileDirectoryPersistTask?.cancel()
+        profileDirectoryPersistTask = Task.detached(priority: .utility) {
+            try? await Task.sleep(nanoseconds: 500_000_000)
+            guard !Task.isCancelled else {
+                return
+            }
+            ProfileDirectoryLocalStore.save(payload, userID: userID)
+        }
+    }
+
+    /// iter1226.466：端末に保存済みの相手プロフィール辞書を復元する（起動時）。
+    /// 既存（今セッションで取得済み）の値は上書きせず、欠けている相手だけ補完する。
+    func restoreProfileDirectoryIfAvailable() {
+        guard let userID = authenticatedUserID,
+              let payload = ProfileDirectoryLocalStore.load(userID: userID)
+        else {
+            return
+        }
+        if !payload.publicProfiles.isEmpty {
+            publicProfilesByUserID.merge(payload.publicProfiles) { existing, _ in existing }
+        }
+        if !payload.meguriProfiles.isEmpty {
+            meguriProfilesByUserID.merge(payload.meguriProfiles) { existing, _ in existing }
+        }
     }
 
     private func applyHomeCandidateSections(_ sections: HomeCandidateSections, fallbackInventory: [GoodsItem]) {

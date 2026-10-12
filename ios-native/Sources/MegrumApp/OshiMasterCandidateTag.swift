@@ -12,7 +12,7 @@ struct OshiMasterCandidateTag: View {
             MegrumHaptics.performSelectionChanged(action)
         } label: {
             Text(title)
-                .font(.system(size: 14.5, weight: .black, design: .rounded))
+                .font(.system(size: 14.5, weight: .semibold, design: .rounded))
                 .lineLimit(1)
                 .minimumScaleFactor(0.76)
                 .foregroundStyle(foregroundStyle)
@@ -45,9 +45,10 @@ struct OshiMasterCandidateTag: View {
         return AnyShapeStyle(MegrumTheme.ink)
     }
 
+    // 選択＝共通グラデ塗り（iter1226.416）。登録済みロックは淡いラベンダーのまま。
     private var backgroundStyle: AnyShapeStyle {
         if isSelected, !isLocked {
-            return AnyShapeStyle(MegrumTheme.lavender)
+            return AnyShapeStyle(MegrumTheme.primaryGradient)
         }
         if isSelected {
             return AnyShapeStyle(MegrumTheme.lavender.opacity(0.10))
@@ -56,6 +57,9 @@ struct OshiMasterCandidateTag: View {
     }
 
     private var borderStyle: Color {
-        isSelected ? MegrumTheme.lavender.opacity(isLocked ? 0.34 : 0.8) : .black.opacity(0.08)
+        if isSelected {
+            return isLocked ? MegrumTheme.lavender.opacity(0.34) : .clear
+        }
+        return .black.opacity(0.08)
     }
 }

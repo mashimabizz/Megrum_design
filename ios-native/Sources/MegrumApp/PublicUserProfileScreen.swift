@@ -100,6 +100,7 @@ struct PublicUserProfileScreen: View {
             await appState.loadPublicUserProfile(userID: userID)
             await appState.loadPublicExchangeContent(userID: userID)
             await appState.loadPublicExchangeSettings(userID: userID)
+            await appState.loadPartnerActivityWindows(userID: userID)
             await appState.loadUserEvaluations(userID: userID)
             await appState.loadGroomLikeCount(userID: userID)
             if appState.oshiGroups.isEmpty {
@@ -113,6 +114,10 @@ struct PublicUserProfileScreen: View {
                presentationState.proposalTargetItem == nil {
                 startPrimaryProposal()
             }
+            // VisualQA：相手の交換条件カレンダーをタップ操作なしで検証する。
+            if ProcessInfo.processInfo.environment["MEGRUM_VISUAL_QA_OPEN_EXCHANGE_CONDITIONS"] != nil {
+                presentationState.isExchangeConditionsPresented = true
+            }
         }
         .sheet(isPresented: $presentationState.isEvaluationListPresented) {
             UserEvaluationListSheet(
@@ -123,14 +128,10 @@ struct PublicUserProfileScreen: View {
             .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: $presentationState.isExchangeConditionsPresented) {
-            NavigationStack {
-                PublicExchangeConditionsScreen(
-                    displayName: displayedPublicProfile?.profile.displayName ?? "相手",
-                    settings: appState.publicExchangeSettingsByUserID[userID],
-                    listings: listings,
-                    profile: displayedPublicProfile?.profile
-                )
-            }
+            // 公開設定は廃止（全員一律閲覧）。打診フローの「＞」と同じ交換条件カレンダーを出す。
+            HomePartnerExchangeCalendarSheet(context: partnerExchangeCalendarContext)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
         }
         // プロフィールは呼び出し元の NavigationStack 内に置かれるため、スライドオーバーレイを
         // ネストするとセーフエリアが失われる（ヘッダーがステータスバーに被る）。

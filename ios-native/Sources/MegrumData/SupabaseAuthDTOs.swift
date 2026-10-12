@@ -14,6 +14,24 @@ struct RefreshTokenPayload: Encodable {
     }
 }
 
+/// メール確認コード（OTP）検証。type は signup / recovery。iter1226.418。
+struct VerifyEmailOTPPayload: Encodable {
+    let email: String
+    let token: String
+    let type: String
+}
+
+/// ログイン済みユーザーのパスワード更新（PUT /auth/v1/user）。iter1226.418。
+struct UpdatePasswordPayload: Encodable {
+    let password: String
+}
+
+/// 確認コードの再送（POST /auth/v1/resend）。iter1226.418。
+struct ResendEmailPayload: Encodable {
+    let email: String
+    let type: String
+}
+
 struct PasswordResetPayload: Encodable {
     var email: String
 }
@@ -81,15 +99,23 @@ struct SignUpPendingConfirmationResponse: Decodable {
     var user: UserResponse?
     var accessToken: String?
     var session: SignUpSessionPlaceholder?
+    /// GoTrue の identities。登録済みメールの列挙防止応答では空配列になる（iter1226.420）。
+    var identities: [SignUpIdentityPlaceholder]?
 
     var requiresEmailConfirmation: Bool {
         user != nil && accessToken == nil && session == nil
+    }
+
+    /// 登録済みメールに対する擬似ユーザー応答か（identities が「存在して空」）。
+    var isLikelyExistingUser: Bool {
+        requiresEmailConfirmation && identities?.isEmpty == true
     }
 
     enum CodingKeys: String, CodingKey {
         case user
         case accessToken
         case session
+        case identities
     }
 
     init(from decoder: Decoder) throws {
@@ -98,8 +124,11 @@ struct SignUpPendingConfirmationResponse: Decodable {
         self.user = wrappedUser ?? (try? UserResponse(from: decoder))
         self.accessToken = try container.decodeIfPresent(String.self, forKey: .accessToken)
         self.session = try container.decodeIfPresent(SignUpSessionPlaceholder.self, forKey: .session)
+        self.identities = try? container.decodeIfPresent([SignUpIdentityPlaceholder].self, forKey: .identities)
     }
 }
+
+struct SignUpIdentityPlaceholder: Decodable {}
 
 struct SignUpSessionPlaceholder: Decodable {}
 

@@ -17,11 +17,37 @@ enum MegrumSlidePresentationMetrics {
             removal: .move(edge: .trailing)
         )
     }
+
+    /// iter1226.422：左から出すスライド（ホーム経由グルーム作成）。
+    static var leadingTransition: AnyTransition {
+        .asymmetric(
+            insertion: .move(edge: .leading),
+            removal: .move(edge: .leading)
+        )
+    }
+
+    static func transition(for edge: MegrumSlidePresentationEdge) -> AnyTransition {
+        switch edge {
+        case .trailing:
+            trailingTransition
+        case .leading:
+            leadingTransition
+        }
+    }
+}
+
+/// スライド表示の出現方向。既存の右から（trailing）に加え、左から（leading）を選べる。
+enum MegrumSlidePresentationEdge: Equatable {
+    case trailing
+    case leading
 }
 
 enum MegrumSlideBackSwipeInteractionScope: Equatable {
     case leadingEdge
     case fullScreen
+    /// iter1226.476：戻るスワイプ無効（明示的な「閉じる」ボタンのみで閉じる）。
+    /// プロフィールなど、横スワイプで誤って閉じたくない画面に使う。
+    case none
 }
 
 enum MegrumSlideBackSwipeResolver {

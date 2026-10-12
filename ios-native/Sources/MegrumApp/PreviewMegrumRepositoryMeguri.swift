@@ -133,6 +133,40 @@ public extension PreviewMegrumRepository {
         }
     }
 
+    func loadMeguriMapDensity(
+        minLatitude: Double,
+        minLongitude: Double,
+        maxLatitude: Double,
+        maxLongitude: Double,
+        cellDegrees: Double
+    ) async throws -> [MeguriMapDensityCell] {
+        // プレビューでは実データ（グルーム＋スレッド）の座標からセル集計を組み立てる。
+        var counts: [String: (lat: Double, lng: Double, grooms: Int, threads: Int)] = [:]
+        func add(latitude: Double?, longitude: Double?, isGroom: Bool) {
+            guard let latitude, let longitude,
+                  latitude >= minLatitude, latitude <= maxLatitude,
+                  longitude >= minLongitude, longitude <= maxLongitude
+            else {
+                return
+            }
+            let cy = (latitude / cellDegrees).rounded(.down)
+            let cx = (longitude / cellDegrees).rounded(.down)
+            let key = "\(cy):\(cx)"
+            var entry = counts[key] ?? ((cy + 0.5) * cellDegrees, (cx + 0.5) * cellDegrees, 0, 0)
+            if isGroom {
+                entry.grooms += 1
+            } else {
+                entry.threads += 1
+            }
+            counts[key] = entry
+        }
+        NativePreviewData.grooms.forEach { add(latitude: $0.latitude, longitude: $0.longitude, isGroom: true) }
+        NativePreviewData.threads.forEach { add(latitude: $0.latitude, longitude: $0.longitude, isGroom: false) }
+        return counts.values.map {
+            MeguriMapDensityCell(latitude: $0.lat, longitude: $0.lng, groomCount: $0.grooms, threadCount: $0.threads)
+        }
+    }
+
     func loadBoardThreads(
         latitude: Double?,
         longitude: Double?,
@@ -150,6 +184,34 @@ public extension PreviewMegrumRepository {
                 return thread.audience == scope
             }
         }
+    }
+
+    /// 本番（Supabase）と同じく最新リプライを先頭にする（iter1226.421）。
+    func loadBoardReplyPreviews(threadIDs: [UUID]) async throws -> [UUID: [String]] {
+        var previews: [UUID: [String]] = [:]
+        for threadID in threadIDs {
+            let bodies = (NativePreviewData.boardReplies[threadID] ?? [])
+                .sorted { $0.createdAt > $1.createdAt }
+                .map(\.body)
+                .filter { !$0.isEmpty }
+            if !bodies.isEmpty {
+                previews[threadID] = Array(bodies.prefix(3))
+            }
+        }
+        return previews
+    }
+
+    func loadBoardReplyActivity(threadIDs: [UUID]) async throws -> [UUID: [Date]] {
+        var activity: [UUID: [Date]] = [:]
+        for threadID in threadIDs {
+            let dates = (NativePreviewData.boardReplies[threadID] ?? [])
+                .map(\.createdAt)
+                .sorted(by: >)
+            if !dates.isEmpty {
+                activity[threadID] = dates
+            }
+        }
+        return activity
     }
 
     func loadBoardReplies(threadID: UUID, latitude: Double?, longitude: Double?, prefecture: String?, scope: BoardThread.Audience) async throws -> [BoardReply] {

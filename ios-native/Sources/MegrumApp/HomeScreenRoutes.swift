@@ -54,6 +54,7 @@ struct HomeProposalRoute: Identifiable, Equatable {
     var initialShippingFee: IndividualListingShippingFeeDraft?
     var initialShippingDays: IndividualListingShippingDaysDraft?
     var initialStep: ProposalCreateStep
+    var initialMessage: String?
 }
 
 enum HomeDiscoveryProposalRouteResolver {
@@ -86,7 +87,8 @@ enum HomeDiscoveryProposalRouteResolver {
             initialCashAmount: selection.cashAmount,
             initialShippingFee: selection.initialShippingFee,
             initialShippingDays: selection.initialShippingDays,
-            initialStep: initialStep(for: selection.exchangeMethod)
+            initialStep: initialStep(for: selection.exchangeMethod),
+            initialMessage: selection.suggestedMessage
         )
     }
 

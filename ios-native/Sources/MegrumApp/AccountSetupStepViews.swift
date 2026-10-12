@@ -62,6 +62,9 @@ struct AccountSetupTextInputStep: View {
     var isHandleField = false
     var footnote: String
     var errorMessage: String?
+    /// iter1226.422：ユーザーID重複時の代替候補チップ（タップで採用）。
+    var suggestions: [String] = []
+    var onSelectSuggestion: (String) -> Void = { _ in }
     var onClearError: () -> Void
 
     var body: some View {
@@ -122,6 +125,31 @@ struct AccountSetupTextInputStep: View {
                 .lineSpacing(4)
 
             AccountSetupErrorText(message: errorMessage)
+
+            if !suggestions.isEmpty {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("使える近いID")
+                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .foregroundStyle(MegrumTheme.muted)
+                    HStack(spacing: 8) {
+                        ForEach(suggestions, id: \.self) { suggestion in
+                            Button {
+                                MegrumHaptics.performSelectionChanged {
+                                    onSelectSuggestion(suggestion)
+                                }
+                            } label: {
+                                Text("@\(suggestion)")
+                                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                                    .foregroundStyle(MegrumTheme.lavender)
+                                    .padding(.horizontal, 13)
+                                    .frame(height: 36)
+                                    .background(MegrumTheme.lavender.opacity(0.12), in: Capsule())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+            }
         }
         .padding(.top, 28)
     }

@@ -10,6 +10,7 @@ public struct SupabaseHomeUserRow: Decodable, Equatable, Sendable, Identifiable 
     public var age: Int?
     public var paymentMethods: [String]
     public var paymentNote: String?
+    public var paymentBankNames: [String]
     public var isTestAccount: Bool?
     public var averageStars: Double?
     public var evaluationCount: Int?
@@ -25,6 +26,7 @@ public struct SupabaseHomeUserRow: Decodable, Equatable, Sendable, Identifiable 
         case age
         case paymentMethods
         case paymentNote
+        case paymentBankNames
         case isTestAccount
         case averageStars
         case evaluationCount
@@ -42,6 +44,7 @@ public struct SupabaseHomeUserRow: Decodable, Equatable, Sendable, Identifiable 
         self.age = try container.decodeIfPresent(Int.self, forKey: .age)
         self.paymentMethods = try container.decodeIfPresent([String].self, forKey: .paymentMethods) ?? []
         self.paymentNote = try container.decodeIfPresent(String.self, forKey: .paymentNote)
+        self.paymentBankNames = try container.decodeIfPresent([String].self, forKey: .paymentBankNames) ?? []
         self.isTestAccount = try container.decodeIfPresent(Bool.self, forKey: .isTestAccount)
         self.averageStars = try container.decodeIfPresent(Double.self, forKey: .averageStars)
         self.evaluationCount = try container.decodeIfPresent(Int.self, forKey: .evaluationCount)
@@ -64,7 +67,7 @@ public struct SupabaseMegrumPlusUserIDRow: Decodable, Equatable, Sendable, Ident
 }
 
 extension SupabaseHomeUserRow {
-    static let select = "id,handle,display_name,primary_area,avatar_url,gender,age,payment_methods,payment_note,is_test_account"
+    static let select = "id,handle,display_name,primary_area,avatar_url,gender,age,payment_methods,payment_note,payment_bank_names,is_test_account"
     static let legacySelect = "id,handle,display_name,primary_area,avatar_url,gender"
 }
 

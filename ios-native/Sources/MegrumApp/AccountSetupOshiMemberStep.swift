@@ -74,13 +74,6 @@ private struct AccountSetupOshiMemberGroupCard: View {
                     .background(MegrumTheme.lavender.opacity(0.12), in: Capsule())
             }
 
-            if let activeGroup {
-                AccountSetupWholeGroupButton(
-                    activeGroup: activeGroup,
-                    isSelected: OnboardingOshiSelectionLogic.isWholeGroupSelected(activeGroup, in: selectedOshiDrafts),
-                    onToggle: toggleWholeGroup
-                )
-            }
 
             if target.pending {
                 AccountSetupPendingOshiRequestCard(
